@@ -7,7 +7,7 @@ import { getAuthToken } from '../../src/auth/gameforgeAuth';
 import { type LearningProject, learningRequestKey } from '../../src/product/gameLearningClient';
 import {
   controlGamePlay, exportGameRecording, getGamePlay, getGameRecording, inputGamePlay, listGamePlays, listGameRecordings, replayGameRecording,
-  startGamePlay, startGameRecording, stopGameRecording, withdrawGameRecording, type GamePlay, type GameRecording,
+  startGamePlay, startGameRecording, stopGameRecording, withdrawGameRecording, type GamePlay, type GameRecording, type GameResourceProfile,
 } from '../../src/product/gamePlayClient';
 import GameLearningFrame from './GameLearningFrame';
 import { saveLearningExport } from './gameLearningFiles';
@@ -45,10 +45,10 @@ function padActions(pad: Gamepad, actions: string[], tool?: string) {
 }
 
 /** Live controls are authenticated input to the canonical runtime, never local gameplay. */
-export default function GamePlayViewport({ project, sourceId, seed, disabled, onRecordingsChange, initialPlay }: {
+export default function GamePlayViewport({ project, sourceId, seed, disabled, onRecordingsChange, initialPlay, resourceProfile }: {
   project: LearningProject; sourceId?: string; seed: number; disabled?: boolean;
   onRecordingsChange?: (recordings: GameRecording[]) => void;
-  initialPlay?: GamePlay | null;
+  initialPlay?: GamePlay | null; resourceProfile?: GameResourceProfile;
 }) {
   const [savedPlays, setSavedPlays] = useState<GamePlay[]>([]);
   const [play, setPlay] = useState<GamePlay | null>(null);
@@ -92,9 +92,7 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
   const accept = useCallback((value: GamePlay, intentional = false) => {
     if (!safe()) return;
     const previous = live.current;
-    if (!previous || previous.play_id !== value.play_id || previous.controller_epoch !== value.controller_epoch) {
-      inputSequence.current = 0; inputQueue.current = []; heldSources.current.clear(); setHeld([]);
-    }
+    if (previous && previous.play_id !== value.play_id && !intentional) return;
     if (previous && previous.play_id === value.play_id) {
       if (!intentional && value.stream_id !== previous.stream_id) { setError('The session changed. Reopen it before sending more controls.'); return; }
       if (!intentional && value.control_version < previous.control_version) return;
@@ -103,9 +101,12 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
       // Reads never grant a new controller lease; preserve only this controller's unchanged epoch.
       if (!value.control_token && value.controller === 'human' && previous.controller === 'human' && value.controller_epoch === previous.controller_epoch) value = { ...value, control_token: previous.control_token };
     }
+    if (!previous || previous.play_id !== value.play_id || previous.controller_epoch !== value.controller_epoch) {
+      inputSequence.current = 0; inputQueue.current = []; heldSources.current.clear(); setHeld([]);
+    }
     live.current = value; setPlay(value); setSavedPlays(current => current.some(item => item.play_id === value.play_id) ? current.map(item => item.play_id === value.play_id ? value : item) : [value, ...current].slice(0, 32));
   }, [safe]);
-  useEffect(() => { if (!initialPlay || initialPlay.project_id !== projectRef.current.project_id || openedPlay.current === initialPlay.play_id || !safe()) return; openedPlay.current = initialPlay.play_id; accept(initialPlay, true); setKeyboard(Platform.OS === 'web' && initialPlay.controller === 'human'); }, [initialPlay, accept, safe]);
+  useEffect(() => { if (!initialPlay || initialPlay.project_id !== projectRef.current.project_id || openedPlay.current === initialPlay.play_id || !safe()) return; openedPlay.current = initialPlay.play_id; if (live.current?.play_id !== initialPlay.play_id) requests.current.forEach(request => request.abort()); accept(initialPlay, true); setKeyboard(Platform.OS === 'web' && initialPlay.controller === 'human'); }, [initialPlay, accept, safe]);
   const stopSound = useCallback(() => {
     audioSources.current.forEach(source => { try { source.stop(); } catch { /* The source already ended. */ } }); audioSources.current.clear();
     audioTime.current = 0; audioCursor.current = 0; audioSession.current = '';
@@ -137,8 +138,9 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
         const event = inputQueue.current.shift()!; const current = live.current;
         if (!current?.control_token || current.controller !== 'human' || current.status !== 'running') { inputQueue.current = []; break; }
         const controller = new AbortController(); requests.current.add(controller);
-        try { const value = await inputGamePlay(current, event.action, event.held, inputSequence.current + 1, { signal: controller.signal }); inputSequence.current++; accept(value); }
+        try { const value = await inputGamePlay(current, event.action, event.held, inputSequence.current + 1, { signal: controller.signal }); if (controller.signal.aborted || !safe() || live.current?.play_id !== current.play_id || live.current.stream_id !== current.stream_id || live.current.controller_epoch !== current.controller_epoch) continue; inputSequence.current++; accept(value); }
         catch (caught) {
+          if (controller.signal.aborted || !safe() || live.current?.play_id !== current.play_id || live.current.stream_id !== current.stream_id || live.current.controller_epoch !== current.controller_epoch) continue;
           inputQueue.current = []; heldSources.current.clear(); if (safe()) { if (live.current) { live.current = { ...live.current, control_token: undefined }; setPlay(live.current); } setHeld([]); setKeyboard(false); setGamepad(false); setError(caught instanceof Error ? caught.message : 'Input could not be delivered.'); }
           break;
         } finally { requests.current.delete(controller); }
@@ -217,9 +219,10 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
   }, [disabled, control]);
   useEffect(() => {
     const leave = () => { release(); setKeyboard(false); setGamepad(false); setSound(false); stopSound(); if (live.current?.status === 'running') control('pause'); };
+    const visibility = () => { if (document.visibilityState === 'hidden') leave(); };
     const subscription = AppState.addEventListener('change', state => { if (state !== 'active') leave(); });
-    if (Platform.OS === 'web') { window.addEventListener('blur', leave); document.addEventListener('visibilitychange', leave); }
-    return () => { subscription.remove(); if (Platform.OS === 'web') { window.removeEventListener('blur', leave); document.removeEventListener('visibilitychange', leave); } };
+    if (Platform.OS === 'web') { window.addEventListener('blur', leave); document.addEventListener('visibilitychange', visibility); }
+    return () => { subscription.remove(); if (Platform.OS === 'web') { window.removeEventListener('blur', leave); document.removeEventListener('visibilitychange', visibility); } };
   }, [control, release, stopSound]);
   useEffect(() => {
     if (Platform.OS !== 'web' || !keyboard) return;
@@ -303,7 +306,9 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     return () => { active = false; };
   }, [play?.latest_frame, play?.stream_id, play?.status, play?.play_id, sound, safe, stopSound]);
   const humanControls = play?.controller === 'human' && !!play.control_token && play.status === 'running' && !busy && !disabled;
+  const playCapacityReady = !!resourceProfile && resourceProfile.available !== false && resourceProfile.max_live_plays > 0;
   const start = (controller: 'human' | 'ai') => { void run(async signal => {
+    if (!playCapacityReady) throw new Error(resourceProfile?.readiness?.message || 'No live play capacity is currently available.');
     const current = projectRef.current; const config = { sourceId, seed, controller, policyId: controller === 'ai' ? current.policy_id || undefined : undefined };
     const fingerprint = JSON.stringify({ projectId: current.project_id, version: current.version, config });
     if (startAttempt.current?.fingerprint !== fingerprint) startAttempt.current = { fingerprint, key: learningRequestKey('play') };
@@ -315,8 +320,9 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     <Text style={s.description}>Play the actual project, or watch its current learned candidate. Use the virtual pad; on the web, enable keyboard input or a connected gamepad.</Text>
     {!!error && <View style={s.alert}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button label="Dismiss" press={() => setError(null)} /></View>}
     {!!savedPlays.length && <><Text style={s.label}>Saved play sessions</Text><View style={s.chips}>{savedPlays.slice(0, 8).map((value, index) => <TouchableOpacity key={value.play_id} accessibilityRole="radio" accessibilityState={{ checked: play?.play_id === value.play_id }} disabled={busy} onPress={() => { release(); setKeyboard(false); setGamepad(false); void run(async signal => { const canonical = await getGamePlay(value.play_id, { signal }); if (!signal.aborted) accept(canonical, true); }); }} style={[s.chip, play?.play_id === value.play_id && s.selected]}><Text style={s.chipText}>Session {index + 1} · {human(value.status)}</Text></TouchableOpacity>)}</View></>}
-    <View style={s.observation}>{play?.latest_frame ? <GameLearningFrame frame={play.latest_frame} /> : <><Ionicons name="game-controller-outline" size={36} color={C.textDim} /><Text style={s.muted}>{play ? 'Waiting for the engine’s first frame.' : 'Start a play session to receive real engine frames.'}</Text></>}</View>
+    {!playCapacityReady && <Text style={s.unavailable}>{resourceProfile?.readiness?.message || 'Waiting for an observed live play resource profile.'}</Text>}<View style={s.observation}>{play?.latest_frame ? <GameLearningFrame frame={play.latest_frame} /> : <><Ionicons name="game-controller-outline" size={36} color={C.textDim} /><Text style={s.muted}>{play ? 'Waiting for the engine’s first frame.' : 'Start a play session to receive real engine frames.'}</Text></>}</View>
     {play && <View style={s.metrics}>{[['Steps', play.steps], ['Reward', play.reward.toLocaleString(undefined, { maximumFractionDigits: 3 })], ['Controller', human(play.controller)]].map(([name, value]) => <View style={s.metric} key={name}><Text style={s.metricValue}>{value}</Text><Text style={s.metricLabel}>{name}</Text></View>)}</View>}
+    {(() => { const native = play?.latest_frame?.native_measurement; if (!native || typeof native !== 'object' || Array.isArray(native)) return null; const evidence = native as Record<string, unknown>; const values = evidence.values; if (!values || typeof values !== 'object' || Array.isArray(values) || !/^[a-f0-9]{64}$/.test(String(evidence.memory_digest)) || !/^[a-f0-9]{64}$/.test(String(evidence.layout_digest))) return null; const labels: Record<string, string> = { player_x: 'Player X', player_y: 'Player Y', health: 'Measured health', won: 'Goal reached', tick: 'Native tick', camera_x: 'Camera X', camera_y: 'Camera Y', graph_phase: 'Animation phase', goal_x: 'Goal X', goal_y: 'Goal Y', goal_visible: 'Goal visible' }; const entries = Object.entries(values as Record<string, unknown>).filter(([key, value]) => labels[key] && typeof value === 'number' && Number.isFinite(value)); return <View style={s.section}><Text accessibilityRole="header" style={s.sectionTitle}>Measured native gameplay</Text><View style={s.metrics}>{entries.map(([key, value]) => <View key={key} style={s.metric}><Text style={s.metricValue}>{key === 'won' || key === 'goal_visible' ? value === 1 ? 'Yes' : 'No' : Number(value).toLocaleString()}</Text><Text style={s.metricLabel}>{labels[key]}</Text></View>)}</View>{typeof evidence.measurement_scope === 'string' && <Text style={s.dim}>{evidence.measurement_scope}</Text>}</View>; })()}
     {!!play?.latest_frame?.hud && <View style={s.metrics}>{Object.entries(play.latest_frame.hud as Record<string, unknown>).filter(([key, value]) => ['health', 'energy', 'coins', 'day', 'season', 'weather', 'fish_caught', 'harvested'].includes(key) && (typeof value === 'number' && Number.isFinite(value) || typeof value === 'string')).map(([key, value]) => <View key={key} style={s.metric}><Text style={s.metricValue}>{typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 1 }) : human(String(value))}</Text><Text style={s.metricLabel}>{human(key)}</Text></View>)}</View>}
     {typeof play?.latest_frame?.dialogue === 'string' && <Text style={s.notice}>{play.latest_frame.dialogue}</Text>}
     {!!connection && <Text accessibilityLiveRegion="polite" style={s.unavailable}>{connection} Held inputs expire when the connection is lost.</Text>}
@@ -326,9 +332,9 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     {play?.source_id && <Text style={s.muted}>Playing source: {project.sources.find(source => source.source_id === play.source_id)?.filename || 'Selected project source'}</Text>}
     {busy && <ActivityIndicator color={C.primaryHover} />}
     <View style={s.chips}>
-      {(!play || ENDED.has(play.status)) ? <>{play?.resume_available && <Button label="Resume saved play" disabled={busy || disabled} press={() => control('resume')} />}{play && <Button label="Reset saved session" disabled={busy || disabled} press={() => control('reset')} />}<Button label="Start playing" primary disabled={busy || disabled} press={() => start('human')} /><Button label="Watch AI play" disabled={busy || disabled || !project.policy_id} press={() => start('ai')} /></> : <>
-        <Button label={play.status === 'paused' || play.status === 'interrupted' ? 'Resume' : 'Pause'} disabled={busy || disabled} press={() => control(play.status === 'paused' || play.status === 'interrupted' ? 'resume' : 'pause')} />
-        <Button label="Reset" disabled={busy || disabled} press={() => control('reset')} />
+      {(!play || ENDED.has(play.status)) ? <>{play?.resume_available && <Button label="Resume saved play" disabled={busy || disabled || !playCapacityReady} press={() => control('resume')} />}{play && <Button label="Reset saved session" disabled={busy || disabled || !playCapacityReady} press={() => control('reset')} />}<Button label="Start playing" primary disabled={busy || disabled || !playCapacityReady} press={() => start('human')} /><Button label="Watch AI play" disabled={busy || disabled || !playCapacityReady || !project.policy_id} press={() => start('ai')} /></> : <>
+        <Button label={play.status === 'paused' || play.status === 'interrupted' ? 'Resume' : 'Pause'} disabled={busy || disabled || !playCapacityReady && (play.status === 'paused' || play.status === 'interrupted')} press={() => control(play.status === 'paused' || play.status === 'interrupted' ? 'resume' : 'pause')} />
+        <Button label="Reset" disabled={busy || disabled || !playCapacityReady} press={() => control('reset')} />
         <Button label="End session" disabled={busy} press={() => control('stop')} />
         {play.controller === 'ai' || !play.control_token ? <Button label="Take control" disabled={busy || disabled} press={() => control('takeover', 'human')} /> : project.policy_id && <Button label="Let AI play" disabled={busy || disabled || !!recording} press={() => control('takeover', 'ai')} />}
       </>}
@@ -369,7 +375,7 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
       {value.status === 'completed' && <Button label="Download recorded demonstration" disabled={busy} press={() => { void run(async signal => { const file = await exportGameRecording(value.recording_id, { signal }); if (!signal.aborted && safe()) await saveLearningExport(file); }); }} />}
       {value.consent && <Button label="Withdraw learning consent" disabled={busy} press={() => setWithdrawal(value.recording_id)} />}
       {withdrawal === value.recording_id && <View style={s.alert}><Text style={s.description}>This demonstration will be blocked from future learning and replay.</Text><View style={s.chips}><Button label="Keep consent" disabled={busy} press={() => setWithdrawal(null)} /><Button label="Withdraw consent" disabled={busy} press={() => { void run(async signal => { await withdrawGameRecording(value, { signal }); if (live.current && live.current.play_id === value.play_id) accept(await getGamePlay(live.current.play_id, { signal })); if (!signal.aborted && safe()) { setWithdrawal(null); if (recording?.recording_id === value.recording_id) setRecording(null); await loadRecordings(signal); } }); }} /></View></View>}
-      <Button label="Replay demonstration" disabled={busy || disabled || !!recording || value.status !== 'completed'} press={() => { release(); void run(async signal => { await serial.current; const current = projectRef.current; const fingerprint = JSON.stringify({ projectId: current.project_id, version: current.version, recordingId: value.recording_id });
+      <Button label="Replay demonstration" disabled={busy || disabled || !playCapacityReady || !!recording || value.status !== 'completed'} press={() => { release(); void run(async signal => { await serial.current; const current = projectRef.current; const fingerprint = JSON.stringify({ projectId: current.project_id, version: current.version, recordingId: value.recording_id });
         if (replayAttempt.current?.fingerprint !== fingerprint) replayAttempt.current = { fingerprint, key: learningRequestKey('replay') };
         const replay = await replayGameRecording(current, value.recording_id, { signal }, replayAttempt.current.key); replayAttempt.current = null; if (!signal.aborted) { accept(replay, true); setKeyboard(false); setGamepad(false); } }); }} />
     </View>)}</View>}

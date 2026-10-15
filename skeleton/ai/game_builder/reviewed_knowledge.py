@@ -5,21 +5,22 @@ the source body, rights declaration and independently reviewed exact-span
 observations. Nothing in this module fetches URLs, learns a user's taste,
 trains a model, executes a build, or promotes a candidate.
 """
+
 from __future__ import annotations
 
-from collections import Counter
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from hashlib import sha256
 import json
-from pathlib import Path
 import re
 import sqlite3
-from typing import Any, Iterable, Mapping
+from collections import Counter
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from hashlib import sha256
+from pathlib import Path
+from typing import Any, Self
 from urllib.parse import urlsplit
 
 from .contracts import canonical_digest, canonical_json
-
 
 SCHEMA = "skeleton.game_builder.reviewed_knowledge.v1"
 BRIEF_SCHEMA = "skeleton.game_builder.reviewed_brief.v1"
@@ -69,15 +70,13 @@ def _integer(value: object, name: str, minimum: int, maximum: int) -> int:
 
 
 def _utc(value: object) -> str:
-    if not isinstance(value, str) or not re.fullmatch(
-        r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", value
-    ):
+    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", value):
         raise KnowledgeError("observation timestamp must be UTC RFC3339 seconds")
     try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(value)
     except ValueError as exc:
         raise KnowledgeError("invalid observation timestamp") from exc
-    if dt.tzinfo != timezone.utc or dt.strftime("%Y-%m-%dT%H:%M:%SZ") != value:
+    if dt.tzinfo != UTC or dt.strftime("%Y-%m-%dT%H:%M:%SZ") != value:
         raise KnowledgeError("noncanonical observation timestamp")
     return value
 
@@ -90,8 +89,12 @@ def _source_url(value: object) -> str:
     except ValueError as exc:
         raise KnowledgeError("invalid source URL") from exc
     if (
-        parsed.scheme != "https" or not parsed.hostname or parsed.username
-        or parsed.password or port not in (None, 443) or parsed.fragment
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or port not in (None, 443)
+        or parsed.fragment
         or any(char.isspace() for char in value)
         or not re.fullmatch(r"[A-Za-z0-9.-]+", parsed.hostname)
     ):
@@ -114,7 +117,8 @@ def _strict_json(raw: str) -> Any:
 
     try:
         return json.loads(
-            raw, object_pairs_hook=pairs,
+            raw,
+            object_pairs_hook=pairs,
             parse_constant=lambda _: (_ for _ in ()).throw(KnowledgeError("nonfinite JSON")),
         )
     except (ValueError, TypeError, UnicodeDecodeError) as exc:
@@ -171,18 +175,30 @@ class ReviewedNote:
             raise KnowledgeError("tags must be unique and sorted")
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any]) -> "ReviewedNote":
+    def from_mapping(cls, data: Mapping[str, Any]) -> ReviewedNote:
         fields = {
-            "note_id", "mechanic", "statement", "start", "end", "stance",
-            "confidence_ppm", "dependence_group", "tags",
+            "note_id",
+            "mechanic",
+            "statement",
+            "start",
+            "end",
+            "stance",
+            "confidence_ppm",
+            "dependence_group",
+            "tags",
         }
         if not isinstance(data, dict) or set(data) != fields or not isinstance(data["tags"], list):
             raise KnowledgeError("invalid reviewed note shape")
         try:
             return cls(
-                data["note_id"], data["mechanic"], data["statement"],
-                data["start"], data["end"], data["stance"],
-                data["confidence_ppm"], data["dependence_group"],
+                data["note_id"],
+                data["mechanic"],
+                data["statement"],
+                data["start"],
+                data["end"],
+                data["stance"],
+                data["confidence_ppm"],
+                data["dependence_group"],
                 tuple(data["tags"]),
             )
         except (TypeError, ValueError) as exc:
@@ -251,10 +267,20 @@ class ReviewedDocument:
             raise KnowledgeError("source body must be valid Unicode") from exc
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any]) -> "ReviewedDocument":
+    def from_mapping(cls, data: Mapping[str, Any]) -> ReviewedDocument:
         fields = {
-            "owner", "source_id", "source_url", "title", "text", "observed_at",
-            "license_id", "allowed_scopes", "reviewer_id", "approved", "notes", "status",
+            "owner",
+            "source_id",
+            "source_url",
+            "title",
+            "text",
+            "observed_at",
+            "license_id",
+            "allowed_scopes",
+            "reviewer_id",
+            "approved",
+            "notes",
+            "status",
         }
         if not isinstance(data, dict) or set(data) != fields:
             raise KnowledgeError("invalid document import shape")
@@ -262,9 +288,16 @@ class ReviewedDocument:
             raise KnowledgeError("document scopes and notes must be lists")
         try:
             return cls(
-                data["owner"], data["source_id"], data["source_url"], data["title"],
-                data["text"], data["observed_at"], data["license_id"],
-                tuple(data["allowed_scopes"]), data["reviewer_id"], data["approved"],
+                data["owner"],
+                data["source_id"],
+                data["source_url"],
+                data["title"],
+                data["text"],
+                data["observed_at"],
+                data["license_id"],
+                tuple(data["allowed_scopes"]),
+                data["reviewer_id"],
+                data["approved"],
                 tuple(ReviewedNote.from_mapping(note) for note in data["notes"]),
                 data["status"],
             )
@@ -284,10 +317,13 @@ class RevisionReceipt:
 
     def to_payload(self) -> dict[str, Any]:
         return {
-            "owner": self.owner, "source_id": self.source_id,
-            "revision": self.revision, "revision_digest": self.revision_digest,
+            "owner": self.owner,
+            "source_id": self.source_id,
+            "revision": self.revision,
+            "revision_digest": self.revision_digest,
             "parent_digest": self.parent_digest,
-            "source_text_digest": self.source_text_digest, "claim_count": self.claim_count,
+            "source_text_digest": self.source_text_digest,
+            "claim_count": self.claim_count,
         }
 
 
@@ -314,10 +350,7 @@ class KnowledgeHit:
     relevance: int
 
     def to_payload(self) -> dict[str, Any]:
-        return {
-            name: getattr(self, name)
-            for name in self.__dataclass_fields__
-        }
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
 
 
 @dataclass(frozen=True, slots=True)
@@ -355,15 +388,22 @@ class ReviewedKnowledgeStore:
     """
 
     def __init__(
-        self, path: str | Path, *,
+        self,
+        path: str | Path,
+        *,
         policy: KnowledgePolicy | None = None,
         read_only: bool = False,
+        source_verifier: Callable[[Mapping[str, Any]], bool] | None = None,
+        existing_only: bool = False,
     ) -> None:
         self.policy = policy or KnowledgePolicy()
         if not isinstance(self.policy, KnowledgePolicy):
             raise KnowledgeError("KnowledgePolicy required")
-        if type(read_only) is not bool:
-            raise KnowledgeError("read_only must be a boolean")
+        if type(read_only) is not bool or type(existing_only) is not bool:
+            raise KnowledgeError("read_only and existing_only must be booleans")
+        if source_verifier is not None and not callable(source_verifier):
+            raise KnowledgeError("source_verifier must be callable")
+        self.source_verifier = source_verifier
         self.read_only = read_only
         if read_only:
             source = Path(path).expanduser()
@@ -371,17 +411,33 @@ class ReviewedKnowledgeStore:
                 raise ValueError("read-only knowledge requires an existing regular SQLite file")
             self.db = sqlite3.connect(
                 source.resolve().as_uri() + "?mode=ro",
-                timeout=10, isolation_level=None, uri=True,
+                timeout=10,
+                isolation_level=None,
+                uri=True,
             )
             self.db.execute("PRAGMA query_only = ON")
+        elif existing_only:
+            source = Path(path).expanduser()
+            if source.is_symlink() or not source.is_file():
+                raise KnowledgeError("existing knowledge requires a regular SQLite file")
+            before = source.stat()
+            self.db = sqlite3.connect(
+                source.resolve().as_uri() + "?mode=rw",
+                timeout=10,
+                isolation_level=None,
+                uri=True,
+            )
+            after = source.stat()
+            if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+                self.db.close()
+                raise KnowledgeError("knowledge file changed during admission")
         else:
             self.db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
         self.db.execute("PRAGMA busy_timeout = 10000")
         self.db.execute("PRAGMA foreign_keys = ON")
         if not read_only:
             self.db.execute("PRAGMA journal_mode = WAL")
-            self.db.execute(
-                """CREATE TABLE IF NOT EXISTS game_builder_knowledge (
+            self.db.execute("""CREATE TABLE IF NOT EXISTS game_builder_knowledge (
                     owner TEXT NOT NULL,
                     source_id TEXT NOT NULL,
                     revision INTEGER NOT NULL,
@@ -389,13 +445,12 @@ class ReviewedKnowledgeStore:
                     payload TEXT NOT NULL,
                     digest TEXT NOT NULL,
                     PRIMARY KEY(owner, source_id, revision)
-                )"""
-            )
+                )""")
 
     def close(self) -> None:
         self.db.close()
 
-    def __enter__(self) -> "ReviewedKnowledgeStore":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -403,10 +458,21 @@ class ReviewedKnowledgeStore:
 
     def _verify_payload(self, body: Any) -> None:
         fields = {
-            "schema", "owner", "source_id", "source_url", "title",
-            "observed_at", "license_id", "allowed_scopes", "reviewer_id",
-            "status", "source_text_digest", "source_chars",
-            "revision", "parent_digest", "notes",
+            "schema",
+            "owner",
+            "source_id",
+            "source_url",
+            "title",
+            "observed_at",
+            "license_id",
+            "allowed_scopes",
+            "reviewer_id",
+            "status",
+            "source_text_digest",
+            "source_chars",
+            "revision",
+            "parent_digest",
+            "notes",
         }
         if not isinstance(body, dict) or set(body) != fields or body["schema"] != SCHEMA:
             raise KnowledgeError("stored knowledge schema mismatch")
@@ -426,8 +492,10 @@ class ReviewedKnowledgeStore:
             raise KnowledgeError("stored rights scopes invalid")
         scopes = body["allowed_scopes"]
         if (
-            not scopes or any(not isinstance(scope, str) for scope in scopes)
-            or set(scopes) - _ALLOWED_SCOPES or scopes != sorted(set(scopes))
+            not scopes
+            or any(not isinstance(scope, str) for scope in scopes)
+            or set(scopes) - _ALLOWED_SCOPES
+            or scopes != sorted(set(scopes))
         ):
             raise KnowledgeError("stored rights scopes invalid")
         if body["status"] not in ("active", "retracted"):
@@ -512,7 +580,7 @@ class ReviewedKnowledgeStore:
             ids.add(note.note_id)
             if note.end > len(document.text):
                 raise KnowledgeError("evidence offset outside source body")
-            quote = document.text[note.start:note.end]
+            quote = document.text[note.start : note.end]
             _text(quote, "evidence quote", self.policy.max_evidence_chars)
             entries.append({"note": note.to_payload(), "exact_quote": quote})
         entries.sort(key=lambda x: x["note"]["note_id"])
@@ -542,9 +610,11 @@ class ReviewedKnowledgeStore:
             if revision >= self.policy.max_revisions_per_owner:
                 raise KnowledgeError("source revision budget exceeded")
             body = {
-                "schema": SCHEMA, "owner": document.owner,
+                "schema": SCHEMA,
+                "owner": document.owner,
                 "source_id": document.source_id,
-                "source_url": document.source_url, "title": document.title,
+                "source_url": document.source_url,
+                "title": document.title,
                 "observed_at": document.observed_at,
                 "license_id": document.license_id,
                 "allowed_scopes": list(document.allowed_scopes),
@@ -552,7 +622,9 @@ class ReviewedKnowledgeStore:
                 "status": document.status,
                 "source_text_digest": sha256(document.text.encode("utf-8")).hexdigest(),
                 "source_chars": len(document.text),
-                "revision": revision, "parent_digest": parent, "notes": entries,
+                "revision": revision,
+                "parent_digest": parent,
+                "notes": entries,
             }
             self._verify_payload(body)
             digest = canonical_digest(body)
@@ -570,8 +642,13 @@ class ReviewedKnowledgeStore:
             self.db.execute("ROLLBACK")
             raise
         return RevisionReceipt(
-            document.owner, document.source_id, revision, digest, parent,
-            body["source_text_digest"], len(entries),
+            document.owner,
+            document.source_id,
+            revision,
+            digest,
+            parent,
+            body["source_text_digest"],
+            len(entries),
         )
 
     def snapshot_root(self, owner: str, *, authorized: bool) -> str:
@@ -579,10 +656,7 @@ class ReviewedKnowledgeStore:
             raise PermissionError("game knowledge inspection requires authorization")
         owner = _id(owner, "owner")
         entries = self._rows(owner)
-        return canonical_digest([
-            [e["source_id"], e["revision"], e["revision_digest"]]
-            for e in entries
-        ])
+        return canonical_digest([[e["source_id"], e["revision"], e["revision_digest"]] for e in entries])
 
     def history(self, owner: str, source_id: str, *, authorized: bool) -> tuple[RevisionReceipt, ...]:
         if not authorized:
@@ -595,19 +669,30 @@ class ReviewedKnowledgeStore:
             WHERE owner=? AND source_id=? ORDER BY revision""",
             (owner, source_id),
         ).fetchall()
-        return tuple(RevisionReceipt(
-            owner, source_id, revision, digest, parent,
-            _strict_json(raw)["source_text_digest"],
-            len(_strict_json(raw)["notes"]),
-        ) for revision, digest, parent, raw in rows)
+        return tuple(
+            RevisionReceipt(
+                owner,
+                source_id,
+                revision,
+                digest,
+                parent,
+                _strict_json(raw)["source_text_digest"],
+                len(_strict_json(raw)["notes"]),
+            )
+            for revision, digest, parent, raw in rows
+        )
 
     def search(
-        self, owner: str, query: str, *,
+        self,
+        owner: str,
+        query: str,
+        *,
         scope: str = "design_reference",
         limit: int = 12,
         min_confidence_ppm: int = 0,
         authorized: bool,
         diversify: bool = True,
+        allowed_revisions: dict[str, str] | None = None,
     ) -> tuple[KnowledgeHit, ...]:
         if not authorized:
             raise PermissionError("game knowledge retrieval requires authorization")
@@ -622,9 +707,30 @@ class ReviewedKnowledgeStore:
         terms = set(_words(query))
         if not terms:
             raise KnowledgeError("query has no searchable terms")
+        if allowed_revisions is not None:
+            if type(allowed_revisions) is not dict or len(allowed_revisions) > 64:
+                raise KnowledgeError("allowed revisions must be a bounded source/digest map")
+            allowed_revisions = {
+                _id(source_id, "allowed source_id"): _digest(revision, "allowed revision_digest")
+                for source_id, revision in allowed_revisions.items()
+            }
+            if not allowed_revisions:
+                return ()
         found: list[KnowledgeHit] = []
         for source in self._rows(owner):
+            if (
+                allowed_revisions is not None
+                and allowed_revisions.get(source["source_id"]) != source["revision_digest"]
+            ):
+                continue
             if source["status"] != "active" or scope not in source["allowed_scopes"]:
+                continue
+            # Captured-source revisions remain unusable unless the embedding
+            # authority checks their exact current owner/consent/revision. Legacy
+            # standalone reviewed documents retain their original semantics.
+            if source["source_id"].startswith("crawler-review:") and (
+                self.source_verifier is None or self.source_verifier(source) is not True
+            ):
                 continue
             for entry in source["notes"]:
                 note = ReviewedNote.from_mapping(entry["note"])
@@ -635,25 +741,42 @@ class ReviewedKnowledgeStore:
                 tag_words = _words(" ".join(note.tags))
                 source_words = _words(source["title"])
                 relevance = sum(
-                    3 * text_words[t] + 6 * mech_words[t]
-                    + 2 * tag_words[t] + source_words[t] for t in terms
+                    3 * text_words[t] + 6 * mech_words[t] + 2 * tag_words[t] + source_words[t] for t in terms
                 )
                 if relevance == 0:
                     continue
-                found.append(KnowledgeHit(
-                    owner, source["source_id"], source["revision"],
-                    source["revision_digest"], source["source_url"],
-                    source["title"], source["source_text_digest"],
-                    source["license_id"], source["observed_at"],
-                    note.note_id, note.mechanic, note.statement,
-                    entry["exact_quote"], note.start, note.end,
-                    note.stance, note.confidence_ppm,
-                    note.dependence_group, relevance,
-                ))
-        found.sort(key=lambda x: (
-            -x.relevance, -x.confidence_ppm,
-            x.source_id, x.revision, x.note_id,
-        ))
+                found.append(
+                    KnowledgeHit(
+                        owner,
+                        source["source_id"],
+                        source["revision"],
+                        source["revision_digest"],
+                        source["source_url"],
+                        source["title"],
+                        source["source_text_digest"],
+                        source["license_id"],
+                        source["observed_at"],
+                        note.note_id,
+                        note.mechanic,
+                        note.statement,
+                        entry["exact_quote"],
+                        note.start,
+                        note.end,
+                        note.stance,
+                        note.confidence_ppm,
+                        note.dependence_group,
+                        relevance,
+                    )
+                )
+        found.sort(
+            key=lambda x: (
+                -x.relevance,
+                -x.confidence_ppm,
+                x.source_id,
+                x.revision,
+                x.note_id,
+            )
+        )
         if not diversify:
             return tuple(found[:limit])
         chosen: list[KnowledgeHit] = []
@@ -669,9 +792,14 @@ class ReviewedKnowledgeStore:
         return tuple(chosen)
 
     def build_brief(
-        self, owner: str, query: str, *,
-        authorized: bool, scope: str = "design_reference",
-        max_hits: int = 12, min_confidence_ppm: int = 0,
+        self,
+        owner: str,
+        query: str,
+        *,
+        authorized: bool,
+        scope: str = "design_reference",
+        max_hits: int = 12,
+        min_confidence_ppm: int = 0,
         min_independent_groups: int = 1,
     ) -> KnowledgeBrief:
         if not authorized:
@@ -679,8 +807,12 @@ class ReviewedKnowledgeStore:
         _integer(max_hits, "max_hits", 1, self.policy.max_brief_hits)
         _integer(min_independent_groups, "min_independent_groups", 1, max_hits)
         hits = self.search(
-            owner, query, scope=scope, limit=max_hits,
-            min_confidence_ppm=min_confidence_ppm, authorized=True,
+            owner,
+            query,
+            scope=scope,
+            limit=max_hits,
+            min_confidence_ppm=min_confidence_ppm,
+            authorized=True,
         )
         groups = len({hit.dependence_group for hit in hits})
         if groups < min_independent_groups:
@@ -688,13 +820,21 @@ class ReviewedKnowledgeStore:
         by_mechanic: dict[str, set[str]] = {}
         for hit in hits:
             by_mechanic.setdefault(hit.mechanic, set()).add(hit.stance)
-        conflicts = tuple(sorted(
-            mechanic for mechanic, stances in by_mechanic.items()
-            if "supports" in stances and "challenges" in stances
-        ))
+        conflicts = tuple(
+            sorted(
+                mechanic
+                for mechanic, stances in by_mechanic.items()
+                if "supports" in stances and "challenges" in stances
+            )
+        )
         return KnowledgeBrief(
-            owner, query, scope, self.snapshot_root(owner, authorized=True),
-            hits, conflicts, groups,
+            owner,
+            query,
+            scope,
+            self.snapshot_root(owner, authorized=True),
+            hits,
+            conflicts,
+            groups,
         )
 
     def require_fresh_brief(self, brief: KnowledgeBrief, *, authorized: bool) -> None:
@@ -706,8 +846,11 @@ class ReviewedKnowledgeStore:
             raise KnowledgeError("knowledge changed; regenerate the design brief")
         # Verify every cited note is still query-retrievable, even after policy changes.
         current = self.search(
-            brief.owner, brief.query, scope=brief.scope,
-            limit=self.policy.max_query_results, authorized=True,
+            brief.owner,
+            brief.query,
+            scope=brief.scope,
+            limit=self.policy.max_query_results,
+            authorized=True,
             diversify=False,
         )
         if not brief.citations or any(hit not in current for hit in brief.citations):
@@ -717,10 +860,13 @@ class ReviewedKnowledgeStore:
         stance_map: dict[str, set[str]] = {}
         for hit in brief.citations:
             stance_map.setdefault(hit.mechanic, set()).add(hit.stance)
-        conflicts = tuple(sorted(
-            mechanic for mechanic, stances in stance_map.items()
-            if "supports" in stances and "challenges" in stances
-        ))
+        conflicts = tuple(
+            sorted(
+                mechanic
+                for mechanic, stances in stance_map.items()
+                if "supports" in stances and "challenges" in stances
+            )
+        )
         if conflicts != brief.conflicts:
             raise KnowledgeError("brief contradiction status was altered")
 
@@ -732,10 +878,18 @@ class ReviewedKnowledgeStore:
         owner = _id(owner, "owner")
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            result = self.db.execute(
-                "DELETE FROM game_builder_knowledge WHERE owner=?", (owner,)
-            )
+            result = self.db.execute("DELETE FROM game_builder_knowledge WHERE owner=?", (owner,))
             count = result.rowcount
+            # These source-review records belong to the same canonical owner
+            # and SQLite authority. Erasure must not leave quoted annotations.
+            tables = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            for table in (
+                "game_builder_captured_source_bindings",
+                "game_builder_source_reviews",
+                "game_builder_source_candidates",
+            ):
+                if table in tables:
+                    self.db.execute("DELETE FROM " + table + " WHERE owner=?", (owner,))
             self.db.execute("COMMIT")
         except Exception:
             self.db.execute("ROLLBACK")
@@ -744,6 +898,12 @@ class ReviewedKnowledgeStore:
 
 
 __all__ = [
-    "KnowledgeError", "KnowledgePolicy", "ReviewedNote", "ReviewedDocument",
-    "RevisionReceipt", "KnowledgeHit", "KnowledgeBrief", "ReviewedKnowledgeStore",
+    "KnowledgeBrief",
+    "KnowledgeError",
+    "KnowledgeHit",
+    "KnowledgePolicy",
+    "ReviewedDocument",
+    "ReviewedKnowledgeStore",
+    "ReviewedNote",
+    "RevisionReceipt",
 ]

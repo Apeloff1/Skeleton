@@ -56,11 +56,14 @@
       "SKELETON_MASTER_SECRET"
     ],
     "optional_env": [
+      "AI_PROVIDER",
+      "AI_MODEL",
+      "AI_LOCAL_MODEL_PATH",
+      "AI_LOCAL_DEPLOYMENT_PATH",
+      "AI_TIMEOUT_SECONDS",
       "OPENAI_API_KEY",
       "EMERGENT_LLM_KEY",
       "STRIPE_API_KEY",
-      "SKELETON_MASTER_SECRET",
-      "GF_SEAL_SECRET",
       "EXPO_PUBLIC_BACKEND_URL",
       "EXPO_PUBLIC_SKELETON_URL",
       "SKELETON_INTERNAL_URL"
@@ -166,6 +169,8 @@
     "skeleton/app/preloader.py",
     "skeleton/app/setup_runtime.py",
     "skeleton/app/installer.py",
+    "skeleton/app/first_install.py",
+    "machine/ai_first_install.json",
     "scripts/install_app.py",
     "skeleton/app/windows_launcher.py",
     "packaging/windows/launcher_entry.py",

@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import ast
-from functools import lru_cache
 import json
 import os
+import posixpath
+import re
 import sys
+from fnmatch import translate as translate_glob
+from functools import lru_cache
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 CONSTRUCTION = ROOT / "machine/ai_app_construction.json"
@@ -204,9 +206,9 @@ def _imported_modules(path: Path) -> list[str]:
         return []
     # The metadata key changes with the source. Return a fresh list so a
     # consumer cannot alter another boundary check's import evidence.
-    return list(_cached_imported_modules(
-        str(path.resolve()), int(metadata.st_mtime_ns), int(metadata.st_size)
-    ))
+    return list(
+        _cached_imported_modules(str(path.resolve()), int(metadata.st_mtime_ns), int(metadata.st_size))
+    )
 
 
 def _provider_sdk_imports(path: Path) -> list[str]:
@@ -278,11 +280,7 @@ def _credential_environment_reads(path: Path) -> list[str]:
                     environ_names.add(alias.asname or alias.name)
 
     def constant_string(node: ast.AST | None) -> str | None:
-        return (
-            node.value
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-            else None
-        )
+        return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
 
     def credential_name(node: ast.AST | None) -> str | None:
         name = constant_string(node)
@@ -301,10 +299,7 @@ def _credential_environment_reads(path: Path) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             func = node.func
-            direct_getenv = (
-                isinstance(func, ast.Name)
-                and func.id in getenv_names
-            )
+            direct_getenv = isinstance(func, ast.Name) and func.id in getenv_names
             module_getenv = (
                 isinstance(func, ast.Attribute)
                 and func.attr == "getenv"
@@ -312,9 +307,7 @@ def _credential_environment_reads(path: Path) -> list[str]:
                 and func.value.id in os_module_names
             )
             environ_get = (
-                isinstance(func, ast.Attribute)
-                and func.attr == "get"
-                and is_environ_value(func.value)
+                isinstance(func, ast.Attribute) and func.attr == "get" and is_environ_value(func.value)
             )
             if (direct_getenv or module_getenv or environ_get) and node.args:
                 name = credential_name(node.args[0])
@@ -326,6 +319,7 @@ def _credential_environment_reads(path: Path) -> list[str]:
                 hits.add(name)
 
     return sorted(hits)
+
 
 @lru_cache(maxsize=65_536)
 def _cached_credential_markers(path_text: str, mtime_ns: int, size: int) -> tuple[str, ...]:
@@ -358,29 +352,22 @@ def _credential_markers(path: Path) -> list[str]:
         metadata = path.stat()
     except OSError:
         return []
-    return list(_cached_credential_markers(
-        str(path.resolve()), int(metadata.st_mtime_ns), int(metadata.st_size)
-    ))
+    return list(
+        _cached_credential_markers(str(path.resolve()), int(metadata.st_mtime_ns), int(metadata.st_size))
+    )
 
 
 def _is_non_runtime_provider_mirror(relative: str) -> bool:
     normalized = relative.replace("\\", "/")
-    return any(
-        normalized.startswith(prefix)
-        for prefix in _NON_RUNTIME_PROVIDER_MIRROR_PREFIXES
-    )
+    return any(normalized.startswith(prefix) for prefix in _NON_RUNTIME_PROVIDER_MIRROR_PREFIXES)
 
 
 def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
     credential_markers = _credential_markers(path)
     sdk_imports = sorted(set(_provider_sdk_imports(path)))
     network_imports = sorted(set(_network_transport_imports(path)))
-    provider_urls = sorted(
-        marker for marker in _PROVIDER_URL_MARKERS if marker in source
-    )
-    client_markers = sorted(
-        marker for marker in _PROVIDER_CLIENT_MARKERS if marker in source
-    )
+    provider_urls = sorted(marker for marker in _PROVIDER_URL_MARKERS if marker in source)
+    client_markers = sorted(marker for marker in _PROVIDER_CLIENT_MARKERS if marker in source)
     return {
         "credential_markers": credential_markers,
         "sdk_imports": sdk_imports,
@@ -388,6 +375,7 @@ def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
         "provider_urls": provider_urls,
         "client_markers": client_markers,
     }
+
 
 def _looks_like_provider_network_surface(
     path: Path,
@@ -469,11 +457,156 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
     }
 
 
+def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
+    """Track actual COPY custody through static named-stage inheritance."""
+    instructions = [
+        " ".join(line.strip().split())
+        for line in docker.replace("\\\n", " ").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    stages, named = [], {}
+    current = None
+    for index, instruction in enumerate(instructions):
+        parts = instruction.split()
+        command = parts[0].upper()
+        if command == "FROM":
+            if current is not None:
+                current["end"] = index
+            base = next((part for part in parts[1:] if not part.startswith("--")), "")
+            parent = named.get(base)
+            name = parts[-1] if len(parts) >= 4 and parts[-2].upper() == "AS" else f"stage-{len(stages)}"
+            current = {
+                "name": name,
+                "base": base,
+                "start": index,
+                "end": len(instructions),
+                "workdir": parent["workdir"] if parent else "/",
+                "copies": list(parent["copies"]) if parent else [],
+            }
+            stages.append(current)
+            named[name] = current
+        elif current is not None and command == "WORKDIR" and len(parts) == 2:
+            value = parts[1]
+            current["workdir"] = (
+                value if value.startswith("/") else current["workdir"].rstrip("/") + "/" + value
+            )
+        elif current is not None and command == "COPY":
+            current["copies"].append((instruction, current["workdir"]))
+    return instructions, stages
+
+
+def _docker_ignore_rule_matches(candidate: str, pattern: str) -> bool:
+    """Conservatively match exclusions, including zero-directory Docker **/."""
+    if "\\" in pattern:
+        # Docker escapes differ from fnmatch. Unsupported exclusions fail closed.
+        return True
+    pattern = posixpath.normpath(pattern)
+    fragments = []
+    for part in pattern.split("**/"):
+        translated = translate_glob(part)
+        if not translated.endswith((r"\Z", r"\z")):
+            # An unknown stdlib translation must not admit a mandatory file.
+            return True
+        fragments.append(translated[:-2])
+    expression = r"(?:.*/)?".join(fragments)
+    # fnmatch's remaining wildcards may match extra separators. That only makes
+    # this mandatory-file exclusion gate stricter; it cannot admit an exclusion.
+    return re.fullmatch(expression, candidate, flags=re.DOTALL) is not None
+
+
+def _bundled_materialization_errors(
+    repo_root: Path,
+    docker_path: str,
+    docker: str,
+    specification: object,
+    required_paths: list[str],
+) -> list[str]:
+    """Validate only declared source-bundle layouts, without relaxing custody."""
+    errors = []
+    if not isinstance(specification, dict):
+        return ["source bundle is not declared in the construction contract"]
+    ignore_path = specification.get("context_ignore")
+    if ignore_path != docker_path + ".dockerignore":
+        return ["source bundle must use its Dockerfile-specific context allowlist"]
+    path = repo_root / ignore_path
+    if not path.is_file():
+        return ["source bundle context allowlist is missing"]
+    rules = [
+        line.strip()
+        for line in path.read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if not rules or rules[0] != "**":
+        return ["source bundle context must begin with deny-all **"]
+    for required in required_paths:
+        exception = "!" + required
+        if exception not in rules:
+            errors.append(f"context does not explicitly admit {required}")
+            continue
+        components = Path(required).parts
+        parents = ["/".join(components[:index]) for index in range(1, len(components))]
+        for parent in parents:
+            if "!" + parent + "/" not in rules:
+                errors.append(f"context does not explicitly admit parent {parent}")
+        last_admission = len(rules) - 1 - rules[::-1].index(exception)
+        for rule in rules[last_admission + 1 :]:
+            if rule.startswith("!"):
+                continue
+            pattern = rule.strip("/")
+            if any(_docker_ignore_rule_matches(candidate, pattern) for candidate in [required, *parents]):
+                errors.append(f"context later excludes mandatory path {required}")
+                break
+    instructions, stages = _docker_materialization_stages(docker)
+    layout = specification.get("layout")
+    if layout == "engine_context_copy" and docker_path == "Dockerfile":
+        if len(stages) != 1 or ("COPY --chown=appuser:appuser . .", "/app") not in stages[-1]["copies"]:
+            errors.append("engine source bundle does not preserve owned /app paths")
+    elif layout == "backend_runtime_source" and docker_path == "backend/Dockerfile":
+        stage = next(
+            (
+                index
+                for index, line in enumerate(instructions)
+                if line.startswith("FROM ") and line.endswith(" AS runtime-source")
+            ),
+            -1,
+        )
+        expected = [
+            "WORKDIR /source",
+            "COPY . .",
+            (
+                "RUN mv backend /runtime && mv skeleton machine docs /runtime/ "
+                "&& test ! -e /runtime/scripts/check_jeeves_training_modules.py "
+                "&& test ! -L /runtime/scripts/check_jeeves_training_modules.py "
+                "&& cp scripts/check_jeeves_training_modules.py /runtime/scripts/check_jeeves_training_modules.py"
+            ),
+        ]
+        if stage < 0 or instructions[stage + 1 : stage + 4] != expected:
+            errors.append("backend source bundle flattening stage is not the declared layout")
+        final_copy = "COPY --from=runtime-source --chown=appuser:appuser /runtime/ ."
+        production = next((item for item in stages if item["name"] == "production"), None)
+        final = stages[-1] if stages else None
+        if (
+            production is None
+            or final is None
+            or final["name"] not in {"production", "development"}
+            or (final["name"] == "development" and final["base"] != "production")
+            or (final_copy, "/app") not in final["copies"]
+            or final_copy not in instructions[production["start"] : production["end"]]
+            or instructions.index(final_copy) <= stage + 3
+        ):
+            errors.append("backend source bundle has no owned final runtime copy")
+    else:
+        errors.append("source bundle layout is unsupported for this runtime image")
+    return errors
+
+
 def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
     errors: list[str] = []
     try:
-        contract = _load() if repo_root == ROOT else json.loads(
-            (repo_root / "machine/ai_app_construction.json").read_text(encoding="utf-8")
+        contract = (
+            _load()
+            if repo_root == ROOT
+            else json.loads((repo_root / "machine/ai_app_construction.json").read_text(encoding="utf-8"))
         )
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         return [str(exc)]
@@ -520,9 +653,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             text = path.read_text(encoding="utf-8", errors="replace")
             for required in must_read:
                 if isinstance(required, str) and required not in text:
-                    errors.append(
-                        f"development provider {provider} is not instructed to read {required}"
-                    )
+                    errors.append(f"development provider {provider} is not instructed to read {required}")
 
     runtime = bootstrap.get("runtime_enforcement")
     if not isinstance(runtime, dict):
@@ -552,9 +683,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             "must_read",
         ):
             if token not in loader:
-                errors.append(
-                    f"shared provider loader does not enforce contract token {token!r}"
-                )
+                errors.append(f"shared provider loader does not enforce contract token {token!r}")
 
     compatibility_loaders = runtime.get("compatibility_loaders", [])
     if not isinstance(compatibility_loaders, list) or not compatibility_loaders:
@@ -587,9 +716,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 errors.append(f"provider compatibility boundary missing: {relative}")
                 continue
             source = path.read_text(encoding="utf-8", errors="replace")
-            credential_hits = sorted(
-                marker for marker in _AI_CREDENTIAL_MARKERS if marker in source
-            )
+            credential_hits = sorted(marker for marker in _AI_CREDENTIAL_MARKERS if marker in source)
             if credential_hits:
                 errors.append(
                     "provider compatibility boundary owns credential markers: "
@@ -607,9 +734,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
         "runtime_model",
         "automation_model",
     }:
-        errors.append(
-            "provider families must declare exactly runtime_model and automation_model"
-        )
+        errors.append("provider families must declare exactly runtime_model and automation_model")
 
     if isinstance(boundary_path, str) and (repo_root / boundary_path).is_file():
         boundary = (repo_root / boundary_path).read_text(encoding="utf-8")
@@ -621,9 +746,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
         )
         for token in required_tokens:
             if token not in boundary:
-                errors.append(
-                    f"provider activation boundary does not enforce architecture token {token!r}"
-                )
+                errors.append(f"provider activation boundary does not enforce architecture token {token!r}")
 
     required_materialized_contracts = (
         "COPY --chown=appuser:appuser machine/manifest.json ./machine/manifest.json",
@@ -645,11 +768,25 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
     ):
         if isinstance(image_path, str) and (repo_root / image_path).is_file():
             docker = (repo_root / image_path).read_text(encoding="utf-8")
-            for token in required_materialized_contracts:
-                if token not in docker:
-                    errors.append(
-                        f"{image_label} does not materialize provider contract: {token}"
-                    )
+            _, stages = _docker_materialization_stages(docker)
+            runtime_copies = stages[-1]["copies"] if stages else []
+            missing = [
+                token for token in required_materialized_contracts if (token, "/app") not in runtime_copies
+            ]
+            if missing:
+                bundles = runtime.get("docker_materialization_bundles", {})
+                specification = bundles.get(image_path) if isinstance(bundles, dict) else None
+                bundle_errors = _bundled_materialization_errors(
+                    repo_root,
+                    image_path,
+                    docker,
+                    specification,
+                    [token.split()[2] for token in required_materialized_contracts],
+                )
+                errors.extend(
+                    f"{image_label} does not materialize provider contracts: {detail}"
+                    for detail in bundle_errors
+                )
 
     for family_key, family_label in (
         ("runtime_model_providers", "runtime"),
@@ -669,9 +806,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 errors.append(f"{family_label} provider id is invalid")
                 continue
             if provider_id in seen:
-                errors.append(
-                    f"duplicate {family_label} provider declaration: {provider_id}"
-                )
+                errors.append(f"duplicate {family_label} provider declaration: {provider_id}")
             seen.add(provider_id)
             for key in (
                 "architecture_read_required",
@@ -679,9 +814,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 "activation_receipt_required",
             ):
                 if item.get(key) is not True:
-                    errors.append(
-                        f"{family_label} provider {provider_id}.{key} must be true"
-                    )
+                    errors.append(f"{family_label} provider {provider_id}.{key} must be true")
 
     surfaces = contract.get("provider_surfaces")
     declared_by_owner: dict[str, dict] = {}
@@ -718,8 +851,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             surface_class = item.get("surface_class")
             if surface_class not in _ALLOWED_SURFACE_CLASSES:
                 errors.append(
-                    f"provider surface {surface_id} has invalid surface_class: "
-                    f"{surface_class!r}"
+                    f"provider surface {surface_id} has invalid surface_class: " f"{surface_class!r}"
                 )
 
             ownership_fields = (
@@ -729,18 +861,13 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             )
             for field in ownership_fields:
                 if not isinstance(item.get(field), bool):
-                    errors.append(
-                        f"provider surface {surface_id}.{field} must be boolean"
-                    )
+                    errors.append(f"provider surface {surface_id}.{field} must be boolean")
 
             expected_edges = item.get("discovery_edge_classes")
             if not isinstance(expected_edges, list) or any(
-                edge not in {"credential", "network_transport", "sdk_client"}
-                for edge in expected_edges
+                edge not in {"credential", "network_transport", "sdk_client"} for edge in expected_edges
             ):
-                errors.append(
-                    f"provider surface {surface_id} discovery_edge_classes are invalid"
-                )
+                errors.append(f"provider surface {surface_id} discovery_edge_classes are invalid")
                 expected_edges = []
 
             if item.get("credential_owner") is True:
@@ -752,20 +879,15 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
 
             if item.get("credential_bearing") is not item.get("credential_owner"):
                 errors.append(
-                    f"provider surface {surface_id} credential_bearing disagrees "
-                    "with credential_owner"
+                    f"provider surface {surface_id} credential_bearing disagrees " "with credential_owner"
                 )
 
             if item.get("credential_owner") is True:
                 if item.get("receipt_required") is not True:
-                    errors.append(
-                        f"credential-bearing provider surface lacks receipt: {surface_id}"
-                    )
+                    errors.append(f"credential-bearing provider surface lacks receipt: {surface_id}")
                 source = path.read_text(encoding="utf-8", errors="replace")
                 if "load_provider_architecture" not in source:
-                    errors.append(
-                        f"credential-bearing provider surface does not load architecture: {owner}"
-                    )
+                    errors.append(f"credential-bearing provider surface does not load architecture: {owner}")
 
     discovered = discover_provider_surfaces(repo_root)
     for owner, signals in sorted(discovered.items()):
@@ -785,10 +907,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             )
         if "credential" in actual and declaration.get("credential_owner") is not True:
             errors.append(f"provider credential edge lacks ownership: {owner}")
-        if (
-            "network_transport" in actual
-            and declaration.get("network_transport_owner") is not True
-        ):
+        if "network_transport" in actual and declaration.get("network_transport_owner") is not True:
             errors.append(f"provider network edge lacks ownership: {owner}")
         if "sdk_client" in actual and declaration.get("sdk_client_owner") is not True:
             errors.append(f"provider SDK edge lacks ownership: {owner}")
@@ -805,9 +924,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
 
     convergence = contract.get("provider_surface_convergence_blueprint")
     isolation_surfaces = (
-        convergence.get("application_isolation_surfaces", [])
-        if isinstance(convergence, dict)
-        else []
+        convergence.get("application_isolation_surfaces", []) if isinstance(convergence, dict) else []
     )
     if not isinstance(isolation_surfaces, list) or not isolation_surfaces:
         errors.append("provider application isolation surfaces are missing")
@@ -822,22 +939,16 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 continue
             path = repo_root / relative
             if not path.is_file():
-                errors.append(
-                    f"provider application isolation surface missing: {relative}"
-                )
+                errors.append(f"provider application isolation surface missing: {relative}")
                 continue
             source = path.read_text(encoding="utf-8", errors="replace")
             required_tokens = item.get("required_tokens")
             if not isinstance(required_tokens, list):
-                errors.append(
-                    f"provider application isolation required_tokens invalid: {relative}"
-                )
+                errors.append(f"provider application isolation required_tokens invalid: {relative}")
                 required_tokens = []
             for token in required_tokens:
                 if not isinstance(token, str) or not token:
-                    errors.append(
-                        f"provider application isolation token invalid: {relative}"
-                    )
+                    errors.append(f"provider application isolation token invalid: {relative}")
                 elif token not in source:
                     errors.append(
                         f"provider application surface lost canonical delegation token: "
@@ -847,8 +958,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             forbidden = item.get("forbidden_edge_classes")
             if not isinstance(forbidden, list):
                 errors.append(
-                    f"provider application isolation forbidden_edge_classes invalid: "
-                    f"{relative}"
+                    f"provider application isolation forbidden_edge_classes invalid: " f"{relative}"
                 )
                 forbidden = []
             signals = _provider_surface_signals(path, source)
@@ -865,7 +975,6 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                     "provider application surface owns forbidden provider edges: "
                     f"{relative}: {', '.join(violations)}"
                 )
-
 
     for root_name in ("backend", "skeleton"):
         source_root = repo_root / root_name
@@ -885,15 +994,13 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 hits = _provider_sdk_imports(path)
                 if hits:
                     errors.append(
-                        "provider SDK bypass outside declared SDK owner: "
-                        f"{relative}: {', '.join(hits)}"
+                        "provider SDK bypass outside declared SDK owner: " f"{relative}: {', '.join(hits)}"
                     )
 
             source = _python_source(path)
             signals = _provider_surface_signals(path, source)
-            if (
-                relative not in network_surface_owners
-                and _looks_like_provider_network_surface(path, source, signals)
+            if relative not in network_surface_owners and _looks_like_provider_network_surface(
+                path, source, signals
             ):
                 errors.append(
                     "provider network bypass outside declared network owner: "
@@ -922,10 +1029,10 @@ def build_provider_surface_evidence(
     """Return a secret-free current-head provider surface receipt."""
 
     try:
-        contract = _load() if repo_root == ROOT else json.loads(
-            (repo_root / "machine/ai_app_construction.json").read_text(
-                encoding="utf-8"
-            )
+        contract = (
+            _load()
+            if repo_root == ROOT
+            else json.loads((repo_root / "machine/ai_app_construction.json").read_text(encoding="utf-8"))
         )
     except (ValueError, OSError, json.JSONDecodeError):
         contract = {}
@@ -942,9 +1049,7 @@ def build_provider_surface_evidence(
                 "credential_owner": item.get("credential_owner"),
                 "network_transport_owner": item.get("network_transport_owner"),
                 "sdk_client_owner": item.get("sdk_client_owner"),
-                "discovery_edge_classes": item.get(
-                    "discovery_edge_classes", []
-                ),
+                "discovery_edge_classes": item.get("discovery_edge_classes", []),
             }
         )
 
@@ -976,9 +1081,7 @@ def build_provider_surface_evidence(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Validate and inventory provider execution surfaces."
-    )
+    parser = argparse.ArgumentParser(description="Validate and inventory provider execution surfaces.")
     parser.add_argument(
         "--evidence-out",
         type=Path,

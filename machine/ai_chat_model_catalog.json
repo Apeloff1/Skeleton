@@ -69,7 +69,8 @@
     "no_model_fabrication": "an unloaded local artifact has no model_id and contributes provider readiness only, never a selectable synthetic model",
     "activation_identity": "existing validated content-only artifact schema/model/digest/byte receipt; no artifact path or weight exposure",
     "handoff": "operator configures existing AI_PROVIDER=local and AI_LOCAL_MODEL_PATH from governed training output and restarts engine; public chat catalog does not accept paths, change provider configuration, hot-load weights or grant production promotion",
-    "neural_conditioning": "bounded full rendered instructions, conversation history, user prompt and assistant role framing prime the native recurrent model; canonical admission counts exact UTF-8 bytes plus BOS"
+    "neural_conditioning": "bounded full rendered instructions, conversation history, user prompt and assistant role framing prime the native recurrent model; canonical admission counts exact UTF-8 bytes plus BOS",
+    "deployment_identity": "Additive skeleton.local_model.deployment.v1 GGUF projection: exact model/artifact SHA, manifest/runtime SHA, runtime_kind llama.cpp-cli, actual stat bytes <=1TiB, local-model-deployment:<manifest_digest>; no paths or weights. Operator AI_LOCAL_DEPLOYMENT_PATH is exclusive alternative to AI_LOCAL_MODEL_PATH."
   },
   "bounds": {
     "providers": 16,

@@ -20,19 +20,23 @@ import { readLearningFile, saveLearningBinary, saveLearningExport } from './game
 import GameLearningFrame from './GameLearningFrame';
 import GamePlayViewport from './GamePlayViewport';
 import GameTrainingInstances from './GameTrainingInstances';
+import GameTrainingPolicyPanel from './GameTrainingPolicyPanel';
 import GameContentUpload from './GameContentUpload';
 import GameConsoleEditor from './GameConsoleEditor';
 import GameSuccessorStudio from './GameSuccessorStudio';
 import GameStudioLearningPanel from './GameStudioLearningPanel';
 import GameCompiledRomPanel from './GameCompiledRomPanel';
+import GameBuildWorkflowPanel from './GameBuildWorkflowPanel';
 import GameStudioAssistantPanel from './GameStudioAssistantPanel';
 import GameStudioReviewPanel from './GameStudioReviewPanel';
-import { getGameResources, listGameRecordings, type GamePlay, type GameRecording, type GameResourceProfile } from '../../src/product/gamePlayClient';
+import GameStudioReadinessPanel from './GameStudioReadinessPanel';
+import { getGamePlay, getGameResources, listGameRecordings, type GamePlay, type GameRecording, type GameResourceProfile } from '../../src/product/gamePlayClient';
 import s, { gameLearningColors as C } from './GameLearningWorkspace.styles';
 
 type Icon = keyof typeof Ionicons.glyphMap;
-type Tab = 'console' | 'successor' | 'editor' | 'sources' | 'observe' | 'learn' | 'build';
+type Tab = 'overview' | 'console' | 'successor' | 'editor' | 'sources' | 'observe' | 'learn' | 'build';
 const TABS: { id: Tab; label: string; icon: Icon }[] = [
+  { id: 'overview', label: 'Studio overview', icon: 'pulse-outline' },
   { id: 'console', label: 'Console studio', icon: 'color-palette-outline' },
   { id: 'successor', label: 'Original successor', icon: 'sparkles-outline' },
   { id: 'editor', label: 'Editor', icon: 'code-slash-outline' },
@@ -152,7 +156,9 @@ export default function GameLearningWorkspace() {
   const [project, setProject] = useState<LearningProject | null>(null);
   const [jobs, setJobs] = useState<Record<string, LearningJob>>({});
   const [initialPlay, setInitialPlay] = useState<GamePlay | null>(null);
-  const [tab, setTab] = useState<Tab>('console'); const [learningPane, setLearningPane] = useState<'assistant' | 'review' | 'campaign' | 'local'>('assistant');
+  const [focusedCampaign, setFocusedCampaign] = useState<string | undefined>();
+  const [focusedGoal, setFocusedGoal] = useState<string | undefined>();
+  const [tab, setTab] = useState<Tab>('overview'); const [learningPane, setLearningPane] = useState<'assistant' | 'review' | 'campaign' | 'local'>('assistant');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -187,6 +193,7 @@ export default function GameLearningWorkspace() {
   const [continueLearning, setContinueLearning] = useState(true);
   const [trainSessions, setTrainSessions] = useState<string[]>([]);
   const [trainWorkers, setTrainWorkers] = useState(1);
+  const [advancedTraining, setAdvancedTraining] = useState(false); const [trainingConfig, setTrainingConfig] = useState({ alpha: '0.25', gamma: '0.95', epsilon: '0.3', epsilonDecay: '0.98', minEpsilon: '0.03', rewardClip: '100', imitationStrength: '1', nStep: '1', evaluationSeeds: '4', minImprovement: '0', maxWorstSeedRegression: '0', executionSeconds: '300' }); const [trainingExploration, setTrainingExploration] = useState<'uniform' | 'least_visited'>('uniform');
   const [resourceProfiles, setResourceProfiles] = useState<GameResourceProfile[]>([]);
   const [resourceProfile, setResourceProfile] = useState('');
   const [demonstrations, setDemonstrations] = useState<GameRecording[]>([]);
@@ -230,6 +237,8 @@ export default function GameLearningWorkspace() {
   const allJobs = Object.values(jobs).filter(job => job.project_id === project?.project_id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const availableAlgorithms = catalogue?.algorithms.filter(value => value.available) || [];
   const runningJobs = allJobs.filter(job => !learningJobTerminal(job));
+  const selectedCompute = resourceProfiles.find(value => value.profile_id === resourceProfile);
+  const trainingCapacityReady = !!selectedCompute && selectedCompute.available !== false && selectedCompute.max_training_workers > 0;
   const ready = !project?.execution_readiness && (!!project?.execution_descriptor || !!profile?.available);
   const editorChanged = !!project && editorVersion !== project.version && dirty;
   const resetEditor = useCallback((value: LearningProject) => {
@@ -417,13 +426,17 @@ export default function GameLearningWorkspace() {
   };
   const train = () => {
     void perform('Starting local training', async (current, signal) => {
+      if (!trainingCapacityReady) throw new Error(selectedCompute?.readiness?.message || 'No training capacity is currently available.');
       const selected = availableAlgorithms.find(value => value.id === algorithm);
       if (!selected) throw new Error('Choose an available local learner.');
       const ids = trainSessions.length ? trainSessions : session ? [session.session_id] : [];
       if (!ids.length && !trainDemonstrations.length) throw new Error('Record an engine session or consented demonstration before training.');
       if (teacherHorizons.length > 1) throw new Error('Choose demonstrations from the same episode limit, or train them separately.');
       const horizon = teacherHorizons[0]; if (trainDemonstrations.length && (!horizon || !Number.isSafeInteger(horizon) || horizon < 1 || horizon > 4096)) throw new Error('Refresh the completed demonstrations to load their exact learning environment.');
-      const config = { sessionIds: ids, algorithm, epochs: integer(epochs, 'Training episodes', 1, 256), seed: integer(seed, 'Seed', 0, 2147483647), episodeSteps: horizon || integer(steps, 'Episode steps', 1, 64), sourceId: selectedSource || undefined, freshPolicy: !continueLearning || !current.policy_id, workers: trainWorkers, demonstrationIds: trainDemonstrations, resourceProfile: resourceProfile || undefined };
+      const numeric = Object.fromEntries(Object.entries(trainingConfig).map(([key, value]) => { if (!value.trim() || !Number.isFinite(Number(value))) throw new Error('Training values must be finite numbers.'); return [key, Number(value)]; })) as Record<keyof typeof trainingConfig, number>;
+      const bounds = { alpha: [Number.MIN_VALUE, 1], gamma: [0, 1], epsilon: [0, 1], epsilonDecay: [Number.MIN_VALUE, 1], minEpsilon: [0, numeric.epsilon], rewardClip: [0, 1000000], imitationStrength: [0, 16], nStep: [1, 16], evaluationSeeds: [1, 8], minImprovement: [0, 1000000], maxWorstSeedRegression: [0, 1000000], executionSeconds: [5, 300] }; for (const [key, range] of Object.entries(bounds)) { const value = numeric[key as keyof typeof numeric]; if (value < range[0] || value > range[1] || ['nStep', 'evaluationSeeds', 'executionSeconds'].includes(key) && !Number.isInteger(value)) throw new Error(key.replace(/([A-Z])/g, ' $1') + ' must be within ' + range.join('–') + '.'); }
+      const config = { ...numeric, explorationStrategy: trainingExploration, sessionIds: ids, algorithm, epochs: integer(epochs, 'Training episodes', 1, 256), seed: integer(seed, 'Seed', 0, 2147483647), episodeSteps: horizon || integer(steps, 'Episode steps', 1, 64), sourceId: selectedSource || undefined, freshPolicy: !continueLearning || !current.policy_id, workers: Math.min(selectedCompute!.max_training_workers, Math.max(1, trainWorkers)), demonstrationIds: trainDemonstrations, resourceProfile: resourceProfile || undefined };
+      if (config.epochs * config.episodeSteps > 65536) throw new Error('Reduce episodes or episode steps to stay within 65,536 planned updates.');
       const fingerprint = JSON.stringify({ projectId: current.project_id, version: current.version, config });
       if (trainAttempt.current?.fingerprint !== fingerprint) trainAttempt.current = { fingerprint, key: learningRequestKey('train') };
       const job = await startLearningTraining(current, config, { signal }, trainAttempt.current.key);
@@ -509,11 +522,13 @@ export default function GameLearningWorkspace() {
           <Text style={s.description}>Choose a platform, edit its project, ingest sources you’re permitted to use, and record actual engine transitions for local learning.</Text>
           <Text style={s.description}>The catalogue identifies reference simulations and supported ROM execution separately.</Text>
           <Button label="Create a project" icon="add-outline" primary disabled={!catalogue} onPress={() => setNewProject(true)} />
+          <GameStudioReadinessPanel key={'readiness:global:' + accountToken} jobs={[]} onOpenJob={() => setNewProject(true)} onOpenPlay={() => setNewProject(true)} onOpenGoal={() => setNewProject(true)} onCampaigns={() => setNewProject(true)} onBuild={() => setNewProject(true)} onSources={() => setNewProject(true)} />
         </View> : <>
           <View style={s.alert}><View style={s.between}><Text style={s.badge}>{project.files?.some(file => file.path === 'game/successor/spec.json') ? 'Original adventure, fishing & farming game' : project.files?.some(file => file.path === 'game/editor/console.json') ? 'Saved design scene' : human(profile?.engine_kind || 'Runtime status unavailable')}</Text>
             <Text style={ready ? s.success : s.unavailable}>{ready ? 'Workspace available' : 'Unavailable'}</Text></View>
             <Text style={s.description}>{project.execution_readiness?.message || (project.files?.some(file => file.path === 'game/successor/spec.json') ? 'Your saved original world drives play, demonstrations, local learning and desktop packages.' : project.files?.some(file => file.path === 'game/editor/console.json') ? 'Play uses your saved scene, tiles, assets, controllers and sound. Native compilation uses the target’s source files and toolchain.' : profile?.readiness?.message || profile?.description || 'Refresh the catalogue for current runtime capabilities.')}</Text>
           </View>
+          {tab === 'overview' && <GameStudioReadinessPanel key={'readiness:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} dirty={dirty} onOpenJob={id => { void perform('Opening issued job', async (current, signal) => { const job = await getLearningJob(id, { signal }); if (job.project_id !== current.project_id) throw new Error('This job belongs to another project.'); if (!signal.aborted) { acceptStudioJob(job); setObservedJob(id); setLearningPane('local'); setTab('learn'); } }); }} onOpenPlay={id => { void perform('Opening actual play', async (current, signal) => { const play = await getGamePlay(id, { signal }); if (play.project_id !== current.project_id) throw new Error('This play belongs to another project.'); if (!signal.aborted) acceptCompiledPlay(play); }); }} onOpenGoal={id => { setFocusedGoal(id || undefined); setLearningPane('assistant'); setTab('learn'); }} onCampaigns={id => { setFocusedCampaign(id); setLearningPane('campaign'); setTab('learn'); }} onBuild={() => setTab('build')} onSources={() => setTab('sources')} />}
           {tab === 'console' && <GameConsoleEditor key={project.project_id + ':' + accountToken} project={project} disabled={!!busy || sourceDirty} onSaved={acceptVisualProject} onDirtyChange={setVisualDirty} onPlay={() => setTab('observe')} onBuild={() => setTab('build')} />}
           {tab === 'successor' && <GameSuccessorStudio key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={!!busy || sourceDirty || visualDirty} onSaved={acceptVisualProject} onJob={acceptStudioJob} onDirtyChange={setWorldDirty} onPlay={() => setTab('observe')} />}
           {tab === 'editor' && <>
@@ -579,7 +594,7 @@ export default function GameLearningWorkspace() {
                 {source.state !== 'revoked' && <Button label="Withdraw source" icon="remove-circle-outline" disabled={!!busy} onPress={() => setWithdrawSource(source.source_id)} />}</View>)}
             </Section>
           </>}
-          {tab === 'observe' && <><GamePlayViewport key={project.project_id + ':' + accountToken} initialPlay={initialPlay?.project_id === project.project_id ? initialPlay : undefined} project={project} sourceId={selectedSource || undefined} seed={/^\d+$/.test(seed) ? Number(seed) : 13} disabled={dirty || !!busy} onRecordingsChange={setDemonstrations} /><View style={narrow ? undefined : s.split}>
+          {tab === 'observe' && <><GamePlayViewport key={project.project_id + ':' + accountToken} resourceProfile={resourceProfiles.find(value => value.profile_id === 'cpu')} initialPlay={initialPlay?.project_id === project.project_id ? initialPlay : undefined} project={project} sourceId={selectedSource || undefined} seed={/^\d+$/.test(seed) ? Number(seed) : 13} disabled={dirty || !!busy} onRecordingsChange={setDemonstrations} /><View style={narrow ? undefined : s.split}>
             <View style={s.column}><Section title="Live engine observation"><Observation session={session} />
               <Metrics values={session ? { ...(session.steps !== undefined ? { steps: session.steps } : {}), ...(session.total_reward !== undefined ? { total_reward: session.total_reward } : {}), ...(session.terminated !== undefined ? { terminated: session.terminated } : {}), ...(session.truncated !== undefined ? { truncated: session.truncated } : {}), ...session.metrics } : undefined} />
             </Section><Section title="Observation lineage"><Lineage refs={session?.lineage_refs} />{!!session?.snapshot_digest && <Text selectable style={s.reference}>Snapshot: {session.snapshot_digest}</Text>}</Section></View>
@@ -601,15 +616,15 @@ export default function GameLearningWorkspace() {
           </View></>}
           {tab === 'learn' && <>
             <View style={s.chips}>{([{ id: 'assistant', label: 'Jeeves assistant' }, { id: 'review', label: 'Measured review' }, { id: 'campaign', label: 'Self-learning campaign' }, { id: 'local', label: 'Local training & instances' }] as const).map(value => <TouchableOpacity key={value.id} accessibilityRole="tab" accessibilityState={{ selected: learningPane === value.id }} onPress={() => setLearningPane(value.id)} style={[s.tab, learningPane === value.id && s.activeTab]}><Text style={[s.tabText, learningPane === value.id && s.activeText]}>{value.label}</Text></TouchableOpacity>)}</View>
-            {learningPane === 'review' && <GameStudioReviewPanel key={'review:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onJob={acceptStudioJob} />}
-            {learningPane === 'assistant' && <GameStudioAssistantPanel key={'assistant:' + project.project_id + ':' + accountToken} project={project} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} onPlay={acceptCompiledPlay} />}
-            {learningPane === 'campaign' && <GameStudioLearningPanel key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} />}
+            {learningPane === 'review' && <GameStudioReviewPanel key={'review:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onJob={acceptStudioJob} onSaved={acceptVisualProject} />}
+            {learningPane === 'assistant' && <GameStudioAssistantPanel key={'assistant:' + project.project_id + ':' + accountToken + ':' + (focusedGoal || '')} initialGoalId={focusedGoal} onReadiness={() => setTab('overview')} project={project} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} onPlay={acceptCompiledPlay} />}
+            {learningPane === 'campaign' && <GameStudioLearningPanel key={project.project_id + ':' + accountToken + ':' + (focusedCampaign || '')} initialCampaignId={focusedCampaign} resourceProfile={resourceProfiles.find(value => value.profile_id === 'cpu')} project={project} jobs={allJobs} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} />}
             {learningPane === 'local' && <><Section title="Local learning" detail="Train a candidate from real engine observations. Measured evaluation and checkpoints stay separate from production promotion.">
               <Text style={s.label}>Learner</Text><View style={s.chips}>{(catalogue?.algorithms || []).map(value => <TouchableOpacity key={value.id} accessibilityRole="radio"
                 accessibilityState={{ selected: algorithm === value.id, disabled: !value.available }} disabled={!value.available} onPress={() => setAlgorithm(value.id)} style={[s.chip, algorithm === value.id && s.selected]}><Text style={s.chipText}>{value.label}{!value.available ? ' · unavailable' : ''}</Text></TouchableOpacity>)}</View>
               {!availableAlgorithms.length && <Text style={s.unavailable}>No local learner is ready. Refresh the catalogue to check again.</Text>}
-              <Text style={s.label}>Independent AI instances</Text><View style={s.chips}>{Array.from({ length: resourceProfiles.find(value => value.profile_id === resourceProfile)?.max_training_workers || 1 }, (_, index) => index + 1).map(value => <TouchableOpacity key={value} accessibilityRole="radio" accessibilityState={{ checked: trainWorkers === value }} onPress={() => setTrainWorkers(value)} style={[s.chip, trainWorkers === value && s.selected]}><Text style={s.chipText}>{value}</Text></TouchableOpacity>)}</View>
-              {!!resourceProfiles.length && <><Text style={s.label}>Available compute</Text><View style={s.chips}>{resourceProfiles.map(value => <TouchableOpacity key={value.profile_id} accessibilityRole="radio" accessibilityState={{ checked: resourceProfile === value.profile_id }} onPress={() => { setResourceProfile(value.profile_id); setTrainWorkers(current => Math.min(current, value.max_training_workers)); }} style={[s.chip, resourceProfile === value.profile_id && s.selected]}><Text style={s.chipText}>{value.label}</Text></TouchableOpacity>)}</View><Text style={s.dim}>The server bounds workers to its current CPU and memory resources.</Text></>}
+              {!trainingCapacityReady && <Text style={s.unavailable}>{selectedCompute?.readiness?.message || 'Waiting for an observed training resource profile.'}</Text>}<Text style={s.label}>Independent AI instances</Text><View style={s.chips}>{Array.from({ length: selectedCompute?.max_training_workers ?? 0 }, (_, index) => index + 1).map(value => <TouchableOpacity key={value} accessibilityRole="radio" accessibilityState={{ checked: trainWorkers === value }} onPress={() => setTrainWorkers(value)} style={[s.chip, trainWorkers === value && s.selected]}><Text style={s.chipText}>{value}</Text></TouchableOpacity>)}</View>
+              {!!resourceProfiles.length && <><Text style={s.label}>Available compute</Text><View style={s.chips}>{resourceProfiles.map(value => <TouchableOpacity key={value.profile_id} accessibilityRole="radio" accessibilityState={{ checked: resourceProfile === value.profile_id, disabled: value.available === false }} disabled={value.available === false} onPress={() => { setResourceProfile(value.profile_id); setTrainWorkers(current => Math.max(1, Math.min(current, value.max_training_workers))); }} style={[s.chip, resourceProfile === value.profile_id && s.selected]}><Text style={s.chipText}>{value.label}</Text></TouchableOpacity>)}</View><Text style={s.dim}>The server bounds workers to its current CPU and memory resources.</Text></>}
               <Text style={s.label}>Human demonstrations</Text><View style={s.chips}>{demonstrations.filter(value => value.usable_for_training === true).map((value, index) => <TouchableOpacity key={value.recording_id} accessibilityRole="checkbox" accessibilityState={{ checked: trainDemonstrations.includes(value.recording_id) }} disabled={!trainDemonstrations.includes(value.recording_id) && trainDemonstrations.length >= 16} onPress={() => setTrainDemonstrations(current => current.includes(value.recording_id) ? current.filter(id => id !== value.recording_id) : current.length < 16 ? [...current, value.recording_id] : current)} style={[s.chip, trainDemonstrations.includes(value.recording_id) && s.selected]}><Text style={s.chipText}>{value.label || `Demonstration ${index + 1}`} · {value.step_count ?? value.steps ?? '—'} steps</Text></TouchableOpacity>)}</View>
               {!!teacherHorizons.length && <Text style={s.muted}>Learning uses the recorded demonstration’s exact episode limit: {teacherHorizons.join(', ')} steps. Start a fresh policy if its previous environment differs.</Text>}
               {!demonstrations.length && <Text style={s.muted}>Record your play with explicit consent in Play & observe to teach from a real demonstration.</Text>}
@@ -623,15 +638,17 @@ export default function GameLearningWorkspace() {
                 <View style={[s.checkboxBox, continueLearning && s.checked]}>{continueLearning && <Ionicons name="checkmark" size={17} color={C.text} />}</View>
                 <Text style={s.checkboxText}>Continue from the current learned candidate. Uncheck to start a fresh policy after changing its environment.</Text>
               </TouchableOpacity>}
-              <Button label="Start local training" icon="analytics-outline" primary disabled={!!busy || !ready || !availableAlgorithms.length || !project.sessions.length && !trainDemonstrations.length || !!runningJobs.length || dirty} onPress={train} />
+              <Button label={advancedTraining ? 'Hide learning and evaluation settings' : 'Learning and evaluation settings'} icon="options-outline" onPress={() => setAdvancedTraining(value => !value)} />{advancedTraining && <View style={s.source}><Text style={s.description}>Configure the actual learner and independent-seed evaluation. Meeting a return gate does not promote a production policy.</Text><View style={s.chips}>{(['uniform', 'least_visited'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="radio" accessibilityState={{ checked: trainingExploration === value }} onPress={() => setTrainingExploration(value)} style={[s.chip, trainingExploration === value && s.selected]}><Text style={s.chipText}>{value === 'uniform' ? 'Uniform exploration' : 'Explore less-visited actions'}</Text></TouchableOpacity>)}</View><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>{(Object.keys(trainingConfig) as (keyof typeof trainingConfig)[]).map(key => <View key={key} style={{ flexGrow: 1, flexBasis: 170, gap: 6 }}><Text style={s.label}>{({ alpha: 'Learning rate', gamma: 'Future reward discount', epsilon: 'Initial exploration', epsilonDecay: 'Exploration decay', minEpsilon: 'Minimum exploration', rewardClip: 'Reward clipping', imitationStrength: 'Human-reference strength', nStep: 'Return horizon (steps)', evaluationSeeds: 'Independent evaluation seeds', minImprovement: 'Minimum mean-return gain', maxWorstSeedRegression: 'Allowed worst-seed loss', executionSeconds: 'Execution seconds' })[key]}</Text><TextInput accessibilityLabel={key.replace(/([A-Z])/g, ' $1')} value={trainingConfig[key]} onChangeText={value => setTrainingConfig(previous => ({ ...previous, [key]: value }))} keyboardType="decimal-pad" maxLength={12} style={s.field} /></View>)}</View><Text style={s.dim}>At most 65,536 planned training updates per job. Deadline interruption retains committed checkpoints; resume waits for observed worker exit.</Text></View>}
+              <Button label="Start local training" icon="analytics-outline" primary disabled={!!busy || !ready || !trainingCapacityReady || !availableAlgorithms.length || !project.sessions.length && !trainDemonstrations.length || !!runningJobs.length || dirty} onPress={train} />
             </Section>
             {!!allJobs.filter(job => job.kind === 'train' || job.kind === 'training').length && <><View style={s.chips}>{allJobs.filter(job => job.kind === 'train' || job.kind === 'training').slice(0, 8).map((job, index) => <TouchableOpacity key={job.job_id} accessibilityRole="radio" accessibilityState={{ checked: (observedJob || allJobs.find(value => value.kind === 'train' || value.kind === 'training')?.job_id) === job.job_id }} onPress={() => setObservedJob(job.job_id)} style={[s.chip, observedJob === job.job_id && s.selected]}><Text style={s.chipText}>Learning job {index + 1} · {human(job.status)}</Text></TouchableOpacity>)}</View>{(() => { const job = allJobs.find(value => value.job_id === observedJob) || allJobs.find(value => value.kind === 'train' || value.kind === 'training'); return job ? <GameTrainingInstances key={job.job_id + ':' + accountToken} job={job} /> : null; })()}</>}
             <Section title="Measured learning jobs">{!allJobs.filter(job => job.kind === 'train' || job.kind === 'training').length && <Text style={s.muted}>Training metrics and checkpoints will appear after a real job starts.</Text>}
               {allJobs.filter(job => job.kind === 'train' || job.kind === 'training').slice(0, 12).map(job => <JobCard key={job.job_id} job={job} busy={!!busy} cancel={cancel} resume={resume} />)}</Section>
-            <Section title="Project learning lineage"><Lineage refs={project.lineage_refs} /><Metrics values={project.metrics} /></Section></>}
+            <GameTrainingPolicyPanel key={'policies:' + project.project_id + ':' + accountToken} project={project} refreshKey={allJobs.filter(job => ['train', 'training'].includes(job.kind)).map(job => job.job_id + ':' + job.status).join(',')} /><Section title="Project learning lineage"><Lineage refs={project.lineage_refs} /><Metrics values={project.metrics} /></Section></>}
           </>}
           {tab === 'build' && <>
-            <GameCompiledRomPanel key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onSaved={acceptVisualProject} onPlay={acceptCompiledPlay} onJob={acceptStudioJob} />
+            <GameBuildWorkflowPanel key={'workflow:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} config={nativeTarget ? { targetId: nativeTarget.target_id, styleId: buildStyle, optimization: nativeTarget.options?.optimization ? optimization : 1, debug: nativeTarget.options?.debug ? debugBuild : false } : undefined} disabled={dirty || !!busy} onBuild={buildNative} onSetup={() => setTab('overview')} />
+            <GameCompiledRomPanel key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onSaved={acceptVisualProject} onPlay={acceptCompiledPlay} onJob={acceptStudioJob} onCampaign={campaign => { setFocusedCampaign(campaign.campaign_id); setLearningPane('campaign'); setTab('learn'); }} />
             <Section title="Native console build" detail="Compile the exact saved files with this console’s installed toolchain. A source export remains available when its compiler or SDK is unavailable.">
               {buildCatalogueError && <Text style={s.error}>{buildCatalogueError}</Text>}
               {nativeTarget ? <>

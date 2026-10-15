@@ -1,0 +1,895 @@
+{
+  "schema_version": "skeleton.ai.studio_reliability_session_evidence.v1",
+  "status": "implementation_candidate",
+  "recorded_at": "2026-10-15T18:09:04.517329+00:00",
+  "continuation_start_commit": "2eaed8f412d01cbb119a15349026ccec0426d29c",
+  "integrated_main_commit": "fed9817c1dd0a759917d59e7d639f9005269c527",
+  "runtime_and_package_source_commit": "ee0bcdae5f1a2643697f04b065224783fb6a6535",
+  "continuation_source_commits": [
+    "0dcb731bfae154313b4194ada85b5314564a7085",
+    "6280bb0a88c571185215bf9e5a3c689995858b99",
+    "e1d414de06ae975c1f4387fa83afc690d57653af",
+    "ee0bcdae5f1a2643697f04b065224783fb6a6535"
+  ],
+  "evidence_commit_scope": {
+    "kind": "metadata_only_descendant_of_qualified_source",
+    "paths": [
+      "docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md",
+      "machine/ai_studio_reliability_session_evidence_2026-10-15.json"
+    ],
+    "rebuilt_image_claimed_for_this_metadata_commit": false,
+    "prior_session_evidence": "machine/ai_studio_enablement_session_evidence_2026-10-15.json",
+    "prior_observations_relabelled": false
+  },
+  "canonical_owners": {
+    "provider": "skeleton/provider_runtime.py",
+    "builder": "backend/core/game_studio_agent.py",
+    "crawler": "backend/core/dragon_crawler.py",
+    "dragon_practice": "backend/core/dragon_reference_practice.py",
+    "learning": "backend/core/game_learning.py",
+    "studio_learning": "backend/core/game_studio_learning.py",
+    "physical_credits": "existing workspace.workers CPU actor pool"
+  },
+  "automated_tests_authored": false,
+  "automated_tests_run": false,
+  "incoming_main_tests": "Preserved unchanged from integrated main; not executed.",
+  "all_requested_features_complete": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_claimed": false,
+  "reliability_changes": {
+    "builder": [
+      "Receipt-derived next prerequisite and exact artifact identities in every new checklist decision.",
+      "Source and binary export preparation tracked independently; only missing counterpart is offered.",
+      "Pending inference identity retained; one model wait per advance and durable-boundary yield.",
+      "Unsupported native checklist rejected before goal or model admission."
+    ],
+    "learning": [
+      "Authoritative checkpoint acknowledged before episode projection; committed traces repaired before overwrite/terminal publication.",
+      "Unconfirmed publication remains an explicit resumable interruption; exact live-worker readback can confirm commit.",
+      "Frozen plan, source, teacher and parent checked before resumed updates.",
+      "Native construction and cancellation drain actual work before credit release.",
+      "Queued stop avoids scheduling; completion selection repair retains original comparator CAS."
+    ],
+    "crawler_and_dragon": [
+      "Failure outcome, terminal status and owned-lease cleanup settle together.",
+      "Local physical worker fences survive expired database lease; bounded recovery rows rotate.",
+      "Full source/export/page reads enforce current withdrawal consistently with chunks and retrieval.",
+      "Queued practice waiting counts toward the attempt deadline; cancelled queued work cannot start.",
+      "Readiness verifies all existing knowledge/practice tables and distinct regular file identities."
+    ],
+    "studio_compute": [
+      "Five existing helper endpoints hold canonical shared CPU credits during actual work.",
+      "Cancellation shields/drains finite executor work before token-owned release.",
+      "Four campaign-bound compute result paths recheck source/teacher authority after computation."
+    ],
+    "frontend_and_installation": [
+      "Duplicate action guards, account/project aborts and stale-result rejection across existing UI owners.",
+      "Loaded console source and path initialize together; true unsaved local edits remain fenced.",
+      "Bounded subprocess readiness diagnostics and authenticated crawler observation.",
+      "Production source stage copies the checker without colliding with backend/scripts."
+    ]
+  },
+  "actual_builder": {
+    "status": "completed",
+    "completion_reason": "verified_workflow_complete",
+    "project_id": "816c63d3-eb11-544b-bbfa-ed6b33c2f9da",
+    "goal_id": "2da9e68d-4921-5557-9468-94da6a63a461",
+    "model_calls": 7,
+    "committed_steps": 7,
+    "actual_tool_operations": [
+      "console.edit",
+      "build.inspect",
+      "build",
+      "artifact.preview",
+      "project.export",
+      "artifact.export"
+    ],
+    "all_requested_owner_checks_verified": true,
+    "canonical_provider_receipts": 7,
+    "preview": {
+      "artifact_id": "0b28550f-3215-55d3-8ecc-941c71dca739",
+      "simulation_receipt_id": "46c5b47f-f603-50ee-9a28-8b8d6ea14ebc",
+      "session_id": "ce33341a-47f9-5fa2-a560-eeae5a228c1a",
+      "steps": 64,
+      "transition_count": 64,
+      "frame": {
+        "content_digest": "7fe00d91fe474502536ea3f128571032c6d95e68fb10ec883e41271e9f3f17d5",
+        "core_id": "gambatte",
+        "height": 144,
+        "native_runs": 71,
+        "pixel_digest": "cb163a65c80e076d248551435d0b7ebe060bf4955cc3c82dbc5a863d87180c5a",
+        "render_kind": "actual_native_frame_preview",
+        "runtime_kind": "installed_libretro_emulator",
+        "source_pixel_digest": "cb163a65c80e076d248551435d0b7ebe060bf4955cc3c82dbc5a863d87180c5a",
+        "video_callbacks": 71,
+        "width": 160
+      }
+    },
+    "separate_authenticated_downloads_verified": true,
+    "source_sha256": "c2d21399dcd26a618491d4bd9bd7d634af766aa23f0bd82a1b62741ed9b64ee8",
+    "binary_sha256": "7fe00d91fe474502536ea3f128571032c6d95e68fb10ec883e41271e9f3f17d5",
+    "binary_bytes": 32768,
+    "source_json_bytes": 68276,
+    "model_export_claim": "Prepared bytes only; ordinary authenticated operator downloads were verified separately.",
+    "previous_revoked_source_goal": {
+      "project_id": "364d1c7a-8d59-502a-9673-8cfc52bfbab7",
+      "goal_id": "f372a55b-c8d8-5c2a-827c-de92f9e2b823",
+      "model_calls": 3,
+      "status": "blocked",
+      "code": "dragon_reviewed_reference_withdrawn",
+      "historical_goal_retried_or_rewritten": false,
+      "new_goal": "A separate explicit goal used current retrieval after withdrawal; same original goal-text hash and eight-call model budget."
+    }
+  },
+  "actual_crawler_and_dragon": {
+    "qualified_source_revision": "6280bb0a88c571185215bf9e5a3c689995858b99",
+    "session_id": "f851b70c-0f06-5de8-9662-4ed11502bfb0",
+    "candidate_id": "8f21fcc190f01ddc1faa919408bc7002e5ae28c96796e629d727558c26068bff",
+    "practice_id": "3c39af0fdd06cdb15000a6820d654a634617567874e7b163f3d66a5fbee33a0b",
+    "capture": {
+      "usage": {
+        "bytes": 1154,
+        "documents": 1,
+        "failures": 0,
+        "requests": 2,
+        "reserved_bytes": 0
+      },
+      "worker": {
+        "active": false,
+        "quiescent": true,
+        "local": false,
+        "lease_until": null,
+        "confirmation": "durable_completion",
+        "recovery_eligible": true
+      },
+      "readiness_schema": "skeleton.dragon.crawler_readiness.v1",
+      "manual_bounded_slices": true
+    },
+    "review": {
+      "decision": "approve_design_reference",
+      "review_id": "5320f909bc99c10daeb4c95d16ba1f5ed2938105081d39e0c8ae06a814c5b261",
+      "exact_replay_verified": true,
+      "saved_intent_resume_identity_verified": true,
+      "truth_verified": false,
+      "training_allowed": false
+    },
+    "measured_practice": {
+      "runtime_kind": "reference_game_simulation",
+      "configured_step_ceiling": 128,
+      "actual_steps": 91,
+      "trace_digest": "8774497ae7f86494568a12c96936c3d5d16916e423b5bb8cc219588af01c7161",
+      "receipt_digest": "32517fe351210c29626a6c1a3ef4c9d906ccd0629f7f4896982657fca585fce7",
+      "exact_replay_verified": true,
+      "history_and_discovery_verified": true,
+      "policy_trained": false,
+      "xp_awarded": 0,
+      "xp_before": 0,
+      "xp_after": 0
+    },
+    "withdrawal": {
+      "kind": "actual_new_capture_cancel_and_erase",
+      "session_id": "f851b70c-0f06-5de8-9662-4ed11502bfb0",
+      "source_id": "8ec8c4f98cfe1deeb8b7c3c20fe72a391656a93d7109c8acdeeceb39070141e2",
+      "candidate_id": "8f21fcc190f01ddc1faa919408bc7002e5ae28c96796e629d727558c26068bff",
+      "practice_id": "3c39af0fdd06cdb15000a6820d654a634617567874e7b163f3d66a5fbee33a0b",
+      "denials": {
+        "full": "crawler_context_revoked",
+        "/export?format=json": "crawler_context_revoked",
+        "/text?offset=0&max_chars=128": "crawler_context_revoked",
+        "page": "crawler_context_revoked",
+        "practice": "dragon_source_unavailable",
+        "exact_practice": "dragon_source_unavailable"
+      },
+      "cancel_replay_verified": true,
+      "erase_replay_verified": true,
+      "source_erased": true,
+      "worker": {
+        "active": false,
+        "quiescent": true,
+        "local": false,
+        "lease_until": null,
+        "confirmation": "durable_completion",
+        "recovery_eligible": true
+      },
+      "automated_tests_run": false,
+      "model_calls": 0,
+      "existing_proof_data_mutated": false
+    },
+    "source_audit_only": [
+      "failure settlement atomicity and legacy orphan reconciliation",
+      "bounded recovery page rotation",
+      "expired lease physical-credit fences",
+      "queued practice deadline and precommit lease fencing",
+      "partial schema and inode alias readiness rejection"
+    ],
+    "limits": [
+      "No DB fault injection or automated tests were run.",
+      "The practice is the existing reference simulation; it does not verify the scraped annotation or train a policy.",
+      "Started thread draining remains cooperative; remote worker exit is not independently attested.",
+      "Bounded recovery rotation does not guarantee global fairness latency.",
+      "Crawler shared-executor queue waiting has no separate hard timeout; it retains credits and has a pre-I/O lease fence."
+    ]
+  },
+  "actual_training": {
+    "http_operations": 186,
+    "non200_operations": [],
+    "native": {
+      "project_id": "91b7c47f-e0b8-519e-b00b-50434c2edaef",
+      "artifact_id": "039fbb62-e33c-5b84-bdf5-b98f58d66af5",
+      "job_id": "e65f4d1e-f556-547e-89b9-2d1540c887c8",
+      "policy_id": "10ae0696-be28-5a90-afd0-4c610712ab67",
+      "policy_digest": "bdee12f0bd07c79d710931f1405d779731ba910415548cf920b30b69cb834695",
+      "committed_episodes": 2,
+      "committed_updates": 32,
+      "default_selection": {
+        "policy_id": "10ae0696-be28-5a90-afd0-4c610712ab67",
+        "comparator_policy_id": "c4b75d12-78be-5304-835f-4e7872869dff",
+        "state": "superseded",
+        "reason": "admission_comparator_differs",
+        "selection_digest": "6e3979b0e07a26899d4451ced64af98d4c1ac292c38021d82ae87536a26e4502"
+      },
+      "play_id": "db693ed6-4a62-5a8a-8082-7427cfc3b98c",
+      "play_steps": 16,
+      "prior_default_policy_id": "c4b75d12-78be-5304-835f-4e7872869dff",
+      "current_default_policy_id": "c4b75d12-78be-5304-835f-4e7872869dff",
+      "actor_summary": {
+        "actor_pids": [
+          290744,
+          290746
+        ],
+        "actual_observed_actor_count": 2,
+        "instance_ids": [
+          "62d6f97a-3b7a-43a5-a736-1edcca200180",
+          "c8312e98-357f-4089-96c1-d9d5ec938dc5"
+        ],
+        "actor_process_alive_at_observation": {
+          "290744": false,
+          "290746": false
+        }
+      },
+      "exported_episode_count": 2,
+      "unique_exported_episode_ids": 2,
+      "exported_trace_steps": 32,
+      "evaluation": {
+        "candidate_mean_return": 1.152170138888889,
+        "baseline_mean_return": 0.9924479166666667,
+        "mean_return_difference": 0.15972222222222232,
+        "measured_steps": 32,
+        "evaluation_digest": "54938dd92a5fd0a2165404f9c1241d785ce50b279f6d6062d2b64c45796a05b5",
+        "heldout_seeds": [
+          1071214
+        ]
+      },
+      "return_gate_met": true,
+      "strict_improvement": true,
+      "receipt_path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/training/actual-ee0bcdae-v1/native/receipt.json"
+    },
+    "sliced": {
+      "job_id": "a45a0f04-ebe8-57ba-a156-4b9fc31fd58b",
+      "policy_id": "1a6668b7-17e1-519b-868e-aec96fef5ef1",
+      "policy_digest": "c976d4f78bd61b1df331e6327a258098773403b769891fbf9126635d6194d11d",
+      "committed_episodes": 8,
+      "committed_updates": 256,
+      "default_selection": {
+        "policy_id": "1a6668b7-17e1-519b-868e-aec96fef5ef1",
+        "comparator_policy_id": "c4b75d12-78be-5304-835f-4e7872869dff",
+        "state": "superseded",
+        "reason": "admission_comparator_differs",
+        "selection_digest": "f5de9ce09aaab1a5d48400527604fa7ecec061584ef117c10b397f59aa35fc82"
+      },
+      "interruption_count": 3,
+      "interruption_after_committed_prefix": true,
+      "exported_episode_count": 8,
+      "unique_exported_episode_ids": 8,
+      "exported_trace_steps": 256,
+      "evaluation": {
+        "candidate_mean_return": 1.3764756944444445,
+        "baseline_mean_return": 1.2160590277777779,
+        "mean_return_difference": 0.16041666666666665,
+        "measured_steps": 64,
+        "evaluation_digest": "1da89659179440992cde67fb3221dd7939facbc73feccf8660fe54e269cccb6b",
+        "heldout_seeds": [
+          1071604
+        ]
+      },
+      "return_gate_met": true,
+      "strict_improvement": true,
+      "receipt_path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/training/actual-ee0bcdae-v1/sliced/receipt.json"
+    },
+    "studio": {
+      "project_id": "a571fc22-86d4-58e6-85fc-aa11818788e5",
+      "job_id": "671dff47-39ae-566d-b7a6-9e84e08d695c",
+      "policy_id": "7d54a675-0970-529e-944e-781c79886c4b",
+      "policy_digest": "5f5d4d93b4abe098304a7967852ad24cbeea1632465dd750250d0fa291c9f62b",
+      "committed_episodes": 2,
+      "committed_updates": 32,
+      "default_selection": {
+        "policy_id": "7d54a675-0970-529e-944e-781c79886c4b",
+        "comparator_policy_id": null,
+        "state": "selected",
+        "reason": "admission_comparator_cas",
+        "selection_digest": "d6e13d2ac74a89cbf4600fe701f8eeae8a6a30aca07be667dc1f758afd352c84"
+      },
+      "campaign_id": "b3571a95-6eb5-586d-8e0f-732547b8b013",
+      "campaign_cursor": 1,
+      "helpers": [
+        {
+          "operation": "engine-probe",
+          "response_digest": "f7f4448511c3d3643f338186b6311f165cb2710606bfebfa8bcbf1a6378fd2b8",
+          "http_status": 200
+        },
+        {
+          "operation": "mirror-views",
+          "response_digest": "f313acdd7a628352726a5d3cd63f46106e04f6e18158ff746d0a21d65cdeb060",
+          "http_status": 200
+        },
+        {
+          "operation": "shadow-audit",
+          "response_digest": "432e9f74a8772a6d55f83b718ac9a11b6f5e77b2912c6beb72c8b2a2040d572a",
+          "http_status": 200
+        },
+        {
+          "operation": "multifactor-plan",
+          "response_digest": "cf7e1e12987426b5e794cba41f9791ddef094d9f916be9655f34a1ccb7c990a6",
+          "http_status": 200
+        },
+        {
+          "operation": "multifactor-experiments",
+          "response_digest": "cbbda3aa17f2a180296710c9343e20f2458b8c67967059dabc86f2fb1fd438f8",
+          "http_status": 200
+        }
+      ],
+      "exported_episode_count": 2,
+      "unique_exported_episode_ids": 2,
+      "exported_trace_steps": 32,
+      "evaluation": {
+        "candidate_mean_return": -0.12,
+        "baseline_mean_return": -0.12,
+        "mean_return_difference": 0.0,
+        "measured_steps": 32,
+        "evaluation_digest": "485263cfcfe1027dcef69cd358fcf01b553f710ab594c56d6e01da8617635e75",
+        "heldout_seeds": [
+          1071704
+        ]
+      },
+      "return_gate_met": true,
+      "strict_improvement": false,
+      "receipt_path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/training/actual-ee0bcdae-v1/studio/receipt.json"
+    },
+    "committed_native_prefix": [
+      2,
+      4,
+      6,
+      8
+    ],
+    "all_export_digests_verified": true,
+    "queued_cancel": {
+      "job_id": "b3c06de2-8384-5423-bde1-535be110d4f8",
+      "admitted_status": "queued",
+      "final_status": "cancelled",
+      "progress": {
+        "completed": 0,
+        "total": 2,
+        "unit": "episodes"
+      },
+      "checkpoint": null,
+      "competing_job_id": "a45a0f04-ebe8-57ba-a156-4b9fc31fd58b",
+      "queued_cancel_with_zero_committed_work": true,
+      "physical_launch_observed_directly": false
+    },
+    "historical_retention": [
+      {
+        "label": "native",
+        "project_id": "91b7c47f-e0b8-519e-b00b-50434c2edaef",
+        "policy_id": "c4b75d12-78be-5304-835f-4e7872869dff",
+        "historical_policy_digest": "a47add47fbd04760d5fcdffe192061c1d82b4f7818ab1559acbc36c082c37618",
+        "observed_default_policy_id": "c4b75d12-78be-5304-835f-4e7872869dff",
+        "http_status": 200,
+        "policy_rewritten": false,
+        "export_http_status": 200,
+        "export_content_digest": "da27b1db29e4d0670f4d2f2a4f75668e22fc0525d8200070c6655e78d3323d99",
+        "exact_issued_policy_retained": true
+      },
+      {
+        "label": "coded",
+        "project_id": "d880f351-ab9b-5c27-8494-b3ae9dbfd355",
+        "policy_id": "e5151b40-ade5-566a-a298-7a7d5b2d46d6",
+        "historical_policy_digest": "c81035fe196308e300f62253657691f55088b7f3f792b6a64a0f88b52cc9d8a7",
+        "observed_default_policy_id": "e5151b40-ade5-566a-a298-7a7d5b2d46d6",
+        "http_status": 200,
+        "policy_rewritten": false,
+        "export_http_status": 200,
+        "export_content_digest": "a558e96924a429ce4c407c425b544128b8c739a6f27d03f369d8f584e3ab0b0f",
+        "exact_issued_policy_retained": true
+      }
+    ],
+    "observed_actor_count": 18,
+    "all_observed_actors_exited": true,
+    "limitations": [
+      "Held-out comparisons use one configured seed each; no general mastery or hardware certification.",
+      "Spectator helper responses prove bounded product execution, not direct observation of their transient durable credit rows.",
+      "Queued stop retained zero committed work; physical no-launch was not independently observed."
+    ]
+  },
+  "actual_frontend": {
+    "production": {
+      "archive": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/app-web-observed-final.zip",
+      "archive_bytes": 10130995,
+      "archive_sha256": "ca26f4c23b3b4e0a407b8aeb9798fb403589828a39e347a4efeca2276dda26cd",
+      "file_count": 306,
+      "uncompressed_bytes": 37154617,
+      "html_routes": 199,
+      "javascript_files": 68,
+      "main_bundle": "_expo/static/js/web/entry-81bd7ce36788dc720912cb64723cc937.js",
+      "main_bundle_bytes": 6091033,
+      "main_bundle_sha256": "695ef5290ef4ba899033c084dbc64c9801bfc5009c625802e5de97d55bbacc46",
+      "source_manifest": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/app-web-observed-final-frontend-source.json",
+      "source_manifest_sha256": "909095a4f3b20c8dbfb1b7ab306fc19ee85de4cf10124f5c1d6d442ab17916e5"
+    },
+    "source_file_count": 823,
+    "source_mismatches": [],
+    "static_validation": {
+      "scoped_typescript": "pass",
+      "eslint_relevant_files": 16,
+      "eslint": "pass",
+      "actual_expo_production_export": "pass",
+      "automated_tests_run": false
+    },
+    "browser": {
+      "form_login": "200",
+      "first_saved_source_navigation": "succeeded without false dirty warning",
+      "real_local_source_edit": "unsaved warning and navigation guard; discarded by reload; never saved",
+      "both_chat_surfaces": "canonical history recovered",
+      "withdrawn_reference": "current_source_usable false; new practice disabled",
+      "retained_native_observation": "64 actual prior steps; no new execution",
+      "completed_model_goal": {
+        "project_id": "816c63d3-eb11-544b-bbfa-ed6b33c2f9da",
+        "goal_id": "2da9e68d-4921-5557-9468-94da6a63a461",
+        "status": "completed",
+        "committed_steps": 7,
+        "model_calls": 7,
+        "all_four_facts_verified": true,
+        "user_download_claimed": false
+      },
+      "fresh_native_policy": {
+        "project_id": "91b7c47f-e0b8-519e-b00b-50434c2edaef",
+        "policy_id": "10ae0696-be28-5a90-afd0-4c610712ab67",
+        "policy_digest": "bdee12f0bd07c79d710931f1405d779731ba910415548cf920b30b69cb834695",
+        "committed_episodes": 2,
+        "committed_updates": 32,
+        "actual_committed_trace": "rendered after digest-verified export"
+      },
+      "one_authorized_normal_chat": {
+        "thread_id": "04cabdfb-7c98-4e97-9aea-8e7dde53270e",
+        "operation_id": "e027d599-e810-5a5f-b3cf-1bc821ed8632",
+        "engine_execution_id": "1f7c37e7-a863-5617-b1b8-62cd42451630",
+        "assistant_message_id": "03338b4c-ff6d-4a42-9c35-76a528b6b7e6",
+        "provider": "local",
+        "provider_receipt_count": 1,
+        "max_output_tokens": 128,
+        "submission_count": 1,
+        "canonical_state": "completed",
+        "same_answer_after_reload": true,
+        "new_submissions_on_reload": 0,
+        "recorded_transition_count": 9
+      },
+      "javascript_exceptions": [],
+      "console_errors": [],
+      "captured_layout_overflow": []
+    },
+    "cleanup": {
+      "owned_chromium_pid": 287120,
+      "owned_chromium_exited": true,
+      "temporary_profile_removed": true,
+      "old_preview_3043_retired": true,
+      "final_preview_port": 3044,
+      "final_preview_pid": 289112,
+      "final_preview_running": true,
+      "model_submission_count": 1,
+      "normal_chat_terminal": "completed",
+      "browser_started_no_training_or_play_work": true
+    },
+    "qualification_receipt": {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/qualification-summary.json",
+      "sha256": "70d9add10cd0e49880fef5b06e5263fb7df33e03d93ff81e05891a553fd9a719"
+    }
+  },
+  "actual_production_backend": {
+    "report": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/backend-proof/actual-production-backend-upgrade-qualification.json",
+    "report_sha256": "ec1360764ad8cc5f6db3b5ee6dd81f07a9e8c255cb44cbc38f66b5b6e1f95197",
+    "git_head": "ee0bcdae5f1a2643697f04b065224783fb6a6535",
+    "image": "sha256:28eba5a07b5fe8ca23bac953267de8c35508a1e38a826c2b2784bc2ac9c9d786",
+    "source_manifest_digest": "16dd1effa9dc77f91bd325af80752cc6acf244605575c4a6968e0ed4568bc3e5",
+    "build_candidate_source_count": 45765,
+    "build_source_drift": [],
+    "build_receipt_sha256": "32220796657695d424137a33454b2e3388e74eb94d7490c01513b5a4426ad0e4",
+    "source_identity_receipt_sha256": "4d05168c700d6f18ff61ab9958c1545846a099c3c1afa1a787105b063621e658",
+    "expected_source_count": 45285,
+    "materialized_source_count": 45285,
+    "exact_build_snapshot": true,
+    "current_repo_at_observation": true,
+    "current_drift_paths": [],
+    "unbound_source_count": 0,
+    "overlays": false,
+    "containers_retired": true,
+    "preserved_volume_names": [
+      "skeleton-studio-final-canonical-oct15-mongo-data",
+      "skeleton-studio-final-canonical-oct15-mongo-config",
+      "skeleton-studio-final-canonical-oct15-backend-data"
+    ],
+    "free_before_retirement": 2608832512,
+    "free_after_retirement": 6978494464,
+    "automated_tests_run": false,
+    "scope": "Exact ee0 canonical backend image only. Engine, model and native dependencies intentionally unconfigured in this private image proof; those operations used the separately configured host.",
+    "original_admin_and_viewer_tokens_after_upgrade_and_restart": "200 with original roles",
+    "fresh_admin_and_viewer_logins": "200",
+    "dragon_volume_identity_and_empty_row_counts_preserved": true,
+    "source_overlays": false,
+    "packaged_catalogue_validator": {
+      "contracts_valid": 576,
+      "training_executed": false
+    }
+  },
+  "actual_readiness": {
+    "doctor": {
+      "scope": "Actual read-only doctor against configured host services. Checkout configuration/host prerequisites are reported separately from live server availability.",
+      "elapsed_seconds": 7.002121255005477,
+      "ai": {
+        "provider": "local",
+        "configuration": "unconfigured",
+        "available": true,
+        "observed": true,
+        "scope": "Canonical AI readiness projection; no inference or model quality claim."
+      },
+      "crawler": {
+        "available": true,
+        "observed": true,
+        "authentication_required": true,
+        "readiness_path": "/api/dragon-academy/crawler/readiness",
+        "scope": "Authenticated canonical crawler readiness; no capture or training requested.",
+        "configured": true,
+        "code": "ready"
+      },
+      "server_studio_observed": true,
+      "dragon_observed": true,
+      "crawler_observed": true,
+      "local_host_observed": true,
+      "configuration_ready": false,
+      "services_ready": true,
+      "automated_tests_run": false
+    },
+    "native_core_inventory": {
+      "approved": 27,
+      "mapped_targets": 46,
+      "total_targets": 169,
+      "registry_digest": "b37877352e04fe52d19fc0b20f3481276fd9f03d800ff273227c70f9e53a4e40",
+      "observed": true,
+      "observed_at": "2026-10-15T17:44:03.195457+00:00"
+    },
+    "public_readiness": {
+      "scope": "Actual public canonical AI-readiness GET through new wall-deadline one-shot diagnostic process; no inference or capture",
+      "observed": true,
+      "elapsed_seconds": 0.16769286000635475,
+      "engine": "skeleton-engine",
+      "llm_available": true,
+      "availability_observed": true,
+      "source_sha256": {
+        "skeleton/app/first_install.py": "45be7267c5a3e660b399e3be17975944e2ad37eb80a6d9eba8f14beba8189588",
+        "skeleton/app/studio_readiness.py": "5adc187d012903c9db43886ec5dceb6c4bed47dcdd494c2fa4de298c82907b25"
+      },
+      "automated_tests_run": false
+    },
+    "completed_health_http_statuses": {
+      "backend": 200,
+      "engine_live": 200,
+      "engine_ready": 200,
+      "dragon": 200,
+      "crawler": 200,
+      "resources": 200
+    },
+    "live_python_snapshots": {
+      "engine": {
+        "pid": 288683,
+        "integration_parent": "e1d414de06ae975c1f4387fa83afc690d57653af",
+        "source_files": 324,
+        "source_manifest_sha256": "bc75ba8de3ea73bf927086ac390fcc0c6dbeec1a53b6e33582e327f4f6b7f139",
+        "drift": []
+      },
+      "backend": {
+        "pid": 288707,
+        "integration_parent": "e1d414de06ae975c1f4387fa83afc690d57653af",
+        "source_files": 324,
+        "source_manifest_sha256": "bc75ba8de3ea73bf927086ac390fcc0c6dbeec1a53b6e33582e327f4f6b7f139",
+        "drift": []
+      }
+    },
+    "host_snapshot_scope": "Host processes started at e1d414de; all 324 recorded Python files match final ee0 source. ee0 changes frontend only. Final documentation/evidence are not runtime reload claims."
+  },
+  "static_validation": {
+    "changed_python_files": 64,
+    "introduced_lint_diagnostics": 0,
+    "ast_compile_json_and_owner_rules": "pass",
+    "provider_bootstrap": {
+      "command": [
+        "python",
+        "scripts/check_provider_bootstrap.py"
+      ],
+      "working_directory": "/workspace/jeeves-first-install-integration",
+      "scope": "Final complete static provider/bootstrap ownership and materialization gate after packaging correction; no automated test suite.",
+      "exit_code": 0,
+      "status": "pass",
+      "completion_observed_at": "2026-10-15T18:06:15.706427+00:00",
+      "source_commit": "ee0bcdae5f1a2643697f04b065224783fb6a6535",
+      "later_changes": "Documentation and new operational session evidence only.",
+      "log": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/provider-bootstrap-final.log",
+      "log_sha256": "31b5b83189cbf6222a2b4796eac5f39f62da6446788ef03c58b3c43892b1b20a",
+      "automated_tests_run": false
+    },
+    "gates": {
+      "architecture": {
+        "status": "pass",
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/architecture.log",
+        "sha256": "cd93298aa9c93da31eca2b2a3a9a0f98a18715100f809fd76b88eb76c12a0599"
+      },
+      "app-final": {
+        "status": "pass",
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/app-final.log",
+        "sha256": "d53bdafe028f6863c4441a54a74a7484f7b40b26541a6c4bc7bda581038658d6"
+      },
+      "capabilities": {
+        "status": "pass",
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/capabilities.log",
+        "sha256": "e7079909f1187da2c36cad3e85658e5475a4f296d723733155baa4c3d9bd74f5"
+      },
+      "state": {
+        "status": "pass",
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/state.log",
+        "sha256": "b70ba568b5946ec1cbbfd573c9eeb50d84d62d3a74424a5bc3fa3e717f2f2dd8"
+      },
+      "file-tree": {
+        "status": "pass",
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/file-tree.log",
+        "sha256": "9e45935096fc8c0c6cfbe3171c839183be4967944e57a93e9c89a61c521ed43d"
+      },
+      "file-tree-ownership": {
+        "status": "pass",
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/file-tree-ownership.log",
+        "sha256": "97c998f16e9541566e6d911cacedd9f575dd99863ba8d6b0f4ea4b5d64b49f8c"
+      }
+    },
+    "enterprise_contracts": [
+      {
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/enterprise.json",
+        "sha256": "4485054712b6bf575e2b057168e052ac7d090d66f3f15e62d3d759872dae67f6"
+      },
+      {
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/enterprise-notes.json",
+        "sha256": "4f705a30843b1f6db6c69bd5d18911f4a478bd678e474b5619552ba00237b9fc"
+      }
+    ],
+    "automated_tests_run": false
+  },
+  "receipts": [
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/provider-bootstrap-final-receipt.json",
+      "sha256": "90eaf0e31cb2dcc27fbe781ca7b1563d2cbc47001ddf2aab9b91b3aeddf4676a"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/source-validation.json",
+      "sha256": "006592471ba59e4ad15e6c6f430f7a7830918143773749d37df1ad81d9427b7a"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/training-source-union-fed9817.json",
+      "sha256": "29d7a4dc23c224f3ef0f9fe8e00b16dc0b6b3a5749403dcc7487097476c5fabe"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/merged-source-pin-refresh.json",
+      "sha256": "0c0f78407a1f7f47497cc1d6199d9e6dab4c487450ea65134ec415d2084448e9"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/source-ready-health-completed.json",
+      "sha256": "c42c43e3e1bc4d9e2edf26fe99b0432d997ff0bcc14a2b7b730994ed76caf33d"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/public-ai-readiness.json",
+      "sha256": "91fced231dd2ea35287419d57f0ce2a09fe0ea23024c1c5d15c50d3380fe73e2"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/first-install-doctor.json",
+      "sha256": "7c33ac147fe3778cae2b371b00327ae5d90debd95dd34a1578acf86ba8539b3e"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/first-install-doctor-summary.json",
+      "sha256": "4c6405ae27a507e80375cfce845a101fb3e0531e2b880edfa4c4fa1e6b4afb05"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/builder/planner-schema-compilation.json",
+      "sha256": "c20d8da604645ffc7dafbf99da269a751e50e557c7b8d4534c2671a966ac8bc0"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/builder/planner-reliability-20261015-01/receipt.json",
+      "sha256": "6c4ff0910a495d048b7edb503a6764855ecb41bb4391708b6c1ef7f8a7ef840a"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/builder/planner-reliability-post-withdrawal-20261015-01/operational-summary.json",
+      "sha256": "9aa7d3dab2cd27108fdc2de17177dd82b1be3987337e7c90b803b97845e33e0b"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/builder/planner-reliability-post-withdrawal-20261015-01/receipt.json",
+      "sha256": "76429d7fa4a84134719306be0dbc842ae94c07ca52600fa0d2f9f0371368c9a0"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/builder/planner-reliability-post-withdrawal-20261015-01/authenticated-download-receipt.json",
+      "sha256": "c7ac98184ae5b651915b54220d515c8c571f9020cdb0c07ef2423b9dc744eb76"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/dragon/evidence-summary.json",
+      "sha256": "01322e77cf582f1e835b271ceb2de7c9cf6213ec10d7e31348a22ea6e8cb5386"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/training/actual-ee0bcdae-v1/summary.json",
+      "sha256": "843b7bd49b94c3a02b6cc0febad8bcbb3e6137b8d73441d8aca2c4d1ec13433f"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/qualification-summary.json",
+      "sha256": "70d9add10cd0e49880fef5b06e5263fb7df33e03d93ff81e05891a553fd9a719"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/app-web-observed-final-artifact.json",
+      "sha256": "88622266cb3eff5219e3ffa257fd53cb1328017c268a776ee725b90c20c34ee1"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/app-web-observed-final-frontend-source.json",
+      "sha256": "909095a4f3b20c8dbfb1b7ab306fc19ee85de4cf10124f5c1d6d442ab17916e5"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/backend-proof/final-qualified-image-summary.json",
+      "sha256": "5d623e4b6b89ad6b401107e1511056689d8975b00afe11c78ea2eea5a272f800"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/backend-proof/actual-production-backend-upgrade-qualification.json",
+      "sha256": "ec1360764ad8cc5f6db3b5ee6dd81f07a9e8c255cb44cbc38f66b5b6e1f95197"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/backend-proof/production-backend-build-receipt.json",
+      "sha256": "32220796657695d424137a33454b2e3388e74eb94d7490c01513b5a4426ad0e4"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/backend-proof/actual-all-runtime-source-identities.json",
+      "sha256": "4d05168c700d6f18ff61ab9958c1545846a099c3c1afa1a787105b063621e658"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/backend-proof/actual-packaged-training-catalogue-check.json",
+      "sha256": "1002a5049a9946070d1ed68e204505d29713ae9723d86fcc0861ccc82bd239a0"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/backend-proof/attempt-6280-source-stage-collision/production-backend-build-receipt.json",
+      "sha256": "6b66a2b2b3baf6373fef00a4d085b4b975a77916e216802d0e29f49686c9a2e3"
+    },
+    {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/backend-proof/source-stage-collision-correction-static.json",
+      "sha256": "4d7812b60798eeb7940dc6955bbd4d00b0c73489473f77b43ea1e11dfcb37f6e"
+    }
+  ],
+  "limitations": [
+    "One completed model workflow is not a general reliability or game-quality benchmark.",
+    "Catalogue membership and installed mappings do not establish universal emulation, complete per-console editors or arbitrary-ROM semantic understanding.",
+    "Native execution requires compatible approved content/core/firmware/toolchain and the mandatory sandbox.",
+    "Held-out training comparisons used one seed each; returns do not certify mastery or subjective game quality. Studio training tied its baseline.",
+    "Dragon reference practice neither verifies the scraped proposition nor trains a policy or awards XP.",
+    "Recovery/fairness/ambiguous-publication failure paths were source-reviewed; no database fault injection or exhaustive concurrency qualification was performed.",
+    "Dragon disappeared-store identity fencing is process-local; complete volume loss across a full restart is not qualified here.",
+    "Started executor work drains cooperatively; no forced remote worker-exit attestation is claimed.",
+    "Configured host availability is separate from checkout configuration: services_ready true, configuration_ready false in this private-env observation.",
+    "No language-model finetuning, autonomous studio-quality creation, 100000-run completion or guaranteed improvement is claimed.",
+    "Scratch receipts, models, SDKs, frontend ZIP and the retained Docker image are local operational artifacts; repository metadata records their exact identities."
+  ],
+  "final_quiescence": {
+    "receipt": {
+      "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/final-operational-quiescence.json",
+      "sha256": "55e647becf4c0189cfc8681ab8a2eea10d8889aefacb4e6774e2e5bd9da493b0"
+    },
+    "summary": {
+      "active_goals": 0,
+      "allowed_history": {
+        "expected_error": "dragon_reviewed_reference_withdrawn",
+        "expected_status": "blocked",
+        "goal_id": "f372a55b-c8d8-5c2a-827c-de92f9e2b823",
+        "note": "Intentional historical source-withdrawal refusal retained unchanged; not active work."
+      },
+      "chat": {
+        "canonical_completed": true,
+        "canonical_terminal_artifact": {
+          "bytes": 2742,
+          "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/final-quiescence/chat-canonical-terminal.json",
+          "sha256": "d28160772226b91700f908af6347499fa5025b0b68fd45f0ea3b124756247fb5"
+        },
+        "execution_id": "1f7c37e7-a863-5617-b1b8-62cd42451630",
+        "mongo_state": "complete",
+        "operation_id": "e027d599-e810-5a5f-b3cf-1bc821ed8632",
+        "provider_receipt_count": 1
+      },
+      "detail_receipt": {
+        "bytes": 7315,
+        "path": "/workspace/scratch/jeeves-studio-reliability-2026-10-15/final-quiescence/receipt.json",
+        "sha256": "d795a2632ce05a882b91a81281bd0955120cfd448d31540100bccc77bb9f7667"
+      },
+      "goals": [
+        {
+          "error_code": null,
+          "goal_id": "2da9e68d-4921-5557-9468-94da6a63a461",
+          "status": "completed"
+        },
+        {
+          "error_code": "dragon_reviewed_reference_withdrawn",
+          "goal_id": "f372a55b-c8d8-5c2a-827c-de92f9e2b823",
+          "status": "blocked"
+        }
+      ],
+      "intentionally_retained_services": [
+        "canonical engine12110",
+        "canonical backend12001",
+        "static preview3044"
+      ],
+      "jobs": {
+        "active": 0,
+        "observed": 10,
+        "states": {
+          "cancelled": 1,
+          "completed": 8,
+          "failed": 1
+        }
+      },
+      "live_worker_credits": 0,
+      "no_active_qualification_work": true,
+      "no_source_edits_tests_model_invocations_or_restarts": true,
+      "observed_at": "2026-10-15T18:08:17.200142+00:00",
+      "plays": {
+        "active": 0,
+        "states": {
+          "stopped": 2
+        }
+      },
+      "preview_retention_basis": "Coordinator reports intentionally retained static preview; not model/native work.",
+      "processes": {
+        "backend": {
+          "descendants": [],
+          "exists": true,
+          "pid": 288707
+        },
+        "engine": {
+          "descendants": [],
+          "exists": true,
+          "pid": 288683
+        },
+        "known_native_actor_pids": [
+          {
+            "exists": false,
+            "pid": 290744
+          },
+          {
+            "exists": false,
+            "pid": 290746
+          }
+        ],
+        "matching_model_or_native_worker_processes": []
+      },
+      "read_only": true,
+      "schema_version": "operator.final_operational_quiescence_summary.v1",
+      "scope": {
+        "goal_ids": [
+          "2da9e68d-4921-5557-9468-94da6a63a461",
+          "f372a55b-c8d8-5c2a-827c-de92f9e2b823"
+        ],
+        "historical_records_outside_scope_not_claimed": true,
+        "project_ids": [
+          "364d1c7a-8d59-502a-9673-8cfc52bfbab7",
+          "816c63d3-eb11-544b-bbfa-ed6b33c2f9da",
+          "91b7c47f-e0b8-519e-b00b-50434c2edaef",
+          "a571fc22-86d4-58e6-85fc-aa11818788e5"
+        ],
+        "records_per_collection_limit": 128
+      }
+    }
+  }
+}

@@ -6,16 +6,15 @@ installer mutation occurs: can this checkout support the assembled app?
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import platform
-from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
 
 from skeleton.app.assembly import checks_ok, find_repo_root, preflight
-
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -186,7 +185,10 @@ def inspect_host(
                 [docker, "info", "--format", "{{.ServerVersion}}"],
                 code="host:docker-daemon",
                 label="Docker daemon",
-                remediation="Start Docker Desktop and wait for the engine to finish starting.",
+                remediation=(
+                    "Start Docker Desktop or Docker Engine and allow the current user access "
+                    "to its socket. Wait for startup and check the selected Docker context; no service was started."
+                ),
                 runner=runner,
                 timeout=15.0,
             )

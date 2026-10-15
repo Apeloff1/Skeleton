@@ -13,6 +13,7 @@ import binascii
 import hashlib
 import json
 import logging
+import math
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -65,6 +66,49 @@ def _key(project_id: str, kind: str, key: str) -> str:
     if not isinstance(key, str) or not key.strip() or key != key.strip() or len(key) > 512:
         raise GameLearningError("invalid_idempotency", "A normalized idempotency key is required.")
     return str(uuid5(NAMESPACE_URL, "game-learning:" + project_id + ":" + kind + ":" + key))
+
+
+async def _drain_executor(future):
+    """Observe the real executor outcome even during repeated request cancellation."""
+    while not future.done():
+        try:
+            await asyncio.shield(future)
+        except asyncio.CancelledError:
+            continue
+        except Exception:
+            break
+    return future.result()
+
+
+async def _close_environment(environment):
+    from skeleton.jeeves.game_learning_demonstrations import close_environment
+
+    cleanup = asyncio.get_running_loop().run_in_executor(None, close_environment, environment)
+    try:
+        await asyncio.shield(cleanup)
+    except asyncio.CancelledError:
+        await _drain_executor(cleanup)
+        raise
+
+
+async def _probe_environment(factory):
+    """A cancelled native admission must still close its eventual environment."""
+    worker = asyncio.get_running_loop().run_in_executor(None, factory)
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        try:
+            environment = await _drain_executor(worker)
+        except Exception:
+            # Failed construction owns its own constructor cleanup. The real
+            # executor has finished; no environment was handed to this caller.
+            pass
+        else:
+            from skeleton.jeeves.game_learning_demonstrations import close_environment
+
+            cleanup = asyncio.get_running_loop().run_in_executor(None, close_environment, environment)
+            await _drain_executor(cleanup)
+        raise
 
 
 def _public(doc: Mapping[str, Any], *, payload: bool = False) -> dict[str, Any]:
@@ -316,14 +360,17 @@ class GameLearningWorkspace:
         studio = requested.startswith("studio:") and len(requested) <= 128
         if studio:
             from skeleton.jeeves.game_studio_environment import (
-                make_studio_source, studio_request_tree,
+                make_studio_source,
+                studio_request_tree,
             )
             from skeleton.ai.game_builder.advanced_gameplay_runtime import ENGINES
+
             editor = requested.removeprefix("studio:")
             if editor not in ENGINES:
                 raise GameLearningError(
                     "studio_engine_unavailable",
-                    "Requested original-game engine is not registered as executable.", 409,
+                    "Requested original-game engine is not registered as executable.",
+                    409,
                 )
             target = None
             initial_studio = studio_request_tree(make_studio_source(editor))
@@ -342,18 +389,22 @@ class GameLearningWorkspace:
                 )
             return await self.get_project(scope, project_id)
         files = (
-            _files([
-                {"path": path, "content": content, "language": "json"}
-                for path, content in initial_studio.items()
-            ])
-            if studio
-            else []
-            if not target.reference_supported
-            else _files(
+            _files(
                 [
-                    {"path": path, "content": text}
-                    for path, text in GameLearningEnvironment(target.target_id).tree.files.items()
+                    {"path": path, "content": content, "language": "json"}
+                    for path, content in initial_studio.items()
                 ]
+            )
+            if studio
+            else (
+                []
+                if not target.reference_supported
+                else _files(
+                    [
+                        {"path": path, "content": text}
+                        for path, text in GameLearningEnvironment(target.target_id).tree.files.items()
+                    ]
+                )
             )
         )
         preferred = next(
@@ -375,13 +426,15 @@ class GameLearningWorkspace:
             "engine_era": "studio_reference" if studio else target.era.value,
             "execution_mode": (
                 "reference"
-                if studio else
-                "rom"
-                if target.requires_rom
+                if studio
                 else (
-                    "native_gameplay_python"
-                    if target.as_dict().get("capabilities", {}).get("native_gameplay_execution")
-                    else "reference" if target.reference_supported else "source_only"
+                    "rom"
+                    if target.requires_rom
+                    else (
+                        "native_gameplay_python"
+                        if target.as_dict().get("capabilities", {}).get("native_gameplay_execution")
+                        else "reference" if target.reference_supported else "source_only"
+                    )
                 )
             ),
             "version": 1,
@@ -488,7 +541,8 @@ class GameLearningWorkspace:
                 current_environment = (
                     GameEnvironmentRequest(
                         self.authored_runtime_target(tree, kind, project["console_id"]),
-                        kind=kind, tree=self.authored_runtime_tree(tree, kind),
+                        kind=kind,
+                        tree=self.authored_runtime_tree(tree, kind),
                         max_steps=64 if kind == "studio" else 256,
                     ).build()
                     if kind
@@ -502,9 +556,13 @@ class GameLearningWorkspace:
                     result["environment_actions"] = list(current_environment.spec.actions)
                     descriptor = getattr(current_environment, "descriptor", None)
                     result["execution_descriptor"] = (
-                        descriptor() if callable(descriptor)
-                        else dict(descriptor) if isinstance(descriptor, Mapping)
-                        else current_environment.spec.as_dict()
+                        descriptor()
+                        if callable(descriptor)
+                        else (
+                            dict(descriptor)
+                            if isinstance(descriptor, Mapping)
+                            else current_environment.spec.as_dict()
+                        )
                     )
                 finally:
                     from skeleton.jeeves.game_learning_demonstrations import close_environment
@@ -1243,15 +1301,130 @@ class GameLearningWorkspace:
 
         return await asyncio.to_thread(read)
 
-    async def _guarded_write(self, scope, binding, operation):
-        dragon = []
-        for expected in (
-            binding["sources"] + binding.get("external_sources", []) + binding.get("derived_sources", [])
-        ):
-            row = await self.sources.find_one({"_id": expected["source_id"], **scope})
-            if row is not None and row["kind"] == "dragon":
+    async def _dragon_guard_references(self, scope, binding):
+        """Collect inherited review dependencies without loading Q tables/files."""
+        roles = ("parent_policy", "generation_policy", "review_policy", "review_baseline_policy")
+        fields = (
+            "project_id",
+            "sources",
+            "external_sources",
+            "derived_sources",
+            "demonstrations",
+            "inherited_demonstrations",
+            "derived_demonstrations",
+            *roles,
+        )
+        projection = {"input." + name: 1 for name in fields}
+        pending, policies, teachers, source_ids = [binding], {}, {}, set()
+        metadata_bytes = len(_json({name: binding[name] for name in fields if name in binding}))
+
+        def retain_input(record):
+            nonlocal metadata_bytes
+            value = self._stored_evidence(record["input"])
+            metadata_bytes += len(_json(value))
+            if metadata_bytes > MAX_JSON:
+                raise GameLearningError("review_guard_limit", "Inherited review metadata exceeds8MiB.", 413)
+            pending.append(value)
+
+        while pending:
+            current = pending.pop()
+            # Source-only guards are also used by prepared editor recovery.
+            # They need no root project unless a relative policy/teacher pin
+            # actually requires that scope.
+            project_id = current.get("project_id")
+            for reference in (
+                current.get("sources", [])
+                + current.get("external_sources", [])
+                + current.get("derived_sources", [])
+            ):
+                source_ids.add(reference["source_id"])
+            if len(source_ids) > 4096:
+                raise GameLearningError(
+                    "review_guard_limit", "Inherited review source inventory exceeds4096.", 413
+                )
+            for role in roles:
+                pin = current.get(role)
+                if not pin:
+                    continue
+                identity = (pin.get("project_id", project_id), pin["policy_id"])
+                if not isinstance(identity[0], str) or not identity[0]:
+                    raise GameLearningError(
+                        "review_guard_scope", "An ancestor policy needs exact project scope.", 503
+                    )
+                if identity in policies:
+                    if policies[identity] != pin["snapshot_digest"]:
+                        raise GameLearningError(
+                            "parent_policy_changed", "Ancestor policy identities conflict.", 403
+                        )
+                    continue
+                if len(policies) >= 256:
+                    raise GameLearningError(
+                        "review_guard_limit", "Review guard exceeds256policy dependencies.", 413
+                    )
+                policy = await self.policies.find_one(
+                    {"_id": identity[1], **scope, "project_id": identity[0]},
+                    {**projection, "snapshot.snapshot_digest": 1},
+                )
+                if (
+                    policy is None
+                    or policy.get("snapshot", {}).get("snapshot_digest") != pin["snapshot_digest"]
+                ):
+                    raise GameLearningError(
+                        "parent_policy_changed", "Ancestor policy review identity differs.", 403
+                    )
+                policies[identity] = pin["snapshot_digest"]
+                retain_input(policy)
+            for pin in (
+                current.get("demonstrations", [])
+                + current.get("inherited_demonstrations", [])
+                + current.get("derived_demonstrations", [])
+            ):
+                identity = (pin.get("project_id", project_id), pin["recording_id"])
+                if not isinstance(identity[0], str) or not identity[0]:
+                    raise GameLearningError(
+                        "review_guard_scope", "An ancestor teacher needs exact project scope.", 503
+                    )
+                if identity in teachers:
+                    if teachers[identity] != pin["demonstration_digest"]:
+                        raise GameLearningError(
+                            "demonstration_identity_changed", "Teacher identities conflict.", 403
+                        )
+                    continue
+                if len(teachers) >= 256:
+                    raise GameLearningError(
+                        "review_guard_limit", "Review guard exceeds256teacher dependencies.", 413
+                    )
+                teacher = await self.database["game_learning_recordings"].find_one(
+                    {
+                        "_id": identity[1],
+                        **scope,
+                        "project_id": identity[0],
+                        "status": "completed",
+                        "consent": True,
+                    },
+                    {**projection, "demonstration.demonstration_digest": 1},
+                )
+                if (
+                    teacher is None
+                    or teacher.get("demonstration", {}).get("demonstration_digest")
+                    != pin["demonstration_digest"]
+                ):
+                    raise GameLearningError(
+                        "demonstration_consent_withdrawn", "Teacher review authority differs.", 403
+                    )
+                teachers[identity] = pin["demonstration_digest"]
+                retain_input(teacher)
+
+        dragon = set()
+        for source_id in sorted(source_ids):
+            row = await self.sources.find_one({"_id": source_id, **scope, "kind": "dragon"})
+            if row is not None:
                 bundle = self._source_bundle(scope, row).to_dict()
-                dragon.append((bundle["provenance"]["source_ref"], row["source_digest"]))
+                dragon.add((bundle["provenance"]["source_ref"], row["source_digest"]))
+        return sorted(dragon)
+
+    async def _guarded_write(self, scope, binding, operation):
+        dragon = await self._dragon_guard_references(scope, binding)
         if not dragon:
             return await operation()
         from routes.dragon_academy import _lab
@@ -1275,18 +1448,22 @@ class GameLearningWorkspace:
                         return await operation()
 
                     future = asyncio.run_coroutine_threadsafe(invoke(), loop)
-                    try:
-                        result = future.result()
-                    except BaseException:
-                        future.cancel()
-                        raise
+                    result = future.result()
                     lab.db.commit()
                     return result
                 finally:
                     if lab.db.in_transaction:
                         lab.db.rollback()
 
-        return await asyncio.to_thread(publish)
+        worker = loop.run_in_executor(None, publish)
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            # The review guard and its actual Mongo publication may still be
+            # owned by the executor. Do not release that lifetime on wrapper
+            # cancellation or detach it on repeated shutdown cancellation.
+            await _drain_executor(worker)
+            raise
 
     async def _source_bytes(self, scope: dict[str, str], project: Mapping[str, Any], source_id: str):
         if source_id not in project["source_ids"]:
@@ -1365,14 +1542,18 @@ class GameLearningWorkspace:
         studio_project = project["console_id"].startswith("studio:")
         if studio_project:
             from skeleton.jeeves.game_studio_environment import studio_source_target
+
             tree = {item["path"]: item["content"] for item in project["files"]}
-            actual = studio_source_target(
-                {"game/studio/session.json": tree["game/studio/session.json"]}
-            ) if "game/studio/session.json" in tree else None
+            actual = (
+                studio_source_target({"game/studio/session.json": tree["game/studio/session.json"]})
+                if "game/studio/session.json" in tree
+                else None
+            )
             if actual != project["console_id"]:
                 raise GameLearningError(
                     "studio_source_changed",
-                    "Project studio identity no longer matches saved executable source.", 409,
+                    "Project studio identity no longer matches saved executable source.",
+                    409,
                 )
             target = None
             if type(episode_steps) is not int or episode_steps < 1:
@@ -1458,6 +1639,10 @@ class GameLearningWorkspace:
                 "core_id": pin["core_id"],
                 "registry_digest": pin["registry_digest"],
             }
+            from core.game_console_build import artifact_native_observation
+
+            native = await artifact_native_observation(scope, picked)
+            binding["native_observation_digest"] = native["descriptor_digest"] if native else None
         return binding
 
     async def _authority(self, scope, binding, *, dragon_guarded=False):
@@ -1497,10 +1682,17 @@ class GameLearningWorkspace:
                 )
             bundle = self._source_bundle(scope, row)
             if row["kind"] == "build_artifact":
-                from core.game_console_build import assert_artifact_source
+                from core.game_console_build import assert_artifact_source, _native_observation
 
-                await assert_artifact_source(scope, row, dragon_guarded=dragon_guarded)
+                record, producer = await assert_artifact_source(scope, row, dragon_guarded=dragon_guarded)
                 if expected["source_id"] == binding.get("source_id"):
+                    native = _native_observation(record, producer, row["artifact_manifest"]["core_id"])
+                    if binding.get("native_observation_digest") != (
+                        native["descriptor_digest"] if native else None
+                    ):
+                        raise GameLearningError(
+                            "native_observation_changed", "Native observation authority changed.", 409
+                        )
                     pin = row["artifact_manifest"]
                     expected_pin = {
                         key: pin[key]
@@ -1540,7 +1732,7 @@ class GameLearningWorkspace:
             registry.resolve_core(binding["emulator_binding"]["core_id"])
         if binding.get("demonstrations") or binding.get("inherited_demonstrations"):
             await self._demonstration_authority(scope, binding, dragon_guarded=dragon_guarded)
-        for role in ("parent_policy", "generation_policy", "review_policy"):
+        for role in ("parent_policy", "generation_policy", "review_policy", "review_baseline_policy"):
             if binding.get(role):
                 parent = await self._admitted_policy(
                     scope, project["project_id"], binding[role]["policy_id"], dragon_guarded=dragon_guarded
@@ -1575,7 +1767,7 @@ class GameLearningWorkspace:
                 raise GameLearningError(
                     "derived_teacher_withdrawn", "An original teacher withdrew consent.", 403
                 )
-            demo = GameDemonstration.from_dict(recorded["demonstration"])
+            demo = GameDemonstration.from_dict(self._stored_evidence(recorded["demonstration"]))
             if (
                 demo.digest != expected["demonstration_digest"]
                 or recorded["input"]["tree_digest"] != expected["tree_digest"]
@@ -1672,6 +1864,7 @@ class GameLearningWorkspace:
         saved = await self.policies.find_one({"_id": policy_id, **scope, "project_id": project_id})
         if saved is None:
             raise GameLearningError("policy_not_found", "An owned completed policy is required.", 404)
+        saved["snapshot"] = self._stored_evidence(saved["snapshot"])
         issuer = await self.jobs.find_one(
             {"_id": saved["job_id"], **scope, "project_id": project_id, "status": "completed"}
         )
@@ -1765,71 +1958,435 @@ class GameLearningWorkspace:
             )
         return saved
 
+    async def _policy_evidence(self, scope, project_id, policy_id):
+        """Read only a completed current-rights issuer, never an orphan row."""
+        from skeleton.jeeves.game_learning import GamePolicyLearner
+
+        saved = await self._admitted_policy(scope, project_id, policy_id, allow_environment_changed=True)
+        project = await self._project(project_id, scope)
+        issuer = await self.jobs.find_one(
+            {"_id": saved["job_id"], **scope, "project_id": project_id, "status": "completed"}
+        )
+        if (
+            issuer is None
+            or issuer["job_id"] not in project["job_ids"]
+            or issuer.get("kind") != "train"
+            or issuer.get("request_digest") != _digest(issuer.get("request"))
+            or _digest(issuer.get("input")) != _digest(saved["input"])
+        ):
+            raise GameLearningError("policy_issuer_invalid", "Policy issuing input is unavailable.", 409)
+        try:
+            learner = GamePolicyLearner.from_snapshot(saved["snapshot"])
+        except ValueError as exc:
+            raise GameLearningError(
+                "policy_runtime_unavailable", "Policy runtime or full snapshot identity is unavailable.", 409
+            ) from exc
+        lineage = saved["snapshot"]["source_lineage"]
+        if (
+            lineage.get("project_id") != project_id
+            or lineage.get("input_digest") != _digest(saved["input"])
+            or lineage.get("sources") != saved["input"]["sources"]
+            or saved["snapshot"]["environment"] != issuer["environment"]
+            or issuer.get("learning_config") is not None
+            and saved["snapshot"]["configuration"] != issuer["learning_config"]
+        ):
+            raise GameLearningError(
+                "policy_issuer_invalid", "Policy differs from its admitted configuration.", 503
+            )
+        result = self._stored_evidence(issuer["result"])
+        configuration_digest = _digest(saved["snapshot"]["configuration"])
+        if (
+            result.get("learning_config_digest", configuration_digest) != configuration_digest
+            or issuer.get("learning_config") is not None
+            and issuer.get("learning_config_digest") != configuration_digest
+        ):
+            raise GameLearningError(
+                "policy_configuration_invalid", "Issued numerical configuration differs.", 503
+            )
+        evaluation = result.get("evaluation")
+        if (
+            not isinstance(evaluation, dict)
+            or evaluation.get("evaluation_digest")
+            != _digest({key: value for key, value in evaluation.items() if key != "evaluation_digest"})
+            or evaluation.get("policy_digest") != saved["snapshot"]["snapshot_digest"]
+            or evaluation.get("policy_id") != policy_id
+            or evaluation.get("environment") != saved["snapshot"]["environment"]
+            or evaluation.get("source_lineage") != lineage
+            or len(evaluation.get("episodes", [])) != issuer["request"].get("evaluation_seeds", 4)
+            or set(evaluation.get("heldout_seeds", [])) & set(saved["snapshot"]["training_seeds"])
+        ):
+            raise GameLearningError("policy_evaluation_invalid", "Policy paired evaluation differs.", 503)
+        acceptance = result.get("acceptance")
+        if acceptance is not None and acceptance != self._training_acceptance(evaluation, issuer["request"]):
+            raise GameLearningError("policy_acceptance_invalid", "Recorded return gate differs.", 503)
+        return saved, issuer, learner
+
+    async def _policy_projection(self, scope, saved, issuer):
+        from skeleton.jeeves.game_learning import MAX_LIFETIME_EPISODES, MAX_LIFETIME_UPDATES
+
+        project = await self._project(saved["project_id"], scope)
+        snapshot, result = saved["snapshot"], issuer["result"]
+        return {
+            "policy_id": saved["policy_id"],
+            "project_id": saved["project_id"],
+            "job_id": saved["job_id"],
+            "created_at": _time(saved["created_at"]).isoformat(),
+            "available": True,
+            "status": "bounded_candidate",
+            "policy_digest": snapshot["snapshot_digest"],
+            "is_default": project.get("policy_id") == saved["policy_id"],
+            "input_digest": _digest(saved["input"]),
+            "environment": snapshot["environment"],
+            "configuration": snapshot["configuration"],
+            "committed_episodes": snapshot["committed_episodes"],
+            "committed_updates": snapshot["committed_updates"],
+            "inherited_episodes": snapshot.get(
+                "inherited_episode_count", len(snapshot.get("inherited_episodes", []))
+            ),
+            "inherited_updates": snapshot.get("inherited_updates", 0),
+            "imitation_observations": snapshot.get("imitation_observations", 0),
+            "parent_policy_id": snapshot.get("parent_policy_id"),
+            "remaining_lifetime_episodes": max(
+                0,
+                MAX_LIFETIME_EPISODES
+                - snapshot["committed_episodes"]
+                - len(snapshot.get("inherited_episodes", [])),
+            ),
+            "remaining_lifetime_updates": max(
+                0, MAX_LIFETIME_UPDATES - snapshot["committed_updates"] - snapshot.get("inherited_updates", 0)
+            ),
+            "metrics": result["metrics"],
+            "acceptance": result.get("acceptance"),
+            "selected_source_id": saved["input"].get("source_id"),
+            "executable_current_revision": (
+                not self._editor_pending(project)
+                and _digest(project["files"]) == saved["input"]["tree_digest"]
+                and project.get("_input_epoch", 0) == saved["input"].get("input_epoch", 0)
+                and project["version"] == saved["input"]["project_version"]
+            ),
+            "production_promotion_authorized": False,
+        }
+
+    async def list_policies(self, scope, project_id, *, limit=16, cursor=None):
+        if type(limit) is not int or not 1 <= limit <= 32:
+            raise GameLearningError("policy_page_invalid", "Policy page exceeds its bound.")
+        await self._project(project_id, scope)
+        predicate = {**scope, "project_id": project_id}
+        if cursor is not None:
+            anchor = await self.policies.find_one({"_id": cursor, **scope, "project_id": project_id})
+            if anchor is None:
+                raise GameLearningError("policy_cursor_invalid", "Owned policy cursor not found.", 409)
+            predicate["$or"] = [
+                {"created_at": {"$lt": anchor["created_at"]}},
+                {"created_at": anchor["created_at"], "_id": {"$lt": cursor}},
+            ]
+        rows = (
+            await self.policies.find(predicate, {"snapshot": 0})
+            .sort([("created_at", -1), ("_id", -1)])
+            .limit(limit + 1)
+            .max_time_ms(2000)
+            .to_list(length=limit + 1)
+        )
+        output = []
+        for row in rows[:limit]:
+            try:
+                saved, issuer, _ = await self._policy_evidence(scope, project_id, row["policy_id"])
+                output.append(await self._policy_projection(scope, saved, issuer))
+            except GameLearningError as exc:
+                # An owned metadata row is not evidence that its issuer or
+                # withdrawn sources are still usable. Never expose its payload.
+                output.append(
+                    {
+                        "policy_id": row["policy_id"],
+                        "project_id": project_id,
+                        "job_id": row["job_id"],
+                        "available": False,
+                        "readiness": {"code": exc.code, "message": exc.message},
+                        "production_promotion_authorized": False,
+                    }
+                )
+        return {"policies": output, "next_cursor": rows[limit - 1]["_id"] if len(rows) > limit else None}
+
+    async def read_policy(self, scope, project_id, policy_id):
+        saved, issuer, _ = await self._policy_evidence(scope, project_id, policy_id)
+        result = await self._policy_projection(scope, saved, issuer)
+        result["evaluation"] = self._stored_evidence(issuer["result"]["evaluation"])
+        await self._admitted_policy(scope, project_id, policy_id, allow_environment_changed=True)
+        return {"policy": result}
+
+    async def policy_episodes(self, scope, project_id, policy_id, *, after=-1, limit=16):
+        if type(after) is not int or not -1 <= after <= 255 or type(limit) is not int or not 1 <= limit <= 32:
+            raise GameLearningError("episode_page_invalid", "Episode page exceeds its bound.")
+        saved, _, _ = await self._policy_evidence(scope, project_id, policy_id)
+        rows = [item for item in saved["snapshot"]["episodes"] if item["ordinal"] > after]
+        page = rows[:limit]
+        await self._admitted_policy(scope, project_id, policy_id, allow_environment_changed=True)
+        return {
+            "policy_id": policy_id,
+            "policy_digest": saved["snapshot"]["snapshot_digest"],
+            "episodes": page,
+            "next_after": page[-1]["ordinal"] if len(rows) > limit else None,
+            "scope": "current_job_committed_episodes",
+        }
+
+    async def export_policy(self, scope, project_id, policy_id):
+        saved, issuer, _ = await self._policy_evidence(scope, project_id, policy_id)
+        payload = {
+            "schema_version": "skeleton.game.policy_export.v1",
+            "policy": await self._policy_projection(scope, saved, issuer),
+            "snapshot": saved["snapshot"],
+            "evaluation": self._stored_evidence(issuer["result"]["evaluation"]),
+            "source_authority": {
+                "project_id": project_id,
+                "tree_digest": saved["input"]["tree_digest"],
+                "input_digest": _digest(saved["input"]),
+                "sources": saved["input"]["sources"],
+                "parent_policy": saved["input"].get("parent_policy"),
+                "demonstrations": saved["input"].get("demonstrations", []),
+                "inherited_demonstrations": saved["input"].get("inherited_demonstrations", []),
+            },
+            "authority_scope": "same-store issued evidence; exported JSON grants no execution/import authority",
+            "production_promotion_authorized": False,
+        }
+        encoded = _json(payload)
+        await self._admitted_policy(scope, project_id, policy_id, allow_environment_changed=True)
+        return {
+            "project_id": project_id,
+            "policy_id": policy_id,
+            "policy_digest": saved["snapshot"]["snapshot_digest"],
+            "filename": "game-policy-" + policy_id + ".json",
+            "media_type": "application/json",
+            "content": encoded.decode(),
+            "content_digest": hashlib.sha256(encoded).hexdigest(),
+        }
+
+    async def export_policy_episode(self, scope, project_id, policy_id, episode_id):
+        saved, issuer, learner = await self._policy_evidence(scope, project_id, policy_id)
+        summary = next(
+            (row for row in saved["snapshot"]["episodes"] if row["episode_id"] == episode_id), None
+        )
+        if summary is None:
+            raise GameLearningError("episode_not_found", "Committed policy episode not found.", 404)
+        record = await self.episodes.find_one(
+            {
+                "_id": issuer["job_id"] + ":" + episode_id,
+                **scope,
+                "project_id": project_id,
+                "job_id": issuer["job_id"],
+                "trace.trace_digest": summary["trace_digest"],
+            }
+        )
+        if record is None:
+            # The latest authoritative checkpoint retains the complete trace
+            # across an interrupted projection. Older committed rows are never
+            # replaced using an unacknowledged rollout or caller payload.
+            await self._project_committed_episode(scope, issuer)
+            record = await self.episodes.find_one(
+                {
+                    "_id": issuer["job_id"] + ":" + episode_id,
+                    **scope,
+                    "project_id": project_id,
+                    "job_id": issuer["job_id"],
+                    "trace.trace_digest": summary["trace_digest"],
+                }
+            )
+        if record is None:
+            raise GameLearningError(
+                "episode_evidence_unavailable", "Committed episode trace is unavailable.", 503
+            )
+        trace = self._stored_evidence(record["trace"])
+        try:
+            learner.validate_trace(trace)
+        except ValueError as exc:
+            raise GameLearningError(
+                "episode_evidence_corrupt", "Committed episode validation failed.", 503
+            ) from exc
+        if any(
+            trace[key] != summary[key] for key in ("episode_id", "trace_digest", "seed", "steps", "return")
+        ):
+            raise GameLearningError(
+                "episode_evidence_corrupt", "Episode differs from its committed policy ledger.", 503
+            )
+        encoded = _json(
+            {
+                "schema_version": "skeleton.game.policy_episode_export.v1",
+                "policy_id": policy_id,
+                "job_id": issuer["job_id"],
+                "policy_digest": saved["snapshot"]["snapshot_digest"],
+                "summary": summary,
+                "trace": trace,
+                "import_authority": False,
+                "production_promotion_authorized": False,
+            },
+            2 * 1024 * 1024,
+        )
+        await self._admitted_policy(scope, project_id, policy_id, allow_environment_changed=True)
+        return {
+            "project_id": project_id,
+            "policy_id": policy_id,
+            "episode_id": episode_id,
+            "filename": "game-episode-" + hashlib.sha256(episode_id.encode()).hexdigest()[:20] + ".json",
+            "media_type": "application/json",
+            "content": encoded.decode(),
+            "content_digest": hashlib.sha256(encoded).hexdigest(),
+        }
+
     async def _factory(self, scope, binding):
         from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
 
         request = GameEnvironmentRequest.from_dict(await self.environment_request(scope, binding))
         return request.build
 
+    async def _simulation_receipt(self, scope, project_id, operation_id, request_digest, receipt):
+        """Publish only an issued prepared result; never replay native execution."""
+        if receipt.get("request_digest") != request_digest or receipt.get("project_id") != project_id:
+            raise GameLearningError(
+                "idempotency_conflict", "Simulation key was reused with different input.", 409
+            )
+        prepared = receipt.get("prepared_session")
+        result = receipt.get("result")
+        if prepared is not None:
+            if (
+                prepared.get("project_id") != project_id
+                or any(prepared.get(key) != value for key, value in scope.items())
+                or prepared.get("_id") != receipt.get("session_id")
+                or prepared.get("session_id") != receipt.get("session_id")
+                or operation_id not in prepared.get("operation_ids", [])
+                or receipt.get("input_digest") != _digest(prepared.get("input"))
+                or prepared.get("snapshot_digest") != _digest(prepared.get("snapshot"))
+                or not isinstance(result, dict)
+                or result.get("snapshot_digest") != prepared.get("snapshot_digest")
+                or receipt.get("prepared_digest")
+                != _digest(
+                    {
+                        "session": _public(prepared),
+                        "snapshot": prepared["snapshot"],
+                        "input": prepared["input"],
+                        "result": result,
+                    }
+                )
+            ):
+                raise GameLearningError(
+                    "session_receipt_corrupt", "Prepared simulation identity is invalid.", 503
+                )
+            expected = receipt.get("expected_session_version")
+            if prepared.get("version") != (1 if expected is None else expected + 1):
+                raise GameLearningError(
+                    "session_receipt_corrupt", "Prepared simulation revision is invalid.", 503
+                )
+            await self._authority(scope, prepared["input"])
+
+            async def publish_prepared():
+                await self._authority(scope, prepared["input"], dragon_guarded=True)
+                current = await self.sessions.find_one(
+                    {"_id": receipt["session_id"], **scope, "project_id": project_id}
+                )
+                if current is None:
+                    if expected is not None:
+                        raise GameLearningError("session_conflict", "Simulation session is missing.", 409)
+                    try:
+                        await self.sessions.insert_one(prepared)
+                    except DuplicateKeyError:
+                        current = await self.sessions.find_one(
+                            {"_id": receipt["session_id"], **scope, "project_id": project_id}
+                        )
+                        if current is None or operation_id not in current.get("operation_ids", []):
+                            raise GameLearningError(
+                                "session_conflict", "Simulation session changed concurrently.", 409
+                            ) from None
+                elif operation_id not in current.get("operation_ids", []):
+                    if expected is None:
+                        raise GameLearningError(
+                            "session_conflict", "Simulation session changed concurrently.", 409
+                        )
+                    changed = await self.sessions.replace_one(
+                        {
+                            "_id": receipt["session_id"],
+                            **scope,
+                            "project_id": project_id,
+                            "version": expected,
+                            "_input_fenced": False,
+                        },
+                        prepared,
+                    )
+                    if not changed.modified_count:
+                        raise GameLearningError(
+                            "session_conflict", "Simulation session changed concurrently.", 409
+                        )
+
+            await self._guarded_write(scope, prepared["input"], publish_prepared)
+        current = await self.sessions.find_one(
+            {"_id": receipt["session_id"], **scope, "project_id": project_id, "operation_ids": operation_id}
+        )
+        if current is None or result is None:
+            code = (
+                "simulation_dispatch_failed"
+                if receipt.get("state") == "failed"
+                else "simulation_dispatch_pending"
+            )
+            raise GameLearningError(
+                code,
+                "The reserved simulation has no committed result; this key cannot dispatch again.",
+                409,
+            )
+        await self._authority(scope, current["input"])
+        if current.get("_input_fenced"):
+            raise GameLearningError(
+                "session_fenced", "This session receipt belongs to withdrawn input authority.", 409
+            )
+        head = await self._project(project_id, scope)
+        if current["session_id"] not in head["session_ids"]:
+            if (
+                current["version"] != 1
+                or current["snapshot_digest"] != result["snapshot_digest"]
+                or _digest(current["snapshot"]) != current["snapshot_digest"]
+            ):
+                raise GameLearningError(
+                    "session_receipt_corrupt", "Prepared session identity is invalid.", 503
+                )
+
+            async def repair_session():
+                await self._authority(scope, current["input"], dragon_guarded=True)
+                changed = await self.projects.update_one(
+                    {
+                        "_id": project_id,
+                        **scope,
+                        "version": current["input"]["project_version"],
+                        "_input_epoch": current["input"].get("input_epoch", 0),
+                        "_session_count": {"$lt": 128},
+                        "session_ids": {"$ne": current["session_id"]},
+                    },
+                    {"$push": {"session_ids": current["session_id"]}, "$inc": {"_session_count": 1}},
+                )
+                if not changed.modified_count:
+                    live = await self._project(project_id, scope)
+                    if current["session_id"] not in live["session_ids"]:
+                        raise GameLearningError(
+                            "session_recovery_conflict", "Project changed before session recovery.", 409
+                        )
+
+            await self._guarded_write(scope, current["input"], repair_session)
+        await self._authority(scope, current["input"])
+        await self.receipts.update_one(
+            {"_id": operation_id, **scope, "request_digest": request_digest},
+            {"$set": {"state": "committed", "committed_at": _now()}},
+        )
+        return await self.get_project(scope, project_id), result
+
     async def simulate(self, scope, project_id, body):
         operation_id = _key(project_id, "simulation", body["idempotency_key"])
         request_digest = _digest(body)
         receipt = await self.receipts.find_one({"_id": operation_id, **scope})
         if receipt is not None:
-            if receipt["request_digest"] != request_digest:
-                raise GameLearningError(
-                    "idempotency_conflict", "Simulation key was reused with different input.", 409
-                )
-            current = await self.sessions.find_one(
-                {"_id": receipt["session_id"], **scope, "operation_ids": operation_id}
-            )
-            if current is not None:
-                await self._authority(scope, current["input"])
-                if current.get("_input_fenced"):
-                    raise GameLearningError(
-                        "session_fenced", "This session receipt belongs to withdrawn input authority.", 409
-                    )
-                head = await self._project(project_id, scope)
-                if current["session_id"] not in head["session_ids"]:
-                    if (
-                        current["version"] != 1
-                        or current["snapshot_digest"] != receipt["result"]["snapshot_digest"]
-                        or _digest(current["snapshot"]) != current["snapshot_digest"]
-                    ):
-                        raise GameLearningError(
-                            "session_receipt_corrupt", "Prepared session identity is invalid.", 503
-                        )
-
-                    async def repair_session():
-                        await self._authority(scope, current["input"], dragon_guarded=True)
-                        changed = await self.projects.update_one(
-                            {
-                                "_id": project_id,
-                                **scope,
-                                "version": current["input"]["project_version"],
-                                "_input_epoch": current["input"].get("input_epoch", 0),
-                                "_session_count": {"$lt": 128},
-                                "session_ids": {"$ne": current["session_id"]},
-                            },
-                            {"$push": {"session_ids": current["session_id"]}, "$inc": {"_session_count": 1}},
-                        )
-                        if not changed.modified_count:
-                            live = await self._project(project_id, scope)
-                            if current["session_id"] not in live["session_ids"]:
-                                raise GameLearningError(
-                                    "session_recovery_conflict",
-                                    "Project changed before session recovery.",
-                                    409,
-                                )
-
-                    await self._guarded_write(scope, current["input"], repair_session)
-                return await self.get_project(scope, project_id), receipt["result"]
+            return await self._simulation_receipt(scope, project_id, operation_id, request_digest, receipt)
         project = await self._project(project_id, scope, body["expected_version"])
         session_id = body.get("session_id") or _key(project_id, "session", body["idempotency_key"])
         existing = await self.sessions.find_one({"_id": session_id, **scope, "project_id": project_id})
         if existing is not None and session_id not in project["session_ids"]:
             raise GameLearningError("session_uncommitted", "Session was not committed to this project.", 409)
         reset = bool(body.get("reset", existing is None))
+        if existing is None and not reset:
+            raise GameLearningError("session_missing", "Reset is required for a new session.", 409)
         if existing is not None and body.get("expected_session_version") != existing["version"]:
             raise GameLearningError(
                 "session_conflict", "Reload the current session revision before stepping.", 409
@@ -1847,8 +2404,10 @@ class GameLearningWorkspace:
             existing = None
         if existing is not None and len(existing.get("operation_ids", [])) >= 4096:
             raise GameLearningError(
-                "session_operation_limit", "Start a new session after 4096 operations.", 413
+                "session_operation_limit", "Start a new session after4096 operations.", 413
             )
+        if existing is None and project["_session_count"] >= 128:
+            raise GameLearningError("session_limit", "Project session limit is reached.", 413)
         binding = (
             await self._input(
                 scope,
@@ -1859,30 +2418,72 @@ class GameLearningWorkspace:
             if reset
             else existing["input"]
         )
+        await self._authority(scope, binding)
         factory = await self._factory(scope, binding)
         actions = body.get("actions") or ([body["action"]] if body.get("action") else [])
-        if not actions and body.get("steps"):
-            env = factory()
-            try:
-                actions = [env.spec.actions[0]] * body["steps"]
-            finally:
-                from skeleton.jeeves.game_learning_demonstrations import close_environment
-
-                close_environment(env)
         seed = body.get("seed", 0)
+        token = str(uuid4())
+        reservation = {
+            "_id": operation_id,
+            **scope,
+            "project_id": project_id,
+            "session_id": session_id,
+            "request_digest": request_digest,
+            "state": "dispatch_reserved",
+            "dispatch_token": token,
+            "input_digest": _digest(binding),
+            "created_at": _now(),
+            "expected_session_version": None if existing is None else existing["version"],
+        }
+        reservation["storage_receipt"] = await self._admit(
+            scope,
+            "game-learning-simulation-dispatch",
+            operation_id + ":dispatch",
+            len(_json({key: value for key, value in reservation.items() if key != "created_at"})),
+        )
+        try:
+            await self.receipts.insert_one(reservation)
+        except DuplicateKeyError:
+            prior = await self.receipts.find_one({"_id": operation_id, **scope})
+            if prior is None:
+                raise GameLearningError(
+                    "simulation_conflict", "Simulation reservation conflicts.", 409
+                ) from None
+            return await self._simulation_receipt(scope, project_id, operation_id, request_digest, prior)
+        cancelled = threading.Event()
+        deadline = time.monotonic() + 120
+
+        def check():
+            if cancelled.is_set() or time.monotonic() >= deadline:
+                raise GameLearningError("simulation_stopped", "Simulation stopped before publication.", 409)
 
         def execute():
+            from skeleton.jeeves.game_learning_demonstrations import close_environment, current_observation
+
+            check()
             env = factory()
             try:
-                observation = env.reset(seed) if reset else env.restore(existing["snapshot"])
+                check()
+                initial = (
+                    env.reset(seed) if reset else env.restore(self._stored_evidence(existing["snapshot"]))
+                )
+                observation = current_observation(env, initial)
                 transitions = []
                 reward = 0.0 if reset else existing["total_reward"]
                 steps = 0 if reset else existing["steps"]
-                terminated = truncated = False
-                for action in actions:
+                terminated = False if reset else existing["terminated"]
+                truncated = False if reset else existing["truncated"]
+                selected_actions = actions or ([env.spec.actions[0]] * body.get("steps", 0))
+                if selected_actions and (terminated or truncated):
+                    raise GameLearningError(
+                        "session_terminal", "Reset a terminal session before stepping.", 409
+                    )
+                for action in selected_actions:
+                    check()
                     if steps >= 4096:
                         raise GameLearningError("step_limit", "Session step budget is exhausted.", 413)
                     outcome = env.step(action)
+                    check()
                     transitions.append(outcome.as_dict())
                     observation = dict(outcome.observation)
                     reward += outcome.reward
@@ -1890,10 +2491,12 @@ class GameLearningWorkspace:
                     terminated, truncated = outcome.terminated, outcome.truncated
                     if terminated or truncated:
                         break
+                snapshot, frame = env.snapshot(), env.preview()
+                check()
                 return (
                     dict(observation),
-                    env.snapshot(),
-                    env.preview(),
+                    snapshot,
+                    frame,
                     transitions,
                     reward,
                     steps,
@@ -1902,99 +2505,92 @@ class GameLearningWorkspace:
                     env.spec.as_dict(),
                 )
             finally:
-                from skeleton.jeeves.game_learning_demonstrations import close_environment
-
                 close_environment(env)
 
-        observation, snapshot, frame, transitions, reward, steps, terminated, truncated, descriptor = (
-            await asyncio.to_thread(execute)
-        )
-        await self._authority(scope, binding)
-        stamp = _now()
-        doc = {
-            "_id": session_id,
-            **scope,
-            "project_id": project_id,
-            "session_id": session_id,
-            "input_project_version": binding["project_version"],
-            "_input_fenced": False,
-            "version": 1 if existing is None else existing["version"] + 1,
-            "input": binding,
-            "snapshot": snapshot,
-            "snapshot_digest": _digest(snapshot),
-            "last_observation": observation,
-            "last_frame": frame,
-            "actions": descriptor["actions"],
-            "environment": descriptor,
-            "steps": steps,
-            "total_reward": reward,
-            "terminated": terminated,
-            "truncated": truncated,
-            "updated_at": stamp,
-            "operation_ids": (existing.get("operation_ids", []) if existing else []) + [operation_id],
-        }
-        result = _public(doc)
-        result["transitions"] = transitions
-        encoded = _json({"session": result, "snapshot": snapshot, "input": binding})
-        admission = await self._admit(scope, "game-learning-session", operation_id, len(encoded))
-        await self.receipts.update_one(
-            {"_id": operation_id},
-            {
-                "$setOnInsert": {
-                    **scope,
-                    "project_id": project_id,
-                    "session_id": session_id,
-                    "request_digest": request_digest,
-                    "result": result,
-                    "storage_receipt": admission,
-                }
-            },
-            upsert=True,
-        )
-        proof = await self.receipts.find_one({"_id": operation_id, **scope})
-        if proof["request_digest"] != request_digest:
-            raise GameLearningError(
-                "idempotency_conflict", "Simulation key was reused with different input.", 409
+        worker = None
+        try:
+            await self._authority(scope, binding)
+            worker = asyncio.get_running_loop().run_in_executor(None, execute)
+            try:
+                observed = await asyncio.wait_for(asyncio.shield(worker), timeout=120)
+            except (asyncio.CancelledError, asyncio.TimeoutError) as exc:
+                cancelled.set()
+                # Repeated request/shutdown cancellation cannot detach physical native work.
+                while not worker.done():
+                    try:
+                        await asyncio.shield(worker)
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception:
+                        break
+                if worker.done() and not worker.cancelled():
+                    worker.exception()
+                if isinstance(exc, asyncio.CancelledError):
+                    raise
+                raise GameLearningError(
+                    "simulation_deadline", "Simulation deadline elapsed; physical cleanup completed.", 409
+                ) from exc
+            observation, snapshot, frame, transitions, reward, steps, terminated, truncated, descriptor = (
+                observed
             )
-
-        async def commit_session():
-            await self._authority(scope, binding, dragon_guarded=True)
-            if existing is None:
-                if project["_session_count"] >= 128:
-                    raise GameLearningError("session_limit", "Project session limit is reached.", 413)
-                try:
-                    await self.sessions.insert_one(doc)
-                except DuplicateKeyError as exc:
-                    raise GameLearningError(
-                        "session_conflict", "Simulation session changed concurrently.", 409
-                    ) from exc
-                head = await self.projects.update_one(
-                    {
-                        "_id": project_id,
-                        **scope,
-                        "version": project["version"],
-                        "_input_epoch": binding.get("input_epoch", 0),
-                        "_session_count": {"$lt": 128},
-                        "session_ids": {"$ne": session_id},
-                    },
-                    {"$push": {"session_ids": session_id}, "$inc": {"_session_count": 1}},
-                )
-                if not head.modified_count:
-                    raise GameLearningError(
-                        "project_conflict", "Project changed during simulation publication.", 409
-                    )
-            else:
-                changed = await self.sessions.replace_one(
-                    {"_id": session_id, **scope, "version": existing["version"], "_input_fenced": False}, doc
-                )
-                if not changed.modified_count:
-                    raise GameLearningError(
-                        "session_conflict", "Simulation session changed concurrently.", 409
-                    )
-
-        await self._guarded_write(scope, binding, commit_session)
-        await self._authority(scope, binding)
-        return await self.get_project(scope, project_id), result
+            await self._authority(scope, binding)
+            # Mongo stores datetimes at millisecond precision. Freeze that exact
+            # representation before issuing the prepared payload digest.
+            stamp = _now()
+            stamp = stamp.replace(microsecond=stamp.microsecond // 1000 * 1000)
+            doc = {
+                "_id": session_id,
+                **scope,
+                "project_id": project_id,
+                "session_id": session_id,
+                "input_project_version": binding["project_version"],
+                "_input_fenced": False,
+                "version": 1 if existing is None else existing["version"] + 1,
+                "input": binding,
+                "snapshot": snapshot,
+                "snapshot_digest": _digest(snapshot),
+                "last_observation": observation,
+                "last_frame": frame,
+                "actions": descriptor["actions"],
+                "environment": descriptor,
+                "steps": steps,
+                "total_reward": reward,
+                "terminated": terminated,
+                "truncated": truncated,
+                "updated_at": stamp,
+                "operation_ids": (existing.get("operation_ids", []) if existing else []) + [operation_id],
+            }
+            result = {**_public(doc), "transitions": transitions}
+            encoded = _json(
+                {"session": _public(doc), "snapshot": snapshot, "input": binding, "result": result},
+                MAX_JSON - 65536,
+            )
+            admission = await self._admit(scope, "game-learning-session", operation_id, len(encoded))
+            changed = await self.receipts.update_one(
+                {"_id": operation_id, **scope, "dispatch_token": token, "state": "dispatch_reserved"},
+                {
+                    "$set": {
+                        "state": "prepared",
+                        "prepared_session": doc,
+                        "result": result,
+                        "prepared_digest": hashlib.sha256(encoded).hexdigest(),
+                        "storage_receipt": admission,
+                        "prepared_at": _now(),
+                    }
+                },
+            )
+            if not changed.modified_count:
+                raise GameLearningError("simulation_fenced", "Simulation dispatch authority changed.", 409)
+        except BaseException:
+            # A failed reservation deliberately cannot dispatch again under this key.
+            # Prepared results remain recoverable when only publication is interrupted.
+            await self.receipts.update_one(
+                {"_id": operation_id, **scope, "dispatch_token": token, "state": "dispatch_reserved"},
+                {"$set": {"state": "failed", "finished_at": _now()}},
+            )
+            raise
+        receipt = await self.receipts.find_one({"_id": operation_id, **scope})
+        return await self._simulation_receipt(scope, project_id, operation_id, request_digest, receipt)
 
     @staticmethod
     def _job_public(job, *, include_result=True):
@@ -2026,6 +2622,91 @@ class GameLearningWorkspace:
         )
         return result
 
+    @staticmethod
+    def _stored_evidence(value):
+        """Lossless BSON numeric roundtrip at the durable runtime JSON boundary."""
+        try:
+            encoded = json.dumps(
+                value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+            ).encode("utf-8")
+            if len(encoded) > MAX_JSON:
+                raise GameLearningError(
+                    "stored_evidence_limit", "Stored runtime JSON exceeds its byte bound.", 413
+                )
+            return json.loads(encoded)
+        except (TypeError, ValueError, OverflowError, RecursionError, UnicodeError) as exc:
+            if isinstance(exc, GameLearningError):
+                raise
+            raise GameLearningError(
+                "stored_evidence_invalid", "Stored runtime evidence is not finite JSON.", 503
+            ) from exc
+
+    @staticmethod
+    def _training_configuration(request, binding, demonstrations):
+        from skeleton.jeeves.game_learning import GameLearningConfig
+
+        episodes, steps = request.get("epochs", 16), binding["episode_steps"]
+        if (
+            type(episodes) is not int
+            or not 1 <= episodes <= 256
+            or type(steps) is not int
+            or not 1 <= steps <= 4096
+            or len(demonstrations) != len(binding.get("demonstrations", []))
+        ):
+            raise GameLearningError(
+                "training_plan_invalid", "The admitted training episode plan differs.", 503
+            )
+        total = episodes + len(demonstrations)
+        if total > 256:
+            raise GameLearningError("episode_budget", "Demonstration plus online episodes exceed256.", 413)
+        demo_steps = 0
+        for demonstration in demonstrations:
+            measured = demonstration["trace"]["steps"]
+            if type(measured) is not int or not 1 <= measured <= steps:
+                raise GameLearningError(
+                    "training_plan_invalid", "The selected demonstration transition count differs.", 503
+                )
+            demo_steps += measured
+        online_steps = episodes * steps
+        if online_steps + demo_steps > 65536:
+            raise GameLearningError(
+                "update_budget",
+                "Online episodes plus the selected measured demonstrations exceed65536updates.",
+                413,
+            )
+        config = GameLearningConfig(
+            **{
+                key: request[key]
+                for key in (
+                    "alpha",
+                    "gamma",
+                    "epsilon",
+                    "epsilon_decay",
+                    "min_epsilon",
+                    "reward_clip",
+                    "imitation_strength",
+                    "exploration_strategy",
+                    "n_step",
+                )
+                if key in request
+            },
+            seed=request.get("seed", 0),
+            max_episodes=total,
+            max_updates=online_steps + demo_steps,
+            max_states=request.get("max_states", 4096),
+            trace_byte_limit=2 * 1024 * 1024,
+        )
+        plan = {
+            "online_episodes": episodes,
+            "demonstration_episodes": len(demonstrations),
+            "demonstration_transitions": demo_steps,
+            "online_transition_upper_bound": online_steps,
+            "update_upper_bound": online_steps + demo_steps,
+            "evaluation_seed_count": request.get("evaluation_seeds", 4),
+            "evaluation_transition_upper_bound": request.get("evaluation_seeds", 4) * 2 * steps,
+        }
+        return config, plan
+
     async def start_job(self, scope, project_id, kind, body):
         environment = None
         try:
@@ -2056,10 +2737,25 @@ class GameLearningWorkspace:
                             "project_conflict", "Project changed before prepared job recovery.", 409
                         )
                 await self._schedule(job_id, scope)
-                return self._job_public(await self.jobs.find_one({"_id": job_id, **scope}))
+                return await self.get_job(scope, job_id)
             project = await self._project(project_id, scope, body["expected_version"])
             if project["_job_count"] >= 512:
                 raise GameLearningError("job_limit", "This project has reached its job limit.", 413)
+            from core.game_play import resource_profiles
+
+            profile_id = body.get("resource_profile", "cpu") if kind == "train" else "cpu"
+            capacity = next(
+                (item for item in resource_profiles()["profiles"] if item["profile_id"] == profile_id), None
+            )
+            if capacity is None:
+                raise GameLearningError(
+                    "resource_profile_unavailable", "Choose an available resource profile.", 409
+                )
+            requested_workers = body.get("workers", 1) if kind == "train" else 1
+            if not capacity["available"] or requested_workers > capacity["max_training_workers"]:
+                raise GameLearningError(
+                    "worker_capacity", "Requested workers exceed current CPU/memory instance capacity.", 429
+                )
             binding = await self._input(
                 scope,
                 project,
@@ -2075,7 +2771,7 @@ class GameLearningWorkspace:
             environment = None
             if kind == "train":
                 factory = await self._factory(scope, binding)
-                environment = await asyncio.to_thread(factory)
+                environment = await _probe_environment(factory)
             if kind not in {"train", "generate"} and kind not in getattr(self, "_job_handlers", {}):
                 raise GameLearningError(
                     "job_handler_unavailable", "This declared job handler is unavailable.", 503
@@ -2164,22 +2860,19 @@ class GameLearningWorkspace:
                         "demonstration_digest": recorded["demonstration"]["demonstration_digest"],
                     }
                 )
-            if binding["demonstrations"]:
-                await self._demonstration_authority(scope, binding)
+            demonstrations = (
+                await self._demonstration_authority(scope, binding) if binding["demonstrations"] else []
+            )
             total = body.get("epochs", 16) + len(binding["demonstrations"]) if kind == "train" else 1
             if total > 256:
                 raise GameLearningError(
                     "episode_budget", "Demonstration plus online episodes exceed 256.", 413
                 )
+            learning_config = None
+            training_plan = None
             if kind == "train":
-                from core.game_play import resource_profiles
-
-                if body.get("workers", 1) > resource_profiles()["profiles"][0]["max_training_workers"]:
-                    raise GameLearningError(
-                        "worker_capacity",
-                        "Requested workers exceed current admitted CPU/memory capacity.",
-                        429,
-                    )
+                config, training_plan = self._training_configuration(body, binding, demonstrations)
+                learning_config = config.as_dict()
             stamp = _now()
             doc = {
                 "_id": job_id,
@@ -2206,6 +2899,16 @@ class GameLearningWorkspace:
                 "_checkpoint": None,
                 "_parent": parent,
             }
+            if kind == "train":
+                # Operational default selection is separate from immutable
+                # numerical lineage. Freeze the pointer before execution so a
+                # delayed completion cannot replace a concurrently newer policy.
+                doc["default_policy_id_at_admission"] = project.get("policy_id")
+                doc["_default_selection_pending"] = True
+            if learning_config is not None:
+                doc["learning_config"] = learning_config
+                doc["learning_config_digest"] = _digest(learning_config)
+                doc["training_plan"] = training_plan
             doc["storage_receipt"] = await self._admit(
                 scope,
                 "game-learning-job",
@@ -2257,9 +2960,7 @@ class GameLearningWorkspace:
 
         finally:
             if environment is not None:
-                from skeleton.jeeves.game_learning_demonstrations import close_environment
-
-                await asyncio.to_thread(close_environment, environment)
+                await _close_environment(environment)
 
     async def _recover_jobs(self, scope, project_id):
         await self.jobs.update_many(
@@ -2346,10 +3047,27 @@ class GameLearningWorkspace:
             raise GameLearningError("job_not_found", "Learning job was not admitted to this project.", 404)
         await self._recover_jobs(scope, doc["project_id"])
         await self._schedule(job_id, scope)
-        return self._job_public(await self.jobs.find_one({"_id": job_id, **scope}))
+        current = await self.jobs.find_one({"_id": job_id, **scope})
+        if await self._repair_default_selection(scope, current):
+            current = await self.jobs.find_one({"_id": job_id, **scope})
+        result = self._job_public(current)
+        task = self._tasks.get(job_id)
+        result["local_worker_draining"] = bool(
+            current["status"] == "interrupted" and task is not None and not task.done()
+        )
+        if result["local_worker_draining"]:
+            result["resume_available"] = False
+        return result
 
     async def cancel_job(self, scope, job_id):
-        await self.get_job(scope, job_id)
+        # A stop request must not start a queued worker through get_job's
+        # ordinary read-driven scheduler before applying the cancellation CAS.
+        owned = await self.jobs.find_one({"_id": job_id, **scope})
+        if owned is None:
+            raise GameLearningError("job_not_found", "Learning job not found.", 404)
+        project = await self._project(owned["project_id"], scope)
+        if job_id not in project["job_ids"]:
+            raise GameLearningError("job_not_found", "Learning job was not admitted to this project.", 404)
         result = await self.jobs.find_one_and_update(
             {"_id": job_id, **scope, "status": {"$in": ["queued", "running", "interrupted"]}},
             {"$set": {"cancel_requested": True, "updated_at": _now()}},
@@ -2365,6 +3083,11 @@ class GameLearningWorkspace:
 
     async def resume_job(self, scope, job_id):
         await self.get_job(scope, job_id)
+        active = self._tasks.get(job_id)
+        if active is not None and not active.done():
+            raise GameLearningError(
+                "worker_draining", "The previous physical worker must stop before this job can resume.", 409
+            )
         doc = await self.jobs.find_one({"_id": job_id, **scope})
         if doc["status"] != "interrupted" or doc["cancel_requested"] or doc["input_changed"]:
             raise GameLearningError(
@@ -2394,40 +3117,63 @@ class GameLearningWorkspace:
             lambda: self._commit_checkpoint(scope, job, token, snapshot, trace, batch_state),
         )
 
+    async def _project_committed_episode(self, scope, job):
+        checkpoint = job.get("_checkpoint")
+        if not checkpoint or checkpoint.get("trace") is None:
+            return
+        checkpoint = self._stored_evidence(checkpoint)
+        snapshot, trace = checkpoint["snapshot"], checkpoint["trace"]
+        summary = next(
+            (row for row in snapshot["episodes"] if row["episode_id"] == trace["episode_id"]), None
+        )
+        if (
+            summary is None
+            or snapshot.get("policy_id") != job["policy_id"]
+            or snapshot.get("snapshot_digest")
+            != _digest({key: value for key, value in snapshot.items() if key != "snapshot_digest"})
+            or trace.get("trace_digest")
+            != _digest({key: value for key, value in trace.items() if key != "trace_digest"})
+            or any(
+                trace.get(key) != summary.get(key)
+                for key in ("episode_id", "trace_digest", "seed", "steps", "return")
+            )
+        ):
+            raise GameLearningError(
+                "episode_checkpoint_corrupt",
+                "The authoritative checkpoint trace differs from its ledger.",
+                503,
+            )
+        episode_id = trace["episode_id"]
+        await self.episodes.update_one(
+            {
+                "_id": job["job_id"] + ":" + episode_id,
+                **scope,
+                "project_id": job["project_id"],
+                "job_id": job["job_id"],
+            },
+            {
+                "$set": {
+                    "episode_id": episode_id,
+                    "trace": trace,
+                    "policy_digest": snapshot["snapshot_digest"],
+                }
+            },
+            upsert=True,
+        )
+        projected = await self.episodes.find_one(
+            {"_id": job["job_id"] + ":" + episode_id, **scope, "job_id": job["job_id"]},
+            {"trace.trace_digest": 1, "project_id": 1},
+        )
+        if (
+            projected is None
+            or projected.get("project_id") != job["project_id"]
+            or projected.get("trace", {}).get("trace_digest") != trace["trace_digest"]
+        ):
+            raise GameLearningError("episode_projection_conflict", "Committed trace projection differs.", 503)
+
     async def _commit_checkpoint(self, scope, job, token, snapshot, trace, batch_state=None):
         await self._authority(scope, job["input"], dragon_guarded=True)
-        payload = {"snapshot": snapshot, "trace": trace, "batch_state": batch_state}
-        _json({"input": job["input"], "parent": job.get("_parent"), "checkpoint": payload}, MAX_JSON - 65536)
-        admission = await self._admit(
-            scope,
-            "game-learning-checkpoint",
-            job["job_id"] + ":" + snapshot["snapshot_digest"],
-            len(_json(payload)),
-        )
-        if batch_state is not None and trace is None:
-            await self.database["game_learning_live_frames"].delete_many({**scope, "job_id": job["job_id"]})
-        elif batch_state is not None:
-            await self.database["game_learning_live_frames"].update_many(
-                {**scope, "job_id": job["job_id"]}, {"$set": {"instance_status": "stopped"}}
-            )
-        if trace is not None:
-            episode_id = trace["episode_id"]
-            await self.episodes.update_one(
-                {"_id": job["job_id"] + ":" + episode_id},
-                {
-                    "$setOnInsert": {
-                        **scope,
-                        "project_id": job["project_id"],
-                        "job_id": job["job_id"],
-                        "episode_id": episode_id,
-                        "trace": trace,
-                        "policy_digest": snapshot["snapshot_digest"],
-                    }
-                },
-                upsert=True,
-            )
-
-        result = await self.jobs.update_one(
+        current = await self.jobs.find_one(
             {
                 "_id": job["job_id"],
                 **scope,
@@ -2436,18 +3182,81 @@ class GameLearningWorkspace:
                 "lease_until": {"$gt": _now()},
                 "cancel_requested": False,
                 "input_changed": False,
-            },
-            {
-                "$set": {
-                    "_checkpoint": payload,
-                    "progress.completed": snapshot["committed_episodes"],
-                    "updated_at": _now(),
-                    "checkpoint_storage_receipt": admission,
-                }
-            },
+            }
         )
-        if not result.modified_count:
+        if current is None:
             raise GameLearningError("worker_fenced", "Worker lost its publication fence.", 409)
+        # Finish the last acknowledged projection before replacing the only
+        # authoritative full trace. This keeps one bounded row per episode.
+        await self._project_committed_episode(scope, current)
+        payload = {"snapshot": snapshot, "trace": trace, "batch_state": batch_state}
+        _json({"input": job["input"], "parent": job.get("_parent"), "checkpoint": payload}, MAX_JSON - 65536)
+        admission = await self._admit(
+            scope,
+            "game-learning-checkpoint",
+            job["job_id"] + ":" + _digest(payload),
+            len(_json(payload)),
+        )
+        frame_scope = {**scope, "job_id": job["job_id"], "stream_id": job.get("frame_stream_id")}
+        if batch_state is not None and trace is None and job.get("frame_stream_id"):
+            await self.database["game_learning_live_frames"].delete_many(frame_scope)
+        elif batch_state is not None and job.get("frame_stream_id"):
+            await self.database["game_learning_live_frames"].update_many(
+                frame_scope, {"$set": {"instance_status": "stopped"}}
+            )
+        publication_filter = {
+            "_id": job["job_id"],
+            **scope,
+            "status": "running",
+            "worker_token": token,
+            "lease_until": {"$gt": _now()},
+            "cancel_requested": False,
+            "input_changed": False,
+        }
+        try:
+            result = await self.jobs.update_one(
+                publication_filter,
+                {
+                    "$set": {
+                        "_checkpoint": payload,
+                        "progress.completed": snapshot["committed_episodes"],
+                        "updated_at": _now(),
+                        "checkpoint_storage_receipt": admission,
+                    }
+                },
+            )
+        except PyMongoError as exc:
+            # A transport failure can follow a committed server-side update.
+            # Only an exact authoritative readback under the same live worker
+            # may acknowledge it; an unreadable outcome remains resumable.
+            try:
+                observed = await self.jobs.find_one({**publication_filter, "lease_until": {"$gt": _now()}})
+            except PyMongoError as read_error:
+                raise GameLearningError(
+                    "checkpoint_publication_unconfirmed",
+                    "Checkpoint acknowledgement and readback are unavailable; resume authoritative stored progress.",
+                    503,
+                ) from read_error
+            if observed is None or _digest(self._stored_evidence(observed.get("_checkpoint"))) != _digest(
+                payload
+            ):
+                raise GameLearningError(
+                    "checkpoint_publication_unconfirmed",
+                    "Checkpoint acknowledgement was lost; resume from authoritative stored progress.",
+                    503,
+                ) from exc
+        else:
+            if not result.matched_count:
+                raise GameLearningError("worker_fenced", "Worker lost its publication fence.", 409)
+        try:
+            await self._project_committed_episode(scope, {**current, "_checkpoint": payload})
+        except Exception as exc:
+            # The episode has committed. Keep its full trace in the job and
+            # repair it before the next checkpoint/terminal overwrite; raising
+            # here would incorrectly roll back acknowledged learner progress.
+            log.warning(
+                "Committed episode projection %s awaits repair: %s", job["job_id"], type(exc).__name__
+            )
 
     async def _heartbeat(self, scope, job_id, token, cancelled, slot_id, slot_token):
         try:
@@ -2489,7 +3298,15 @@ class GameLearningWorkspace:
                         1
                         if row is not None
                         and row["kind"]
-                        in {"build", "successor", "successor_compare", "desktop", "studio_learning", "review"}
+                        in {
+                            "build",
+                            "generate",
+                            "successor",
+                            "successor_compare",
+                            "desktop",
+                            "studio_learning",
+                            "review",
+                        }
                         else 0
                     )
                 )
@@ -2560,16 +3377,49 @@ class GameLearningWorkspace:
                     else (
                         1
                         if admitted["kind"]
-                        in {"build", "successor", "successor_compare", "desktop", "studio_learning", "review"}
+                        in {
+                            "build",
+                            "generate",
+                            "successor",
+                            "successor_compare",
+                            "desktop",
+                            "studio_learning",
+                            "review",
+                        }
                         else 0
                     )
                 )
                 from core.game_play import resource_profiles
 
-                for index in range(resource_profiles()["profiles"][0]["max_training_workers"]):
+                profile_id = (
+                    admitted["request"].get("resource_profile", "cpu")
+                    if admitted["kind"] == "train"
+                    else "cpu"
+                )
+                profile = next(
+                    (item for item in resource_profiles()["profiles"] if item["profile_id"] == profile_id),
+                    None,
+                )
+                if profile is None or not profile["available"] or required > profile["max_training_workers"]:
+                    return
+                credit_ids = profile.get("training_credit_ids") or [
+                    "game-learning-actor:" + str(index) for index in range(profile["max_training_workers"])
+                ]
+                if (
+                    not isinstance(credit_ids, list)
+                    or len(credit_ids) > 8
+                    or len(set(credit_ids)) != len(credit_ids)
+                    or len(credit_ids) < required
+                    or any(
+                        not isinstance(value, str)
+                        or not value.startswith(("game-learning-actor:", "game-learning-play:"))
+                        for value in credit_ids
+                    )
+                ):
+                    return
+                for identity in credit_ids:
                     if len(actor_slots) == required:
                         break
-                    identity = "game-learning-actor:" + str(index)
                     await self.workers.update_one(
                         {"_id": identity},
                         {"$setOnInsert": {"lease_until": datetime(1970, 1, 1, tzinfo=timezone.utc)}},
@@ -2583,7 +3433,8 @@ class GameLearningWorkspace:
                                 "job_id": job_id,
                                 "resource_class": "training",
                                 "lease_until": _now() + timedelta(seconds=30),
-                            }
+                            },
+                            "$unset": {"play_id": "", "credit_kind": ""},
                         },
                         return_document=ReturnDocument.AFTER,
                     )
@@ -2638,17 +3489,22 @@ class GameLearningWorkspace:
         self._cancel[job_id] = cancelled
         heartbeat = asyncio.create_task(self._heartbeat(scope, job_id, token, cancelled, slot_id, slot_token))
         loop = asyncio.get_running_loop()
-        worker_deadline = time.monotonic() + 300
+        worker_deadline = time.monotonic() + (
+            job["request"].get("execution_seconds", 300) if job["kind"] == "train" else 300
+        )
 
         def checkpoint(snapshot, trace, batch_state=None):
             future = asyncio.run_coroutine_threadsafe(
                 self._checkpoint(scope, job, token, snapshot, trace, batch_state), loop
             )
             try:
+                future.result(timeout=max(0.001, min(30.0, worker_deadline - time.monotonic())))
+            except TimeoutError:
+                cancelled.set()
+                # Publication may already have reached Mongo. Keep physical
+                # ownership and observe its outcome before the learner decides
+                # whether to retain or roll back this episode in memory.
                 future.result()
-            except BaseException:
-                future.cancel()
-                raise
 
         def authorize():
             if time.monotonic() >= worker_deadline:
@@ -2663,9 +3519,17 @@ class GameLearningWorkspace:
             await self.emit_job_event(scope, job, token, payload)
 
         def on_frame(payload):
-            asyncio.run_coroutine_threadsafe(emit_event(payload), loop).result()
+            future = asyncio.run_coroutine_threadsafe(emit_event(payload), loop)
+            try:
+                future.result(timeout=max(0.001, min(10.0, worker_deadline - time.monotonic())))
+            except TimeoutError:
+                cancelled.set()
+                future.result()
 
         try:
+            for key in ("request", "input", "_checkpoint", "_parent", "learning_config", "training_plan"):
+                if job.get(key) is not None:
+                    job[key] = self._stored_evidence(job[key])
             frame_stream_id = str(uuid4())
             await self.jobs.update_one(
                 {"_id": job_id, **scope, "worker_token": token},
@@ -2676,8 +3540,11 @@ class GameLearningWorkspace:
             if job["kind"] == "train":
                 job["_environment_request"] = await self.environment_request(scope, job["input"])
                 job["_demonstrations"] = await self._demonstration_authority(scope, job["input"])
-                worker = asyncio.create_task(
-                    asyncio.to_thread(self._train, job, factory, checkpoint, cancelled, authorize, on_frame)
+                # This must remain an executor Future, not a Task wrapping
+                # to_thread: loop shutdown cancels every Task, which can finish
+                # the wrapper while its real actor-owning thread is still alive.
+                worker = loop.run_in_executor(
+                    None, self._train, job, factory, checkpoint, cancelled, authorize, on_frame
                 )
                 try:
                     result, policy = await asyncio.shield(worker)
@@ -2729,22 +3596,78 @@ class GameLearningWorkspace:
             if not done.modified_count:
                 raise GameLearningError("worker_fenced", "Worker lost its completion fence.", 409)
             if job["kind"] == "train":
-                await self.projects.update_one(
-                    {"_id": project["project_id"], **scope, "version": job["input"]["project_version"]},
-                    {"$set": {"policy_id": job["policy_id"]}},
-                )
+                if job.get("_default_selection_pending"):
+                    completed = await self.jobs.find_one({"_id": job_id, **scope})
+                    await self._repair_default_selection(scope, completed)
+                else:
+                    # An already admitted historical job keeps its original
+                    # completion path; reads do not retrofit a selection intent.
+                    await self._select_default_policy(scope, job, result, project)
+        except asyncio.CancelledError:
+            # The shielded worker path above has already drained its physical
+            # thread/actors. Publish interruption only after that exact outcome.
+            cancelled.set()
+            stopping = await self.jobs.find_one({"_id": job_id, **scope})
+            interrupted_state = (
+                "cancelled"
+                if stopping and (stopping.get("cancel_requested") or stopping.get("input_changed"))
+                else "interrupted"
+            )
+            await self.jobs.update_one(
+                {"_id": job_id, **scope, "status": "running", "worker_token": token},
+                {
+                    "$set": {
+                        "status": interrupted_state,
+                        "updated_at": _now(),
+                        "error": {
+                            "code": "worker_interrupted",
+                            "message": "Execution stopped after worker cleanup; exact committed checkpoints may resume.",
+                        },
+                    },
+                    "$unset": {"worker_token": "", "lease_until": ""},
+                },
+            )
+            raise
         except Exception as exc:
             log.warning("Game learning job %s ended with %s", job_id, type(exc).__name__)
             row = await self.jobs.find_one({"_id": job_id, **scope})
-            state = "cancelled" if row.get("cancel_requested") or row.get("input_changed") else "failed"
+            stopped = row.get("cancel_requested") or row.get("input_changed")
+            time_slice = (
+                job["kind"] == "train"
+                and time.monotonic() >= worker_deadline
+                and row.get("_checkpoint") is not None
+            )
+            storage_interrupted = job["kind"] == "train" and (
+                isinstance(exc, PyMongoError)
+                or getattr(exc, "code", None) == "checkpoint_publication_unconfirmed"
+            )
+            state = (
+                "cancelled" if stopped else "interrupted" if time_slice or storage_interrupted else "failed"
+            )
             await self.jobs.update_one(
                 {"_id": job_id, **scope, "status": "running", "worker_token": token},
                 {
                     "$set": {
                         "status": state,
                         "error": {
-                            "code": getattr(exc, "code", "execution_rejected"),
-                            "message": "Execution stopped; committed checkpoints remain available.",
+                            "code": (
+                                "worker_time_slice_exhausted"
+                                if time_slice and not stopped
+                                else (
+                                    "worker_storage_interrupted"
+                                    if storage_interrupted and not stopped
+                                    else getattr(exc, "code", "execution_rejected")
+                                )
+                            ),
+                            "message": (
+                                "The bounded time slice ended after actor cleanup; resume the exact committed checkpoint."
+                                if time_slice and not stopped
+                                else (
+                                    "Storage acknowledgement was interrupted after worker cleanup; resume authoritative committed progress."
+                                    if storage_interrupted and not stopped
+                                    else "Execution stopped; committed checkpoints remain available."
+                                )
+                            ),
                         },
                         "updated_at": _now(),
                     },
@@ -2757,13 +3680,131 @@ class GameLearningWorkspace:
             await asyncio.gather(heartbeat, return_exceptions=True)
             self._cancel.pop(job_id, None)
 
+    async def _select_default_policy(self, scope, job, result, claimed_project):
+        parent = job["input"].get("parent_policy")
+        observed = job.get(
+            "default_policy_id_at_admission",
+            parent["policy_id"] if parent else claimed_project.get("policy_id"),
+        )
+        receipt = {"policy_id": job["policy_id"], "comparator_policy_id": observed}
+        acceptance = result.get("acceptance")
+        if acceptance is not None:
+            if acceptance.get("meets_configured_return_gate") is not True:
+                return {**receipt, "state": "rejected", "reason": "configured_return_gate_not_met"}
+            baseline = acceptance.get("baseline", {})
+            if parent:
+                if (
+                    parent["policy_id"] != observed
+                    or baseline.get("kind") != "parent_policy"
+                    or baseline.get("policy_digest") != parent["snapshot_digest"]
+                ):
+                    return {**receipt, "state": "superseded", "reason": "admission_comparator_differs"}
+            elif observed is not None or baseline.get("kind") != "seeded_uniform_random":
+                # A fresh candidate beating random has not demonstrated that
+                # it beats an already selected project policy.
+                return {**receipt, "state": "superseded", "reason": "admission_comparator_differs"}
+        if claimed_project["version"] != job["input"]["project_version"] or claimed_project.get(
+            "_input_epoch", 0
+        ) != job["input"].get("input_epoch", 0):
+            return {**receipt, "state": "superseded", "reason": "project_revision_changed"}
+
+        async def publish():
+            await self._authority(scope, job["input"], dragon_guarded=True)
+            changed = await self.projects.update_one(
+                {
+                    "_id": job["project_id"],
+                    **scope,
+                    "version": job["input"]["project_version"],
+                    "_input_epoch": job["input"].get("input_epoch", 0),
+                    "policy_id": observed,
+                },
+                {"$set": {"policy_id": job["policy_id"]}},
+            )
+            if changed.modified_count:
+                return {**receipt, "state": "selected", "reason": "admission_comparator_cas"}
+            selected = await self.projects.find_one(
+                {
+                    "_id": job["project_id"],
+                    **scope,
+                    "version": job["input"]["project_version"],
+                    "_input_epoch": job["input"].get("input_epoch", 0),
+                    "policy_id": job["policy_id"],
+                },
+                {"_id": 1},
+            )
+            return {
+                **receipt,
+                "state": "selected" if selected else "superseded",
+                "reason": "already_selected" if selected else "project_default_changed",
+            }
+
+        return await self._guarded_write(scope, job["input"], publish)
+
+    async def _repair_default_selection(self, scope, job):
+        """Finish only a new job's issued post-completion selection intent."""
+        if (
+            job is None
+            or job.get("kind") != "train"
+            or job.get("status") != "completed"
+            or job.get("_default_selection_pending") is not True
+        ):
+            return False
+        try:
+            # A prepared policy row or caller-supplied passing scalar is never
+            # enough. Reopen the exact completed issuer and current rights.
+            _, issuer, _ = await self._policy_evidence(scope, job["project_id"], job["policy_id"])
+            project = await self._project(job["project_id"], scope)
+            receipt = await self._select_default_policy(scope, job, issuer["result"], project)
+        except GameLearningError as exc:
+            if exc.status not in {403, 404} and exc.code not in {
+                "input_changed",
+                "input_fenced",
+                "project_conflict",
+                "policy_runtime_unavailable",
+            }:
+                log.warning("Policy default selection %s awaits repair: %s", job["job_id"], exc.code)
+                return False
+            receipt = {"policy_id": job["policy_id"], "state": "unavailable", "reason": exc.code}
+        except PyMongoError as exc:
+            log.warning(
+                "Policy default selection %s awaits storage recovery: %s", job["job_id"], type(exc).__name__
+            )
+            return False
+        receipt["selection_digest"] = _digest(receipt)
+        changed = await self.jobs.update_one(
+            {
+                "_id": job["job_id"],
+                **scope,
+                "status": "completed",
+                "policy_id": job["policy_id"],
+                "_default_selection_pending": True,
+            },
+            {"$set": {"default_selection": receipt}, "$unset": {"_default_selection_pending": ""}},
+        )
+        return bool(changed.modified_count)
+
     async def _complete_job(self, scope, job, token, result):
         await self._authority(scope, job["input"])
         job_id = job["job_id"]
-        return await self._guarded_write(
-            scope,
-            job["input"],
-            lambda: self.jobs.update_one(
+
+        async def publish():
+            await self._authority(scope, job["input"], dragon_guarded=True)
+            if job["kind"] == "train":
+                current = await self.jobs.find_one(
+                    {
+                        "_id": job_id,
+                        **scope,
+                        "status": "running",
+                        "worker_token": token,
+                        "cancel_requested": False,
+                        "input_changed": False,
+                        "lease_until": {"$gt": _now()},
+                    }
+                )
+                if current is None:
+                    raise GameLearningError("worker_fenced", "Worker lost its completion fence.", 409)
+                await self._project_committed_episode(scope, current)
+            return await self.jobs.update_one(
                 {
                     "_id": job_id,
                     **scope,
@@ -2783,16 +3824,34 @@ class GameLearningWorkspace:
                     },
                     "$unset": {"worker_token": "", "lease_until": ""},
                 },
-            ),
-        )
+            )
+
+        return await self._guarded_write(scope, job["input"], publish)
 
     @staticmethod
     def _train(job, factory, checkpoint, cancelled, authorize, on_frame=None):
         from skeleton.jeeves.game_learning import GameLearningConfig, GamePolicyLearner
 
-        environment = factory()
-        try:
-            request = job["request"]
+        request = job["request"]
+        recordings = job.get("_demonstrations", [])
+        if job.get("request_digest") != _digest(request):
+            raise GameLearningError("training_request_changed", "The frozen training request differs.", 503)
+        if job.get("learning_config") is not None:
+            config, plan = GameLearningWorkspace._training_configuration(request, job["input"], recordings)
+            if (
+                config.as_dict() != job["learning_config"]
+                or job.get("learning_config_digest") != _digest(config.as_dict())
+                or job.get("training_plan") != plan
+                or job["progress"]["total"] != config.max_episodes
+            ):
+                raise GameLearningError(
+                    "training_configuration_changed",
+                    "Frozen training knobs or measured work plan differ.",
+                    503,
+                )
+        else:
+            # Historical jobs retain their original fixed numerical defaults.
+            # They do not acquire newly requested knobs while recovering.
             config = GameLearningConfig(
                 seed=request.get("seed", 0),
                 max_episodes=256,
@@ -2800,12 +3859,40 @@ class GameLearningWorkspace:
                 max_states=4096,
                 trace_byte_limit=2 * 1024 * 1024,
             )
+        parent_pin, parent = job["input"].get("parent_policy"), job.get("_parent")
+        if (
+            (parent_pin is None) != (parent is None)
+            or parent_pin
+            and (
+                parent.get("snapshot_digest") != parent_pin.get("snapshot_digest")
+                or parent.get("policy_id") != parent_pin.get("policy_id")
+            )
+        ):
+            raise GameLearningError(
+                "training_parent_changed", "The full admitted parent snapshot differs.", 503
+            )
+        authorize()
+        environment = factory()
+        try:
+            # A descriptor probe may own a real native subprocess. Release it
+            # before actors claim their physical process budget.
+            environment_spec = environment.spec
+            if environment_spec.as_dict() != job.get("environment"):
+                raise GameLearningError(
+                    "training_environment_changed",
+                    "Runtime code, controller profile or environment differs from the admitted descriptor.",
+                    409,
+                )
+            authorize()
+            from skeleton.jeeves.game_learning_demonstrations import close_environment
+
+            close_environment(environment)
+            environment = None
             lineage = {
                 "project_id": job["project_id"],
                 "input_digest": _digest(job["input"]),
                 "sources": job["input"]["sources"],
             }
-            recordings = job.get("_demonstrations", [])
             if recordings:
                 lineage["admitted_traces"] = {
                     recording["trace"]["trace_digest"]: recording["trace"]["source_lineage"]
@@ -2814,7 +3901,7 @@ class GameLearningWorkspace:
             prior = job.get("_checkpoint")
             if prior is not None:
                 learner = GamePolicyLearner(
-                    environment.spec,
+                    environment_spec,
                     config,
                     policy_id=job["policy_id"],
                     source_lineage=lineage,
@@ -2826,11 +3913,21 @@ class GameLearningWorkspace:
                     newpolicy_id=job["policy_id"],
                     newsource_lineage=lineage,
                     config=config,
-                    expected_spec=environment.spec,
+                    expected_spec=environment_spec,
                 )
             else:
                 learner = GamePolicyLearner(
-                    environment.spec, config, policy_id=job["policy_id"], source_lineage=lineage
+                    environment_spec, config, policy_id=job["policy_id"], source_lineage=lineage
+                )
+            restored = learner.snapshot()
+            if parent_pin and (
+                restored.get("parent_snapshot_digest") != parent_pin["snapshot_digest"]
+                or restored.get("parent_policy_id") != parent_pin["policy_id"]
+            ):
+                raise GameLearningError(
+                    "training_parent_changed",
+                    "Recovered policy no longer binds its admitted full parent.",
+                    503,
                 )
             from skeleton.jeeves.game_learning_parallel import (
                 GameEnvironmentRequest,
@@ -2873,7 +3970,7 @@ class GameLearningWorkspace:
             snapshot = learner.snapshot()
             seeds = []
             probe = (request.get("seed", 0) + 1_000_003) % (2**63)
-            while len(seeds) < 4:
+            while len(seeds) < request.get("evaluation_seeds", 4):
                 if probe not in snapshot["training_seeds"]:
                     seeds.append(probe)
                 probe = (probe + 1) % (2**63)
@@ -2899,15 +3996,75 @@ class GameLearningWorkspace:
                 "policy_digest": snapshot["snapshot_digest"],
                 "committed_episodes": snapshot["committed_episodes"],
                 "committed_updates": snapshot["committed_updates"],
+                "learning_config_digest": _digest(config.as_dict()),
                 "metrics": metrics,
                 "evaluation": evaluation,
+                "acceptance": GameLearningWorkspace._training_acceptance(evaluation, request),
                 "promotion_authorized": False,
             }, snapshot
 
         finally:
             from skeleton.jeeves.game_learning_demonstrations import close_environment
 
-            close_environment(environment)
+            if environment is not None:
+                close_environment(environment)
+
+    @staticmethod
+    def _training_acceptance(evaluation, request):
+        """Derive a declared return gate from actual paired trajectories only."""
+        episodes = evaluation["episodes"]
+        seeds = evaluation.get("heldout_seeds")
+        if (
+            not isinstance(episodes, list)
+            or not 1 <= len(episodes) <= 8
+            or not isinstance(seeds, list)
+            or len(seeds) != len(episodes)
+            or any(type(seed) is not int or not 0 <= seed < 2**63 for seed in seeds)
+            or len(set(seeds)) != len(seeds)
+        ):
+            raise GameLearningError(
+                "policy_evaluation_invalid", "Paired evaluation seed ledger differs.", 503
+            )
+        for item, seed in zip(episodes, seeds):
+            if type(seed) is not int or not 0 <= seed < 2**63 or item.get("seed") != seed:
+                raise GameLearningError("policy_evaluation_invalid", "Paired evaluation seed differs.", 503)
+            returns = [item[label]["return"] for label in ("candidate", "baseline")]
+            if any(type(value) not in (int, float) or not math.isfinite(value) for value in returns):
+                raise GameLearningError(
+                    "policy_evaluation_invalid", "Measured paired returns are not finite.", 503
+                )
+            if item.get("return_difference") != returns[0] - returns[1]:
+                raise GameLearningError(
+                    "policy_evaluation_invalid", "Measured paired return difference differs.", 503
+                )
+        difference = math.fsum(item["return_difference"] for item in episodes) / len(episodes)
+        if difference != evaluation["mean_return_difference"]:
+            raise GameLearningError(
+                "policy_evaluation_invalid", "Measured mean return difference differs.", 503
+            )
+        worst = min(item["return_difference"] for item in episodes)
+        minimum = request.get("min_improvement", 0)
+        regression = request.get("max_worst_seed_regression", 0)
+        evidence = {
+            "schema_version": "skeleton.game.policy_acceptance.v1",
+            "policy_id": evaluation["policy_id"],
+            "policy_digest": evaluation["policy_digest"],
+            "evaluation_digest": evaluation["evaluation_digest"],
+            "baseline": evaluation["baseline"],
+            "heldout_seeds": evaluation["heldout_seeds"],
+            "mean_return_difference": difference,
+            "worst_seed_difference": worst,
+            "thresholds": {
+                "min_improvement": minimum,
+                "max_worst_seed_regression": regression,
+            },
+            "meets_configured_return_gate": difference >= minimum and worst >= -regression,
+            "strict_improvement": difference > 0,
+            "interpretation": "Measured declared reward returns only; termination is not assumed to mean success.",
+            "production_promotion_authorized": False,
+        }
+        evidence["acceptance_digest"] = _digest(evidence)
+        return evidence
 
     async def _generate(self, scope, job, factory, cancelled):
         from skeleton.jeeves.game_learning_generation import GameGenerationRequest, generate_game_project
@@ -3183,6 +4340,7 @@ class GameLearningWorkspace:
     async def environment_request(self, scope, binding):
         from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
         from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry
+        from core.game_console_build import artifact_native_observation
 
         project = await self._authority(scope, binding)
         frozen_files = binding.get("files", project["files"])
@@ -3206,8 +4364,11 @@ class GameLearningWorkspace:
                 self.authored_runtime_target(tree, authored_kind, binding["console_id"]),
                 kind=authored_kind,
                 tree=self.authored_runtime_tree(tree, authored_kind),
-                max_steps=(min(128, binding["episode_steps"]) if authored_kind == "studio"
-                           else binding["episode_steps"]),
+                max_steps=(
+                    min(128, binding["episode_steps"])
+                    if authored_kind == "studio"
+                    else binding["episode_steps"]
+                ),
             ).as_dict()
         generated = "game/generated/game.json" in tree and not compiled
         rom, content, filename = None, None, "game.bin"
@@ -3277,6 +4438,9 @@ class GameLearningWorkspace:
                     content=content,
                     rom_source=rom,
                     filename=filename,
+                    native_observation=(
+                        await artifact_native_observation(scope, selected_source) if compiled else None
+                    ),
                 )
                 return request.as_dict()
         request = GameEnvironmentRequest(
@@ -3296,11 +4460,15 @@ class GameLearningWorkspace:
             "game/studio/session.json": "studio",
         }
         present = [kind for path, kind in markers.items() if path in tree]
-        if len(present) > 1 or (present and "game/generated/game.json" in tree):
+        if ("studio" in present and len(present) > 1) or (present and "game/generated/game.json" in tree):
             raise GameLearningError(
                 "ambiguous_engine_source",
-                "A project cannot execute multiple competing authored engine roots.", 409,
+                "A project cannot execute multiple competing authored engine roots.",
+                409,
             )
+        # Successor adoption retains the original editor document as inactive
+        # source evidence. Keep its established active-source precedence rather
+        # than stranding an otherwise valid existing project after an upgrade.
         return present[0] if present else None
 
     @staticmethod
@@ -3308,9 +4476,7 @@ class GameLearningWorkspace:
         if kind == "studio":
             from skeleton.jeeves.game_studio_environment import studio_source_target
 
-            return studio_source_target(
-                {"game/studio/session.json": tree["game/studio/session.json"]}
-            )
+            return studio_source_target({"game/studio/session.json": tree["game/studio/session.json"]})
         return fallback
 
     @staticmethod
@@ -3422,7 +4588,7 @@ class GameLearningWorkspace:
                     "Recording is unavailable or its consent was withdrawn.",
                     403,
                 )
-            demo = GameDemonstration.from_dict(row["demonstration"])
+            demo = GameDemonstration.from_dict(self._stored_evidence(row["demonstration"]))
             if (
                 demo.digest != reference["demonstration_digest"]
                 or row["input"]["tree_digest"] != binding["tree_digest"]

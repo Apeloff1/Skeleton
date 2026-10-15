@@ -4,6 +4,7 @@ export const LEGACY_KEY = '@tutolage/jeeves-chat:v2';
 export const MAX_CONVERSATIONS = 30;
 export const MAX_MESSAGES = 100;
 export const MAX_TEXT = 16_000;
+export const MAX_REPLY = 100_000;
 export const MAX_CONTEXT = 4_000;
 /** @deprecated Canonical server sessions are durable; retained for API compatibility. */
 export const SESSION_TTL = 6 * 60 * 60 * 1000;
@@ -30,7 +31,8 @@ export type Message = {
   artifactCount?: number;
   attachmentName?: string;
   /** Exact non-binary submission parameters; never rebuilt from later edits. */
-  retryRequest?: Pick<ChatBody, 'session_id' | 'context' | 'force_all_forms'>;
+  retryRequest?: Omit<ChatBody, 'message' | 'client_message_id' | 'image_base64' | 'pdf_base64'>;
+  terminal?: boolean;
   error?: string;
 };
 
@@ -66,6 +68,14 @@ export type ChatBody = {
   context: string;
   image_base64?: string;
   pdf_base64?: string;
+  canonical_thread_id?: string;
+  provider_id?: string;
+  model_id?: string;
+  max_output_tokens?: number;
+  crawler_context?: { query: string; max_documents: number; max_characters: number };
+  resume_existing?: boolean;
+  resume_only?: boolean;
+  resume_cursor?: { operation_id: string; last_seen_sequence: number; last_event_digest: string | null };
 };
 
 export type CanonicalChatTurn = {
@@ -91,6 +101,9 @@ export type ChatHistoryProjection = {
   available?: boolean;
   history_source?: string;
   canonical_thread_id?: string | null;
+  thread_title?: string;
+  thread_state?: string;
+  pending_turns?: { client_message_id: string; text: string; created_at: number; terminal: boolean }[];
 };
 
 export function newId(): string {
@@ -135,8 +148,8 @@ function restoreMessage(value: unknown, now: number): Message | null {
   const status = interrupted ? 'failed'
     : item.status === 'failed' || item.status === 'cancelled' ? item.status : 'complete';
   return {
-    id: text(item.id, 100) || newId(), role: item.role, text: text(item.text),
-    createdAt: timestamp(item.createdAt, now), status,
+    id: text(item.id, 100) || newId(), role: item.role, text: text(item.text, item.role === 'jeeves' ? MAX_REPLY : MAX_TEXT),
+    createdAt: timestamp(item.createdAt, now), status, terminal: item.terminal === true,
     tier: text(item.tier, 80) || undefined, model: text(item.model, 120) || undefined,
     forms: Array.isArray(item.forms) ? item.forms.filter((x): x is string => typeof x === 'string').slice(0, 10) : undefined,
     artifactCount: typeof item.artifactCount === 'number' ? Math.max(0, Math.min(100, item.artifactCount)) : 0,
@@ -155,7 +168,24 @@ function restoreRetryRequest(value: unknown): Message['retryRequest'] {
     session_id: item.session_id as string,
     context: item.context,
     force_all_forms: item.force_all_forms,
+    ...(typeof item.canonical_thread_id === 'string' && sessionIdentity(item.canonical_thread_id) ? { canonical_thread_id: item.canonical_thread_id } : {}),
+    ...(typeof item.provider_id === 'string' && item.provider_id.length <= 128 && typeof item.model_id === 'string' && item.model_id.length <= 256 ? { provider_id: item.provider_id, model_id: item.model_id } : {}),
+    ...(Number.isSafeInteger(item.max_output_tokens) && (item.max_output_tokens as number) > 0 && (item.max_output_tokens as number) <= 65536 ? { max_output_tokens: item.max_output_tokens as number } : {}),
+    ...(item.resume_existing === true ? { resume_existing: true } : {}),
+    ...(item.resume_only === true ? { resume_only: true } : {}),
+    ...restoreCrawlerContext(item.crawler_context),
+    ...restoreCursor(item.resume_cursor),
   };
+}
+function restoreCrawlerContext(value: unknown): Pick<ChatBody, 'crawler_context'> {
+  const item = record(value);
+  return item && typeof item.query === 'string' && item.query.length > 0 && item.query.length <= 1024 && Number.isSafeInteger(item.max_documents) && (item.max_documents as number) >= 1 && (item.max_documents as number) <= 4 && Number.isSafeInteger(item.max_characters) && (item.max_characters as number) >= 1 && (item.max_characters as number) <= 16000
+    ? { crawler_context: { query: item.query, max_documents: item.max_documents as number, max_characters: item.max_characters as number } } : {};
+}
+function restoreCursor(value: unknown): Pick<ChatBody, 'resume_cursor'> {
+  const item = record(value);
+  return item && typeof item.operation_id === 'string' && item.operation_id.length <= 160 && Number.isSafeInteger(item.last_seen_sequence) && (item.last_seen_sequence as number) > 0 && typeof item.last_event_digest === 'string' && /^[a-f0-9]{64}$/.test(item.last_event_digest)
+    ? { resume_cursor: { operation_id: item.operation_id, last_seen_sequence: item.last_seen_sequence as number, last_event_digest: item.last_event_digest } } : {};
 }
 
 function restoreConversation(value: unknown, now: number): Conversation | null {
@@ -208,8 +238,8 @@ export function encodeWorkspace(workspace: Workspace): string {
       context: c.context.slice(0, MAX_CONTEXT), allForms: c.allForms,
       sessionId: c.sessionId, sessionUpdatedAt: c.sessionUpdatedAt,
       messages: c.messages.slice(-MAX_MESSAGES).map(m => ({
-        id: m.id, role: m.role, text: m.text.slice(0, MAX_TEXT), createdAt: m.createdAt,
-        status: m.status, tier: m.tier, model: m.model, forms: m.forms,
+        id: m.id, role: m.role, text: m.text.slice(0, m.role === 'jeeves' ? MAX_REPLY : MAX_TEXT), createdAt: m.createdAt,
+        status: m.status, tier: m.tier, model: m.model, forms: m.forms, terminal: m.terminal,
         artifactCount: m.artifacts?.length || m.artifactCount || 0,
         attachmentName: m.attachmentName, error: m.error,
         retryRequest: m.status === 'complete' ? undefined : restoreRetryRequest(m.retryRequest),
@@ -275,6 +305,7 @@ export function buildChatBody(
   return {
     message,
     session_id: serverSessionId,
+    canonical_thread_id: conversation.canonicalThreadId,
     ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
     force_all_forms: conversation.allForms,
     context: conversation.context,
@@ -287,7 +318,7 @@ function canonicalTurnText(value: unknown, field: string): string {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`Canonical Jeeves history has invalid ${field}.`);
   }
-  return value.slice(0, MAX_TEXT);
+  return value.slice(0, MAX_REPLY);
 }
 
 function canonicalTurnId(value: unknown, fallback: string): string {
@@ -374,11 +405,21 @@ export function projectCanonicalHistory(
     });
   });
 
+  const pending = projection.pending_turns || [];
   const unresolved = conversation.messages.filter(message => (
     message.role === 'user'
     && message.status !== 'complete'
     && !canonicalIds.has(message.id)
   ));
+  for (const turn of pending) {
+    if (!turn || typeof turn.client_message_id !== 'string' || typeof turn.text !== 'string' || !Number.isFinite(turn.created_at) || canonicalIds.has(turn.client_message_id)) continue;
+    const index = unresolved.findIndex(message => message.id === turn.client_message_id);
+    const previous = index >= 0 ? unresolved[index] : undefined;
+    const message: Message = { ...previous, id: turn.client_message_id, role: 'user', text: turn.text.slice(0, MAX_TEXT), createdAt: turn.created_at, status: 'failed', terminal: turn.terminal,
+      error: turn.terminal ? 'This turn ended without a reply. You can send a new message.' : 'This saved turn has no confirmed answer yet. Resume to follow its actual state.',
+      retryRequest: previous?.retryRequest || { session_id: projection.session_id, canonical_thread_id: projection.session_id, context: '', force_all_forms: false, resume_existing: true, resume_only: true } };
+    if (index >= 0) unresolved[index] = message; else unresolved.push(message);
+  }
   const messages = [...projected, ...unresolved].slice(-MAX_MESSAGES);
   const updatedAt = messages.reduce(
     (latest, item) => Math.max(latest, item.createdAt),
@@ -386,6 +427,8 @@ export function projectCanonicalHistory(
   );
   return {
     ...conversation,
+    title: projection.thread_title || conversation.title,
+    archived: projection.thread_state ? projection.thread_state === 'archived' : conversation.archived,
     canonicalThreadId: projection.canonical_thread_id || conversation.canonicalThreadId,
     sessionId: projection.session_id,
     sessionUpdatedAt: now,

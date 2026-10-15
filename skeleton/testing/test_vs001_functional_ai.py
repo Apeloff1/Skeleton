@@ -282,7 +282,7 @@ async def test_vs001_rejects_local_model_identity_swap_between_turns(tmp_path) -
         ),
     )
 
-    with pytest.raises(RuntimeError,match="identity changed after binding"):
+    with pytest.raises(RuntimeError,match="provider route, configuration, activation or runtime identity changed"):
         await runtime.execute(request)
 
 

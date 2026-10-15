@@ -85,6 +85,7 @@ class GameEnvironmentRequest:
     frames_per_step: int = 1
     emulator_timeout_seconds: float = 5.0
     gameplay_dialect: str | None = None
+    native_observation: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         _name(self.target_id, "environment target")
@@ -120,8 +121,20 @@ class GameEnvironmentRequest:
             _sha(self.registry_digest, "approved emulator registry")
             if self.tree is not None or (self.content is None) == (self.rom_source is None):
                 raise GameLearningError("emulator request needs exactly one admitted content source")
+            if self.native_observation is not None:
+                from .game_emulator_host import validate_native_observation
+
+                object.__setattr__(
+                    self,
+                    "native_observation",
+                    validate_native_observation(
+                        self.native_observation, core_id=self.core_id, target_id=self.target_id
+                    ),
+                )
         elif any(value is not None for value in (self.core_id, self.registry_digest, self.content)):
             raise GameLearningError("builtin request cannot carry an emulator registry or content descriptor")
+        if self.kind != "libretro" and self.native_observation is not None:
+            raise GameLearningError("native RAM observations require the approved emulator owner")
         if self.kind in ("console_editor", "successor", "studio", "studio_rules") and (
             self.tree is None or self.rom_source is not None or self.gameplay_dialect is not None
         ):
@@ -139,9 +152,7 @@ class GameEnvironmentRequest:
             or len(self.tree["game/studio/rule_curriculum.json"].encode("utf-8")) > 192000
             or self.max_steps > 128
         ):
-            raise GameLearningError(
-                "AI rules environment requires one bounded source-bound curriculum tree"
-            )
+            raise GameLearningError("AI rules environment requires one bounded source-bound curriculum tree")
         _name(self.filename, "emulator content filename")
         if self.gameplay_dialect is not None:
             _name(self.gameplay_dialect, "environment gameplay dialect")
@@ -167,6 +178,7 @@ class GameEnvironmentRequest:
             "frames_per_step": self.frames_per_step,
             "emulator_timeout_seconds": float(self.emulator_timeout_seconds),
             "gameplay_dialect": self.gameplay_dialect,
+            "native_observation": self.native_observation,
         }
 
     @property
@@ -198,7 +210,11 @@ class GameEnvironmentRequest:
             "frames_per_step",
             "emulator_timeout_seconds",
             "gameplay_dialect",
+            "native_observation",
         }
+        # Old serialized requests stay readable; current code identities still
+        # fence existing policy and worker evidence at their ordinary owners.
+        raw.setdefault("native_observation", None)
         if set(raw) != expected or raw.pop("schema_version") != REQUEST_SCHEMA:
             raise GameLearningError("environment request schema differs")
         encoded = raw.pop("rom_base64")
@@ -223,7 +239,8 @@ class GameEnvironmentRequest:
             )
         if self.kind == "studio_rules":
             from .game_studio_rule_curriculum import (
-                RuleCurriculumEnvironment, verify_rule_curriculum,
+                RuleCurriculumEnvironment,
+                verify_rule_curriculum,
             )
 
             def pairs(rows):
@@ -237,15 +254,19 @@ class GameEnvironmentRequest:
             raw = self.tree["game/studio/rule_curriculum.json"]
             try:
                 document = json.loads(
-                    raw, object_pairs_hook=pairs,
+                    raw,
+                    object_pairs_hook=pairs,
                     parse_constant=lambda _: (_ for _ in ()).throw(
-                        GameLearningError("nonfinite AI game-rule number")),
+                        GameLearningError("nonfinite AI game-rule number")
+                    ),
                 )
             except (ValueError, UnicodeError, RecursionError) as exc:
                 raise GameLearningError("invalid finite original game-rule source") from exc
             plan = verify_rule_curriculum(document)
-            if (self.target_id != "studio-rules:" + plan["base_source"]["editor"]
-                    or self.max_steps != plan["max_steps"]):
+            if (
+                self.target_id != "studio-rules:" + plan["base_source"]["editor"]
+                or self.max_steps != plan["max_steps"]
+            ):
                 raise GameLearningError("AI rule scenario target or max-step identity changed")
             return RuleCurriculumEnvironment(plan)
         if self.kind == "studio":
@@ -275,6 +296,7 @@ class GameEnvironmentRequest:
                 frames_per_step=self.frames_per_step,
                 timeout_seconds=self.emulator_timeout_seconds,
                 cancelled=cancel,
+                native_observation=self.native_observation,
             )
         from .game_learning_runtime import create_game_environment
 
@@ -354,6 +376,7 @@ def _worker(channel: socket.socket) -> None:
             stopped = True
         return stopped
 
+    actor_visits = {state: list(values) for state, values in frozen._visits.items()}
     for assignment in request["assignments"]:
         environment = None
         try:
@@ -371,11 +394,29 @@ def _worker(channel: socket.socket) -> None:
             trace_bytes = 0
             for sequence in range(1, expected["max_episode_steps"] + 1):
                 GamePolicyLearner._guard(cancelled, None)
-                action = (
-                    frozen._actions[rng.randrange(len(frozen._actions))]
-                    if rng.random() < epsilon
-                    else frozen._greedy(observation)
-                )
+                explore = rng.random() < epsilon
+                if frozen.config.exploration_strategy == "least_visited":
+                    state = frozen._state(observation)
+                    if state not in actor_visits:
+                        if len(actor_visits) >= frozen.config.max_states:
+                            raise GameLearningError("actor exploration state budget exhausted")
+                        actor_visits[state] = [0] * len(frozen._actions)
+                    scores = frozen._scores(state)
+                    candidates = (
+                        list(range(len(scores)))
+                        if explore
+                        else [i for i, v in enumerate(scores) if v == max(scores)]
+                    )
+                    minimum = min(actor_visits[state][i] for i in candidates)
+                    candidates = [i for i in candidates if actor_visits[state][i] == minimum]
+                    index = candidates[rng.randrange(len(candidates))]
+                    action = frozen._actions[index]
+                else:
+                    action = (
+                        frozen._actions[rng.randrange(len(frozen._actions))]
+                        if explore
+                        else frozen._greedy(observation)
+                    )
                 step = environment.step(action)
                 value: dict[str, Any] = {
                     "sequence": sequence,
@@ -393,6 +434,8 @@ def _worker(channel: socket.socket) -> None:
                 if step.transition_digest:
                     value["transition_digest"] = step.transition_digest
                 transition = frozen._transition(value, sequence)
+                if frozen.config.exploration_strategy == "least_visited":
+                    actor_visits[state][index] += 1
                 trace_bytes += len(_json(transition))
                 if trace_bytes > frozen.config.trace_byte_limit:
                     raise GameLearningError("actor trace byte budget exhausted")
@@ -548,7 +591,7 @@ class ParallelGamePolicyTrainer:
                     "ordinal": ordinal,
                     "actor_index": offset % self.actors,
                     "seed": seed,
-                    "rollout_seed": int(identity[:16], 16),
+                    "rollout_seed": int(identity[:16], 16) % (2**63),
                     "episode_id": "actor-episode:" + identity,
                 }
             )
@@ -620,7 +663,7 @@ class ParallelGamePolicyTrainer:
                 "ordinal": ordinal,
                 "actor_index": offset % self.actors,
                 "seed": seed,
-                "rollout_seed": int(identity[:16], 16),
+                "rollout_seed": int(identity[:16], 16) % (2**63),
                 "episode_id": "actor-episode:" + identity,
             }
             if (
@@ -969,7 +1012,8 @@ class ParallelGamePolicyTrainer:
         current = self.learner.snapshot()
         if (
             current["committed_episodes"] + count > self.learner.config.max_episodes
-            or len(current["inherited_episodes"]) + current["committed_episodes"] + count > MAX_LIFETIME_EPISODES
+            or len(current["inherited_episodes"]) + current["committed_episodes"] + count
+            > MAX_LIFETIME_EPISODES
         ):
             raise GameLearningError("parallel requested work exceeds cumulative episode budgets")
         initial_updates = current["committed_updates"]

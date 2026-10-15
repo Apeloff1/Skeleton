@@ -55,11 +55,11 @@
         "backend_data"
       ],
       "durability": "persistent-volume",
-      "production_role": "application-local support data; local Chroma is rebuildable retrieval projection only",
+      "production_role": "Existing application-local support data: rebuildable local Chroma, authoritative Curiosity filesystem ledgers, and existing owner-scoped Dragon reviewed-knowledge/practice SQLite files. Studio enablement remains implementation-candidate.",
       "network": "not directly network-addressable",
       "authentication": "process boundary",
-      "backup": "optional for local Chroma projection; authoritative product state is backed up through Mongo",
-      "restore": "rebuild local Chroma projections from canonical Mongo/content sources",
+      "backup": "Retain Curiosity and both complete Dragon SQLite authorities using their consistent backup protocols with backend_data. Canonical conversations, crawler consent/erasure and studio jobs remain Mongo authorities.",
+      "restore": "Restore original file ownership and consistent SQLite databases before Dragon bootstrap; do not recreate a disappeared live authority. Recheck every restored crawler-bound note against current Mongo consent/revocation. No cross-store atomic restore qualification is claimed.",
       "migration": "canonical Jeeves RAG product state migrated to Mongo; legacy Chroma state imports through RAGService.migrate_legacy_chroma_state",
       "evidence": [
         "docker-compose.yml",
@@ -937,6 +937,110 @@
         "machine/ai_game_studio_learning.json"
       ],
       "continuation": "Existing-store scoped play/controller leases, consented measured demonstrations, immutable media manifests, build-derived artifact receipts and episode-atomic parallel learner checkpoints. Runtime sockets/processes/preview frames/private content files are derived execution handles, never source or consent authority. Console authoring documents, exact original successor candidates, cross-project source and teacher lineage, current edited-world desktop packages use the same scoped authority; editor simulation and native player save files remain derived state. Native compiled artifact membership and agent goal journals use existing sources/chunks/revisions authority; finite goal execution rechecks each current source/action and records exact EngineChat execution/typed command receipts. Existing scheduler may recover only currently authorized bounded campaigns."
+    },
+    {
+      "id": "dragon-crawler-application",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME.dragon_crawler_sessions plus existing dragon_crawler_commands account/global capacity and command records",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "implementation-candidate",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Scoped session/version/lease CAS, immutable finite execution grant and pre-dispatch slice credit; only complete current-token checkpoints publish a core snapshot. Existing scheduler consumes only unexpired grants and current canonical editor/admin authority.",
+      "consistency": "Tenant/owner isolation, exact request digest and bounded source/frontier/provenance state; no synthetic fetched/learned counters and no raw crawl automatically promoted to reviewed knowledge.",
+      "retention": "Bounded owner-controlled source/session lifetime; stop prevents continuation, while explicit data retention/deletion remains distinct.",
+      "backup_restore": "Restore existing CORE_DB before resuming; finite grants retain original expiry/budgets and consumed dispatch credits. Expired leases fence authority and expose interrupted work; only an observed local executor join confirms physical quiescence.",
+      "migration": "Additive scoped collections and indexes in existing store; old Academy reviewed practice authority remains unchanged.",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "machine/ai_dragon_crawler_app.json",
+        "machine/ai_dragon_crawler_operations.json",
+        "backend/core/dragon_crawler.py",
+        "backend/routes/dragon_academy.py"
+      ]
+    },
+    {
+      "id": "backend-curiosity-file-state",
+      "owner_plane": "feedback-learning",
+      "physical_store": "backend-data-volume",
+      "logical_location": "CURIOSITY_DATA_ROOT=/app/data/curiosity",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "implementation-candidate",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Existing CuriosityService filesystem locks and per-owner knowledge/frontier/evidence/truth/epistemic ledgers; no new persistence implementation.",
+      "consistency": "Existing canonical Curiosity and truth owners retain their file protocols; read-only application image never acts as writable state.",
+      "retention": "Existing Curiosity policy and operator volume lifetime; independent of raw crawler snapshots and their consent/erasure authority.",
+      "backup_restore": "Stop existing Curiosity workers, back up the complete directory with existing backend_data volume, and restore with original ownership before startup. This continuation does not claim a completed Curiosity restore drill.",
+      "migration": "Compose explicitly selects existing supported CURIOSITY_DATA_ROOT under the existing durable backend data volume; no automatic import from a different historical directory.",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "backend/core/curiosity_service.py",
+        "backend/core/verified_curiosity.py",
+        "docker-compose.yml",
+        "machine/ai_first_install.json"
+      ]
+    },
+    {
+      "id": "dragon-reviewed-design-knowledge",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume",
+      "logical_location": "SKL_DRAGON_KNOWLEDGE_DB_PATH=/app/data/dragon_knowledge.sqlite",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "implementation-candidate",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Existing ReviewedKnowledgeStore revisions plus same-SQLite captured-source candidate, immutable review-intent and revision/source binding tables.",
+      "consistency": "Authoritative user annotations and review receipts, not authoritative external truth. Reserved crawler-review revisions require exact current owner/source/consent/expiry verification at search, brief, builder evidence and practice admission.",
+      "retention": "Existing owner-controlled store lifetime and bounded canonical row budgets. Crawler source withdrawal immediately removes eligibility; retained own review/practice audit metadata is distinct from permission to reuse a source. Canonical knowledge owner erasure removes adjacent source-candidate/review/binding records.",
+      "backup_restore": "Stop writers or use SQLite backup API for a consistent database with original ownership; retain schema and exact receipt identities. Restore Mongo source/consent authority first, then recheck live references before learning/retrieval. No completed restore drill claimed.",
+      "migration": "Existing SQLite owners remain canonical. Normal operator installation may exclusively initialize empty private schemas; runtime reads never recreate missing files, silently import history or upgrade unknown source identities.",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "machine/ai_dragon_knowledge_runtime.json",
+        "skeleton/ai/game_builder/reviewed_knowledge.py",
+        "skeleton/ai/game_builder/dragon_source_review.py",
+        "backend/core/dragon_runtime.py"
+      ]
+    },
+    {
+      "id": "dragon-practice-state",
+      "owner_plane": "feedback-learning",
+      "physical_store": "backend-data-volume",
+      "logical_location": "SKL_DRAGON_PRACTICE_DB_PATH=/app/data/dragon_practice.sqlite",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "implementation-candidate",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Existing DragonPracticeLab/cycles and same-SQLite measured-reference intents, finite attempt credits, leases, transition checkpoints and immutable completion receipts.",
+      "consistency": "Only actual completed observations advance measured practice history. Fixed reference play cannot manufacture calibrated lessons, policy training, XP or source rights. Existing approved Lab promotion gates remain unchanged.",
+      "retention": "Existing owner-controlled store lifetime and bounded canonical row budgets. Crawler source withdrawal immediately removes eligibility; retained own review/practice audit metadata is distinct from permission to reuse a source. Canonical knowledge owner erasure removes adjacent source-candidate/review/binding records.",
+      "backup_restore": "Stop writers or use SQLite backup API for a consistent database with original ownership; retain schema and exact receipt identities. Restore Mongo source/consent authority first, then recheck live references before learning/retrieval. No completed restore drill claimed.",
+      "migration": "Existing SQLite owners remain canonical. Normal operator installation may exclusively initialize empty private schemas; runtime reads never recreate missing files, silently import history or upgrade unknown source identities.",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "machine/ai_dragon_knowledge_runtime.json",
+        "skeleton/ai/webcrawler/dragon_practice_lab.py",
+        "backend/core/dragon_reference_practice.py",
+        "backend/core/dragon_runtime.py"
+      ]
     }
   ],
   "state_flows": [
@@ -1107,6 +1211,22 @@
       "mode": "fail-closed lifecycle registration",
       "rule": "GovernedMemoryWriter commits canonical memory then reconciles tenant-bound lifecycle metadata; if governance persistence fails the committed memory is tombstoned fail-closed and a canonical delete projection intent is emitted",
       "failure": "active ungoverned memory is forbidden; governance registration failure forces canonical memory tombstone and surfaces a typed writeback error"
+    },
+    {
+      "id": "captured-source-to-reviewed-reference",
+      "from": "dragon-crawler-application",
+      "to": "dragon-reviewed-design-knowledge",
+      "mode": "explicit-human-reviewed-source-reference",
+      "rule": "A source-bound annotation requires actual preserved source bytes, exact codepoint span, current scope/consent and explicit human design/research review. Raw capture never grants training or calibrated truth.",
+      "failure": "Missing/withdrawn source or unpublished exact revision binding hides the reference; no cross-Mongo/SQLite atomicity claim."
+    },
+    {
+      "id": "reviewed-reference-to-measured-practice",
+      "from": "dragon-reviewed-design-knowledge",
+      "to": "dragon-practice-state",
+      "mode": "explicit-bounded-reference-exercise",
+      "rule": "Only a current approved reference with explicit practice consent may label a fixed coded reference exercise. Durable finite credits precede execution; current source checks and actual transitions precede completion.",
+      "failure": "Interruption retains only measured partial checkpoints, never XP/mastery; repeated cancellation drains the local physical worker before releasing its handle."
     }
   ],
   "recovery_order": [

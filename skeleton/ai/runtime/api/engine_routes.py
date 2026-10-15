@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import base64
 import binascii
-from datetime import datetime
 import hmac
-from typing import Any
+from datetime import datetime
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
@@ -28,7 +28,6 @@ from skeleton.provider_runtime import (
     ProviderSpeechRequest,
     ProviderUnavailableError,
 )
-
 
 router = APIRouter(prefix="/engine", tags=["engine"])
 
@@ -238,6 +237,49 @@ def _authorize_media(
         )
 
 
+@router.get("/providers")
+def providers(
+    request: Request,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+    tenant_id: Annotated[str | None, Query(min_length=1, max_length=512)] = None,
+) -> dict[str, Any]:
+    """Observe the canonical registry under the existing service read grant."""
+    principal = _verified_service_principal(request, service_token)
+    try:
+        grant = service.authorities.grant_for(principal)
+    except EngineAuthorityError as exc:
+        raise HTTPException(status_code=403, detail="engine provider read denied") from exc
+    if "engine:read" not in grant.scopes:
+        raise HTTPException(status_code=403, detail="engine provider read denied")
+    if tenant_id is not None and not grant.allows_tenant(tenant_id):
+        raise HTTPException(status_code=403, detail="engine provider tenant denied")
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine provider registry unavailable")
+    registry = coordinator.provider_registry
+    fields = (
+        "id", "provider_id", "model", "available", "active", "fallback",
+        "architecture_acknowledged", "configured", "readiness_code",
+        "execution_mode", "network_policy", "credential_free", "capabilities",
+        "context_window", "max_output_tokens", "default_output_tokens",
+        "limits_source", "tokenizer", "supports_temperature", "artifact",
+    )
+    rows = [{key: value[key] for key in fields if key in value} for value in registry.statuses()]
+    artifact_fields = (
+        "schema", "model_id", "model_digest", "artifact_sha256", "artifact_bytes",
+        "manifest_digest", "runtime_digest", "runtime_kind", "reference",
+    )
+    for row in rows:
+        row.setdefault("id", row.get("provider_id"))
+        artifact = row.get("artifact")
+        if isinstance(artifact, dict):
+            row["artifact"] = {
+                key: artifact[key] for key in artifact_fields if key in artifact
+            }
+    return {"active": registry.active_id, "available": registry.available, "providers": rows}
+
+
 def _media_adapter(coordinator):
     if coordinator is None:
         raise HTTPException(
@@ -301,9 +343,7 @@ def _raise_engine_error(exc: Exception) -> None:
     if isinstance(exc, (EngineServiceError, ExecutionRepositoryError)):
         detail = str(exc)
         code = (
-            status.HTTP_404_NOT_FOUND
-            if "unknown" in detail.lower()
-            else status.HTTP_422_UNPROCESSABLE_ENTITY
+            status.HTTP_404_NOT_FOUND if "unknown" in detail.lower() else status.HTTP_422_UNPROCESSABLE_ENTITY
         )
         raise HTTPException(status_code=code, detail=detail) from exc
     if isinstance(exc, (ValueError, TypeError)):
@@ -312,40 +352,6 @@ def _raise_engine_error(exc: Exception) -> None:
             detail=str(exc),
         ) from exc
     raise exc
-
-
-@router.get("/providers")
-def provider_status(
-    request: Request,
-    service: EngineExecutionService = Depends(_engine_service),
-    service_token: str = Depends(_engine_service_token),
-    coordinator=Depends(_engine_coordinator),
-) -> dict[str, Any]:
-    """Expose engine-owned provider identity to the authenticated application."""
-    principal = _verified_service_principal(request, service_token)
-    try:
-        grant = service.authorities.grant_for(principal)
-    except EngineAuthorityError as exc:
-        raise HTTPException(status_code=403, detail="engine provider authority denied") from exc
-    if "engine:read" not in grant.scopes:
-        raise HTTPException(status_code=403, detail="engine provider read scope denied")
-    if coordinator is None:
-        raise HTTPException(status_code=503, detail="engine provider runtime unavailable")
-    registry = coordinator.provider_registry
-    providers = []
-    for raw in registry.statuses():
-        row = {key: raw[key] for key in (
-            "id", "model", "available", "execution_mode", "network_policy",
-        ) if key in raw}
-        artifact = raw.get("artifact")
-        if isinstance(artifact, dict):
-            row["artifact"] = {key: artifact[key] for key in (
-                "schema", "model_id", "model_digest", "artifact_sha256",
-                "artifact_bytes", "reference",
-            ) if key in artifact}
-        providers.append(row)
-    return {"active": registry.active_id, "available": registry.available,
-            "providers": providers}
 
 
 @router.post("/executions", status_code=status.HTTP_202_ACCEPTED)
@@ -414,11 +420,7 @@ def reconcile_governed_write(
             source_ref=body.source_ref,
             data_class=body.data_class,
             purposes=tuple(body.purposes),
-            deletion_targets=(
-                None
-                if body.deletion_targets is None
-                else tuple(body.deletion_targets)
-            ),
+            deletion_targets=(None if body.deletion_targets is None else tuple(body.deletion_targets)),
             created_at=body.created_at,
             retention_until=body.retention_until,
             exportable=body.exportable,
@@ -459,11 +461,7 @@ def request_governance_deletion(
         return service.request_external_governance_deletion(
             verified_service_principal=principal,
             tenant_id=body.tenant_id,
-            record_ids=(
-                None
-                if body.record_ids is None
-                else tuple(body.record_ids)
-            ),
+            record_ids=(None if body.record_ids is None else tuple(body.record_ids)),
             reason=body.reason,
         )
     except Exception as exc:
@@ -471,9 +469,7 @@ def request_governance_deletion(
         raise
 
 
-@router.post(
-    "/governance/deletions/{plan_id}/execute-engine-targets"
-)
+@router.post("/governance/deletions/{plan_id}/execute-engine-targets")
 async def execute_governance_engine_targets(
     plan_id: str,
     body: EngineGovernancePlanExecutionBody,
@@ -593,11 +589,7 @@ async def cancel_execution(
             actor_id=body.actor_id,
             tenant_id=body.tenant_id,
         )
-        if (
-            coordinator is not None
-            and cancelled.execution_state
-            not in {"completed", "failed", "cancelled"}
-        ):
+        if coordinator is not None and cancelled.execution_state not in {"completed", "failed", "cancelled"}:
             await coordinator.interrupt_cancelled_execution(execution_id)
             cancelled = service.status(
                 execution_id,
@@ -775,11 +767,7 @@ async def edit_engine_image(
     )
     adapter = _media_adapter(coordinator)
     image = _decode_media(body.image_base64, "image_base64")
-    mask = (
-        None
-        if body.mask_base64 is None
-        else _decode_media(body.mask_base64, "mask_base64")
-    )
+    mask = None if body.mask_base64 is None else _decode_media(body.mask_base64, "mask_base64")
     try:
         result = await adapter.edit_image(
             image,
@@ -881,8 +869,8 @@ def execution_events(
 
 
 __all__ = [
-    "router",
     "_engine_coordinator",
     "_engine_service",
     "_engine_service_token",
+    "router",
 ]

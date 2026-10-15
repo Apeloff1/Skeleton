@@ -706,5 +706,367 @@
       "changed_python_files": 27,
       "changed_python_status": "pass"
     }
+  },
+  "runtime_continuation": {
+    "schema_version": "skeleton.ai.game_studio_runtime_continuation.v1",
+    "status": "measured_implementation_candidate",
+    "started_utc": "2026-10-14T07:52:51Z",
+    "continued_utc": "2026-10-15T11:29:00Z",
+    "automated_tests_authored": false,
+    "automated_tests_run": false,
+    "production_promotion_authorized": false,
+    "masterplan_completion_authorized": false,
+    "scope": "Native scene graph and observation, composed remembered improvement, actual app operation and canonical model integration; first-install continuation is separately recorded.",
+    "native_application": {
+      "workspace_project_id": "d3067eb9-6cdb-5343-a98f-4d2f2e6edacd",
+      "head_version": 3,
+      "artifact_id": "7776364a-bee8-5b74-9f70-3761e3269bc4",
+      "artifact_sha256": "7fe00d91fe474502536ea3f128571032c6d95e68fb10ec883e41271e9f3f17d5",
+      "source_id": "53078f58-7415-58ea-8a7a-aa5048a4953b",
+      "build_job_id": "e80d9c2c-ae07-5787-9550-631194ac6980",
+      "build_bytes": 32768,
+      "target": "game_boy",
+      "core": "gambatte",
+      "training_job_id": "4372cd21-7bd5-52f9-8d2e-97f9a7d1e697",
+      "actual_training_episodes": 2,
+      "actual_q_updates": 128,
+      "policy_id": "2f091601-28d0-5ecf-add2-eb99cdcf8d0f",
+      "policy_sha256": "45dfc3c477f603d969940561b0cb60cca497813bb8e781e174f59160d0db0cd6",
+      "heldout_metrics": {
+        "candidate_mean_return": 1.2486979166666667,
+        "baseline_mean_return": 1.3683159722222222,
+        "mean_return_difference": -0.11961805555555549,
+        "measured_steps": 512,
+        "evaluation_digest": "b08417e228222dfbc280cd11f71d7232d181aa44051fa88438a6baa37e677d40"
+      },
+      "policy_reopened_from_actual_canonical_storage": true,
+      "live_ai_play_id": "9acfc65c-57de-5c3f-bbec-04cfabaa20f4",
+      "actual_play_steps": 64,
+      "actual_frame_sequence": 65,
+      "retained_frame_samples": 18,
+      "last_actual_native_measurement": {
+        "values": {
+          "camera_x": 0,
+          "camera_y": 0,
+          "goal_visible": 1,
+          "goal_x": 136,
+          "goal_y": 120,
+          "graph_phase": 0,
+          "health": 5,
+          "player_x": 26,
+          "player_y": 12,
+          "tick": 65,
+          "won": 0
+        },
+        "memory_digest": "87fcecdc279df8dc42d097ebdab4a43dba70dbff8f780f04f77a2c54860fc955",
+        "layout_digest": "3ceda7d22b52b0999561eb7e41c61960369d30c49a8f08af78a350f524ea9538",
+        "measurement_scope": "Exact trusted authored kernel RAM, not inferred commercial ROM semantics"
+      },
+      "exact_unmodified_frame": {
+        "schema_version": "operator.actual_native_frame_export.v1",
+        "source_receipt": "play-latest-v5.json",
+        "play_id": "9acfc65c-57de-5c3f-bbec-04cfabaa20f4",
+        "frame_sequence": 65,
+        "steps": 64,
+        "core_id": "gambatte",
+        "native_runs": 71,
+        "video_callbacks": 71,
+        "content_digest": "7fe00d91fe474502536ea3f128571032c6d95e68fb10ec883e41271e9f3f17d5",
+        "width": 160,
+        "height": 144,
+        "png_bytes": 803,
+        "png_digest": "203feabf1698e0e84b3010ff928210bef2028cd4850f972d25cdf18f5e332bf0",
+        "pixel_digest": "43961736a9dfcd58782473246e08807efb2545e5584f82b3a7f6da9a60b70e02",
+        "source_pixel_digest": "43961736a9dfcd58782473246e08807efb2545e5584f82b3a7f6da9a60b70e02",
+        "raster": {
+          "width": 160,
+          "height": 144,
+          "pixel_digest": "43961736a9dfcd58782473246e08807efb2545e5584f82b3a7f6da9a60b70e02",
+          "png_digest": "203feabf1698e0e84b3010ff928210bef2028cd4850f972d25cdf18f5e332bf0",
+          "scaling_method": "identity",
+          "source_width": 160,
+          "source_height": 144
+        },
+        "native_measurement": {
+          "values": {
+            "camera_x": 0,
+            "camera_y": 0,
+            "goal_visible": 1,
+            "goal_x": 136,
+            "goal_y": 120,
+            "graph_phase": 0,
+            "health": 5,
+            "player_x": 26,
+            "player_y": 12,
+            "tick": 65,
+            "won": 0
+          },
+          "memory_digest": "87fcecdc279df8dc42d097ebdab4a43dba70dbff8f780f04f77a2c54860fc955",
+          "layout_digest": "3ceda7d22b52b0999561eb7e41c61960369d30c49a8f08af78a350f524ea9538",
+          "measurement_scope": "Exact trusted authored kernel RAM, not inferred commercial ROM semantics"
+        },
+        "hardware_compatibility_verified": false,
+        "pixel_modification_applied": false
+      },
+      "quiescence": {
+        "observed_at": "2026-10-14T09:37:08.723348+00:00",
+        "play_id": "9acfc65c-57de-5c3f-bbec-04cfabaa20f4",
+        "status": "stopped",
+        "steps": 64,
+        "last_observed_frame_sequence": 65,
+        "frame_sequence_source": "Saved exact API frame projection; live frame cache is TTL-bound",
+        "worker_binding_removed": true,
+        "lease_removed": true,
+        "active_game_workspace_physical_credits": 0,
+        "active_game_workspace_jobs": 0,
+        "active_game_workspace_plays": 0,
+        "live_native_emulator_or_parallel_actor_process_count": 0,
+        "physical_process_scan_scope": "Current container /proc; exact approved worker argv identifiers only"
+      },
+      "summary_receipt_sha256": "7eeb4432e412fe753e235e7a6a11cbebf27f33367a1eb96336b4bf66591e5c7b",
+      "quality_result": "Candidate return was lower than the seeded random baseline; no quality gain or production promotion claimed."
+    },
+    "composed_campaign": {
+      "configured_rounds": 100000,
+      "actual_rounds": 8,
+      "actual_transitions": 10752,
+      "candidate_q_updates": 1536,
+      "parent_q_updates": 384,
+      "checkpoint_reopened_between_rounds": [
+        4,
+        5
+      ],
+      "composed_proposals": 2,
+      "proposal_components": [
+        3,
+        4
+      ],
+      "search_receipts": 8,
+      "counterexamples": 14,
+      "lessons": 32,
+      "accepted_continuations": 1,
+      "rejected_candidates": 7,
+      "acceptance_reason": "Measured action diversity increased; return, completion and survival unchanged.",
+      "code_pins": {
+        "source_sha256": {
+          "game_studio_review.py": "ca3a8576a8ddc324d0213a48c23c40dfe6170923074b0cfd45d2f48389058936",
+          "game_learning.py": "ac7c93f7cebca864265b7dcdbafabf863c5522b3e7c160ed482093a0254fb6cd",
+          "game_studio_learning.py": "6c27b96df678a59e918fb22964728f76ce5fd8e0a9ba3981c22580688005fea2",
+          "game_learning_parallel.py": "7df2b44f2b7931b9f8fe5b539257887b91b8b0a7b1bf8866cc002f3474611883",
+          "game_emulator_catalog.py": "1851ace1bff06c37b57d610e92a2ff561dee1183430e31e64cd92e5cf95e7b2a"
+        },
+        "campaign_implementation_digest": "515ee0aeda32928482027249a62736ca2b6baa9fe53dcd3a546b32fbafa62177",
+        "snapshot_digest": "d1c315e9874594a2af3fa1c6b910e1abc5c624de50193ecf9c3632c1bf13bf19",
+        "python": [
+          3,
+          12,
+          14
+        ],
+        "automated_tests_run": false,
+        "historical_runs_preserved": [
+          "studio-composition-workload",
+          "studio-composition-workload-final-v2"
+        ]
+      },
+      "snapshot_sha256": "d1c315e9874594a2af3fa1c6b910e1abc5c624de50193ecf9c3632c1bf13bf19",
+      "receipt_sha256": "4a38a84cd6dedb9986783f9bead485d02845d550f2bfad55cf198dcf2077b629",
+      "hundred_thousand_round_endurance_executed": false
+    },
+    "semantic_review": {
+      "simulation": {
+        "purpose": "Actual productive source-bound studio inspection; no automated tests",
+        "report_bytes": 52536,
+        "report_sha256": "763d933b7228b84ae1d238c1bed22d54fa56f9eced223a22f3c88629f3da7cd0",
+        "review_digest": "bf3d637ae041496e6362c002a803a340ef628b0195dc7c20a2171b5f527f9ec2",
+        "reviewer_implementation_digest": "648e357cf7d66819f68ab3b88ab2f0ce4662ab2a74f0610c3f5c8c63d6cdf650",
+        "current_reviewer_implementation_digest": "648e357cf7d66819f68ab3b88ab2f0ce4662ab2a74f0610c3f5c8c63d6cdf650",
+        "reviewer_source_sha256": "ca3a8576a8ddc324d0213a48c23c40dfe6170923074b0cfd45d2f48389058936",
+        "actual_steps": 16,
+        "actual_captured_frames": 9,
+        "semantic_scope": "authored_simulation",
+        "findings": [
+          "operation_exceeds_60hz_budget",
+          "authored_spawn_collision",
+          "no_initial_grid_route",
+          "quest_resource_has_no_producer",
+          "held_control_without_displacement"
+        ],
+        "proposals": [
+          "console.inspect",
+          "console.edit",
+          "console.inspect",
+          "console.inspect"
+        ],
+        "source_request_digest": "b31bb36aa433eac467a806f7f6c3e625dbc3bf1481fe4e4fb1b4b4fd431a4583"
+      },
+      "native": {
+        "purpose": "Actual productive source-bound studio inspection; no automated tests",
+        "report_bytes": 52311,
+        "report_sha256": "817725adc9a49628dba516e949b7d07ed2ac6b68d6ca138b2601244537b2b32a",
+        "review_digest": "d05498fe31161bbb958ed5e6b0241b1052550e9230a7958cea55910376b94ce1",
+        "reviewer_implementation_digest": "648e357cf7d66819f68ab3b88ab2f0ce4662ab2a74f0610c3f5c8c63d6cdf650",
+        "current_reviewer_implementation_digest": "648e357cf7d66819f68ab3b88ab2f0ce4662ab2a74f0610c3f5c8c63d6cdf650",
+        "reviewer_source_sha256": "ca3a8576a8ddc324d0213a48c23c40dfe6170923074b0cfd45d2f48389058936",
+        "actual_steps": 16,
+        "actual_captured_frames": 9,
+        "semantic_scope": "approved_native_observation",
+        "findings": [
+          "flat_raster",
+          "abrupt_visual_transition",
+          "operation_exceeds_60hz_budget"
+        ],
+        "proposals": [],
+        "source_request_digest": "2115d30e5c4918036b1035f00f159d3c71b0a8ba40d57641c9a5c8e49fe931a8"
+      }
+    },
+    "local_model": {
+      "repository": "Qwen/Qwen3-0.6B-GGUF",
+      "revision": "23749fefcc72300e3a2ad315e1317431b06b590a",
+      "artifact": "Qwen3-0.6B-Q8_0.gguf",
+      "artifact_bytes": 639446688,
+      "artifact_sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+      "runtime_release": "llama.cpp b11429",
+      "runtime": "llama-completion",
+      "runtime_sha256": "7119bef261611b26f326f7c4da4dc3fdeb7bb28e2faf1ec392bda7b21215ef52",
+      "context_size": 8192,
+      "threads": 2,
+      "execution_boundary": "EngineChat -> EngineText -> EngineClient -> canonical engine/provider -> approved digest-pinned local subprocess",
+      "historical_blocked_goal": {
+        "goal_id": "8cecdafe-9440-51a1-b7ee-9ecfcc602252",
+        "execution_id": "67da408e-04c3-5b10-9933-f20836048a24",
+        "provider_receipts": 1,
+        "input_tokens": 5989,
+        "output_tokens": 78,
+        "result": "Actual canonical generation succeeded; host rejected inconsistent done=true with an operation. Retained as failed evidence; stricter root decision schema subsequently added."
+      },
+      "planning_quality_claim": false,
+      "actual_completed_goal": {
+        "schema_version": "studio.actual_local_model_goal_receipt.v1",
+        "goal_id": "53f0d2a1-571f-5e24-935a-fd7b62577878",
+        "project_id": "d3067eb9-6cdb-5343-a98f-4d2f2e6edacd",
+        "status": "completed",
+        "cursor": 2,
+        "model_calls": 2,
+        "integrity": {
+          "status": "verified",
+          "history_digest": "0f9a8aa0e6f4ac2fae013731a44d3824b841b365f7b927b864f7159c43c6cb3e",
+          "state_digest": "a5235ca483628b78d425ccac4ffe8f3245187afa1e0b2497ee339041f40343fb"
+        },
+        "error": null,
+        "outcome": {
+          "completion_reason": "planner_declared_done",
+          "goal_satisfaction_verified": false
+        },
+        "actual_steps": [
+          {
+            "index": 0,
+            "operation": "console.inspect",
+            "executed": true,
+            "decision_done": false,
+            "step_digest": "37658663180dabd6c3605271f6d267e625d80647f5d7faf060af0ce3aec37cc5",
+            "result_digest": "0649d7a6d717f73aebfbede5c35a4f5325c630443a6d75ad612445993df193b6",
+            "model_execution_id": "e3fba265-6f1a-55ea-a8d1-ac1d742cc6fc",
+            "provider_receipts": [
+              "provider:local:local:llama:7119bef261611b26f326f7c4da4dc3fdeb7bb28e2faf1ec392bda7b21215ef52:9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031:b9115e555c381ea8f4d26fb07af32b77"
+            ],
+            "usage": {
+              "model_turns": 1,
+              "provider_usage": [
+                {
+                  "billed_cost": "0",
+                  "cached_input_tokens": null,
+                  "currency": "USD",
+                  "estimated_cost": "0",
+                  "input_tokens": 6017,
+                  "output_tokens": 83,
+                  "reasoning_tokens": null,
+                  "total_tokens": 6100,
+                  "usage_source": "local_model"
+                }
+              ],
+              "tool_calls": 0,
+              "verification_disposition": "publish"
+            }
+          },
+          {
+            "index": 1,
+            "operation": null,
+            "executed": false,
+            "decision_done": true,
+            "step_digest": "0f9a8aa0e6f4ac2fae013731a44d3824b841b365f7b927b864f7159c43c6cb3e",
+            "result_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "model_execution_id": "917d2db3-918f-51fe-ab2b-93592b8cbd66",
+            "provider_receipts": [
+              "provider:local:local:llama:7119bef261611b26f326f7c4da4dc3fdeb7bb28e2faf1ec392bda7b21215ef52:9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031:f08425d1283176e969d820ebaf8d572c"
+            ],
+            "usage": {
+              "model_turns": 1,
+              "provider_usage": [
+                {
+                  "billed_cost": "0",
+                  "cached_input_tokens": null,
+                  "currency": "USD",
+                  "estimated_cost": "0",
+                  "input_tokens": 6224,
+                  "output_tokens": 53,
+                  "reasoning_tokens": null,
+                  "total_tokens": 6277,
+                  "usage_source": "local_model"
+                }
+              ],
+              "tool_calls": 0,
+              "verification_disposition": "publish"
+            }
+          }
+        ],
+        "source_files": {
+          "skeleton/provider_runtime.py": "2540479e6787ba05dccd7a882b900a6c16ce1961b6ff4df79591430520e82bc0",
+          "skeleton/api/engine_runtime.py": "80f1909005361d5bccb8ab539f7783c9d3a2811df7b73048fde6ff246cf93324",
+          "skeleton/api/engine_routes.py": "f33579f131666463982d6e0924838d06c443660faa393f0983f2d1661f1135ff",
+          "skeleton/ai/runtime/inference/llama_cpp.py": "cf79c6d87ddbeded9d00816011b3f98e04207bd05fda80558221bb337a0446ce",
+          "skeleton/ai/runtime/inference/deployment.py": "98a8268e27c9e1946386a2ff49a96bb7692a76da0479a55106db45045ca5457c",
+          "skeleton/ai/runtime/inference/local.py": "63d4e7641a2e7219de1cc6f7281568a1816d8c8866c664cde600af188b101206",
+          "backend/core/game_studio_agent.py": "ea159d1a3986c9233cb84132be3127ab04a1269edb12d30bc903a1105f29be9f"
+        },
+        "automated_tests_run": false,
+        "scope": "Actual authenticated full-app local Qwen goal: canonical model-generated console.inspect executed, then second canonical model declared completion. No production promotion or automated semantic satisfaction claim.",
+        "receipt_sha256": "3ae4bc70e9cf6e39653b963c273df60dd18116c22ad7840136d31ed1ef8c4929"
+      },
+      "usage_measurement": "llama.cpp adapter normalized input/output token estimates, not exact tokenizer throughput measurements"
+    },
+    "oct14_web_export": {
+      "archive": "/workspace/scratch/jeeves-studio-app-observed-final.zip",
+      "bytes": 9218374,
+      "sha256": "bb81125305eac477595a1d14f14c7742ad0c43cbf3e10183d902aca438f34e37",
+      "files": 292,
+      "uncompressed_bytes": 33419371,
+      "html_routes": 186,
+      "javascript_files": 67,
+      "deployed": false
+    },
+    "effective_native_capacity": {
+      "observed_cgroup_cpus": 2,
+      "training_actors": 1,
+      "live_plays": 1,
+      "combined_native_capacity": 2,
+      "global_ceiling": 8,
+      "configuration_is_not_execution": true
+    },
+    "validation": {
+      "architecture_map": "passed",
+      "construction": "passed",
+      "capability_interfaces": "passed",
+      "provider_bootstrap": "whole-repository passed Oct14; Oct15 continuation rechecking",
+      "changed_python_ownership_ast_compilation": "passed before and during first-install continuation",
+      "frontend": "TypeScript, scoped ESLint and production export passed Oct14; first-install continuation will have separate final export",
+      "automated_tests_run": false
+    },
+    "limitations": [
+      "Every-console/title compatibility and full native graph semantics remain unverified.",
+      "Arbitrary ROMs do not acquire inferred score/health/success semantics.",
+      "No subjective studio-quality, original-game superiority, cross-OS execution or 100000 executed retries claim.",
+      "Q-learning lifetime and ancestry limits remain enforced; declared campaign rounds do not bypass them.",
+      "Readiness observations do not replace operation-specific authority, source, capacity and deadline checks."
+    ]
   }
 }

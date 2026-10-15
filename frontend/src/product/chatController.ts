@@ -111,6 +111,10 @@ export class ChatController {
   private saving = false;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private sending = false;
+  private creating = false;
+  private retrying = false;
+  private cancelling = false;
+  private editing = false;
   private cancellationRequests = new Set<string>();
   private regenerationAdmitting = false;
   private regenerationSubmission: { thread: ConversationThread; messageId: string; key: string; model: ChatModel | null } | null = null;
@@ -360,15 +364,34 @@ export class ChatController {
     this.saveSelection();
   }
 
-  newConversation = async (input: { title?: string } = {}): Promise<void> => {
-    if (this.snapshot.status === 'submitting' && !this.sending) throw new ChatClientError('Another conversation update is running.', { kind: 'conflict' });
+  private async createAndSelect(input: { title?: string } = {}, fromSend = false): Promise<void> {
+    if (this.creating || !fromSend && (this.sending || this.snapshot.pending || ['submitting', 'cancelling', 'loading'].includes(this.snapshot.status))) {
+      throw new ChatClientError('Another conversation update is running.', { kind: 'conflict' });
+    }
+    this.creating = true;
+    let epoch = this.selectionEpoch;
+    this.emit({ status: fromSend ? 'submitting' : 'loading', error: null });
     try {
       await this.identity();
+      if (epoch !== this.selectionEpoch) throw new ChatClientError('The conversation changed before creation was submitted.', { kind: 'cancelled' });
       const thread = await createConversation({ ...this.request(), title: input.title });
+      this.assertSession();
       this.upsertThread(thread);
-      await this.openConversation(thread.thread_id);
-    } catch (error) { const failure = asChatError(error); this.emit({ status: 'error', error: failure }); throw failure; }
-  };
+      if (epoch !== this.selectionEpoch) throw new ChatClientError('The new conversation was saved. Open it from the library when ready.', { kind: 'cancelled' });
+      const opening = this.openConversation(thread.thread_id);
+      epoch = this.selectionEpoch;
+      await opening;
+      if (epoch !== this.selectionEpoch || this.snapshot.activeThread?.thread_id !== thread.thread_id) {
+        throw new ChatClientError('The selected conversation changed. The new conversation remains in your library.', { kind: 'cancelled' });
+      }
+    } catch (error) {
+      const failure = asChatError(error);
+      if (epoch === this.selectionEpoch) this.emit({ status: 'error', error: failure });
+      throw failure;
+    } finally { this.creating = false; }
+  }
+
+  newConversation = async (input: { title?: string } = {}): Promise<void> => this.createAndSelect(input);
 
   send = async (message: string, options: SendChatOptions = {}): Promise<void> => {
     if (this.sending || this.snapshot.pending || ['submitting', 'cancelling', 'loading'].includes(this.snapshot.status)) {
@@ -382,18 +405,30 @@ export class ChatController {
       || (options.temperature !== undefined && (!Number.isFinite(options.temperature) || options.temperature < 0 || options.temperature > 2))) {
       throw new ChatClientError('Context, attachment references or generation settings are invalid.', { kind: 'validation' });
     }
+    const originThreadId = this.snapshot.activeThread?.thread_id ?? null;
+    const model = this.snapshot.models.find(item => item.id === this.snapshot.selectedModelId) ?? null;
+    let epoch = this.selectionEpoch;
     this.sending = true;
+    this.emit({ status: 'submitting', error: null, notice: null });
     try {
       await this.identity();
-      if (!this.snapshot.activeThread) await this.newConversation({ title: message.trim().slice(0, 80) || 'New conversation' });
+      if (epoch !== this.selectionEpoch || (this.snapshot.activeThread?.thread_id ?? null) !== originThreadId) {
+        throw new ChatClientError('The conversation changed before submission. Your original draft is preserved.', { kind: 'cancelled' });
+      }
+      if (!this.snapshot.activeThread) {
+        await this.createAndSelect({ title: message.trim().slice(0, 80) || 'New conversation' }, true);
+        epoch = this.selectionEpoch;
+      }
       let thread = this.snapshot.activeThread;
       if (!thread) throw new ChatClientError('Create a conversation before sending.', { kind: 'unavailable' });
       if (thread.state !== 'active') throw new ChatClientError('Restore this archived conversation before sending.', { kind: 'validation' });
       if (thread.message_sequence === 0 && thread.title === 'New conversation') {
         thread = await renameConversation(thread, message.trim().replace(/\s+/g, ' ').slice(0, 80), this.request());
+        this.assertSession();
+        if (epoch !== this.selectionEpoch || this.snapshot.activeThread?.thread_id !== thread.thread_id) throw new ChatClientError('The conversation changed before submission. Your original draft is preserved.', { kind: 'cancelled' });
         this.upsertThread(thread);
       }
-      const model = this.snapshot.models.find(item => item.id === this.snapshot.selectedModelId) ?? null;
+      if (epoch !== this.selectionEpoch || this.snapshot.activeThread?.thread_id !== thread.thread_id) throw new ChatClientError('The conversation changed before submission.', { kind: 'cancelled' });
       const pending: PendingChatTurn = { kind: 'chat', threadId: thread.thread_id, idempotencyKey: newKey('chat'), message,
         context: options.context, attachmentRefs: [...(options.attachmentRefs ?? [])], streamText: '',
         lastEventId: 0, state: 'submitting', startedAt: new Date().toISOString(), accepted: false };
@@ -401,8 +436,8 @@ export class ChatController {
       this.mutationRetry = null;
       this.emit({ pending, status: 'submitting', error: null, notice: null });
       this.rememberPending(pending);
-      await this.submit(this.submission, this.selectionEpoch);
-    } catch (error) { const failure = asChatError(error); this.emit({ status: 'error', error: failure }); throw failure; }
+      await this.submit(this.submission, epoch);
+    } catch (error) { const failure = asChatError(error); if (epoch === this.selectionEpoch) this.emit({ status: 'error', error: failure }); throw failure; }
     finally { this.sending = false; }
   };
 
@@ -496,6 +531,9 @@ export class ChatController {
   }
 
   cancel = async (): Promise<void> => {
+    if (this.cancelling) return;
+    this.cancelling = true;
+    try {
     const pending = this.snapshot.pending;
     if (!pending) return;
     const epoch = this.selectionEpoch;
@@ -528,9 +566,13 @@ export class ChatController {
       const failure = asChatError(error);
       if (epoch === this.selectionEpoch) { this.emit({ status: 'error', error: failure }); throw failure; }
     }
+    } finally { this.cancelling = false; }
   };
 
   retry = async (): Promise<void> => {
+    if (this.retrying) return;
+    this.retrying = true;
+    try {
     if (this.mutationRetry) { await this.mutationRetry(); return; }
     const pending = this.snapshot.pending;
     if (!pending) { await this.refreshConversation(); return; }
@@ -572,6 +614,7 @@ export class ChatController {
       else if (failure.status === 404 && this.submission && !pending.accepted) await this.submit(this.submission, epoch);
       else { this.emit({ status: 'error', error: failure }); throw failure; }
     }
+    } finally { this.retrying = false; }
   };
 
   refreshConversation = async (): Promise<void> => {
@@ -592,15 +635,17 @@ export class ChatController {
       await this.identity();
       const catalog = await getChatModels(this.request());
       const selected = catalog.models.find(model => model.id === this.snapshot.selectedModelId && model.selectable && model.available);
-      this.emit({ models: catalog.models, selectedModelId: selected?.id ?? null, error: null }); this.saveSelection();
+      this.emit({ models: catalog.models, selectedModelId: selected?.id ?? null }); this.saveSelection();
     } catch (error) { this.emit({ error: asChatError(error) }); }
   };
 
   edit = async (messageId: string, content: string): Promise<void> => {
     const thread = this.snapshot.activeThread;
-    if (!thread || this.snapshot.pending) return;
+    if (!thread || this.snapshot.pending || ['submitting', 'cancelling', 'loading'].includes(this.snapshot.status)) throw new ChatClientError('Wait for the current conversation update before editing.', { kind: 'conflict' });
     const key = newKey('edit'); const epoch = this.selectionEpoch;
     const execute = async () => {
+      if (this.editing) return;
+      this.editing = true;
       this.emit({ status: 'submitting', error: null });
       try {
         await this.identity();
@@ -623,6 +668,7 @@ export class ChatController {
         this.emit({ pending, status: 'submitting' }); this.rememberPending(pending);
         await this.submit(this.submission, epoch);
       } catch (error) { if (epoch === this.selectionEpoch) { const failure = asChatError(error); this.emit({ status: 'error', error: failure }); throw failure; } }
+      finally { this.editing = false; }
     };
     this.mutationRetry = execute; await execute();
   };
@@ -697,7 +743,7 @@ export class ChatController {
     try {
       await this.identity(); await requestConversationDeletion(thread, this.request());
       this.pendingReferences.delete(thread.thread_id);
-      this.emit({ threads: this.snapshot.threads.filter(item => item.thread_id !== thread.thread_id), activeThread: null, messages: [], error: null });
+      this.emit({ threads: this.snapshot.threads.filter(item => item.thread_id !== thread.thread_id), ...(this.snapshot.activeThread?.thread_id === thread.thread_id ? { activeThread: null, messages: [], error: null } : {}) });
       this.saveSelection();
     } catch (error) { const failure = asChatError(error); this.emit({ error: failure }); throw failure; }
   };

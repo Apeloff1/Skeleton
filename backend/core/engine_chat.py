@@ -123,9 +123,7 @@ class EngineChat:
         if system_message is None and positional:
             system_message = positional.pop(0)
         if positional:
-            raise TypeError(
-                "EngineChat accepts at most three compatibility positional arguments"
-            )
+            raise TypeError("EngineChat accepts at most three compatibility positional arguments")
         self.session_id = str(
             session_id
             if session_id is not None and str(session_id).strip()
@@ -135,43 +133,30 @@ class EngineChat:
             instruction_policy,
             InstructionPolicy,
         ):
-            raise TypeError(
-                "instruction_policy must be InstructionPolicy"
-            )
+            raise TypeError("instruction_policy must be InstructionPolicy")
         explicit_system = str(system_message or "")
         if (
             instruction_policy is not None
             and explicit_system
             and explicit_system != instruction_policy.instructions
         ):
-            raise ValueError(
-                "system_message cannot override instruction_policy"
-            )
+            raise ValueError("system_message cannot override instruction_policy")
         self.instruction_policy = instruction_policy
         self.system_message = (
-            instruction_policy.instructions
-            if instruction_policy is not None
-            else explicit_system
+            instruction_policy.instructions if instruction_policy is not None else explicit_system
         )
         self.tenant_id = str(tenant_id).strip()
         self.actor_id = str(actor_id).strip()
         self.capability = str(capability).strip()
-        self.verification_profile = str(
-            verification_profile
-        ).strip()
+        self.verification_profile = str(verification_profile).strip()
         self.data_class = str(data_class).strip().lower()
         self.purpose = str(purpose).strip()
         if turn_idempotency_key is None:
             self._turn_idempotency_key = None
         else:
             normalized_turn_key = str(turn_idempotency_key).strip()
-            if (
-                not normalized_turn_key
-                or len(normalized_turn_key) > 1024
-            ):
-                raise ValueError(
-                    "turn_idempotency_key must be 1..1024 characters"
-                )
+            if not normalized_turn_key or len(normalized_turn_key) > 1024:
+                raise ValueError("turn_idempotency_key must be 1..1024 characters")
             self._turn_idempotency_key = normalized_turn_key
         self._engine_executor = engine_executor or execute_engine_text
         if not callable(self._engine_executor):
@@ -185,9 +170,7 @@ class EngineChat:
                 self.purpose,
             )
         ):
-            raise ValueError(
-                "engine chat runtime identity must be non-empty"
-            )
+            raise ValueError("engine chat runtime identity must be non-empty")
         if self.data_class not in {
             "public",
             "internal",
@@ -196,13 +179,12 @@ class EngineChat:
         }:
             raise ValueError("engine chat data_class is invalid")
         self._provider_hint: str | None = None
-        self._model_hint: str | None = (
-            str(model).strip() if model else None
-        )
+        self._model_hint: str | None = str(model).strip() if model else None
         self._max_output_tokens: int | None = None
         self._params: dict[str, Any] = {}
         self._history: list[dict[str, str]] = []
         self._evidence: list[dict[str, str]] = []
+        self._structured_output_schema: dict[str, Any] | None = None
         self._queued_prompt: str | None = None
         # One mutable conversation projection must have one in-flight turn.
         self._send_lock = asyncio.Lock()
@@ -223,9 +205,7 @@ class EngineChat:
         system_message: str,
     ) -> "EngineChat":
         if self.instruction_policy is not None:
-            raise ValueError(
-                "instruction policy owns system instructions"
-            )
+            raise ValueError("instruction policy owns system instructions")
         self.system_message = str(system_message or "")
         return self
 
@@ -235,13 +215,8 @@ class EngineChat:
     ) -> "EngineChat":
         if not isinstance(policy, InstructionPolicy):
             raise TypeError("policy must be InstructionPolicy")
-        if (
-            self.system_message
-            and self.system_message != policy.instructions
-        ):
-            raise ValueError(
-                "existing system_message conflicts with policy"
-            )
+        if self.system_message and self.system_message != policy.instructions:
+            raise ValueError("existing system_message conflicts with policy")
         self.instruction_policy = policy
         self.system_message = policy.instructions
         return self
@@ -280,13 +255,9 @@ class EngineChat:
             self._queued_prompt = text
             return self
         if normalized_role == "assistant":
-            self._history.append(
-                {"role": "assistant", "content": text}
-            )
+            self._history.append({"role": "assistant", "content": text})
             return self
-        raise ValueError(
-            "engine chat role must be system, user, or assistant"
-        )
+        raise ValueError("engine chat role must be system, user, or assistant")
 
     def add_history_message(
         self,
@@ -298,20 +269,12 @@ class EngineChat:
         normalized_role = str(role).strip().lower()
         text = str(content).strip()
         if normalized_role not in {"user", "assistant"}:
-            raise ValueError(
-                "engine chat history role must be user or assistant"
-            )
+            raise ValueError("engine chat history role must be user or assistant")
         if not text:
-            raise ValueError(
-                "engine chat history content must be non-empty"
-            )
-        self._history.append(
-            {"role": normalized_role, "content": text}
-        )
+            raise ValueError("engine chat history content must be non-empty")
+        self._history.append({"role": normalized_role, "content": text})
         if len(self._history) > 1024:
-            raise ValueError(
-                "engine chat history exceeds maximum turn count"
-            )
+            raise ValueError("engine chat history exceeds maximum turn count")
         return self
 
     def add_evidence(
@@ -327,17 +290,11 @@ class EngineChat:
         text = str(content).strip()
         normalized_kind = str(kind).strip().lower()
         if not source or not text:
-            raise ValueError(
-                "engine chat evidence source/content must be non-empty"
-            )
+            raise ValueError("engine chat evidence source/content must be non-empty")
         if normalized_kind not in {"retrieval_evidence", "artifact"}:
-            raise ValueError(
-                "engine chat evidence kind is unsupported"
-            )
+            raise ValueError("engine chat evidence kind is unsupported")
         if any(item["source_id"] == source for item in self._evidence):
-            raise ValueError(
-                "engine chat evidence source_id must be unique"
-            )
+            raise ValueError("engine chat evidence source_id must be unique")
         self._evidence.append(
             {
                 "source_id": source,
@@ -346,9 +303,17 @@ class EngineChat:
             }
         )
         if len(self._evidence) > 256:
-            raise ValueError(
-                "engine chat evidence exceeds maximum segment count"
-            )
+            raise ValueError("engine chat evidence exceeds maximum segment count")
+        return self
+
+    def with_json_schema(self, schema: dict[str, Any]) -> "EngineChat":
+        """Request actual canonical structured output; never an app-side mock."""
+        from skeleton.skills.tool_contract import validate_json_schema
+
+        encoded = json.dumps(schema, allow_nan=False, ensure_ascii=False)
+        if len(encoded.encode()) > 65536:
+            raise ValueError("structured output schema exceeds64KiB")
+        self._structured_output_schema = validate_json_schema(json.loads(encoded))
         return self
 
     @staticmethod
@@ -359,24 +324,17 @@ class EngineChat:
         if text is None:
             text = getattr(message, "content", None)
         if text is None:
-            raise TypeError(
-                "engine chat message must provide text/content"
-            )
+            raise TypeError("engine chat message must provide text/content")
         return str(text)
 
     def _idempotency_key(self, prompt: str) -> str:
         if self._turn_idempotency_key is not None:
             return (
                 "engine-chat-explicit:"
-                + hashlib.sha256(
-                    self._turn_idempotency_key.encode("utf-8")
-                ).hexdigest()
+                + hashlib.sha256(self._turn_idempotency_key.encode("utf-8")).hexdigest()
             )
         policy = self.instruction_policy
-        instructions = (
-            self.system_message.strip()
-            or "Respond helpfully to the user request."
-        )
+        instructions = self.system_message.strip() or "Respond helpfully to the user request."
         material = json.dumps(
             {
                 "session_id": self.session_id,
@@ -384,18 +342,15 @@ class EngineChat:
                 "prompt": prompt,
                 "history": self._history,
                 "evidence": self._evidence,
-                "instruction_policy_id": (
-                    None if policy is None else policy.policy_id
-                ),
-                "instruction_policy_version": (
-                    None if policy is None else policy.version
-                ),
+                "instruction_policy_id": (None if policy is None else policy.policy_id),
+                "instruction_policy_version": (None if policy is None else policy.version),
                 "instructions": instructions,
                 "tenant_id": self.tenant_id,
                 "actor_id": self.actor_id,
                 "capability": self.capability,
                 "verification_profile": self.verification_profile,
                 "max_output_tokens": self._max_output_tokens,
+                "structured_output_schema": self._structured_output_schema,
                 "data_class": self.data_class,
                 "purpose": self.purpose,
             },
@@ -421,20 +376,13 @@ class EngineChat:
     ) -> EngineChatResponse:
         prompt = self._prompt_text(message).strip()
         if not prompt:
-            raise ValueError(
-                "engine chat prompt must be non-empty"
-            )
-        instructions = (
-            self.system_message.strip()
-            or "Respond helpfully to the user request."
-        )
+            raise ValueError("engine chat prompt must be non-empty")
+        instructions = self.system_message.strip() or "Respond helpfully to the user request."
         policy = self.instruction_policy
         # Replaying the just-committed explicit turn must compare to the
         # original immutable request, not the history that it appended.
         # Any later history mutation means this key is no longer reusable.
-        history_snapshot = tuple(
-            (entry["role"], entry["content"]) for entry in self._history
-        )
+        history_snapshot = tuple((entry["role"], entry["content"]) for entry in self._history)
         effective_history = tuple(self._history)
         if (
             self._turn_idempotency_key is not None
@@ -446,12 +394,8 @@ class EngineChat:
             instructions=instructions,
             prompt=prompt,
             idempotency_key=self._idempotency_key(prompt),
-            instruction_policy_id=(
-                None if policy is None else policy.policy_id
-            ),
-            instruction_policy_version=(
-                None if policy is None else policy.version
-            ),
+            instruction_policy_id=(None if policy is None else policy.policy_id),
+            instruction_policy_version=(None if policy is None else policy.version),
             history=effective_history,
             evidence=tuple(self._evidence),
             tenant_id=self.tenant_id,
@@ -461,37 +405,24 @@ class EngineChat:
             max_output_tokens=self._max_output_tokens,
             data_class=self.data_class,
             purpose=self.purpose,
+            structured_output_schema=self._structured_output_schema,
         )
-        if (
-            self._turn_idempotency_key is not None
-            and self._completed_explicit_request is not None
-        ):
+        if self._turn_idempotency_key is not None and self._completed_explicit_request is not None:
             if request != self._completed_explicit_request:
-                raise EngineTextError(
-                    "explicit idempotency key reused with changed chat request"
-                )
+                raise EngineTextError("explicit idempotency key reused with changed chat request")
             if self._completed_explicit_response is None:
                 raise EngineTextError("explicit turn has no recorded terminal")
             return self._completed_explicit_response
-        response: EngineTextResponse = await self._engine_executor(
-            request
-        )
+        response: EngineTextResponse = await self._engine_executor(request)
         if not isinstance(response, EngineTextResponse):
-            raise EngineTextError(
-                "engine chat requires a canonical typed terminal response"
-            )
-        self._history.append(
-            {"role": "user", "content": prompt}
-        )
-        self._history.append(
-            {"role": "assistant", "content": response.text}
-        )
+            raise EngineTextError("engine chat requires a canonical typed terminal response")
+        self._history.append({"role": "user", "content": prompt})
+        self._history.append({"role": "assistant", "content": response.text})
         # This is a bounded rebuildable view, not the persisted conversation
         # record. Retain complete user/assistant pairs and evict oldest first.
         while (
             len(self._history) > 100
-            or sum(len(item["content"].encode("utf-8")) for item in self._history)
-            > 512 * 1024
+            or sum(len(item["content"].encode("utf-8")) for item in self._history) > 512 * 1024
         ):
             self._history.pop(0)
             while self._history and self._history[0]["role"] == "assistant":
@@ -529,9 +460,7 @@ class EngineChat:
         if consume_queued:
             target = self._queued_prompt
         if target is None:
-            raise ValueError(
-                "engine chat requires a queued or explicit message"
-            )
+            raise ValueError("engine chat requires a queued or explicit message")
         response = await self.send_message(target)
         if consume_queued and self._queued_prompt == target:
             self._queued_prompt = None
@@ -546,13 +475,10 @@ class EngineChat:
     ) -> EngineChatResponse:
         material = list(messages)
         if not material:
-            raise ValueError(
-                "engine chat messages must not be empty"
-            )
+            raise ValueError("engine chat messages must not be empty")
         if len(material) != 1:
             raise ValueError(
-                "engine chat send_async accepts exactly one message; "
-                "use add_message for canonical history"
+                "engine chat send_async accepts exactly one message; " "use add_message for canonical history"
             )
         return await self.send_message(material[0])
 

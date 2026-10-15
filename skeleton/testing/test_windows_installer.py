@@ -52,7 +52,7 @@ def test_bundled_installer_disables_external_python_requirements(monkeypatch, tm
     monkeypatch.setattr("skeleton.app.installer.inspect_host", fake_preload)
     monkeypatch.setattr(
         "skeleton.app.installer.ensure_runtime_environment",
-        lambda root, rotate_secrets=False: SetupResult(
+        lambda root, rotate_secrets=False, **kwargs: SetupResult(
             env_path=Path(root) / ".env",
             created=False,
             changed=False,
