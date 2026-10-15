@@ -282,3 +282,29 @@ def test_windows_installer_runs_actual_frozen_payload_preflight():
     assert 'ArgumentList @("--verify-payload")' in workflow
     assert "SkeletonOffline.exe" in workflow
     assert 'ArgumentList @("--help") -Wait -PassThru' in workflow
+
+def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    calls = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
+    ok, detail = launcher.open_running_application()
+    assert not ok
+    assert "backend offline" in detail
+    assert calls == []
+
+
+def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "all services healthy"))
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: False)
+    ok, detail = launcher.open_running_application()
+    assert not ok
+    assert "no browser accepted" in detail
+
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: True)
+    ok, detail = launcher.open_running_application()
+    assert ok
+    assert "all services healthy" in detail
