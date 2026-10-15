@@ -107,6 +107,27 @@ class OriginalStreamedDiscAcceptance(unittest.TestCase):
         with self.assertRaises(DiscAcceptanceError):
             run_matrix([self.case], rights_acknowledged=False)
 
+    def test_programmatic_disc_audit_cannot_bypass_manifest_file_limit(self):
+        illegal = json.loads(json.dumps(self.case))
+        illegal["files"] = [
+            {
+                "name": f"original-media-{i:02d}.bin",
+                "path": str(self.bin),
+                "sha256": digest(self.bin.read_bytes()),
+                "size_bytes": self.bin.stat().st_size,
+            }
+            for i in range(17)
+        ]
+        illegal["entrypoint"] = illegal["files"][0]["name"]
+        with self.assertRaises(DiscAcceptanceError):
+            run_matrix([illegal], rights_acknowledged=True)
+
+    def test_programmatic_disc_audit_requires_exact_absolute_source_paths(self):
+        illegal = json.loads(json.dumps(self.case))
+        illegal["files"][1]["path"] = "relative-original.bin"
+        with self.assertRaises(DiscAcceptanceError):
+            run_matrix([illegal], rights_acknowledged=True)
+
     def test_native_disc_rewind_receipt_requires_real_host_state(self):
         host = StubNativeHost()
         host.core.firmware_digest = "a" * 64
