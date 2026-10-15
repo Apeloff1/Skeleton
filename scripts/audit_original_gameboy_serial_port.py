@@ -47,8 +47,18 @@ def _cpu_program(data: int, control: int) -> GameBoyMachine:
 def _run(control: int):
     core = _cpu_program(0x6A, control)
     actual_source_cpu_cycles = 0
-    for _ in range(4):
-        actual_source_cpu_cycles += core.instruction()
+    for ordinal in range(4):
+        elapsed = core.instruction()
+        actual_source_cpu_cycles += elapsed
+        if ordinal == 3 and elapsed != 12:
+            raise SerialProofError("source serial-starting LDH opcode has unexpected cycles")
+    # The fourth opcode writes SC *before* _advance(12) runs, so 12 serial
+    # T-cycles have already elapsed when the following HALT begins. Avoid
+    # inventing a 2048T halfway point by ignoring the launch instruction.
+    start_opcode_serial_cycles = elapsed
+    halfway_idle_instructions = (2048 - start_opcode_serial_cycles - 4) // 4
+    if start_opcode_serial_cycles + 4 + halfway_idle_instructions * 4 != 2048:
+        raise SerialProofError("source HALT cannot align to serial bit boundary")
     if (
         core.memory[0xFF01] != 0x6A
         or core.memory[0xFF02] != control
@@ -59,7 +69,7 @@ def _run(control: int):
     beginning = core.snapshot()
     if core.instruction() != 4 or not core.halted:
         raise SerialProofError("original source HALT did not preserve clocked serial bus")
-    for _ in range(511):
+    for _ in range(halfway_idle_instructions):
         core.instruction()
     midpoint = core.snapshot()
     if control == 0x81:
@@ -89,7 +99,9 @@ def _run(control: int):
     return {
         "mode": "DMG_internal_disconnected" if control == 0x81 else "DMG_external_unclocked",
         "CPU_started_actual_SB_SC_writes": 4,
-        "actual_cpu_clock_advance_instructions": 1024,
+        "actual_cpu_clock_advance_instructions": 1 + halfway_idle_instructions + 512,
+        "source_program_cpu_instruction_calls": 4 + 1 + halfway_idle_instructions + 512,
+        "serial_start_opcode_clocked_tcycles": start_opcode_serial_cycles,
         "hardware_clock_t_cycles_observed": 4096,
         "source_ROM_SHA256": core.metadata["rom_digest"],
         "source_initial_snapshot_sha256": _digest(beginning),
@@ -119,7 +131,12 @@ def audit_serial_port() -> dict:
         "status": "original_DMG_disconnected_serial_source_replayed",
         "original_owned_source_ROM_only": True,
         "real_serial_cpu_modes": 2,
-        "actual_cpu_oscillator_steps": 2048,
+        "actual_cpu_oscillator_steps": sum(
+            trial["actual_cpu_clock_advance_instructions"] for trial in trials
+        ),
+        "actual_original_cpu_instruction_calls": sum(
+            trial["source_program_cpu_instruction_calls"] for trial in trials
+        ),
         "real_source_trials": trials,
         "hardware_serial_bit_cycles": 512,
         "unattached_external_link_peer_fabricated": False,
@@ -147,7 +164,7 @@ def main(argv=None):
             file.write(encoded)
             file.flush()
             os.fsync(file.fileno())
-        print(json.dumps({"status": result["status"], "CPU_oscillator_steps": 2048, "hardware_accuracy": False, "evidence_file": str(path)}))
+        print(json.dumps({"status": result["status"], "CPU_oscillator_steps": result["actual_cpu_oscillator_steps"], "hardware_accuracy": False, "evidence_file": str(path)}))
         return 0
     except (ValueError, TypeError, RuntimeError, OSError) as exc:
         print(json.dumps({"status": "serial_source_probe_failed", "reason": str(exc)[:500]}), file=sys.stderr)
