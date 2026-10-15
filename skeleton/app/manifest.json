@@ -49,7 +49,11 @@
       "SKL_MONGO_URI",
       "MONGO_INITDB_ROOT_PASSWORD",
       "JWT_SECRET",
-      "SKL_ENGINE_SERVICE_TOKEN"
+      "SKL_ENGINE_SERVICE_TOKEN",
+      "GAMEFORGE_JWT_SECRET",
+      "GF_SEAL_SECRET",
+      "GF_KEYHOLDER_SEED",
+      "SKELETON_MASTER_SECRET"
     ],
     "optional_env": [
       "OPENAI_API_KEY",
