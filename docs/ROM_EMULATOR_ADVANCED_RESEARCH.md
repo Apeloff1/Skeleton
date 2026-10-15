@@ -829,3 +829,95 @@ remain mandatory.
 to draft PR #3935, but a local GitHub clone could not be resolved
 from this session; no actual conformance command, emulator native
 build, ROM boot, or gradient session has been executed here.
+
+
+## P. Complete Z/C branch controls and source-emulated interrupt priority
+
+Opcode replay alone does not establish the behavior of instructions that
+depend on CPU flags. The original SM83 source audit now executes all
+**16 conditional JR, JP, CALL and RET variants** under the four
+independent Z/C states 00, 01, 10 and 11, checking **64 actual source
+flag-controlled branches**, 32 taken and 32 not taken. Each recorded
+branch must match the independently expected T-cycle count, CPU program
+counter and stack pointer, and then reproduce the exact same full
+snapshot after rewind.
+
+The source matrix therefore requests **564 real opcode timing
+comparisons** and **1,128 real single-opcode instruction executions
+including replays** (500 original legal variants and 64 additional
+flag-specific branch trials). The 11 illegal base instructions are
+required to fail, not counted as successfully executed CPU opcodes.
+The counts describe the operator's executable coverage gate, not an
+actual measurement from this chat.
+
+A separate synthetic-ROM oracle,
+`scripts/audit_original_gameboy_interrupts.py`, exercises 11
+independently replayed CPU/interrupt scenarios:
+
+- Five interrupt priority vectors 0x40, 0x48, 0x50, 0x58 and 0x60,
+  with the interrupted return address pushed correctly to WRAM.
+- `EI` delayed until after the following CPU instruction, and `DI`
+  cancelling a pending delayed `EI`.
+- The SM83 HALT bug duplicating an opcode byte when interrupts are
+  pending with IME disabled, and HALT waking to service an enabled IRQ.
+- `RETI` restoring the saved PC and immediately setting IME.
+- STOP oscillator inactivity until an actual joypad edge wakes the CPU.
+
+The oracle compares **22 physical synthetic ROM scenario executions**,
+one original and one restored replay per scenario. Actual content is
+original source-generated ROM bytes only, not proprietary game data.
+
+```bash
+python scripts/audit_original_gameboy_interrupts.py \
+  --evidence-file /private/research/sm83-irq-source.json
+```
+
+The suite requires both the 64 branch matrix and all eleven ordered,
+exact-source interrupt case identities. It rejects missing cases,
+non-identical replay hashes, changed PC/SP, timing differences or
+counterfeit completed-interrupt claims even when the outer JSON digest
+was recomputed. A real interrupt-level replay is still not a verified
+sub-M-cycle hardware bus simulation.
+
+## Q. Large governed optical media: separate from inline ROM acceptance
+
+The new native operator command
+`scripts/audit_game_emulator_disc_first_boot.py` uses the existing
+native library's `GameContentReference` and `GameContentBundle` for
+streaming actual lawful disc media through the worker's approved-core
+sandbox. An operator supplies exact absolute local paths, sizes,
+SHA-256 digests and a dependency-valid disc descriptor such as CUE/BIN,
+GDI, M3U, CHD or ISO. These files are **not downloaded**, embedded into
+source, or arbitrarily run as non-emulated binaries.
+
+The reader checks source-file type, source identity, size and digest,
+streams bounded blocks to the existing private host materializer, and
+uses the catalog's strict disc dependency/entrypoint validation.
+Both manifest and direct programmatic calls enforce at most eight
+operator cases, 16 files per case and a 4-GiB aggregate ceiling, subject
+also to the host's more restrictive existing limits.
+
+Only an actually approved core with correctly authorized required
+firmware can pass. An individual media case must then produce a native
+frame, execute idle and button A, serialize a native snapshot, restore
+it, repeat and compare the exact measured observation, reward,
+transition digest and final native savestate. Per-core failed cases
+remain failures, not inferred working emulator platforms. It does not
+certify hardware accuracy or general disc compatibility.
+
+This **disc acceptance command is not automatically executed by
+normal CI**. The manual-only source suite exercises synthetic original
+CUE/BIN custody, changed file SHA, symlink, missing dependency,
+unexpected file counts and mocked source replay safety; an actual
+rights-cleared disc/BIOS/core must be supplied by an operator for
+separate native results. See the exact manifest example in
+`docs/ROM_EMULATOR_COMPLETION.md`.
+
+### Proof status
+
+All code, governed manifests, regression sources and operators above
+are committed to the same draft PR. The current environment cannot
+clone GitHub for local execution, and no native disc/core or generated
+ROM end-to-end neural acceptance execution took place in this pass.
+The gates describe **what must actually run to count**, not measured
+success, game mastery, model-weight improvement or finished production.
