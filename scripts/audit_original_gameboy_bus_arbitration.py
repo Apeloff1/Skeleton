@@ -92,8 +92,9 @@ def audit_original_bus_arbitration() -> dict:
     m.memory[0xFF90] = 0xA5
     _cpu_step(m, 0xFF90, 0xFF80, 0x7E)
     checked("active_DMA_CPU_HRAM_read_allowed", m.a == 0xA5)
+    m.a = 0x5C
     _cpu_step(m, 0xFF90, 0xFF80, 0x77)
-    checked("active_DMA_CPU_HRAM_write_allowed", m.memory[0xFF90] == 0xA5)
+    checked("active_DMA_CPU_HRAM_write_allowed", m.memory[0xFF90] == 0x5C)
 
     m.pc = 0x0100
     try:
