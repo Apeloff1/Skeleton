@@ -272,6 +272,63 @@ class SimulationController:
         self.cursor = position
         self.previous_digest = self.trace[-1]["digest"] if self.trace else ZERO
 
+    def checkpoint(self) -> dict[str, Any]:
+        """Checkpoint an in-flight simulator, never the serving LLM weights."""
+        value = {
+            "schema_version": "skeleton.jeeves.cinematic_cursor.v1",
+            "source_digest": self.validation["source_digest"],
+            "controls": dict(self.controls), "frame_ms": self.frame_ms,
+            "cursor": self.cursor, "paused": self.paused,
+            "tail_digest": self.previous_digest,
+            "observations": list(self.trace),
+            "serving_model_state_included": False,
+        }
+        value["checkpoint_sha256"] = _hash(value)
+        return value
+
+    @classmethod
+    def from_checkpoint(cls, scene: dict[str, Any], checkpoint: dict[str, Any]):
+        """Resume an intact trace without replaying already executed frames."""
+        _require(type(checkpoint) is dict and set(checkpoint) == {
+            "schema_version", "source_digest", "controls", "frame_ms",
+            "cursor", "paused", "tail_digest", "observations",
+            "serving_model_state_included", "checkpoint_sha256",
+        }, "unknown simulation checkpoint format")
+        signature = checkpoint["checkpoint_sha256"]
+        body = {key: value for key, value in checkpoint.items() if key != "checkpoint_sha256"}
+        _require(signature == _hash(body) and
+                 checkpoint["schema_version"] == "skeleton.jeeves.cinematic_cursor.v1",
+                 "simulation checkpoint integrity failed")
+        _require(checkpoint["serving_model_state_included"] is False,
+                 "simulation checkpoints must not carry live model state")
+        controller = cls(scene, checkpoint["controls"], frame_ms=checkpoint["frame_ms"])
+        _require(checkpoint["source_digest"] == controller.validation["source_digest"],
+                 "simulator source changed since checkpoint")
+        entries = checkpoint["observations"]
+        position = _bounded_int(checkpoint["cursor"], 0, len(controller.times), "sim cursor")
+        _require(type(entries) is list and len(entries) == position,
+                 "simulation checkpoint contains an invalid cursor")
+        prior = ZERO
+        for index, entry in enumerate(entries):
+            _require(type(entry) is dict and entry.get("frame") == index and
+                     entry.get("tick_ms") == controller.times[index],
+                     "simulation checkpoint has reordered observations")
+            frame = {k: v for k, v in entry.items() if k not in ("digest", "previous_digest")}
+            _require(entry.get("previous_digest") == prior and
+                     entry.get("digest") == _hash({
+                         "frame": frame, "previous_digest": prior,
+                     }), "simulation checkpoint chain integrity failed")
+            prior = entry["digest"]
+        _require(prior == checkpoint["tail_digest"],
+                 "simulation checkpoint tail does not match observation chain")
+        _require(type(checkpoint["paused"]) is bool,
+                 "checkpoint pause state invalid")
+        controller.cursor = position
+        controller.trace = entries[:]
+        controller.previous_digest = prior
+        controller.paused = checkpoint["paused"]
+        return controller
+
     def _frame(self, index: int) -> dict[str, Any]:
         tick = self.times[index]
         shot = next((s for s in self.scene["shots"]
