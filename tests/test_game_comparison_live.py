@@ -299,6 +299,12 @@ class NativeLiveComparisonContracts(unittest.TestCase):
         audit=verify_live_evidence(packet)
         self.assertEqual(audit["total_native_disc_swaps_verified"],1)
         self.assertEqual(audit["games"][0]["native_disc_swaps_verified"],1)
+        controls={"buttons":0,"axes":[0,0,0,0],"keys":[],
+                  "mouse":[0]*6,"pointer":[0]*3}
+        session.step({"steps":[{"game_id":"first","controls":[controls]}]})
+        after_step=verify_live_evidence(session.export_evidence())
+        self.assertEqual(after_step["total_native_disc_swaps_verified"],1)
+        self.assertEqual(after_step["total_real_reported_native_steps"],1)
         same=session.swap_disc({"game_id":"first","image_index":2})
         self.assertFalse(same["changed"])
         self.assertEqual(tracked["count"],1)
