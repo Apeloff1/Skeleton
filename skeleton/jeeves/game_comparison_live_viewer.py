@@ -47,7 +47,8 @@ textarea{width:100%;min-height:75px;resize:vertical}
 <body>
 <header><div><h1>Live Comparative Emulator Lab</h1>
 <small>Approved local libretro · two visible games · up to ten simultaneous lanes</small></div>
-<div class="inline"><button id="all">Advance all active games</button>
+<div class="inline"><label>Steps per advance <select id="repeat"><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="8">8</option></select></label>
+<button id="all">Advance all active games</button>
 <button id="evidence">Export native evidence</button>
 <button id="stop" class="critical">Stop &amp; close workers</button></div></header>
 <p id="message" role="status" aria-live="polite">Connecting to the operator-approved native session…</p>
@@ -125,9 +126,10 @@ async function step(ids){
  if(!current)return;
  try{
   msg("Running "+ids.length+" actual native game worker(s)…");
-  const response=await request("/api/step",{steps:ids.map(id=>({game_id:id,controls:vector(id)}))});
+  const repeat=Number($("repeat").value)||1;
+  const response=await request("/api/step",{steps:ids.map(id=>({game_id:id,controls:vector(id),repeat}))});
   ids.forEach(clearInputs);await load();
-  msg(response.all_succeeded?"Real native frames and receipts updated":"One or more native cores failed; inspect per-game status");
+  msg(response.all_succeeded?"Real native frames updated · "+repeat+" receipt(s) per game":"One or more native bursts failed or reached a limit; inspect the per-game evidence");
  }catch(e){msg("Native step rejected: "+e.message)}
 }
 async function resetGame(id){
@@ -215,7 +217,7 @@ function panel(side){
  root.append(stage);
  root.append(deckFor(id));
  const actions=txt("div","","inline"),doStep=txt("button","Advance native frame"),doReset=txt("button","Reset this emulator");
- doStep.disabled=lane.status!=="running";doReset.disabled=lane.status==="native_execution_failed"||lane.reset_count>=4;
+ doStep.disabled=lane.status!=="running"||lane.lifetime_steps>=lane.max_lifetime_steps;doReset.disabled=lane.status==="native_execution_failed"||lane.reset_count>=4;
  doStep.onclick=()=>step([id]);doReset.onclick=()=>resetGame(id);
  actions.append(doStep,doReset);root.append(actions);
  root.append(txt("p",lane.status+" · lifetime "+lane.lifetime_steps+"/"+lane.max_lifetime_steps+
@@ -226,7 +228,9 @@ function panel(side){
 }
 function render(){if(!current)return;panel("left");panel("right")}
 $("all").onclick=()=>{if(!current)return;
- const ids=current.native_game_ids.filter(id=>current.lanes[id].status==="running");
+ const repeat=Number($("repeat").value)||1;
+ const ids=current.native_game_ids.filter(id=>current.lanes[id].status==="running"
+    && current.lanes[id].lifetime_steps+repeat<=current.lanes[id].max_lifetime_steps);
  if(ids.length)step(ids);else msg("No active games can advance")
 };
 $("evidence").onclick=async()=>{try{

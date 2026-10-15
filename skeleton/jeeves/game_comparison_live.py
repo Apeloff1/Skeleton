@@ -29,6 +29,7 @@ MAX_LANES = 10
 MAX_STEPS_PER_LANE = 256
 MAX_RESET_PER_LANE = 4
 MAX_REQUEST_LANES = 10
+MAX_BURST_STEPS = 8
 MAX_IMAGE_URI = 320_000
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 
@@ -211,7 +212,7 @@ class LiveComparison:
                 raise LiveComparisonError("Live report exceeds five MiB; reset session or reduce lane count")
             return result
 
-    def _execute_one(self, lane: _Lane, controls: list[dict[str, Any]]) -> dict[str, Any]:
+    def _execute_one(self, lane: _Lane, controls: list[dict[str, Any]], *, include_preview: bool = True) -> dict[str, Any]:
         try:
             step = lane.env.input_step(controls)
             frame = lane.env._frame
@@ -251,13 +252,41 @@ class LiveComparison:
                 lane.status = "episode_complete"
             return {"game_id": lane.game["id"], "status": lane.status,
                     "receipt": evidence,
-                    "native_preview": _preview(lane.env)}
+                    "native_preview": _preview(lane.env) if include_preview else None}
         except BaseException as exc:
             lane.status = "native_execution_failed"
             lane.error_class = type(exc).__name__
             lane.env.close()
             return {"game_id": lane.game["id"], "status": lane.status,
                     "error_class": lane.error_class, "native_receipt_created": False}
+
+    def _execute_burst(
+        self, lane: _Lane, controls: list[dict[str, Any]], repeat: int
+    ) -> dict[str, Any]:
+        """Advance 1–8 actually executed steps; encode only final native PNG."""
+        receipts=[]
+        last=None
+        for index in range(repeat):
+            last=self._execute_one(
+                lane,controls,include_preview=(index==repeat-1),
+            )
+            if last["status"]=="native_execution_failed":
+                break
+            receipts.append(last["receipt"])
+        return {
+            "game_id":lane.game["id"],
+            "status":last["status"] if last is not None else lane.status,
+            "attempted_native_steps":repeat,
+            "completed_native_steps":len(receipts),
+            "receipts":receipts,
+            "last_receipt_sha256":receipts[-1]["receipt_sha256"] if receipts else None,
+            "native_preview":(
+                last.get("native_preview") if last is not None and last["status"]!="native_execution_failed"
+                else None
+            ),
+            "error_class":last.get("error_class") if last is not None else None,
+            "complete":len(receipts)==repeat,
+        }
 
     def step(self, raw: object) -> dict[str, Any]:
         with self._lock:
@@ -270,14 +299,18 @@ class LiveComparison:
             prepared=[]
             seen=set()
             for row in rows:
-                if not isinstance(row,dict) or set(row)!={"game_id","controls"}:
-                    raise LiveComparisonError("Step item requires game_id and exact controller vectors")
+                if (not isinstance(row,dict)
+                    or set(row) not in ({"game_id","controls"}, {"game_id","controls","repeat"})):
+                    raise LiveComparisonError("Step item requires game_id, controls and optional bounded repeat")
+                repeat=row.get("repeat",1)
+                if type(repeat) is not int or not 1<=repeat<=MAX_BURST_STEPS:
+                    raise LiveComparisonError("Native input repeat must be a positive integer <=8")
                 identity = row["game_id"]
                 if type(identity) is not str or identity not in self._lanes or identity in seen:
                     raise LiveComparisonError("Step must address a unique existing active game lane")
                 lane=self._lanes[identity]
-                if lane.status!="running" or lane.total_steps >= self._max_steps:
-                    raise LiveComparisonError("Native lane reached its step budget or stopped")
+                if lane.status!="running" or lane.total_steps+repeat>self._max_steps:
+                    raise LiveComparisonError("Native burst exceeds this lane's remaining lifetime step budget")
                 controls = _controls(row["controls"])
                 if len(controls) > len(lane.game["controller_devices"]):
                     raise LiveComparisonError("Controller vector exceeds selected native topology")
@@ -290,15 +323,16 @@ class LiveComparison:
                         or any(control["pointer"])
                     ):
                         raise LiveComparisonError("Disconnected native controller port rejects nonzero input")
-                prepared.append((lane,controls))
+                prepared.append((lane,controls,repeat))
                 seen.add(identity)
             # First validate ALL lanes, then execute at most 10 actual cores.
             with ThreadPoolExecutor(max_workers=len(prepared)) as executor:
-                futures=[executor.submit(self._execute_one,lane,controls) for lane,controls in prepared]
+                futures=[executor.submit(self._execute_burst,lane,controls,repeat)
+                         for lane,controls,repeat in prepared]
                 results=[f.result() for f in futures]
             return {"schema_version":"skeleton.game.live_step_batch.v1",
                     "results":results,"parallel_native_lanes_attempted":len(results),
-                    "all_succeeded":all(x["status"]!="native_execution_failed" for x in results),
+                    "all_succeeded":all(x["complete"] and x["status"]!="native_execution_failed" for x in results),
                     "model_training_performed":False}
 
     def reset(self, game_id: str) -> dict[str, Any]:

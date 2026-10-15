@@ -847,7 +847,14 @@
         "tests/test_game_comparison_live_http.py",
         "tests/test_game_comparison_raw_qualification_regression.py"
       ],
-      "native_execution_tested": false
+      "native_execution_tested": false,
+      "bounded_held_controller_bursts": {
+        "status": "Source implemented; no native gameplay run in this editing session",
+        "repeat_per_request": "Explicit 1,2,4,8 native input-step repeat choices, including all active up-to-ten game lanes; same selected multiport input applied to each actual step",
+        "evidence": "Each held step independently committed into SHA-linked input/video/audio receipt chain; one final PNG encoded per lane per request to avoid redundant intermediate image work",
+        "budget": "Each lane remains limited to <=256 cumulative native steps and <=4 manual resets, with no partial preflight of an over-budget request",
+        "replay": "Full individual controller frames retained as native evidence for independent replay (up to 64-step episode per approved qualification run)"
+      }
     },
     "operator_readiness_doctor": {
       "state": "Source implemented, user-specific installed core/game scan not executed in this session",

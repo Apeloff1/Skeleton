@@ -63,3 +63,9 @@ The baseline qualification runner also received a necessary bug fix: when only a
 ### Current qualification boundary
 
 This pass adds concrete runtime and HTTP paths plus tests using synthetic fake workers. **Actual native libretro game play, exact physical controller compatibility, hardware accuracy, performance of ten real concurrent disc cores, and measured training/LLM-weight improvements have not been demonstrated by this code-editing session.** Source-level unit/HTTP tests were added but not executed in this session. The user must use the approved installed core registry, lawful game sources and available local disk/CPU to qualify live operation.
+
+## Held controller input bursts
+
+The live browser now supports **1, 2, 4 or 8 native steps per press**. The selected controller chord is held through every actual `input_step` in the burst, for one game or all eligible active games. Each step has its **own frame/PCM and exact-controller SHA-256 record** and is included in the reset-aware export. Only the final native preview of the burst is encoded as PNG, avoiding repeated image encoding overhead. The server preflights the *entire requested burst* against every lane's 256-step lifetime limit before executing any of the lanes, so an over-limit burst is rejected without partial execution.
+
+This is bounded operator-driven multi-step playback, not a claimed 60 FPS streaming engine, real-time audio streaming, or physical-controller latency qualification. The browser preserves its below-screen controller placement and clearly shows what was or was not actually executed.
