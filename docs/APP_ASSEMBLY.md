@@ -385,3 +385,42 @@ adversarial work (counterexample, edge cases, security, verification).
 Both are scored against the same untouched held-out examples. If either view
 lacks sufficient reviewed material in gaming, AI and coding, training aborts
 before spawning optimizers; synthetic placeholder data is not substituted.
+
+### Cinematic angle, cutscene, item and apparel simulation
+
+The authored scene validator supports original `pan_to`, `tilt`, `dolly`,
+`crane`, `orbit`, `rack_focus`, `handheld`, tracking and cut types.
+Jeeves can simulate timed camera positions, look targets, yaw/pitch, focal
+range, spoken-line chronology, costume mobility, and item carrying constraints
+without rendering images or pretending a fitted clothing-physics model exists.
+
+Use the installed Windows **Cutscene Multi-Sim** control with a
+rights-reviewed original scene JSON, or the operator CLI:
+
+```bash
+python -m skeleton app cinematic-sim --scene my-cutscene.json \
+  --output cinematic-evidence.json --candidate-output cutscene-review.jsonl \
+  --workers 4 --limit 128 --frame-ms 100 \
+  --yaw-offsets -30 -15 0 15 30 --pan-rates 70 100 130 \
+  --fov-offsets -10 0 10 --item-mass-deltas 0 250 \
+  --apparel-drag-deltas 0 15 \
+  --item-variants lantern shield --apparel-variants cloak armor
+```
+
+A simulation is one continuous frame evolution; the engine audits its
+collected digest chain **backwards per run without restarting the sim**.
+This supplies two complementary audit/readout directions, *not* twice the
+independent model training. Each distinct trace can yield two quarantined,
+linked review exercises. Duplicate traces are not counted as novel evidence.
+Only an independently reviewed and rights-cleared corpus may later enter
+the attested candidate optimizer; no serving weights are changed here.
+
+Use `--audit-report cinematic-evidence.json` to inspect an existing
+receipt without starting a new simulation; optionally combine that with
+`--candidate-output` to export review-only pairs from the existing trace
+summary. Every simulation run is bounded by per-run and global frame,
+memory, worker and variation budgets. Item/apparel variants may only refer
+to approved source identities; voice, scene chronology and screen direction
+are kept invariant. Data includes shot-level camera range, occlusion, carry
+capacity, outfit mobility and reverse integrity statistics. This is a
+pre-render structural simulator, **not** a playable video-rendering engine.

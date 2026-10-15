@@ -231,3 +231,13 @@ def test_windows_installer_packages_jeeves_curriculum_and_mirror_routes():
     assert "No model weights were trained or promoted by this check." in launcher
     assert '"skeleton.ai.training.jeeves_parallel_mirrors"' in builder
     assert '"skeleton.ai.training.jeeves_multidomain"' in builder
+
+def test_windows_bundle_includes_cutscene_multi_sim_and_review_runtime():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    builder = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    assert "test_jeeves_cinematic_simulation.py" in workflow
+    assert '"--cinematic-sim", "--help"' in workflow
+    assert '"Cutscene Multi-Sim", self.run_cutscene_sim' in launcher
+    assert "args.cinematic_sim" not in launcher
+    assert '"skeleton.ai.training.jeeves_cinematic_simulation"' in builder

@@ -212,7 +212,9 @@
     "skeleton/ai/training/jeeves_multidomain.py",
     "skeleton/ai/training/jeeves_parallel_mirrors.py",
     "scripts/check_jeeves_training_modules.py",
-    "skeleton/testing/test_jeeves_multidomain.py"
+    "skeleton/testing/test_jeeves_multidomain.py",
+    "skeleton/ai/training/jeeves_cinematic_simulation.py",
+    "skeleton/testing/test_jeeves_cinematic_simulation.py"
   ],
   "architecture": {
     "contract": "machine/architecture.json",

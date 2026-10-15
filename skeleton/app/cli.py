@@ -230,6 +230,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "training-modules":
         from skeleton.ai.training.jeeves_parallel_mirrors import main as training_main
         return training_main(arguments[1:])
+    if arguments and arguments[0] == "cinematic-sim":
+        from skeleton.ai.training.jeeves_cinematic_simulation import main as cinema_main
+        return cinema_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main

@@ -224,6 +224,9 @@ class WindowsLauncher:
         self._add_button(
             offline_buttons, "Jeeves Training Modules", self.inspect_jeeves_modules
         )
+        self._add_button(
+            offline_buttons, "Cutscene Multi-Sim", self.run_cutscene_sim
+        )
 
         helper = ttk.Frame(outer)
         helper.pack(fill="x", pady=(0, 10))
@@ -369,6 +372,47 @@ class WindowsLauncher:
             )
 
         self._run_worker("Inspecting Jeeves curriculum...", check, lambda value: value)
+
+    def run_cutscene_sim(self) -> None:
+        """Opt-in original cutscene rehearsal; never perform model training."""
+        from tkinter import filedialog
+        chosen = filedialog.askopenfilename(
+            parent=self.window, title="Select rights-reviewed original cutscene",
+            filetypes=[("Scene JSON", "*.json"), ("All files", "*.*")])
+        if not chosen:
+            return
+        destination = filedialog.asksaveasfilename(
+            parent=self.window, title="Save new cinematic simulation evidence",
+            defaultextension=".json", filetypes=[("Evidence JSON", "*.json")])
+        if not destination:
+            return
+        path = Path(destination)
+        if path.exists() or path.is_symlink():
+            self._set_log("A new evidence filename is required; existing output is not overwritten.")
+            return
+
+        def simulate() -> str:
+            from skeleton.ai.training.jeeves_cinematic_simulation import (
+                _read_json, _write_new, run_batch, variation_controls)
+            source = _read_json(Path(chosen), 128 * 1024)
+            adjustments = variation_controls(
+                offsets=(-15, 0, 15), pan_rates=(75, 100, 125),
+                item_mass_deltas=(0, 250), apparel_drag_deltas=(0, 15),
+                limit=36)
+            result = run_batch(source, variations=adjustments, workers=2)
+            _write_new(path, result)
+            return (
+                f"Cutscene rehearsals: {result['simulations_executed']}\n"
+                f"Camera/item/apparel observations: {result['forward_observations']}\n"
+                f"Reverse audit observations: {result['reverse_observations']}\n"
+                f"Unique trace sources: {result['unique_trace_digests']}\n"
+                f"Audit failures: {result['reverse_audit_failures']}\n"
+                "Training examples pending independent review; no weights changed.\n"
+                f"Evidence: {path}"
+            )
+
+        self._run_worker("Simulating camera and cutscene variants...", simulate,
+                         lambda value: value)
 
     def _start_browser_service(self, selected: Path, *, gguf: bool) -> str:
         """Start one authenticated loopback service owned by this launcher.
@@ -642,6 +686,9 @@ def main(argv: list[str] | None = None) -> int:
     if arguments and arguments[0] == "--training-modules":
         from skeleton.ai.training.jeeves_parallel_mirrors import main as training_main
         return training_main(arguments[1:])
+    if arguments and arguments[0] == "--cinematic-sim":
+        from skeleton.ai.training.jeeves_cinematic_simulation import main as cinema_main
+        return cinema_main(arguments[1:])
     if "--offline-command" in arguments:
         # The frozen executable shares the canonical offline CLI. This path
         # is usable on a headless host and never initializes Tk or Compose.
