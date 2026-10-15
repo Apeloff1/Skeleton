@@ -332,3 +332,91 @@ Focused regression sources cover altered savestate audio, source planning
 versus neutral controls, rehashed malformed neural tensors, optimizer CPU
 limits, finite cancellation, and operator-authored native memory hypotheses.
 They have not been executed in this authoring session.
+
+
+## G. One-command original ROM → Q replay → neural optimizer acceptance
+
+The new explicit operator runner `scripts/accept_original_rom_ai_pipeline.py`
+creates a lawful **original homebrew cartridge** from the repository's own
+DMG game generator. It executes real Game Boy CPU instructions through
+the experimental DMG interpreter, source-replays actual savestate action
+sequences, trains the existing tabular Q policy on those replay-verified
+transitions, validates each numeric neural example against its **original
+per-transition replay receipt**, and performs **real bounded numerical
+neural candidate optimization** with an independent episode-group holdout.
+
+No external game ROM, BIOS, proprietary video/audio, installed core, cloud
+LLM or provider connection is needed. To run a local acceptance session:
+
+```bash
+python scripts/accept_original_rom_ai_pipeline.py \
+  --output-directory /private/research/original-rom-run-001 \
+  --seed 42 --max-runs 12 --episode-steps 12 \
+  --neural-epochs 4 --neural-width 8
+```
+
+The requested directory must not exist and its parent must already exist.
+The operator writes create-only private `original-training.gb`,
+`rom-policy.json`, `rom-source-evidence.json`,
+`neural-world-candidate.json`, `neural-world-measurements.json`
+and a final `acceptance.json`. The final acceptance record includes
+independently measured CPU action/Q updates, neural optimizer steps, exact
+source and model digests, and the candidate's held-out mean-square
+prediction improvement relative to the original train-only baseline.
+
+A measured training run that **does not** beat its held-out baseline returns
+a nonzero exit code with the explicit status
+`original_rom_trained_but_heldout_gain_not_proven`; simply running gradient
+steps never proves capability. The receipt explicitly says native libretro
+or physical hardware compatibility is unverified, and production Jeeves
+transformer weights are never changed.
+
+The typed per-transition source projection ties every neural training
+example's action, observation, next observation, numeric reward, reward
+components, and terminal flags to the original replay-audited episode receipt.
+A changed candidate row cannot be admitted merely by recomputing the
+candidate export's checksum without corresponding recorded source evidence.
+This is an integrity consistency check, not a third-party cryptographic
+attestation of untrusted source data.
+
+## H. Original cartridge game-objective training from actual CPU memory
+
+A separate `game_original_rom_goal_training.py` path probes the repo's
+**specific authored original maze cartridge**, where the game generator
+itself declares which CPU memory locations represent player X/Y, score,
+and completion. It boots the emitted ROM to materialize the game's
+**actual CPU-written VRAM tilemap**, derives a legal route through that map,
+and then **physically executes controller inputs in the ROM interpreter**.
+
+The action is not credited until the actual CPU game RAM commits the
+expected adjacent position. On completion, score and objective-complete
+registers must prove the authored state change. The operator then:
+
+- Rewinds the exact initial CPU/memory/raster savestate and replays every
+  recorded action; rewards, raw CPU observation evidence, frame digests
+  and final snapshot must agree.
+- Executes a matching-length neutral-input baseline from the identical
+  starting savestate; idle frames must not achieve the same score/completion.
+- Builds a separate bounded tabular Q-policy whose reward is tied to
+  physically measured moves and the **source-authored** completion flag.
+
+Use only the built-in homebrew generator, not another game ROM:
+
+```bash
+python -m skeleton.jeeves.game_original_rom_goal_training \
+  --seed 42 --max-steps 2048 --max-frames-per-tile 16 \
+  --evidence-file /private/research/original-goal-q-001.json
+```
+
+This is a narrowly scoped original-game demonstration, **not** a generic
+automated health/score/quest detector or a guarantee of arbitrary cartridge
+success. The resulting offline Q snapshot is a candidate from one measured
+successful route; generalization, independent gameplay performance, hardware
+accuracy, commercial IP compatibility, and production weight promotion
+remain completely separate obligations.
+
+**Verification status:** The new commands, manifest constraints and their
+focused positive/negative regression sources have been committed to the
+draft branch. No actual command or native session has been run from this
+conversation's environment; successful completion and held-out gain require
+real executable receipts.
