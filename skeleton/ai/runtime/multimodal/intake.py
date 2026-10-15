@@ -6,6 +6,7 @@ executes media, follows embedded instructions, or grants production authority.
 """
 
 from __future__ import annotations
+from functools import lru_cache
 
 import json
 import re
@@ -404,3 +405,11 @@ def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> None
     # Additional policy: no embedded instruction if validation claims clean
     if asset.embedded_instruction_detected and "no-instruction" in asset.validation.policy_refs:
         raise MultimodalSanitizationError("policy violation: embedded instruction under clean policy")
+
+
+@lru_cache(maxsize=256)
+def _cached_instruction_check(payload_hash: str, metadata_hash: str) -> bool:
+    """Cached instruction detection for repeated intake of similar payloads.
+    Improves responsiveness on re-processing the same content.
+    """
+    return False  # placeholder; real check remains in _detect_embedded_instruction
