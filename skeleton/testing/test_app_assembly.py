@@ -496,3 +496,51 @@ def test_application_probe_includes_aggregate_readiness(monkeypatch):
         "http://localhost:8001/api/app/ready",
         1.5,
     ) in seen
+
+
+def test_installed_public_ports_follow_compose_env(tmp_path):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(
+        "FRONTEND_PORT=3300\nBACKEND_PORT=8101\nSKELETON_PORT=8110\n",
+        encoding="utf-8",
+    )
+    urls = public_service_urls(tmp_path, environ={})
+    assert urls == {
+        "frontend": "http://localhost:3300",
+        "backend": "http://localhost:8101",
+        "skeleton": "http://localhost:8110",
+    }
+
+
+@pytest.mark.parametrize("bad", ["0", "65536", "abc", "-2", "8080:80"])
+def test_installed_public_port_rejects_invalid_configuration(tmp_path, bad):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(f"FRONTEND_PORT={bad}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="FRONTEND_PORT"):
+        public_service_urls(tmp_path, environ={})
+
+
+def test_runtime_probes_use_configured_ports_including_ready_route(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application
+
+    seen = []
+    def fake_probe_http(name, url, *, timeout):
+        seen.append((name, url))
+        return ProbeResult(name, url, True, 200, "healthy")
+
+    monkeypatch.setattr("skeleton.app.health.probe_http", fake_probe_http)
+    results = probe_application(
+        manifest=load_manifest(),
+        public_url_overrides={
+            "frontend": "http://localhost:3300",
+            "backend": "http://localhost:8101",
+            "skeleton": "http://localhost:8110",
+        },
+    )
+    assert len(results) >= 3
+    assert ("frontend", "http://localhost:3300/") in seen
+    assert ("backend", "http://localhost:8101/api/health") in seen
+    assert ("skeleton", "http://localhost:8110/api/v1/health/live") in seen
+    assert ("application", "http://localhost:8101/api/app/ready") in seen
