@@ -63,7 +63,7 @@ class NativeSaveRamWorkerContracts(unittest.TestCase):
 
     def test_exact_matching_import_roundtrip(self):
         obj = worker(b"abcdefghijklmnop")
-        payload = b"another-save-ram"
+        payload = b"another-save-ram!"
         sha = hashlib.sha256(payload).hexdigest()
         # A region must not be expanded or shortened silently.
         with self.assertRaisesRegex(ValueError, "native_save_ram_exact_size_mismatch"):
