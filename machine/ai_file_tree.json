@@ -5740,7 +5740,9 @@
         "jeeves_production_game_recovery.py",
         "jeeves_production_game_session.py",
         "jeeves_production_game_train.py",
-        "jeeves_production_readiness.py"
+        "jeeves_production_readiness.py",
+        "jeeves_torch_game_vocabulary.py",
+        "jeeves_training_progress.py"
       ]
     },
     {
@@ -6498,7 +6500,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_43_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_45_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7464,7 +7466,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 43
+    "native_ai_owner_count": 45
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8646,6 +8648,30 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Canonical Jeeves game learning and production training module: jeeves_production_readiness.py.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-TORCH-GAME-VOCABULARY",
+      "path": "skeleton/ai/training/jeeves_torch_game_vocabulary.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Native Jeeves production model training capability: jeeves_torch_game_vocabulary.py.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-TRAINING-PROGRESS",
+      "path": "skeleton/ai/training/jeeves_training_progress.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Native Jeeves production model training capability: jeeves_training_progress.py.",
       "volume_refs": [
         "VOL-006",
         "VOL-072"
