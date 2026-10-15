@@ -205,6 +205,8 @@ class GameLearningConfig:
     reward_clip: float = 100.0
     trace_byte_limit: int = MAX_BYTES
     imitation_strength: float = 1.0
+    exploration_strategy: str = "uniform"
+    n_step: int = 1
 
     def __post_init__(self) -> None:
         for key in ("alpha", "gamma", "epsilon", "epsilon_decay", "min_epsilon"):
@@ -218,6 +220,9 @@ class GameLearningConfig:
         _int(self.max_updates, "update budget", 1, 1048576)
         _int(self.max_states, "state budget", 1, 16384)
         _int(self.max_episodes, "episode budget", 1, 8192)
+        _int(self.n_step, "actual reward backup horizon", 1, 16)
+        if self.exploration_strategy not in ("uniform", "least_visited"):
+            raise GameLearningError("unknown action exploration strategy")
         _int(self.trace_byte_limit, "trace byte budget", 1024, MAX_BYTES)
         clip = _number(self.reward_clip, "reward clip", 1e6)
         if clip <= 0:
@@ -403,10 +408,36 @@ class GamePolicyLearner:
             self.config.epsilon * self.config.epsilon_decay ** len(self._episodes),
         )
         if self._rng.random() < epsilon:
+            if self.config.exploration_strategy == "least_visited":
+                state = self._state(observation)
+                visits = self._visits.get(state, [0] * len(self._actions))
+                minimum = min(visits)
+                choices = [i for i, value in enumerate(visits) if value == minimum]
+                return self._actions[choices[self._rng.randrange(len(choices))]]
             return self._actions[self._rng.randrange(len(self._actions))]
+        if self.config.exploration_strategy == "least_visited":
+            state = self._state(observation)
+            scores = self._scores(state)
+            best = max(scores)
+            choices = [i for i, value in enumerate(scores) if value == best]
+            visits = self._visits.get(state, [0] * len(self._actions))
+            minimum = min(visits[i] for i in choices)
+            choices = [i for i in choices if visits[i] == minimum]
+            return self._actions[choices[self._rng.randrange(len(choices))]]
         return self._greedy(observation)
 
-    def _update(self, transition: Mapping[str, Any]) -> None:
+    def _n_step_target(self, transitions: Sequence[Mapping[str, Any]]) -> float:
+        """Use only observed rewards; no inferred goal or intrinsic reward."""
+        total, factor = 0.0, 1.0
+        for transition in transitions[: self.config.n_step]:
+            reward = min(self.config.reward_clip, max(-self.config.reward_clip, transition["reward"]))
+            total += factor * reward
+            factor *= self.config.gamma
+            if transition["terminated"]:
+                return total
+        return total + factor * max(self._row(self._state(transition["next_observation"])))
+
+    def _update(self, transition: Mapping[str, Any], *, target: float | None = None) -> None:
         if self._updates >= self.config.max_updates:
             raise GameLearningError("cumulative policy update budget exhausted")
         if self._updates + self._inherited_updates >= MAX_LIFETIME_UPDATES:
@@ -419,7 +450,8 @@ class GamePolicyLearner:
         continuation = 0.0
         if not transition["terminated"]:
             continuation = self.config.gamma * max(self._row(self._state(transition["next_observation"])))
-        value = row[index] + self.config.alpha * (reward + continuation - row[index])
+        target = reward + continuation if target is None else target
+        value = row[index] + self.config.alpha * (target - row[index])
         if not math.isfinite(value) or abs(value) > 1e15:
             raise GameLearningError("Q update exceeded finite numerical bounds")
         row[index] = value
@@ -432,7 +464,12 @@ class GamePolicyLearner:
         if cancel is not None and cancel():
             raise GameLearningCancelled("game learning was cancelled")
         if authorize is not None:
-            authorize()
+            result = authorize()
+            if result is not None and result is not True:
+                close = getattr(result, "close", None)
+                if callable(close):
+                    close()
+                raise GameLearningError("game learning authorization did not finish synchronously")
 
     def _capture(self) -> dict[str, Any]:
         return {
@@ -740,7 +777,7 @@ class GamePolicyLearner:
             for value, visits in zip(learner._q[state], learner._visits[state], strict=True):
                 if visits == 0 and value != 0.0:
                     raise GameLearningError("unvisited policy action has a learned Q value")
-                numerical_bound = inherited_q_bound + config.reward_clip * updates
+                numerical_bound = inherited_q_bound + config.reward_clip * config.n_step * updates
                 if abs(value) > numerical_bound and not math.isclose(
                     abs(value),
                     numerical_bound,
@@ -997,14 +1034,15 @@ class GamePolicyLearner:
             raise GameLearningError("factory returned a foreign environment")
         observation = self._observation(environment.reset(seed))
         transitions: list[dict[str, Any]] = []
+        pending: list[dict[str, Any]] = []
         byte_count = 0
         for sequence in range(1, self.descriptor["max_episode_steps"] + 1):
             self._guard(cancel, authorize)
             if step_budget is not None and sequence > step_budget:
                 raise GameLearningError("evaluation cumulative step budget exhausted")
-            if update and self._updates >= self.config.max_updates:
+            if update and self._updates + len(pending) >= self.config.max_updates:
                 raise GameLearningError("cumulative policy update budget exhausted")
-            if update and self._updates + self._inherited_updates >= MAX_LIFETIME_UPDATES:
+            if update and self._updates + len(pending) + self._inherited_updates >= MAX_LIFETIME_UPDATES:
                 raise GameLearningError("lifetime policy update budget exhausted")
             action = select(observation)
             step: EpisodeStep = environment.step(action)
@@ -1037,11 +1075,18 @@ class GamePolicyLearner:
             if byte_count > self.config.trace_byte_limit:
                 raise GameLearningError("episode trace byte budget exhausted")
             if update:
-                self._update(transition)
+                pending.append(transition)
+                if len(pending) >= self.config.n_step:
+                    self._update(pending[0], target=self._n_step_target(pending))
+                    pending.pop(0)
             transitions.append(transition)
             observation = transition["next_observation"]
             if transition["terminated"] or transition["truncated"]:
                 break
+        while pending:
+            self._guard(cancel, authorize)
+            self._update(pending[0], target=self._n_step_target(pending))
+            pending.pop(0)
         trace = {
             "schema_version": TRACE_SCHEMA,
             "environment": self.descriptor,
@@ -1139,12 +1184,15 @@ class GamePolicyLearner:
             if len(self._imitation_receipts) >= 1024 and verified.source == "human_demonstration":
                 raise GameLearningError("imitation receipt budget exhausted")
             prior_digest = self.snapshot_digest
-            for transition in trace["transitions"]:
+            for index, transition in enumerate(trace["transitions"]):
                 self._guard(cancel, authorize)
                 transition = self._transition(transition, transition["sequence"])
                 if verified.source == "human_demonstration":
                     self._record_imitation(transition["observation"], transition["action"], 1)
-                self._update(transition)
+                self._update(
+                    transition,
+                    target=self._n_step_target(trace["transitions"][index : index + self.config.n_step]),
+                )
             if verified.source == "human_demonstration":
                 if any(receipt["digest"] == verified.evidence_digest for receipt in self._imitation_receipts):
                     raise GameLearningError("human demonstration was already learned")
@@ -1334,9 +1382,14 @@ class GamePolicyLearner:
                     ):
                         raise GameLearningError("offline episode was already committed")
                     prior_digest = self.snapshot_digest
-                    for transition in trace["transitions"]:
+                    for index, transition in enumerate(trace["transitions"]):
                         self._guard(cancel, authorize)
-                        self._update(self._transition(transition, transition["sequence"]))
+                        self._update(
+                            self._transition(transition, transition["sequence"]),
+                            target=self._n_step_target(
+                                trace["transitions"][index : index + self.config.n_step]
+                            ),
+                        )
                     summary = self._commit_episode(
                         trace,
                         source="offline_import",

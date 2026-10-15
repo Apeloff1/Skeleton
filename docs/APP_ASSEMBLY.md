@@ -96,6 +96,10 @@ The canonical first-run path is split into three bounded layers:
   `--start` extends the transaction through application startup and readiness.
 
 ```bash
+python3 -m venv .venv
+# Linux/macOS; Windows uses .\.venv\Scripts\Activate.ps1
+source .venv/bin/activate
+
 python -m skeleton app preload
 python -m skeleton app setup
 python -m skeleton app install
@@ -109,6 +113,10 @@ python -m skeleton app install --skip-python
 # Install, build, start and verify the complete runtime
 python -m skeleton app install --start
 python -m skeleton app install --start --production
+
+# Distinguish host/configuration, service health and actual AI availability:
+python -m skeleton app doctor
+python -m skeleton app doctor --live --json
 ```
 
 The installer does not silently install Docker or elevate privileges. Missing
@@ -126,6 +134,121 @@ credentials; existing databases require coordinated credential migration.
 Keep the previous private environment backup for rollback; never attach it to
 diagnostic reports. Setup alone does not install trained AI weights or prove
 model readiness.
+
+The host preloader checks that the selected Docker daemon is reachable, in
+addition to finding the Compose plugin. Python dependencies come from
+`pyproject.toml`; `requirements.txt` delegates to that same metadata. Host
+Node 24+ and Yarn 1.22.22 are only prerequisites for a host Expo process;
+Compose supplies them in its frontend image.
+
+Setup also creates a separate persistent `GAMEFORGE_JWT_SECRET` for the existing
+account/login authority. Restarting the backend therefore retains its signing
+identity. No default-password administrator is created. Public registration
+creates a viewer; administrative/editor work requires an explicitly granted
+role. To bootstrap an operator, create a private UTF-8 password file locally
+(at least 16 characters, at most 72 UTF-8 bytes), then run:
+
+```bash
+python -m skeleton app setup --admin-email operator@example.com \
+  --admin-password-file /private/path/operator-password.txt
+python -m skeleton app up --no-build
+```
+
+On Unix the password file must have private permissions (`chmod 600`). The
+password is read from that file rather than from command arguments, and is
+never printed in setup receipts. Configure both inputs together. The existing
+auth bootstrap reads the explicitly configured pair on the next backend
+startup; first-user registration is never silently elevated. The same pair of
+options is available on `app install`.
+
+Minimal startup defaults to `SKIP_HEAVY_SEED=true`. Auth/index bootstrap and
+small agent collection initialization remain; large generated book/code
+libraries, launch-prefill and automatic Android installation are skipped.
+Those generated records are not learned or crawled evidence. Bulk sample
+content is an explicit operator opt-in with `SKIP_HEAVY_SEED=false`.
+The existing optional Curiosity research worker is disabled initially with
+`CURIOSITY_IDLE_ENABLED=false`; its existing state stays under the durable
+backend volume rather than the read-only application source directory.
+
+`app doctor` is read-only. Without `--live`, capabilities are **not probed**.
+With `--live`, it reads existing application health and canonical AI provider
+inventory, without sending a model request, starting a crawl or loading an
+emulator. Unavailable AI is separate from healthy application services.
+Reports contain no provider key, Mongo URI, JWT value or rendered Compose
+environment. `app config` validates with `docker compose config --quiet`.
+
+### Configure real AI
+
+The [first-install AI and crawler guide](ai/FIRST_INSTALL_AI_AND_CRAWLER.md)
+covers the optional pinned provisioning command and authenticated crawler
+workflow. Provisioning is an operator action; the browser never runs a shell.
+
+Fresh `.env` files use `AI_PROVIDER=local` with both local model paths empty.
+AI remains unavailable while Mongo, the APIs and the product shell can start.
+Do not use a placeholder API key to simulate readiness.
+Setup prepares the operator-owned local model directory before Compose starts,
+so a later explicit provisioning command can use it. Existing assets are kept;
+an inaccessible empty directory requires an ownership repair or a different
+`SKELETON_LOCAL_MODEL_DIR`, rather than being overwritten.
+
+For an existing trained native Skeleton artifact, copy it into the persistent
+engine data volume, then edit the **private** `.env`:
+
+```bash
+docker compose cp ./trained-model.json skeleton:/app/data/local-model.json
+```
+
+```dotenv
+AI_PROVIDER=local
+AI_LOCAL_MODEL_PATH=/app/data/local-model.json
+AI_LOCAL_DEPLOYMENT_PATH=
+```
+
+An arbitrary JSON file does not become trained weights; the canonical loader
+must validate the artifact. Compose paths refer to files **inside** the engine
+container. Host filenames are not automatically mounted.
+`AI_LOCAL_DEPLOYMENT_PATH` accepts a pinned GGUF deployment when an
+operator-provisioned compatible llama.cpp executable, shared libraries and exact
+model files exist at the manifest's container paths. The base image does not
+include llama.cpp or model weights. For the existing host GGUF chat/workspace
+path, use the standalone commands in the README.
+
+For hosted OpenAI execution, set `AI_PROVIDER=openai`, configure a genuine
+`OPENAI_API_KEY` and the intended `AI_MODEL` in private `.env`, and leave local
+model paths empty. The engine image includes the `hosted-inference` extra;
+credentials and provider calls remain engine-owned. The backend and frontend
+receive no model-provider key. Existing architecture, governance and provider
+availability checks still apply.
+
+After changing model configuration:
+
+```bash
+python -m skeleton app up --no-build
+python -m skeleton app doctor --live
+```
+
+Readiness establishes runtime admission, not useful response quality. The
+doctor performs no inference. Operator-approved emulator cores, firmware,
+toolchains and crawler source/egress permissions are separate optional
+capabilities; setup does not bundle or approve them.
+
+### Startup failures and retained state
+
+Package installation and Compose builds have finite installer budgets.
+Failures return phase receipts and remediation commands without
+credential-bearing subprocess output. Inspect `app doctor`, `app ps` and
+`app logs <service>` locally. Treat logs as private operational data.
+
+`FRONTEND_PORT`, `BACKEND_PORT`, `SKELETON_PORT` and `MONGO_PORT` must be valid,
+distinct host ports. Startup health probes honor them. Browser
+`EXPO_PUBLIC_*` endpoint overrides must also match your deployment; Docker
+service names do not resolve in the browser. Production exports embed these
+public endpoints at build time, so rebuild the frontend after changing them;
+restarting an existing static image cannot change its bundle. Set
+`CORS_ORIGINS` to the explicit browser origin(s), including custom ports.
+A normal `app down` retains
+application and database volumes. Ordinary startup failures do not require
+deleting volumes or rotating secrets.
 
 ### Pre-compilation readiness
 

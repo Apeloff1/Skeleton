@@ -204,3 +204,15 @@ export async function readPickedAttachment(asset: { uri: string; size?: number; 
   validateAttachment(encoded);
   return encoded;
 }
+
+/** Save only a bounded, authorized canonical JSON/Markdown export already checked by its client. */
+export async function saveChatExport(file: { filename: string; mediaType: string; content: string }): Promise<void> {
+  const mime = file.mediaType.split(';')[0].trim();
+  if (!['application/json', 'text/markdown'].includes(mime) || !file.content || new TextEncoder().encode(file.content).byteLength > 8 * 1024 * 1024) throw new Error('The conversation export is invalid or too large.');
+  const filename = safeFilename(file.filename);
+  if (Platform.OS === 'web') { download(new Blob([file.content], { type: mime + ';charset=utf-8' }), filename); return; }
+  if (!FileSystem.cacheDirectory || !await Sharing.isAvailableAsync()) { await Share.share({ title: filename, message: file.content }); return; }
+  const uri = FileSystem.cacheDirectory + Date.now() + '-' + filename;
+  try { await FileSystem.writeAsStringAsync(uri, file.content, { encoding: FileSystem.EncodingType.UTF8 }); await Sharing.shareAsync(uri, { mimeType: mime, dialogTitle: 'Save conversation' }); }
+  finally { await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {}); }
+}

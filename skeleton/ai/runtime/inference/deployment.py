@@ -29,6 +29,13 @@ from .local import (
 
 SCHEMA = "skeleton.local_model.deployment.v1"
 QUALIFICATION_SCHEMA = "skeleton.local_model.qualification.v1"
+QWEN3_COMPLETION_CHAT_TEMPLATE = (
+    "{% for message in messages %}"
+    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
+    "{% endfor %}{% if add_generation_prompt %}"
+    "{{ '<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n' }}"
+    "{% endif %}"
+)
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -112,6 +119,7 @@ class LocalModelDeployment:
     temperature: float
     extra_args: tuple[str, ...]
     manifest_digest: str
+    output_framing: str = "raw"
 
     @classmethod
     def load(cls, manifest_path: str | Path) -> "LocalModelDeployment":
@@ -174,6 +182,7 @@ class LocalModelDeployment:
             "gpu_layers",
             "temperature",
             "extra_args",
+            "output_framing",
         }
         unknown = set(config) - allowed_config
         if unknown:
@@ -202,6 +211,7 @@ class LocalModelDeployment:
                 gpu_layers=config.get("gpu_layers"),
                 temperature=config.get("temperature", 0.0),
                 extra_args=tuple(extra_args),
+                output_framing=config.get("output_framing", "raw"),
                 reject_model_symlink=True,
                 rehash_artifacts_each_run=False,
             )
@@ -239,6 +249,7 @@ class LocalModelDeployment:
             gpu_layers=validated.gpu_layers,
             temperature=float(validated.temperature),
             extra_args=validated.extra_args,
+            output_framing=validated.output_framing,
             manifest_digest=_stable_digest(payload),
         )
         deployment.verify_artifacts()
@@ -269,6 +280,7 @@ class LocalModelDeployment:
             gpu_layers=self.gpu_layers,
             temperature=self.temperature,
             extra_args=self.extra_args,
+            output_framing=self.output_framing,
             reject_model_symlink=True,
             rehash_artifacts_each_run=rehash_artifacts_each_run,
         )
@@ -280,12 +292,35 @@ class LocalModelDeployment:
         default_seed: int = 0,
         rehash_artifacts_each_run: bool = False,
     ) -> LocalModelAdapter:
-        return build_llama_cpp_adapter(
+        adapter = build_llama_cpp_adapter(
             self.llama_cpp_config(
                 rehash_artifacts_each_run=rehash_artifacts_each_run
             ),
             cache_size=cache_size,
             default_seed=default_seed,
+        )
+        model = adapter.engine.model
+        if not isinstance(model, LlamaCppModel):
+            raise LocalModelDeploymentError("deployment runtime identity is invalid")
+        if (
+            model.model_artifact.sha256 != self.model_sha256
+            or model.runtime_artifact.sha256 != self.executable_sha256
+        ):
+            raise LocalModelDeploymentError("loaded deployment identity mismatch")
+        return LocalModelAdapter(
+            adapter.engine,
+            default_seed=default_seed,
+            artifact_status={
+                "schema": SCHEMA,
+                "model_id": model.model_id,
+                "model_digest": model.model_digest,
+                "artifact_sha256": model.model_artifact.sha256,
+                "artifact_bytes": model.model_artifact.size_bytes,
+                "manifest_digest": self.manifest_digest,
+                "runtime_digest": model.runtime_digest,
+                "runtime_kind": self.runtime_kind,
+                "reference": "local-model-deployment:" + self.manifest_digest,
+            },
         )
 
 
@@ -299,6 +334,8 @@ def create_local_model_deployment(
     threads: int | None = None,
     gpu_layers: int = 0,
     timeout_seconds: float = 120.0,
+    output_framing: str = "raw",
+    runtime_profile: str = "raw",
 ) -> LocalModelDeployment:
     """Prepare a pinned configuration from existing files, without execution.
 
@@ -306,6 +343,20 @@ def create_local_model_deployment(
     Publish only after that authority validates a private candidate. Hard-link
     publication is create-only: an existing destination is never replaced.
     """
+    if not isinstance(runtime_profile, str) or runtime_profile not in {
+        "raw", "llama-completion-chat", "qwen3-completion-chat"
+    }:
+        raise LocalModelDeploymentError("unsupported local runtime profile")
+    extra_args: tuple[str, ...] = ()
+    completion_profile = runtime_profile in {"llama-completion-chat", "qwen3-completion-chat"}
+    if completion_profile:
+        extra_args = (
+            "--conversation", "--single-turn", "--simple-io", "--no-perf",
+            "--no-escape", "--color", "off", "--jinja", "--reasoning", "off",
+        )
+        output_framing = "llama_completion_eog"
+        if runtime_profile == "qwen3-completion-chat":
+            extra_args += ("--chat-template", QWEN3_COMPLETION_CHAT_TEMPLATE)
     target = Path(destination).expanduser().absolute()
     if not target.parent.is_dir():
         raise LocalModelDeploymentError("manifest destination directory must already exist")
@@ -323,7 +374,9 @@ def create_local_model_deployment(
     validated = LlamaCppConfig(
         executable=str(executable), model_path=str(model), model_id=identity.strip(),
         context_size=context_size, threads=threads, gpu_layers=gpu_layers,
-        timeout_seconds=timeout_seconds, reject_model_symlink=True,
+        timeout_seconds=timeout_seconds, output_framing=output_framing, reject_model_symlink=True,
+        extra_args=extra_args,
+        batch_size=512 if completion_profile else None,
     )
     payload = {
         "schema_version": SCHEMA, "runtime_kind": "llama.cpp-cli",
@@ -332,8 +385,11 @@ def create_local_model_deployment(
         "model_path": str(model), "model_sha256": _sha256_file(model),
         "config": {"context_size": validated.context_size, "threads": validated.threads,
                    "gpu_layers": validated.gpu_layers, "timeout_seconds": validated.timeout_seconds,
-                   "temperature": 0.0, "extra_args": []},
+                   "temperature": 0.0, "extra_args": list(validated.extra_args),
+                   "output_framing": validated.output_framing},
     }
+    if completion_profile:
+        payload["config"]["batch_size"] = validated.batch_size
     candidate: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json",
@@ -514,6 +570,7 @@ __all__ = [
     "LocalModelDeployment",
     "LocalModelDeploymentError",
     "QUALIFICATION_SCHEMA",
+    "QWEN3_COMPLETION_CHAT_TEMPLATE",
     "SCHEMA",
     "create_local_model_deployment",
     "load_local_model_adapter",

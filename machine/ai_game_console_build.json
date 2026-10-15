@@ -73,6 +73,7 @@
       "POST /game-learning/projects/{project}/build-artifacts/{artifact}/admit",
       "POST /game-learning/projects/{project}/build-artifacts/{artifact}/play",
       "POST /game-learning/projects/{project}/build-artifacts/{artifact}/train",
+      "POST /game-learning/projects/{project}/build-artifacts/{artifact}/campaign",
       "GET existing artifact binary download"
     ],
     "source_kind": "build_artifact",
@@ -87,7 +88,7 @@
       "approved core registry/target/extension",
       "recording consent and parent policy identity"
     ],
-    "recovery": "idempotent source association and existing durable play/train owners; reauthorize producer before admission, native execution and checkpoints",
+    "recovery": "Idempotent source association and existing durable play/train/campaign owners; reauthorize exact current producer before admission, native execution, rounds and checkpoints",
     "bounds": {
       "artifact_file_bytes": 16777216,
       "workspace_sources": 64,
@@ -98,6 +99,63 @@
       "successful_compilation_implies_playability": false,
       "production_promotion": false,
       "automated_tests_requested": false
-    }
+    },
+    "native_instrumentation": {
+      "status": "implementation_candidate",
+      "owners": [
+        "skeleton/jeeves/game_emulator_host.py",
+        "skeleton/jeeves/game_learning_parallel.py",
+        "backend/core/game_console_build.py"
+      ],
+      "authority": "Only an exact completed current scoped compiler receipt whose full frozen source graph matches the canonical authored kernel/data binding can issue the application native observation descriptor; HTTP accepts no addresses, layout or caller consent fields.",
+      "trust_boundary": "The fixed pure host ABI validates descriptor/core/target/checksums/artifact bytes, but does not issue application authority to caller-constructed envelopes. Existing authenticated Mongo producer and source owners supply that authority.",
+      "descriptor_schema": "skeleton.console_build.native_observation.v1",
+      "layout_schema": "skeleton.console_editor_native_observation.v1",
+      "targets": {
+        "game_boy": "approved Gambatte SYSTEM_RAM region2, offset0, span24; exact WRAM C000 authored layout",
+        "nes": "approved FCEUmm SYSTEM_RAM region2, offset0, span19; exact authored zero-page layout"
+      },
+      "bootstrap": "At most64native initialization runs, no issued policy reward/transition before actual JEEV RAM signature; signature and fixed typed field ranges enforced thereafter.",
+      "actual_signals": [
+        "player_x",
+        "player_y",
+        "health",
+        "won",
+        "tick",
+        "Game Boy camera/graph phase/goal position and visibility"
+      ],
+      "rewards": "Actual measured position displacement capped1, health delta capped[-1,1], one-time actual won-flag edge, plus visual change; terminal actual won orhealthzero.",
+      "receipts": [
+        "exact artifact and producer input SHA",
+        "kernel/assets/document/graph/layout SHA",
+        "actual read-only RAM checksum",
+        "actual native frame/controller/transition chain"
+      ],
+      "recovery": "Full native savestate and frame plus recorded RAM checksum; restore re-reads actual native RAM and compares checksum and normalized fields before continuation.",
+      "opaque_rom": "Unbound or modified authored sources and commercial ROMs retain visual exploration only; no inferred score, health, collision, mastery, task success or hidden RAM offsets.",
+      "bounds": {
+        "descriptor_bytes": 16384,
+        "boot_native_runs": 64,
+        "memory_region": 2,
+        "memory_offset": 0,
+        "memory_read_bytes_max": 24
+      },
+      "hardware_execution_verified": false,
+      "automated_tests_requested": false,
+      "checkpoint_storage_admission": "Existing governed storage admission identity binds SHA of full checkpoint snapshot/trace/pending-batch envelope, not only weight/cursor snapshot digest; exact retry remains idempotent while the same snapshot with a new durable pending batch has its own exact footprint.",
+      "live_worker_errors": "Existing live play child reports only bounded typed lowercase error code and exception class; no exception message, credentials or operator paths. Failures remain terminal, current source/policy rights and exact native authority unchanged.",
+      "live_nested_limits": "For libretro only, existing live supervisor keeps soft address-space1.5GiB and CPU900seconds with hard2GiB/3600seconds, permitting the unchanged isolated native worker to establish its already-declared2GiB/3600second hard limits. Other live adapters retain original hard limits. Command deadlines, finite episodes, source/lease fences and actual process drain remain unchanged.",
+      "native_resource_admission": "Generic CPU profile partitions observed CPU and cgroup memory after512MiB application reserve using2GiB per native instance (matching native worker hard address-space bound), global actor ceiling8. Insufficient memory yields availablefalse/zero capacity and new job/play requests429 before native probes. Exact prior completed receipts remain readable; current2CPU8GiB permits1training+1live.",
+      "durable_runtime_json": "Existing workspace._stored_evidence losslessly roundtrips finite bounded runtime JSON envelopes after Mongo BSON decoding, converting BSON integer representation back to standard JSON integer values before strict pure validators. Applies policy/checkpoint/pending actor batch/demonstration and live IPC envelopes. No default-string coercion or whole document normalization of dates/binary, no snapshot relabeling or weakened spec/runtime/hash/source/consent checks."
+    },
+    "baseline_cartridge_format_admission": "Canonical emulator_content_extensions includes original installed baseline cores and remaining installed known core declarations. Suffix hints never grant execution authority; exact approved target/core/issuer cartridge format remains required and actual native worker checks loaded retro_system_info.valid_extensions. Unknown core mappings remain denied; no artifact-specific bypass."
+  },
+  "builder_workflow_interface": {
+    "owner": "existing backend/core/game_console_build.py",
+    "preflight": "Exact project version, current source authority and canonical build_runner.plan without compiler dispatch; secret-free projection of tool hashes, plan/runtime/source digests and expected relative artifacts.",
+    "preview": "Exact completed binary -> existing derived source admission -> bounded canonical simulation receipt; no bypass when sandbox/core/toolchain unavailable.",
+    "export": "Current source authority and completed producer remain required for all byte reads and download references.",
+    "publication": "Goal host validates exact current project/version/head and actual completed owner receipts before declaring requested build workflow complete.",
+    "frontend": "frontend/features/Jeeves/GameBuildWorkflowPanel.tsx consumes only actual source revision, build preflight, job/artifact, bounded preview and authorized export receipts; queued/source_only and prepared download remain explicitly distinct from compiled/playback/client download evidence."
   }
 }

@@ -1,0 +1,553 @@
+{
+  "schema_version": "skeleton.ai.studio_enablement_session_evidence.v1",
+  "status": "implementation_candidate",
+  "continuation_start_commit": "85eaa1fecf952e26d16909c10f1dfcdad041b045",
+  "upstream_integration_target": "454ca20790f44fc9a1f51bbea164443c2cd8d56d",
+  "canonical_owners": "Existing backend, scheduler, engine, MongoDB workspace and Dragon SQLite stores; no additional provider boundary or promotion authority",
+  "automated_tests_run": false,
+  "validation_policy": "User explicitly requested no tests; source gates, lint/compile, frontend export and actual application/compiler/emulator/model/crawl/train operations only",
+  "completed_operational_evidence": {
+    "crawler": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/crawler/20261015T152752Z-e53a08be/evidence-summary.json",
+      "sha256": "617bbef891b777526815e8ba7d20f19e855322800cd921aa5c0dc9834f5ef5ab",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "dragon": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/dragon/evidence-summary.json",
+      "sha256": "5bbebad10bbbdb7a97a8b59cb28f969e124d246dd45df5a1cd52c819d2099aa5",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "builder": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/tools-20261015-final-01/receipt.json",
+      "sha256": "db63acda84247f3bd39d3ad5f97d0f84ead5515e9da146d0a1238ee48ed87fab",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "model_attempt": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/model-goal-20261015-final-01/receipt.json",
+      "sha256": "28675ff3ec53a6923c0042eb3f99abd8485920150909a514b12f9241efb34c9b",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "parallel_training": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/receipt.json",
+      "sha256": "f365d69977a29fd3937a532c08265b741e251910e38696e1427293a04b0c7a77",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "paired_review": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/review/20261015T152936Z-6907064d/summary.json",
+      "sha256": "7d95b345f56ce8ed341db92f7f182be8f4f5e5020418e71d09469deb213fa6bd",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "installer": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/installer-workload-report.json",
+      "sha256": "7dd550b2f929c401222b66ba7a2f73a6c0deafa7c9e66ce87878dd3aa7c21eb5",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "production_backend": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/backend-proof/final-production-runtime-qualification.json",
+      "sha256": "e7bcd3bec78b7b7b5b13c4e74c0efcc2d391052bfe578c097700a4ef8668f34c",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    }
+  },
+  "observed_results": {
+    "crawler": {
+      "accepted_sources": 3,
+      "accepted_bytes": 149221,
+      "autonomous_slices": 3,
+      "unknown_outcome_reserved_cap_retained": true,
+      "pause_reauthorize_and_active_erase_observed": true
+    },
+    "dragon": {
+      "actual_reference_steps": 91,
+      "canonical_typed_knowledge_read": true,
+      "exact_replay": true,
+      "source_withdrawal_denies_downstream_use": true,
+      "xp_awarded": 0,
+      "policy_trained": false,
+      "truth_verified": false
+    },
+    "builder": {
+      "original_game_boy_binary_bytes": 32768,
+      "native_preview_steps": 64,
+      "actual_video_callbacks": 71,
+      "source_and_binary_export_verified": true,
+      "model_authored": false
+    },
+    "parallel_training": {
+      "admitted_workers": 2,
+      "distinct_physical_actor_pids": 4,
+      "campaign_committed_rounds": 2,
+      "campaign_recovered_across_restart": true,
+      "last_candidate_return_gate": false,
+      "guaranteed_quality_improvement": false
+    },
+    "paired_review": {
+      "actual_steps_per_policy": 32,
+      "matching_execution_protocol": true,
+      "different_frozen_policies": true,
+      "subjective_quality_certified": false
+    },
+    "model_attempt": {
+      "status": "failed_before_engine_admission",
+      "cause": "Current USER prompt omitted by capacity-constrained context compiler; typed admission guard and capacity-aware planner correction require fresh qualification"
+    },
+    "production_backend": {
+      "fresh_accounts_and_auth_restart": true,
+      "private_empty_dragon_stores": true,
+      "declared_source_overlays": 6,
+      "checked_effective_python_sources": 29,
+      "engine_model_or_native_execution_in_container_proven": false
+    }
+  },
+  "final_integration_qualification": {
+    "status": "completed_with_declared_scope_and_limits",
+    "native_api_union": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/integration/native-api-union.json",
+      "sha256": "b88e11dba866f95ecfcca33334644e59c439274152dead8b7dc67c88f97f629b"
+    },
+    "source_health": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/late-main-source-ready-health.json",
+      "sha256": "89e7078a271fce1dddb51b8e539a0cd1d95271dfee0e007634f0c2126e79a0b5",
+      "scope": "Actual post-main245 host backend and canonical engine health; all six endpoints returned HTTP200. Not the separate unconfigured-engine production container."
+    },
+    "native_builder": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/combined-native-tools-20261015-01/receipt.json",
+      "sha256": "368e6e26fee40152b10a5b189e3d9b3173c1762dc8114844334ffde4e6a01ebf"
+    },
+    "source_validation": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/changed-source-validation.json",
+      "sha256": "90ecbf83ff90e84dedc4aa7d20a8a0eccd8e606a5dd2d1ffccdb607c186f35cc"
+    },
+    "lint_delta": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/lint-delta.json",
+      "sha256": "0bc4c4e2508c275306887770ff48bd359700d767578716d2eed8f6dec9627256"
+    },
+    "actual_native_builder": {
+      "project_id": "91b7c47f-e0b8-519e-b00b-50434c2edaef",
+      "project_version": 3,
+      "artifact_id": "039fbb62-e33c-5b84-bdf5-b98f58d66af5",
+      "artifact_bytes": 32768,
+      "artifact_sha256": "7fe00d91fe474502536ea3f128571032c6d95e68fb10ec883e41271e9f3f17d5",
+      "steps": 64,
+      "actual_downloads_verified": true,
+      "model_planned": false
+    },
+    "parallel_training": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-combined/receipt.json",
+      "sha256": "4dbc07ae449c0feab806a542f73e78609fdfd74625df1b3bccf7924621f232d8"
+    },
+    "post_reload_policy_read": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-combined/post-reload-projection-receipt.json",
+      "sha256": "8eb02db79c80452052677fa26ae754aaddfdc59a27e403009f5c60dce6689734"
+    },
+    "paired_review": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/review/20261015T161219Z-747ee0d2/summary.json",
+      "sha256": "b6be3dce1219de09396f4af7d2ee09cce4ed62eeda050728642d47caf0aae0bc"
+    },
+    "browser": {
+      "local_path": "/workspace/scratch/jeeves-studio-operations-runtime/browser/qualification-summary.json",
+      "sha256": "9c13430d95c47d25c804abf0957edd9d64ea2495c352b449b1d063a9b0afaaec"
+    },
+    "training_observations": {
+      "actors_per_batch": 2,
+      "distinct_actor_pids": 10,
+      "all_observed_actors_exited": true,
+      "initial_committed_updates": 256,
+      "initial_heldout_return_delta": 0.04250649565293289,
+      "initial_gate": true,
+      "candidate_committed_updates": 64,
+      "candidate_inherited_updates": 256,
+      "candidate_heldout_return_delta": -0.021077885452638872,
+      "candidate_gate": false,
+      "default_policy_retained": true,
+      "rejected_candidate_exportable": true
+    },
+    "paired_review_observations": {
+      "status": "paired_observation",
+      "actual_steps_each": 32,
+      "observed_regressions": [
+        "task_return"
+      ],
+      "quality_improvement_verified": false,
+      "export_digest_matches": null
+    },
+    "frontend_artifact": {
+      "archive": "/workspace/scratch/jeeves-app-oct15-studio-main245-final.zip",
+      "archive_bytes": 10120281,
+      "archive_sha256": "f19fa2fc305fb458442cdd01aad46d5f782b2f1b3a35fb7d7e9a1ed4cf062791",
+      "all_javascript_identical_to_browser_qualified_bundle": true,
+      "only_html_delta": "Nondeterministic decorative particle styles on welcome.html; normalized page identical",
+      "requalification_path": "/workspace/scratch/jeeves-app-oct15-studio-main245-final-requalification.json",
+      "frontend_source_files": 822,
+      "frontend_source_manifest_sha256": "226e52399b90309f728c327cc0a7bab03036a8e3045392394353741073342dc8",
+      "source_drift": false,
+      "actual_ui_native_steps": 16,
+      "final_javascript_errors": 0,
+      "automated_tests_run": false,
+      "browser_scope": "Retained actual browser observation; all68 exported JavaScript files and the five relevant route HTML files remain byte-identical in the new export. No new browser run claimed."
+    },
+    "runtime_code_commit": "d8b6b1a194f996f40ec47cd77f01235794f6159e",
+    "production_image_build_snapshot": "d8b6b1a194f996f40ec47cd77f01235794f6159e",
+    "native_learning_and_play": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-native-v2/receipt.json",
+      "sha256": "ca1c1a6ba2c61ec85620a2e825001390dc0b62b6ba17c5f8662c11fd0bfe046d"
+    },
+    "production_image": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main245-backend-proof/actual-production-backend-upgrade-qualification.json",
+      "sha256": "5e25bf8df5d74501551b400debf5006d7e54c1215b2212d4ae1bac9347f1bc7b"
+    },
+    "quiescence": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main245-studio-quiescence.json",
+      "sha256": "24b644b38bf1257ff55287d88aedc33334fa37bf849a6f701220420ddcebd24d"
+    },
+    "native_observations": {
+      "artifact_sha256": "7fe00d91fe474502536ea3f128571032c6d95e68fb10ec883e41271e9f3f17d5",
+      "actual_actors": 2,
+      "committed_episodes": 2,
+      "committed_updates": 32,
+      "policy_id": "c4b75d12-78be-5304-835f-4e7872869dff",
+      "actual_play_steps": 16,
+      "play_status": "stopped",
+      "all_observed_actor_processes_exited": true,
+      "finite_actions": 31,
+      "trusted_authored_kernel_ram": true,
+      "commercial_rom_semantics_inferred": false,
+      "paired_heldout_seeds": 1,
+      "general_quality_certified": false
+    },
+    "production_observations": {
+      "image_id": "sha256:e7f8fc703f173ede96a7a4d6ac5234c9e105680db3479f1ed46a1aaf464a7c75",
+      "image_bytes": 1110229896,
+      "uid": 10001,
+      "all_materialized_files": 45218,
+      "all_source_bytes_match_build_snapshot": true,
+      "source_overlays_present": false,
+      "auth_and_private_store_upgrade_restart_verified": true,
+      "runtime_containers_retired": true,
+      "volumes_models_and_image_retained": true,
+      "engine_configured_in_container": false,
+      "full_stack_or_native_execution_in_container_proven": false,
+      "snapshot_scope": "Exact historicald8b image only. Later incoming main454 adds training/CLI/Windows source and minimal Docker packaging fixes, qualified separately at source level; no current full-tree image or executed-new-training claim.",
+      "metadata_changes_before_main454": [
+        "docs/architecture/enterprise-volume-notes/DP-161-200.md",
+        "machine/enterprise_volume_notes/DP-161-200.json",
+        "machine/ai_studio_enablement_session_evidence_2026-10-15.json"
+      ],
+      "latest_full_tree_image_available": false
+    },
+    "previous_production_snapshot_97c3": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/final-native-actions-backend-proof/actual-production-backend-upgrade-qualification.json",
+      "sha256": "ef034537625cb7b4d45297e75f7f08665f71134ffb79190541a692e65c7980a8"
+    },
+    "previous_frontend_artifact": {
+      "archive": "/workspace/scratch/jeeves-app-oct15-studio-operations-qualified-final.zip",
+      "archive_bytes": 10120286,
+      "archive_sha256": "dff74cd15f53c415fb84fa86c4360c4a23d0e1fc80287ffb2785744c94ad6d0d",
+      "frontend_source_files": 822,
+      "frontend_source_manifest_sha256": "60965fe54d02bd6c5548f4884eb067c09a9f33c8ce22464a1371d8ac55ff38e7",
+      "source_drift": false,
+      "actual_ui_native_steps": 16,
+      "final_javascript_errors": 0,
+      "automated_tests_run": false
+    },
+    "app_api_union": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main245-backend-proof/app-merge-api-union.json",
+      "sha256": "33c20a14446bea1847116b7d5483b6ef711e5bec307e5ecfcf748d9ffd30e363"
+    },
+    "canonical_game_source_continuity": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main245-backend-proof/canonical-game-source-continuity.json",
+      "sha256": "9b80e1c23665a9d940164721174ddc06a454efa15313da92985ae8be4c1376f8",
+      "scope": "All96 canonical skeleton/jeeves/game_*.py sources unchanged from97c3 throughd8b. Earlier measured native learning/play results retain their exact original code scope."
+    },
+    "post_main_chat_and_replay": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/post-main245-canonical-chat/receipt.json",
+      "sha256": "59aeae950914f3a981ca8ffc5f08f90c82e6919ff84d9b48928dcb2990305922",
+      "scope": "Actual canonical model chat and same-operation replay on merged runtime; no new full-builder completion claim."
+    },
+    "post_main_policy_retention": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/post-main245/post-main245-read-receipt.json",
+      "sha256": "8ee4e79524f26c02492815726993ebabedc64c9e1a84270987e9ea49123354b5",
+      "scope": "GET-only native/coded policy, export, default, campaign and actor-exit observation; not a new training run."
+    },
+    "previous_repository_source_snapshot": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/qualified-repository-sources.json",
+      "sha256": "2d591a46d1f5828075904b1aab91188540038a722725140f06b10a3c2b6a0c5a",
+      "scope": "Historical source snapshot from the earlier qualification phase; latest source identities are bound by the d8b production-image and changed-source receipts."
+    },
+    "latest_repository_code_commit": "156b87ee186916f70d99bf0168d4f7118eec6732"
+  },
+  "limitations": [
+    "Configured catalogue targets are not proof of universal emulation, full per-console editors or arbitrary ROM understanding.",
+    "Native execution requires an approved compatible core, content, firmware where applicable, toolchain and mandatory sandbox.",
+    "Q-learning returns and deterministic review findings do not establish subjective game quality or outperformance.",
+    "The observed rejected candidate did not improve held-out returns; no automatic production promotion is authorized.",
+    "The first model planning operation failed before inference and remains retained as failed evidence.",
+    "Scratch receipts and large model/toolchain/frontend assets are local operational evidence, not bundled repository deliverables."
+  ],
+  "integrated_main_commit": "454ca20790f44fc9a1f51bbea164443c2cd8d56d",
+  "integration_merge_commit": "7c67b34249f6cf06c3926a325b8a93100232b3e2",
+  "upstream_preservation": {
+    "both_parent_api_union_missing_methods": 0,
+    "both_parent_api_union_missing_parameters": 0,
+    "disc_save_ram_controller_precision_timing_retained": true,
+    "n_step_least_visited_and_native_memory_observation_retained": true,
+    "canonical_only_modules_retained": 14,
+    "historical_host_worker_copies_preserved": true,
+    "source_pinned_exact_comparison_mirrors_refreshed": 5,
+    "incoming_tests_authored_or_run_by_this_work": false,
+    "initial_phase_main": "389ea48a78c6e420e0ad7b01df8d7844b315cfa3",
+    "initial_phase_scope": "Original phase preserved fourteen canonical-only modules and historical compatibility copies. Main245 supplied those missing copies; exact compatibility parity is now preserved while canonical authority remains unchanged.",
+    "compatibility_host_worker_current_exact_canonical_copies": true,
+    "native_owner_count": 52,
+    "latest_app_api_union": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main245-backend-proof/app-merge-api-union.json",
+      "sha256": "33c20a14446bea1847116b7d5483b6ef711e5bec307e5ecfcf748d9ffd30e363"
+    }
+  },
+  "model_planner_observations": {
+    "canonical_inference_completed": true,
+    "first_compact_context": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/combined-model-goal-20261015-01/receipt.json",
+      "sha256": "8fbf927d5378260b85660494854d09f9bc2cf7fb358e812d24e39d3b5e8da2d6"
+    },
+    "strict_done_schema": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/strict-model-goal-20261015-final-01/receipt.json",
+      "sha256": "f99d4f7d1fb685a53c603d53a6a4f2093872efb100a62467fe42de17eaa3ccc4"
+    },
+    "first_output": "Premature completion blocked against four unverified host checks; no fabricated work",
+    "strict_output": "Real console.edit decision with empty payload blocked by owner before mutation; no fabricated edit",
+    "next_correction": "No source correction pending in this session. Operation-specific forms are implemented; reliable autonomous planning and source-export completion remain model-quality limitations.",
+    "ai_built_complete_game_verified": false,
+    "operation_specific_schema": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/typed-schema-compilation-final-bounded.json",
+      "sha256": "68afade609fa06577c7843644dd7132c66823af0b213dddc9e84df9307e197d9"
+    },
+    "bounded_typed_run": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/typed-payload-model-goal-20261015-final-01/receipt.json",
+      "sha256": "350d75ed67f1014395e9262fd5866fdceafd3defab5d105df1b1657f3156de67"
+    },
+    "canonical_model_calls": 3,
+    "actual_owner_accepted_actions": [
+      "console.edit",
+      "build"
+    ],
+    "edit_verified": true,
+    "binary_build_verified": true,
+    "preview_verified": false,
+    "export_verified": false,
+    "remaining_model_limitation": "Third decision supplied an invalid preview action; owner blocked it without fabricating playback. A complete autonomous workflow is unverified.",
+    "transport_recovery": {
+      "initial_http_status": 504,
+      "steps_per_resumed_advance": 1,
+      "terminal_retries": 0
+    },
+    "three_call_status": "blocked",
+    "latest_full_checklist_run": {
+      "receipt": {
+        "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/full-checklist-model-goal-20261015-final-01/receipt.json",
+        "sha256": "dad159d66e272026e84318d974913c8cbbc21625169b1f1b63a0c5c915784ae1"
+      },
+      "status": "blocked",
+      "model_calls": 8,
+      "committed_steps": 8,
+      "host_checks": {
+        "build": true,
+        "edit": true,
+        "export": false,
+        "preview": true
+      },
+      "full_checklist_verified": false,
+      "actual_native_preview_steps": 64,
+      "binary_export_executed": true,
+      "source_export_verified": false,
+      "limitation": "The small qualification model repeated binary export and omitted source export until its exact8-call budget stopped it. No completed workflow or game-quality claim.",
+      "transport_timeouts": 0,
+      "terminal_retries": 0
+    }
+  },
+  "runtime_code_commit": "156b87ee186916f70d99bf0168d4f7118eec6732",
+  "native_training_discovery": {
+    "failed_attempt": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-native/failure-receipt.json",
+      "sha256": "b6b8706869938b637de3fc26a675996f67123809ad84e27282260002a98ef60e"
+    },
+    "actual_committed_checkpoint_updates": 32,
+    "policy_issued": false,
+    "cause": "controller_input was listed as a finite policy action but requires a separate actual controller vector; held-out random selection correctly failed on the undispatchable marker",
+    "fix": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/integration/native-policy-actions-fix.json",
+      "sha256": "746b44e105e22f30af30ec965a039c687482e5564672ec3b9551f0c6ec37132e"
+    },
+    "fixed_finite_policy_actions": 31,
+    "rich_controller_apis_preserved": true,
+    "fresh_qualification_status": "completed_fresh_job_policy_and_live_play_under_corrected_runtime",
+    "fresh_qualification": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-native-v2/receipt.json",
+      "sha256": "ca1c1a6ba2c61ec85620a2e825001390dc0b62b6ba17c5f8662c11fd0bfe046d"
+    }
+  },
+  "automated_tests_authored": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "required_source_gates": {
+    "architecture_map": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-architecture.log",
+      "sha256": "cd93298aa9c93da31eca2b2a3a9a0f98a18715100f809fd76b88eb76c12a0599",
+      "status": "pass"
+    },
+    "app_construction": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-app.log",
+      "sha256": "d53bdafe028f6863c4441a54a74a7484f7b40b26541a6c4bc7bda581038658d6",
+      "status": "pass"
+    },
+    "capability_interfaces": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-capabilities.log",
+      "sha256": "e7079909f1187da2c36cad3e85658e5475a4f296d723733155baa4c3d9bd74f5",
+      "status": "pass"
+    },
+    "state_topology": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-state.log",
+      "sha256": "b70ba568b5946ec1cbbfd573c9eeb50d84d62d3a74424a5bc3fa3e717f2f2dd8",
+      "status": "pass"
+    },
+    "enterprise_superiority": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-enterprise.json",
+      "sha256": "4485054712b6bf575e2b057168e052ac7d090d66f3f15e62d3d759872dae67f6",
+      "status": "pass"
+    },
+    "enterprise_notes": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-enterprise-notes.json",
+      "sha256": "4f705a30843b1f6db6c69bd5d18911f4a478bd678e474b5619552ba00237b9fc",
+      "status": "pass"
+    },
+    "ai_file_tree": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-file-tree.log",
+      "sha256": "9e45935096fc8c0c6cfbe3171c839183be4967944e57a93e9c89a61c521ed43d",
+      "status": "pass"
+    },
+    "provider_bootstrap": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/provider-bootstrap-combined.log",
+      "sha256": "31b5b83189cbf6222a2b4796eac5f39f62da6446788ef03c58b3c43892b1b20a",
+      "scope_note": "Whole-tree provider gate passed before late main245/454. Latest131 changed Python sources passed ownership/AST/compilation and no-new-lint validation; existing bundled materialization validator separately passed both updated Docker contexts. No later full-tree provider rerun or new provider owner claimed."
+    },
+    "ai_file_tree_ownership": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-ownership.log",
+      "sha256": "7227426719f7268da9578a9726b1fb21d35df0dbd1197c88ca2c40d3937f32f5",
+      "status": "pass"
+    }
+  },
+  "final_static_observations": {
+    "changed_python_sources_checked": 131,
+    "introduced_lint_diagnostics": 0,
+    "governed_mappings": 179,
+    "all_tool_schemas_compiled": 41,
+    "general_schema_engine_serialization_bytes": 60355,
+    "existing_schema_byte_cap": 65536,
+    "frontend_sources_qualified": 822,
+    "test_suites_added_or_run": false,
+    "approved_native_owners": 52
+  },
+  "all_requested_features_complete": false,
+  "outstanding_scope": [
+    "Universal console/hardware coverage and complete per-console native editors are not established by the catalogue.",
+    "Arbitrary commercial ROM semantic understanding and game mastery remain unverified.",
+    "The small model did not complete the full autonomous export checklist, although real edit/build/preview/binary-export actions executed.",
+    "100,000-iteration quality improvement, AAA fidelity and guaranteed outperformance are unverified."
+  ],
+  "late_main_integration": {
+    "incoming_main": "2458395ca074ef7ee3e153020967ffce8efd42a7",
+    "status": "completed_with_declared_scope_and_limits",
+    "reason": "Main advanced during publication with Windows first-install/runtime recovery and governed compatibility parity repairs. Preserve both parents before final handoff.",
+    "canonical_native_host_worker_learner_parallel_changed": false,
+    "existing_native_training_and_play_fingerprints_retained": true,
+    "compatibility_host_worker_now_exact_current_canonical_copies": true,
+    "native_api_union_receipt": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/integration/native-mirror-union-2458395.json",
+      "sha256": "3a67c6c3c1a94e7e79ea19c8c562c3d1df36044ac2914f05e52366b0a0a7967d"
+    },
+    "new_frontend_artifact": {
+      "archive": "/workspace/scratch/jeeves-app-oct15-studio-main245-final.zip",
+      "archive_bytes": 10120281,
+      "archive_sha256": "f19fa2fc305fb458442cdd01aad46d5f782b2f1b3a35fb7d7e9a1ed4cf062791",
+      "source_files": 822,
+      "source_manifest_sha256": "226e52399b90309f728c327cc0a7bab03036a8e3045392394353741073342dc8",
+      "all_javascript_identical_to_browser_qualified_bundle": true,
+      "only_html_delta": "Nondeterministic decorative particle styles on welcome.html; normalized page identical",
+      "requalification_path": "/workspace/scratch/jeeves-app-oct15-studio-main245-final-requalification.json"
+    },
+    "prior_image_qualification": "97c3 remains the historical exact captured snapshot. Final merged production snapshotd8b passed clean source, auth, private-store upgrade and restart qualification; container engine remains explicitly unconfigured.",
+    "test_suites_run": false,
+    "integration_merge_commit": "d8b6b1a194f996f40ec47cd77f01235794f6159e",
+    "final_production_image": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main245-backend-proof/actual-production-backend-upgrade-qualification.json",
+      "sha256": "5e25bf8df5d74501551b400debf5006d7e54c1215b2212d4ae1bac9347f1bc7b"
+    },
+    "canonical_game_source_continuity": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main245-backend-proof/canonical-game-source-continuity.json",
+      "sha256": "9b80e1c23665a9d940164721174ddc06a454efa15313da92985ae8be4c1376f8",
+      "scope": "All96 canonical skeleton/jeeves/game_*.py sources unchanged from97c3 throughd8b. Earlier measured native learning/play results retain their exact original code scope."
+    },
+    "canonical_chat_and_replay": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/post-main245-canonical-chat/receipt.json",
+      "sha256": "59aeae950914f3a981ca8ffc5f08f90c82e6919ff84d9b48928dcb2990305922",
+      "scope": "Actual canonical model chat and same-operation replay on merged runtime; no new full-builder completion claim."
+    },
+    "get_only_policy_retention": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/post-main245/post-main245-read-receipt.json",
+      "sha256": "8ee4e79524f26c02492815726993ebabedc64c9e1a84270987e9ea49123354b5",
+      "scope": "GET-only native/coded policy, export, default, campaign and actor-exit observation; not a new training run."
+    },
+    "derived_notes_status_alignment": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/late-main-notes-status-alignment.json",
+      "sha256": "5234a40b39585ba4388a43ff283049c05a2013ee696879c5b0bd521f811f9643",
+      "scope": "Ten derived legacy statuses lowered from verified to implemented to agree with incoming main; no maturity promotion."
+    },
+    "windows_scope": "Preserved incoming Windows installation/recovery and strict local URL APIs through union review and static validation; no native Windows execution claimed."
+  },
+  "final_installation_diagnostics": {
+    "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/late-main-cli-doctor.json",
+    "sha256": "f29cee88fef04cd76ec5768da4feee32a7e3205373935e45e670cf8023658394",
+    "scope": "Read-only CLI doctor returned valid diagnostic JSON and exit1 for an unconfigured checkout. Configured host operations and the deliberately engine-unconfigured production container are recorded separately; no first-install all-ready claim."
+  },
+  "final_main454_integration": {
+    "incoming_main": "454ca20790f44fc9a1f51bbea164443c2cd8d56d",
+    "merge_commit": "7c67b34249f6cf06c3926a325b8a93100232b3e2",
+    "final_repository_code_commit": "156b87ee186916f70d99bf0168d4f7118eec6732",
+    "status": "source_union_and_packaging_static_qualification_completed",
+    "source_continuity": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-service-source-continuity.json",
+      "sha256": "1963cd46f0d847e738ca85a5c38d677046020d012c391123cac86a41c107d965"
+    },
+    "training_catalogue_contract": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-training-modules.json",
+      "sha256": "82825103e7a069b1329c5cf8a141a42ccd4ffaab73a1a614017b7200b149e046",
+      "scope": "576 validated curriculum contracts across three domains. No training execution, learned competency or mastery claim."
+    },
+    "cli_dispatch": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-cli-dispatch.json",
+      "sha256": "4cb06e3f9e6eadfec2ee8d75fe55a75894864e61ede33e9e7520723c24a64f20"
+    },
+    "packaging_static": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main245-backend-proof/incoming454-packaging-static-check.json",
+      "sha256": "5f047af7ea72926f9f7153dff8eb8b3622817e6c19aa01f3984edd4f7340c27b",
+      "scope": "Existing Docker materializer validated both contexts and14 required bootstrap/training paths;92 Windows required payload paths exist. Captured before the separately recorded visible-shortcut fix."
+    },
+    "visible_windows_tools": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/post-main454-visible-launcher.json",
+      "sha256": "fa49f5b51ba2addfa30e53de4eb60f51658ecfeb64369d34c36d8f156d850015",
+      "scope": "Start Menu arguments now select existing visible GUI actions; canonical headless arguments retained. Source/argument validation only, no native Windows/frozen EXE execution."
+    },
+    "app_context_updates": [
+      "Dockerfile.dockerignore",
+      "backend/Dockerfile.dockerignore",
+      "backend/Dockerfile",
+      "machine/ai_app_construction.json",
+      "scripts/check_provider_bootstrap.py"
+    ],
+    "native_game_and_backend_service_source_unchanged_from_qualified_d8b": true,
+    "new_training_modules_executed": false,
+    "new_production_image_built": false,
+    "qualification_scope": "Actual source-bound host model/crawl/build/native/learn receipts retain their original snapshots. All backend runtime, frontend, canonical native game and provider sources remain identical through final merge. Incoming CLI/training/Windows and packaging changes passed static qualification only. The historical exactd8b image is not a current full-tree image.",
+    "test_suites_authored_or_run": false
+  }
+}

@@ -15,9 +15,6 @@ runtimes plug into CallableLocalModel without changing cognitive orchestration.
 from __future__ import annotations
 
 import asyncio
-from collections import Counter, OrderedDict
-from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
 import hashlib
 import json
 import math
@@ -25,12 +22,20 @@ import random
 import re
 import threading
 import time
-from typing import Any, Callable, Mapping, Protocol, Sequence
+from collections import Counter, OrderedDict
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
+from typing import Any, Protocol
 
-from skeleton.provider_runtime import ProviderAdapter, ProviderRequest, ProviderResponse
-from skeleton.skills.tool_contract import ToolContractError, validate_json_value
+from skeleton.provider_runtime import (
+    ProviderAdapter,
+    ProviderPolicyError,
+    ProviderRequest,
+    ProviderResponse,
+)
 from skeleton.providers.contract import FinishReason, ProviderToolCall, ProviderUsage
-
+from skeleton.skills.tool_contract import ToolContractError, validate_json_value
 
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
@@ -123,8 +128,7 @@ class LocalInferenceRequest:
             tuple(dict.fromkeys(item for item in self.stop if isinstance(item, str) and item)),
         )
         if len(self.stop) > 16 or any(
-            len(marker) > 256 or any(0xD800 <= ord(char) <= 0xDFFF for char in marker)
-            for marker in self.stop
+            len(marker) > 256 or any(0xD800 <= ord(char) <= 0xDFFF for char in marker) for marker in self.stop
         ):
             raise ValueError("stop supports at most 16 valid Unicode markers of 256 characters")
         object.__setattr__(self, "tools", tuple(dict(item) for item in self.tools))
@@ -136,7 +140,9 @@ class LocalInferenceRequest:
             if len(encoded.encode("utf-8")) > 512 * 1024:
                 raise ValueError("structured_output_schema exceeds size limit")
             object.__setattr__(self, "structured_output_schema", schema)
-        if self.context_digest is not None and (len(self.context_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.context_digest)):
+        if self.context_digest is not None and (
+            len(self.context_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.context_digest)
+        ):
             raise ValueError("context_digest must be lowercase sha256")
 
     @property
@@ -191,16 +197,13 @@ class LocalInferenceResult:
         ):
             raise ValueError("execution_receipt_digest must be lowercase sha256")
 
-        if (
-            len(self.model_digest) != 64
-            or any(ch not in "0123456789abcdef" for ch in self.model_digest)
-        ):
+        if len(self.model_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.model_digest):
             raise ValueError("model_digest must be lowercase sha256")
         if (
-            isinstance(self.input_tokens,bool)
-            or isinstance(self.output_tokens,bool)
-            or not isinstance(self.input_tokens,int)
-            or not isinstance(self.output_tokens,int)
+            isinstance(self.input_tokens, bool)
+            or isinstance(self.output_tokens, bool)
+            or not isinstance(self.input_tokens, int)
+            or not isinstance(self.output_tokens, int)
             or self.input_tokens < 0
             or self.output_tokens < 0
         ):
@@ -216,25 +219,26 @@ class LocalInferenceResult:
         supplied_calls = tuple(self.tool_calls)
         if any(not isinstance(call, LocalToolCall) for call in supplied_calls):
             raise TypeError("tool_calls must contain LocalToolCall values")
-        calls=tuple(replace(call) for call in supplied_calls)
-        call_ids=[call.call_id for call in calls]
-        if len(call_ids)!=len(set(call_ids)):
+        calls = tuple(replace(call) for call in supplied_calls)
+        call_ids = [call.call_id for call in calls]
+        if len(call_ids) != len(set(call_ids)):
             raise ValueError("local tool call ids must be unique")
-        if self.finish_reason=="tool_calls" and not calls:
+        if self.finish_reason == "tool_calls" and not calls:
             raise ValueError("tool_calls finish reason requires tool calls")
-        if calls and self.finish_reason!="tool_calls":
+        if calls and self.finish_reason != "tool_calls":
             raise ValueError("tool calls require tool_calls finish reason")
         if self.text is None and not calls and self.structured_output is None:
             raise ValueError("local inference result must contain output")
-        object.__setattr__(self,"tool_calls",calls)
+        object.__setattr__(self, "tool_calls", calls)
         if self.structured_output is not None:
-            object.__setattr__(self, "structured_output",
-                               json.loads(_stable_json(dict(self.structured_output))))
+            object.__setattr__(
+                self, "structured_output", json.loads(_stable_json(dict(self.structured_output)))
+            )
         if self.latency_ms is not None:
-            latency=float(self.latency_ms)
-            if not math.isfinite(latency) or latency<0:
+            latency = float(self.latency_ms)
+            if not math.isfinite(latency) or latency < 0:
                 raise ValueError("latency_ms must be finite and non-negative")
-            object.__setattr__(self,"latency_ms",latency)
+            object.__setattr__(self, "latency_ms", latency)
 
 
 class LocalModelBackend(Protocol):
@@ -290,7 +294,7 @@ class ReferenceNGramModel:
         *,
         order: int = 2,
         model_id: str = "skeleton-reference-ngram-v1",
-    ) -> "ReferenceNGramModel":
+    ) -> ReferenceNGramModel:
         if not corpus:
             raise ValueError("training corpus must be non-empty")
         tables: dict[tuple[str, ...], Counter[str]] = {}
@@ -301,7 +305,7 @@ class ReferenceNGramModel:
             tokens = list(_tokenize(document)) + [_EOS]
             prefix: list[str] = []
             for token in tokens:
-                for width in range(0, min(order, len(prefix)) + 1):
+                for width in range(min(order, len(prefix)) + 1):
                     context = tuple(prefix[-width:]) if width else ()
                     tables.setdefault(context, Counter())[token] += 1
                 prefix.append(token)
@@ -341,7 +345,7 @@ class ReferenceNGramModel:
         return payload
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> "ReferenceNGramModel":
+    def from_dict(cls, payload: Mapping[str, Any]) -> ReferenceNGramModel:
         if not isinstance(payload, Mapping):
             raise TypeError("local model payload must be a mapping")
         allowed_top_level = {
@@ -355,71 +359,54 @@ class ReferenceNGramModel:
         unknown_top_level = set(payload) - allowed_top_level
         if unknown_top_level:
             raise ValueError(
-                "unsupported local model artifact key(s): "
-                + ", ".join(sorted(map(str, unknown_top_level)))
+                "unsupported local model artifact key(s): " + ", ".join(sorted(map(str, unknown_top_level)))
             )
         if payload.get("schema_version") != 1:
             raise ValueError("unsupported local model schema_version")
         if payload.get("kind") != "reference_ngram":
             raise ValueError("unsupported local model kind")
 
-        order=payload.get("order")
-        if isinstance(order,bool) or not isinstance(order,int) or not 1 <= order <= 8:
+        order = payload.get("order")
+        if isinstance(order, bool) or not isinstance(order, int) or not 1 <= order <= 8:
             raise ValueError("order must be an integer in [1, 8]")
-        model_id=payload.get("model_id")
-        if not isinstance(model_id,str) or not model_id.strip():
+        model_id = payload.get("model_id")
+        if not isinstance(model_id, str) or not model_id.strip():
             raise ValueError("model_id must be non-empty text")
 
-        rows=payload.get("transitions")
-        if not isinstance(rows,list) or not rows:
+        rows = payload.get("transitions")
+        if not isinstance(rows, list) or not rows:
             raise ValueError("transitions must be a non-empty list")
         transitions: dict[tuple[str, ...], dict[str, int]] = {}
-        for index,row in enumerate(rows):
+        for index, row in enumerate(rows):
             if not isinstance(row, Mapping):
-                raise ValueError(f"transition row {index} must be an object")
+                raise ValueError(  # noqa: TRY004 -- artifact validation compatibility
+                    f"transition row {index} must be an object"
+                )
             unknown_row_keys = set(row) - {"context", "counts"}
             if unknown_row_keys:
                 raise ValueError(
                     f"transition row {index} contains unsupported key(s): "
                     + ", ".join(sorted(map(str, unknown_row_keys)))
                 )
-            context_raw=row.get("context")
-            counts_raw=row.get("counts")
-            if not isinstance(context_raw,list) or any(
-                not isinstance(token,str) for token in context_raw
-            ):
-                raise ValueError(
-                    f"transition row {index} context must contain only strings"
-                )
-            context=tuple(context_raw)
-            if len(context)>order:
-                raise ValueError(
-                    f"transition row {index} context exceeds model order"
-                )
+            context_raw = row.get("context")
+            counts_raw = row.get("counts")
+            if not isinstance(context_raw, list) or any(not isinstance(token, str) for token in context_raw):
+                raise ValueError(f"transition row {index} context must contain only strings")
+            context = tuple(context_raw)
+            if len(context) > order:
+                raise ValueError(f"transition row {index} context exceeds model order")
             if context in transitions:
-                raise ValueError(
-                    f"duplicate transition context at row {index}"
-                )
-            if not isinstance(counts_raw,Mapping) or not counts_raw:
-                raise ValueError(
-                    f"transition row {index} counts must be a non-empty object"
-                )
-            counts:dict[str,int]={}
-            for token,value in counts_raw.items():
-                if not isinstance(token,str) or not token:
-                    raise ValueError(
-                        f"transition row {index} token ids must be non-empty strings"
-                    )
-                if (
-                    isinstance(value,bool)
-                    or not isinstance(value,int)
-                    or value <= 0
-                ):
-                    raise ValueError(
-                        f"transition row {index} counts must be positive integers"
-                    )
-                counts[token]=value
-            transitions[context]=counts
+                raise ValueError(f"duplicate transition context at row {index}")
+            if not isinstance(counts_raw, Mapping) or not counts_raw:
+                raise ValueError(f"transition row {index} counts must be a non-empty object")
+            counts: dict[str, int] = {}
+            for token, value in counts_raw.items():
+                if not isinstance(token, str) or not token:
+                    raise ValueError(f"transition row {index} token ids must be non-empty strings")
+                if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                    raise ValueError(f"transition row {index} counts must be positive integers")
+                counts[token] = value
+            transitions[context] = counts
 
         model = cls(
             order=order,
@@ -429,8 +416,8 @@ class ReferenceNGramModel:
         claimed = payload.get("model_digest")
         if claimed is not None:
             if (
-                not isinstance(claimed,str)
-                or len(claimed)!=64
+                not isinstance(claimed, str)
+                or len(claimed) != 64
                 or any(ch not in "0123456789abcdef" for ch in claimed)
             ):
                 raise ValueError("model_digest must be lowercase sha256")
@@ -487,13 +474,16 @@ class ReferenceNGramModel:
         text = _detokenize(output)
         if not text:
             text = "I do not have enough learned local context to answer."
-        response_id = "local:" + _digest(
-            {
-                "model": self.model_digest,
-                "request": request.digest,
-                "text": text,
-            }
-        )[:32]
+        response_id = (
+            "local:"
+            + _digest(
+                {
+                    "model": self.model_digest,
+                    "request": request.digest,
+                    "text": text,
+                }
+            )[:32]
+        )
         return LocalInferenceResult(
             text=text,
             model_id=self.model_id,
@@ -543,15 +533,21 @@ class CallableLocalModel:
 
 class LocalInferenceEngine:
     def __init__(
-        self, model: LocalModelBackend, *, cache_size: int = 128,
-        max_concurrency: int = 1, max_batch_size: int = 256,
+        self,
+        model: LocalModelBackend,
+        *,
+        cache_size: int = 128,
+        max_concurrency: int = 1,
+        max_batch_size: int = 256,
     ) -> None:
         if not hasattr(model, "infer") or not hasattr(model, "model_digest"):
             raise TypeError("model must implement LocalModelBackend")
         if isinstance(cache_size, bool) or not isinstance(cache_size, int) or cache_size < 0:
             raise ValueError("cache_size must be a non-negative integer")
-        for name, value, upper in (("max_concurrency", max_concurrency, 32),
-                                   ("max_batch_size", max_batch_size, 4096)):
+        for name, value, upper in (
+            ("max_concurrency", max_concurrency, 32),
+            ("max_batch_size", max_batch_size, 4096),
+        ):
             if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= upper:
                 raise ValueError(f"{name} must be between 1 and {upper}")
         self.model = model
@@ -563,7 +559,9 @@ class LocalInferenceEngine:
         self._cache_lock = asyncio.Lock()
 
     def _infer_admitted(
-        self, request: LocalInferenceRequest, cancel: threading.Event,
+        self,
+        request: LocalInferenceRequest,
+        cancel: threading.Event,
     ) -> LocalInferenceResult:
         # A thread semaphore is shared across event loops. Desktop callers
         # can create a new asyncio loop per turn without weakening capacity.
@@ -592,13 +590,12 @@ class LocalInferenceEngine:
                     await asyncio.shield(worker)
                 except asyncio.CancelledError:
                     continue
-                except Exception:
+                except Exception:  # noqa: BLE001 -- wait for any backend failure to quiesce
                     break
-            if worker.done():
-                try:
-                    worker.result()
-                except (asyncio.CancelledError, Exception):
-                    pass
+            if worker.done() and not worker.cancelled():
+                # Retrieve a failed backend outcome without replacing the
+                # caller's cancellation after actual worker quiescence.
+                worker.exception()
             raise
 
     def _key(self, request: LocalInferenceRequest) -> str:
@@ -618,8 +615,11 @@ class LocalInferenceEngine:
         }
         profile = getattr(self.model, "execution_profile_digest", None)
         if profile is not None:
-            if (not isinstance(profile, str) or len(profile) != 64
-                    or any(ch not in "0123456789abcdef" for ch in profile)):
+            if (
+                not isinstance(profile, str)
+                or len(profile) != 64
+                or any(ch not in "0123456789abcdef" for ch in profile)
+            ):
                 raise ValueError("execution profile digest must be lowercase sha256")
             identity["execution_profile"] = profile
         return _digest(identity)
@@ -652,23 +652,19 @@ class LocalInferenceEngine:
         if self._key(request) != key:
             raise ValueError("local runtime identity changed during inference")
 
-        declared_tools={
-            str(item.get("tool_id","")).strip(): item
+        declared_tools = {
+            str(item.get("tool_id", "")).strip(): item
             for item in request.tools
-            if str(item.get("tool_id","")).strip()
+            if str(item.get("tool_id", "")).strip()
         }
         for call in result.tool_calls:
-            declared=declared_tools.get(call.tool_id)
+            declared = declared_tools.get(call.tool_id)
             if declared is None:
-                raise ValueError(
-                    f"local inference requested undeclared tool_id {call.tool_id!r}"
-                )
-            schema=declared.get("input_schema")
+                raise ValueError(f"local inference requested undeclared tool_id {call.tool_id!r}")
+            schema = declared.get("input_schema")
             if schema is not None:
-                if not isinstance(schema,Mapping):
-                    raise ValueError(
-                        f"declared tool {call.tool_id!r} input_schema must be an object"
-                    )
+                if not isinstance(schema, Mapping):
+                    raise ValueError(f"declared tool {call.tool_id!r} input_schema must be an object")
                 try:
                     validate_json_value(
                         schema,
@@ -680,10 +676,7 @@ class LocalInferenceEngine:
                         f"local tool arguments violate schema for {call.tool_id!r}: {exc}"
                     ) from exc
 
-        if (
-            result.structured_output is not None
-            and request.structured_output_schema is not None
-        ):
+        if result.structured_output is not None and request.structured_output_schema is not None:
             try:
                 validate_json_value(
                     request.structured_output_schema,
@@ -691,9 +684,7 @@ class LocalInferenceEngine:
                     path="structured_output",
                 )
             except ToolContractError as exc:
-                raise ValueError(
-                    f"local structured output violates request schema: {exc}"
-                ) from exc
+                raise ValueError(f"local structured output violates request schema: {exc}") from exc
 
         if self.cache_size and result.finish_reason not in {"cancelled", "deadline"}:
             async with self._cache_lock:
@@ -759,14 +750,14 @@ class LocalInferenceScheduler:
         batch_window_ms: float = 2.0,
     ) -> None:
         if (
-            isinstance(max_batch_size,bool)
-            or not isinstance(max_batch_size,int)
+            isinstance(max_batch_size, bool)
+            or not isinstance(max_batch_size, int)
             or not 1 <= max_batch_size <= 256
         ):
             raise ValueError("max_batch_size must be in [1, 256]")
         if (
-            isinstance(batch_window_ms,bool)
-            or not isinstance(batch_window_ms,(int,float))
+            isinstance(batch_window_ms, bool)
+            or not isinstance(batch_window_ms, (int, float))
             or not math.isfinite(float(batch_window_ms))
             or not 0 <= batch_window_ms <= 1000
         ):
@@ -774,9 +765,7 @@ class LocalInferenceScheduler:
         self.engine = engine
         self.max_batch_size = max_batch_size
         self.batch_window = batch_window_ms / 1000.0
-        self._queue: asyncio.Queue[_BatchItem | None] = asyncio.Queue(
-            maxsize=max_batch_size * 32
-        )
+        self._queue: asyncio.Queue[_BatchItem | None] = asyncio.Queue(maxsize=max_batch_size * 32)
         self._worker: asyncio.Task[None] | None = None
         self._admission_lock = asyncio.Lock()
         self._close_task: asyncio.Task[None] | None = None
@@ -816,7 +805,7 @@ class LocalInferenceScheduler:
         except asyncio.CancelledError:
             item.future.cancel()
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- forward arbitrary model failures to their owning future
             if not item.future.done():
                 item.future.set_exception(exc)
         else:
@@ -829,7 +818,7 @@ class LocalInferenceScheduler:
             if first is None:
                 return
             batch = [first]
-            close_after_batch=False
+            close_after_batch = False
             deadline = asyncio.get_running_loop().time() + self.batch_window
             while len(batch) < self.max_batch_size:
                 remaining = deadline - asyncio.get_running_loop().time()
@@ -837,10 +826,10 @@ class LocalInferenceScheduler:
                     break
                 try:
                     item = await asyncio.wait_for(self._queue.get(), remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     break
                 if item is None:
-                    close_after_batch=True
+                    close_after_batch = True
                     break
                 batch.append(item)
 
@@ -850,9 +839,7 @@ class LocalInferenceScheduler:
                     item.task = asyncio.create_task(self._execute_item(item))
                 # Each caller owns its result and cancellation. A malformed
                 # request must not fail unrelated requests sharing a batch.
-                await asyncio.gather(
-                    *(item.task for item in active), return_exceptions=True
-                )
+                await asyncio.gather(*(item.task for item in active), return_exceptions=True)
             if close_after_batch:
                 return
 
@@ -900,9 +887,7 @@ class LocalModelAdapter(ProviderAdapter):
         self.engine = engine
         self.model = engine.model.model_id
         self.default_seed = default_seed
-        self._artifact_status = (
-            None if artifact_status is None else dict(artifact_status)
-        )
+        self._artifact_status = None if artifact_status is None else dict(artifact_status)
 
     @property
     def available(self) -> bool:
@@ -919,18 +904,16 @@ class LocalModelAdapter(ProviderAdapter):
         status["model_digest"] = self.engine.model.model_digest
         status["runtime_digest"] = self.runtime_digest
         status["execution_profile_digest"] = getattr(
-            self.engine.model, "execution_profile_digest", None,
+            self.engine.model,
+            "execution_profile_digest",
+            None,
         )
         status["capacity"] = {
             "max_concurrency": self.engine.max_concurrency,
             "max_batch_size": self.engine.max_batch_size,
             "cache_entries": self.engine.cache_size,
         }
-        status["artifact"] = (
-            None
-            if self._artifact_status is None
-            else dict(self._artifact_status)
-        )
+        status["artifact"] = None if self._artifact_status is None else dict(self._artifact_status)
         return status
 
     @property
@@ -949,7 +932,16 @@ class LocalModelAdapter(ProviderAdapter):
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
         if not isinstance(request, ProviderRequest):
             raise TypeError("request must be ProviderRequest")
-        max_tokens = request.max_output_tokens or 256
+        if getattr(request, "temperature", None) is not None:
+            raise ProviderPolicyError("local model does not support request temperature")
+        budget = request.resource_budget
+        max_tokens = (
+            min(256, budget.max_output_tokens)
+            if request.max_output_tokens is None
+            else request.max_output_tokens
+        )
+        if type(max_tokens) is not int or max_tokens < 1 or max_tokens > budget.max_output_tokens:
+            raise ProviderPolicyError("local output token budget exceeded")
         seed_material = "|".join(
             item or ""
             for item in (
@@ -968,12 +960,19 @@ class LocalModelAdapter(ProviderAdapter):
             seed=self.default_seed ^ derived_seed,
             tools=tuple(item.as_dict() for item in request.tools),
             structured_output_schema=(
-                None
-                if request.structured_output_schema is None
-                else dict(request.structured_output_schema)
+                None if request.structured_output_schema is None else dict(request.structured_output_schema)
             ),
             context_digest=request.context_digest,
         )
+        if isinstance(self.engine.model, ReferenceNGramModel):
+            input_tokens = len(_tokenize(local_request.rendered_input))
+        else:
+            render = getattr(self.engine.model, "_render_prompt", None)
+            full_prompt = render(local_request) if callable(render) else local_request.rendered_input
+            input_tokens = len(full_prompt.encode("utf-8")) + 1
+        if input_tokens > budget.max_input_tokens:
+            raise ProviderPolicyError("local input token budget exceeded")
+        remaining = float(budget.max_wall_seconds)
         if request.deadline is not None:
             if (
                 not isinstance(request.deadline, datetime)
@@ -981,19 +980,16 @@ class LocalModelAdapter(ProviderAdapter):
                 or request.deadline.utcoffset() is None
             ):
                 raise ValueError("local inference deadline must be timezone-aware")
-            remaining = (
-                request.deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)
-            ).total_seconds()
-            if remaining <= 0:
-                raise LocalInferenceCancelled("local inference deadline exceeded")
-            try:
-                result = await asyncio.wait_for(
-                    self.engine.generate(local_request), timeout=remaining
-                )
-            except asyncio.TimeoutError as exc:
-                raise LocalInferenceCancelled("local inference deadline exceeded") from exc
-        else:
-            result = await self.engine.generate(local_request)
+            remaining = min(
+                remaining,
+                (request.deadline.astimezone(UTC) - datetime.now(UTC)).total_seconds(),
+            )
+        if not math.isfinite(remaining) or remaining <= 0:
+            raise LocalInferenceCancelled("local inference deadline exceeded")
+        try:
+            result = await asyncio.wait_for(self.engine.generate(local_request), timeout=remaining)
+        except TimeoutError as exc:
+            raise LocalInferenceCancelled("local inference deadline exceeded") from exc
         tool_calls = tuple(
             ProviderToolCall(
                 call_id=item.call_id,
@@ -1011,9 +1007,7 @@ class LocalModelAdapter(ProviderAdapter):
             response_id=result.response_id,
             execution_receipt_digest=result.execution_receipt_digest,
             structured_output=(
-                dict(result.structured_output)
-                if result.structured_output is not None
-                else None
+                dict(result.structured_output) if result.structured_output is not None else None
             ),
             tool_calls=tool_calls,
             finish_reason=_FINISH_MAP[result.finish_reason],

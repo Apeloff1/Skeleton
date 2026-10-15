@@ -1,5 +1,5 @@
 /**
- * src/utils/tunnelHeartbeat.ts — polls /api/health/tunnel and surfaces
+ * src/utils/tunnelHeartbeat.ts — probes /api/health and surfaces
  * a coarse status ("ok" | "degraded" | "down") via a tiny pub/sub.
  *
  * Intentionally low-frequency (15s) so it doesn't tax preview tunnels.
@@ -22,27 +22,34 @@ let _status: TunnelStatus = 'unknown';
 let _last: any = null;
 let _timer: ReturnType<typeof setTimeout> | null = null;
 let _started = false;
+let _inFlight = false;
 let _fails = 0;                   // consecutive heartbeat failures
 const _listeners = new Set<Listener>();
 
 function _emit() { _listeners.forEach(fn => { try { fn(_status, _last); } catch {} }); }
 
 async function _poll() {
+  if (_inFlight) return;
+  _inFlight = true;
   let failed = false;
   try {
-    const r = await api.get<{ status: TunnelStatus; gap_since_last_request_s?: number; flap_count_total?: number }>(
-      '/api/health/tunnel', { timeoutMs: 6_000, retries: 1 },
+    const r = await api.get<{ status?: string }>(
+      '/api/health', { timeoutMs: 6_000, retries: 1 },
     );
     if (r.ok && r.data) {
       _fails = 0;                                   // any success clears the streak
-      const next = (r.data.status || 'unknown') as TunnelStatus;
+      // Passive tunnel inactivity does not establish current reachability.
+      // Capability readiness remains owned by its separate service checks.
+      const applicationStatus = typeof r.data.status === 'string' ? r.data.status.slice(0, 64) : null;
+      const next: TunnelStatus = ['degraded', 'limited'].includes(applicationStatus || '') ? 'degraded' : 'ok';
+      const observed = { probe: '/api/health', http_status: r.status, application_status: applicationStatus, observed_at: new Date().toISOString() };
       if (next !== _status) {
-        trail.add('tunnel', `status:${_status} → ${next}`, r.data as any, next === 'ok' ? 'info' : 'warn');
+        trail.add('tunnel', `status:${_status} → ${next}`, observed, next === 'ok' ? 'info' : 'warn');
         _status = next;
-        _last = r.data;
+        _last = observed;
         _emit();
       } else {
-        _last = r.data;
+        _last = observed;
       }
     } else {
       failed = true;
@@ -60,6 +67,7 @@ async function _poll() {
       _emit();
     }
   }
+  _inFlight = false;
   _schedule(failed && _status !== 'down');
 }
 

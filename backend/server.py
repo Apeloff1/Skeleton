@@ -2270,7 +2270,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"CodeDock Quantum Nexus v{SYSTEM_VERSION} ({SYSTEM_CODENAME}) Starting...")
     logger.info("=" * 80)
 
-    _skip_heavy = os.environ.get("SKIP_HEAVY_SEED", "false").strip().lower() in ("1", "true", "yes")
+    _skip_heavy = os.environ.get("SKIP_HEAVY_SEED", "true").strip().lower() not in ("0", "false", "no", "off")
     if _skip_heavy:
         logger.info("[deploy-prep] SKIP_HEAVY_SEED=true — heavy seeders will be skipped on this boot")
         print(f"[BOOT] {time.strftime('%H:%M:%S')} SKIP_HEAVY_SEED active — fast startup mode", flush=True)
@@ -2510,12 +2510,25 @@ async def lifespan(app: FastAPI):
                 ensure_canonical_memory_indexes(),
                 timeout=10,
             )
+            from core.chat_sessions import initialize_chat_runtime
+            await asyncio.wait_for(initialize_chat_runtime(), timeout=5)
             logger.info("MongoDB indexes created successfully")
         except asyncio.TimeoutError:
             logger.warning("MongoDB index creation timed out - indexes will be created on first use")
         except Exception as e:
             logger.warning(f"MongoDB index creation deferred: {e}")
     _kick(2, "mongo-indexes", _kick_index_creation)
+
+    # Empty schema initialization is explicitly enabled by the operator. It
+    # does not import knowledge, approve lessons, create keys, or start practice.
+    async def _kick_dragon_runtime():
+        try:
+            from core.dragon_runtime import initialize_dragon_runtime
+            await asyncio.wait_for(initialize_dragon_runtime(), timeout=10)
+        except Exception:
+            logger.warning("Dragon runtime storage unavailable; check configured persistent paths")
+    _kick(0, "dragon-runtime-storage", _kick_dragon_runtime)
+
 
     # ── Jeeves self-training: prefill game-specific logic at launch ──────────
     async def _kick_jeeves_training():
@@ -2526,14 +2539,15 @@ async def lifespan(app: FastAPI):
             logger.info(f"[jeeves] self-training at launch: {res}")
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[jeeves] self-training deferred: {e}")
-    _kick(3, "jeeves-self-training", _kick_jeeves_training)
+    if not _skip_heavy:
+        _kick(3, "jeeves-self-training", _kick_jeeves_training)
 
-    # ── Seed default admin user (idempotent) for Studio RBAC ─────────────────
+    # Auth indexes and optional explicitly configured operator bootstrap.
     async def _kick_seed_admin():
         try:
             from routes.gameforge_auth import seed_admin
             await asyncio.to_thread(seed_admin)
-            logger.info("[auth] default admin seeded")
+            logger.info("[auth] account indexes and optional operator bootstrap initialized")
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[auth] admin seed deferred: {e}")
     _kick(4, "seed-admin", _kick_seed_admin)
@@ -2667,8 +2681,9 @@ async def lifespan(app: FastAPI):
             logger.warning("Database seeding timed out — will retry on next restart")
         except Exception as e:
             logger.warning(f"Database seeding deferred: {e}")
-    _kick(5, "tutolage-seed", _kick_tutolage_seed)
-    logger.info("Tutolage seed kicked off in background")
+    if not _skip_heavy:
+        _kick(5, "tutolage-seed", _kick_tutolage_seed)
+        logger.info("Tutolage seed kicked off in background")
 
     # ═══ Bootstrap agent-facing collections + tutorial_progress (idempotent) ═══
     async def _kick_agent_bootstrap():
@@ -2707,14 +2722,16 @@ async def lifespan(app: FastAPI):
             logger.info(f"[android-toolchain] installer exit: {proc.returncode}")
         except Exception as e:
             logger.warning(f"[android-toolchain] install deferred: {e}")
-    _kick(10, "android-toolchain", _kick_android_toolchain)
+    if not _skip_heavy:
+        _kick(10, "android-toolchain", _kick_android_toolchain)
 
     # ═══ Deploy-prep gate: when SKIP_HEAVY_SEED=true is set in .env, skip the
     # heavy auto-regenerable seeders. This keeps the dev MongoDB small enough
     # that Emergent's platform MONGODB_MIGRATE step can finish within its
-    # time/size budget. Prod has this flag unset, so prod re-seeds from code
-    # on first boot. See /app/backend/scripts/deploy_prep.py.
-    _skip_heavy = os.environ.get("SKIP_HEAVY_SEED", "false").strip().lower() in ("1", "true", "yes")
+    # time/size budget. Minimal startup is the default in every environment;
+    # operators explicitly opt into bulk samples with SKIP_HEAVY_SEED=false.
+    # See /app/backend/scripts/deploy_prep.py.
+    _skip_heavy = os.environ.get("SKIP_HEAVY_SEED", "true").strip().lower() not in ("0", "false", "no", "off")
     if _skip_heavy:
         logger.info("[deploy-prep] SKIP_HEAVY_SEED=true — skipping heavy seeders (mega-db, unique_flair, narrative_vault, game_knowledge, game_code_library, swarm, auto-reseal)")
 
@@ -2969,8 +2986,9 @@ async def lifespan(app: FastAPI):
                     logger.warning(f"[academy-extras] study_paths seed failed: {_se}")
         except Exception as ex:
             logger.warning(f"[academy-extras] top-level failure: {ex}")
-    _kick(45, "academy-extras", _kick_academy_extras_seed)
-    logger.info("[academy-extras] reading_library/bugfix_library/study_paths seeders kicked off in background")
+    if not _skip_heavy:
+        _kick(45, "academy-extras", _kick_academy_extras_seed)
+        logger.info("[academy-extras] reading_library/bugfix_library/study_paths seeders kicked off in background")
 
     # ═══ Auto-import open-license book registry + background reading content prewarm ═══
     async def _kick_reading_content_warmup():

@@ -41,6 +41,7 @@ from .game_console_assets import (
 )
 from .game_console_graph import (
     GRAPH_PATH,
+    ConsoleGraphRuntime,
     ConsoleSceneGraph,
     SceneGraphError,
     empty_scene_graph,
@@ -1091,9 +1092,65 @@ class ConsoleProject:
             "toolchain_readiness": profile["toolchain_readiness"],
             "source_integration_required": binding_status["source_integration_required"],
             "native_binding": binding_status,
+            "native_graph_compatibility": self.native_graph_compatibility(),
             "native_execution_verified": False,
             "validation": self.validate().as_dict(),
         }
+
+    def native_graph_compatibility(self) -> dict:
+        graph = self.scene_graph.as_dict()
+        active = any(graph[key] for key in ("nodes", "animations", "variables", "rules"))
+        issues = _native_graph_issues(self)
+        metrics = {}
+        if not issues and self.target_id == "game_boy":
+            try:
+                plan = _starter_plan(self)
+                metrics = {
+                    "native_data_bytes": plan["graph_data_bytes"],
+                    "sprite_tile_count": len(plan["sprites"]) // 16,
+                    "timeline_frames": len(plan["native_frames"]),
+                    "quantization": plan["graph_quantization"],
+                }
+            except (ConsoleEditorError, ConsoleAssetError) as exc:
+                issues.append({"record_id": None, "code": exc.code, "message": str(exc)})
+        return {
+            "schema_version": "skeleton.console_editor_native_graph.v1",
+            "target_id": self.target_id,
+            "graph_digest": self.scene_graph.digest,
+            "status": "unsupported" if issues else "supported" if active else "empty",
+            "capabilities": (
+                [
+                    "parent_translation",
+                    "node_visibility",
+                    "sprite_atlas_frames",
+                    "fixed_tick_sprite_timeline",
+                    "moving_visible_goal_marker",
+                ]
+                if self.target_id == "game_boy"
+                else []
+            ),
+            "limits": {
+                "sprites": 40,
+                "timeline_frames": 128,
+                "native_tiles": 256,
+                "native_data_bytes": 28672,
+            },
+            "unsupported": issues,
+            **metrics,
+            "timing_scope": "One native gameplay loop per vblank; actual core FPS may differ from designer nominal60Hz",
+            "sprite_opacity_scope": "Native DMG sprite palette index0 is transparent; original pixel quantization does not assert identical software RGBA composition",
+            "measurement_scope": "Compiled original sprite rendering and goal-marker subset; unsupported entity gameplay remains deferred; actual compilation/play require independent receipts",
+        }
+
+    def native_observation_layout(self) -> dict:
+        binding = _native_binding_status(self)
+        if not binding["bound"]:
+            raise ConsoleEditorError(
+                "editor_native_observation_unbound",
+                "Native observation requires the exact current trusted kernel and authored data",
+                409,
+            )
+        return dict(binding["observation_layout"])
 
     def native_asset_files(self) -> dict[str, bytes]:
         assets, _ = _native_projection(self.as_dict(), console_profile(self.target_id).as_dict())
@@ -1997,7 +2054,7 @@ def _starter_plan(project: ConsoleProject) -> dict:
         palette = bytearray(
             [sum(value << (2 * index) for index, value in enumerate(encode_palette(first, "dmg_gray")))]
         )
-    return {
+    plan = {
         "target": target,
         "document_digest": project.digest,
         "player": player,
@@ -2022,6 +2079,202 @@ def _starter_plan(project: ConsoleProject) -> dict:
         + (["scrolling"] if target == "nes" else ["larger_than_32x32_map_streaming"]),
         "projection_digest": _digest(projection),
     }
+    return _compile_dmg_graph(project, plan)
+
+
+def _native_graph_issues(project: ConsoleProject) -> list[dict]:
+    graph = project.scene_graph.as_dict()
+    if not any(graph[key] for key in ("nodes", "animations", "variables", "rules")):
+        return []
+    issues = []
+    if project.target_id != "game_boy":
+        return [
+            {
+                "record_id": None,
+                "code": "native_graph_target",
+                "message": "Graph compilation currently targets the fixed DMG kernel only",
+            }
+        ]
+    for group in ("variables", "rules"):
+        for row in graph[group]:
+            issues.append(
+                {
+                    "record_id": row["id"],
+                    "code": "native_graph_" + group,
+                    "message": "This typed " + group + " record needs an explicit native gameplay port",
+                }
+            )
+    animations = graph["animations"]
+    loops = {row["loop"] for row in animations}
+    periods = {row["duration_ticks"] for row in animations}
+    if len(loops) > 1 or loops == {True} and len(periods) > 1:
+        issues.append(
+            {
+                "record_id": None,
+                "code": "native_graph_clock",
+                "message": "Native timelines require one common loop period or only clamped nonloop timelines",
+            }
+        )
+    limit = 128 if loops == {True} else 127
+    for row in animations:
+        if row["duration_ticks"] > limit:
+            issues.append(
+                {
+                    "record_id": row["id"],
+                    "code": "native_graph_timeline_limit",
+                    "message": "Native phase clock exceeds its128frame table capacity",
+                }
+            )
+    for node in graph["nodes"]:
+        for frame in node["frames"]:
+            if frame["width"] != 8 or frame["height"] != 8:
+                issues.append(
+                    {
+                        "record_id": node["id"],
+                        "code": "native_graph_frame_size",
+                        "message": "Native DMG atlas frames must be exactly8x8 pixels",
+                    }
+                )
+    return issues
+
+
+def _compile_dmg_graph(project: ConsoleProject, plan: dict) -> dict:
+    issues = _native_graph_issues(project)
+    if issues:
+        raise ConsoleEditorError("editor_native_graph_unsupported", issues[0]["message"])
+    if plan["target"] != "game_boy":
+        return plan
+    graph = project.scene_graph.as_dict()
+    runtime = ConsoleGraphRuntime(project.scene_graph)
+    animations = graph["animations"]
+    loop = bool(animations and animations[0]["loop"])
+    horizon = max((row["duration_ticks"] for row in animations), default=0)
+    phases = horizon if loop else horizon + 1
+    sprite_tiles = list(decode_tiles(plan["sprites"], "gb_2bpp"))
+    slots = {tuple(tile): index for index, tile in enumerate(sprite_tiles)}
+    assets = {row["id"]: row for row in project.as_dict()["assets"]}
+    palette = project.as_dict()["palettes"][0]["colors"]
+    images, frame_slots, quantization = {}, {}, []
+    frames = []
+    for tick in range(phases):
+        data = bytearray()
+        for actor in plan["actors"]:
+            pose = runtime.pose(actor["id"], tick)
+            x, y = actor["x"] + pose["x"], actor["y"] + pose["y"]
+            if x != int(x) or y != int(y) or not 0 <= x <= plan["max_x"] or not 0 <= y <= plan["max_y"]:
+                raise ConsoleEditorError(
+                    "editor_native_graph_position",
+                    "Every native timeline pose must be integral and inside the authored world",
+                )
+            slot = actor["tile"]
+            frame = pose["frame"]
+            if frame:
+                key = tuple(frame[name] for name in ("asset_id", "x", "y", "width", "height"))
+                if key not in frame_slots:
+                    name = frame["asset_id"]
+                    if name not in images:
+                        asset = assets[name]
+                        raw = base64.b64decode(asset["data_base64"], validate=True)
+                        if asset["codec"] == "png":
+                            images[name] = decode_png(raw)
+                        elif asset["codec"] == "rgba8888":
+                            images[name] = asset["metadata"]["width"], asset["metadata"]["height"], raw
+                        else:
+                            image = decode_tim(raw)
+                            images[name] = image.width, image.height, image.rgba_bytes()
+                    width, _height, rgba = images[name]
+                    crop = b"".join(
+                        rgba[
+                            ((frame["y"] + row) * width + frame["x"])
+                            * 4 : ((frame["y"] + row) * width + frame["x"] + 8)
+                            * 4
+                        ]
+                        for row in range(8)
+                    )
+                    tiles, receipt = image_to_tiles(crop, 8, 8, palette, "gb_2bpp")
+                    tile = tuple(tiles[0])
+                    if tile not in slots:
+                        slots[tile] = len(sprite_tiles)
+                        sprite_tiles.append(tile)
+                    frame_slots[key] = slots[tile]
+                    quantization.append(
+                        {"asset_id": name, "source_rect": [frame["x"], frame["y"], 8, 8], **receipt}
+                    )
+                slot = frame_slots[key]
+            tile_id = plan["sprite_offset"] + slot
+            if tile_id > 255:
+                raise ConsoleEditorError(
+                    "editor_native_graph_tiles",
+                    "Background plus original animated sprite frames exceed256DMG tiles",
+                )
+            data.extend((int(y), int(x), tile_id, int(pose["visible"])))
+        frames.append(bytes(data))
+    sprites = encode_tiles(sprite_tiles, "gb_2bpp")
+    data_bytes = (
+        len(plan["patterns"])
+        + len(sprites)
+        + len(plan["nametable"])
+        + len(plan["collisions"])
+        + sum(map(len, frames))
+        + len(frames) * 2
+    )
+    if data_bytes > 28672:
+        raise ConsoleEditorError(
+            "editor_native_graph_rom",
+            "Original graph tables exceed the28KiB data budget reserved inside32KiB ROM",
+        )
+    return {
+        **plan,
+        "sprites": sprites,
+        "native_frames": tuple(frames),
+        "graph_loop": loop,
+        "graph_data_bytes": data_bytes,
+        "graph_quantization": quantization,
+        "native_graph_digest": project.scene_graph.digest,
+    }
+
+
+def _native_observation_layout(project, kernel_sha256, assets_sha256):
+    target = project.target_id
+    fields = {
+        "player_x": {"offset": 0, "encoding": "u8", "minimum": 0, "maximum": 255},
+        "player_y": {"offset": 1, "encoding": "u8", "minimum": 0, "maximum": 255},
+        "won": {"offset": 5, "encoding": "u8", "minimum": 0, "maximum": 1},
+        "health": {"offset": 6, "encoding": "u8", "minimum": 0, "maximum": 255},
+    }
+    if target == "game_boy":
+        fields.update(
+            {
+                "camera_x": {"offset": 8, "encoding": "u8", "minimum": 0, "maximum": 96},
+                "camera_y": {"offset": 9, "encoding": "u8", "minimum": 0, "maximum": 112},
+                "tick": {"offset": 12, "encoding": "u16le", "minimum": 0, "maximum": 65535},
+                "graph_phase": {"offset": 14, "encoding": "u8", "minimum": 0, "maximum": 127},
+                "goal_x": {"offset": 15, "encoding": "u8", "minimum": 0, "maximum": 248},
+                "goal_y": {"offset": 16, "encoding": "u8", "minimum": 0, "maximum": 248},
+                "goal_visible": {"offset": 17, "encoding": "u8", "minimum": 0, "maximum": 1},
+            }
+        )
+        offset, size = 18, 24
+    else:
+        fields["tick"] = {"offset": 13, "encoding": "u16le", "minimum": 0, "maximum": 65535}
+        offset, size = 15, 19
+    payload = {
+        "schema_version": "skeleton.console_editor_native_observation.v1",
+        "target_id": target,
+        "core_ids": ["gambatte" if target == "game_boy" else "fceumm"],
+        "memory_region": 2,
+        "read_offset": 0,
+        "read_size": size,
+        "fields": fields,
+        "boot_signature": {"offset": offset, "hex": "4a454556"},
+        "boot_grace_runs": 64,
+        "kernel_sha256": kernel_sha256,
+        "assets_sha256": assets_sha256,
+        "document_digest": project.digest,
+        "graph_digest": project.scene_graph.digest,
+        "measurement_scope": "Exact trusted authored kernel RAM, not inferred commercial ROM semantics",
+    }
+    return {**payload, "layout_digest": _digest(payload)}
 
 
 def _nes_starter_kernel() -> str:
@@ -2042,6 +2295,9 @@ Col: .res 1
 Row: .res 1
 Ptr: .res 2
 Temp: .res 1
+TickLo: .res 1
+TickHi: .res 1
+BootSignature: .res 4
 .segment "CODE"
 Reset:
  sei
@@ -2069,6 +2325,16 @@ Reset:
  sta $0200,x
  inx
  bne @staticSprites
+ lda #$4A
+ sta BootSignature
+ lda #$45
+ sta BootSignature+1
+ sta BootSignature+2
+ lda #$56
+ sta BootSignature+3
+ lda #0
+ sta TickLo
+ sta TickHi
  lda #INIT_X
  sta PlayerX
  lda #INIT_Y
@@ -2117,6 +2383,10 @@ Reset:
 Loop:
  bit $2002
  bpl Loop
+ inc TickLo
+ bne @tickDone
+ inc TickHi
+@tickDone:
  jsr PollPad
  lda Health
  beq @frozen
@@ -2431,6 +2701,17 @@ Start:
  ld [DamageTimer],a
  ld [CameraX],a
  ld [CameraY],a
+ ld [TickLo],a
+ ld [TickHi],a
+ ld [GraphPhase],a
+ ld hl,BootSignature
+ ld a,$4A
+ ld [hli],a
+ ld a,$45
+ ld [hli],a
+ ld [hli],a
+ ld a,$56
+ ld [hl],a
  ld a,BGP_VALUE
  ldh [rBGP],a
  ldh [rOBP0],a
@@ -2444,9 +2725,20 @@ Start:
  and a
  jr z,.frozen
  call Movement
- call CheckGoal
 .frozen:
+ ld hl,TickLo
+ inc [hl]
+ jr nz,.tickDone
+ inc hl
+ inc [hl]
+.tickDone:
+ call AdvanceGraph
  call BuildSprites
+ ld a,[Health]
+ and a
+ jr z,.noGoal
+ call CheckGoal
+.noGoal:
  call WaitFrame
  call UploadFrame
  jr .loop
@@ -2604,16 +2896,23 @@ GetCollision:
  ld a,[hl]
  ret
 CheckGoal:
+ ld a,[GoalVisible]
+ and a
+ jr z,.damage
+ ld a,[GoalX]
+ ld b,a
  ld a,[PlayerX]
- sub GOAL_X
+ sub b
  jr nc,.positiveX
  cpl
  inc a
 .positiveX:
  cp 8
  jr nc,.damage
+ ld a,[GoalY]
+ ld b,a
  ld a,[PlayerY]
- sub GOAL_Y
+ sub b
  jr nc,.positiveY
  cpl
  inc a
@@ -2677,8 +2976,17 @@ BuildSprites:
 .storeY:
  ld [CameraY],a
 .cameraDone:
+ ld a,[GraphPhase]
+ add a
+ ld c,a
+ ld b,0
+ ld hl,SpriteFramePointers
+ add hl,bc
+ ld a,[hli]
+ ld e,a
+ ld a,[hl]
+ ld d,a
  ld hl,ShadowOAM
- ld de,SpritePositions
  ld b,ACTOR_COUNT
 .actor:
  ld a,[de]
@@ -2687,6 +2995,22 @@ BuildSprites:
  ld a,[de]
  inc de
  ld [SpriteX],a
+ ld a,[de]
+ inc de
+ ld [SpriteTile],a
+ ld a,[de]
+ inc de
+ ld [SpriteVisible],a
+ ld a,l
+ cp GOAL_OAM
+ jr nz,.notGoal
+ ld a,[SpriteX]
+ ld [GoalX],a
+ ld a,[SpriteY]
+ ld [GoalY],a
+ ld a,[SpriteVisible]
+ ld [GoalVisible],a
+.notGoal:
  ld a,l
  cp PLAYER_OAM
  jr nz,.static
@@ -2695,6 +3019,9 @@ BuildSprites:
  ld a,[PlayerX]
  ld [SpriteX],a
 .static:
+ ld a,[SpriteVisible]
+ and a
+ jr z,.hidden
  ld a,[CameraY]
  ld c,a
  ld a,[SpriteY]
@@ -2720,14 +3047,27 @@ BuildSprites:
  ld [hli],a
  ld [hli],a
 .art:
- ld a,[de]
- inc de
+ ld a,[SpriteTile]
  ld [hli],a
- ld a,[de]
- inc de
+ xor a
  ld [hli],a
  dec b
  jr nz,.actor
+ ret
+AdvanceGraph:
+ ld a,[GraphPhase]
+ inc a
+ cp GRAPH_FRAMES
+ jr c,.store
+ ld a,GRAPH_LOOP
+ and a
+ jr z,.clamp
+ xor a
+ jr .store
+.clamp:
+ ld a,GRAPH_FRAMES-1
+.store:
+ ld [GraphPhase],a
  ret
 UploadFrame:
  ld a,[CameraX]
@@ -2754,7 +3094,7 @@ DmaRoutine:
 DmaRoutineEnd:
 
 INCLUDE "assets.inc"
-SECTION "Variables",WRAM0
+SECTION "Variables",WRAM0[$C000]
 PlayerX: ds 1
 PlayerY: ds 1
 NextX: ds 1
@@ -2767,7 +3107,16 @@ CameraX: ds 1
 CameraY: ds 1
 SpriteX: ds 1
 SpriteY: ds 1
-SECTION "Shadow OAM",WRAM0,ALIGN[8]
+TickLo: ds 1
+TickHi: ds 1
+GraphPhase: ds 1
+GoalX: ds 1
+GoalY: ds 1
+GoalVisible: ds 1
+BootSignature: ds 4
+SpriteTile: ds 1
+SpriteVisible: ds 1
+SECTION "Shadow OAM",WRAM0[$C100]
 ShadowOAM: ds 160
 """
 
@@ -2791,6 +3140,9 @@ def native_starter_source_files(project: ConsoleProject) -> dict[str, str]:
         "PLAYER_OAM": player_index * 4,
         "ACTOR_BYTES": len(plan["actors"]) * 4,
         "ACTOR_COUNT": len(plan["actors"]),
+        "GOAL_OAM": next(index for index, row in enumerate(plan["actors"]) if row["id"] == goal["id"]) * 4,
+        "GRAPH_FRAMES": len(plan.get("native_frames", (b"",))),
+        "GRAPH_LOOP": int(plan.get("graph_loop", False)),
         "MAX_CAMERA_X": plan["max_camera_x"],
         "MAX_CAMERA_Y": plan["max_camera_y"],
         "CAMERA_FOLLOW": int(plan["camera_follow"]),
@@ -2853,7 +3205,11 @@ SEGMENTS {
         lines.append("TilesEnd::")
         array("NameTable", plan["nametable"])
         array("Collision", plan["collisions"])
-        array("SpritePositions", positions)
+        lines.append("SpriteFramePointers::")
+        for index in range(len(plan["native_frames"])):
+            lines.append(f" dw SpriteFrame{index}")
+        for index, frame in enumerate(plan["native_frames"]):
+            array(f"SpriteFrame{index}", frame)
         result = {prefix + "src/main.asm": kernel, prefix + "assets.inc": "\n".join(lines) + "\n"}
     binding = {
         "schema_version": "skeleton.console_editor_native_binding.v1",
@@ -2869,7 +3225,12 @@ SEGMENTS {
             if target == "game_boy"
             else "bounded_native_tile_scene_movement_collision_goal"
         ),
-        "deferred_mechanics": plan["deferred"],
+        "deferred_mechanics": [item for item in plan["deferred"] if item != "scene_graph"]
+        + (
+            ["native_graph_variables_and_rules", "animated_entity_physics"]
+            if target == "game_boy"
+            else ["scene_graph"]
+        ),
         "movement_quantization": {
             "requested_pixels_per_nominal_second": project.as_dict()["config"]["speed"],
             "actual_pixels_per_frame": plan["speed"],
@@ -2878,6 +3239,10 @@ SEGMENTS {
         "binary_build_verified": False,
         "native_execution_verified": False,
     }
+    binding["graph_digest"] = project.scene_graph.digest
+    binding["observation_layout"] = _native_observation_layout(
+        project, binding["kernel_sha256"], binding["assets_sha256"]
+    )
     result["game/editor/native_binding.json"] = _json(binding).decode() + "\n"
     return _files(result)
 
@@ -2902,8 +3267,10 @@ def _native_binding_status(project: ConsoleProject) -> dict:
         "binary_build_verified",
         "native_execution_verified",
     }
+    additional = {"graph_digest", "observation_layout"}
     if (
-        set(binding) != required
+        not required <= set(binding)
+        or bool(set(binding) - required - additional)
         or binding["schema_version"] != "skeleton.console_editor_native_binding.v1"
         or binding["target_id"] != project.target_id
     ):
@@ -2917,11 +3284,12 @@ def _native_binding_status(project: ConsoleProject) -> dict:
             "message": str(exc),
             "source_integration_required": True,
         }
-    graph_active = any(
-        project.scene_graph.as_dict()[key] for key in ("nodes", "animations", "rules", "variables")
+    prefix = f"game/generated/native/{project.target_id}/"
+    extra_native_files = sorted(
+        name for name in project._files if name.startswith(prefix) and name not in expected
     )
     valid = (
-        not graph_active
+        not extra_native_files
         and binding["document_digest"] == project.digest
         and binding["profile_digest"] == project.as_dict()["profile_digest"]
         and all(project._files.get(name) == text for name, text in expected.items())
@@ -2930,10 +3298,11 @@ def _native_binding_status(project: ConsoleProject) -> dict:
         **binding,
         "bound": valid,
         "code": (
-            "scene_graph_requires_native_source_port"
-            if graph_active
+            "native_source_graph_extended"
+            if extra_native_files
             else "source_data_bound" if valid else "source_modified_or_stale"
         ),
+        "extra_native_files": extra_native_files,
         "source_integration_required": not valid,
         "binary_build_verified": False,
         "native_execution_verified": False,

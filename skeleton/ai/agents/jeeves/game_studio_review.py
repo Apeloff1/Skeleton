@@ -12,12 +12,18 @@ import json
 import math
 import time
 from collections.abc import Callable, Mapping, Sequence
+from itertools import pairwise
 from pathlib import Path
 from statistics import median
 from typing import Any
 
 from .game_console_assets import decode_png, png_rgba
-from .game_learning import GameLearningCancelled, GameLearningError, GamePolicyLearner
+from .game_learning import (
+    GameLearningCancelled,
+    GameLearningError,
+    GamePolicyLearner,
+    _copy_json,
+)
 from .game_learning_parallel import GameEnvironmentRequest
 from .game_studio_learning import StudioLearningCampaign
 
@@ -25,13 +31,11 @@ SCHEMA = "skeleton.game.studio_review.v1"
 MAX_FRAMES = 25
 MAX_STEPS = 512
 MAX_RESULT = 2 * 1024 * 1024
+MAX_COMPARISON = 65536
 
 
 def _copy(value: Any, limit: int = MAX_RESULT) -> Any:
-    data = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    if len(data) > limit:
-        raise GameLearningError("studio review evidence exceeds its byte budget")
-    return json.loads(data)
+    return _copy_json(value, limit=limit)
 
 
 def _digest(value: Any) -> str:
@@ -46,6 +50,266 @@ def _integer(value, name, low, high):
     return value
 
 
+def _observation_digest(review):
+    """Identify the actual run without creating a self-referential comparison."""
+    return _digest(
+        {
+            key: value
+            for key, value in review.items()
+            if key not in {"review_digest", "comparison", "triangle_review"}
+        }
+    )
+
+
+def _validated_review(review):
+    value = _copy(review)
+    if not isinstance(value, dict) or value.get("schema_version") != SCHEMA:
+        raise GameLearningError("paired review requires actual studio review evidence")
+    payload = {key: item for key, item in value.items() if key != "review_digest"}
+    if value.get("review_digest") != _digest(payload):
+        raise GameLearningError("paired review evidence digest differs")
+    return value
+
+
+def compare_executed_reviews(baseline, candidate):
+    """Compare two issued observations; application callers must verify authority.
+
+    A paired, bounded observation can expose a regression. It cannot establish
+    that a game, policy or renderer is generally better from a single episode.
+    """
+    baseline, candidate = _validated_review(baseline), _validated_review(candidate)
+    old, new = baseline.get("source_identity", {}), candidate.get("source_identity", {})
+    reasons = []
+    required = (
+        "project_id",
+        "project_version",
+        "input_epoch",
+        "tree_digest",
+        "environment_request_digest",
+        "environment",
+        "reviewer_implementation_digest",
+        "seed",
+        "review_protocol",
+    )
+    for key in required:
+        if key not in old or key not in new:
+            reasons.append("missing_" + key)
+        elif old[key] != new[key]:
+            reasons.append("different_" + key)
+    for review in (baseline, candidate):
+        execution = review.get("execution")
+        if not isinstance(execution, dict) or not isinstance(execution.get("trace"), list):
+            reasons.append("missing_executed_trace")
+            continue
+        trace = execution["trace"]
+        if execution.get("trace_digest") != _digest(trace) or execution.get("steps") != len(trace):
+            raise GameLearningError("paired review executed trace differs")
+    reasons = sorted(set(reasons))
+    measurements = []
+
+    def measure(name, before, after, direction, *, advisory=False):
+        if (
+            type(before) not in (int, float)
+            or type(after) not in (int, float)
+            or not math.isfinite(before)
+            or not math.isfinite(after)
+        ):
+            return
+        delta = after - before
+        status = "unchanged" if delta == 0 else "increased" if delta > 0 else "decreased"
+        regression = bool(
+            not reasons
+            and not advisory
+            and ((direction == "higher" and delta < 0) or (direction == "lower" and delta > 0))
+        )
+        measurements.append(
+            {
+                "metric": name,
+                "baseline": before,
+                "candidate": after,
+                "delta": delta,
+                "change": status,
+                "preferred_direction": direction,
+                "bounded_regression_observed": regression,
+                "advisory": advisory,
+                "classification": "paired_bounded_observation" if not reasons else "unpaired_observation",
+            }
+        )
+
+    before_execution, after_execution = (
+        baseline.get("execution", {}),
+        candidate.get("execution", {}),
+    )
+    measure(
+        "task_return",
+        before_execution.get("return"),
+        after_execution.get("return"),
+        "higher",
+    )
+    before_semantics, after_semantics = (
+        baseline.get("semantic_review", {}),
+        candidate.get("semantic_review", {}),
+    )
+    semantics_available = before_semantics.get("scope") == after_semantics.get(
+        "scope"
+    ) and before_semantics.get("scope") in {
+        "declared_reference_runtime",
+        "authored_simulation",
+        "approved_native_observation",
+    }
+    if semantics_available:
+        for name, key, direction in (
+            ("observed_goal", "observed_success_steps", "higher"),
+            ("observed_death", "observed_death_steps", "lower"),
+        ):
+            measure(
+                name,
+                int(bool(before_semantics.get(key))),
+                int(bool(after_semantics.get(key))),
+                direction,
+            )
+        controls = [item.get("control_response", {}) for item in (before_semantics, after_semantics)]
+        measure(
+            "physical_positions_available",
+            int(controls[0].get("physical_positions_available") is True),
+            int(controls[1].get("physical_positions_available") is True),
+            "higher",
+        )
+        measure(
+            "unchanged_directional_holds",
+            controls[0].get("unchanged_directional_holds"),
+            controls[1].get("unchanged_directional_holds"),
+            "inspect",
+            advisory=True,
+        )
+    for key in ("available_frames", "captured_frames", "unchanged_moving_frame_pairs"):
+        measure(
+            key,
+            baseline.get("metrics", {}).get(key),
+            candidate.get("metrics", {}).get(key),
+            "inspect",
+            advisory=True,
+        )
+    regressions = [item["metric"] for item in measurements if item["bounded_regression_observed"]]
+    result = {
+        "schema_version": "skeleton.game.studio_review_comparison.v1",
+        "status": "inconclusive" if reasons else "paired_observation",
+        "comparability_failures": reasons,
+        "baseline_review_digest": baseline["review_digest"],
+        "baseline_job_id": old.get("job_id"),
+        "baseline_observation_digest": _observation_digest(baseline),
+        "candidate_observation_digest": _observation_digest(candidate),
+        "comparison_kind": (
+            "frozen_policy_comparison"
+            if old.get("policy_digest") != new.get("policy_digest")
+            else "same_controller_repeat"
+        ),
+        "baseline_policy_digest": old.get("policy_digest"),
+        "candidate_policy_digest": new.get("policy_digest"),
+        "measurements": measurements,
+        "semantic_comparison_available": semantics_available,
+        "observed_regressions": regressions,
+        "next_action": (
+            "rerun_matched_protocol"
+            if reasons
+            else "inspect_regressions" if regressions else "expand_held_out_evidence"
+        ),
+        "quality_improvement_verified": False,
+        "automatic_acceptance": False,
+        "limitations": [
+            "One paired episode does not establish general quality, statistical significance or promotion.",
+            "Task reward has only the admitted environment meaning; it is not a subjective game quality score.",
+            "Frame counts and held controls require inspection; termination, collisions or intentional scenes can explain them.",
+            "Offline timings are excluded from regression gates because this observer does not isolate machine load.",
+        ],
+    }
+    result["comparison_digest"] = _digest(result)
+    return _copy(result, MAX_COMPARISON)
+
+
+def review_triangle(review):
+    """Build a durable, bounded work queue from actual specialist observations."""
+    identity = review.get("source_identity", {})
+    execution = review.get("execution", {})
+    semantics = review.get("semantic_review", {})
+    comparison = review.get("comparison")
+    severity_order = {"error": 0, "warning": 1, "info": 2}
+    findings = sorted(
+        review.get("findings", []),
+        key=lambda item: (
+            severity_order.get(item.get("severity"), 3),
+            item.get("finding_id", ""),
+        ),
+    )
+    priorities = []
+    for finding in findings[:16]:
+        proposals = [
+            item["proposal_digest"]
+            for item in review.get("remedial_actions", [])
+            if item.get("finding_id") == finding.get("finding_id")
+        ]
+        priorities.append(
+            {
+                "finding_id": finding["finding_id"],
+                "code": finding["code"],
+                "severity": finding["severity"],
+                "evidence_refs": finding["evidence_refs"],
+                "required_inspection": finding["candidate_constraint"]["requires"],
+                "remedial_proposal_digests": proposals,
+                "automatic_execution": False,
+            }
+        )
+    result = {
+        "schema_version": "skeleton.game.studio_review_triangle.v1",
+        "observation_digest": _observation_digest(review),
+        "source_identity": {
+            key: identity.get(key)
+            for key in (
+                "project_id",
+                "project_version",
+                "input_epoch",
+                "tree_digest",
+                "job_id",
+                "environment_request_digest",
+                "policy_digest",
+                "reviewer_implementation_digest",
+            )
+        },
+        "roles": {
+            "jeeves": {
+                "reviewer_kind": "actual_registered_runtime_execution",
+                "steps": execution.get("steps", 0),
+                "trace_digest": execution.get("trace_digest"),
+                "task_return": execution.get("return"),
+                "controller": identity.get("controller"),
+                "policy_digest": identity.get("policy_digest"),
+            },
+            "dragon": {
+                "reviewer_kind": "deterministic_source_and_raster_observer",
+                "semantic_scope": semantics.get("scope"),
+                "semantic_digest": semantics.get("semantic_digest"),
+                "available_frames": review.get("metrics", {}).get("available_frames", 0),
+                "finding_count": len(findings),
+                "model_critic_executed": False,
+            },
+            "adversarial": {
+                "reviewer_kind": "deterministic_paired_evidence_scrutiny",
+                "status": "baseline_required" if comparison is None else comparison["status"],
+                "comparison_digest": None if comparison is None else comparison["comparison_digest"],
+                "observed_regressions": [] if comparison is None else comparison["observed_regressions"],
+                "next_action": "run_matched_baseline" if comparison is None else comparison["next_action"],
+            },
+        },
+        "priority_findings": priorities,
+        "retained_by": "existing_immutable_scoped_review_job",
+        "automatic_mutation": False,
+        "learning_claim": "retrievable_observations_and_constraints_only",
+        "quality_certified": False,
+    }
+    result["triangle_digest"] = _digest(result)
+    return _copy(result, MAX_COMPARISON)
+
+
 def review_implementation_digest() -> str:
     here = Path(__file__).parent
     from skeleton.ai.webcrawler import dragon_temporal_segmentation
@@ -54,6 +318,11 @@ def review_implementation_digest() -> str:
         here / "game_studio_review.py",
         here / "game_studio_learning.py",
         here / "game_console_assets.py",
+        here / "game_console_editor.py",
+        here / "game_console_graph.py",
+        here / "game_console_simulation.py",
+        here / "game_successor.py",
+        here / "game_emulator_host.py",
         Path(dragon_temporal_segmentation.__file__),
     ]
     return _digest({path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in names})
@@ -102,7 +371,9 @@ def _decode(frame):
 
 
 def analyze_frame_sequence(
-    frames: Sequence[Mapping[str, Any]], *, source_identity: Mapping[str, Any] | None = None
+    frames: Sequence[Mapping[str, Any]],
+    *,
+    source_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Observe supplied actual frames; caller supplies their scoped provenance.
 
@@ -154,7 +425,14 @@ def analyze_frame_sequence(
         ref = "frame:" + str(step)
         observation = _copy(dict(row.get("observation") or {}), 8192)
         if decoded is None:
-            records.append({"evidence_ref": ref, "step": step, "available": False, "timings": timings})
+            records.append(
+                {
+                    "evidence_ref": ref,
+                    "step": step,
+                    "available": False,
+                    "timings": timings,
+                }
+            )
             continue
         measured, samples, thumbnail = decoded
         total_bytes += measured["png_bytes"]
@@ -203,7 +481,10 @@ def analyze_frame_sequence(
                     "luminance_range": visual["luminance_range"],
                     "palette_bins": visual["occupied_quantized_palette_bins"],
                 },
-                {"requires": "inspect scene visibility and palette", "automatic_mutation": False},
+                {
+                    "requires": "inspect scene visibility and palette",
+                    "automatic_mutation": False,
+                },
             )
         if visual["opaque_fraction"] < 0.02:
             finding(
@@ -212,7 +493,10 @@ def analyze_frame_sequence(
                 "Less than two percent of sampled pixels are visible.",
                 [ref],
                 {"opaque_fraction": visual["opaque_fraction"]},
-                {"requires": "verify intended background and visible layers", "automatic_mutation": False},
+                {
+                    "requires": "verify intended background and visible layers",
+                    "automatic_mutation": False,
+                },
             )
         if prior_size is not None and prior_size != size:
             finding(
@@ -221,7 +505,10 @@ def analyze_frame_sequence(
                 "The runtime changed preview dimensions within this sequence.",
                 [records[-1]["evidence_ref"], ref],
                 {"before": list(prior_size), "after": list(size)},
-                {"requires": "confirm viewport transition is intentional", "automatic_mutation": False},
+                {
+                    "requires": "confirm viewport transition is intentional",
+                    "automatic_mutation": False,
+                },
             )
         record = {
             "evidence_ref": ref,
@@ -254,7 +541,12 @@ def analyze_frame_sequence(
         vectors.append(
             (
                 step,
-                (luminance, visual["edge_density"], visual["dominant_color_fraction"], min(1, motion or 0)),
+                (
+                    luminance,
+                    visual["edge_density"],
+                    visual["dominant_color_fraction"],
+                    min(1, motion or 0),
+                ),
                 ref,
             )
         )
@@ -416,6 +708,35 @@ def review_project_sequence(
         if actions is not None and any(action not in allowed for action in actions):
             raise GameLearningError("review action is not registered for the actual environment")
         observation = environment.reset(seed)
+        descriptor = _copy(getattr(environment, "descriptor", {}), 262144)
+        native_binding = descriptor.get("native_observation")
+        geometry_snapshot = None
+        if request.kind == "console_editor":
+            geometry = environment.review_geometry(max_cells=32768)
+            geometry_snapshot = {
+                key: geometry[key]
+                for key in (
+                    "schema_version",
+                    "available",
+                    "reason",
+                    "project_digest",
+                    "manifest_digest",
+                    "source_manifest_digest",
+                    "graph_digest",
+                    "environment_digest",
+                    "state_digest",
+                    "tick",
+                    "world_size",
+                    "player_spawn_rect",
+                    "player_current_rect",
+                    "movement_mode",
+                    "dynamic_geometry",
+                    "geometry_digest",
+                    "scope",
+                )
+                if key in geometry
+            }
+        semantic_trace_bytes = 0
         rows, trace, operation_times = [], [], []
         steps = len(actions) if actions is not None else request.max_steps
         interval = max(capture_every, math.ceil(steps / (MAX_FRAMES - 1)))
@@ -461,6 +782,10 @@ def review_project_sequence(
             observation = outcome.observation
             total += outcome.reward
             terminal, truncated = outcome.terminated, outcome.truncated
+            info = _semantic_info(outcome.info)
+            semantic_trace_bytes += len(json.dumps(info, separators=(",", ":")).encode())
+            if semantic_trace_bytes > 524288:
+                raise GameLearningError("executed semantic evidence exceeds its byte budget")
             trace.append(
                 {
                     "step": index + 1,
@@ -470,6 +795,7 @@ def review_project_sequence(
                     "observation_digest": _digest(dict(observation)),
                     "terminated": terminal,
                     "truncated": truncated,
+                    "info": info,
                 }
             )
             if (index + 1) % interval == 0 or terminal or truncated or index + 1 == steps:
@@ -491,8 +817,31 @@ def review_project_sequence(
                 if actions is not None
                 else "frozen_q_policy" if policy else "registered_action_cycle"
             ),
+            "review_protocol": {
+                "schema_version": "skeleton.game.studio_review_protocol.v1",
+                "planned_steps": steps,
+                "capture_every": interval,
+                "controller": (
+                    "explicit_actions"
+                    if actions is not None
+                    else "frozen_q_policy" if policy else "registered_action_cycle"
+                ),
+                "actions_digest": None if actions is None else _digest(list(actions)),
+            },
         }
         result = analyze_frame_sequence(rows, source_identity=identity)
+        semantics = analyze_executed_semantics(
+            request,
+            trace,
+            source_identity=identity,
+            native_binding=native_binding,
+            geometry_snapshot=geometry_snapshot,
+            guard=guard,
+        )
+        result["semantic_review"] = semantics
+        result["remedial_actions"] = semantics["remedial_actions"]
+        result["findings"] = [*result["findings"], *semantics["findings"]][:128]
+        result["metrics"]["semantic_scope"] = semantics["scope"]
         guard()
         if review_implementation_digest() != implementation:
             raise GameLearningError("numeric reviewer implementation changed during analysis")
@@ -509,6 +858,9 @@ def review_project_sequence(
             "capture_frames": MAX_FRAMES,
             "decoded_frame_pixels": 1048576,
             "result_bytes": MAX_RESULT,
+            "semantic_trace_bytes": 524288,
+            "initial_geometry_cells": 32768,
+            "remedial_actions": 16,
             "deadline_seconds": 60,
         }
         result["execution"] = {
@@ -527,6 +879,7 @@ def review_project_sequence(
             },
             "elapsed_wall_ms": (time.monotonic() - started) * 1000,
         }
+        result["triangle_review"] = review_triangle(result)
         result.pop("review_digest")
         result["review_digest"] = _digest(result)
         return _copy(result)
@@ -535,3 +888,669 @@ def review_project_sequence(
             close = getattr(environment, "close", None)
             if callable(close):
                 close()
+
+
+def _semantic_info(info):
+    """Retain measured state/events without copying native raw-frame evidence."""
+    if not isinstance(info, Mapping):
+        raise GameLearningError("executed runtime semantic metadata must be a mapping")
+    keys = (
+        "runtime_kind",
+        "events",
+        "won",
+        "goal_reached",
+        "dead",
+        "player_x",
+        "player_y",
+        "vx",
+        "vy",
+        "contact_entity_ids",
+        "movement_observation",
+        "native_measurement",
+        "attempted_controls",
+        "collision_semantics_available",
+        "state_digest",
+        "rules_fired",
+    )
+    return _copy({key: info[key] for key in keys if key in info}, 16384)
+
+
+def _approved_native_binding(request, value):
+    if request.kind != "libretro" or value is None:
+        return None
+    from .game_emulator_host import validate_native_observation
+
+    approved = validate_native_observation(value, core_id=request.core_id, target_id=request.target_id)
+    if approved is None:
+        raise GameLearningError("native review descriptor did not yield approved observation authority")
+    return _copy(approved, 65536)
+
+
+def _native_values(binding, measured):
+    if not isinstance(measured, dict) or (
+        measured.get("layout_digest") != binding["layout"]["layout_digest"]
+        or measured.get("artifact_digest") != binding["artifact_digest"]
+        or measured.get("producer_job_id") != binding["producer_job_id"]
+        or not isinstance(measured.get("memory_digest"), str)
+        or len(measured["memory_digest"]) != 64
+        or any(char not in "0123456789abcdef" for char in measured["memory_digest"])
+    ):
+        raise GameLearningError("measured native values differ from their exact approved artifact/layout")
+    values = measured.get("values")
+    fields = binding["layout"]["fields"]
+    if not isinstance(values, dict) or set(values) != set(fields):
+        raise GameLearningError("native measured field coverage differs from the approved layout")
+    for name, field in fields.items():
+        if type(values[name]) is not int or not field["minimum"] <= values[name] <= field["maximum"]:
+            raise GameLearningError("native measured value is outside its declared integer encoding")
+    return values
+
+
+def _overlaps(a, b):
+    return a[0] < b[0] + b[2] and a[0] + a[2] > b[0] and a[1] < b[1] + b[3] and a[1] + a[3] > b[1]
+
+
+def _editor_layout(request, guard):
+    """Initial authored geometry; independent of task/combat/timeline success."""
+    from collections import deque
+
+    from .game_console_editor import ConsoleProject, file_manifest_digest
+    from .game_console_graph import ConsoleGraphRuntime
+
+    project = ConsoleProject.from_files(request.tree, target_id=request.target_id)
+    document = project.as_dict()
+    graph = project.scene_graph.as_dict()
+    poses = ConsoleGraphRuntime(project.scene_graph)
+    player = next(row for row in document["entities"] if row["kind"] == "player")
+    layers = document["layers"]
+    width = max(row["offset"][0] + row["width"] * 8 for row in layers)
+    height = max(row["offset"][1] + row["height"] * 8 for row in layers)
+    pw, ph = player["width"], player["height"]
+    dynamic = bool(graph["animations"]) or any(
+        effect["kind"] in {"set_node_visibility", "set_node_offset", "teleport", "win"}
+        for rule in graph["rules"]
+        for effect in rule["actions"]
+    )
+    one_way = any(cell["collision"] == "one_way" for layer in layers for cell in layer["cells"]) or any(
+        row["kind"] == "platform" and row["properties"]["one_way"] for row in document["entities"]
+    )
+    platforms, goals = [], []
+    for row in document["entities"]:
+        pose = poses.pose(row["id"], 0)
+        rect = [row["x"] + pose["x"], row["y"] + pose["y"], row["width"], row["height"]]
+        if not pose["visible"]:
+            continue
+        if row["kind"] == "platform" and not row["properties"]["one_way"]:
+            platforms.append((row["id"], rect))
+        if row["kind"] == "goal":
+            goals.append(
+                {
+                    "target_id": row["id"],
+                    "kind": "entity",
+                    "rect": rect,
+                    "source_ref": "source:game/editor/console.json#entities/" + row["id"],
+                }
+            )
+    for layer in layers:
+        for index, cell in enumerate(layer["cells"]):
+            if cell["collision"] == "goal" and len(goals) < 64:
+                x, y = index % layer["width"], index // layer["width"]
+                goals.append(
+                    {
+                        "target_id": layer["id"] + ":" + str(x) + ":" + str(y),
+                        "kind": "tile",
+                        "rect": [
+                            layer["offset"][0] + x * 8,
+                            layer["offset"][1] + y * 8,
+                            8,
+                            8,
+                        ],
+                        "source_ref": "source:game/editor/console.json#layers/"
+                        + layer["id"]
+                        + "/cells/"
+                        + str(index),
+                    }
+                )
+    facts = {
+        "available": True,
+        "classification": "initial_authored_geometry_not_full_game_solver",
+        "document_digest": project.digest,
+        "manifest_digest": file_manifest_digest(request.tree),
+        "normalized_manifest_digest": project.manifest_digest,
+        "graph_digest": project.scene_graph.digest,
+        "world_size": [width, height],
+        "player_id": player["id"],
+        "spawn_rect": [player["x"], player["y"], pw, ph],
+        "movement_mode": document["config"]["movement_mode"],
+        "dynamic_geometry": dynamic,
+        "one_way_geometry": one_way,
+        "targets": [],
+        "limitations": [
+            "Initial geometry only; combat, resource gates, portals, timeline changes and authored rules can change reachable outcomes."
+        ],
+    }
+
+    collision_queries = 0
+
+    def collision(x, y):
+        nonlocal collision_queries
+        collision_queries += 1
+        if collision_queries % 128 == 0:
+            guard()
+        body = [x, y, pw, ph]
+        refs = []
+        if x < 0 or y < 0 or x + pw > width or y + ph > height:
+            refs.append(
+                {
+                    "kind": "world_boundary",
+                    "source_ref": "source:game/editor/console.json#layers",
+                }
+            )
+        for identity, rect in platforms:
+            if _overlaps(body, rect):
+                refs.append(
+                    {
+                        "kind": "entity",
+                        "entity_id": identity,
+                        "rect": rect,
+                        "source_ref": "source:game/editor/console.json#entities/" + identity,
+                    }
+                )
+        for layer in layers:
+            ox, oy = layer["offset"]
+            for ty in range(
+                max(0, math.floor((y - oy) / 8)),
+                min(layer["height"] - 1, math.floor((y + ph - 1e-8 - oy) / 8)) + 1,
+            ):
+                for tx in range(
+                    max(0, math.floor((x - ox) / 8)),
+                    min(layer["width"] - 1, math.floor((x + pw - 1e-8 - ox) / 8)) + 1,
+                ):
+                    cell = layer["cells"][ty * layer["width"] + tx]
+                    if cell["collision"] == "solid":
+                        refs.append(
+                            {
+                                "kind": "tile",
+                                "layer_id": layer["id"],
+                                "x": tx,
+                                "y": ty,
+                                "cell": cell,
+                                "source_ref": "source:game/editor/console.json#layers/"
+                                + layer["id"]
+                                + "/cells/"
+                                + str(ty * layer["width"] + tx),
+                            }
+                        )
+        return refs[:64]
+
+    footprint = (math.ceil(pw / 8) + 1) * (math.ceil(ph / 8) + 1)
+    if footprint > 64:
+        facts.update(available=False, reason="player_collision_footprint_exceeds64tiles")
+        return facts, project, document, graph
+    spawn_contacts = collision(player["x"], player["y"])
+    facts["spawn_contacts"] = spawn_contacts
+    total_cells = sum(len(layer["cells"]) for layer in layers)
+    facts["source_cells"] = total_cells
+    if document["config"]["movement_mode"] != "top_down":
+        facts.update(
+            route_available=False,
+            route_reason="Platformer reachability requires actual jump/one_way dynamics; no top_down grid claim.",
+        )
+        return facts, project, document, graph
+    ox, oy = player["x"] % 8, player["y"] % 8
+    columns = max(0, math.floor((width - pw - ox) / 8) + 1)
+    rows = max(0, math.floor((height - ph - oy) / 8) + 1)
+    if columns * rows > 32768 or total_cells > 65536:
+        facts.update(
+            route_available=False,
+            route_reason="Authored geometry exceeds bounded exact grid budget.",
+            grid_cells=columns * rows,
+        )
+        return facts, project, document, graph
+    start = (int((player["x"] - ox) / 8), int((player["y"] - oy) / 8))
+    parents = {start: None} if not spawn_contacts else {}
+    queue = deque(parents)
+    blocked_frontier = []
+    visited_iterations = 0
+    while queue:
+        visited_iterations += 1
+        if visited_iterations % 64 == 0:
+            guard()
+        col, row = queue.popleft()
+        for adjacent in (
+            (col - 1, row),
+            (col + 1, row),
+            (col, row - 1),
+            (col, row + 1),
+        ):
+            if adjacent in parents or not 0 <= adjacent[0] < columns or not 0 <= adjacent[1] < rows:
+                continue
+            dx, dy = adjacent[0] - col, adjacent[1] - row
+            contacts = []
+            for fraction in (2, 4, 6, 8):
+                contacts = collision(ox + col * 8 + dx * fraction, oy + row * 8 + dy * fraction)
+                if contacts:
+                    break
+            if contacts:
+                if len(blocked_frontier) < 64:
+                    blocked_frontier.append(
+                        {
+                            "from": [ox + col * 8, oy + row * 8],
+                            "toward": [ox + adjacent[0] * 8, oy + adjacent[1] * 8],
+                            "contacts": contacts[:4],
+                        }
+                    )
+                continue
+            parents[adjacent] = (col, row)
+            queue.append(adjacent)
+    facts.update(
+        route_available=True,
+        method="body_rect_four_neighbor8px_with2px_segment_contacts",
+        grid_cells=columns * rows,
+        visited_cells=len(parents),
+        blocked_frontier=blocked_frontier,
+    )
+    facts["collision_queries"] = collision_queries
+    for goal in goals[:64]:
+        guard()
+        destination = next(
+            (
+                cell
+                for cell in parents
+                if _overlaps([ox + cell[0] * 8, oy + cell[1] * 8, pw, ph], goal["rect"])
+            ),
+            None,
+        )
+        route = []
+        cursor = destination
+        while cursor is not None:
+            route.append([ox + cursor[0] * 8, oy + cursor[1] * 8])
+            cursor = parents[cursor]
+        route.reverse()
+        facts["targets"].append(
+            {
+                **goal,
+                "grid_route_found": destination is not None,
+                "route_length_cells": len(route),
+                "route_sample": route[:64],
+                "classification": "initial_geometry_candidate_not_task_completion_proof",
+            }
+        )
+    return facts, project, document, graph
+
+
+def analyze_executed_semantics(
+    request,
+    trace,
+    *,
+    source_identity=None,
+    native_binding=None,
+    geometry_snapshot=None,
+    guard=lambda: None,
+):
+    """Source facts plus measured responses; no opaque-ROM semantic guessing."""
+    if (
+        not isinstance(request, GameEnvironmentRequest)
+        or not isinstance(trace, list)
+        or len(trace) > MAX_STEPS
+    ):
+        raise GameLearningError("semantic review requires one registered request and bounded executed trace")
+    identity = dict(source_identity or {})
+    findings, proposals = [], []
+    opaque_rom = request.kind == "libretro" or (request.kind == "builtin" and request.rom_source is not None)
+    scope = (
+        "opaque_rom_pixel_advisory"
+        if opaque_rom
+        else "declared_reference_runtime" if request.kind == "builtin" else "authored_simulation"
+    )
+    layout, project, document, graph = (
+        {
+            "available": False,
+            "reason": "No typed authored scene geometry for this adapter.",
+        },
+        None,
+        None,
+        None,
+    )
+    if request.kind == "console_editor":
+        layout, project, document, graph = _editor_layout(request, guard)
+        if geometry_snapshot is not None:
+            layout["runtime_initial_snapshot"] = _copy(geometry_snapshot, 16384)
+    elif request.kind == "successor":
+        from .game_successor import GameSuccessorError, validate_successor_routes
+
+        spec = json.loads(request.tree["game/successor/spec.json"])
+        if spec.get("gameplay_mode") == "top_down":
+            try:
+                layout = {
+                    "available": True,
+                    "source_ref": "source:game/successor/spec.json#world",
+                    **validate_successor_routes(spec),
+                }
+            except GameSuccessorError as exc:
+                layout = {
+                    "available": True,
+                    "source_ref": "source:game/successor/spec.json#world",
+                    "classification": "analytical_authored_geometry_not_measured_task_success",
+                    "initial_route_valid": False,
+                    "reason": str(exc),
+                }
+        else:
+            layout = {
+                "available": False,
+                "reason": "No full continuous platformer reachability solver is claimed.",
+            }
+
+    def add(code, message, refs, measurement, severity="warning"):
+        finding = {
+            "code": code,
+            "severity": severity,
+            "message": message,
+            "evidence_refs": refs,
+            "measurement": measurement,
+            "classification": (
+                "source_bound_semantic_candidate"
+                if refs and refs[0].startswith("source:")
+                else "actual_bounded_run_observation"
+            ),
+            "candidate_constraint": {
+                "requires": "Inspect this exact source and executed counterexample before accepting a change.",
+                "automatic_mutation": False,
+            },
+        }
+        finding["finding_id"] = _digest(finding)
+        findings.append(finding)
+        return finding
+
+    def command(finding, operation, payload, reason):
+        if len(proposals) >= 16:
+            return
+        value = {
+            "operation": operation,
+            "payload": payload,
+            "finding_id": finding["finding_id"],
+            "reason": reason,
+            "source_request_digest": request.digest,
+            "source_identity": {key: value for key, value in identity.items() if key != "environment"},
+            "requires_explicit_execution": True,
+            "automatic_execution": False,
+        }
+        value["proposal_digest"] = _digest(value)
+        proposals.append(value)
+
+    if project is not None:
+        if layout.get("spawn_contacts"):
+            refs = [row["source_ref"] for row in layout["spawn_contacts"]]
+            finding = add(
+                "authored_spawn_collision",
+                "The declared player spawn overlaps initial solid geometry. Inspect the colliding source cells/entities.",
+                refs,
+                {
+                    "player_id": layout["player_id"],
+                    "spawn_rect": layout["spawn_rect"],
+                    "contacts": layout["spawn_contacts"],
+                },
+            )
+            command(
+                finding,
+                "console.inspect",
+                {"section": "entities", "record_id": layout["player_id"]},
+                "Inspect the actual player spawn source record.",
+            )
+            if (
+                type(identity.get("project_version")) is int
+                and identity.get("project_id") == document["project_id"]
+            ):
+                from .game_console_editor import apply_console_edits
+
+                for contact in layout["spawn_contacts"]:
+                    if contact["kind"] != "tile":
+                        continue
+                    edit = {
+                        "op": "set_map_cell",
+                        "layer_id": contact["layer_id"],
+                        "x": contact["x"],
+                        "y": contact["y"],
+                        "cell": {**contact["cell"], "collision": "none"},
+                    }
+                    try:
+                        apply_console_edits(
+                            request.tree,
+                            target_id=request.target_id,
+                            edits=[edit],
+                            expected_manifest_digest=layout["manifest_digest"],
+                        )
+                    except ValueError:
+                        continue
+                    command(
+                        finding,
+                        "console.edit",
+                        {
+                            "expected_version": identity["project_version"],
+                            "expected_manifest_digest": layout["manifest_digest"],
+                            "idempotency_key": "review-remedy:"
+                            + request.digest
+                            + ":"
+                            + finding["finding_id"],
+                            "edits": [edit],
+                        },
+                        "Optional validated one-cell draft removes this measured source spawn blocker; inspect before execution.",
+                    )
+                    break
+        for target in layout.get("targets", []):
+            if not target["grid_route_found"]:
+                finding = add(
+                    "no_initial_grid_route",
+                    "No body-sized route to this goal was found in the bounded initial collision snapshot. Dynamic rules or abilities may provide another route.",
+                    [target["source_ref"]],
+                    {
+                        "target_id": target["target_id"],
+                        "rect": target["rect"],
+                        "visited_cells": layout["visited_cells"],
+                        "dynamic_geometry": layout["dynamic_geometry"],
+                        "one_way_geometry": layout["one_way_geometry"],
+                    },
+                    severity=(
+                        "info" if layout["dynamic_geometry"] or layout["one_way_geometry"] else "warning"
+                    ),
+                )
+                if target["kind"] == "entity":
+                    command(
+                        finding,
+                        "console.inspect",
+                        {"section": "entities", "record_id": target["target_id"]},
+                        "Inspect this exact goal and its initial transform before editing geometry.",
+                    )
+        resource_rules = {
+            effect.get("metric")
+            for rule in graph["rules"]
+            for effect in rule["actions"]
+            if effect["kind"] in {"set_metric", "add_metric"}
+        } | {
+            effect.get("resource")
+            for rule in graph["rules"]
+            for effect in rule["actions"]
+            if effect["kind"] == "trade"
+        }
+        for npc in document["entities"]:
+            if npc["kind"] != "npc":
+                continue
+            quest = npc["properties"]["quest_type"]
+            resource = "crops" if quest == "deliver_crop" else "fish" if quest == "catch_fish" else None
+            natural = (
+                resource == "crops"
+                and any(row["kind"] == "crop" for row in document["entities"])
+                or resource == "fish"
+                and (
+                    any(row["kind"] == "water" for row in document["entities"])
+                    or any(
+                        cell["collision"] == "water"
+                        for layer in document["layers"]
+                        for cell in layer["cells"]
+                    )
+                )
+            )
+            if resource and not natural and resource not in resource_rules:
+                finding = add(
+                    "quest_resource_has_no_producer",
+                    "This authored quest requires a resource with no producing entity/tile or typed resource rule in this scene.",
+                    ["source:game/editor/console.json#entities/" + npc["id"]],
+                    {
+                        "npc_id": npc["id"],
+                        "quest_type": quest,
+                        "required_count": npc["properties"]["required_count"],
+                        "resource": resource,
+                        "producing_entities_or_tiles": 0,
+                        "producing_rules": 0,
+                    },
+                )
+                command(
+                    finding,
+                    "console.inspect",
+                    {"section": "entities", "record_id": npc["id"]},
+                    "Inspect the exact quest requirement and add an appropriate original producer through the editor.",
+                )
+    if layout.get("initial_route_valid") is False:
+        add(
+            "authored_route_validation_failed",
+            "The authored geometry validator rejected a spawn/goal/relic route; this is analytical evidence, not a claim about combat or task mastery.",
+            [layout["source_ref"]],
+            {"reason": layout["reason"]},
+        )
+
+    events, positions, contacts = {}, [], []
+    successful, dead, native_rows = [], [], []
+    native = _approved_native_binding(request, native_binding)
+    for row in trace:
+        guard()
+        info = row.get("info", {})
+        for event in info.get("events", []):
+            if isinstance(event, str) and len(event) <= 128:
+                events[event] = events.get(event, 0) + 1
+        response = info.get("movement_observation")
+        if isinstance(response, dict):
+            point = response.get("end")
+        else:
+            point = [info.get("player_x"), info.get("player_y")]
+        if opaque_rom:
+            measured = info.get("native_measurement")
+            if native is not None and measured is not None:
+                values = _native_values(native, measured)
+                point = [values["player_x"], values["player_y"]]
+                native_rows.append({"step": row["step"], **measured})
+                if values["won"] == 1:
+                    successful.append(row["step"])
+                if values["health"] == 0:
+                    dead.append(row["step"])
+            else:
+                point = None
+        else:
+            if info.get("won") is True or info.get("goal_reached") is True:
+                successful.append(row["step"])
+            if info.get("dead") is True:
+                dead.append(row["step"])
+        if (
+            isinstance(point, (list, tuple))
+            and len(point) == 2
+            and all(type(value) in (int, float) and math.isfinite(value) for value in point)
+        ):
+            positions.append((row["step"], row["action"], tuple(point)))
+        if isinstance(info.get("contact_entity_ids"), list):
+            contacts.extend(
+                {"step": row["step"], "entity_id": entity}
+                for entity in info["contact_entity_ids"][:16]
+                if isinstance(entity, str)
+            )
+    if native_rows:
+        scope = "approved_native_observation"
+        layout = {
+            "available": True,
+            "classification": "source_bound_native_ram_not_collision_or_route_proof",
+            "descriptor_digest": native["descriptor_digest"],
+            "layout_digest": native["layout"]["layout_digest"],
+            "document_digest": native["layout"]["document_digest"],
+            "graph_digest": native["layout"]["graph_digest"],
+            "artifact_digest": native["artifact_digest"],
+            "producer_job_id": native["producer_job_id"],
+            "fields": native["layout"]["fields"],
+            "measurement_scope": native["layout"]["measurement_scope"],
+            "collision_semantics_available": False,
+            "route_available": False,
+            "measured_steps": len(native_rows),
+            "measurement_digest": _digest(native_rows),
+        }
+    zero_runs = []
+    run = []
+    directions = {
+        "left",
+        "right",
+        "up",
+        "down",
+        "left_jump",
+        "right_jump",
+        "up_left",
+        "up_right",
+        "down_left",
+        "down_right",
+    }
+    for previous, current in pairwise(positions):
+        if (
+            current[0] == previous[0] + 1
+            and current[1] == previous[1]
+            and current[1] in directions
+            and math.hypot(current[2][0] - previous[2][0], current[2][1] - previous[2][1]) < 0.01
+        ):
+            if not run:
+                run.append(previous)
+            run.append(current)
+        else:
+            if len(run) >= 8:
+                zero_runs.append(run)
+            run = []
+    if len(run) >= 8:
+        zero_runs.append(run)
+    for run in zero_runs[:16]:
+        matching_contacts = [row for row in contacts if run[0][0] <= row["step"] <= run[-1][0]]
+        add(
+            "held_control_without_displacement",
+            "A directional action was held for at least eight executed steps without measurable physical displacement. Collision or authored locking may explain it; inspect the counterexample.",
+            ["step:" + str(run[0][0]), "step:" + str(run[-1][0])],
+            {
+                "action": run[0][1],
+                "first_step": run[0][0],
+                "last_step": run[-1][0],
+                "position_pixels": list(run[-1][2]),
+                "contacts": matching_contacts[:16],
+            },
+        )
+    result = {
+        "schema_version": "skeleton.game.studio_semantic_review.v1",
+        "scope": scope,
+        "layout": layout,
+        "control_response": {
+            "physical_positions_available": bool(positions),
+            "observed_position_steps": len(positions),
+            "unchanged_directional_holds": len(zero_runs),
+            "contact_samples": contacts[:64],
+            "blocked_collision_queries": sum(
+                row.get("info", {}).get("movement_observation", {}).get("blocked_collision_queries", 0)
+                for row in trace
+            ),
+            "collision_semantics_available": request.kind == "console_editor",
+            "native_collision_or_body_inference": False,
+        },
+        "actual_events": events,
+        "native_measurement_samples": native_rows[:16],
+        "observed_success_steps": successful[:16] if scope != "opaque_rom_pixel_advisory" else [],
+        "observed_death_steps": dead[:16] if scope != "opaque_rom_pixel_advisory" else [],
+        "findings": findings[:128],
+        "remedial_actions": proposals,
+        "source_request_digest": request.digest,
+        "limitations": [
+            "A goal not reached in this bounded run is not proven unreachable.",
+            "Opaque ROM pixels cannot establish player identity, task success, control response or semantic defects.",
+            "Static grid routes do not solve jumping, combat, gates, timeline rules or full progression.",
+        ],
+    }
+    result["semantic_digest"] = _digest(result)
+    return _copy(result)

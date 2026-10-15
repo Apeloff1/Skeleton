@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import traceback
 from datetime import datetime, timezone
 from typing import Iterable
 
@@ -361,45 +363,16 @@ class EngineExecutionCoordinator:
                 "execution_admission_denied",
             )
             return
-        selection = command.execution_request.context_policy.get("provider_selection")
-        if selection is None:
-            try:
-                provider = self.provider_registry.require_active()
-            except ProviderUnavailableError:
-                await self._finalize_failure(execution_id, "provider_unavailable")
-                return
-        else:
-            if (
-                not isinstance(selection, dict)
-                or set(selection) != {"provider_id", "model_id"}
-                or command.execution_request.context_policy.get("provider_model")
-                != selection.get("model_id")
-            ):
-                await self._finalize_failure(execution_id, "provider_selection_invalid")
-                return
-            try:
-                provider = self.provider_registry.require_selected(
-                    selection["provider_id"], selection["model_id"],
-                )
-            except (ProviderUnavailableError, TypeError, ValueError):
-                await self._finalize_failure(execution_id, "provider_selection_unavailable")
-                return
-
-        requested_temperature = command.execution_request.context_policy.get("provider_temperature")
-        if requested_temperature is not None:
-            # Only the hosted Responses adapters currently implement sampling
-            # overrides. Never report a local-model request as honored when
-            # the local inference adapter has not bound the option.
-            if provider.provider_id not in {"openai", "openai-compatible-secondary"}:
-                await self._finalize_failure(execution_id, "provider_temperature_unsupported")
-                return
-            if (
-                isinstance(requested_temperature, bool)
-                or not isinstance(requested_temperature, (int, float))
-                or not 0 <= requested_temperature <= 2
-            ):
-                await self._finalize_failure(execution_id, "provider_temperature_invalid")
-                return
+        try:
+            provider = self.provider_registry.require_for_context(
+                command.execution_request.context_policy,
+            )
+        except ProviderUnavailableError:
+            await self._finalize_failure(
+                execution_id,
+                "provider_unavailable",
+            )
+            return
 
         handoff = command.compiled_context
         allowed_tool_ids = tuple(
@@ -484,7 +457,13 @@ class EngineExecutionCoordinator:
                 )
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Engine execution %s failed (%s); frames=%s",
+                execution_id,
+                type(exc).__name__,
+                [f"{frame.name}:{frame.lineno}" for frame in traceback.extract_tb(exc.__traceback__)],
+            )
             await self._finalize_failure(
                 execution_id,
                 "engine_execution_exception",

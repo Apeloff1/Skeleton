@@ -6,8 +6,8 @@ import argparse
 import json
 import os
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from skeleton.app.assembly import (
     checks_ok,
@@ -16,6 +16,7 @@ from skeleton.app.assembly import (
     load_manifest,
     manifest_payload,
     preflight,
+    runtime_manifest,
 )
 
 
@@ -39,6 +40,23 @@ def _parser() -> argparse.ArgumentParser:
         help="also require Docker and runtime environment values",
     )
     check.add_argument("--json", action="store_true", dest="as_json")
+
+    doctor = sub.add_parser(
+        "doctor", help="show redacted install, service and AI readiness with actionable fixes"
+    )
+    doctor.add_argument(
+        "--live", action="store_true", help="probe existing endpoints; never invoke AI or start a crawler"
+    )
+    doctor.add_argument("--timeout", type=float, default=3.0, help="per-probe timeout, at most 10 seconds")
+    doctor.add_argument("--json", action="store_true", dest="as_json")
+    doctor.add_argument(
+        "--studio", action="store_true",
+        help="inspect actual local SDK/core prerequisites separately from server readiness",
+    )
+    doctor.add_argument(
+        "--auth-token-file", type=Path,
+        help="private existing bearer-token file for authenticated --studio --live server readiness",
+    )
 
     plan = sub.add_parser("plan", help="show dependency-aware application startup order")
     plan.add_argument("--full", action="store_true", help="include optional full-profile services")
@@ -108,6 +126,12 @@ def _parser() -> argparse.ArgumentParser:
     prepare.add_argument("--threads", type=int)
     prepare.add_argument("--gpu-layers", type=int, default=0)
     prepare.add_argument("--timeout", type=float, default=120.0)
+    prepare.add_argument(
+        "--runtime-profile",
+        choices=("raw", "llama-completion-chat", "qwen3-completion-chat"),
+        default="raw",
+        help="operator-selected prompt/output protocol for the pinned local executable",
+    )
     prepare.add_argument("--json", action="store_true", dest="as_json")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
     sub.add_parser("serve-local-ai", add_help=False, help="open the authenticated offline AI workspace (serve-local-ai --help)")
@@ -125,7 +149,7 @@ def _parser() -> argparse.ArgumentParser:
     logs.add_argument("service", nargs="?", default="")
     logs.add_argument("-f", "--follow", action="store_true")
 
-    sub.add_parser("config", help="render and validate the Docker Compose configuration")
+    sub.add_parser("config", help="validate Compose without printing rendered credentials")
 
     from skeleton.app.installer import configure_setup_parsers
 
@@ -140,7 +164,7 @@ def _print_status(
     full: bool = False,
     timeout: float = 3.0,
 ) -> int:
-    manifest = load_manifest()
+    manifest = runtime_manifest()
     payload = manifest_payload(manifest)
     live_results = ()
     live_ok: bool | None = None
@@ -172,7 +196,7 @@ def _print_status(
         print(f"{marker} {service.name:<10} {service.role:<18} {service.kind}{profile}{url}")
 
     if live:
-        print("")
+        print()
         for result in live_results:
             status = result.status if result.status is not None else "-"
             print(
@@ -250,12 +274,21 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     command = args.command or "status"
 
     if command == "prepare-local-model":
-        from skeleton.ai.runtime.inference.deployment import create_local_model_deployment
+        from skeleton.ai.runtime.inference.deployment import (
+            create_local_model_deployment,
+        )
+
         try:
             model = create_local_model_deployment(
-                args.output, executable_path=args.executable, model_path=args.model,
-                model_id=args.model_id, context_size=args.context_size,
-                threads=args.threads, gpu_layers=args.gpu_layers, timeout_seconds=args.timeout,
+                args.output,
+                executable_path=args.executable,
+                model_path=args.model,
+                model_id=args.model_id,
+                context_size=args.context_size,
+                threads=args.threads,
+                gpu_layers=args.gpu_layers,
+                timeout_seconds=args.timeout,
+                runtime_profile=args.runtime_profile,
             )
         except (ValueError, OSError, RuntimeError) as exc:
             if args.as_json:
@@ -283,6 +316,57 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         )
     if command == "check":
         return _print_checks(bool(args.runtime), bool(args.as_json))
+    if command == "doctor":
+        from skeleton.app.first_install import first_install_report
+
+        try:
+            report = first_install_report(
+                live=bool(args.live), timeout=args.timeout,
+                studio=bool(args.studio), auth_token_file=args.auth_token_file,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            print("doctor could not inspect the application: " + type(exc).__name__)
+            return 2
+        if args.as_json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print("Host prerequisites: " + ("ready" if report["platform_ready"] else "blocked"))
+            print("Runtime configuration: " + ("ready" if report["configuration_ready"] else "blocked"))
+            print(
+                "Application services: "
+                + (
+                    "not probed"
+                    if report["services_ready"] is None
+                    else "ready" if report["services_ready"] else "unavailable"
+                )
+            )
+            ai = report["ai"]
+            print(
+                "AI: "
+                + (
+                    "not probed"
+                    if ai["available"] is None
+                    else "available" if ai["available"] else "unavailable"
+                )
+                + " ("
+                + str(ai["configuration"])
+                + ")"
+            )
+            print("Product: " + report["endpoints"]["product"])
+            if args.studio:
+                studio_report = report["studio"]
+                local = studio_report["local_host"]
+                print("Studio host inventory: " + ("observed" if local.get("observed") else "unavailable"))
+                print("Studio server inventory: " + ("observed" if studio_report["server"].get("observed") else "not observed"))
+                print("Native target prerequisites and Dragon runtime details: use --json.")
+            for step in report["next_steps"]:
+                print("Next: " + step)
+        ok = (
+            report["platform_ready"]
+            and report["configuration_ready"]
+            and report["services_ready"] is not False
+        )
+        return 0 if ok else 1
     if command == "plan":
         from skeleton.app.plan import build_plan
 
@@ -298,7 +382,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
-        from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
+        from skeleton.app.local_ai import (
+            OfflineAISession,
+            inspect_local_model,
+            load_native_checkpoint,
+            run_offline_ai,
+        )
 
         if args.improve_dataset:
             if (
@@ -693,13 +782,16 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
         return run_setup_command(command, args)
 
-
     root = find_repo_root()
     manifest = load_manifest()
 
     if command == "up":
         if bool(args.production) and bool(args.hot):
             print("--production and --hot are mutually exclusive")
+            return 2
+        # Invalid verification budgets must never start containers first.
+        if args.verify_attempts < 1 or not 0 <= args.verify_delay <= 60:
+            print("startup verification requires positive attempts and delay from 0 to 60 seconds")
             return 2
         checks = preflight(root, runtime=True, manifest=manifest)
         if not checks_ok(checks):
@@ -708,6 +800,15 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     print(f"[FAIL] {check.message}")
             print("application start aborted: runtime preflight failed")
             return 1
+        from skeleton.app.preloader import inspect_host
+
+        host = inspect_host(root, require_pip=False)
+        if not host.ready:
+            for check in host.checks:
+                if check.required and not check.ok:
+                    print(f"[FAIL] {check.detail}; {check.remediation}")
+            return 1
+        manifest = runtime_manifest(manifest, root=root)
         mode = "production" if bool(args.production) else "development"
         exit_code = _run_compose(
             compose_command(
@@ -744,13 +845,14 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 f"{result.service:<10} status={status} {result.url} {result.detail}"
             )
         if probes_ok(results):
-            print("application start: ready")
+            print("application services: ready; AI availability is reported separately by app doctor --live")
             return 0
         print("application start: services launched but readiness verification failed")
         return 1
     if command == "smoke":
         from skeleton.app.health import probes_ok, wait_for_application
 
+        manifest = runtime_manifest(manifest, root=root)
         timeout = float(args.timeout)
         attempts = int(args.attempts)
         delay = float(args.delay)

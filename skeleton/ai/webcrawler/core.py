@@ -9,16 +9,17 @@ from __future__ import annotations
 
 import hashlib
 import heapq
-from email.utils import parsedate_to_datetime
 import html
 import ipaddress
 import json
 import posixpath
 import re
 import time
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
+from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
-from typing import Iterable, Mapping, Protocol
+from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
@@ -29,15 +30,20 @@ _ALLOWED_SCHEMES = {"http", "https"}
 
 def canonicalize_url(url: str, *, base: str | None = None) -> str:
     """Return stable HTTP(S) identity, removing fragments and common tracking noise."""
+    if not isinstance(url, str) or len(url) > 16384 or any(ord(c) < 32 for c in url):
+        raise ValueError("invalid or oversized crawl URL")
     raw = urljoin(base, url) if base else url
     p = urlsplit(raw.strip())
     scheme = p.scheme.lower()
     if scheme not in _ALLOWED_SCHEMES or not p.hostname:
         raise ValueError("only absolute http(s) URLs are crawlable")
+    if p.username is not None or p.password is not None:
+        raise ValueError("credential-bearing crawl URLs are forbidden")
     host = p.hostname.encode("idna").decode("ascii").lower()
     port = p.port
     default_port = (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
-    netloc = host if port is None or default_port else f"{host}:{port}"
+    authority = f"[{host}]" if ":" in host else host
+    netloc = authority if port is None or default_port else f"{authority}:{port}"
     path = re.sub(r"/{2,}", "/", p.path or "/")
     trailing = path.endswith("/")
     path = posixpath.normpath(path)
@@ -46,7 +52,8 @@ def canonicalize_url(url: str, *, base: str | None = None) -> str:
     if trailing and path != "/":
         path += "/"
     pairs = [
-        (k, v) for k, v in parse_qsl(p.query, keep_blank_values=True)
+        (k, v)
+        for k, v in parse_qsl(p.query, keep_blank_values=True, max_num_fields=256)
         if k.lower() not in _TRACKING_KEYS
         and not any(k.lower().startswith(prefix) for prefix in _TRACKING_PREFIXES)
     ]
@@ -80,7 +87,9 @@ class CrawlPolicy:
     robots_ttl_seconds: float = 86_400.0
     retry_statuses: tuple[int, ...] = (408, 425, 429, 500, 502, 503, 504)
     allowed_content_types: tuple[str, ...] = (
-        "text/html", "text/plain", "application/xhtml+xml",
+        "text/html",
+        "text/plain",
+        "application/xhtml+xml",
     )
     allowed_hosts: frozenset[str] | None = None
 
@@ -97,9 +106,7 @@ class CrawlPolicy:
             return False
         if not destination_allowed(p.hostname or ""):
             return False
-        if self.allowed_hosts is not None and (p.hostname or "").lower() not in self.allowed_hosts:
-            return False
-        return True
+        return self.allowed_hosts is None or (p.hostname or "").lower() in self.allowed_hosts
 
 
 @dataclass
@@ -181,15 +188,17 @@ class CrawlDocument:
 
 
 class _Extractor(HTMLParser):
-    _SKIP = {"script", "style", "noscript", "svg", "canvas", "template"}
+    _SKIP = frozenset({"script", "style", "noscript", "svg", "canvas", "template"})
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_links: int = 500, max_text_chars: int = 1_000_000) -> None:
         super().__init__(convert_charrefs=True)
         self.skip = 0
         self.text: list[str] = []
         self.links: list[str] = []
         self.title: list[str] = []
         self.in_title = False
+        self.max_links = max_links
+        self.remaining_text = max_text_chars
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
@@ -199,7 +208,7 @@ class _Extractor(HTMLParser):
             self.in_title = True
         if tag == "a" and not self.skip:
             href = dict(attrs).get("href")
-            if href:
+            if href and len(self.links) < self.max_links and len(href) <= 4096:
                 self.links.append(href)
 
     def handle_endtag(self, tag: str) -> None:
@@ -213,7 +222,9 @@ class _Extractor(HTMLParser):
         if self.skip:
             return
         cleaned = " ".join(data.split())
-        if cleaned:
+        if cleaned and self.remaining_text > 0:
+            cleaned = cleaned[: self.remaining_text]
+            self.remaining_text -= len(cleaned)
             self.text.append(cleaned)
             if self.in_title:
                 self.title.append(cleaned)
@@ -233,17 +244,22 @@ def _source_score(url: str, text: str, status: int) -> float:
     return max(0.0, min(1.0, score))
 
 
-def extract_document(response: FetchResponse, canonical_url: str) -> CrawlDocument | None:
+def extract_document(
+    response: FetchResponse, canonical_url: str, *, max_links: int = 500, max_text_chars: int = 1_000_000
+) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
     charset = "utf-8"
-    match = re.search(r"charset=([^;\s]+)", response.headers.get("content-type", ""), re.I)
+    match = re.search(r"charset=([^;\s]+)", response.headers.get("content-type", ""), re.IGNORECASE)
     if match:
-        charset = match.group(1).strip('"\'')
-    raw = response.body.decode(charset, errors="replace")
+        charset = match.group(1).strip("\"'")
+    try:
+        raw = response.body.decode(charset, errors="replace")
+    except (LookupError, UnicodeError):
+        raw = response.body.decode("utf-8", errors="replace")
     title = ""
     links: list[str] = []
     if ctype in {"text/html", "application/xhtml+xml"}:
-        parser = _Extractor()
+        parser = _Extractor(max_links=max_links, max_text_chars=max_text_chars)
         parser.feed(raw)
         text = " ".join(parser.text)
         title = " ".join(parser.title)
@@ -269,6 +285,7 @@ def extract_document(response: FetchResponse, canonical_url: str) -> CrawlDocume
         "fetched_at": response.fetched_at,
         "status": response.status,
         "content_hash": digest,
+        "raw_body_hash": hashlib.sha256(response.body).hexdigest(),
     }
     return CrawlDocument(
         canonical_url=canonical_url,
@@ -319,7 +336,15 @@ class RobotsCache:
         self._parsers: dict[str, RobotFileParser] = {}
         self._meta: dict[str, dict[str, object]] = {}
 
-    def install(self, origin: str, robots_text: str, *, fetched_at: float = 0.0, etag: str | None = None, last_modified: str | None = None) -> None:
+    def install(
+        self,
+        origin: str,
+        robots_text: str,
+        *,
+        fetched_at: float = 0.0,
+        etag: str | None = None,
+        last_modified: str | None = None,
+    ) -> None:
         parser = RobotFileParser()
         parser.set_url(origin.rstrip("/") + "/robots.txt")
         parser.parse(robots_text.splitlines())
@@ -343,18 +368,25 @@ class RobotsCache:
         return f"{p.scheme}://{p.netloc}" in self._parsers
 
     def fresh(self, url: str, *, now: float, ttl: float) -> bool:
-        p=urlsplit(url);meta=self._meta.get(f"{p.scheme}://{p.netloc}")
-        return bool(meta and now-float(meta["fetched_at"]) < ttl)
+        p = urlsplit(url)
+        meta = self._meta.get(f"{p.scheme}://{p.netloc}")
+        return bool(meta and now - float(meta["fetched_at"]) < ttl)
 
     def validators(self, url: str) -> dict[str, str]:
-        p=urlsplit(url);meta=self._meta.get(f"{p.scheme}://{p.netloc}") or {};out={}
-        if meta.get("etag"):out["If-None-Match"]=str(meta["etag"])
-        if meta.get("last_modified"):out["If-Modified-Since"]=str(meta["last_modified"])
+        p = urlsplit(url)
+        meta = self._meta.get(f"{p.scheme}://{p.netloc}") or {}
+        out = {}
+        if meta.get("etag"):
+            out["If-None-Match"] = str(meta["etag"])
+        if meta.get("last_modified"):
+            out["If-Modified-Since"] = str(meta["last_modified"])
         return out
 
-    def touch(self,url: str, *, fetched_at: float) -> None:
-        p=urlsplit(url);origin=f"{p.scheme}://{p.netloc}"
-        if origin in self._meta:self._meta[origin]["fetched_at"]=fetched_at
+    def touch(self, url: str, *, fetched_at: float) -> None:
+        p = urlsplit(url)
+        origin = f"{p.scheme}://{p.netloc}"
+        if origin in self._meta:
+            self._meta[origin]["fetched_at"] = fetched_at
 
     def allowed(self, url: str) -> bool:
         p = urlsplit(url)
@@ -395,8 +427,13 @@ class CrawlEngine:
         self.robots.install(origin, robots_text)
 
     def enqueue(
-        self, url: str, *, depth: int = 0, parent_url: str | None = None,
-        priority: float = 0.0, ready_at: float = 0.0,
+        self,
+        url: str,
+        *,
+        depth: int = 0,
+        parent_url: str | None = None,
+        priority: float = 0.0,
+        ready_at: float = 0.0,
     ) -> bool:
         try:
             url = canonicalize_url(url, base=parent_url)
@@ -434,13 +471,21 @@ class CrawlEngine:
         if item.attempts >= self.policy.max_retries:
             return
         self._seen.discard(item.url)
-        fallback = self.policy.retry_base_seconds * (2 ** item.attempts)
+        fallback = self.policy.retry_base_seconds * (2**item.attempts)
         retry = min(self.policy.max_retry_delay_seconds, max(0.0, fallback if delay is None else delay))
         self._seq += 1
-        heapq.heappush(self._frontier, FrontierItem(
-            now + retry, item.priority, self._seq, item.url,
-            item.depth, item.parent_url, item.attempts + 1,
-        ))
+        heapq.heappush(
+            self._frontier,
+            FrontierItem(
+                now + retry,
+                item.priority,
+                self._seq,
+                item.url,
+                item.depth,
+                item.parent_url,
+                item.attempts + 1,
+            ),
+        )
         self._queued.add(item.url)
 
     @staticmethod
@@ -452,39 +497,54 @@ class CrawlEngine:
             return max(0.0, float(raw.strip()))
         except (ValueError, TypeError):
             try:
-                target=parsedate_to_datetime(raw.strip()).timestamp()
-                return max(0.0,target-(time.time() if now is None else now))
-            except (ValueError,TypeError,OverflowError):
+                target = parsedate_to_datetime(raw.strip()).timestamp()
+                return max(0.0, target - (time.time() if now is None else now))
+            except (ValueError, TypeError, OverflowError):
                 return None
 
     def load_robots(self, url: str, *, now: float | None = None) -> bool:
         """Load an origin's robots policy once, charging the crawl budget."""
         p = urlsplit(url)
         origin = f"{p.scheme}://{p.netloc}"
-        at=time.time() if now is None else now
-        if self.robots.known(url) and self.robots.fresh(url,now=at,ttl=self.policy.robots_ttl_seconds):
+        at = time.time() if now is None else now
+        if self.robots.known(url) and self.robots.fresh(url, now=at, ttl=self.policy.robots_ttl_seconds):
             return True
         if not self.budget.can_request():
             return False
         robots_url = origin + "/robots.txt"
         try:
             from .redirects import fetch_robots_with_policy
-            response = fetch_robots_with_policy(self, robots_url, now=at, extra_headers=self.robots.validators(url))
-        except Exception:
+
+            response = fetch_robots_with_policy(
+                self, robots_url, now=at, extra_headers=self.robots.validators(url)
+            )
+        except Exception:  # noqa: BLE001 -- missing robots always denies acquisition
             return False
         body = response.body[:512_000]
         if response.status == 304 and self.robots.known(url):
-            self.robots.touch(url,fetched_at=at)
+            self.robots.touch(url, fetched_at=at)
             return True
         if response.status in {404, 410}:
-            self.robots.install(origin, "",fetched_at=at,etag=response.headers.get("etag"),last_modified=response.headers.get("last-modified"))
+            self.robots.install(
+                origin,
+                "",
+                fetched_at=at,
+                etag=response.headers.get("etag"),
+                last_modified=response.headers.get("last-modified"),
+            )
             return True
         if response.status != 200:
             return False
         ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].lower()
         if ctype not in {"text/plain", "text/html"}:
             return False
-        self.robots.install(origin, body.decode("utf-8", errors="replace"),fetched_at=at,etag=response.headers.get("etag"),last_modified=response.headers.get("last-modified"))
+        self.robots.install(
+            origin,
+            body.decode("utf-8", errors="replace"),
+            fetched_at=at,
+            etag=response.headers.get("etag"),
+            last_modified=response.headers.get("last-modified"),
+        )
         return True
 
     def step(self, *, now: float | None = None) -> CrawlDocument | None:
@@ -499,7 +559,8 @@ class CrawlEngine:
         self._seen.add(item.url)
         if not self.robots.known(item.url) and not self.load_robots(item.url, now=now):
             self._seen.discard(item.url)
-            if self.budget.can_request(): self._retry(item, now=now)
+            if self.budget.can_request():
+                self._retry(item, now=now)
             return None
         if not self.budget.can_request():
             self._seen.discard(item.url)
@@ -509,26 +570,52 @@ class CrawlEngine:
         # Redirect-aware fetch_with_policy performs the per-hop host cooldown
         # check and commits its reservation. Reserving here first makes that
         # very same first hop appear too early and rejects positive crawl delays.
+        host = urlsplit(item.url).hostname or ""
+        # Loading robots may have consumed this host's dispatch slot. Preserve the
+        # item without spending a retry; fetch_with_policy owns page admission.
+        if self._host_ready.get(host, 0.0) > now:
+            self._seen.discard(item.url)
+            heapq.heappush(
+                self._frontier,
+                FrontierItem(
+                    self._host_ready[host],
+                    item.priority,
+                    item.sequence,
+                    item.url,
+                    item.depth,
+                    item.parent_url,
+                    item.attempts,
+                ),
+            )
+            self._queued.add(item.url)
+            return None
         try:
             from .redirects import fetch_with_policy
+
             response = fetch_with_policy(self, item.url, now=now)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- transport failures enter bounded retry
             from .redirects import RedirectFetchError
-            if isinstance(exc,RedirectFetchError) and exc.request_started:self.budget.requests += 1
+
+            if isinstance(exc, RedirectFetchError) and exc.request_started:
+                self.budget.requests += 1
             self._retry(item, now=now)
             return None
 
         body = response.body[: self.policy.max_response_bytes]
         if response.status in self.policy.retry_statuses:
-            self._retry(item, now=now, delay=self._retry_after(response.headers,now=response.fetched_at))
+            self._retry(item, now=now, delay=self._retry_after(response.headers, now=response.fetched_at))
             return None
         ctype = response.headers.get("content-type", "").split(";", 1)[0].lower()
         accepted_type = ctype in self.policy.allowed_content_types
         successful = 200 <= response.status < 300 and accepted_type
-        doc = extract_document(
-            FetchResponse(response.url, response.status, response.headers, body, response.fetched_at),
-            item.url,
-        ) if successful else None
+        doc = (
+            extract_document(
+                FetchResponse(response.url, response.status, response.headers, body, response.fetched_at),
+                item.url,
+            )
+            if successful
+            else None
+        )
         novel = bool(doc and not self.store.has_content(doc.content_hash))
         # fetch_with_policy already charged each network response, including
         # redirect hops, against the request/byte budget. Only a novel,

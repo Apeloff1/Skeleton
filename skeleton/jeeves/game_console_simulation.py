@@ -210,6 +210,7 @@ class EditorSimulationEnvironment:
         }
         self._last_damage, self._last_fish, self._last_attack, self._last_interact = -60, -60, -30, -30
         self._dialogue = None
+        self._collision_queries, self._collision_blocks, self._contact_ids = 0, 0, set()
         self._chain = _digest(
             {"environment_digest": self.spec.environment_digest, "seed": seed, "state": self._state()}
         )
@@ -243,6 +244,12 @@ class EditorSimulationEnvironment:
         )
 
     def _collision(self, x, y, *, downward=False, previous_bottom=None):
+        self._collision_queries += 1
+        blocked = self._collision_geometry(x, y, downward=downward, previous_bottom=previous_bottom)
+        self._collision_blocks += int(blocked)
+        return blocked
+
+    def _collision_geometry(self, x, y, *, downward=False, previous_bottom=None):
         width, height = self._player_source["width"], self._player_source["height"]
         rect = (x, y, width, height)
         if x < 0 or y < 0 or x + width > self._world_width or y + height > self._world_height:
@@ -402,6 +409,8 @@ class EditorSimulationEnvironment:
             raise ConsoleEditorError(
                 "editor_simulation_action", "Action is outside the exact declared action set"
             )
+        self._collision_queries, self._collision_blocks, self._contact_ids = 0, 0, set()
+        start_position = [self._x, self._y]
         previous_distance, previous_day, previous = self._goal_distance(), self._day(), self._chain
         config, speed = self._config, self._config["speed"]
         self._vx = -speed if action == "left" else speed if action == "right" else 0.0
@@ -411,7 +420,8 @@ class EditorSimulationEnvironment:
             if action == "jump" and self._grounded:
                 self._vy = -config["jump_speed"]
             self._vy = min(2000.0, self._vy + config["gravity"] / 60)
-        self._move(self._vx / 60, self._vy / 60)
+        attempted_displacement = [self._vx / 60, self._vy / 60]
+        self._move(*attempted_displacement)
         self._tick += 1
         rewards = {key: 0.0 for key in _REWARDS}
         rewards["time"] = -0.001
@@ -431,6 +441,8 @@ class EditorSimulationEnvironment:
                 continue
             kind, properties, identity = row["kind"], row["properties"], row["id"]
             overlapping = _overlap(self._player_rect(), self._rect(row))
+            if overlapping and identity != self._player_source["id"]:
+                self._contact_ids.add(identity)
             if kind == "goal" and overlapping and not self._won:
                 self._won = True
                 self._score += properties["points"]
@@ -602,6 +614,20 @@ class EditorSimulationEnvironment:
         self._actions.append(action)
         observation = self._observation()
         state = self._state()
+        movement = {
+            "start": start_position,
+            "end": [self._x, self._y],
+            "attempted_displacement": attempted_displacement,
+            "actual_displacement": [self._x - start_position[0], self._y - start_position[1]],
+            "collision_queries": self._collision_queries,
+            "blocked_collision_queries": self._collision_blocks,
+            "rule_teleport_attempted": any(
+                effect["kind"] == "teleport"
+                for rule in self._graph.document["rules"]
+                if rule["id"] in self._graph.last_rule_ids
+                for effect in rule["actions"]
+            ),
+        }
         evidence = {
             "environment_digest": self.spec.environment_digest,
             "tick": self._tick,
@@ -610,6 +636,8 @@ class EditorSimulationEnvironment:
             "reward_components": rewards,
             "state_digest": _digest(state),
             "events": self._last_events,
+            "movement_observation": movement,
+            "contact_entity_ids": sorted(self._contact_ids),
             "previous_transition_digest": previous,
         }
         self._chain = _digest(evidence)
@@ -625,6 +653,8 @@ class EditorSimulationEnvironment:
                 "state_digest": evidence["state_digest"],
                 "events": self._last_events,
                 "rules_fired": list(self._graph.last_rule_ids),
+                "contact_entity_ids": sorted(self._contact_ids),
+                "movement_observation": movement,
                 "rule_actions_executed_total": self._graph.executed_actions,
                 "rule_actions_skipped_total": self._graph.skipped_actions,
                 "day": state["day"],
@@ -830,6 +860,95 @@ class EditorSimulationEnvironment:
             },
             "hardware_emulation": False,
         }
+
+    def review_geometry(self, *, max_cells: int = 4096) -> dict:
+        """Actual current geometry snapshot; this is not temporal route proof."""
+        maximum = _int(max_cells, 1, 32768, "review geometry cell budget")
+        if self._seed is None:
+            raise ConsoleEditorError("editor_simulation_inactive", "Reset before inspecting current geometry")
+        count = sum(len(layer["cells"]) for layer in self._layers)
+        base = {
+            "schema_version": "skeleton.console_editor_review_geometry.v1",
+            "project_digest": self.project.digest,
+            "manifest_digest": self.project.manifest_digest,
+            "source_manifest_digest": self.project.source_manifest_digest,
+            "graph_digest": self.project.scene_graph.digest,
+            "environment_digest": self.spec.environment_digest,
+            "state_digest": _digest(self._state()),
+            "tick": self._tick,
+            "movement_mode": self._config["movement_mode"],
+            "scope": "Actual current authored collision/goal snapshot; excludes future timeline/rule effects and moving platform carrying",
+        }
+        if count > maximum:
+            return {
+                **base,
+                "available": False,
+                "reason": "geometry_cell_budget",
+                "cell_count": count,
+                "cell_capacity": maximum,
+            }
+        collisions = []
+        encoded_collision_bytes = 0
+        for layer in self._layers:
+            for index, cell in enumerate(layer["cells"]):
+                if cell["collision"] == "none":
+                    continue
+                x, y = index % layer["width"], index // layer["width"]
+                record = {
+                    "layer_id": layer["id"],
+                    "x": x,
+                    "y": y,
+                    "rect": [layer["offset"][0] + x * 8, layer["offset"][1] + y * 8, 8, 8],
+                    "cell": dict(cell),
+                }
+                encoded_collision_bytes += len(_json(record, 4096))
+                if encoded_collision_bytes > 2 * 1024 * 1024:
+                    return {
+                        **base,
+                        "available": False,
+                        "reason": "geometry_byte_budget",
+                        "cell_count": count,
+                        "cell_capacity": maximum,
+                    }
+                collisions.append(record)
+        entities = [
+            {
+                "entity_id": row["id"],
+                "kind": row["kind"],
+                "rect": list(self._player_rect() if row["kind"] == "player" else self._rect(row)),
+                "properties": dict(row["properties"]),
+            }
+            for row in self._entities
+            if self._visible(row)
+        ]
+        result = {
+            **base,
+            "available": True,
+            "world_size": [self._world_width, self._world_height],
+            "player_spawn_rect": [self._player_source[key] for key in ("x", "y", "width", "height")],
+            "player_current_rect": list(self._player_rect()),
+            "collision_cells": collisions,
+            "visible_platforms": [row for row in entities if row["kind"] == "platform"],
+            "visible_goals": [row for row in entities if row["kind"] == "goal"],
+            "visible_entities": entities,
+            "config": dict(self._config),
+            "dynamic_geometry": {
+                "timelines": bool(self._graph.document["animations"]),
+                "rules": bool(self._graph.document["rules"]),
+                "enemy_patrol": any(
+                    row["kind"] == "enemy" and row["properties"]["speed"] > 0 for row in self._entities
+                ),
+            },
+        }
+        if len(_json(result)) > 2 * 1024 * 1024:
+            return {
+                **base,
+                "available": False,
+                "reason": "geometry_byte_budget",
+                "cell_count": count,
+                "cell_capacity": maximum,
+            }
+        return {**result, "geometry_digest": _digest(result)}
 
     def current_observation(self):
         if self._seed is None:

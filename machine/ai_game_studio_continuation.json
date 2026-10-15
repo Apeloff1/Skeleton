@@ -23,8 +23,8 @@
   "production_promotion_authorized": false,
   "masterplan_completion_authorized": false,
   "studio_goal": {
-    "schema": "skeleton.game.studio_goal.v1",
-    "decision_schema": "skeleton.game.studio_decision.v1",
+    "schema": "skeleton.game.studio_goal.v2",
+    "decision_schema": "skeleton.game.studio_decision.v2",
     "store": "Existing game_learning_revisions, scope-closed kindstudio_agent_goal journals; no additional collection",
     "execution": "Bounded request-driven advance, canonical EngineChat text planner plus strict typed existing application command owners; no direct model/provider transport",
     "source_authority": "Current project/tree every step; all previous source/teacher dependencies reauthorized before model/context reuse; own committed edits recover only by exact issued editor receipt and committed source identity",
@@ -39,7 +39,10 @@
       "advance_requests": 128,
       "control_requests": 64,
       "lease_seconds": 90,
-      "goals_per_project": 64
+      "goals_per_project": 64,
+      "workflow_actions": 4,
+      "renewal_requests": 64,
+      "model_attempts_per_decision": 3
     },
     "idempotency": "Frozen canonical model prompt/key and exact typed action/key persisted before dispatch; completed advance/control keys retained without eviction; retry of own edits checks exact application revision receipt",
     "stop": "Pause/cancel owner-only including withdrawn-source projects, at already-issued operation boundary; expiry checked before model and before next action",
@@ -48,9 +51,228 @@
     "compiled_execution": "Host discovers exact completed artifactIDs/digests before compaction, routes artifact.inspect/admit/train/play to existing approved owners. Agent AIplay forces admittedpolicy+controllerai, <=256frames, counts againstjobbudget, and joins actualplayterminal status beforeplanninganother action.",
     "history_policy_authority": "Bounded exactsnapshot parent/generation/review policy pins rechecked through existing64ancestor admission; historicalmode bypasses only current tree equality, never sources/teachers/core/producer/sourcecontent/code",
     "discovery": "Exact Pydantic model schemas+realtypededitoropfields+graphrecordexamples;128KiBdecisions; sourceinspector1500Unicodecharacters, record/section/array paging1..32. Promptfeedbackretains realartifact/policy/session/metric identities with digests oflargeoutputs.",
-    "bounded_waiting": "GETpolls consume no executionrequestbudget. Explicit advances<=128pergoal, issued noactionwaitreturns recordedreceipt; interrupted jobs/play block withactualrecoverable receipt. Alreadyissuedjobs/play retain their owncontrols."
+    "bounded_waiting": "GETpolls consume no executionrequestbudget. Explicit advances<=128pergoal, issued noactionwaitreturns recordedreceipt; interrupted jobs/play block withactualrecoverable receipt. Alreadyissuedjobs/play retain their owncontrols.",
+    "journal_integrity": "V2 journals bind immutable initial intent/grants and exact contiguous decision/action/outcome receipt hashes, history chain and sealed state digest. Legacy v1 remains explicit unverified/read-only inspection; no silent migration or fabricated historical checks. Privileged complete valid history rewriting is outside unsigned hash authority.",
+    "recovery": "Explicit owner-scoped retry reuses frozen exact planner/action keys or resumes exact issued typed child work. A separately budgeted new canonical planner attempt requires authenticated terminal proof; 404/not-admitted/running/unconfigured observations retain the original key because delayed intake remains possible. No source/grant/model budget escalation.",
+    "renewal": "Finite explicit expected-version/idempotent authorization renewal up to3600 seconds, bounded64 renewals; never reset model/action/job counters or alter original execution/edit grants.",
+    "workflow": "Optional strict planner workflow up to4 typed commands, sequentially checkpointed with actual child-job/play terminal joins; exact prior issued receipt identity references are data, never executable interpolation. No fabricated completion or automatic production authority.",
+    "interfaces": [
+      "inspect",
+      "list_goals",
+      "advance",
+      "control",
+      "retry",
+      "authorize_goal",
+      "history",
+      "catalog"
+    ],
+    "single_decision_compatibility": "Strict existing skeleton.game.studio_decision.v1 single-command response remains accepted within a freshly issued v2 goal; no v1 journal upgrade.",
+    "workflow_receipt_references": "Optional v2 follow_up (<=3) selects only granted typed operations. Fixed @receipt:tokens in identity fields resolve exclusively canonical goal last_job/last_play/current step output IDs/digests, never arbitrary object paths or strings/code. Every queued child joins actual terminal state before next command.",
+    "prepared_mutation_recovery": "Exact console/world/champion typed operation, immutable request/save body, matching owned editor revision and current head are required. Prepared same-operation save retries reauthorize source/teacher/ancestor rights under original Dragon guard; time-only renewal can authorize frozen prepared metadata without publishing source.",
+    "structured_planner": "Frozen validated response JSON schema flows only EngineChat.with_json_schema through canonical EngineText/context-policy/provider grammar. Actual text and deterministic operation/execution IDs are compared with authenticated canonical terminal proof before accepting decisions.",
+    "goal_capacity": "Existing project keeps bounded idempotent goal reservation IDs; exact reservation+insert retry does not leak quota increments. Shared revision/storage limits remain unchanged.",
+    "action_budgets": "jobs_started counts distinct actual issued job/play handles, never campaign configuration receipts. Every compound command rechecks original work grant, current lease/cursor/pending/stop/expiry immediately before dispatch. Already-issued late actual results may settle truthfully; subsequent actions remain fenced.",
+    "state_digest_format": "bson_utc_milliseconds.v1: all actual BSON datetime values in sealed state normalize to UTC ISO at millisecond precision before both initial and reopened hashing. Naive Mongo decoded datetimes mean UTC. Explicit format marker is sealed; no unknown-format acceptance or automatic repair/rehash of corrupt old journals.",
+    "storage_write_identity": "Storage admission binds the exact canonical BSON-normalized mutation digest, resulting sealed state and requested byte amount; equivalent final states reached by different-sized patches never reuse a conflicting admission identity. Verified semantic no-op updates retain the current row without extra admission/version changes, only while the exact worker lease remains live.",
+    "planner_capacity": {
+      "max_output_tokens": {
+        "minimum": 256,
+        "maximum": 4096,
+        "default": 1024,
+        "strict_integer": true,
+        "immutable_original_intent": true,
+        "pending_request_pinned": true
+      },
+      "legacy_missing_budget": "Retain 4096 for previously issued v2 requests; omit absent budget from sealed state representation without rewriting historical hashes.",
+      "poll_seconds": 15,
+      "canonical_probe_seconds": 5,
+      "local_waiter_limit": 8,
+      "detach": "Shield bounded canonical EngineChat waiters on HTTP poll timeout; no additional provider boundary or background journal publisher. Reuse exact pending model key and call count. Actual canonical running/not-admitted/unknown remains pending; fresh attempts require terminal proof.",
+      "create_replay": "Route preserves explicit max_output_tokens presence. Existing v2 missing-budget intents may replay only their exact original request body when new field is omitted, retaining original4096 grant/hash/counters. Explicit budget addition conflicts. Fresh goals default1024 only after historical prior lookup; new defaulted intents replay consistently."
+    },
+    "structured_decision_consistency": "Provider grammar uses oneOf two complete object branches: done=false requires a granted string operation; done=true requires null operation and no nonempty follow_up. Existing strict host decision validation remains authoritative. Prior pending schemas/blocked receipts remain immutable."
   },
   "related_contracts": [
     "machine/ai_game_studio_review.json"
-  ]
+  ],
+  "readiness_owners": {
+    "application": "backend/core/game_studio_health.py",
+    "api": "backend/routes/game_studio_health.py",
+    "product": "frontend/features/Jeeves/GameStudioReadinessPanel.tsx"
+  },
+  "readiness_authority": "Existing CORE_DB, canonicalengine/operator core+compiler config and currentauthenticatedscope only; diagnostics expose safe readiness/presence/typedfailure, never secrets or callerpaths. No newservice/root orimplicitinstallation.",
+  "local_model_activation_extension": {
+    "owner": "skeleton/provider_runtime.py",
+    "existing_runtime": "skeleton/ai/runtime/inference/deployment.py",
+    "existing_schema": "skeleton.local_model.deployment.v1",
+    "config": "AI_PROVIDER=local selects exactlyoneofAI_LOCAL_MODEL_PATH orAI_LOCAL_DEPLOYMENT_PATH",
+    "security": "Digest-pinnedoperatorowned GGUF+llamaCLI; no hostedfallback/secondaryprovider/verifier, no caller path; existingproviderarchitecture/governance/admission/receipt/limits/cancellation gates preserved",
+    "scope": "Optionalactual offline modelexecution forstudio app throughcanonicalEngineChat/EngineText/EngineClient; no newproviderboundary/store/runtime/service",
+    "automated_tests_run": false,
+    "cli_protocol": "A standalone completion executable with raw generated stdout and noninteractive flags is required for strict structured output; modern interactive llama-cli UI framing is not parsed or silently stripped. Operator selects the exact digest-pinned compatible executable.",
+    "framing_owners": [
+      "skeleton/ai/runtime/inference/llama_cpp.py",
+      "skeleton/ai/runtime/inference/deployment.py"
+    ],
+    "output_framing": {
+      "config": "Optional strict operator config output_framing enum raw (default) or llama_completion_eog, bound into execution profile and deployment config",
+      "normalization": "Only in declared completion_eog mode remove an exact EOF suffix: ASCII space+[end of text]+LF, or the pinned b11429 completion suffix space+[end of text]+3LF (EOG LOG then unconditional final LOG of2LF). No other suffix or arbitrary whitespace normalization. Existing strict whole-output JSON/schema parser unchanged; plain text uses same exact rule.",
+      "evidence": "Actual raw stdout SHA remains bound in response and execution receipt; normalization mode AND exact allowed suffix whitelist are execution-profile-bound.",
+      "operator_protocol": "Digest-pinned compatible completion executable; preserve prompt bytes via no-escape. Do not use log-disable on b11429 completion because token emission uses its logger. All model execution remains through existing canonical runtime.",
+      "upstream_evidence": "ggml-org/llama.cpp b11429/d81235049 tools/completion/completion.cpp EOG LOG at929 and unconditional final LOG at949",
+      "failure_diagnostics": "Bounded categorical parser diagnostics only: exception class/known decoder category, numeric position/line/column/length, prefix structural class and known EOG trailer presence. Never raw text, prompts, arbitrary exception messages or private artifact persistence."
+    },
+    "safe_deployment_inventory": {
+      "owner": "skeleton/ai/runtime/inference/deployment.py:LocalModelDeployment.adapter",
+      "consumer": "Existing local adapter status and canonical provider inventory/chat catalog projection",
+      "fields": [
+        "schema",
+        "model_id",
+        "model_digest",
+        "artifact_sha256",
+        "artifact_bytes",
+        "manifest_digest",
+        "runtime_digest",
+        "runtime_kind",
+        "reference"
+      ],
+      "authority": "Derived only from verified loaded GGUF/runtime identities and immutable manifest digest; no file paths, weights, credentials, caller-provided metadata or activation mutations. Existing inference engine/factory remains sole dispatch owner.",
+      "schema": "skeleton.local_model.deployment.v1",
+      "reference": "local-model-deployment:<manifest_digest>"
+    },
+    "operator_runtime_profile": {
+      "owners": [
+        "skeleton/ai/runtime/inference/deployment.py:create_local_model_deployment",
+        "skeleton/app/cli.py:prepare-local-model"
+      ],
+      "selection": "Explicit runtime_profile enum raw (unchanged default), llama-completion-chat, or qwen3-completion-chat; no executable discovery, model download or inference during preparation.",
+      "llama_completion_chat": "Emit the fixed compatible completion arguments --conversation --single-turn --simple-io --no-perf --no-escape --color off --jinja --reasoning off, batch_size512 and explicit llama_completion_eog output framing. The executable remains digest-pinned and must implement those options; no log-disable or arbitrary response extraction.",
+      "limits": "Existing explicit context_size/timeout_seconds/thread/GPU validation remains authoritative. The measured local operator profile used context8192,timeout600,threads2; these are not universal quality or latency guarantees.",
+      "paths": "The creator resolves and pins real local files. Container deployment must prepare with the final container-visible paths and retain necessary adjacent trusted runtime libraries; host absolute paths are not implicitly translated.",
+      "authority": "Existing private create-only manifest preparation and canonical deployment loader only; no new provider, runtime, activation API, service, automatic installation or promotion."
+    },
+    "qwen3_non_thinking_profile": {
+      "owner": "skeleton/ai/runtime/inference/deployment.py:QWEN3_COMPLETION_CHAT_TEMPLATE",
+      "selection": "Explicit qwen3-completion-chat only; generic llama-completion-chat and raw preserve their original template semantics.",
+      "protocol": "Use the pinned completion executable's supported --chat-template with a fixed Qwen3 ChatML Jinja template preserving every actual message role/content and the official nonthinking assistant generation prefix containing an already closed empty think block. No output prefix removal, answer fabrication or unsupported chat-template-kwargs option.",
+      "identity": "Entire literal template and fixed extra arguments are manifest/execution-profile-bound. New configuration is create-only; previous manifests, generated responses and receipts remain historical.",
+      "scope": "Explicit compatible Qwen3 GGUFs only; no universal model template or quality guarantee. A fresh canonical app inference must demonstrate an actual final answer before readiness is claimed."
+    },
+    "native_neural_conditioning": {
+      "owner": "skeleton/ai/runtime/inference/neural.py:NumpyRecurrentLM.infer",
+      "input": "Prime BOS plus the exact UTF-8 byte tokens of LocalInferenceRequest.rendered_input, including governed system instructions, ordered history, current user message and assistant role framing. Report that exact byte-token count plus BOS as input usage.",
+      "cancellation": "Check the existing cooperative cancellation event during priming and generation; no new worker or inference boundary.",
+      "identity": "Learned parameter digest remains a weight identity. Existing canonical runtime source fingerprint binds changed inference/conditioning semantics and fences unfinished work or caches using the former implementation."
+    }
+  },
+  "readiness_route_domain": "Canonical backend/core/route_policy_catalog.py classifies actual game studio routes as existing studio/learning domains, preventing confidential goals from falling into legacy INTERNAL ceiling",
+  "structured_goal_planning_extension": {
+    "owners": [
+      "backend/core/engine_chat.py",
+      "backend/core/engine_text.py",
+      "backend/core/engine_client.py"
+    ],
+    "existing_contract": "AIExecutionRequest.context_policy.structured_output_schema ->canonicalexecution_runtime ->ProviderRequest ->existinglocal/hostedadapter",
+    "interface": "Addoptionalvalidatedboundedstructured_output_schema toEngineTextRequest, command_from_context andexplicitEngineChat.with_json_schema. Bindconstraintintheactualcommandexecutionidentity; no featureproviderSDK/transport. Generictextcallersremainunchanged.",
+    "scope": "Studio decision JSON constrainedbyactualcanonicalruntime, thenstrictapplicationowner modelsandcurrentgrants stillvalidate beforeexecution",
+    "bounds": "ValidatedownerJSONschema<=64KiB, finiteJSON, immutablecopy",
+    "automated_tests_run": false
+  },
+  "readiness_engine_interface": {
+    "owner": "skeleton/api/engine_routes.py",
+    "existing_consumer": "backend/core/engine_client.py:provider_status",
+    "surface": "GET /api/v1/engine/providers",
+    "authority": "Existing engine service token/principal grant+engine:read; projectionfromexistingproviderregistry, no execution/configurationmutation",
+    "data": "Provider identifiers/availability/capabilitymetadata only; no secret oroperatorpath projection",
+    "catalog_projection": "Allowlisted canonical registry status fields only: configured readiness, execution mode, credential-free status, text/media capabilities, supported sampling, engine chat policy context/output ceilings/tokenizer and safe loaded artifact identity. The route never constructs a provider or activates a model.",
+    "tenant_read": "Optional explicit tenant_id must satisfy the current service principal's engine:read tenant grant; omitted tenant returns the same global nonsecret configuration projection for existing operator diagnostics."
+  },
+  "local_activation_recovery": {
+    "owner": "backend/core/reliability.py",
+    "problem": "Existing graceful drain installed its own signal handler then reraised into the same handler, leaving realbackend alive indefinitely",
+    "fix": "Capture originalASGIhandler, restore/delegate afterboundeddrain; repeatedsignal handoff immediate; existinglifespan ownsactualworker/campaign/DBcleanup",
+    "scope": "No new runtime/service; real localoperator restart made concrete, no tests",
+    "engine_failure_diagnostics": {
+      "owner": "skeleton/api/engine_runtime.py",
+      "mirror": "skeleton/ai/runtime/api/engine_runtime.py",
+      "scope": "Existing canonical execution coordinator logs only exception class and internal traceback frame locations for real failed execution; no prompt, provider message, environment, credential or invented provider receipt."
+    }
+  },
+  "readiness_probe_bounds": {
+    "owner": "backend/core/game_studio_health.py",
+    "actual_problem": "RealcoldSDK/corediagnosticquerytook50.8s andouterAPIcorrectlytimedout30s",
+    "fix": "Atmostoneinflightnative+onecompilerderivedprobeperprocess;4secondboundedjoin,30secondfreshderivedcache,explicitobservedfalsependingprojection. These arediagnosticsnotexecutiongrants;everybuild/play/trainstillreauthorizesexactoperator/source/runtime. Noautomaticinstallation ornewstore."
+  },
+  "builder_workflows_extension": {
+    "status": "implementation_candidate",
+    "owners": [
+      "backend/core/game_studio_agent.py",
+      "backend/core/game_studio_tools.py",
+      "backend/core/game_console_build.py",
+      "skeleton/jeeves/game_studio_tools.py"
+    ],
+    "operations": [
+      "build.inspect",
+      "artifact.preview",
+      "project.export",
+      "artifact.export",
+      "knowledge.search",
+      "knowledge.practice"
+    ],
+    "preflight": "Safe allowlisted exact-source compiler plan/tool hashes/output paths; no private SDK paths/commands in application projection; no compiler invocation.",
+    "preview": "Existing completed artifact admission and approved native runtime through GameLearningWorkspace.simulate; at most256 actual actions per command, fixed caller-independent isolation, current rights/core/artifact/source identity. NOOP or explicit legal inputs, never a policy/mastery proof.",
+    "exports": "Generate current canonical source export and fully verify exact completed binary bytes; return authorized download references and SHA256/size/filename, no arbitrary filesystem paths. Prepared export is not proof of client download.",
+    "completion_requirements": "Optional finite edit/build/preview/export checklist on original sealed goal intent. Completion only after successful exact-current-head owner receipts; build means actual binary_ready not queued/source_only. Preview must bind that completed artifact and a real committed simulation receipt. Export requires both current source JSON and same compiled binary receipts. No source/model/teacher rights granted.",
+    "evidence": "Optional planner evidence_refs may name only actual current scoped source/job/lesson/step identities exposed in frozen context. Revalidate original source dependencies before action/final settlement; model URLs cannot become authority.",
+    "compatibility": "Older goals omit new optional fields from sealed state and retain unverified completion semantics. Never rewrite historical request hashes/receipts.",
+    "bounds": {
+      "preview_actions": 256,
+      "goal_actions": 16,
+      "evidence_refs": 16
+    },
+    "new_runtime": false,
+    "new_store": false,
+    "validation": "Source checks and genuine bounded homebrew app workflow; no automated tests per user.",
+    "physical_drain": "Existing build and successor worker helpers use raw executor Futures, shielded wait and repeated-cancellation drain; global Task cancellation cannot masquerade as physical thread/process quiescence. Existing worker/cancellation owners retained.",
+    "reviewed_design_knowledge": {
+      "search_operation": "knowledge.search",
+      "owner": "existing backend/core/dragon_runtime.py reviewed-reference projection",
+      "classification": "human_reviewed_design_reference, truth_verified=false, training_allowed=false",
+      "authority": "exact actor/tenant source/revision/review/consent pins, rechecked before model dispatch, tools and final workflow completion; reviewed text is untrusted design context only",
+      "bounds": {
+        "retrieval_limit": 8,
+        "query_characters": 300,
+        "goal_context_limit": 4,
+        "practice_references": 16
+      },
+      "lineage": "existing sealed goal evidence_dependencies and actual issued citation references; no new knowledge store or provider",
+      "scope_adapter": "Existing reviewed_scope_from_workspace converts only already authenticated workspace tenant/account email to the exact canonical Academy owner SHA; no role or source permission is granted.",
+      "practice_operation": "knowledge.practice",
+      "practice": "Read only exact completed source-bound measured practice receipt; separate sealed practice_references pins bind candidate/practice/receipt/runtime and current source/review/consent, rechecked before model/tool dispatch and final settlement. Factual observations only, not truth verification, XP or policy training permission."
+    },
+    "typed_training_compatibility": "Existing typed studio training adapters use the canonical inherited TrainRequest.admitted_request helper so newly added omitted controls do not silently alter historical same-key request identity; the job still freezes full resolved numerical configuration.",
+    "capacity_bound_planning": {
+      "authority": "Existing canonical EngineClient + model_catalog/resolve_selection/context_budget_for_selection/estimate_context_tokens. No provider choice, approximate tokenizer substitution, engine budget increase or direct inference.",
+      "projection": "New preparations only: when full source/tool context exceeds actual admitted model capacity, retain exact goal, current source/manifest/workflow identities and strict current-stage owner forms. Actual current completion receipts select prerequisite stage edit/build/preview/export; the model still chooses each typed action or done under existing finite grant. Optional evidence/observations are added only when they fit, with explicit whole-context digest/omission disclosure.",
+      "framing": "Measure exact declared token profile plus actual LocalInferenceRequest rendered system/user framing. Respect compiler protected policy reservation and segment cap. Persist safe capacity/projection receipt in existing pending record.",
+      "compatibility": "Existing frozen pending prompts/model keys remain untouched; typed capacity errors never become fabricated model steps. Historical failed/unknown goals retain original evidence.",
+      "incomplete_workflow_grammar": "For NEW pending decisions only, when requested host completion facts are incomplete, the frozen canonical structured response schema permits only done=false and a non-null actually allowed operation. Model still selects its actual typed tool; no host-invented action. Completed checks allow ordinary done branch; historical frozen pending schema/keys are unchanged."
+    },
+    "receipt_bound_stage_guidance": {
+      "scope": "NEW pending checklist decisions only, independent of model capacity; existing frozen prompts, schemas, model keys and historical receipts remain unchanged.",
+      "facts": "Recompute separate current-head source-export and matching-previewed-binary-export facts from actual goal-issued owner receipts. An export is verified only when both exist; prepared exports never attest client download.",
+      "guidance": "Derive the next prerequisite stage from those exact facts. After either export counterpart is prepared, expose only the remaining export operation. Completed build receipts supply exact artifact identities for preview; current verified source/binary receipts and remaining obligations are present even in the minimum capacity projection. Existing pending_receipt exposes only the frozen workflow_stage string, not private model context. The model still chooses and supplies every typed action; the host never fabricates a decision, payload or success.",
+      "limits": "Existing model/action/job/lease limits and strict owner validation remain authoritative. Missing or stale proofs cannot advance the stage. Generic goals without a checklist retain their existing operation inventory."
+    },
+    "checklist_project_admission": "NEW nonempty completion_requirements require the existing canonical console_editor authored environment and a ConsoleProject.from_files document matching the owned project's console_id. Reject successor/reference/nonconsole or invalid documents with typed studio_goal_checklist_project before journal reservation, storage admission or model dispatch. This declares owner compatibility, not installed toolchain/core readiness or hardware certification. Existing goals/replays and ordinary goals without a checklist retain their original semantics.",
+    "advance_poll_yield": "One advance request may join at most one bounded canonical model wait, then yields at a durable operation boundary before preparing another model decision. Already-issued compound tool actions may continue within the original requested step grant. No waiter cancellation, HTTP timeout increase, new model key, budget reset or fabricated progress; callers continue with the returned current cursor/status until terminal.",
+    "operation_specific_planner_payloads": {
+      "status": "implementation_candidate",
+      "scope": "New pending decisions only, using existing studio_application_schemas owner forms. No new operation/provider/runtime/store. Existing frozen schemas/model keys/recovery remain exact.",
+      "schema": "Each operation has its own decision and follow-up payload reference under decision-root definitions. Inline owner-local $defs/$ref with finite node/depth/byte limits; remove annotations only. Preserve semantic constraints and additionalProperties denial. Remove expected_version/idempotency_key only where the existing host actually supplies them.",
+      "editor": "Require nonempty edits and each selected op plus exact required field list from existing x-owner-edit-fields; no automatic edit choice or fabricated argument values. An observed current console manifest SHA may constrain required expected_manifest_digest by enum; host/source CAS remains final authority.",
+      "receipt_references": "Only recognized top-level _REF_FIELDS may expose finite existing _RECEIPT_REFS tokens; the existing resolver and owner type validation still reject unavailable, unknown or mismatched values before tool IO. Nested fields never gain receipt interpolation.",
+      "authority": "Typed grammar constrains model-produced data; it never certifies action success. Current model/source/actor grants and real owner payload validation remain mandatory."
+    }
+  }
 }

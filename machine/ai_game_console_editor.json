@@ -89,7 +89,8 @@
     "import": "import_original_asset measures PNG/TIM/WAVE/native bytes; currentrights owned by backend",
     "simulation": "EditorSimulationEnvironment spec/reset/step/snapshot/restore/preview/close consumes exact typed authoreddocument, compactsource identity metadata and declared bindings",
     "review": "inspect_console_project binds actual source/profile/document digests, counts/encodings and bounded staticgrid reachability; unavailablephysics/hardware/quality remains explicitly unavailable",
-    "transaction": "begin_console_edit_transaction produces exact bounded inversefile patches; undo requires postmanifest and restores prem anifest exactly; persistence/CAS remains existingbackend"
+    "transaction": "begin_console_edit_transaction produces exact bounded inversefile patches; undo requires postmanifest and restores prem anifest exactly; persistence/CAS remains existingbackend",
+    "review_geometry": "EditorSimulationEnvironment.review_geometry returns exact current authored collision/goal/entity geometry with source/state digests,2MiB/caller-cell bound; explicit unavailable result beyond budget. EpisodeStep actual movement/contact/collision measurements bind transition digest."
   },
   "native_starters": {
     "targets": [
@@ -121,7 +122,9 @@
     "design_play": "Original Meadow Workshop131fixedsteps, actualcrop harvest2/fish2; actualPNG and source/transition hashes in /workspace/scratch/console-editor-original-authoring/meadow-play",
     "automated_tests_written_or_run": false,
     "graph_play": "Original authored Meadow graph120ticks plus exactsnapshot reopen/continuedtick: composedhierarchy+actualsprite atlas/timeline, seed trade12money->9 and3seeds->5, visitvariable6 includingnext-tick customevent+regionedge,16actualruleactions; actualPNG/state/transition artifacts /workspace/scratch/console-editor-graph-authoring, no automated tests",
-    "scrolling_dmg_play": "Original32x32 DMG editor scene compiled32768byte actualRGBDS cartridge then271actualGambatte runs, actualscrollednativePNG/code/content receipts /workspace/scratch/console-editor-scrolling-authoring; no full commercialcompatibility claim"
+    "scrolling_dmg_play": "Original32x32 DMG editor scene compiled32768byte actualRGBDS cartridge then271actualGambatte runs, actualscrollednativePNG/code/content receipts /workspace/scratch/console-editor-scrolling-authoring; no full commercialcompatibility claim",
+    "native_graph": "Original Meadow3nodes/4timelines compile32phase/twooriginal8x8atlas frame tables. Actual isolatedRGBDS32KiBROM SHA90e26acfc991de00401e37f362e0de941b1498ff39952b3566c31f3d17c5aa92 and81actualGambatte runs: RAMgoalX216..232,visibility0/1,tick75phase11. Proof /workspace/scratch/console-editor-native-graph-capability. No automated tests or durableMongoissuer claim.",
+    "native_instrumentation": "Actual fixedNESca65/ld65 cartridge and33FCEUmm runs measuredposition36/16,health5,tick29,exactboot signature; sameproofdirectory/nes-instrumentation. Metadata alone is never observedgameplay."
   },
   "scene_graph": {
     "document": "game/editor/graph.json",
@@ -162,5 +165,30 @@
     "state_authority": "Same existing project file manifest/CAS and bounded replay snapshot, no new persistence owner",
     "metrics_scope": "Measured structure/reference/cycle/economy limits and actual rule fire/action counters, not hardware behavior or game quality",
     "verification": "Source static checks and productive original authoring/play only; no automated tests per user."
+  },
+  "native_graph_compiler": {
+    "status": "implemented_unpromoted",
+    "owner": "skeleton/jeeves/game_console_editor.py",
+    "scope": "Actual DMG bounded graph hierarchy translations/visibility and fixedtick8x8 original atlas sprite timelines compile into trusted native ROM frame tables consumed by fixed RGBDS kernel. Goal marker position/visibility follows same native table; unsupported variables/rules fail explicit before source binding.",
+    "limits": {
+      "sprites": 40,
+      "timeline_frames": 128,
+      "native_tiles_including_background": 256,
+      "native_data_bytes": 28672,
+      "world_pixels": 256
+    },
+    "timelines": "All loops share one duration at most128ticks; nonloops share bounded horizon at most127ticks. Mixed loop/nonloop rejected. Translation evaluated at every native phase must be an exact integer and composed pose within authored world. Rendering subset does not confer unsupported entity physics or gameplay rules.",
+    "interfaces": [
+      "ConsoleProject.native_graph_compatibility()",
+      "ConsoleProject.native_observation_layout()"
+    ],
+    "instrumentation": "Only exact current trusted kernel+assets+graph/document source binding can issue a named read-only SYSTEM_RAM layout for Gambatte/FCEUmm. Native observed bytes must be measured through existing isolated host; metadata alone is never gameplay evidence. Fixed boot signature rejects incorrect memory mapping. Boot signature at GBoffset18/NESoffset15 is allowed64bounded native bootstrap runs, then enforced. Competing native source files/custom build controls cause exact binding refusal; source metadata cannot instrument a different compiled cartridge.",
+    "production_promotion_authorized": false,
+    "limitations": [
+      "Native graph variables/rules require a later explicit compiler port",
+      "Animated entity physics, NPC/farming interactions and hardware music remain deferred",
+      "One native gameplay loop per vblank can differ from nominal designer60Hz",
+      "DMG sprite palette index0 transparency is an explicit physical composition constraint"
+    ]
   }
 }

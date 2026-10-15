@@ -90,8 +90,10 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     href: capabilityHref('jeeves'),
     backendSurface: '/api/jeeves',
     actions: [
-      { id: 'reason', title: 'Reason', description: 'Work through a complex product or engineering problem.', operation: 'jeeves.reason' },
-      { id: 'learn-games', title: 'Game learning studio', description: 'Edit, simulate and train original games across registered engine and console targets.', operation: 'jeeves.reason', href: '/game-learning' },
+      { id: 'reason', title: 'AI chat', description: 'Work through a problem with the configured engine and durable conversation history.', navigationId: 'jeeves.chat.canonical', href: '/jeeves-chat' },
+      { id: 'governed-chat', title: 'Conversation workspace', description: 'Use governed attachments, message editing and regeneration with canonical conversation history.', navigationId: 'jeeves.chat.governed', href: '/ai-chat' },
+      { id: 'capture-web', title: 'Capture web knowledge', description: 'Authorize a bounded crawl and inspect captured sources.', navigationId: 'jeeves.crawler', href: '/crawler' },
+      { id: 'learn-games', title: 'Game learning studio', description: 'Edit, simulate and train original games across registered engine and console targets.', navigationId: 'jeeves.games.learn', href: '/game-learning' },
       { id: 'plan', title: 'Plan', description: 'Turn a goal into coordinated executable work.', operation: 'jeeves.plan' },
       { id: 'review', title: 'Review agents', description: 'Inspect delegated work and agent outcomes.', operation: 'agents.review', legacyHref: '/agent-review' },
     ],
@@ -118,6 +120,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/ops',
     actions: [
       { id: 'agents', title: 'Agents', description: 'Inspect active workers, tasks and health.', operation: 'ops.agents', legacyHref: '/agents' },
+      { id: 'setup', title: 'Setup & readiness', description: 'Check first-install services, model availability and capture readiness.', navigationId: 'operations.setup', href: '/setup' },
       { id: 'runtime', title: 'Runtime health', description: 'Inspect governed queues, policy, audit and resource pressure.', operation: 'ops.runtime', href: '/control-plane' },
       { id: 'deployments', title: 'Deployments', description: 'Review build and deployment state.', operation: 'ops.deployments' },
     ],

@@ -45,6 +45,13 @@ ROUTE_DOMAIN_RULES: tuple[RouteRule, ...] = (
     RouteRule("/api/jeeves", "jeeves"),
     RouteRule("/api/gameforge", "gameforge"),
     RouteRule("/api/galaxy-studio", "studio"),
+    RouteRule("/api/game-console-studio", "studio"),
+    RouteRule("/api/game-successor", "studio"),
+    RouteRule("/api/game-studio-agent", "studio"),
+    RouteRule("/api/game-studio-tools", "studio"),
+    RouteRule("/api/game-studio-health", "studio"),
+    RouteRule("/api/game-studio-learning", "learning"),
+    RouteRule("/api/game-learning", "learning"),
     RouteRule("/api/worldforge", "worldforge"),
     RouteRule("/api/vault", "vault"),
     RouteRule("/api/binary", "build_artifacts"),
@@ -73,9 +80,7 @@ class CatalogRouteDomainPolicy(RouteDomainPolicy):
         domain_rules: Sequence[RouteRule],
     ) -> None:
         super().__init__(open_prefixes=open_prefixes, domain_rules=domain_rules)
-        self._exact_open_paths = frozenset(
-            self._normalize_path(path) for path in exact_open_paths
-        )
+        self._exact_open_paths = frozenset(self._normalize_path(path) for path in exact_open_paths)
 
     @property
     def exact_open_paths(self) -> tuple[str, ...]:
@@ -121,9 +126,7 @@ def catalog_summary() -> dict[str, object]:
         "version": ROUTE_POLICY_CATALOG_VERSION,
         "open_prefixes": list(OPEN_ROUTE_PREFIXES),
         "exact_open_paths": list(OPEN_EXACT_PATHS),
-        "domain_rules": [
-            {"prefix": rule.prefix, "domain": rule.domain} for rule in ROUTE_DOMAIN_RULES
-        ],
+        "domain_rules": [{"prefix": rule.prefix, "domain": rule.domain} for rule in ROUTE_DOMAIN_RULES],
         "enforcement": "report_only",
         "fallback_domain": "legacy_api",
     }

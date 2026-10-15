@@ -6,14 +6,16 @@ idempotent and never returns secret values in receipts or logs.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
 import os
-from pathlib import Path
 import secrets
+import stat
+from dataclasses import dataclass
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from urllib.parse import quote, urlsplit
 
-from skeleton.app.assembly import find_repo_root
+from skeleton.app.assembly import _dotenv_value, find_repo_root
 
 
 @dataclass(frozen=True)
@@ -45,7 +47,7 @@ def _parse_env(text: str) -> dict[str, str]:
         key, value = line.split("=", 1)
         key = key.strip()
         if key:
-            values[key] = value.strip().strip('"').strip("'")
+            values[key] = _dotenv_value(value)
     return values
 
 
@@ -136,14 +138,96 @@ def _atomic_write(path: Path, text: str) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str, str] | None:
+    """Admit an explicit operator account without exposing a password in argv."""
+
+    if email is None and password_file is None:
+        return None
+    if email is None or password_file is None:
+        raise ValueError("--admin-email and --admin-password-file must be supplied together")
+    email = email.strip().lower()
+    if (
+        len(email) > 254
+        or email.count("@") != 1
+        or any(char.isspace() or ord(char) < 32 for char in email)
+        or not all(email.split("@"))
+    ):
+        raise ValueError("operator admin email must be a valid non-empty email address")
+    descriptor = os.open(Path(password_file).expanduser(), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(descriptor, "rb") as handle:
+        info = os.fstat(handle.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 4096:
+            raise ValueError("admin password input must be a regular file of at most 4096 bytes")
+        if os.name != "nt" and info.st_mode & 0o077:
+            raise ValueError("admin password file must be private; run chmod 600 on that file")
+        raw = handle.read(4097)
+    if len(raw) > 4096:
+        raise ValueError("admin password file exceeds 4096 bytes")
+    try:
+        password = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValueError("admin password file must contain UTF-8 text") from None
+    if password.endswith("\r\n"):
+        password = password[:-2]
+    elif password.endswith("\n"):
+        password = password[:-1]
+    if (
+        len(password) < 16
+        or len(password.encode("utf-8")) > 72
+        or any(ord(char) < 32 or ord(char) == 127 for char in password)
+    ):
+        raise ValueError(
+            "admin password must contain at least 16 characters, at most 72 UTF-8 bytes and no control characters"
+        )
+    return email, password
+
+
+def _prepare_model_directory(root: Path, values: dict[str, str]) -> bool:
+    """Prepare the operator's bind root before Docker can create it as root."""
+
+    raw = os.environ.get("SKELETON_LOCAL_MODEL_DIR", values.get("SKELETON_LOCAL_MODEL_DIR", ""))
+    raw = raw.strip() or "./data/local-ai"
+    if "\x00" in raw or len(raw) > 4096:
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR must be a valid local directory path")
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = root / path
+    if path.is_symlink():
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR must name a real directory, not a symbolic link")
+    created = False
+    try:
+        path.mkdir(parents=True, mode=0o755)
+        path.chmod(0o755)
+        created = True
+    except FileExistsError:
+        if not path.is_dir():
+            raise ValueError("SKELETON_LOCAL_MODEL_DIR exists but is not a directory") from None
+    except OSError:
+        raise ValueError(
+            "Cannot prepare SKELETON_LOCAL_MODEL_DIR; choose an operator-owned directory and check parent permissions"
+        ) from None
+    try:
+        empty = next(path.iterdir(), None) is None
+    except OSError:
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR must be readable by the operator") from None
+    if empty and not os.access(path, os.W_OK | os.X_OK):
+        raise ValueError(
+            "Empty SKELETON_LOCAL_MODEL_DIR is not writable; select an operator-owned directory or repair its ownership before provisioning"
+        )
+    return created
+
+
 def ensure_runtime_environment(
     root: Path | None = None,
     *,
     rotate_secrets: bool = False,
+    admin_email: str | None = None,
+    admin_password_file: Path | None = None,
 ) -> SetupResult:
     """Create or repair .env without overwriting valid existing values."""
 
     root = (root or find_repo_root()).resolve()
+    operator_admin = _operator_admin(admin_email, admin_password_file)
     env_path = root / ".env"
     example_path = root / ".env.example"
     created = not env_path.exists()
@@ -167,6 +251,21 @@ def ensure_runtime_environment(
     values = _parse_env(text)
     configured: list[str] = []
     preserved: list[str] = []
+    if operator_admin is not None:
+        email, password = operator_admin
+        for key, value in (
+            ("GAMEFORGE_SEED_ADMIN_EMAIL", email),
+            ("GAMEFORGE_SEED_ADMIN_PASSWORD", password),
+        ):
+            if values.get(key) == value:
+                preserved.append(key)
+            else:
+                # Compose interpolates unquoted/double-quoted dollar values.
+                # JSON quoting plus escaped dollar pairs preserves exact bytes.
+                literal = json.dumps(value, ensure_ascii=False).replace("$", "$$")
+                text = _replace_env_value(text, key, literal)
+                values[key] = value
+                configured.append(key)
 
     username = values.get("MONGO_INITDB_ROOT_USERNAME", "admin").strip() or "admin"
     if not values.get("MONGO_INITDB_ROOT_USERNAME", "").strip():
@@ -188,13 +287,25 @@ def ensure_runtime_environment(
         preserved.append("MONGO_INITDB_ROOT_PASSWORD")
 
     jwt_secret = values.get("JWT_SECRET", "")
-    if rotate_secrets or _is_placeholder(jwt_secret):
+    if rotate_secrets or _is_placeholder(jwt_secret) or not 32 <= len(jwt_secret) <= 4096:
         jwt_secret = secrets.token_hex(32)
         text = _replace_env_value(text, "JWT_SECRET", jwt_secret)
         values["JWT_SECRET"] = jwt_secret
         configured.append("JWT_SECRET")
     else:
         preserved.append("JWT_SECRET")
+
+    # The existing GameForge auth owner uses a different configuration key.
+    # Keep its signing identity stable too, without sharing signing material
+    # between the two existing authentication surfaces.
+    gameforge_secret = values.get("GAMEFORGE_JWT_SECRET", "")
+    if rotate_secrets or _is_placeholder(gameforge_secret) or not 32 <= len(gameforge_secret) <= 4096:
+        gameforge_secret = secrets.token_hex(32)
+        text = _replace_env_value(text, "GAMEFORGE_JWT_SECRET", gameforge_secret)
+        values["GAMEFORGE_JWT_SECRET"] = gameforge_secret
+        configured.append("GAMEFORGE_JWT_SECRET")
+    else:
+        preserved.append("GAMEFORGE_JWT_SECRET")
 
     # The backend and engine must share this value before Compose can start.
     # Upgrade existing .env files as well as templates predating Stage-5.
@@ -266,8 +377,32 @@ def ensure_runtime_environment(
             preserved.append(key)
 
     for key in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY", "STRIPE_API_KEY"):
-        if _is_placeholder(values.get(key, "")):
+        current = values.get(key, "")
+        if current and _is_placeholder(current):
+            text = _replace_env_value(text, key, "")
+            values[key] = ""
+            configured.append(key)
+        if not values.get(key, ""):
             warnings.append(f"{key} remains optional and unconfigured")
+
+    if not values.get("AI_PROVIDER", "").strip():
+        # Preserve existing genuine hosted configuration on upgrades. Clean
+        # installations need neither a provider credential nor invented weights.
+        provider = (
+            "openai" if any(values.get(key) for key in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY")) else "local"
+        )
+        text = _replace_env_value(text, "AI_PROVIDER", provider)
+        values["AI_PROVIDER"] = provider
+        configured.append("AI_PROVIDER")
+    if values["AI_PROVIDER"].strip().lower() == "local" and not any(
+        values.get(key, "").strip() for key in ("AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH")
+    ):
+        warnings.append(
+            "AI is unavailable until a trained local model is configured; application services can still start"
+        )
+
+    if _prepare_model_directory(root, values):
+        warnings.append("Local AI mount directory prepared; no model files acquired or provider activated")
 
     changed = created or bool(configured)
     if changed:

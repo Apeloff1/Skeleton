@@ -17,6 +17,10 @@ __pycache__/
 develop-eggs/
 dist/
 downloads/
+# Operator-provisioned model weights, binaries and manifests.
+/data/local-ai/
+# Canonical product-control operational ledgers are runtime state.
+/data/product-control/
 eggs/
 .eggs/
 lib/
@@ -185,6 +189,7 @@ chronicle/persistkv.json
 
 # WORM vault audit chain (runtime durable ledger)
 data/vault/
+/data/local-ai/
 
 # Generated pre-E2E diagnostic evidence stays in runner artifacts.
 /.e2e-evidence/

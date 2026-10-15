@@ -44,6 +44,9 @@ services:
       - BACKEND_TOOL_RECEIPT_PATH=/app/data/backend_tool_receipts.sqlite3
       - BACKEND_TOOL_RESULT_PATH=/app/data/backend_tool_results.sqlite3
       - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
+      # Preserve operator proxy settings while bypassing private service traffic.
+      - NO_PROXY=localhost,127.0.0.1,::1,skeleton,mongo,backend,chroma,${NO_PROXY:-},${no_proxy:-}
+      - no_proxy=localhost,127.0.0.1,::1,skeleton,mongo,backend,chroma,${NO_PROXY:-},${no_proxy:-}
       - SKL_ENGINE_ALLOWED_TENANTS_CSV=${SKL_ENGINE_ALLOWED_TENANTS_CSV:-*}
       - SKL_ENGINE_ALLOWED_CAPABILITIES_CSV=${SKL_ENGINE_ALLOWED_CAPABILITIES_CSV:-*}
       - SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite
@@ -57,11 +60,13 @@ services:
       - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}
       - SKELETON_MASTER_SECRET=${SKELETON_MASTER_SECRET:?SKELETON_MASTER_SECRET must be initialized by Skeleton setup}
       # Runtime model selection is owned by the Skeleton engine process.
-      # Local mode uses a model artifact placed in the persistent skeleton_data
-      # volume (default /app/data/local-model.json) and requires no provider key.
-      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      # Local mode requires an explicit trained artifact or pinned deployment.
+      # Empty paths keep AI unavailable while application services can boot.
+      - AI_PROVIDER=${AI_PROVIDER:-local}
       - AI_MODEL=${AI_MODEL:-}
-      - AI_LOCAL_MODEL_PATH=${AI_LOCAL_MODEL_PATH:-/app/data/local-model.json}
+      - AI_LOCAL_MODEL_PATH=${AI_LOCAL_MODEL_PATH:-}
+      - AI_LOCAL_DEPLOYMENT_PATH=${AI_LOCAL_DEPLOYMENT_PATH:-}
+      - AI_TIMEOUT_SECONDS=${AI_TIMEOUT_SECONDS:-120}
       - AI_LOCAL_MODEL_CACHE_SIZE=${AI_LOCAL_MODEL_CACHE_SIZE:-128}
       - AI_LOCAL_MODEL_SEED=${AI_LOCAL_MODEL_SEED:-0}
       - AI_VERIFICATION_MODEL=${AI_VERIFICATION_MODEL:-}
@@ -81,6 +86,7 @@ services:
       start_period: 15s
     volumes:
       - skeleton_data:/app/data
+      - ${SKELETON_LOCAL_MODEL_DIR:-./data/local-ai}:/app/local-ai:ro
     networks:
       - tutolage
 
@@ -108,22 +114,34 @@ services:
       - "${BACKEND_PORT:-8001}:8001"
     environment:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
+      - DB_NAME=${DB_NAME:-tutolage}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - DEBUG=${DEBUG:-false}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
-      # GameForge authenticates and signs requests in the backend process.
-      # Keep its identity stable across upgrades and Docker image recreation.
-      - GAMEFORGE_JWT_SECRET=${GAMEFORGE_JWT_SECRET:?GAMEFORGE_JWT_SECRET must be initialized by Skeleton setup}
+      - GAMEFORGE_JWT_SECRET=${GAMEFORGE_JWT_SECRET:?GAMEFORGE_JWT_SECRET must be set; run app setup}
+      - GAMEFORGE_AUTH_ENFORCE=${GAMEFORGE_AUTH_ENFORCE:-true}
+      - GAMEFORGE_SEED_ADMIN_EMAIL=${GAMEFORGE_SEED_ADMIN_EMAIL:-}
+      - GAMEFORGE_SEED_ADMIN_PASSWORD=${GAMEFORGE_SEED_ADMIN_PASSWORD:-}
+      - SKIP_HEAVY_SEED=${SKIP_HEAVY_SEED:-true}
+      - CURIOSITY_DATA_ROOT=/app/data/curiosity
+      - CURIOSITY_IDLE_ENABLED=${CURIOSITY_IDLE_ENABLED:-false}
       - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}
       - GF_KEYHOLDER_SEED=${GF_KEYHOLDER_SEED:?GF_KEYHOLDER_SEED must be initialized by Skeleton setup}
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
       - SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}
+      - SKELETON_ENGINE_EXECUTION_TIMEOUT_S=${SKELETON_ENGINE_EXECUTION_TIMEOUT_S:-600}
       - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
+      # Preserve operator proxy settings while bypassing private service traffic.
+      - NO_PROXY=localhost,127.0.0.1,::1,skeleton,mongo,backend,chroma,${NO_PROXY:-},${no_proxy:-}
+      - no_proxy=localhost,127.0.0.1,::1,skeleton,mongo,backend,chroma,${NO_PROXY:-},${no_proxy:-}
       - SKL_ENGINE_SERVICE_PRINCIPAL=${SKL_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
       - SKL_JEEVES_CANONICAL_CONVERSATIONS=${SKL_JEEVES_CANONICAL_CONVERSATIONS:-1}
       - SKL_DRAGON_PRACTICE_DB_PATH=/app/data/dragon_practice.sqlite
+      - SKL_DRAGON_KNOWLEDGE_DB_PATH=/app/data/dragon_knowledge.sqlite
+      - SKL_DRAGON_RUNTIME_BOOTSTRAP=${SKL_DRAGON_RUNTIME_BOOTSTRAP:-1}
     volumes:
       - backend_data:/app/data
     depends_on:
@@ -146,6 +164,9 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        EXPO_PUBLIC_BACKEND_URL: ${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8001}
+        EXPO_PUBLIC_SKELETON_URL: ${EXPO_PUBLIC_SKELETON_URL:-http://localhost:8010}
       target: ${FRONTEND_BUILD_TARGET:-development}
     container_name: tutolage-frontend
     restart: unless-stopped

@@ -20,6 +20,7 @@ These are pure-Python and depend only on motor/fastapi/asyncio.
 Every primitive is no-op safe — if something explodes inside, the wrapped
 work still happens. Reliability code must NEVER be the reason for an outage.
 """
+
 from __future__ import annotations
 import asyncio
 import functools
@@ -39,18 +40,22 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("Reliability")
 
+
 # ════════════════════════════════════════════════════════════════════════════
 #  1. IDEMPOTENCY
 # ════════════════════════════════════════════════════════════════════════════
 class _IdemEntry:
     __slots__ = ("ts", "result")
+
     def __init__(self, result):
         self.ts = time.time()
         self.result = result
 
+
 _IDEM_CACHE: dict[str, _IdemEntry] = {}
 _IDEM_LOCKS: dict[str, asyncio.Lock] = {}
 IDEM_TTL_SEC = 5 * 60  # 5-min window — enough to deduplicate retry storms.
+
 
 def _idem_evict():
     """Drop entries older than IDEM_TTL_SEC (called opportunistically)."""
@@ -59,6 +64,7 @@ def _idem_evict():
     for k in stale:
         _IDEM_CACHE.pop(k, None)
         _IDEM_LOCKS.pop(k, None)
+
 
 def idempotent(ttl: int = IDEM_TTL_SEC):
     """Decorator: dedupe POST handlers by `Idempotency-Key` header.
@@ -71,13 +77,16 @@ def idempotent(ttl: int = IDEM_TTL_SEC):
     If two requests arrive with the same key, the second waits for the
     first to finish and returns the same response.  Window: TTL seconds.
     """
+
     def decorator(fn: Callable[..., Awaitable[Any]]):
         @functools.wraps(fn)
         async def wrapper(*args, **kwargs):
             # Locate Request object (might be positional or kw)
             req: Optional[Request] = None
             for a in args:
-                if isinstance(a, Request): req = a; break
+                if isinstance(a, Request):
+                    req = a
+                    break
             if req is None:
                 req = kwargs.get("request")
             if req is None:
@@ -97,7 +106,9 @@ def idempotent(ttl: int = IDEM_TTL_SEC):
                 result = await fn(*args, **kwargs)
                 _IDEM_CACHE[full_key] = _IdemEntry(result)
                 return result
+
         return wrapper
+
     return decorator
 
 
@@ -106,7 +117,10 @@ def idempotent(ttl: int = IDEM_TTL_SEC):
 # ════════════════════════════════════════════════════════════════════════════
 async def mongo_retry(
     coro_factory: Callable[[], Awaitable[Any]],
-    *, retries: int = 3, base_delay: float = 0.15, max_delay: float = 1.5,
+    *,
+    retries: int = 3,
+    base_delay: float = 0.15,
+    max_delay: float = 1.5,
     label: str = "mongo",
 ):
     """Run an async Mongo call with exponential backoff.
@@ -152,8 +166,10 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
 
     Bypass paths can be passed via `bypass_prefixes` (e.g. SSE / WebSocket).
     """
-    def __init__(self, app, *, timeout: float = 60.0,
-                 bypass_prefixes: tuple[str, ...] = ("/api/ai/stream", "/api/sse")):
+
+    def __init__(
+        self, app, *, timeout: float = 60.0, bypass_prefixes: tuple[str, ...] = ("/api/ai/stream", "/api/sse")
+    ):
         super().__init__(app)
         self.timeout = timeout
         self.bypass = bypass_prefixes
@@ -182,6 +198,7 @@ class CircuitBreaker:
         open     — short-circuit all calls for cool_down seconds.
         half_open — let one call through; success closes, fail re-opens.
     """
+
     def __init__(self, *, name: str, fail_threshold: int = 5, cool_down: float = 60.0):
         self.name = name
         self.fail_threshold = fail_threshold
@@ -232,18 +249,22 @@ SCRAPER_BREAKER = CircuitBreaker(name="scraper", fail_threshold=8, cool_down=120
 DLQ_MAX = 200
 _DLQ: deque[dict] = deque(maxlen=DLQ_MAX)
 
+
 def dlq_push(task_label: str, error: Exception | str, payload: Any = None):
     """Record a failed task for /api/health/dlq inspection."""
     try:
-        _DLQ.append({
-            "ts": datetime.utcnow().isoformat(),
-            "task": task_label,
-            "error": "task_failed",
-            "error_type": type(error).__name__ if isinstance(error, BaseException) else "str",
-            "payload_keys": list(payload.keys())[:20] if isinstance(payload, dict) else None,
-        })
+        _DLQ.append(
+            {
+                "ts": datetime.utcnow().isoformat(),
+                "task": task_label,
+                "error": "task_failed",
+                "error_type": type(error).__name__ if isinstance(error, BaseException) else "str",
+                "payload_keys": list(payload.keys())[:20] if isinstance(payload, dict) else None,
+            }
+        )
     except Exception:
         pass
+
 
 def dlq_snapshot() -> list[dict]:
     return list(_DLQ)
@@ -314,6 +335,7 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
 
     Health-check paths are NEVER shed so K8s probes still pass.
     """
+
     NEVER_SHED = ("/api/health", "/api/health/", "/api/healthz", "/api/readiness", "/api/liveness")
 
     def __init__(self, app, *, wd_stale_sec: float = 120.0, lag_threshold_ms: float = 750.0):
@@ -331,7 +353,11 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
                 # Watchdog stale check
                 try:
                     from core import build_watchdog as _bwd
-                    if _bwd._tick_count > 0 and (time.time() - getattr(_bwd, "_last_tick_at", time.time())) > self.wd_stale_sec:
+
+                    if (
+                        _bwd._tick_count > 0
+                        and (time.time() - getattr(_bwd, "_last_tick_at", time.time())) > self.wd_stale_sec
+                    ):
                         shed = True
                 except Exception:
                     pass
@@ -349,7 +375,7 @@ def reliability_snapshot() -> dict:
     return {
         "idempotency": {"cache_size": len(_IDEM_CACHE), "ttl_sec": IDEM_TTL_SEC},
         "circuit_breakers": {
-            "llm":     {"state": LLM_BREAKER.state,     "fails": LLM_BREAKER._fail_count},
+            "llm": {"state": LLM_BREAKER.state, "fails": LLM_BREAKER._fail_count},
             "scraper": {"state": SCRAPER_BREAKER.state, "fails": SCRAPER_BREAKER._fail_count},
         },
         "dlq": {"size": len(_DLQ), "max": DLQ_MAX},
@@ -358,9 +384,15 @@ def reliability_snapshot() -> dict:
 
 
 __all__ = [
-    "idempotent", "mongo_retry", "RequestTimeoutMiddleware",
-    "CircuitBreaker", "LLM_BREAKER", "SCRAPER_BREAKER",
-    "dlq_push", "dlq_snapshot",
-    "install_graceful_drain", "LoadSheddingMiddleware",
+    "idempotent",
+    "mongo_retry",
+    "RequestTimeoutMiddleware",
+    "CircuitBreaker",
+    "LLM_BREAKER",
+    "SCRAPER_BREAKER",
+    "dlq_push",
+    "dlq_snapshot",
+    "install_graceful_drain",
+    "LoadSheddingMiddleware",
     "reliability_snapshot",
 ]
