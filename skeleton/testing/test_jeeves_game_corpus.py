@@ -20,16 +20,34 @@ class JeevesGameCorpusTests(unittest.TestCase):
             rows = []
             for family in families:
                 for i in range(count):
+                    if split == "train":
+                        prompt = (
+                            f"Design a playable {family} scenario with seed train-{i} "
+                            "and clearly signposted decisions for the player."
+                        )
+                        answer = (
+                            f"For {family}, provide mechanics, original objectives, player "
+                            f"agency, recoverable outcomes and resource constraints. Train example {i}."
+                        )
+                    else:
+                        # The HOLDOUT authoring template is intentionally
+                        # different from training. Otherwise a six-gram leak
+                        # check correctly rejects these synthetic fixtures.
+                        prompt = (
+                            f"Evaluate the {family} consequences of a confusing hidden "
+                            f"route where a novice encounters setback heldout-{i}."
+                        )
+                        answer = (
+                            f"Inspect {family} consequences after the detour, determine "
+                            f"whether novices can return, and document alternatives. "
+                            f"Evaluation example {i} with unique authored context."
+                        )
                     rows.append({
                         "id": f"{split}_{family}_{i:03d}",
                         "split": split,
                         "family": family,
-                        "prompt": f"Design a playable {family} scenario with unique seed {split}-{i} and clear player choices.",
-                        "answer": (
-                            f"For {family}, use an original coherent game loop with agency, "
-                            f"observable feedback and safe recovery. This is the authored "
-                            f"{split} case {i}; introduce distinct interactions {family}-{i}."
-                        ),
+                        "prompt": prompt,
+                        "answer": answer,
                         "rights": {
                             "schema_version": RIGHTS_SCHEMA,
                             "source_kind": "original_authoring",
