@@ -74,11 +74,11 @@ def _active_snapshot(blob: dict[str, Any]) -> tuple[str, dict[str, Any], str]:
     snapshot = blob.get(key)
     if not isinstance(snapshot, dict):
         raise ProductionCheckpointError("active production speaking weights missing: " + key)
-    if snapshot.get("kind") == "torch-stack":
-        raise ProductionCheckpointError(
-            "active torch-stack model requires the TorchTransformer trainer"
-        )
-    required = ("itos", "E", "layers", "dim", "ctx", "steps", "fitted")
+    kind = snapshot.get("kind")
+    if kind == "torch-stack":
+        required = ("itos", "state", "dim", "ctx", "steps", "fitted")
+    else:
+        required = ("itos", "E", "layers", "dim", "ctx", "steps", "fitted")
     if any(field not in snapshot for field in required):
         raise ProductionCheckpointError("active production model is not a weight-bearing snapshot")
     if type(snapshot["steps"]) is not int or type(snapshot["fitted"]) is not int:
@@ -133,7 +133,11 @@ def _texts() -> tuple[tuple[str, ...], dict[str, tuple[str, ...]]]:
 def _token_coverage(model: Any, corpus: tuple[str, ...]) -> float:
     total = unseen = 0
     for text in corpus:
-        ids = model._ids(text)
+        if hasattr(model, "_ids"):
+            ids = model._ids(text)
+        else:
+            from skeleton.cortex.port import tokens
+            ids = [model._id(piece) for piece in tokens(text)]
         total += len(ids)
         unseen += sum(1 for token in ids if token == model.unk)
     return 0.0 if total == 0 else (total - unseen) / total
@@ -197,8 +201,17 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         raise ProductionCheckpointError("outputs cannot overwrite active production checkpoint")
     dataset, heldout = _texts()
     selected_key, original_snapshot, mouth = _active_snapshot(original)
-    model = TinyTransformer.from_snapshot(original_snapshot)
-    model.bpe = BytePairEncoder.from_snapshot(original["bpe"])
+    torch_stack = original_snapshot.get("kind") == "torch-stack"
+    if torch_stack:
+        from skeleton.cortex.torch_lm import TorchTransformer
+        model = TorchTransformer.from_snapshot(original_snapshot)
+        if model.snapshot().get("state") != original_snapshot.get("state"):
+            raise ProductionCheckpointError("restored Torch model weights differ from the production checkpoint")
+    else:
+        model = TinyTransformer.from_snapshot(original_snapshot)
+        model.bpe = BytePairEncoder.from_snapshot(original["bpe"])
+        if model.snapshot().get("E") != original_snapshot.get("E"):
+            raise ProductionCheckpointError("restored native embeddings differ from production checkpoint")
     if model.snapshot()["steps"] != original_snapshot["steps"]:
         raise ProductionCheckpointError("restored transformer training cursor mismatch")
     vocab_coverage = _token_coverage(model, dataset + tuple(
@@ -214,7 +227,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     before, sample_before = _heldout(model, heldout)
     steps_before = model.steps
     for _ in range(epochs):
-        model.fit(dataset, lr=lr, schedule="cosine")
+        if torch_stack:
+            model.fit(dataset, lr=lr)
+        else:
+            model.fit(dataset, lr=lr, schedule="cosine")
     trained_snapshot = model.snapshot()
     if model.steps <= steps_before or trained_snapshot == original_snapshot:
         raise ProductionCheckpointError("production-derived weights did not change")
@@ -230,6 +246,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "source": "operator_pinned_live_jeeves_cortex",
         "source_checkpoint_sha256": parent_sha,
         "model_kind": "JeevesCortex." + selected_key,
+        "architecture": "torch-stack" if torch_stack else "TinyTransformer",
         "speaking_mouth": mouth,
         "production_weights_modified": False,
         "candidate_promoted": False,
