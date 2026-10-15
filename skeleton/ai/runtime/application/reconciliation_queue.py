@@ -26,6 +26,10 @@ class ReconciliationQueue:
         self._items: Deque[ReconciliationItem] = deque(maxlen=max_items)
 
     def enqueue(self, item: ReconciliationItem) -> None:
+        # A full recovery queue must reject additional work. deque(maxlen=N)
+        # otherwise silently evicts its oldest (unreconciled) item.
+        if len(self._items) >= self._items.maxlen:
+            raise OverflowError("reconciliation queue is full")
         self._items.append(item)
 
     def dequeue(self) -> ReconciliationItem | None:
