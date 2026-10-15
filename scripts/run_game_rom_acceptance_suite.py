@@ -236,7 +236,8 @@ def _verify_serial_source(directory: Path) -> dict[str, Any]:
         or report.get("status") != "original_DMG_disconnected_serial_source_replayed"
         or report.get("original_owned_source_ROM_only") is not True
         or report.get("real_serial_cpu_modes") != 2
-        or report.get("actual_cpu_oscillator_steps") != 2048
+        or report.get("actual_cpu_oscillator_steps") != 2042
+        or report.get("actual_original_cpu_instruction_calls") != 2050
         or report.get("hardware_serial_bit_cycles") != 512
         or report.get("unattached_external_link_peer_fabricated") is not False
         or report.get("interconsole_link_gameplay_verified") is not False
@@ -251,7 +252,9 @@ def _verify_serial_source(directory: Path) -> dict[str, Any]:
                 "DMG_internal_disconnected" if index == 0 else "DMG_external_unclocked"
             )
             or row.get("CPU_started_actual_SB_SC_writes") != 4
-            or row.get("actual_cpu_clock_advance_instructions") != 1024
+            or row.get("actual_cpu_clock_advance_instructions") != 1021
+            or row.get("source_program_cpu_instruction_calls") != 1025
+            or row.get("serial_start_opcode_clocked_tcycles") != 12
             or row.get("hardware_clock_t_cycles_observed") != 4096
             or row.get("exact_source_cpu_replay") is not True
             or row.get("source_finished_snapshot_sha256") != row.get("source_replayed_snapshot_sha256")
