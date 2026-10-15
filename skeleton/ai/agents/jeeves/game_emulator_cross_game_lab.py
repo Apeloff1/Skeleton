@@ -149,11 +149,13 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
     if _digest(start) != digest_before:
         raise CrossGameComparisonError("same-core restore changed exact pre-intervention source state")
     previous_frame = _frame(environment)
+    previous_observation = dict(before)
     transitions, visual_changes, initial_frame = [], 0, previous_frame
     for sequence, action in enumerate(program):
         step = environment.step(action)
         frame = _frame(environment)
-        visual_changes += frame != previous_frame
+        observed_change = frame != previous_frame
+        visual_changes += observed_change
         previous_frame = frame
         if not isinstance(step.observation, Mapping) or not isinstance(step.reward_components, Mapping):
             raise CrossGameComparisonError("source step has no actual reward/observation contract")
@@ -167,17 +169,33 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
         # Source Game Boy ROM steps do not declare transition_digest;
         # create an explicitly LOCAL projection hash of measured data,
         # never falsely label it as an engine-declared native receipt.
+        next_observation = dict(step.observation)
+        for measured in (previous_observation, next_observation, reward):
+            if (
+                not 1 <= len(measured) <= 64
+                or any(
+                    type(k) is not str or not 1 <= len(k) <= 128
+                    or type(v) not in (int, float) or not math.isfinite(float(v))
+                    for k, v in measured.items()
+                )
+            ):
+                raise CrossGameComparisonError("native game numeric observation/reward is not finite or bounded")
         projected = {
             "ordinal": sequence,
             "action": action,
+            "source_observation": previous_observation,
+            "source_next_observation": next_observation,
+            "source_reward_components": reward,
+            "source_visual_change_observed": observed_change,
             "actual_frame_sha256": frame,
-            "source_observation_sha256": _digest(dict(step.observation)),
+            "source_observation_sha256": _digest(next_observation),
             "source_reward_components_sha256": _digest(reward),
             "actual_machine_state_sha256": actual_state_digest,
             "declared_native_transition_sha256": declared_digest or None,
             "terminated": step.terminated,
             "truncated": step.truncated,
         }
+        previous_observation = next_observation
         transitions.append({
             **projected,
             "measured_source_projection_sha256": _digest(projected),
@@ -234,6 +252,7 @@ def verify_cross_game_comparison_receipt(document: Mapping[str, Any]) -> dict[st
         or not isinstance(pairs, list) or len(pairs) != n * (n - 1) // 2
         or report.get("actual_replayed_game_programs") != n * len(programs) * 2
         or report.get("actual_source_action_steps") != n * sum(map(len, programs)) * 2
+        or report.get("cross_game_feature_alignment_inferred") is not False
         or report.get("cross_game_rewards_equivalent") is not False
         or report.get("ai_training_gradient_updates") != 0
         or report.get("neural_model_promotion_authorized") is not False
@@ -241,6 +260,7 @@ def verify_cross_game_comparison_receipt(document: Mapping[str, Any]) -> dict[st
     ):
         raise CrossGameComparisonError("comparison source library, action budget or learning claims are unverified")
     seen = set()
+    candidate_rows = []
     for i, row in enumerate(library):
         if (
             not isinstance(row, dict)
@@ -268,6 +288,7 @@ def verify_cross_game_comparison_receipt(document: Mapping[str, Any]) -> dict[st
             ):
                 raise CrossGameComparisonError("source controller replay evidence is incomplete")
             prior = _sha(phase["initial_frame_sha256"])
+            previous_observation = None
             changes = 0
             for j, (action, step) in enumerate(zip(
                 actions, phase["controlled_source_step_receipts"], strict=True
@@ -287,6 +308,33 @@ def verify_cross_game_comparison_receipt(document: Mapping[str, Any]) -> dict[st
                 _sha(step["source_observation_sha256"])
                 _sha(step["source_reward_components_sha256"])
                 _sha(step["actual_machine_state_sha256"])
+                before = step.get("source_observation")
+                after = step.get("source_next_observation")
+                reward = step.get("source_reward_components")
+                if (
+                    not all(isinstance(candidate, dict) and 1 <= len(candidate) <= 64
+                            for candidate in (before, after, reward))
+                    or any(
+                        type(key) is not str or type(value) not in (int, float)
+                        or not math.isfinite(float(value))
+                        for candidate in (before, after, reward)
+                        for key, value in candidate.items()
+                    )
+                    or previous_observation is not None and before != previous_observation
+                    or _digest(after) != step["source_observation_sha256"]
+                    or _digest(reward) != step["source_reward_components_sha256"]
+                    or step.get("source_visual_change_observed") is not
+                        (step["actual_frame_sha256"] != prior)
+                ):
+                    raise CrossGameComparisonError("real numeric source feature, reward or frame-change chronology differs")
+                previous_observation = after
+                candidate_rows.append({
+                    "game_source_digest": row["request_digest"],
+                    "environment_digest": row["environment_digest"],
+                    "controller_program": actions,
+                    "step": j,
+                    "measured_source_projection_sha256": actual,
+                })
                 changes += step["actual_frame_sha256"] != prior
                 prior = step["actual_frame_sha256"]
             program = {
@@ -327,9 +375,15 @@ def verify_cross_game_comparison_receipt(document: Mapping[str, Any]) -> dict[st
                 or pair.get("gameplay_skill_or_causation_established") is not False
             ):
                 raise CrossGameComparisonError("cross-console visual difference evidence was fabricated or altered")
+    if (
+        report.get("candidate_numeric_source_rows") != len(candidate_rows)
+        or report.get("candidate_numeric_dataset_sha256") != _digest(candidate_rows)
+    ):
+        raise CrossGameComparisonError("measured numeric observation rows no longer match the candidate source dataset")
     return {
         "accepted": True,
         "source_game_count": n,
+        "verified_numeric_candidate_rows": len(candidate_rows),
         "real_replayed_source_programs": n * len(programs) * 2,
         "controlled_pairwise_comparisons": position,
         "production_model_gradient_steps": 0,
@@ -419,6 +473,18 @@ def compare_real_emulator_games(
                 "pixel_content_directly_comparable": False,
                 "gameplay_skill_or_causation_established": False,
             })
+    candidate_rows = [
+        {
+            "game_source_digest": game["request_digest"],
+            "environment_digest": game["environment_digest"],
+            "controller_program": phase["controller_program"],
+            "step": step["ordinal"],
+            "measured_source_projection_sha256": step["measured_source_projection_sha256"],
+        }
+        for game in compared
+        for phase in game["controller_programs"]
+        for step in phase["controlled_source_step_receipts"]
+    ]
     result = {
         "schema_version": SCHEMA,
         "status": "measured_source_emulator_controller_comparison",
@@ -431,6 +497,9 @@ def compare_real_emulator_games(
         "controlled_programs": [list(p) for p in programs],
         "actual_replayed_game_programs": len(admitted) * len(programs) * 2,
         "actual_source_action_steps": len(admitted) * sum(map(len, programs)) * 2,
+        "candidate_numeric_source_rows": len(candidate_rows),
+        "candidate_numeric_dataset_sha256": _digest(candidate_rows),
+        "cross_game_feature_alignment_inferred": False,
         "game_receipts": compared,
         "pairwise_measured_evidence": comparisons,
         "cross_game_rewards_equivalent": False,
