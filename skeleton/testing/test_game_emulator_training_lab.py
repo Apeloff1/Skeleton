@@ -146,7 +146,9 @@ class EmulatorTrainingCustodyTests(unittest.TestCase):
         with patch.object(GameEnvironmentRequest, "build", return_value=specimen):
             with self.assertRaises(EmulatorTrainingError):
                 _collect_audited(
-                    _request(), learner, EmulatorLabConfig(max_runs=10, steps_per_run=4),
+                    _request(), learner, EmulatorLabConfig(
+                        max_runs=10, steps_per_run=4, counterfactual_actions=0
+                    ),
                     run_index=0, seed=0, angle="boundary",
                     cancel=None, authorize=None,
                 )
@@ -170,6 +172,29 @@ class EmulatorTrainingCustodyTests(unittest.TestCase):
         self.assertTrue(report["limits"]["visual_novelty_is_not_game_success"])
         self.assertTrue(report["boomerang_replay_receipts"])
         self.assertNotEqual(report["report_digest"], "")
+
+    def test_pixel_audio_measurements_are_bounded_and_nonsemantic(self):
+        from skeleton.jeeves.game_emulator_host import _measured_signal_channels
+
+        pixels = bytes([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255])
+        channels = _measured_signal_channels(
+            pixels, 2, 2, [200, -200, -100, 100, 0, 0, 300, -300]
+        )
+        self.assertEqual(
+            set(channels),
+            {
+                "frame_entropy", "luma_contrast", "spatial_edges",
+                "color_saturation", "color_bias", "audio_peak",
+                "audio_zero_crossing", "stereo_difference",
+            },
+        )
+        self.assertTrue(all(0.0 <= value <= 1.0 for value in channels.values()))
+        self.assertGreater(channels["frame_entropy"], 0.0)
+        self.assertGreater(channels["stereo_difference"], 0.0)
+        self.assertEqual(
+            _measured_signal_channels(bytes(12), 2, 2, [])["audio_zero_crossing"],
+            0.0,
+        )
 
 
 if __name__ == "__main__":
