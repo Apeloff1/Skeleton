@@ -500,9 +500,10 @@ class GameLearningWorkspace:
                 )
                 try:
                     result["environment_actions"] = list(current_environment.spec.actions)
+                    descriptor = getattr(current_environment, "descriptor", None)
                     result["execution_descriptor"] = (
-                        current_environment.descriptor()
-                        if callable(getattr(current_environment, "descriptor", None))
+                        descriptor() if callable(descriptor)
+                        else dict(descriptor) if isinstance(descriptor, Mapping)
                         else current_environment.spec.as_dict()
                     )
                 finally:
@@ -1374,6 +1375,12 @@ class GameLearningWorkspace:
                     "Project studio identity no longer matches saved executable source.", 409,
                 )
             target = None
+            if type(episode_steps) is not int or episode_steps < 1:
+                raise GameLearningError("episode_limit", "Studio episode length must be positive.", 422)
+            # All consumers (live play, training, campaign, reset/simulate)
+            # must store the same length they send into the emulator-style
+            # child environment. No phantom 4096-step session can exist.
+            episode_steps = min(128, episode_steps)
         else:
             target = resolve_console(project["console_id"])
         selected = source_id or project.get("default_source_id")

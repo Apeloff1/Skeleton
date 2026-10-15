@@ -420,7 +420,9 @@ async def create(scope, project_id, body):
         round_limit=body["round_limit"],
         slice_rounds=body["slice_rounds"],
         episodes_per_round=body["episodes"],
-        episode_steps=body["max_steps"],
+        episode_steps=(min(128,body["max_steps"])
+                       if project["console_id"].startswith("studio:")
+                       else body["max_steps"]),
         seed=body["seed"],
         evaluation_seeds=body.get("evaluation_seeds", 3),
         curriculum=body.get("curriculum", "mixed"),
