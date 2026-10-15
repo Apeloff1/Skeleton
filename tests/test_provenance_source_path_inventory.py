@@ -19,6 +19,7 @@ LIVE_EXAMPLES = (
     ("backend/server.py", "canonical"),
     ("frontend/package.json", "canonical"),
     ("core/activation_security.py", "first-party"),
+    ("data/conversational/README.md", "first-party"),
     ("apps/jeeves/README.md", "first-party"),
     ("skeleton/testing/test_backlog_reader.py", "first-party"),
     ("backend/tests/test_architecture_boundaries.py", "first-party"),
@@ -90,6 +91,16 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("frontend/node_modules/react/index.js"), "vendor")
         self.assertEqual(policy.classify_path("skeleton/vendor/third.py"), "vendor")
         self.assertEqual(policy.classify_path("backend/third_party/lib.py"), "vendor")
+
+    def test_conversational_corpus_has_reviewable_first_party_owner(self) -> None:
+        for path in (
+            "data/conversational/README.md",
+            "data/conversational/conversations_20k.jsonl",
+            "data/conversational/MEGA_CONVERSATIONAL_CORPUS_10X2.txt",
+            "data/conversational/pareto_snippets_500k.txt",
+        ):
+            self.assertEqual(policy.classify_path(path), "first-party")
+        self.assertEqual(policy.classify_path("data/unknown/new_corpus.txt"), "unknown")
 
     def test_volume_forge_is_first_party_not_canonical(self) -> None:
         self.assertEqual(policy.classify_path("volume_forge/__init__.py"), "first-party")
