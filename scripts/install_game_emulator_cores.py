@@ -1716,7 +1716,7 @@ def _validate_recipe_contract():
             or any(
                 not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", key)
                 or not isinstance(value, str)
-                or not re.fullmatch(r"[A-Za-z0-9_./+:-]{1,128}", value)
+                or not re.fullmatch(r"[A-Za-z0-9_./+ :\-]{1,128}", value)
                 for key, value in variables.items()
             )):
             raise ValueError("Pinned make variables exceed safe literal bounds: " + core_id)
