@@ -138,7 +138,7 @@ def run_original_rom_ai_pipeline(
     model, neural_report = train_neural_world_from_evidence(
         evidence, policy,
         config=NeuralWorldConfig(
-            seed=seed, holdout_seed=seed + 1,
+            seed=seed, holdout_seed=(seed + 1) % (2**63),
             width=neural_width, epochs=neural_epochs,
             minibatch=8, max_samples=512,
             max_compute_units=8_000_000,
