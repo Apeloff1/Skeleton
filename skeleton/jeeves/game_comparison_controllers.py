@@ -11,7 +11,7 @@ from typing import Any
 
 from .game_comparison_schema import digest
 from .game_emulator_catalog import canonical_targets
-from .game_emulator_host import _ACTIONS, _KEY_ACTIONS, _controller_ports
+from .game_emulator_host import EmulatorEnvironment, _ACTIONS, _KEY_ACTIONS, _controller_ports
 
 SCHEMA = "skeleton.game.comparison_controller_layout.v1"
 
@@ -151,3 +151,45 @@ def supported_controller_layout_catalog() -> dict[str, Any]:
         "real_controller_compatibility_verified":0,
         "retro_input_device_coverage":["joypad","analog","keyboard","mouse","pointer","none"],
     }
+
+
+def controller_layout_for_native_environment(
+    target_id: str, environment: EmulatorEnvironment
+) -> dict[str, Any]:
+    """Bind a below-screen layout to *observed* core input metadata.
+
+    A native worker supplies the labels and device announcements; the layout
+    itself stays a semantic overlay. No API caller-supplied metadata is treated
+    as a hardware qualification or physical controller certification.
+    """
+    if not isinstance(environment, EmulatorEnvironment):
+        raise ValueError("A live approved native emulator session is required")
+    if target_id not in environment.core.target_ids:
+        raise ValueError("The hardware target does not belong to this approved core")
+    evidence = environment.controller_profile
+    panel = controller_layout_for_target(target_id, evidence["devices"])
+    capabilities = evidence["core_advertised_types"]
+    for slot in panel["ports"]:
+        port = slot["port"]
+        slot["native_core_port_status"] = evidence["port_status"][port]
+        slot["native_core_device_options"] = (
+            None if capabilities is None or port >= len(capabilities)
+            else [dict(row) for row in capabilities[port]]
+        )
+        slot["native_core_input_labels"] = [
+            dict(row) for row in evidence["core_input_descriptors"]
+            if row["port"] == port
+        ]
+        # The native core declares input types but this does not verify that
+        # the device physically works or that the input mapping is authentic.
+        slot["live_core_peripheral_validated"] = False
+    panel["runtime_kind"] = "installed_libretro_emulator"
+    panel["native_core_id"] = environment.core.core_id
+    panel["native_core_sha256"] = environment.core.library_sha256
+    panel["controller_evidence_sha256"] = environment.descriptor["core_controller_profile_digest"]
+    panel["notes"] = (
+        "Core-declared options and legends are observed from the live native core. "
+        "Neither a declaration nor this panel certifies hardware compatibility."
+    )
+    panel["layout_sha256"] = digest({k: v for k, v in panel.items() if k != "layout_sha256"})
+    return panel
