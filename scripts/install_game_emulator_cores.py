@@ -983,11 +983,12 @@ def install(args):
             if not args.continue_on_error:
                 raise
             failures.append({"core_id": identity, "error_type": type(exc).__name__, "message": str(exc)})
-    registry = GameEmulatorRegistry(args.install_root / "cores.json")
+    registry_path = args.install_root / "cores.json"
+    registry = GameEmulatorRegistry(registry_path) if registry_path.exists() else None
     return {
         "status": "partial_core_installation" if failures else "compiled_artifacts_installed",
-        "registry_digest": registry.registry_digest,
-        "registry_path": str(args.install_root / "cores.json"),
+        "registry_digest": registry.registry_digest if registry is not None else None,
+        "registry_path": str(registry_path) if registry is not None else None,
         "environment_variable": "SKL_GAME_EMULATOR_REGISTRY",
         "cores": records,
         "selected_count": len(selected),
