@@ -33,6 +33,8 @@ jobs:
         run: |
           python -m compileall -q \
             skeleton/jeeves/game_comparison_live.py \
+            skeleton/jeeves/game_emulator_timing.py \
+            skeleton/jeeves/game_emulator_host.py \
             skeleton/jeeves/game_comparison_controllers.py \
             skeleton/jeeves/game_emulator_worker.py \
             skeleton/jeeves/game_comparison_live_evidence.py \
@@ -60,6 +62,7 @@ jobs:
         run: |
           python -m unittest -v \
             tests.test_game_comparison_live \
+            tests.test_game_emulator_timing \
             tests.test_game_comparison_core_input_descriptors \
             tests.test_game_comparison_counterfactual \
             tests.test_game_comparison_counterfactual_integrity \
