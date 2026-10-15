@@ -318,6 +318,8 @@ class SimulationController:
                      entry.get("digest") == _hash({
                          "frame": frame, "previous_digest": prior,
                      }), "simulation checkpoint chain integrity failed")
+            _require(_json(frame) == _json(controller._expected_frame(index)),
+                     "checkpoint evidence inconsistent with authored scene")
             prior = entry["digest"]
         _require(prior == checkpoint["tail_digest"],
                  "simulation checkpoint tail does not match observation chain")
@@ -376,15 +378,22 @@ class SimulationController:
                 "lighting": shot["lighting_id"], "dialogue": shot["dialogue_ids"],
                 "issues": issues}
 
+    def _expected_frame(self, index: int) -> dict[str, Any]:
+        """Stateless source-derived camera/prop oracle for both sim and audit."""
+        frame = self._frame(index)
+        if index:
+            previous = self._frame(index - 1)
+            if previous["shot"] == frame["shot"]:
+                difference = abs(_angle_difference(previous["yaw_deg"], frame["yaw_deg"]))
+                elapsed = max(1, frame["tick_ms"] - previous["tick_ms"])
+                if difference * 1000 / elapsed > 180:
+                    frame["issues"].append("abrupt_camera_pan_rate")
+        return frame
+
     def step(self) -> dict[str, Any] | None:
         if self.paused or self.cursor >= len(self.times):
             return None
-        frame = self._frame(self.cursor)
-        if self.trace and frame["shot"] == self.trace[-1]["shot"]:
-            difference = abs(_angle_difference(self.trace[-1]["yaw_deg"], frame["yaw_deg"]))
-            elapsed = max(1, frame["tick_ms"] - self.trace[-1]["tick_ms"])
-            if difference * 1000 / elapsed > 180:
-                frame["issues"].append("abrupt_camera_pan_rate")
+        frame = self._expected_frame(self.cursor)
         body = {"frame": frame, "previous_digest": self.previous_digest}
         entry = {**frame, "previous_digest": self.previous_digest, "digest": _hash(body)}
         self.trace.append(entry)
@@ -409,6 +418,7 @@ class SimulationController:
             fields = {k: v for k, v in entry.items() if k not in ("digest", "previous_digest")}
             recomputed = _hash({"frame": fields, "previous_digest": entry["previous_digest"]})
             if (entry["frame"] != index or entry["digest"] != recomputed or
+                    _json(fields) != _json(self._expected_frame(index)) or
                     (successor is not None and successor["previous_digest"] != entry["digest"]) or
                     (index == 0 and entry["previous_digest"] != ZERO)):
                 failures.append(index)
