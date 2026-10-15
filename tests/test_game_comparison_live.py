@@ -296,6 +296,9 @@ class NativeLiveComparisonContracts(unittest.TestCase):
         session.set_timing({"game_id":"first","mode":"fast","factor":4})
         burst=session.step({"steps":[{"game_id":"first","controls":self._controls_idle()}]})
         self.assertEqual(burst["results"][0]["completed_native_steps"],4)
+        self.assertEqual(burst["results"][0]["fully_receipted_native_frames"],4)
+        self.assertGreaterEqual(burst["results"][0]["observed_native_frames_per_wall_second"],0)
+        self.assertGreater(burst["results"][0]["measured_wall_ms"],0)
         self.assertTrue(burst["all_succeeded"])
         self.assertEqual(verify_live_evidence(session.export_evidence())[
             "total_real_reported_native_steps"],5)
