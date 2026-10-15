@@ -50,9 +50,12 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         if initial!=expect:
             raise LiveEvidenceError("First native state hash differs from the initial approved environment")
         events=lane.get("native_events")
-        if not isinstance(events,list) or len(events)>260:
+        if not isinstance(events,list) or len(events)>292:
             raise LiveEvidenceError("Native event recording exceeds the 256-step + 4-reset lifetime cap")
         reset_generation=0
+        disc_changes=0
+        disc_image=None
+        host_disc_chain=digest(["native_disc_control",env_sha])
         episode_step=0
         steps=0
         previous=initial
@@ -92,12 +95,75 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                 steps+=1
                 episode_step+=1
                 episodes[-1].append(controls)
+            elif row["event_kind"]=="native_disc_swap":
+                required={
+                    "schema_version", "game_id", "index", "episode_step",
+                    "reset_generation", "source_content_sha256", "core_sha256",
+                    "native_host_disc_receipt_sha256", "native_host_disc_receipt",
+                    "previous_image_index", "selected_image_index",
+                    "registered_disc_count", "interface_version",
+                    "previous_chain_sha256", "native_frame_advanced",
+                    "receipt_sha256",
+                }
+                if (set(payload)!=required
+                    or payload["schema_version"]!="skeleton.game.live_native_disc_swap_receipt.v1"
+                    or payload["index"]!=disc_changes+1
+                    or payload["episode_step"]!=episode_step
+                    or payload["reset_generation"]!=reset_generation
+                    or payload["source_content_sha256"]!=source
+                    or payload["core_sha256"]!=core_sha
+                    or payload["native_frame_advanced"] is not False):
+                    raise LiveEvidenceError("Native disc event counters or source differ")
+                count=payload["registered_disc_count"]
+                old=payload["previous_image_index"]
+                new=payload["selected_image_index"]
+                if (type(count) is not int or not 2<=count<=32
+                    or type(old) is not int or not 0<=old<count
+                    or type(new) is not int or not 0<=new<count
+                    or new==old
+                    or (disc_image is not None and old!=disc_image)
+                    or type(payload["interface_version"]) is not int
+                    or payload["interface_version"] not in (0,1)):
+                    raise LiveEvidenceError("Disc swap did not select a valid distinct preloaded image")
+                host=payload["native_host_disc_receipt"]
+                host_fields={
+                    "schema_version", "core_sha256", "content_digest",
+                    "environment_digest", "event_index", "episode_step_before_swap",
+                    "previous_image_index", "selected_image_index", "registered_disc_count",
+                    "interface_version", "previous_disc_chain_sha256",
+                    "prior_game_transition_sha256", "rendered_frame_after_swap",
+                    "receipt_sha256",
+                }
+                if not isinstance(host,dict) or set(host)!=host_fields:
+                    raise LiveEvidenceError("Native host media provenance receipt is missing")
+                host_data={k:v for k,v in host.items() if k!="receipt_sha256"}
+                if (host["schema_version"]!="skeleton.game.native_disc_swap_receipt.v1"
+                    or host["core_sha256"]!=core_sha
+                    or host["content_digest"]!=source
+                    or host["environment_digest"]!=env_sha
+                    or host["event_index"]!=disc_changes+1
+                    or host["episode_step_before_swap"]!=episode_step
+                    or host["previous_image_index"]!=old
+                    or host["selected_image_index"]!=new
+                    or host["registered_disc_count"]!=count
+                    or host["interface_version"]!=payload["interface_version"]
+                    or host["previous_disc_chain_sha256"]!=host_disc_chain
+                    or host["rendered_frame_after_swap"] is not False
+                    or digest(host_data)!=host["receipt_sha256"]
+                    or host["receipt_sha256"]!=payload["native_host_disc_receipt_sha256"]):
+                    raise LiveEvidenceError("Native disc host receipt chain diverged")
+                disc_changes+=1
+                if disc_changes>32:
+                    raise LiveEvidenceError("Native disc swap lifetime exceeded 32 events")
+                disc_image=new
+                host_disc_chain=host["receipt_sha256"]
             elif row["event_kind"]=="native_reset":
                 if (payload.get("schema_version")!="skeleton.game.live_native_reset_receipt.v1"
                     or payload.get("reset_generation")!=reset_generation+1
                     or payload.get("source_content_sha256")!=source):
                     raise LiveEvidenceError("Native reset generation was mutated")
                 reset_generation+=1
+                disc_image=None
                 episode_step=0
                 episodes.append([])
             else:
@@ -105,7 +171,8 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
             previous=row["receipt_sha256"]
         if (lane.get("final_chain_sha256")!=previous
             or lane.get("step_count")!=steps
-            or lane.get("reset_count")!=reset_generation):
+            or lane.get("reset_count")!=reset_generation
+            or lane.get("disc_change_count",0)!=disc_changes):
             raise LiveEvidenceError("Final native evidence count/root differs from committed events")
         rows.append({
             "game_id":game_id,"core_id":lane["core_id"],
@@ -113,6 +180,8 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
             "native_events_verified":len(events),
             "native_input_steps_verified":steps,
             "native_resets_verified":reset_generation,
+            "native_disc_swaps_verified":disc_changes,
+            "last_native_disc_chain_sha256":host_disc_chain,
             "episode_tape_lengths":[len(ep) for ep in episodes],
             "initial_chain_sha256":initial,
             "final_chain_sha256":previous,
@@ -128,6 +197,7 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         "game_count":len(rows),
         "total_real_reported_native_steps":sum(x["native_input_steps_verified"] for x in rows),
         "total_native_reset_events":sum(x["native_resets_verified"] for x in rows),
+        "total_native_disc_swaps_verified":sum(x["native_disc_swaps_verified"] for x in rows),
         "games":rows,
         "correctness_claim":"Checks a self-contained hash chain and exact raw controller records, not independently signed hardware execution",
         "model_weights_changed":False,
