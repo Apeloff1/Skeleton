@@ -106,6 +106,9 @@ FIRST_PARTY_PREFIXES = (
     ".machine/",
     "machine/",
     "packaging/",
+    # Authored reference corpora and their documentation are first-party data;
+    # the root remains deliberately narrow so unknown data trees still fail closed.
+    "data/conversational/",
     "volume_forge/",  # repository-owned volume assembly tooling, not canonical runtime
     "complete/",
     "volume_forge/",
