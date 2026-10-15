@@ -14,8 +14,9 @@ import subprocess
 import sys
 import unicodedata
 
-# Leave headroom for a checkout root such as C:\\work\\Skeleton on Windows.
-MAX_NEW_PATH_LENGTH = 240
+# Require a path that can fit the Windows installer payload's 190-unit relative budget.
+# The installer additionally checks the absolute destination with a long user profile.
+MAX_NEW_PATH_LENGTH = 190
 MAX_COMPONENT_BYTES = 180
 MAX_COMPONENT_UTF16 = 180
 INVALID_WINDOWS_CHARACTERS = re.compile(r'[<>:"\\|?*\x00-\x1f\x7f-\x9f]')
