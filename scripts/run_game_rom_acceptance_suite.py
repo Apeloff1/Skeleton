@@ -225,6 +225,51 @@ def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
     }
 
 
+def _verify_serial_source(directory: Path) -> dict[str, Any]:
+    report, ref = _json_file(directory / "original-serial-clock.json")
+    _verify_digest(report, "report_digest")
+    trials = report.get("real_source_trials")
+    if (
+        report.get("schema_version") != "skeleton.game.original_dmg_serial_source_proof.v1"
+        or report.get("status") != "original_DMG_disconnected_serial_source_replayed"
+        or report.get("original_owned_source_ROM_only") is not True
+        or report.get("real_serial_cpu_modes") != 2
+        or report.get("actual_cpu_oscillator_steps") != 2048
+        or report.get("hardware_serial_bit_cycles") != 512
+        or report.get("unattached_external_link_peer_fabricated") is not False
+        or report.get("interconsole_link_gameplay_verified") is not False
+        or report.get("production_neural_model_updated") is not False
+        or not isinstance(trials, list) or len(trials) != 2
+    ):
+        raise AcceptanceSuiteError("DMG serial source CPU clock or independent replay missing")
+    for index, row in enumerate(trials):
+        if (
+            not isinstance(row, dict)
+            or row.get("mode") != (
+                "DMG_internal_disconnected" if index == 0 else "DMG_external_unclocked"
+            )
+            or row.get("CPU_started_actual_SB_SC_writes") != 4
+            or row.get("actual_cpu_clock_advance_instructions") != 1024
+            or row.get("hardware_clock_t_cycles_observed") != 4096
+            or row.get("exact_source_cpu_replay") is not True
+            or row.get("source_finished_snapshot_sha256") != row.get("source_replayed_snapshot_sha256")
+            or not isinstance(row.get("source_ROM_SHA256"), str)
+            or len(row["source_ROM_SHA256"]) != 64
+            or row.get("serial_interrupt_set") is not (index == 0)
+            or row.get("serial_SC_still_active") is not (index == 1)
+            or row.get("serial_final_SB") != (255 if index == 0 else 0x6A)
+        ):
+            raise AcceptanceSuiteError("real DMG source CPU internal/external serial case inconsistent")
+    return {
+        "accepted": True,
+        "source_serial_modes": 2,
+        "actual_t_cycle_executions": 8192,
+        "real_replay_snapshots_identical": True,
+        "native_multiplayer_link_peers_verified": 0,
+        "source_receipt": ref,
+    }
+
+
 def _verify_cpu_bus_arbitration(directory: Path) -> dict[str, Any]:
     document, ref = _json_file(directory / "original-cpu-bus.json")
     _verify_digest(document, "report_digest")
@@ -675,6 +720,14 @@ def run_acceptance_suite(
                 output_directory, "focused_synthetic_and_real_original_rom_regressions",
                 seconds=process_timeout_seconds,
             ))
+        serial_path = output_directory / "original-serial-clock.json"
+        processes.append(_run(
+            [sys.executable, "scripts/audit_original_gameboy_serial_port.py",
+             "--evidence-file", str(serial_path)],
+            output_directory, "original_dmg_serial_port_cpu_clock",
+            seconds=process_timeout_seconds,
+        ))
+        serial_clock = _verify_serial_source(output_directory)
         bus_path = output_directory / "original-cpu-bus.json"
         processes.append(_run(
             [sys.executable, "scripts/audit_original_gameboy_bus_arbitration.py",
@@ -776,6 +829,7 @@ def run_acceptance_suite(
             "independent_cpu_alu_flags_reference_verified": True,
             "real_interrupt_priority_and_IME_control_replay_verified": True,
             "cpu_DMA_and_PPU_bus_arbitration_verified": True,
+            "source_internal_external_serial_replay_verified": True,
             "source_q_rewind_proven": True,
             "neural_candidate_optimized_and_scored": True,
             "source_goal_replay_and_neutral_control_verified": True,
@@ -787,6 +841,7 @@ def run_acceptance_suite(
             "original_cpu_alu_reference": alu_reference,
             "original_cpu_interrupt_control": interrupts,
             "original_cpu_bus_arbitration": cpu_bus,
+            "original_DMG_serial_clock": serial_clock,
             "bounded_worker_receipts": processes,
             "real_libretro_installed_core_tested": False,
             "independent_game_hardware_accuracy_certified": False,
