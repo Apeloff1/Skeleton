@@ -387,9 +387,13 @@ def _usable_secret(value: str) -> bool:
         "your-key-here",
         "your-secret",
         "replace-me",
-        "example",
     )
-    return not any(token in lowered for token in placeholders)
+    # Operator secrets and database URLs may legitimately contain "example"
+    # (for instance db.example.net). Match a literal placeholder, not a
+    # substring of an otherwise real credential.
+    return lowered not in {"example", "example-value", "example-secret"} and not any(
+        token in lowered for token in placeholders
+    )
 
 
 def preflight(
