@@ -84,17 +84,22 @@ def verify_game_decompilation_report(
         if (not isinstance(listing,list) or len(listing)>4096
             or len(listing)!=code.get("instructions_emitted")):
             raise ValueError("Static code map size/counters differ")
-        seen=set()
+        seen={}
         for instr in listing:
             offset=instr.get("file_offset") if isinstance(instr,dict) else None
-            if (type(offset) is not int or not 0<=offset<size
-                or offset in seen):
-                raise ValueError("Instruction file offset outside original source or duplicated")
-            seen.add(offset)
+            if type(offset) is not int or not 0<=offset<size:
+                raise ValueError("Instruction file offset is outside original binary")
             rawhex=instr.get("instruction_bytes",instr.get("instruction_word_hex"))
             if (type(rawhex) is not str or not 2<=len(rawhex)<=8
                 or len(rawhex)%2 or any(ch not in "0123456789abcdef" for ch in rawhex)):
                 raise ValueError("Decoded instruction byte representation was modified")
+            # An NROM-128 16 KiB PRG is physically mirrored at $8000/$C000.
+            # The same verified bytes can have two different CPU addresses.
+            if offset in seen and (
+                code.get("architecture") != "mos6502_nrom" or seen[offset] != rawhex
+            ):
+                raise ValueError("Conflicting duplicate binary instruction offset")
+            seen[offset]=rawhex
         instruction_count=len(listing)
     assets=raw.get("asset_analysis")
     if assets is not None and "decode_assets" not in rights["authorized_scopes"]:
