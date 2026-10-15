@@ -745,3 +745,37 @@ def test_preflight_fails_placeholder_in_mongo_password_not_dns(monkeypatch, tmp_
         not next(c for c in checks if c.code == f"env:{key}").ok
         for key in ("MONGO_URL", "SKL_MONGO_URI")
     )
+
+def test_app_preflight_accepts_authenticated_mongo_replica_set_seedlist(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    authority = "replica-user" + ":" + "private-db-pass" + "@"
+    remote = f"mongodb://{authority}db-a.internal:27017,db-b.internal:27019/app?replicaSet=rs0"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={remote}\nSKL_MONGO_URI={remote}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    for key in ("MONGO_URL", "SKL_MONGO_URI"):
+        result = next(c for c in checks if c.code == f"env:{key}")
+        assert result.ok
+        assert "private-db-pass" not in result.message
+
+
+@pytest.mark.parametrize("host_list", [
+    "db-a.internal:27017,",
+    ",db-b.internal:27017",
+    "db-a.internal:27017,db-b.internal:bad",
+    "db-a.internal:27017,,db-b.internal:27017",
+])
+def test_app_preflight_rejects_invalid_replica_set_host_list(tmp_path, monkeypatch, host_list):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    remote = "mongodb://" + "user:secret@" + host_list + "/app"
+    (tmp_path / ".env").write_text(f"MONGO_URL={remote}\n", encoding="utf-8")
+    checks = preflight(tmp_path, runtime=True, environ={})
+    entry = next(c for c in checks if c.code == "env:MONGO_URL")
+    assert not entry.ok
+    assert "secret" not in entry.message

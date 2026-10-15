@@ -420,10 +420,21 @@ def _authenticated_mongo_uri(value: str) -> bool:
             for value in (parsed.username, parsed.password)
         ):
             return False
-        # SRV records contain their own discovered port.
-        if parsed.scheme == "mongodb+srv" and parsed.port is not None:
+        # MongoDB permits comma-separated seed lists for replica sets.
+        # urllib.parse only understands a single host, so checking parsed.port
+        # rejects otherwise valid multi-host URIs. Validate each authority
+        # endpoint independently; SRV mode must declare exactly one hostname
+        # and must not carry a port.
+        endpoints = parsed.netloc.rsplit("@", 1)[-1].split(",")
+        if parsed.scheme == "mongodb+srv" and len(endpoints) != 1:
             return False
-        _ = parsed.port  # Reject malformed numeric ports before Compose.
+        for endpoint in endpoints:
+            host = urlsplit("//" + endpoint)
+            if not host.hostname:
+                return False
+            port = host.port  # Reject malformed ports, also in replica sets.
+            if parsed.scheme == "mongodb+srv" and port is not None:
+                return False
     except ValueError:
         return False
     return True
