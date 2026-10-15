@@ -42,6 +42,19 @@ class JeevesProductionProfileTests(unittest.TestCase):
         self.assertEqual(model.snapshot()["kind"], "torch-stack")
 
     @unittest.skipUnless(importlib.util.find_spec("torch"), "torch optional")
+    def test_torch_curriculum_accepts_cosine_schedule(self) -> None:
+        from skeleton.cortex.torch_lm import TorchTransformer
+        model = TorchTransformer(
+            vocab=("quest", "dialogue", "world"),
+            dim=8, ctx=8, n_layers=1, n_heads=2, d_ff=16,
+            device="cpu",
+        )
+        before = model.steps
+        updates = model.fit(("quest dialogue world",), lr=0.005, schedule="cosine")
+        self.assertGreater(updates, 0)
+        self.assertEqual(model.steps, before + updates)
+
+    @unittest.skipUnless(importlib.util.find_spec("torch"), "torch optional")
     def test_invalid_or_missing_accelerator_is_not_hidden(self) -> None:
         from skeleton.cortex.production_profile import _torch_device
         with patch.dict(os.environ, {"SKELETON_JEEVES_DEVICE": "bad-gpu"}):
