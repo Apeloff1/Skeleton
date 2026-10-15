@@ -257,6 +257,14 @@
       "framing": "Measure exact declared token profile plus actual LocalInferenceRequest rendered system/user framing. Respect compiler protected policy reservation and segment cap. Persist safe capacity/projection receipt in existing pending record.",
       "compatibility": "Existing frozen pending prompts/model keys remain untouched; typed capacity errors never become fabricated model steps. Historical failed/unknown goals retain original evidence.",
       "incomplete_workflow_grammar": "For NEW pending decisions only, when requested host completion facts are incomplete, the frozen canonical structured response schema permits only done=false and a non-null actually allowed operation. Model still selects its actual typed tool; no host-invented action. Completed checks allow ordinary done branch; historical frozen pending schema/keys are unchanged."
+    },
+    "operation_specific_planner_payloads": {
+      "status": "implementation_candidate",
+      "scope": "New pending decisions only, using existing studio_application_schemas owner forms. No new operation/provider/runtime/store. Existing frozen schemas/model keys/recovery remain exact.",
+      "schema": "Each operation has its own decision and follow-up payload reference under decision-root definitions. Inline owner-local $defs/$ref with finite node/depth/byte limits; remove annotations only. Preserve semantic constraints and additionalProperties denial. Remove expected_version/idempotency_key only where the existing host actually supplies them.",
+      "editor": "Require nonempty edits and each selected op plus exact required field list from existing x-owner-edit-fields; no automatic edit choice or fabricated argument values. An observed current console manifest SHA may constrain required expected_manifest_digest by enum; host/source CAS remains final authority.",
+      "receipt_references": "Only recognized top-level _REF_FIELDS may expose finite existing _RECEIPT_REFS tokens; the existing resolver and owner type validation still reject unavailable, unknown or mismatched values before tool IO. Nested fields never gain receipt interpolation.",
+      "authority": "Typed grammar constrains model-produced data; it never certifies action success. Current model/source/actor grants and real owner payload validation remain mandatory."
     }
   }
 }

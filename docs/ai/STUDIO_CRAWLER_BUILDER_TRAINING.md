@@ -125,6 +125,11 @@ For new decisions, an incomplete required workflow permits only a real granted
 operation with `done=false`; the terminal response branch becomes available
 after the host verifies the requested facts. Model output still requires owner
 validation and can fail without executing a tool.
+New decision and follow-up payloads also use the existing tool request forms.
+Required editor fields, nonempty edit lists and the observed manifest identity
+are constrained before inference. Shared schema definitions keep the full tool
+inventory within its existing bound. Owner validation still checks nested game
+records, rights and live project identities before any mutation.
 
 ## Train, observe and retain lessons
 

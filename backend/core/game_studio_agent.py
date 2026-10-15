@@ -1229,7 +1229,11 @@ async def _prepare(scope, row, token):
     allow_done = (
         not row.get("completion_requirements") or context.get("completion", {}).get("verified") is True
     )
-    response_schema = _planner_response_schema(allowed, allow_done=allow_done)
+    response_schema = _planner_response_schema(
+        allowed,
+        allow_done=allow_done,
+        payload_schemas=_planner_payload_schemas(schemas, allowed, context),
+    )
     _json({"prompt": prompt}, 256 * 1024)
     pending = {
         "index": row["cursor"],
@@ -2911,7 +2915,121 @@ async def _next_workflow_action(scope, row, token):
     return await _accept_response(scope, row, token)
 
 
-def _planner_response_schema(allowed, *, allow_done=True):
+def _planner_payload_schemas(schemas, allowed, context):
+    """Translate existing owner forms; no values/actions are fabricated here."""
+    result = {}
+    for operation in sorted(allowed):
+        source = schemas[operation]
+        definitions = source.get("$defs", {})
+        nodes = 0
+
+        def inline(schema, depth=0, visiting=()):
+            nonlocal nodes
+            nodes += 1
+            if nodes > 4096 or depth > 16 or not isinstance(schema, dict):
+                raise GameLearningError(
+                    "studio_planner_schema_bounds", "Owner schema exceeds bounded planner structure.", 409
+                )
+            if "$ref" in schema:
+                reference = schema["$ref"]
+                prefix = "#/$defs/"
+                if not isinstance(reference, str) or not reference.startswith(prefix):
+                    raise GameLearningError(
+                        "studio_planner_schema_reference",
+                        "Only existing local owner schema definitions are supported.",
+                        409,
+                    )
+                key = reference[len(prefix) :].replace("~1", "/").replace("~0", "~")
+                if key not in definitions or key in visiting:
+                    raise GameLearningError(
+                        "studio_planner_schema_reference",
+                        "Owner schema reference is absent or recursive.",
+                        409,
+                    )
+                resolved = {
+                    **definitions[key],
+                    **{name: value for name, value in schema.items() if name != "$ref"},
+                }
+                return inline(resolved, depth + 1, (*visiting, key))
+            value = {}
+            for key, item in schema.items():
+                if key in {
+                    "$defs",
+                    "title",
+                    "description",
+                    "default",
+                    "examples",
+                    "$schema",
+                } or key.startswith("x-"):
+                    continue
+                if key in {"properties", "patternProperties"}:
+                    value[key] = {name: inline(child, depth + 1, visiting) for name, child in item.items()}
+                elif key in {"items", "additionalProperties", "not", "if", "then", "else"} and isinstance(
+                    item, dict
+                ):
+                    value[key] = inline(item, depth + 1, visiting)
+                elif key in {"anyOf", "oneOf", "allOf", "prefixItems"}:
+                    value[key] = [inline(child, depth + 1, visiting) for child in item]
+                else:
+                    value[key] = item
+            return value
+
+        payload = inline(source)
+        payload["type"] = "object"
+        payload["additionalProperties"] = False
+        properties = payload.setdefault("properties", {})
+        supplied = set()
+        if operation in WORK | EDIT:
+            supplied.add("idempotency_key")
+            if operation != "campaign.pulse":
+                supplied.add("expected_version")
+        if operation in {"build.inspect", "project.export"}:
+            supplied.add("expected_version")
+        for field in supplied:
+            properties.pop(field, None)
+        payload["required"] = [name for name in payload.get("required", []) if name not in supplied]
+        for field in _REF_FIELDS.intersection(properties):
+            # The existing resolver handles only these exact top-level fields.
+            properties[field] = {
+                "anyOf": [
+                    properties[field],
+                    {"$ref": "#/$defs/r"},
+                ]
+            }
+        if operation == "console.edit":
+            edits = source.get("x-owner-edit-fields", {})
+            branches = []
+            for op, fields in edits.items():
+                branches.append(
+                    {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": fields,
+                        "properties": {
+                            **{name: {} for name in fields},
+                            "op": {"type": "string", "enum": [op]},
+                            "edit_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                        },
+                    }
+                )
+            if not branches:
+                raise GameLearningError(
+                    "studio_planner_schema_missing", "Typed editor operation discovery is unavailable.", 409
+                )
+            properties["edits"]["items"] = {"oneOf": branches}
+            manifest = context.get("console_manifest_digest")
+            if (
+                isinstance(manifest, str)
+                and len(manifest) == 64
+                and all(c in "0123456789abcdef" for c in manifest)
+            ):
+                properties["expected_manifest_digest"]["enum"] = [manifest]
+        result[operation] = payload
+    _json(result, 48 * 1024)
+    return result
+
+
+def _planner_response_schema(allowed, *, allow_done=True, payload_schemas=None):
     action = {
         "type": "object",
         "additionalProperties": False,
@@ -2962,6 +3080,61 @@ def _planner_response_schema(allowed, *, allow_done=True):
     }
     if not allow_done:
         schema["oneOf"] = schema["oneOf"][:1]
+    if payload_schemas is not None:
+        if set(payload_schemas) != set(allowed):
+            raise GameLearningError(
+                "studio_planner_schema_missing",
+                "Every granted operation needs its exact owner payload form.",
+                409,
+            )
+        definitions = {
+            "r": {
+                "type": "string",
+                "enum": ["@receipt:" + name for name in sorted(_RECEIPT_REFS)],
+            },
+            "e": properties["explanation"],
+            "v": properties["evidence_refs"],
+            "s": properties["schema_version"],
+            "f": {"type": "array", "maxItems": 3, "items": {"$ref": "#/$defs/a"}},
+        }
+        actions, decisions = [], []
+        for index, operation in enumerate(sorted(allowed)):
+            name = "p" + str(index)
+            definitions[name] = payload_schemas[operation]
+            fields = {
+                "operation": {"type": "string", "enum": [operation]},
+                "payload": {"$ref": "#/$defs/" + name},
+                "explanation": {"$ref": "#/$defs/e"},
+                "evidence_refs": {"$ref": "#/$defs/v"},
+            }
+            actions.append(
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["operation", "payload", "explanation"],
+                    "properties": fields,
+                }
+            )
+            decisions.append(
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": required,
+                    "properties": {
+                        **fields,
+                        "schema_version": {"$ref": "#/$defs/s"},
+                        "done": {"type": "boolean", "enum": [False]},
+                        "follow_up": {"$ref": "#/$defs/f"},
+                    },
+                }
+            )
+        definitions["a"] = {"oneOf": actions}
+        if allow_done:
+            done = schema["oneOf"][-1]
+            done["properties"]["follow_up"] = {"type": "array", "maxItems": 0}
+            decisions.append(done)
+        schema = {"$defs": definitions, "oneOf": decisions}
+        _json(schema, 65536)
     return schema
 
 
