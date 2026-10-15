@@ -97,6 +97,7 @@ FIRST_PARTY_PREFIXES = (
     "scripts/",
     "tests/",
     "docs/",
+    "data/conversational/",  # authored corpus and reports; not a canonical runtime owner
     "design/",  # first-party authored visual identity, not a canonical runtime root
     ".github/",
     ".cursor/",
