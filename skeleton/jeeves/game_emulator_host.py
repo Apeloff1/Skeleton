@@ -503,7 +503,7 @@ class EmulatorEnvironment:
         self._content_root, entry, files, materialized_digest = _prepared(descriptor, cancelled=cancelled)
         self._code_bindings = {
             name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
-            for name in ("game_emulator_host.py", "game_emulator_worker.py", "game_emulator_protocol.py")
+            for name in ("game_emulator_host.py", "game_emulator_worker.py", "game_emulator_protocol.py", "game_emulator_timing.py")
         }
         self._descriptor = {
             "schema_version": SCHEMA,
