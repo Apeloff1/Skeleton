@@ -750,3 +750,82 @@ connector has no workflow-dispatch action. **No actual acceptance,
 native emulator build, regression suite or neural optimization job has
 been run.** An existing manual workflow is defined in source but is not
 an executed result and the PR remains draft.
+
+
+## O. Independent CPU instruction and arithmetic conformance before AI training
+
+A replayed emulator can be *consistently wrong*. Its original-ROM
+neural world model would still learn those invented CPU rules if the
+only gate compared an instruction to a second execution of itself.
+To avoid that self-validation failure, the original-ROM operator suite
+now requires two separate executable source conformance stages.
+
+**1. Original SM83 opcode coverage and independently sourced cycles**
+
+The source-owned
+`scripts/audit_original_gameboy_cpu_opcodes.py` runs a synthetic local
+32-KiB Game Boy ROM for every legal single-step base operation and
+every `CB`-prefixed variant. It checks the executed machine's CPU
+register/instruction counters, T-cycles, and exact replay of the
+CPU/memory/cartridge/PPU state from the same checkpoint.
+
+A pinned `machine/gbdev_sm83_opcode_reference.json` contains **both
+256 unprefixed and 256 prefixed opcode definitions**, including
+documented instruction lengths, mnemonic, flags and the independent
+community timing tables. It derives from
+<https://github.com/gbdev/gb-opcodes/blob/376f61c86fdac2048f7ce5fe838ae756b306017e/Opcodes.json>
+under **CC0-1.0**. The oracle resolves taken versus not-taken
+conditional branch cycles from actual pre-instruction Z/C flags.
+It fails if a documented legal operation has the wrong T-cycle count,
+an invalid opcode executes, a reference input is malformed or a
+restored execution produces a different CPU/memory/raster state.
+
+The scope is deliberately specific: 244 non-CB base opcodes plus
+256 CB variants are executed individually and each replayed again
+(1,000 actual instruction executions). The prefix dispatcher makes
+245 total legal base identities; all 11 undefined unprefixed opcodes
+must instead fail. The count is **not 1,000 distinct opcodes**.
+
+```bash
+python scripts/audit_original_gameboy_cpu_opcodes.py \
+  --evidence-file /private/research/sm83-opcodes.json
+```
+
+**2. Independent Z/N/H/C arithmetic reference**
+
+`scripts/audit_original_gameboy_alu_flags.py` performs **5,184
+separate real source ALU operations**, across 18 small, half-carry,
+sign-boundary and byte-overflow accumulator/operand values, both
+carry-in states and all eight arithmetic/logic families:
+ADD, ADC, SUB, SBC, AND, XOR, OR and CP. A separately calculated
+reference computes the expected A register and zero, subtract,
+half-carry and carry flags; it refuses the first differing measured
+operation. This is a bounded boundary corpus, not exhaustive
+65,536×2 testing of every arithmetic input.
+
+```bash
+python scripts/audit_original_gameboy_alu_flags.py \
+  --evidence-file /private/research/sm83-arithmetic.json
+```
+
+`skeleton/testing/test_game_original_cpu_conformance.py` exercises
+both real sources and adversarially tampers with a rehashed opcode
+receipt, and separately replaces an ALU execution with a no-op to
+verify that the independent oracle fails. The manual-only
+`scripts/run_game_rom_acceptance_suite.py` now *requires* both
+source reports before its final training acceptance receipt.
+All source reports are finite, hash-bound and marked **not hardware
+accuracy certification**.
+
+This **does not** prove correct mid-instruction memory access cycles,
+full OAM DMA CPU lockout, LCD dot-level pixel fetching, electrical
+DMG timing, all operand combinations, audio/speed modes or universal
+game compatibility. Nor does a completed source CPU matrix train
+Jeeves production transformer parameters; separate actual
+gradient execution and independently held-out downstream outcomes
+remain mandatory.
+
+**Execution note:** The CC0 reference and implementation are committed
+to draft PR #3935, but a local GitHub clone could not be resolved
+from this session; no actual conformance command, emulator native
+build, ROM boot, or gradient session has been executed here.
