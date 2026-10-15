@@ -115,3 +115,17 @@ authoritative engines. The existing React Native learning-workspace console
 picker now shows searchable **Original game** engine options from the same
 backend catalogue. No parallel ungoverned API or fake hardware renderer was
 introduced.
+
+## Replay-linked measured game-state telemetry frame
+
+`skeleton/jeeves/game_studio_frame.py` generates a deterministic 96x64 RGB24
+status visualization from the actual source-executed per-step observation and
+session receipt. `StudioGameEnvironment.preview()` exposes it through the
+existing emulator-compatible `pixels_base64 / width / height / format`
+frame contract without a second API, and carries a SHA-256 digest, explicit
+state metric labels, and a source session digest. The existing frontend
+recognizes `render_kind="reference_state_telemetry_raster"` and labels the
+frame as telemetry, never as actual engine-world pixels or audio.
+
+This is a visual monitor for learning mechanics, not a game renderer. Native
+emulator RGB remains bound to the approved actual libretro framebuffer.

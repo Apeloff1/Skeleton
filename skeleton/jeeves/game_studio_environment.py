@@ -22,11 +22,12 @@ from skeleton.ai.game_builder import advanced_gameplay_runtime as gameplay
 from skeleton.ai.game_builder import advanced_level_scenes as scenes
 from skeleton.ai.game_builder import system_editors
 from .game_learning_runtime import EpisodeStep, GameEnvironmentSpec
+from .game_studio_frame import render_studio_state_telemetry
 
 SOURCE_SCHEMA = "skeleton.game_builder.learning_source.v1"
 SNAPSHOT_SCHEMA = "skeleton.game_builder.learning_snapshot.v1"
 MAX_SOURCE_BYTES = 131072
-MAX_PREVIEW_BYTES = 16384
+MAX_PREVIEW_BYTES = 65536
 MAX_ENGINE_STEPS = gameplay.MAX_TURNS
 _FEATURES = ("progress", "score", "resources", "health", "time", "success", "failure")
 _REWARDS = ("progress", "score", "health", "goal", "invalid", "time")
@@ -332,6 +333,14 @@ class StudioGameEnvironment:
             "audio_frame_available": False,
             "game_success_measured_only_from_runtime_state": True,
         }
+        telemetry = render_studio_state_telemetry(
+            self.editor, self._observation, state,
+            source_session_digest=self._receipt["digest"],
+            accepted_action_count=len(self._receipt["trace"]),
+        )
+        frame.update(telemetry)
+        frame["pixel_frame_available"] = False
+        frame["telemetry_raster_available"] = True
         _json(frame, MAX_PREVIEW_BYTES)
         return frame
 

@@ -84,7 +84,7 @@ class ProductReferenceTests(unittest.TestCase):
         self.assertTrue(verify_advanced_session(session))
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("platform_profile",
-                                 {"ram_budget_mb":1},["spawn:1"])
+                                 {"ram_budget_mb":1,"npc_active_budget":5},["stream:4"])
 
     def test_scene_custody_and_learning_environment_for_all_four(self):
         for editor in ("ui_hud","accessibility","localization","platform_profile"):
