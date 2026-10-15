@@ -950,6 +950,9 @@ class GameBoyMachine:
             "dma_index",
             "dma_tcycles",
             "dma_startup",
+            "serial_active",
+            "serial_bits",
+            "serial_phase",
         )
         result = {
             "schema_version": 1,
@@ -1009,6 +1012,8 @@ class GameBoyMachine:
             "dma_index": 160,
             "dma_tcycles": 3,
             "dma_startup": 4,
+            "serial_bits": 7,
+            "serial_phase": SERIAL_INTERNAL_BIT_CYCLES - 1,
             "rom_bank": (
                 511 if self.metadata["mapper"] == "mbc5"
                 else 127 if self.metadata["mapper"] == "mbc3"
@@ -1072,6 +1077,16 @@ class GameBoyMachine:
             if len(data) != length:
                 raise GameRomRuntimeError("ROM snapshot memory length is invalid")
             decoded[name] = bytearray(data)
+        if (
+            bool(decoded["memory"][0xFF02] & 0x80) != registers["serial_active"]
+            or decoded["memory"][0xFF02] & ~0x81
+            or (not registers["serial_active"] and (
+                registers["serial_bits"] or registers["serial_phase"]
+            ))
+            or (registers["serial_active"] and not decoded["memory"][0xFF02] & 1
+                and registers["serial_phase"])
+        ):
+            raise GameRomRuntimeError("source serial clock state or SB/SC session is invalid")
         if registers["dma_active"] and decoded["memory"][0xFF46] != registers["dma_source"] >> 8:
             raise GameRomRuntimeError("OAM DMA source and programmed bus register differ")
         if decoded["memory"][0xFF44] > 153 or any(
