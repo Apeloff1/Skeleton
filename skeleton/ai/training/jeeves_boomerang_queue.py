@@ -25,7 +25,7 @@ from .jeeves_cinematic_simulation import (
     _write_new, _write_new_bytes, validate_scene,
 )
 from .jeeves_adaptive_sim_training import (
-    _execute, _features, _targeted, draft_scenarios,
+    _execute, _controls, _environment, _targeted, draft_scenarios,
     verify_campaign, validate_scenario,
 )
 
@@ -52,6 +52,13 @@ def _checked_file(path: Path, max_bytes: int) -> dict:
     _require(32 <= path.stat().st_size <= max_bytes,
              "source or prior evidence file outside size limit")
     return _read_json(path, max_bytes)
+
+
+def _effective_identity(case: dict) -> str:
+    """Same real controls/situation/environment = one experiment, even with another seed."""
+    controls = {key: value for key, value in _controls(case).items() if key != "seed"}
+    return _hash({"situation": case["situation"],
+                  "environment": _environment(case), "controls": controls})
 
 
 def _source_record(scene_file: Path, campaign_file: Path) -> dict:
@@ -168,6 +175,7 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
             entry["revisits_completed"]]
         _require(entry["status"] == status, "queue completion status drift")
         seen = set(entry["initial_scenario_ids"])
+        effective_seen = set()
         _require(len(seen) == len(entry["initial_scenario_ids"]),
                  "duplicate original experiment identity")
         known_families = set(entry["initial_risk_families"])
@@ -184,18 +192,24 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
                      sum(x["frames_executed"] for x in rows),
                      "boomerang pass observation counts changed")
             new_families = set().union(*(set(row["risk_counts"]) for row in rows))
-            _require(part["novel_failure_families"] ==
+            _require(part["distinct_effective_control_scenarios"] == len({
+                _effective_identity(row["scenario"]) for row in rows}) and
+                     part["distinct_effective_control_scenarios"] == len(rows) and
+                     part["novel_failure_families"] ==
                      sorted(new_families - known_families) and
                      part["novel_family_count"] == len(new_families - known_families),
                      "claimed boomerang discoveries do not match observations")
             known_families.update(new_families)
             for row in rows:
                 case = validate_scenario(row["scenario"])
+                signature = _effective_identity(case)
                 _require(row["source_digest"] == entry["source"]["source_digest"]
                          and row["reverse_audit_passed"] is True
-                         and case["scenario_id"] not in seen,
-                         "duplicate scenario, source splice or reverse audit failure")
+                         and case["scenario_id"] not in seen
+                         and signature not in effective_seen,
+                         "duplicate effective controls, source splice or reverse audit failure")
                 seen.add(case["scenario_id"])
+                effective_seen.add(signature)
             for pair in part["comparisons"]:
                 child = next((x for x in rows if
                               x["scenario"]["scenario_id"] == pair["child_scenario"]), None)
@@ -233,6 +247,11 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
                              pair["observed_reduction"] == (pair["after"] < pair["before"]) and
                              pair["observed_regression"] == (pair["after"] > pair["before"]),
                              "counterfactual values changed since source re-analysis")
+            archived_semantics = {_effective_identity(row["scenario"])
+                                  for row in source_archive["cases"]}
+            archived_semantics.add(_effective_identity(source_archive["baseline"]["scenario"]))
+            _require(not (archived_semantics & effective_seen),
+                     "boomerang revisited old effective controls without actual adjustment")
             _require(entry["initial_case_count"] == source_archive["budget_requested"] and
                      entry["initial_risk_families"] == source_archive["risk_families_observed"] and
                      entry["initial_scenario_ids"] == sorted({
@@ -262,21 +281,20 @@ def _previous_rows(entry: dict, archive: dict) -> list[dict]:
     return rows
 
 
-def _coverage_fill(scene: dict, used: set[str], chosen: list[dict],
-                   parents: dict[str, str], targets: dict[str, str],
-                   budget: int, prior_generation: int) -> None:
+def _coverage_fill(scene: dict, used: set[str], effective: set[str],
+                   chosen: list[dict], budget: int, prior_generation: int) -> None:
     for shift in range(1, 16):
         if len(chosen) >= budget:
             return
         seed = (prior_generation * 1871 + shift * 65537) % (2**31)
         for case in draft_scenarios(scene, budget=max(4, budget), seed=seed):
             identity = case["scenario_id"]
-            if identity in used:
+            signature = _effective_identity(case)
+            if identity in used or signature in effective:
                 continue
             chosen.append(case)
             used.add(identity)
-            parents[identity] = ""
-            targets[identity] = ""
+            effective.add(signature)
             if len(chosen) >= budget:
                 return
 
@@ -317,6 +335,8 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
             row["scenario"]["scenario_id"]))
     proposals, parent_of, targeted = [], {}, {}
     used = set(old_ids)
+    effective = {_effective_identity(row["scenario"]) for row in previous}
+    effective.add(_effective_identity(archive["baseline"]["scenario"]))
     for iteration in range(1, 11):
         for row in ordered:
             if len(proposals) >= budget:
@@ -326,17 +346,19 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
             signal = risks[(iteration - 1) % len(risks)] if risks else "coverage"
             # Odd runs attack, even runs repair. Both are grounded in risk counts.
             case = _targeted(row["scenario"], signal, iteration)
-            if case["scenario_id"] in used:
+            signature = _effective_identity(case)
+            if case["scenario_id"] in used or signature in effective:
                 continue
             proposals.append(case)
             used.add(case["scenario_id"])
+            effective.add(signature)
             parent_of[case["scenario_id"]] = row
             targeted[case["scenario_id"]] = signal
         if len(proposals) >= budget:
             break
     if len(proposals) < budget:
         # Honest exploration: no causal parent is invented for fallback probes.
-        _coverage_fill(scene, used, proposals, {}, {}, budget, pass_number)
+        _coverage_fill(scene, used, effective, proposals, budget, pass_number)
     _require(len(proposals) == budget and len({x["scenario_id"] for x in proposals}) == budget,
              "no source-appropriate novel simulation controls left for this pass")
     results = _execute(scene, tuple(proposals), frame_ms, workers)
@@ -382,6 +404,9 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
         "novel_control_context_risk_signatures": len(new_signatures),
         "risk_signatures_not_independent_training_proof": True,
         "new_camera_trace_digests": len(new_traces),
+        "distinct_effective_control_scenarios": len({
+            _effective_identity(row["scenario"]) for row in results}),
+        "random_seed_only_variants_excluded": True,
         "comparisons": comparisons, "results": results,
         "source_project_id": entry["source"]["project_id"],
         "source_digest": entry["source"]["source_digest"],
