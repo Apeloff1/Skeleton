@@ -52,6 +52,8 @@ jobs:
             scripts/audit_original_rom_instruction_divergence.py \
             scripts/audit_game_emulator_first_boot.py \
             scripts/audit_game_emulator_disc_first_boot.py \
+            scripts/audit_rom_cross_game_comparison.py \
+            skeleton/jeeves/game_emulator_cross_game_lab.py \
             skeleton/jeeves/game_rom_instruction_divergence.py \
             skeleton/jeeves/game_emulator_training_lab.py \
             skeleton/jeeves/game_emulator_neural_world.py \
