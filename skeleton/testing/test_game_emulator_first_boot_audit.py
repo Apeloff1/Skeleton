@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.audit_game_emulator_first_boot import (
-    SCHEMA, FirstBootError, _manifest, _run_case, run_matrix,
+    SCHEMA, FirstBootError, MAX_CONTENT, _read, _manifest, _run_case, run_matrix,
 )
 
 
@@ -94,6 +94,18 @@ class FirstBootMatrixTests(unittest.TestCase):
             "filename": "original.gb",
             "rom_sha256": checksum(self.rom_path.read_bytes()),
         }
+
+    def test_large_cartridge_content_matches_real_inline_host_admission(self):
+        # A lawful cartridge may exceed the old 2 MiB first-boot limit even
+        # when its approved libretro core supports ordinary inline media.
+        self.assertEqual(MAX_CONTENT, 16 * 1024 * 1024)
+        large = Path(self.temp.name) / "synthetic-original-6mb.sfc"
+        large.write_bytes(b"\x00" * (6 * 1024 * 1024))
+        self.assertEqual(len(_read(large, MAX_CONTENT)), 6 * 1024 * 1024)
+        with large.open("wb") as target:
+            target.truncate(MAX_CONTENT + 1)
+        with self.assertRaises(FirstBootError):
+            _read(large, MAX_CONTENT)
 
     def test_manifest_requires_flat_exact_hash_and_no_duplicates(self):
         location = Path(self.temp.name) / "manifest.json"
