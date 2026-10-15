@@ -66,6 +66,36 @@ def main(argv:list[str])->int:
         frame=core.frame()[0]
         if frame["width"]!=32 or frame["height"]!=24 or frame["audio_frames"]<64:
             raise ValueError("Compiled native frame/audio callbacks did not return actual buffers")
+        # Real native frame cursor, exposed ONLY by this original test C core.
+        # A pause or RGB tile audit must not call retro_run; 1 and 8 native
+        # callbacks must move exactly 1 and 8 C-core state ticks respectively.
+        native_cursor=core.core.skl_fixture_ticks
+        native_cursor.restype=C.c_uint32
+        frozen_cursor=int(native_cursor())
+        rgb=core.rgb()
+        inspected=inspect_rgb_frame(
+            rgb,frame["width"],frame["height"],frame["pixel_sha256"],
+            frame["audio_sha256"],frozen_cursor,
+        )
+        if int(native_cursor())!=frozen_cursor or inspected["total_tiles"]!=256:
+            raise ValueError("Compiled native framebuffer inspection mutated actual core ticks")
+        if inspected["tiles"][0]["tile_rgb_sha256"]!=hashlib.sha256(
+            b"".join(rgb[y*frame["width"]*3:y*frame["width"]*3+6] for y in range(1))
+        ).hexdigest():
+            raise ValueError("Compiled first native RGB tile differs from actual pixel bytes")
+        core.controls[0]["buttons"]=0
+        core.core.retro_run()
+        after_single=int(native_cursor())
+        if after_single-frozen_cursor!=1:
+            raise ValueError("Single-frame slow motion did not execute exactly one native retro_run")
+        frame_after_single=core.frame()[0]
+        if frame_after_single["pixel_sha256"]==frame["pixel_sha256"]:
+            raise ValueError("Native frame-by-frame precision did not update original output pixels")
+        for _ in range(8):
+            core.core.retro_run()
+        after_eight=int(native_cursor())
+        if after_eight-after_single!=8:
+            raise ValueError("Fast native batch did not execute exactly eight retro_run callbacks")
         report={
             "schema_version":"skeleton.game.compiled_homebrew_console_abi.v1",
             "status":"actual_compiled_original_disc_sram_abi_exercised",
@@ -77,6 +107,10 @@ def main(argv:list[str])->int:
             "actual_native_sram_sha256_after_reset":after["sha256"],
             "actual_native_sram_survived_reset":True,
             "actual_native_pcm_callback_frames":frame["audio_frames"],
+            "compiled_core_pause_cursor_unchanged":True,
+            "compiled_native_single_frame_run_count":after_single-frozen_cursor,
+            "compiled_native_fast_eight_frame_run_count":after_eight-after_single,
+            "compiled_original_rgb_tile_hashes_checked":inspected["total_tiles"],
             "commercial_rom_or_bios_used":False,
             "real_console_compatibility_qualified":False,
             "bubblewrap_launch_tested":False,
