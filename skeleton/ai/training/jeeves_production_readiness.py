@@ -249,9 +249,13 @@ def inspect(
                 coverage = _token_coverage(model, all_cases)
                 planned_new_tokens = 0
                 if coverage < 0.80:
-                    if allow_vocabulary_expansion and not is_torch:
-                        from .jeeves_game_vocabulary import planned_new_pieces
-                        planned_new_tokens = len(planned_new_pieces(model, all_cases))
+                    if allow_vocabulary_expansion:
+                        if is_torch:
+                            from .jeeves_torch_game_vocabulary import planned_new_words
+                            planned_new_tokens = len(planned_new_words(model, all_cases))
+                        else:
+                            from .jeeves_game_vocabulary import planned_new_pieces
+                            planned_new_tokens = len(planned_new_pieces(model, all_cases))
                     else:
                         blockers.append("game_curriculum_vocabulary_coverage_below_80_percent")
                 elif allow_vocabulary_expansion:
