@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from urllib.parse import urlsplit
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -396,6 +397,23 @@ def _usable_secret(value: str) -> bool:
     )
 
 
+def _authenticated_mongo_uri(value: str) -> bool:
+    """Require authenticated MongoDB connection syntax without logging a URI."""
+    try:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"mongodb", "mongodb+srv"}:
+            return False
+        if not parsed.hostname or not parsed.username or not parsed.password:
+            return False
+        # SRV records contain their own discovered port.
+        if parsed.scheme == "mongodb+srv" and parsed.port is not None:
+            return False
+        _ = parsed.port  # Reject malformed numeric ports before Compose.
+    except ValueError:
+        return False
+    return True
+
+
 def preflight(
     root: Path | None = None,
     *,
@@ -477,6 +495,8 @@ def preflight(
         for key in manifest.required_env:
             value = values.get(key, "")
             ok = _usable_secret(value)
+            if key in {"MONGO_URL", "SKL_MONGO_URI"}:
+                ok = ok and _authenticated_mongo_uri(value)
             if key == "SKL_ENGINE_SERVICE_TOKEN":
                 ok = ok and 32 <= len(value) <= 4096 and value == value.strip()
             if key in {"GAMEFORGE_JWT_SECRET", "GF_SEAL_SECRET"}:

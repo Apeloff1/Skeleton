@@ -455,3 +455,31 @@ def test_first_install_build_output_streams_to_file_instead_of_memory(tmp_path, 
     assert receipt.ok
     assert len(calls) == 2
     assert "pretend-secret" not in repr(receipt.to_dict())
+
+def test_setup_repairs_local_unauthenticated_mongo_urls(tmp_path):
+    (tmp_path / ".env").write_text(
+        "MONGO_INITDB_ROOT_USERNAME=admin\n"
+        "MONGO_INITDB_ROOT_PASSWORD=stable-root-password\n"
+        "MONGO_URL=mongodb://mongo:27017/tutolage\n"
+        "SKL_MONGO_URI=mongodb://mongo:27017/skeleton\n"
+        "JWT_SECRET=stable-jwt-secret\n",
+        encoding="utf-8",
+    )
+    receipt = ensure_runtime_environment(tmp_path)
+    values = _read_values(tmp_path / ".env")
+    assert receipt.changed
+    assert values["MONGO_URL"].startswith("mongodb://admin:stable-root-password@mongo:27017/")
+    assert values["SKL_MONGO_URI"].startswith("mongodb://admin:stable-root-password@mongo:27017/")
+    assert not ensure_runtime_environment(tmp_path).changed
+
+
+def test_setup_does_not_rewrite_external_unauthenticated_database(tmp_path):
+    remote = "mongodb://external-database.example.net:27017/app"
+    (tmp_path / ".env").write_text(
+        "MONGO_INITDB_ROOT_USERNAME=admin\n"
+        "MONGO_INITDB_ROOT_PASSWORD=stable-root-password\n"
+        f"MONGO_URL={remote}\nSKL_MONGO_URI=\nJWT_SECRET=stable-jwt-secret\n",
+        encoding="utf-8",
+    )
+    ensure_runtime_environment(tmp_path)
+    assert _read_values(tmp_path / ".env")["MONGO_URL"] == remote

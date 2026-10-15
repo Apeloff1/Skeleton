@@ -563,3 +563,42 @@ def test_runtime_preflight_rejects_invalid_forge_security_configuration(
     check = next(item for item in checks if item.code == f"env:{key}")
     assert check.ok is False
     assert invalid not in check.message
+
+@pytest.mark.parametrize("candidate", [
+    "",
+    "mongodb://mongo:27017/tutolage",
+    "mongodb://mongo:invalid/tutolage",
+    "mongodb+srv://service@cluster.example.net/app",
+    "mongodb+srv://service:password@cluster.example.net:27017/app",
+    "http://service:password@mongo:27017/app",
+])
+def test_app_preflight_rejects_malformed_or_unauthenticated_mongo_uris(tmp_path, monkeypatch, candidate):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={candidate}\nSKL_MONGO_URI={candidate}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    for key in ("MONGO_URL", "SKL_MONGO_URI"):
+        result = next(item for item in checks if item.code == f"env:{key}")
+        assert not result.ok
+        assert candidate not in result.message or not candidate
+
+
+def test_app_preflight_accepts_valid_mongo_db_uri_without_logging_credentials(tmp_path, monkeypatch):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    (tmp_path / ".env").write_text(
+        "MONGO_URL=mongodb://service:password@mongo:27017/app\n"
+        "SKL_MONGO_URI=mongodb+srv://service:password@cluster.example.net/app\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        next(item for item in checks if item.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
+    assert "password" not in repr(tuple(check.message for check in checks))

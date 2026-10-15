@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import secrets
 from tempfile import NamedTemporaryFile
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from skeleton.app.assembly import find_repo_root
 
@@ -66,6 +66,23 @@ def _is_placeholder(value: str) -> bool:
             "replace-me",
         )
     ) or lowered in {"example", "example-value", "example-secret"}
+
+
+def _bundled_mongo_endpoint(value: str) -> bool:
+    """Recognize only the bundled Mongo host, including legacy no-auth URIs.
+
+    Remote database URLs must never be rewritten during setup. URL parsing
+    prevents substring matches in external hostnames or credential text.
+    """
+    try:
+        parsed = urlsplit(value)
+        return (
+            parsed.scheme == "mongodb"
+            and parsed.hostname == "mongo"
+            and parsed.port in {None, 27017}
+        )
+    except ValueError:
+        return False
 
 
 def _replace_env_value(text: str, key: str, value: str) -> str:
@@ -224,7 +241,7 @@ def ensure_runtime_environment(
     }
     for key, generated in generated_uris.items():
         current = values.get(key, "")
-        local_generated_uri = "@mongo:27017/" in current
+        local_generated_uri = _bundled_mongo_endpoint(current)
         # A legacy environment may hold a concrete-looking local URI whose
         # credentials are now stale after a password repair. Keep intentionally
         # external Mongo targets untouched, but rebind the bundled local ones.
