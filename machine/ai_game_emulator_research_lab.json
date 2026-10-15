@@ -281,7 +281,8 @@
     "entrypoint": "python scripts/audit_original_gameboy_mapper_matrix.py",
     "actual_source_banks": [
       "rom_only",
-      "mbc1",
+      "mbc1_large",
+      "mbc1_ram",
       "mbc2",
       "mbc3",
       "mbc5"
@@ -297,7 +298,10 @@
     ],
     "integration": "scripts/run_game_rom_acceptance_suite.py",
     "first_execution_confirmed": false,
-    "hardware_accuracy_certified": false
+    "hardware_accuracy_certified": false,
+    "hardware_mapper_families": 5,
+    "independent_cartridge_geometry_profiles": 6,
+    "mbc1_wiring_gate": "1-2MiB source ROM only with <=8KiB SRAM; four SRAM banks only with <=512KiB ROM"
   },
   "manual_acceptance_runner": {
     "entrypoint": "python scripts/run_game_rom_acceptance_suite.py",
@@ -317,5 +321,14 @@
       "workflow_dispatch"
     ],
     "normal_push_pr_merge_ci_runs_added": 0
+  },
+  "mbc1_geometry_correction": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "standard_wiring": true,
+    "large_rom_mbc1m_variants_supported": false,
+    "validation": "fail closed on size_code>=5 with >8192 bytes RAM",
+    "source": "https://gbdev.io/pandocs/MBC1.html",
+    "independent_acceptance_executed": false
   }
 }
