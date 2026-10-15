@@ -816,6 +816,16 @@
       "no_compilation_or_video_claim": true,
       "auto_train_weights": false,
       "executed_on_real_game_content": false
+    },
+    "uptake_integrity": {
+      "module": "skeleton/jeeves/game_comparison_uptake.py",
+      "purpose": "Recalculate every game native input/action/frame/audio/transition hash receipt chain and bind three checkpoint receipts to exact observed action steps",
+      "output": "Per-game verification counts, exact native source and locally updated isolated Q-policy SHA identities, reviewed source note dimensions, production evaluation/promotion blockers",
+      "review_dimensions": "Attribution and epistemic status of locally-reviewed human/Jeeves/Dragon notes, not automatic factual certainty",
+      "measured_parameter_updates": "Only actual existing episode-atomic Q table updates when explicitly operator-authorized; not transformer weights",
+      "withheld": "No invented gameplay victory, held-out improvement, ROM licensing approval, Dragon custody approval or production-weight promotion",
+      "presentation": "Comparison viewer has reviewable six-metric uptake summary and exact digest; Dragon intake references uptake receipt without promoting it",
+      "tests": "tests/test_game_comparison_uptake.py added with synthetic source fixtures, no real emulator run"
     }
   }
 }

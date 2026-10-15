@@ -88,6 +88,8 @@ footer{margin-top:20px;color:#bbc6d5;font-size:12px}
 <h2>Series / evolution</h2><div id="timeline"></div>
 <h2>Research synthesis &amp; ten-game curriculum proposals</h2>
 <div id="synthesis"></div>
+<h2>Verified knowledge &amp; parameter uptake</h2>
+<div id="uptake"></div>
 </section>
 <aside class="panel">
 <h2>Viewer & Dragon notes</h2>
@@ -257,6 +259,23 @@ function renderTelemetry(pair){
   events.append(table);details.append(events);root.append(details);target.append(root)
  }
 }
+function renderUptake(){
+ const u=report.learning_uptake_audit||{},target=$("uptake"),m=u.measured_summary||{};
+ target.replaceChildren();
+ const rows=[
+  ["Chained native actions verified",m.native_steps_reverified||0],
+  ["Completed native game receipt chains",m.native_receipt_chains_reverified||0],
+  ["Locally reviewed note candidates",m.reviewed_source_linked_note_count||0],
+  ["Actual isolated Q-table updates",m.locally_applied_q_table_updates||0],
+  ["Verified held-out learning improvements",m.heldout_comparative_gameplay_improvements_verified||0],
+  ["Production model weight updates",m.production_llm_parameter_updates||0]
+ ];
+ const cards=txt("div","","stats");
+ rows.forEach(([label,value])=>{const box=txt("div","","stat");box.append(txt("small",label),txt("strong",value));cards.append(box)});
+ target.append(cards,txt("p","Source rights, independent cross-game review, held-out evaluation and production weight promotion remain separate gates.","muted"));
+ const digestBox=txt("small","Native receipt audit: "+(u.uptake_digest||"not yet completed"),"meta");
+ target.append(digestBox)
+}
 function currentPair(){return activePairs[Number($("pair").value)||0]||null}
 function render(){
  const p=currentPair(),phase=$("phase").value;
@@ -332,6 +351,7 @@ $("pair").addEventListener("change",render);
 $("add").addEventListener("click",addNote);
 $("export").addEventListener("click",exportNotes);
 renderSynthesis();
+renderUptake();
 updatePairs();
 </script>
 </body>
