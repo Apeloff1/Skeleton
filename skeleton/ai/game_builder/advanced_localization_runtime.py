@@ -51,8 +51,12 @@ def default_layout(config, seed):
         "title": "Original Message Catalogue " + str(seed % 10000),
         "source_locale": "en",
         "locales": [
-            {"id":locale,
-             "strings": {key: deepcopy(_TEXT[locale][key]) for key in keys}}
+            {"id": locale,
+             "strings": {
+                 key: ("Items" if key == "items" and not config["plural_rules"]
+                       else deepcopy(_TEXT[locale][key]))
+                 for key in keys
+             }}
             for locale in _LOCALES[:count]
         ],
         "required_keys": keys,
@@ -96,9 +100,7 @@ def normalize_layout(config, layout):
             raise LocalizationActionError("unknown localized string key")
         clean = {}
         for key,value in strings.items():
-            if key == "items":
-                if not config["plural_rules"]:
-                    raise LocalizationActionError("plural source requires enabled plural rule interpreter")
+            if key == "items" and config["plural_rules"]:
                 allowed = ("zero", "one", "two", "few", "many", "other")
                 if (type(value) is not dict or "other" not in value or
                         not set(value).issubset(allowed) or not all(
