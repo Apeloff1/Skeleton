@@ -254,9 +254,13 @@ def _controller_probes(
         return []
     from .game_emulator_host import _policy_controls
 
+    mixed_ab = _policy_controls("a")
+    mixed_ab["buttons"] |= _policy_controls("b")["buttons"]
+    mixed_combo = _policy_controls("a_right")
+    mixed_combo["buttons"] |= _policy_controls("start")["buttons"]
     probes = [
-        [_policy_controls("a_right")],
-        [_policy_controls("b_left")],
+        [mixed_ab],
+        [mixed_combo],
         [_policy_controls("a"), _policy_controls("b")],
         [_policy_controls("start"), _policy_controls("select"),
          _policy_controls("up"), _policy_controls("down")],
@@ -492,6 +496,7 @@ def run_emulator_training_lab(
     neural_candidate_samples: list[dict[str, Any]] = []
     boomerangs: list[dict[str, Any]] = []
     ring: list[dict[str, Any]] = []
+    next_boomerang = config.boomerang_interval
     measured_runs = 0
     stagnant = 0
     steps = 0
@@ -538,10 +543,15 @@ def run_emulator_training_lab(
         receipt["receipt_digest"] = _digest({k: v for k, v in receipt.items() if k != "receipt_digest"})
         evidence.append(receipt)
         stagnant = 0 if new_signatures else stagnant + 1
-        ring.append(retained)
-        if len(ring) > config.boomerang_retained:
-            ring.pop(0)
-        if (ordinal + 1) % config.boomerang_interval == 0 and ring:
+        if len(ring) < config.boomerang_retained:
+            ring.append(retained)
+        else:
+            # Deterministic reservoir replacement keeps some OLD samples
+            # eligible for surprise reparse instead of only the last N runs.
+            reservoir_index = int(_digest(["reservoir", config.seed, ordinal])[:8], 16) % (ordinal + 1)
+            if reservoir_index < config.boomerang_retained:
+                ring[reservoir_index] = retained
+        if ordinal + 1 >= next_boomerang and ring:
             selection = int(_digest(["boomerang", config.seed, ordinal])[:8], 16) % len(ring)
             return_receipt = _boomerang(
                 request, learner, ring[selection], cancel=cancel, authorize=authorize
@@ -549,6 +559,12 @@ def run_emulator_training_lab(
             return_receipt["after_run"] = ordinal + 1
             return_receipt["return_receipt_digest"] = _digest(return_receipt)
             boomerangs.append(return_receipt)
+            # Interval randomized from a pinned seed; cannot silently run
+            # unbounded additional native episodes between main runs.
+            interval = 1 + int(
+                _digest(["interval", config.seed, ordinal])[:8], 16
+            ) % (2 * config.boomerang_interval)
+            next_boomerang = ordinal + 1 + interval
         if on_checkpoint is not None:
             _guard(cancel, authorize)
             on_checkpoint(learner.snapshot(), {
