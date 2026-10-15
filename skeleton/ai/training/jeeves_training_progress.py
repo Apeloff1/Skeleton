@@ -110,6 +110,10 @@ class CandidateProgress:
             raise ProductionCheckpointError("training cursor and starting checkpoint disagree")
         return {"receipt": receipt, "snapshot": snapshot}
 
+    def initial_snapshot(self) -> dict[str, Any]:
+        """Inspect stage zero to compare it against reconstructed live parent."""
+        return self._validate_cursor(0)["snapshot"]
+
     def latest(self, *, resume: bool) -> tuple[int, dict[str, Any]] | None:
         """Refuse accidental reuse; verify every committed stage and no gaps."""
         committed = sorted(self.directory.glob(self.prefix + "-progress-*.json"))
