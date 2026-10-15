@@ -31,7 +31,8 @@ def _safe_member(info: zipfile.ZipInfo) -> str:
     if not parts or len(parts) > 16 or any(part in {".", ".."} or part.startswith(".") for part in parts):
         raise ValueError("Archive member includes hidden/traversing paths")
     mode = (info.external_attr >> 16) & 0xFFFF
-    if stat.S_ISLNK(mode) or (mode and not (stat.S_ISREG(mode) or stat.S_ISDIR(mode))):
+    kind = stat.S_IFMT(mode)
+    if kind not in (0, stat.S_IFREG, stat.S_IFDIR):
         raise ValueError("Archive member is not an ordinary regular file/directory")
     return path
 
