@@ -188,6 +188,8 @@ def _publish_new(path: Path, payload: bytes) -> None:
 def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           epochs: int, lr: float, min_coverage: float, max_domain_regression: float,
           expand_vocabulary: bool = False,
+          capacity_growth: str = "none",
+          max_added_parameters: int = 500000,
           max_optimizer_steps: int = 25000,
           max_training_seconds: int = 1200,
           dataset_manifest: Path | None = None,
@@ -214,6 +216,11 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         raise ValueError("max_training_seconds must be an integer in [1, 86400]")
     if type(expand_vocabulary) is not bool:
         raise ValueError("expand_vocabulary must be boolean")
+    from .jeeves_capacity_growth import PROFILE_FACTORS
+    if capacity_growth not in PROFILE_FACTORS:
+        raise ValueError("unsupported Jeeves capacity growth profile")
+    if type(max_added_parameters) is not int or not 1 <= max_added_parameters <= 2000000:
+        raise ValueError("max_added_parameters must be a bounded positive integer")
     if type(epochs) is not int or not 1 <= epochs <= 3:
         raise ValueError("epochs must be 1..3")
     if type(lr) is not float or not math.isfinite(lr) or not 0 < lr <= 0.03:
@@ -256,6 +263,12 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             raise ProductionCheckpointError("restored native embeddings differ from production checkpoint")
     if model.snapshot()["steps"] != original_snapshot["steps"]:
         raise ProductionCheckpointError("restored transformer training cursor mismatch")
+    if capacity_growth != "none" and not torch_stack:
+        raise ProductionCheckpointError(
+            "actual FFN parameter growth requires the attested torch-stack speaking model")
+    parent_parameter_count = (
+        sum(int(p.numel()) for p in model.net.parameters() if p.requires_grad)
+        if torch_stack else None)
     curriculum_and_eval = dataset + tuple(
         case for rows in heldout.values() for case in rows
     )
@@ -296,6 +309,12 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             f"production vocabulary coverage {vocab_coverage:.4f} < {min_coverage:.4f}; "
             "refusing ineffective UNK-token specialization"
         )
+    growth_receipt: dict[str, Any] | None = None
+    if torch_stack:
+        from .jeeves_capacity_growth import grow_feedforward
+        model, growth_receipt = grow_feedforward(
+            model, profile=capacity_growth,
+            max_added_parameters=max_added_parameters)
     before, sample_before = _heldout(model, heldout, deadline=deadline)
     steps_before = model.steps
     if torch_stack:
@@ -336,6 +355,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "min_coverage": min_coverage,
             "max_domain_regression": max_domain_regression,
             "native_vocabulary_expansion": expand_vocabulary,
+            "capacity_growth": capacity_growth,
+            "max_added_parameters": max_added_parameters,
+            "capacity_growth_receipt": growth_receipt,
             "active_model_key": selected_key,
             "architecture": "torch-stack" if torch_stack else "TinyTransformer",
             "expected_optimizer_updates": expected_steps,
@@ -438,6 +460,17 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "vocabulary_coverage": vocab_coverage,
         "vocabulary_expansion": expansion,
         "vocabulary_growth_opted_in": expand_vocabulary,
+        "capacity_growth_profile": capacity_growth,
+        "capacity_growth": growth_receipt,
+        "max_added_parameters": max_added_parameters,
+        "parent_trainable_parameters": parent_parameter_count,
+        "candidate_trainable_parameters": (
+            sum(int(p.numel()) for p in model.net.parameters() if p.requires_grad)
+            if torch_stack else None),
+        "trainable_parameters_added_by_growth": (
+            growth_receipt["new_trainable_parameters"] if growth_receipt else 0),
+        "new_parameters_received_optimizer_updates": bool(
+            capacity_growth != "none" and observed_steps > 0),
         "parent_heldout_losses_before_vocabulary_growth": parent_heldout,
         "parent_generated_before_vocabulary_growth": parent_generations,
         "losses_across_changed_vocabulary_not_directly_comparable": bool(expansion and expansion["new_tokens"]),
@@ -484,6 +517,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-coverage", type=float, default=0.80)
     parser.add_argument("--expand-vocabulary", action="store_true",
                         help="explicitly add missing BPE pieces or Torch tokens to the cloned active production LM only")
+    parser.add_argument("--capacity-growth", choices=("none", "micro", "balanced", "large", "xlarge"),
+                        default="none", help="real Torch FFN trainable parameter growth, candidate-only")
+    parser.add_argument("--max-added-parameters", type=int, default=500000,
+                        help="hard cap on extra trainable candidate parameters")
     parser.add_argument("--max-domain-regression", type=float, default=0.0)
     args = parser.parse_args(argv)
     try:
@@ -492,6 +529,8 @@ def main(argv: list[str] | None = None) -> int:
                        min_coverage=args.min_coverage,
                        max_domain_regression=args.max_domain_regression,
                        expand_vocabulary=args.expand_vocabulary,
+                       capacity_growth=args.capacity_growth,
+                       max_added_parameters=args.max_added_parameters,
                        max_optimizer_steps=args.max_optimizer_steps,
                        max_training_seconds=args.max_training_seconds,
                        dataset_manifest=args.dataset_manifest,
