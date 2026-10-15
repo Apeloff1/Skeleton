@@ -7,8 +7,10 @@
   "support": {
     "cpu": "Official LR35902 base and CB instructions; invalid instructions fail explicitly",
     "cartridges": [
-      "ROM-only",
-      "MBC1 without RTC"
+      "ROM-only (including header-declared SRAM)",
+      "MBC1 banking, up to 2 MiB ROM / 32 KiB SRAM",
+      "MBC3 without RTC (types 0x11–0x13)",
+      "MBC5 without rumble (types 0x19–0x1B), up to 8 MiB ROM / 128 KiB SRAM"
     ],
     "ppu": "Bounded DMG background/window/sprite raster with approximate timing; not cycle-accurate certification",
     "input": "Eight DMG controls mapped to declared action set",
@@ -26,12 +28,12 @@
     "preview()"
   ],
   "bounds": {
-    "rom_bytes": 2097152,
+    "rom_bytes": 8388608,
     "cycles_per_step": 140448,
     "episode_steps": 4096,
     "framebuffer_pixels": 23040,
     "state_bytes": 400000
   },
-  "failure": "Unsupported cartridge, color-only ROM, malformed checksum/header, illegal opcode, cycle/resource overrun and altered snapshot/ROM identity raise explicit typed errors. No copyrighted BIOS, keys or downloaded games are bundled.",
-  "verification": "Source candidate only; no automated tests or live ROM execution during user-directed no-tests session. Hardware compatibility remains unverified."
+  "failure": "Unsupported mapper/RTC/rumble, invalid RAM/ROM geometry, malformed header/checksum, illegal opcode, cycle/resource overrun and modified state/ROM identity fail explicitly. No proprietary BIOS, keys or game ROMs are bundled.",
+  "verification": "Source candidate; this change was not compiled, exercised with ROMs, measured on native hardware or independently CI-qualified. Boot ROM, CGB-only, RTC, rumble, audio and cycle-perfect PPU/APU behavior remain unavailable."
 }
