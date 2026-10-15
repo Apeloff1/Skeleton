@@ -45,6 +45,8 @@ TEST_MODULES = (
     "skeleton.testing.test_game_rom_acceptance_suite",
     "skeleton.testing.test_game_original_mapper_bus_audit",
     "skeleton.testing.test_game_rom_virtual_rtc",
+    "skeleton.testing.test_game_rom_cpu_timer",
+    "skeleton.testing.test_game_rom_instruction_divergence",
 )
 
 
@@ -218,6 +220,67 @@ def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
     }
 
 
+def _verify_instruction_microtrace(directory: Path) -> dict[str, Any]:
+    """Read a real original CPU branching trace and validate every source row."""
+    report, reference = _json_file(directory / "original-cpu-instruction-divergence.json")
+    _verify_digest(report, "report_digest")
+    runs = report.get("actual_passive_and_controller_interventions")
+    contrasts = report.get("paired_replay_verified_differences")
+    if (
+        report.get("schema_version") != "skeleton.game.original_rom_instruction_divergence.v1"
+        or report.get("all_source_replays_identical") is not True
+        or report.get("source_instruction_and_memory_trace") is not True
+        or report.get("production_jeeves_model_promotion") is not False
+        or report.get("neural_or_q_training_updates") != 0
+        or not isinstance(runs, list) or not 2 <= len(runs) <= 8
+        or not isinstance(contrasts, list) or len(contrasts) != len(runs) - 1
+        or runs[0].get("control") != "idle"
+    ):
+        raise AcceptanceSuiteError("controlled real ROM CPU instruction evidence is incomplete")
+    executed = 0
+    for case in runs:
+        source = case.get("first_run", {})
+        observations = source.get("time_and_video_evidence")
+        if (
+            case.get("source_replay_identical") is not True
+            or case.get("actual_repeated_physical_cpu_runs") != 2
+            or source.get("source_state_before_inputs_sha256") != report.get("exact_boot_source_checkpoint_sha256")
+            or source.get("actual_source_output_digest") != case.get("second_run_source_output_digest")
+            or source.get("full_source_end_snapshot_sha256") != case.get("second_run_final_snapshot_sha256")
+            or not isinstance(observations, list) or not 2 <= len(observations) <= 1024
+            or source.get("real_source_sample_count") != len(observations)
+            or source.get("real_source_cpu_instructions") != report.get("requested_instructions_per_branch")
+        ):
+            raise AcceptanceSuiteError("source-emulated CPU replay evidence differs from repeated run")
+        for observation in observations:
+            if not isinstance(observation, dict) or "sample_digest" not in observation:
+                raise AcceptanceSuiteError("source microtrace sample digest is unavailable")
+            _verify_digest(observation, "sample_digest")
+        if _sha(_canonical(observations)) != source.get("actual_source_output_digest"):
+            raise AcceptanceSuiteError("measured emulator CPU samples differ from their source trace")
+        executed += source["real_source_cpu_instructions"] * 2
+    if executed != report.get("real_source_instruction_executions"):
+        raise AcceptanceSuiteError("source instruction replay claims more or fewer CPU instructions than audited")
+    for comparison in contrasts:
+        finding = comparison.get("comparison")
+        if (
+            not isinstance(finding, dict)
+            or type(finding.get("actual_source_control_difference_observed")) is not bool
+            or finding.get("game_objective_success_proven") is not False
+            or finding.get("real_world_cause_proven") is not False
+        ):
+            raise AcceptanceSuiteError("source CPU experiment invented game causation or objectives")
+    return {
+        "accepted": True,
+        "source_instruction_executions": executed,
+        "actual_replayed_branch_pairs": len(runs),
+        "controlled_divergence_pairs": len(contrasts),
+        "receipt_file": reference,
+        "hardware_timing_or_game_success_certified": False,
+        "production_weights_updated": False,
+    }
+
+
 def _verify_game_goal(directory: Path) -> dict[str, Any]:
     goal, reference = _json_file(directory / "original-goal-q.json")
     _verify_digest(goal, "receipt_digest")
@@ -356,6 +419,19 @@ def run_acceptance_suite(
                 output_directory, "focused_synthetic_and_real_original_rom_regressions",
                 seconds=process_timeout_seconds,
             ))
+        instruction_path = output_directory / "original-cpu-instruction-divergence.json"
+        processes.append(_run(
+            [
+                sys.executable, "scripts/audit_original_rom_instruction_divergence.py",
+                "--evidence-file", str(instruction_path),
+                "--seed", str(seed), "--instruction-count", "2048",
+                "--sample-stride", "8", "--max-cycles-per-branch", "131072",
+                "--actions", "idle", "a", "right", "a_right",
+            ],
+            output_directory, "original_cpu_source_instruction_replays",
+            seconds=process_timeout_seconds,
+        ))
+        instruction = _verify_instruction_microtrace(output_directory)
         mapper_path = output_directory / "original-mapper-bus.json"
         processes.append(_run(
             [
@@ -398,12 +474,14 @@ def run_acceptance_suite(
             "focused_tests_executed": tests,
             "source_cpu_interpreter_executed": True,
             "original_cartridge_bus_matrix_verified": True,
+            "source_instruction_replay_and_divergence_verified": True,
             "source_q_rewind_proven": True,
             "neural_candidate_optimized_and_scored": True,
             "source_goal_replay_and_neutral_control_verified": True,
             "original_training": original,
             "original_goal_training": goal,
             "real_cartridge_bus_matrix": mapper,
+            "source_cpu_instruction_divergence": instruction,
             "bounded_worker_receipts": processes,
             "real_libretro_installed_core_tested": False,
             "independent_game_hardware_accuracy_certified": False,
