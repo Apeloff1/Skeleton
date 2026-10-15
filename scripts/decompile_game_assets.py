@@ -19,6 +19,7 @@ from pathlib import Path
 from skeleton.jeeves.game_decompilation import (
     MAX_GAME_BYTES, GameDecompilationGrant, decompile_authorized_game,
     SCOPE_STRUCTURE, SCOPE_CODE, SCOPE_ASSETS, SCOPE_PREVIEWS, SCOPE_QUALITY,
+    SCOPE_SHADOW, prepare_reviewed_training_candidate,
 )
 
 _SHA = re.compile(r"^[0-9a-f]{64}$")
@@ -92,6 +93,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--export-previews", action="store_true",
                         help="Separate explicit authorization to export reconstructed tile PNGs")
     parser.add_argument("--instruction-limit", type=int, default=2048)
+    parser.add_argument("--human-score", type=int, help="Human review score 0–100, opt-in shadow label only")
+    parser.add_argument("--reviewer", help="Human reviewer reference, required with score")
+    parser.add_argument("--label-evidence-digest", help="SHA-256 of independent human review evidence")
     parser.add_argument("--candidate-tile", action="append", default=[],
                         help="Explicit candidate offset:length:codec (max four; never guessed)")
     args = parser.parse_args(argv)
@@ -99,6 +103,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("Source reverse-engineering and training-feature rights must be explicitly attested")
     if not _SHA.fullmatch(args.rights_digest):
         parser.error("--rights-digest must be a lowercase SHA-256")
+    if args.human_score is not None and (
+        args.skip_quality or not args.reviewer or not args.label_evidence_digest
+        or not _SHA.fullmatch(args.label_evidence_digest)
+        or not 0 <= args.human_score <= 100
+    ):
+        parser.error("Shadow labels require quality brief, score 0–100, reviewer and independent label evidence SHA")
     if len(args.candidate_tile)>4:
         parser.error("At most four explicitly scoped candidate regions allowed")
     candidates=[]
@@ -118,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
         scopes.append(SCOPE_PREVIEWS)
     if not args.skip_quality:
         scopes.append(SCOPE_QUALITY)
+    if args.human_score is not None:
+        scopes.append(SCOPE_SHADOW)
     grant = GameDecompilationGrant(
         source_sha256=hashlib.sha256(data).hexdigest(),
         rights_evidence_digest=args.rights_digest,
@@ -133,7 +145,17 @@ def main(argv: list[str] | None = None) -> int:
         export_previews=args.export_previews,derive_quality=not args.skip_quality,
         candidate_tile_regions=candidates,instruction_limit=args.instruction_limit,
     )
-    _safe_output(args.output,result.report,result.previews)
+    report = dict(result.report)
+    if args.human_score is not None:
+        candidate = prepare_reviewed_training_candidate(
+            result,grant=grant,authorize=local_explicit_authority,
+            human_score=args.human_score,reviewer_ref=args.reviewer,
+            label_evidence_digest=args.label_evidence_digest,
+        )
+        # Human label is a separate explicit result, never hidden in
+        # the original game evidence digest or inserted into model weights.
+        report["local_shadow_training_candidate"] = candidate
+    _safe_output(args.output,report,result.previews)
     print(json.dumps({
         "report_sha256":result.report["report_sha256"],
         "source_sha256":result.report["source_sha256"],
