@@ -329,8 +329,6 @@ class NativeCore:
                 }):
                 raise ValueError("requested native controller is absent from the core's port capabilities")
             self.core.retro_set_controller_port_device(port, allowed_ports[device])
-        self.info["controller_capabilities"] = self.controller_capabilities
-        self.info["input_descriptors"] = self.input_descriptors
         self.info["controller_routing_evidence"] = [
             "disconnected" if device == "none" else (
                 "not_advertised" if self.controller_capabilities is None
@@ -344,6 +342,9 @@ class NativeCore:
         ]
         self.av = AvInfo()
         self.core.retro_get_system_av_info(C.byref(self.av))
+        # Some cores update their input legends while querying AV geometry.
+        self.info["controller_capabilities"] = self.controller_capabilities
+        self.info["input_descriptors"] = list(self.input_descriptors)
         self._check_av()
         self._check()
 
