@@ -317,3 +317,33 @@ def test_windows_ci_sparse_checkout_contains_every_installer_root():
         "/.github/copilot-instructions.md",
     ):
         assert required in source
+
+
+def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    (tmp_path / ".env").write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "healthy"))
+    opened = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
+
+    success, detail = launcher.open_running_application(tmp_path)
+    assert success
+    assert opened == ["http://localhost:3300"]
+    assert "http://localhost:3300" in detail
+
+
+def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    secret = "sensitive-compose-secret"
+    def runner(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command, 5, stdout=f"MONGO_URL={secret}", stderr=f"JWT_SECRET={secret}",
+        )
+
+    monkeypatch.setattr(launcher, "_hidden_runner", runner)
+    success, detail = launcher.stop_runtime(tmp_path)
+    assert not success
+    assert "exit 5" in detail
+    assert secret not in detail
