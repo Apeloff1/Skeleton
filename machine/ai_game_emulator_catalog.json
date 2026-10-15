@@ -127,7 +127,12 @@
     "parallel_n64": "a8280501a71c1bcd4c85c5b8bfe75cfa62cd6127",
     "fbneo": "abe41e850b515c4ffc4dca054d1d61b828e9200c",
     "ppsspp": "e26225c99b401f259a670e45d25be4f4615bdbc5",
-    "flycast": "6b41116a315bc372d6f813439e1bd04a57718b1c"
+    "flycast": "6b41116a315bc372d6f813439e1bd04a57718b1c",
+    "sameboy": "aa158a889a48b538a0302873704a34577c8eb67d",
+    "nestopia": "06a8949e0b3cf60e3a38a374b1426bf40fccb9a0",
+    "mesen": "0102910c39ad1a62bc3f784466f3f67ca9eae335",
+    "snes9x2010": "fe690dd321fa5a46b5234a2bde089d2518c62b0e",
+    "mednafen_saturn": "faef2779a7568c1734addc4fe63cc76e9fa2566b"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -283,5 +288,25 @@
     "license_aliases": "An upstream license symlink may be resolved only to a nonsymlink regular file inside the exact pinned source root. Copy its actual text under an immutable regular destination and record the source alias/target; external targets and unsafe installed-library paths remain rejected.",
     "bootstrap_pins_count": 35,
     "static_compilation_scope": "34 ELF libretro core libraries built locally at this wave end, including28 additional.29 operator-approved mappings cover46 canonical hardware targets; 4 firmware-missing candidates and1 hardware-rendering candidate remain inactive. No automated tests or actual game compatibility verification. Local artifact evidence is separate from portable checked-in source."
+  },
+  "extended_core_recipes": {
+    "2026-10-15": {
+      "scope": "Five additional opt-in, exact-upstream native libretro source/build recipes. No binaries are bundled; no emulator execution, ROM compatibility, firmware rights or CI signoff claimed.",
+      "core_ids": [
+        "sameboy",
+        "nestopia",
+        "mesen",
+        "snes9x2010",
+        "mednafen_saturn"
+      ],
+      "requirements": [
+        "operator-invoked build and explicit approval",
+        "host-shape and ABI validation",
+        "rights-cleared content and legitimate BIOS",
+        "actual isolated boot, input/frame/save-state replay evidence"
+      ],
+      "default_selection_unchanged": true,
+      "execution_checked": false
+    }
   }
 }
