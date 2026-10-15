@@ -127,6 +127,33 @@ Keep the previous private environment backup for rollback; never attach it to
 diagnostic reports. Setup alone does not install trained AI weights or prove
 model readiness.
 
+### Pre-compilation readiness
+
+Before creating any installer or claiming the assembled app can ship, run the
+read-only contract pass from a configured development environment:
+
+```bash
+make precompile
+```
+
+This sequences the architecture map, AI construction and capability interfaces,
+provider bootstrap, app assembly, toolchain contract, and structural application
+checks. It does **not** install dependencies, mutate `.env`, launch Docker,
+compile release binaries, train the model, or qualify an enterprise release.
+A passing pre-compilation contract pass is necessary but not sufficient for
+a completed app; it must be followed by exact-head build, runtime journey,
+security, Windows installation, and independent release evidence.
+
+The Windows build compiles both frozen executables and the Inno Setup recipe
+from the same `git archive` source revision as the installed payload. The
+payload is expanded with **all** `required_paths` declared by the archived
+`skeleton/app/manifest.json`, and it fails before compilation if any file is
+missing, a path exceeds the Windows portability budget, or its project version
+differs from the requested installer version. The Windows CI interpreter is
+aligned to the Python 3.11.16 toolchain baseline and the application package's
+Pydantic minimum. Build failures release the temporary drive so repair attempts
+are not blocked by stale mappings.
+
 ### Windows Setup.exe
 
 The Windows distribution wraps the same setup/runtime plane in two executable
