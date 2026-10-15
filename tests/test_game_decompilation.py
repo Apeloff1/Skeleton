@@ -207,6 +207,24 @@ class RealStructureAndAssetContracts(unittest.TestCase):
         )
         self.assertEqual(silent.previews,())
 
+    def test_image_and_audio_source_metrics_feed_human_review_not_auto_weights(self):
+        rgba=bytes([5,10,15,255, 90,100,120,0])*2
+        source=png_rgba(rgba,2,2)
+        result=decompile_authorized_game(
+            source,"original.png",grant=grant(source),authorize=lambda *_:True,
+        )
+        brief=result.report["quality_brief"]
+        self.assertEqual(brief["measured_numeric_features"]["decoded_image_pixels"],4)
+        self.assertEqual(brief["measured_numeric_features"]["nonopaque_pixel_fraction"],0.5)
+        self.assertFalse(brief["model_training_performed"])
+        reviewed=prepare_reviewed_training_candidate(
+            result,grant=grant(source),authorize=lambda *_:True,
+            human_score=50,reviewer_ref="reviewer",
+            label_evidence_digest="b"*64,
+        )
+        self.assertIn("decoded_image_pixels",reviewed["measured_features"])
+        self.assertFalse(reviewed["production_model_or_language_model_updated"])
+
     def test_existing_png_decodes_actual_rgba_without_export_by_default(self):
         rgba=bytes([60,120,180,255])*4
         source=png_rgba(rgba,2,2)
