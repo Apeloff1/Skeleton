@@ -82,6 +82,13 @@ def _check_receipt(receipt: Mapping[str, Any]) -> None:
         or type(receipt.get("actual_steps")) is not int
         or receipt["actual_steps"] < 1
         or receipt.get("actual_tabular_q_updates") != receipt["actual_steps"]
+        or not isinstance(receipt.get("verified_training_projection_sha256"), list)
+        or len(receipt["verified_training_projection_sha256"]) != receipt["actual_steps"]
+        or any(
+            type(item) is not str or len(item) != 64
+            or any(ch not in "0123456789abcdef" for ch in item)
+            for item in receipt["verified_training_projection_sha256"]
+        )
         or not isinstance(receipt.get("scrutiny_checks"), Mapping)
         or len(receipt["scrutiny_checks"]) != 10
         or not all(value is True for value in receipt["scrutiny_checks"].values())
@@ -167,6 +174,7 @@ def verify_neural_training_sources(
     for raw_sample in samples:
         if not isinstance(raw_sample, Mapping) or set(raw_sample) != {
             "trace_digest", "environment_digest", "seed", "sequence",
+            "verified_training_projection_sha256",
             "observation", "action", "next_observation", "measured_reward",
             "measured_reward_components", "terminated", "truncated", "source",
         }:
@@ -182,6 +190,30 @@ def verify_neural_training_sources(
             or type(raw_sample["truncated"]) is not bool
         ):
             raise EmulatorNeuralError("candidate example lacks original verified source binding")
+        projection = {
+            "sequence": raw_sample["sequence"],
+            "observation": raw_sample["observation"],
+            "action": raw_sample["action"],
+            "next_observation": raw_sample["next_observation"],
+            "reward": raw_sample["measured_reward"],
+            "reward_components": raw_sample["measured_reward_components"],
+            "terminated": raw_sample["terminated"],
+            "truncated": raw_sample["truncated"],
+        }
+        claimed_projection = raw_sample.get("verified_training_projection_sha256")
+        source_projection = receipt_map[trace]["verified_training_projection_sha256"][
+            raw_sample["sequence"] - 1
+        ]
+        if (
+            type(claimed_projection) is not str
+            or claimed_projection != _digest(projection)
+            or claimed_projection != source_projection
+            or summary_map[trace].get("steps") != receipt_map[trace]["actual_steps"]
+            or summary_map[trace].get("seed") != receipt_map[trace].get("seed")
+        ):
+            raise EmulatorNeuralError(
+                "neural example differs from source-audited action, observation, reward or episode"
+            )
         key = (trace, raw_sample["sequence"])
         if key in observed:
             raise EmulatorNeuralError("duplicate replay segment cannot multiply neural training weight")
