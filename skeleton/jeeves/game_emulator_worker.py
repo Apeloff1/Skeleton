@@ -510,6 +510,14 @@ class NativeCore:
             }
         # Do not trust an arbitrary native library's declared capacity.
         count = int(self._disk_call("get_num_images", C.c_uint)())
+        if count == 0:
+            # Some cores register the ABI before discovering whether the
+            # loaded image contains a multidisc set. Do not break regular
+            # boot/step paths merely because there are no registered disks.
+            return {
+                "supported": False, "interface_version": None,
+                "image_count": 0, "image_index": None, "ejected": None,
+            }
         if not 1 <= count <= 32:
             raise ValueError("native_disk_count_outside_bound")
         index = int(self._disk_call("get_image_index", C.c_uint)())
