@@ -244,3 +244,20 @@ def test_host_preload_rejects_stopped_docker_daemon(monkeypatch, tmp_path):
     assert report.ready is False
     assert daemon.required is True
     assert "Start Docker Desktop" in daemon.remediation
+
+def test_windows_launcher_failure_receipts_do_not_show_ready_status(tmp_path):
+    from skeleton.app.installer import InstallPhase, InstallReceipt
+    from skeleton.app.preloader import PreloadCheck, PreloadReport
+    from skeleton.app.windows_launcher import _action_succeeded
+
+    failure = InstallReceipt(tmp_path, (InstallPhase("runtime-preflight", False, "Docker missing"),))
+    passed = InstallReceipt(tmp_path, (InstallPhase("runtime-preflight", True, "ok"),))
+    blocked = PreloadReport(
+        tmp_path, "Windows AMD64", "3.14",
+        (PreloadCheck("host:docker-daemon", False, "Docker stopped"),),
+    )
+    assert not _action_succeeded(failure)
+    assert _action_succeeded(passed)
+    assert not _action_succeeded(blocked)
+    assert not _action_succeeded((False, "cannot stop services"))
+    assert _action_succeeded((True, "stopped"))
