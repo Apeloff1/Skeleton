@@ -232,9 +232,25 @@ class GameBoyMachine:
             raise GameRomRuntimeError("RTC hours write outside admitted range")
         self.rtc_regs[index] = value & (0xC1 if index == 4 else 0xFF)
 
+    def _cpu_ppu_memory_locked(self, address: int) -> bool:
+        # CPU-only DMG video bus arbitration. Rendering/DMA accesses must
+        # bypass this check. Mode 3 timing remains an approximate 80..251
+        # T-cycle span, not dot-perfect pixel fetch arbitration.
+        if not self._cpu_bus_active or not (self.memory[0xFF40] & 0x80):
+            return False
+        if self.memory[0xFF44] >= HEIGHT:
+            return False
+        mode3 = 80 <= self.line_cycles < 252
+        return (
+            0x8000 <= address < 0xA000 and mode3
+            or 0xFE00 <= address < 0xFEA0 and self.line_cycles < 252
+        )
+
     def read(self, address: int) -> int:
         address &= 65535
         if self._cpu_bus_active and self.dma_active and not 0xFF80 <= address <= 0xFFFE:
+            return 0xFF
+        if self._cpu_ppu_memory_locked(address):
             return 0xFF
         if address < 0x8000:
             if address < 0x4000:
@@ -289,6 +305,8 @@ class GameBoyMachine:
     def write(self, address: int, value: int) -> None:
         address, value = address & 65535, value & 255
         if self._cpu_bus_active and self.dma_active and not 0xFF80 <= address <= 0xFFFE:
+            return
+        if self._cpu_ppu_memory_locked(address):
             return
         if address < 0x8000:
             mapper = self.metadata["mapper"]
