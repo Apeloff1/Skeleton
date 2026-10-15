@@ -23,6 +23,8 @@ A compiled game's complete authored source, asset identities, shader logic, leve
 | Game-project ZIP | Up to 96 safely checked members, file size/inflation/CRC/path guards, no disk extraction | Scripts recognized as **opaque**, never executed | Actual bounded PNG decoding and WAV PCM feature measurements with no raw media returned. |
 | **Any installed libretro core** | User/host captures actual RGB24 frames | No game RAM scraping, instruction execution or asset classification | Up to 16 checksum-verified frames, each spatially tiled into up to 16×16 full-region hashes; sampled palette/brightness, cross-frame pixel changes and native-run-counter consistency. Requires authorized source + approved core binary digest. |
 
+The full hardware coverage/gap report is available with `PYTHONPATH=. python scripts/audit_game_decompilation_targets.py --summary`; it enumerates every current canonical target and explicitly distinguishes implemented decoders from missing ones, without pretending that all catalogued targets are installed or bootable.
+
 ## Authorization contract
 
 Each call to `decompile_authorized_game(data, filename, grant=…, authorize=…)` requires:
