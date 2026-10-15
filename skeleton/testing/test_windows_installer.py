@@ -123,6 +123,7 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert '"backend"' in source
     assert '"frontend"' in source
     assert '"skeleton"' in source
+    assert '"machine"' in source
     assert '":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json"' in source
     assert "$MaxRuntimeRelativePathChars = 190" in source
     assert "$PathBudgetViolations" in source
@@ -148,6 +149,7 @@ def test_windows_runtime_payload_respects_portable_path_budget():
             "skeleton",
             "scripts",
             "packaging",
+            "machine",
         ],
         check=True,
         capture_output=True,
