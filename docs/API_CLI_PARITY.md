@@ -64,11 +64,13 @@ Contract version 1.0 records streaming capability in command metadata but does n
 
 The **creator CLI** `python -m skeleton run` uses the ten-stage
 `skeleton.context.pipeline.GameForgeRun` application workflow. The
-shared `run` command and HTTP `POST /gameforge/run` now use the **same
-engine when `target="godot"` is explicitly requested**; those calls do
-not accept remote output paths. The legacy default `target="json"` and
-YAML specification path retain the existing `state.gameforge.run`
-compatibility contract and are **not** yet equivalent to Godot generation.
+shared `run` command and HTTP `POST /gameforge/run` use the **same
+ten-stage Godot engine by default**, including when `target` is omitted.
+Both paths reject remote output paths on HTTP. JSON and YAML remain explicit
+compatibility targets (`target="json"` or `target="yaml"`) and still use
+`state.gameforge.run`; their legacy specification objects are **not**
+identical to a Godot source manifest. This intentional default change removes
+the silent split between creator CLI and API implicit generation.
 Deterministic fixture-based manifest comparison and real Godot boot
 evidence remain required for complete [#3613](https://github.com/Apeloff1/Skeleton/issues/3613) acceptance.
 
@@ -113,8 +115,8 @@ it even with `include_files=false`. Project `FORGE_MANIFEST.json` writes
 `source_sha256` using the same algorithm; the sealed
 `build_report.md` includes that same digest. The receipt proves equality
 of emitted bytes only. Real Godot boot/playability is still controlled by
-`playtest` and not implied by a matching hash. The JSON/YAML legacy target
-continues to use its separate specification format.
+`playtest` and not implied by a matching hash. The JSON/YAML legacy targets remain available only through explicit
+`target` selection and use their separate specification formats.
 
 ## Security and verification boundary
 
