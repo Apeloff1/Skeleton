@@ -29,7 +29,9 @@
     "python -m skeleton.jeeves.game_learning_cli probe-emulator-goals",
     "python scripts/audit_game_emulator_first_boot.py",
     "python scripts/accept_original_rom_ai_pipeline.py",
-    "python -m skeleton.jeeves.game_original_rom_goal_training"
+    "python -m skeleton.jeeves.game_original_rom_goal_training",
+    "python scripts/run_game_rom_acceptance_suite.py",
+    "python scripts/audit_original_gameboy_mapper_matrix.py"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -123,7 +125,9 @@
     "skeleton/testing/test_game_emulator_operator_goals.py",
     "skeleton/testing/test_game_emulator_first_boot_audit.py",
     "skeleton/testing/test_game_original_rom_ai_acceptance.py",
-    "skeleton/testing/test_game_original_rom_goal_training.py"
+    "skeleton/testing/test_game_original_rom_goal_training.py",
+    "skeleton/testing/test_game_rom_acceptance_suite.py",
+    "skeleton/testing/test_game_original_mapper_bus_audit.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -256,5 +260,62 @@
       "automatic Jeeves production promotion"
     ],
     "real_executable_proof_established": false
+  },
+  "mbc2_emulation": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "cartridge_type_ids": [
+      "0x05",
+      "0x06"
+    ],
+    "mode": "actual bounded GameBoyMachine interpreter bus",
+    "max_rom_bytes": 262144,
+    "ram": "512 internal half-byte registers, upper nibble reads high",
+    "bank_control": "A8-qualified separate RAM enable and 4-bit ROM bank selection, zero aliases one",
+    "snapshot": "full source CPU, memory, framebuffer and internal nibbles with verified reload",
+    "synthetic_tests": "skeleton/testing/test_game_rom_mapper_expansion.py",
+    "hardware_accuracy_independently_verified": false,
+    "real_executable_rom_tests_during_this_turn": 0
+  },
+  "original_mapper_bus_matrix": {
+    "entrypoint": "python scripts/audit_original_gameboy_mapper_matrix.py",
+    "actual_source_banks": [
+      "rom_only",
+      "mbc1",
+      "mbc2",
+      "mbc3",
+      "mbc5"
+    ],
+    "source": "synthetic owned cartridge headers with bank markers, never third-party ROM media",
+    "checks": [
+      "source cartridge SHA",
+      "RAM enable and bank-select decode",
+      "high ROM bank address bits",
+      "A8 control gate",
+      "independent RAM banks and MBC2 nibble mirror",
+      "exact CPU/memory/raster snapshot restore"
+    ],
+    "integration": "scripts/run_game_rom_acceptance_suite.py",
+    "first_execution_confirmed": false,
+    "hardware_accuracy_certified": false
+  },
+  "manual_acceptance_runner": {
+    "entrypoint": "python scripts/run_game_rom_acceptance_suite.py",
+    "readiness": "operator-only, source implementation committed but not yet run",
+    "phases": [
+      "focused synthetic and original ROM regressions",
+      "five mapper source bus audit",
+      "generated original ROM Q and neural candidate evidence",
+      "source-authored original goal-conditioned Q",
+      "artifact content integrity and report custody validation"
+    ],
+    "failure": "nonzero subprocess and phase_*.json status, absence of suite-acceptance.json",
+    "production_model_promotion": false,
+    "native_libretro_core_tested": false,
+    "manual_only_workflow": ".github/workflows/on-demand-rom-ai-acceptance.yml",
+    "workflow_triggers": [
+      "workflow_dispatch"
+    ],
+    "normal_push_pr_merge_ci_runs_added": 0
   }
 }
