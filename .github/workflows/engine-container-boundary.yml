@@ -20,6 +20,8 @@ on:
       - "skeleton/testing/live_engine_process_app.py"
       - "scripts/check_engine_container_boundary.py"
       - "scripts/verify_engine_application_boundary_closure.py"
+      - "scripts/check_engine_container_boundary.py"
+      - "tests/test_engine_container_boundary_context.py"
       - "tests/test_engine_application_boundary_independent_verifier.py"
       - "machine/ai_app_construction.json"
       - "machine/ai_implementation_handoff.json"
@@ -79,6 +81,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           tests/test_engine_application_boundary_independent_verifier.py
+          tests/test_engine_container_boundary_context.py
 
       - name: Emit exact-head Stage-5 closure receipt
         env:
@@ -198,7 +201,12 @@ jobs:
           )
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as target:
               for name in required:
-                  target.write(f"{name}={secrets.token_hex(32)}\n")
+                  value = secrets.token_hex(32)
+                  # GITHUB_ENV values are injected into later workflow steps.
+                  # Mask before injection so the runner's environment/step
+                  # dumps cannot expose live, albeit CI-only, credentials.
+                  print(f"::add-mask::{value}")
+                  target.write(f"{name}={value}\n")
           print(f"Initialized {len(required)} ephemeral test secret identities")
           PY
 
