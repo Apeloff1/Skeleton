@@ -98,6 +98,7 @@ FIRST_PARTY_PREFIXES = (
     "tests/",
     "docs/",
     "design/",  # first-party authored visual identity, not a canonical runtime root
+    "data/",  # reviewed conversational/training corpora owned by this repository
     ".github/",
     ".cursor/",
     "memory/",
