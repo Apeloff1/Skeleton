@@ -51,6 +51,10 @@ _ROM_EXTENSIONS = {
     ".z64",
     ".v64",
     ".n64",
+    ".lnx",
+    ".a78",
+    ".sms",
+    ".gg",
 }
 _ARCHIVE_EXTENSIONS = {".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz"}
 _TEXT_EXTENSIONS = {
@@ -105,6 +109,10 @@ _HARDWARE = {
     "genesis": (1988, "16-bit cartridge console"),
     "gba": (2001, "32-bit handheld"),
     "n64": (1996, "64-bit cartridge console"),
+    "lynx": (1989, "color handheld"),
+    "atari_7800": (1984, "8-bit cartridge console"),
+    "master_system": (1985, "8-bit cartridge console"),
+    "game_gear": (1990, "color handheld"),
 }
 _GENRE_TERMS = {
     "platformer": ("platformer", "platform game"),
@@ -850,8 +858,125 @@ def _rom_n64(data: bytes) -> dict[str, Any]:
     }
 
 
+
+def _rom_lynx(data: bytes) -> dict[str, Any]:
+    """Inspect the actual 64-byte Handy/Lynx LNX header, not a bare .lyx image."""
+    if len(data) <= 64 or data[:4] != b"LYNX":
+        _fail("invalid_rom", "Lynx cartridge requires a 64-byte LYNX header and data")
+    bank0 = int.from_bytes(data[4:6], "little")
+    bank1 = int.from_bytes(data[6:8], "little")
+    version = int.from_bytes(data[8:10], "little")
+    rotation = data[58]
+    if bank0 not in (256, 512, 1024, 2048) or bank1 not in (0, 256, 512, 1024, 2048):
+        _fail("invalid_rom", "Lynx cartridge bank page sizes are invalid")
+    if version != 1 or rotation not in (0, 1, 2) or data[59] not in (0, 1):
+        _fail("invalid_rom", "Lynx header version, rotation or AUDIN mode is invalid")
+    return {
+        "console_id": "lynx",
+        "format": "atari_lynx_lnx",
+        "header_version": version,
+        "title": _ascii(data[10:42]),
+        "manufacturer": _ascii(data[42:58]),
+        "bank0_page_size": bank0,
+        "bank1_page_size": bank1,
+        "screen_rotation": rotation,
+        "audin_addressing": bool(data[59]),
+        "eeprom_flags": data[60],
+        "header_offset": 0,
+        "layout": [
+            _layout(data, 0, 64, "lynx_header"),
+            _layout(data, 64, len(data) - 64, "lynx_cartridge"),
+        ],
+        "warnings": [
+            "LNX metadata cannot validate Lynx ROM bootloader, encryption, cartridges, audio or gameplay."
+        ],
+    }
+
+
+def _rom_a78(data: bytes) -> dict[str, Any]:
+    """Inspect only signed .a78 images; unlabeled Atari 2600/7800 BINs are ambiguous."""
+    if len(data) <= 128 or data[1:10] != b"ATARI7800":
+        _fail("invalid_rom", "Atari 7800 image requires the 128-byte A78 header")
+    version = data[0]
+    declared = int.from_bytes(data[49:53], "big")
+    actual = len(data) - 128
+    if version not in (1, 2, 3, 4) or not 1 <= declared <= actual:
+        _fail("invalid_rom", "A78 version or declared cartridge byte count is invalid")
+    warning = []
+    if declared < actual:
+        warning.append("A78 header declares fewer cartridge bytes than supplied; extra bytes are not claimed as mapped ROM.")
+    if data[57] & ~7:
+        warning.append("A78 video-region flag includes unknown bits.")
+    warning.append("A78 mapper/controller headers do not establish real machine or input emulation.")
+    return {
+        "console_id": "atari_7800",
+        "format": "atari_7800_a78",
+        "header_version": version,
+        "title": _ascii(data[17:49]),
+        "declared_cartridge_bytes": declared,
+        "supplied_cartridge_bytes": actual,
+        "cartridge_type_bits": int.from_bytes(data[53:55], "big"),
+        "controller_types": [data[55], data[56]],
+        "video_flags": data[57],
+        "save_peripheral_flags": data[58],
+        "header_offset": 0,
+        "layout": [
+            _layout(data, 0, 128, "a78_header"),
+            _layout(data, 128, declared, "a78_declared_cartridge"),
+        ],
+        "warnings": warning,
+    }
+
+
+def _rom_sms(data: bytes, filename: str) -> dict[str, Any]:
+    """Inspect actual TMR SEGA software headers at one of three canonical offsets."""
+    locations = (0x7FF0, 0x3FF0, 0x1FF0)
+    found = [offset for offset in locations if len(data) >= offset + 16
+             and data[offset:offset + 8] == b"TMR SEGA"]
+    if not found:
+        _fail("invalid_rom", "SMS/Game Gear cartridge lacks a recognized TMR SEGA header")
+    offset = found[0]
+    header = data[offset:offset + 16]
+    region = header[15] >> 4
+    size_code = header[15] & 15
+    if region not in (3, 4, 5, 6, 7):
+        _fail("invalid_rom", "SMS/Game Gear header region and console identity are unknown")
+    platform = "game_gear" if region in (5, 6, 7) else "master_system"
+    suffix = PurePosixPath(filename).suffix.lower()
+    warnings = []
+    if suffix in {".sms", ".gg"} and ((suffix == ".gg") != (platform == "game_gear")):
+        warnings.append("Filename console extension differs from actual TMR SEGA system field.")
+    if len(found) > 1:
+        warnings.append("Multiple TMR SEGA headers found; first canonical location selected.")
+    warnings.append("SMS/Game Gear checksum and mapper support are unverified; headers can contain inaccurate metadata.")
+    return {
+        "console_id": platform,
+        "format": "sega_tmr_sega",
+        "header_offset": offset,
+        "checksum_stored": int.from_bytes(header[10:12], "little"),
+        "product_id_raw": header[12:15].hex(),
+        "version_nibble": header[14] & 15,
+        "region_code": region,
+        "rom_size_code": size_code,
+        "layout": [
+            _layout(data, offset, 16, "tmr_sega_header"),
+            _layout(data, 0, len(data), "sms_game_gear_image"),
+        ],
+        "warnings": warnings,
+    }
+
+
 def _parse_rom(data: bytes, filename: str) -> dict[str, Any]:
     extension = PurePosixPath(filename).suffix.casefold()
+    if data[:4] == b"LYNX" or extension == ".lnx":
+        return _rom_lynx(data)
+    if len(data) >= 10 and data[1:10] == b"ATARI7800" or extension == ".a78":
+        return _rom_a78(data)
+    if extension in {".sms", ".gg"} or any(
+        len(data) >= offset + 16 and data[offset:offset + 8] == b"TMR SEGA"
+        for offset in (0x7FF0, 0x3FF0, 0x1FF0)
+    ):
+        return _rom_sms(data, filename)
     if data.startswith(b"NES\x1a"):
         return _rom_nes(data)
     if len(data) >= 0x150 and data[0x104:0x134] == _GB_LOGO:
@@ -873,6 +998,12 @@ def _parse_rom(data: bytes, filename: str) -> dict[str, Any]:
 def _has_rom_signature(data: bytes) -> bool:
     return (
         data.startswith(b"NES\x1a")
+        or data[:4] == b"LYNX"
+        or len(data) >= 10 and data[1:10] == b"ATARI7800"
+        or any(
+            len(data) >= offset + 16 and data[offset:offset + 8] == b"TMR SEGA"
+            for offset in (0x7FF0, 0x3FF0, 0x1FF0)
+        )
         or len(data) >= 0x150
         and data[0x104:0x134] == _GB_LOGO
         or data[:4] in {bytes.fromhex("80371240"), bytes.fromhex("37804012"), bytes.fromhex("40123780")}
