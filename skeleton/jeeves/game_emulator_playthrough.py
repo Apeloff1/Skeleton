@@ -448,7 +448,7 @@ def audit_native_playthrough_directory(directory: Path) -> dict[str, object]:
         status = value["stop_reason"]
         if status not in ("running", "input_exhausted", "completion_rule_matched", "cancelled", "time_budget_exhausted"):
             raise PlaythroughError("unknown native playthrough stop reason")
-        if status != "running" and filename != filenames[-1]:
+        if status in ("input_exhausted", "completion_rule_matched") and filename != filenames[-1]:
             raise PlaythroughError("a terminal playthrough receipt has unexpected successors")
     if (checkpoint["absolute_step"] != cursor
         or checkpoint["windows"] != windows
