@@ -671,5 +671,31 @@
     "CGB_high_speed_serial_implemented": false,
     "actual_local_execution_during_authoring": false,
     "production_model_weights_updated": 0
+  },
+  "native_core_manual_build_pipeline": {
+    "workflow": ".github/workflows/on-demand-libretro-core-build.yml",
+    "trigger": "workflow_dispatch only, absolutely no push/PR/schedule/merge trigger",
+    "exact_core_choices": [
+      "sameboy",
+      "nestopia",
+      "mesen",
+      "snes9x2010",
+      "mednafen_saturn"
+    ],
+    "upstream_pinned_recipes": "scripts/install_game_emulator_cores.py",
+    "execution": "GitHub Actions ubuntu-24.04 single serial source clone and native build, inspected libretro ELF",
+    "max_parallel_builds_per_ref": 1,
+    "max_job_minutes": 45,
+    "max_recipe_seconds": 1800,
+    "operator_receipt": "source-build-receipt.json",
+    "short_retention_days": 3,
+    "approval_gate": "native build registry must explicitly distinguish approved vs firmware_missing/candidate",
+    "first_boot_required_after_build": true,
+    "firmware_or_ROM_downloaded": false,
+    "build_artifact_attached_for_distribution": false,
+    "normal_CI_runs_added": 0,
+    "production_weights_updated": 0,
+    "actual_workflow_runs_confirmed": 0,
+    "draft_PR_has_not_merged": true
   }
 }
