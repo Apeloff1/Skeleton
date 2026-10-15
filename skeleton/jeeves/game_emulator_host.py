@@ -976,6 +976,15 @@ class EmulatorEnvironment:
             self._chain,
         )
 
+    def capture_training_trace(
+        self, actions: Sequence[str], *, seed: int = 0,
+        rights_evidence_digest: str | None = None,
+    ) -> dict[str, object]:
+        """Capture a real, bounded native rollout for offline review; never train/promote here."""
+        return capture_emulator_trace(
+            self, actions, seed=seed, rights_evidence_digest=rights_evidence_digest
+        )
+
     def preview(self) -> dict[str, object] | None:
         self._authority()
         if self._pixels is None:
@@ -1205,6 +1214,115 @@ class EmulatorEnvironment:
             self.close()
         except (AttributeError, OSError, RuntimeError):
             pass
+
+
+def capture_emulator_trace(
+    environment: EmulatorEnvironment,
+    actions: Sequence[str],
+    *,
+    seed: int = 0,
+    rights_evidence_digest: str | None = None,
+) -> dict[str, object]:
+    """Record actual libretro frames, input, audio and hash-chained transitions.
+
+    This is an evidence capture, *not* a proof of emulator correctness, gameplay
+    success, legal ROM rights or a promoted weight update. Uses the canonical
+    offline trace validator; no caller can inject observations or rewards.
+    """
+    if not isinstance(environment, EmulatorEnvironment):
+        raise EmulatorHostError("emulator_trace_source", "An active native emulator environment is required")
+    if not isinstance(actions, (list, tuple)) or not 1 <= len(actions) <= environment.max_steps:
+        raise EmulatorHostError("emulator_trace_budget", "Trace actions exceed the bounded episode horizon")
+    if not all(type(action) is str and action in environment.spec.actions for action in actions):
+        raise EmulatorHostError("emulator_trace_action", "Trace controls must use declared policy actions")
+    _int(seed, 0, 2**63 - 1, "episode trace seed")
+    if rights_evidence_digest is not None:
+        _sha(rights_evidence_digest)
+    environment._authority()
+    initial = environment.reset(seed)
+    previous = dict(initial)
+    transitions = []
+    rewards = []
+    for index, action in enumerate(actions, 1):
+        step = environment.step(action)
+        value = step.as_dict()
+        evidence = value["info"].get("evidence")
+        if not isinstance(evidence, dict):
+            raise EmulatorHostError("emulator_trace_evidence", "Native trace is missing frame evidence")
+        if (evidence.get("environment_digest") != environment.spec.environment_digest
+            or evidence.get("core_sha256") != environment.core.library_sha256
+            or evidence.get("episode_step") != index
+            or evidence.get("frame_digest") != environment._frame["pixel_sha256"]
+            or value["transition_digest"] != environment._chain):
+            raise EmulatorHostError("emulator_trace_evidence", "Native frame/transition binding differs")
+        reward_components = dict(value["reward_components"])
+        row = {
+            "sequence": index,
+            "observation": previous,
+            "action": action,
+            "next_observation": dict(value["observation"]),
+            "reward": value["reward"],
+            "reward_components": reward_components,
+            "terminated": bool(value["terminated"]),
+            "truncated": index == len(actions) and not value["terminated"],
+            "transition_digest": value["transition_digest"],
+            "info": {
+                "runtime_kind": "installed_libretro_emulator",
+                "source": "actual_isolated_native_core",
+                "frame_sha256": evidence["frame_digest"],
+                "controls_sha256": evidence["controller_digest"],
+                "previous_transition_digest": evidence["previous_transition_digest"],
+                "native_runs": evidence["native_runs"],
+                "video_callbacks": evidence["video_callbacks"],
+                "audio_frames": evidence["audio_frames"],
+            },
+        }
+        transitions.append(row)
+        rewards.append(value["reward"])
+        previous = dict(value["observation"])
+        if value["terminated"] or value["truncated"]:
+            if index != len(actions):
+                raise EmulatorHostError("emulator_trace_incomplete", "Core episode ended before the declared action sequence")
+            break
+    spec = environment.spec.as_dict()
+    descriptor = environment.descriptor
+    lineage = {
+        "runtime_kind": "installed_libretro_emulator",
+        "core_id": environment.core.core_id,
+        "core_sha256": environment.core.library_sha256,
+        "content_digest": descriptor["content_digest"],
+        "registry_digest": descriptor["registry_digest"],
+        "firmware_digest": descriptor["firmware_digest"],
+        "options_digest": descriptor["options_digest"],
+        "source_code_digest": descriptor["source_code_digest"],
+        "frames_per_step": environment.frames_per_step,
+        "rights_evidence_digest": rights_evidence_digest,
+        "rights_verified": False,
+        "hardware_compatibility_verified": False,
+        "game_success_verified": False,
+        "production_training_admitted": False,
+        "seed_semantics": "episode label; native core may ignore seed",
+        "reward_semantics": "visual difference signal, not gameplay quality or victory",
+    }
+    episode_identity = _digest({
+        "environment_digest": environment.spec.environment_digest,
+        "seed": seed, "actions": list(actions),
+        "end_transition_digest": environment._chain,
+    })
+    trace = {
+        "schema_version": "skeleton.game.trace.v1",
+        "environment": spec,
+        "episode_id": "libretro-" + episode_identity,
+        "seed": seed,
+        "source_lineage": lineage,
+        "transitions": transitions,
+        "return": math.fsum(rewards),
+        "steps": len(transitions),
+    }
+    trace["trace_digest"] = _digest(trace)
+    from .game_learning_ingestion import _validate_trace
+
+    return _validate_trace(trace)
 
 
 def create_emulator_environment(
