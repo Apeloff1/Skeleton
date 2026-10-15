@@ -159,10 +159,23 @@ deadline with a committed checkpoint is interrupted/resumable. Resume retains
 original request, policy, source and teacher authority, with no uncommitted
 transitions counted as learned.
 
+The acknowledged job checkpoint owns the committed training trace. Episode
+exports are projections of that checkpoint, repaired before a later checkpoint
+can replace it or completion can publish. A missing export row cannot roll back
+acknowledged learning. An uncertain database acknowledgement remains an explicit
+resumable interruption until exact worker-owned readback confirms the commit.
+Resume validates the frozen training plan and source identities before updating.
+Stopping queued work does not schedule it as a side effect of inspection.
+
 Where the server exposes `cpu_throughput`, selecting it allows training to borrow
 idle play slots from the same existing physical credit pool. Active human play
 and training still compete for those exact credits. The ordinary CPU profile
 keeps its existing allocation.
+
+Studio engine probes, mirror views, shadow scrutiny and multifactor helpers also
+hold the existing shared CPU credits while physical computation runs. Request
+cancellation drains finite work before releasing those credits. Campaign-bound
+results recheck current source and teacher authority before publication.
 
 Evaluation uses disjoint held-out seeds and measured candidate/baseline returns.
 Acceptance metadata remains distinct from production promotion. Inspect/export
@@ -195,6 +208,12 @@ Authenticated review export returns the exact completed JSON and an
 operation timing remains separate from display FPS.
 
 Actual session results are recorded in
-`machine/ai_studio_enablement_session_evidence_2026-10-15.json`. Every-console
+`machine/ai_studio_enablement_session_evidence_2026-10-15.json`; the subsequent
+reliability work and fresh operational receipts are in
+`machine/ai_studio_reliability_session_evidence_2026-10-15.json`. The latter
+includes a completed seven-call model workflow through real console compilation,
+native preview and both exports; three checkpoint resumes through eight native
+episodes; source withdrawal enforcement; and a UI chat recovered after reload.
+Each observation retains its actual source and package identity. Every-console
 compatibility, semantic understanding of arbitrary ROMs, universal native editors
 and guaranteed improvement remain outside this continuation's evidence.
