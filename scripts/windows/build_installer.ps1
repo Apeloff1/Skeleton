@@ -70,6 +70,10 @@ $RuntimePaths = @(
     "skeleton",
     "scripts",
     "packaging",
+    # The governance/build configuration is consumed by several application
+    # subsystems after installation, not just at Docker image build time.
+    # This source tree contains no paths over the portable 190-char budget.
+    "machine",
     # The installed launcher runs the same assembly preflight as the checkout.
     # Include every otherwise-unbundled manifest requirement and every root/
     # backend Dockerfile COPY input. Missing inputs make the first install fail
