@@ -1179,7 +1179,7 @@ class ContentScrutinyEngine:
         self._evidence: list[ScrutinyEvidence] = []
 
     def scrutinize(self, corpus: MultimodalCorpus, *, depth: int = 0) -> ScrutinyEvidence:
-        if depth > self.max_depth:
+        if depth > self.max_depth or depth < 0:  # adversarial bound
             raise ContentScrutinyError("max scrutiny depth")
         layers = ("bounds", "digest", "authority", "temporal")
         digests = []
