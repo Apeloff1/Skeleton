@@ -253,3 +253,14 @@ def test_reverse_semantic_oracle_rejects_self_consistent_forged_hash_chain():
     controller.previous_digest = prior
     audit = controller.reverse_audit()
     assert not audit["passed"] and 12 in audit["first_failure_indices"]
+
+def test_spawned_multi_sim_workers_preserve_deterministic_results():
+    variants = variation_controls(offsets=(-15, 15), pan_rates=(90, 110),
+                                  limit=4)
+    sequential = run_batch(scene(), variations=variants, workers=1)
+    parallel = run_batch(scene(), variations=variants, workers=2)
+    assert parallel["parallel_processes_requested"] == 2
+    assert [r["forward_head_digest"] for r in sequential["simulators"]] == [
+        r["forward_head_digest"] for r in parallel["simulators"]]
+    assert parallel["unique_trace_digests"] == sequential["unique_trace_digests"]
+    assert parallel["reverse_audit_failures"] == 0
