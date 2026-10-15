@@ -118,6 +118,26 @@ class JeevesGameCorpusTests(unittest.TestCase):
             with self.assertRaisesRegex(ProductionCheckpointError, "answer copied"):
                 load_approved_corpus(regenerate())
 
+    def test_near_duplicate_heldout_reference_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            train, heldout, regenerate = self._fixtures(root)
+            # Preserve the main reference text and only modify one final
+            # word. A high lexical score here would measure copying, not
+            # game-design generalization.
+            heldout[0]["answer"] = train[0]["answer"] + " extra"
+            with self.assertRaisesRegex(ProductionCheckpointError, "near-duplicates"):
+                load_approved_corpus(regenerate())
+
+    def test_immutable_benchmark_prompt_cannot_enter_training(self) -> None:
+        from skeleton.ai.training.jeeves_game_design_benchmark import BENCHMARK
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            train, _, regenerate = self._fixtures(root)
+            train[0]["prompt"] = BENCHMARK[0][1]
+            with self.assertRaisesRegex(ProductionCheckpointError, "benchmark"):
+                load_approved_corpus(regenerate())
+
     def test_cross_split_record_id_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
