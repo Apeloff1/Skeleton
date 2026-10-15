@@ -180,10 +180,13 @@ def _publish_new(path: Path, payload: bytes) -> None:
 
 
 def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
-          epochs: int, lr: float, min_coverage: float, max_domain_regression: float) -> dict[str, Any]:
+          epochs: int, lr: float, min_coverage: float, max_domain_regression: float,
+          expand_vocabulary: bool = False) -> dict[str, Any]:
     from skeleton.cortex.transformer import TinyTransformer
     from skeleton.cortex.bpe import BytePairEncoder
 
+    if type(expand_vocabulary) is not bool:
+        raise ValueError("expand_vocabulary must be boolean")
     if type(epochs) is not int or not 1 <= epochs <= 3:
         raise ValueError("epochs must be 1..3")
     if type(lr) is not float or not math.isfinite(lr) or not 0 < lr <= 0.03:
@@ -214,9 +217,26 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             raise ProductionCheckpointError("restored native embeddings differ from production checkpoint")
     if model.snapshot()["steps"] != original_snapshot["steps"]:
         raise ProductionCheckpointError("restored transformer training cursor mismatch")
-    vocab_coverage = _token_coverage(model, dataset + tuple(
+    curriculum_and_eval = dataset + tuple(
         case for rows in heldout.values() for case in rows
-    ))
+    )
+    vocab_coverage_before = _token_coverage(model, curriculum_and_eval)
+    expansion: dict[str, Any] | None = None
+    if expand_vocabulary and vocab_coverage_before < min_coverage:
+        if torch_stack:
+            raise ProductionCheckpointError(
+                "torch-stack production vocabulary expansion is not implemented; "
+                "never substitute a native transformer"
+            )
+        from .jeeves_game_vocabulary import expand_native_game_pieces
+        expansion = expand_native_game_pieces(
+            model, curriculum_and_eval,
+            expected_snapshot_digest=sha256(json.dumps(
+                original_snapshot, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=False, allow_nan=False,
+            ).encode("utf-8")).hexdigest(),
+        )
+    vocab_coverage = _token_coverage(model, curriculum_and_eval)
     # The tiny default cortex vocabulary typically cannot represent arbitrary
     # game-design language. Fail closed rather than training mostly <UNK> ids.
     if vocab_coverage < min_coverage:
@@ -254,7 +274,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "epochs": epochs,
         "training_steps_before": steps_before,
         "training_steps_after": model.steps,
+        "vocabulary_coverage_before": vocab_coverage_before,
         "vocabulary_coverage": vocab_coverage,
+        "vocabulary_expansion": expansion,
+        "vocabulary_growth_opted_in": expand_vocabulary,
         "heldout_losses_before": before,
         "heldout_losses_after": after,
         "mean_heldout_loss_before": mean_before,
@@ -289,12 +312,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--learning-rate", type=float, default=0.005)
     parser.add_argument("--min-coverage", type=float, default=0.80)
+    parser.add_argument("--expand-vocabulary", action="store_true",
+                        help="explicitly add missing original BPE pieces to a cloned native LM only")
     parser.add_argument("--max-domain-regression", type=float, default=0.0)
     args = parser.parse_args(argv)
     try:
         result = train(args.checkpoint, expected=args.expected_sha256, candidate=args.candidate,
                        report=args.report, epochs=args.epochs, lr=args.learning_rate,
-                       min_coverage=args.min_coverage, max_domain_regression=args.max_domain_regression)
+                       min_coverage=args.min_coverage,
+                       max_domain_regression=args.max_domain_regression,
+                       expand_vocabulary=args.expand_vocabulary)
         print(json.dumps({k: v for k, v in result.items() if not k.startswith("generated_")},
                          sort_keys=True, allow_nan=False))
         return 0 if result["status"] != "rejected_evaluation_gate" else 3
