@@ -374,6 +374,16 @@ _CORE_TARGET_GROUPS = {
 # declarations. The worker validates its actual loaded implementation again.
 # Unsafe archive containers and DSi-specific content are intentionally excluded.
 _CORE_CONTENT_EXTENSIONS = {
+    # Extension hints are grounded in the pinned libretro system-info sources.
+    # These DO NOT activate a core or bypass the worker's live extension check.
+    "nestopia": "nes|unf|unif",
+    "mesen": "nes|unf|unif",
+    "bluemsx": "rom|ri|mx1|mx2|dsk|col|sg|sc|sf|cas|m3u",
+    "fmsx": "rom|mx1|mx2|dsk|fdi|cas|m3u",
+    "vice_x64": "d64|d71|d80|d81|d82|g64|g41|x64|t64|tap|prg|p00|crt|bin|cmd|m3u|vfl|vsf|rom",
+    "px68k": "dim|img|d88|88d|hdm|dup|2hd|xdf|hdf|cmd|m3u",
+    "quasi88": "d88|m3u|t88|cmt",
+    "mednafen_saturn": "cue|ccd|chd|toc|m3u",
     "stella2014": "a26|bin|mvc",
     "prosystem": "a78|bin|cdf",
     "handy": "lnx|lyx|o",
