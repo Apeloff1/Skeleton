@@ -261,3 +261,12 @@ def test_windows_capacity_growth_is_opt_in_candidate_only():
     assert '"--capacity-growth"' in trainer
     assert '"--max-added-parameters"' in trainer
     assert "candidate_promoted" in trainer
+
+def test_windows_packages_capability_replay_and_attested_parameter_training():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    installer = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    trainer = Path("skeleton/ai/training/jeeves_production_game_train.py").read_text(encoding="utf-8")
+    assert "test_jeeves_capability_replay.py" in workflow
+    assert '"skeleton.ai.training.jeeves_capability_replay"' in installer
+    assert '"--adaptive-replay"' in trainer
+    assert '"--max-scored-examples"' in trainer

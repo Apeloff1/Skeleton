@@ -522,3 +522,29 @@ count, parent/candidate checksums, equivalence maximum error, measured
 SGD updates, holdout loss/regression and withheld production promotion.
 These are *capacity and candidate optimization results*, not independent
 proof of improved game-design capabilities.
+
+### Measured capability rehearsal (real training data, not test-set leakage)
+
+The attested candidate trainer also offers opt-in **training-only hard-example
+selection**. This uses the current model's actual average token log-probability
+to score *approved training texts only*. It reserves both weak and easier
+retention examples in gaming, AI and coding; then favors distinct specialties
+and higher-loss cases. No held-out example enters this scheduler, selected
+texts are content-hashed, and selection is checkpoint/resume-bound.
+
+```bash
+skeleton-jeeves-production-train --checkpoint LIVE_OWN.json \
+  --expected-sha256 VERIFIED_64_HEX \
+  --dataset-manifest APPROVED_DATASET.json \
+  --capacity-growth balanced --max-added-parameters 500000 \
+  --adaptive-replay --replay-examples 64 --max-scored-examples 128 \
+  --candidate candidate.json --report report.json
+```
+
+The same switches work on `python -m skeleton app training-modules --train-mirrors`
+for separate constructive and adversarial optimizer processes. The scorer
+refuses unreviewed/synthetic inputs, duplicate training texts, absent domains,
+nonfinite losses and source datasets above the explicit inference budget.
+Validation and production promotion remain independent requirements. Increases
+in trainable parameter count or training loss exposure **do not establish**
+a capability uplift without blind external evaluation.
