@@ -336,3 +336,39 @@ because the Expo development server is not the production reverse proxy.
 6. Existing subsystem work should reconcile through bounded integration
    branches based on the latest assembled `main`; do not revive the superseded
    mega-diff consolidation trunk or create a competing application root.
+
+### Jeeves multidisciplinary specialization and mirrors
+
+The app ships with **384 executable curriculum specialization contracts**
+(16 specialties by 8 review lenses in each of gaming, AI and coding). These are
+training/evaluation routes, **not** 384 separately trained neural models.
+Inspect the registry without running a model:
+
+```bash
+python -m skeleton app training-modules
+```
+
+For four parallel, independent data-analysis angles, supply a rights-reviewed
+multidomain manifest pointing to content-addressed train and heldout JSONL:
+
+```bash
+python -m skeleton app training-modules --dataset-manifest PATH_TO_APPROVED_MANIFEST
+```
+
+To launch **two actual CPU-process optimizers concurrently**, the operator must
+supply a running-app Jeeves attestation, configured persisted SKELETON_OWN
+checkpoint, explicit rights review, existing output directory, and new receipt:
+
+```bash
+python -m skeleton app training-modules --train-mirrors \
+  --dataset-manifest PATH_TO_APPROVED_MANIFEST \
+  --attestation PATH_TO_IN_PROCESS_ATTESTATION \
+  --output-directory PATH_TO_PRIVATE_CANDIDATES \
+  --receipt PATH_TO_PRIVATE_CANDIDATES/mirror-receipt.json
+```
+
+The implementation fails closed on unsupported checkpoints, missing attestation,
+dataset contamination, insufficient RAM/disk, or heldout regression. It never
+writes to serving weights and never auto-promotes a candidate. The mirrors
+perform distinct optimizer schedules; separate blinded human/independent model
+review is still required to establish improvement beyond language loss.

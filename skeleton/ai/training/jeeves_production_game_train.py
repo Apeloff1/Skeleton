@@ -234,8 +234,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "heldout_examples": sum(len(items) for items in heldout.values()),
         }
     else:
-        from .jeeves_game_corpus import load_approved_corpus
-        dataset, heldout, dataset_receipt = load_approved_corpus(dataset_manifest)
+        from .jeeves_multidomain import load_training_corpus
+        dataset, heldout, dataset_receipt = load_training_corpus(dataset_manifest)
     selected_key, original_snapshot, mouth = _active_snapshot(original)
     torch_stack = original_snapshot.get("kind") == "torch-stack"
     if torch_stack:

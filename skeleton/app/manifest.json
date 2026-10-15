@@ -207,7 +207,12 @@
     "machine/ai_runtime_schemas.json",
     "machine/ai_implementation_handoff.json",
     "machine/ai_closure_evidence.json",
-    "machine/ai_capabilities.json"
+    "machine/ai_capabilities.json",
+    "machine/jeeves_training_modules.json",
+    "skeleton/ai/training/jeeves_multidomain.py",
+    "skeleton/ai/training/jeeves_parallel_mirrors.py",
+    "scripts/check_jeeves_training_modules.py",
+    "skeleton/testing/test_jeeves_multidomain.py"
   ],
   "architecture": {
     "contract": "machine/architecture.json",
