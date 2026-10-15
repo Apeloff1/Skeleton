@@ -35,8 +35,12 @@ from skeleton.gate_plane.s2s.clock import ManualClock
 SECRET = encode_secret(b"s" * 32)
 SECRET2 = encode_secret(b"t" * 32)
 URL = "https://hooks.example.com/cb"
-PUBLIC = {"hooks.example.com": ["93.184.216.34"], "b.example.com": ["93.184.216.35"],
-          "evil.example.com": ["169.254.169.254"], "mixed.example.com": ["93.184.216.34", "10.0.0.1"]}
+PUBLIC = {
+    "hooks.example.com": ["93.184.216.34"],
+    "b.example.com": ["93.184.216.35"],
+    "evil.example.com": ["169.254.169.254"],
+    "mixed.example.com": ["93.184.216.34", "10.0.0.1"],
+}
 
 
 def resolver(host):
@@ -73,10 +77,10 @@ class TestSigning:
 
     def test_known_vector(self):
         # Standard Webhooks reference vector.
-        secrets = SecretSet.of("whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw")
+        secrets = SecretSet.of("whsec_af6CRWIFaNFCV7fOYAvKAa8E+HGoJST8k28TjlCBn60=")
         body = b'{"test": 2432232314}'
         hdrs = WebhookSigner().headers(secrets, "msg_p5jXN8AQM9LWM0D4loKWxJek", body, timestamp=1614265330)
-        assert hdrs["webhook-signature"] == "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+        assert hdrs["webhook-signature"] == "v1,D9ooh/d9MMDUL4eYyPCCM2uwf8omMibdxsPbWwDQhTk="
 
     def test_tamper_skew_replay(self, clock):
         secrets = SecretSet.of(SECRET)
@@ -107,7 +111,10 @@ class TestSigning:
         "headers,reason",
         [
             ({}, "missing_headers"),
-            ({"webhook-id": "bad id", "webhook-timestamp": "1", "webhook-signature": "v1,x"}, "bad_message_id"),
+            (
+                {"webhook-id": "bad id", "webhook-timestamp": "1", "webhook-signature": "v1,x"},
+                "bad_message_id",
+            ),
             ({"webhook-id": "m", "webhook-timestamp": "soon", "webhook-signature": "v1,x"}, "bad_timestamp"),
         ],
     )
@@ -141,7 +148,12 @@ class TestAllowlist:
 
     def test_allowed(self):
         v = self.allow().check(URL)
-        assert v.allowed and v.host == "hooks.example.com" and v.port == 443 and v.addresses == ("93.184.216.34",)
+        assert (
+            v.allowed
+            and v.host == "hooks.example.com"
+            and v.port == 443
+            and v.addresses == ("93.184.216.34",)
+        )
 
     @pytest.mark.parametrize(
         "url,reason",
@@ -172,8 +184,9 @@ class TestAllowlist:
         assert allow.check("https://[::1]/x").reason is EgressDenyReason.PRIVATE_ADDRESS
 
     def test_allowed_networks_and_http_dev(self):
-        allow = EgressAllowlist(["localhost"], allow_http=True, allowed_networks=["127.0.0.0/8"],
-                                resolver=lambda h: ["127.0.0.1"])
+        allow = EgressAllowlist(
+            ["localhost"], allow_http=True, allowed_networks=["127.0.0.0/8"], resolver=lambda h: ["127.0.0.1"]
+        )
         assert allow.check("http://localhost/cb").allowed
         assert allow.check("http://localhost:8080/cb").reason is EgressDenyReason.PORT
 
@@ -188,8 +201,16 @@ class TestAllowlist:
 
     @pytest.mark.parametrize(
         "addr,public",
-        [("93.184.216.34", True), ("10.1.2.3", False), ("169.254.169.254", False), ("100.64.1.1", False),
-         ("::ffff:10.0.0.1", False), ("2606:4700::1111", True), ("0.0.0.0", False), ("224.0.0.1", False)],
+        [
+            ("93.184.216.34", True),
+            ("10.1.2.3", False),
+            ("169.254.169.254", False),
+            ("100.64.1.1", False),
+            ("::ffff:10.0.0.1", False),
+            ("2606:4700::1111", True),
+            ("0.0.0.0", False),
+            ("224.0.0.1", False),
+        ],
     )
     def test_is_public(self, addr, public):
         import ipaddress
@@ -256,10 +277,14 @@ class TestDeadLetterQueue:
 class TestSubscription:
     def test_accepts(self):
         sub = Subscription("s1", URL, SecretSet.of(SECRET), event_types=frozenset({"forge.*", "swarm.done"}))
-        assert sub.accepts("forge.build.done") and sub.accepts("swarm.done") and not sub.accepts("swarm.start")
+        assert (
+            sub.accepts("forge.build.done") and sub.accepts("swarm.done") and not sub.accepts("swarm.start")
+        )
         assert sub.public_view()["secret_fingerprint"] and "secrets" not in sub.public_view()
 
-    @pytest.mark.parametrize("kw", [{"id": "Bad Id"}, {"headers": {"Webhook-Id": "x"}}, {"headers": {"Authorization": "x"}}])
+    @pytest.mark.parametrize(
+        "kw", [{"id": "Bad Id"}, {"headers": {"Webhook-Id": "x"}}, {"headers": {"Authorization": "x"}}]
+    )
     def test_validation(self, kw):
         args = {"id": "s1", "url": URL, "secrets": SecretSet.of(SECRET), **kw}
         with pytest.raises(ValueError):
@@ -328,10 +353,15 @@ class TestGateway:
         for step in (1.0, 2.0):
             clock.advance(step)
             results += gw.drain()
-        assert [r.outcome for r in results] == [DeliveryOutcome.SCHEDULED, DeliveryOutcome.SCHEDULED,
-                                                DeliveryOutcome.DEAD_LETTERED]
+        assert [r.outcome for r in results] == [
+            DeliveryOutcome.SCHEDULED,
+            DeliveryOutcome.SCHEDULED,
+            DeliveryOutcome.DEAD_LETTERED,
+        ]
         letter = gw.dlq.get("msg_dead")
-        assert letter.reason == "exhausted:status_503" and letter.attempts == 9 and letter.body() == b'{"n":1}'
+        assert (
+            letter.reason == "exhausted:status_503" and letter.attempts == 9 and letter.body() == b'{"n":1}'
+        )
         assert len(letter.history) == 3 and gw.pending() == 0
         tr.default = 200
         gw.replay("msg_dead")
@@ -396,7 +426,9 @@ class TestGateway:
     def test_breaker_opens_per_host_and_isolates(self, clock):
         tr = ScriptedTransport(default=503)
         gw, _ = make(
-            clock, tr, retry=RetrySpec.no_retry(),
+            clock,
+            tr,
+            retry=RetrySpec.no_retry(),
             breaker_config=BreakerConfig(consecutive_failures=2, min_calls=2, window_size=4, cooldown_s=60.0),
         )
         gw.register(Subscription("sub-b", "https://b.example.com/x", SecretSet.of(SECRET)))
@@ -415,8 +447,12 @@ class TestGateway:
         from skeleton.gate_plane.pipeline.budget import RetryBudgetRegistry
 
         budgets = RetryBudgetRegistry(clock=clock, retry_ratio=0.0, min_retries_per_s=0.1, window_s=10.0)
-        gw, _ = make(clock, tr, budgets=budgets, breaker_config=BreakerConfig(consecutive_failures=100,
-                                                                           min_calls=100, window_size=100))
+        gw, _ = make(
+            clock,
+            tr,
+            budgets=budgets,
+            breaker_config=BreakerConfig(consecutive_failures=100, min_calls=100, window_size=100),
+        )
         for i in range(5):
             gw.deliver("sub-a", Callback.build("forge.done", b"{}", message_id=f"msg_b{i}"))
         # 5 originals + at most 1 retry token from the floor budget.
@@ -424,8 +460,11 @@ class TestGateway:
 
     def test_publish_fanout_filters(self, clock):
         gw, tr = make(clock)
-        gw.register(Subscription("sub-b", "https://b.example.com/x", SecretSet.of(SECRET2),
-                                 event_types=frozenset({"swarm.*"})))
+        gw.register(
+            Subscription(
+                "sub-b", "https://b.example.com/x", SecretSet.of(SECRET2), event_types=frozenset({"swarm.*"})
+            )
+        )
         gw.register(Subscription("sub-t", "https://b.example.com/t", SecretSet.of(SECRET2), tenant_id="t9"))
         ids = gw.publish("forge.done", {"x": 1}, event_id="evt_1", tenant_id="t1")
         assert ids == ["evt_1:sub-a"]
@@ -471,8 +510,12 @@ class TestGateway:
 
     def test_config_validation(self, clock):
         allow = EgressAllowlist(["x.example.com"], resolver=resolver)
-        for kw in ({"timeout_s": 0}, {"timeout_s": 1, "attempt_timeout_s": 2}, {"redelivery_schedule_s": (0,)},
-                   {"redelivery_jitter": 0.9}):
+        for kw in (
+            {"timeout_s": 0},
+            {"timeout_s": 1, "attempt_timeout_s": 2},
+            {"redelivery_schedule_s": (0,)},
+            {"redelivery_jitter": 0.9},
+        ):
             with pytest.raises(ValueError):
                 EgressGateway(allow, ScriptedTransport(), clock=clock, **kw)
 

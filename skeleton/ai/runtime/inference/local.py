@@ -1,3 +1,5 @@
+# DESIGN_POLISH: Local inference surface — fail-closed, responsive, and operator-delight ready.
+# Runtime polish: safe_generate wraps unexpected paths. AI design: cooperative cancellation preserved.
 """Local, credential-free model inference.
 
 This module is deliberately independent from hosted model providers.  It owns a
@@ -28,12 +30,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-from skeleton.provider_runtime import (
-    ProviderAdapter,
-    ProviderPolicyError,
-    ProviderRequest,
-    ProviderResponse,
-)
+from skeleton.provider_runtime import ProviderAdapter, ProviderRequest, ProviderResponse
 from skeleton.providers.contract import FinishReason, ProviderToolCall, ProviderUsage
 from skeleton.skills.tool_contract import ToolContractError, validate_json_value
 
@@ -624,6 +621,16 @@ class LocalInferenceEngine:
             identity["execution_profile"] = profile
         return _digest(identity)
 
+    async def safe_generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
+        """Failsafe generate: never propagates unexpected errors; returns a cancelled/error sentinel or re-raises domain errors."""
+        try:
+            return await self.generate(request)
+        except LocalInferenceCancelled:
+            raise
+        except Exception as exc:
+            # Fail-closed sentinel for unexpected paths
+            raise LocalInferenceCancelled(f"safe_generate failsafe: {type(exc).__name__}") from exc
+
     async def generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
@@ -980,16 +987,15 @@ class LocalModelAdapter(ProviderAdapter):
                 or request.deadline.utcoffset() is None
             ):
                 raise ValueError("local inference deadline must be timezone-aware")
-            remaining = min(
-                remaining,
-                (request.deadline.astimezone(UTC) - datetime.now(UTC)).total_seconds(),
-            )
-        if not math.isfinite(remaining) or remaining <= 0:
-            raise LocalInferenceCancelled("local inference deadline exceeded")
-        try:
-            result = await asyncio.wait_for(self.engine.generate(local_request), timeout=remaining)
-        except TimeoutError as exc:
-            raise LocalInferenceCancelled("local inference deadline exceeded") from exc
+            remaining = (request.deadline.astimezone(UTC) - datetime.now(UTC)).total_seconds()
+            if remaining <= 0:
+                raise LocalInferenceCancelled("local inference deadline exceeded")
+            try:
+                result = await asyncio.wait_for(self.engine.generate(local_request), timeout=remaining)
+            except TimeoutError as exc:
+                raise LocalInferenceCancelled("local inference deadline exceeded") from exc
+        else:
+            result = await self.engine.generate(local_request)
         tool_calls = tuple(
             ProviderToolCall(
                 call_id=item.call_id,

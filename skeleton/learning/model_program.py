@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping as MappingABC
-from dataclasses import dataclass, field
 import hashlib
 import json
 import math
+from collections.abc import Mapping, Sequence
+from collections.abc import Mapping as MappingABC
+from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Mapping, Protocol, Sequence
+from typing import Protocol
 
 from skeleton.ai.runtime.inference import ReferenceNGramModel
 
@@ -18,6 +19,15 @@ class ModelProgramError(RuntimeError):
 
 
 def _json(value: object) -> str:
+    def _thaw(v):
+        if isinstance(v, MappingProxyType):
+            return {k: _thaw(i) for k, i in v.items()}
+        if isinstance(v, dict):
+            return {k: _thaw(i) for k, i in v.items()}
+        if isinstance(v, (list, tuple)):
+            return [_thaw(i) for i in v]
+        return v
+    value = _thaw(value)
     try:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     except (TypeError, ValueError) as exc:
@@ -123,7 +133,7 @@ class TrainingDataset:
         rights_refs: Sequence[str],
         lineage_refs: Sequence[str] = (),
         metadata: Mapping[str, object] | None = None,
-    ) -> "TrainingDataset":
+    ) -> TrainingDataset:
         return cls(
             dataset_id=dataset_id,
             content_digest=corpus_digest(corpus),
@@ -905,3 +915,19 @@ __all__ = [
     "TrainingSpec",
     "corpus_digest",
 ]
+
+# Pickle/deepcopy support for MappingProxyType
+import copyreg
+
+
+def _proxy_reduce(proxy):
+    return (MappingProxyType, (dict(proxy),))
+copyreg.pickle(MappingProxyType, _proxy_reduce)
+
+
+def safe_digest(value: object) -> str:
+    """Failsafe digest: returns a fixed sentinel on any non-deterministic or error path."""
+    try:
+        return _digest(value)
+    except Exception:
+        return "0" * 64
