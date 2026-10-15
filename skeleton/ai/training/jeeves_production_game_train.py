@@ -52,6 +52,42 @@ def _strict_json(data: bytes) -> dict[str, Any]:
     return blob
 
 
+def _active_snapshot(blob: dict[str, Any]) -> tuple[str, dict[str, Any], str]:
+    """Resolve Jeeves's selected speaking weights; never train a silent fallback.
+
+    Mirrors JeevesCortex.speaking_name()/mouth(): RMS uses neo_rms, while
+    neo/gelu use transformer. An unsupported specialist or torch-stack mouth
+    is a hard stop until its own optimizer and serialization are supported.
+    """
+    raw = blob.get("mouth_override") or blob.get("winner") or "neo"
+    if not isinstance(raw, str):
+        raise ProductionCheckpointError("live speaking mouth must be text")
+    mouth = raw.strip().lower()
+    if mouth in ("neo", "gelu", "transformer"):
+        key = "transformer"
+    elif mouth in ("rms", "swiglu", "neo_rms"):
+        key = "neo_rms"
+    else:
+        raise ProductionCheckpointError(
+            "unsupported active Jeeves speaking mouth: " + mouth[:60]
+        )
+    snapshot = blob.get(key)
+    if not isinstance(snapshot, dict):
+        raise ProductionCheckpointError("active production speaking weights missing: " + key)
+    if snapshot.get("kind") == "torch-stack":
+        raise ProductionCheckpointError(
+            "active torch-stack model requires the TorchTransformer trainer"
+        )
+    required = ("itos", "E", "layers", "dim", "ctx", "steps", "fitted")
+    if any(field not in snapshot for field in required):
+        raise ProductionCheckpointError("active production model is not a weight-bearing snapshot")
+    if type(snapshot["steps"]) is not int or type(snapshot["fitted"]) is not int:
+        raise ProductionCheckpointError("invalid active production training counters")
+    if snapshot["steps"] < 1 and snapshot["fitted"] < 1:
+        raise ProductionCheckpointError("active production weights have no training history")
+    return key, snapshot, mouth
+
+
 def _production_source(explicit: Path | None, expected: str) -> tuple[Path, dict[str, Any], str]:
     """Require operator-pinned bytes at the *live* Jeeves persistence path."""
     env = os.environ.get("SKELETON_OWN", "").strip()
@@ -76,14 +112,9 @@ def _production_source(explicit: Path | None, expected: str) -> tuple[Path, dict
     # A NumPy RNN artifact or ranking adapter MUST NEVER be treated as Jeeves.
     if not isinstance(blob.get("own"), dict) or not isinstance(blob.get("lms"), dict):
         raise ProductionCheckpointError("not a full persisted Jeeves cortex state")
-    if not isinstance(blob.get("transformer"), dict):
-        raise ProductionCheckpointError("production transformer snapshot absent")
-    xf = blob["transformer"]
-    required = ("itos", "E", "layers", "dim", "ctx", "steps", "fitted")
-    if any(key not in xf for key in required):
-        raise ProductionCheckpointError("production transformer is not a weight-bearing snapshot")
-    if int(xf["steps"]) < 1 and int(xf["fitted"]) < 1:
-        raise ProductionCheckpointError("snapshot has no training history; not established production weights")
+    _active_snapshot(blob)
+    if not isinstance(blob.get("bpe"), dict):
+        raise ProductionCheckpointError("live Jeeves BPE tokenizer snapshot missing")
     return source, blob, digest
 
 
@@ -147,6 +178,7 @@ def _publish_new(path: Path, payload: bytes) -> None:
 def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           epochs: int, lr: float, min_coverage: float, max_domain_regression: float) -> dict[str, Any]:
     from skeleton.cortex.transformer import TinyTransformer
+    from skeleton.cortex.bpe import BytePairEncoder
 
     if type(epochs) is not int or not 1 <= epochs <= 3:
         raise ValueError("epochs must be 1..3")
@@ -164,8 +196,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     if parent_path.resolve() in (candidate.resolve(), report.resolve()):
         raise ProductionCheckpointError("outputs cannot overwrite active production checkpoint")
     dataset, heldout = _texts()
-    original_snapshot = original["transformer"]
+    selected_key, original_snapshot, mouth = _active_snapshot(original)
     model = TinyTransformer.from_snapshot(original_snapshot)
+    model.bpe = BytePairEncoder.from_snapshot(original["bpe"])
     if model.snapshot()["steps"] != original_snapshot["steps"]:
         raise ProductionCheckpointError("restored transformer training cursor mismatch")
     vocab_coverage = _token_coverage(model, dataset + tuple(
@@ -196,7 +229,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "status": "rejected_evaluation_gate" if regressions or not lower_loss else "candidate_trained_needs_game_design_review",
         "source": "operator_pinned_live_jeeves_cortex",
         "source_checkpoint_sha256": parent_sha,
-        "model_kind": "JeevesCortex.transformer",
+        "model_kind": "JeevesCortex." + selected_key,
+        "speaking_mouth": mouth,
         "production_weights_modified": False,
         "candidate_promoted": False,
         "curriculum_exposures_per_epoch": len(dataset),
@@ -218,7 +252,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         raise ProductionCheckpointError("live checkpoint changed during training; refusing stale candidate")
     if result["status"] != "rejected_evaluation_gate":
         output = dict(original)
-        output["transformer"] = trained_snapshot
+        output[selected_key] = trained_snapshot
         blob = json.dumps(output, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
         _publish_new(candidate, blob)
         result["candidate_sha256"] = sha256(blob).hexdigest()
