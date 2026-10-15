@@ -1061,6 +1061,7 @@ class EmulatorEnvironment:
         self._audio_total = 0
         self._audio_generation += 1
         self._pixels = None
+        self._audio = b""
         self._controls = [json.loads(json.dumps(_EMPTY))]
         metadata, blocks = self._exchange("reset", {"controls": self._controls})
         observation = self._accept_frame(metadata, blocks)
@@ -1177,7 +1178,14 @@ class EmulatorEnvironment:
     def snapshot(self) -> dict[str, object]:
         if self._seed is None:
             raise EmulatorHostError("emulator_episode_inactive", "Reset before snapshotting native state")
-        capacity = (MAX_SNAPSHOT_JSON - 65536) * 3 // 4 - len(self._pixels)
+        # Rewind must preserve the last raw audio chunk too: 12 temporal
+        # sensor channels compare consecutive output chunks, and a
+        # seemingly correct native core restore can otherwise change the
+        # next measured observation and fail real source replay.
+        capacity = (
+            (MAX_SNAPSHOT_JSON - 65536) * 3 // 4
+            - len(self._pixels) - len(self._audio)
+        )
         state_info, _ = self._exchange("state_info", {})
         state_size = _int(state_info.get("state_size"), 0, 2**63 - 1, "native state size")
         if not 1 <= state_size <= capacity:
@@ -1209,6 +1217,9 @@ class EmulatorEnvironment:
             "state_base64": base64.b64encode(state).decode(),
             "frame": self._frame,
             "pixels_base64": base64.b64encode(self._pixels).decode(),
+            "audio_size": len(self._audio),
+            "audio_sha256": hashlib.sha256(self._audio).hexdigest(),
+            "audio_base64": base64.b64encode(self._audio).decode(),
         }
         if (
             len(json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode())
@@ -1235,6 +1246,9 @@ class EmulatorEnvironment:
             "state_base64",
             "frame",
             "pixels_base64",
+            "audio_size",
+            "audio_sha256",
+            "audio_base64",
             "snapshot_digest",
         }
         if (
@@ -1252,6 +1266,9 @@ class EmulatorEnvironment:
         chain = _sha(snapshot["transition_digest"])
         lifetime_audio = _int(snapshot["lifetime_audio_frames"], 0, 2**63 - 1, "audio cursor")
         audio_generation = _int(snapshot["audio_generation"], 0, 2**63 - 1, "audio generation")
+        audio_size = _int(snapshot["audio_size"], 0, 131072 * 4, "last audio chunk size")
+        if audio_size % 4:
+            raise EmulatorHostError("native_state_corrupt", "Previous stereo audio chunk is misaligned")
         observation = snapshot["observation"]
         if (
             not isinstance(observation, Mapping)
@@ -1267,9 +1284,14 @@ class EmulatorEnvironment:
             or len(snapshot["state_base64"]) != 4 * ((size + 2) // 3)
             or not isinstance(snapshot["pixels_base64"], str)
             or len(snapshot["pixels_base64"]) != 4 * ((frame["width"] * frame["height"] * 3 + 2) // 3)
+            or not isinstance(snapshot["audio_base64"], str)
+            or len(snapshot["audio_base64"]) != 4 * ((audio_size + 2) // 3)
         ):
             raise EmulatorHostError("native_state_limit", "Native savestate encoding exceeds capacity")
-        if len(snapshot["state_base64"]) + len(snapshot["pixels_base64"]) > MAX_SNAPSHOT_JSON - 65536:
+        if (
+            len(snapshot["state_base64"]) + len(snapshot["pixels_base64"])
+            + len(snapshot["audio_base64"]) > MAX_SNAPSHOT_JSON - 65536
+        ):
             raise EmulatorHostError("native_state_size_unavailable", "Operational snapshot exceeds capacity")
         payload = {key: value for key, value in snapshot.items() if key != "snapshot_digest"}
         if _digest(payload) != _sha(snapshot["snapshot_digest"]):
@@ -1277,12 +1299,18 @@ class EmulatorEnvironment:
         try:
             state = base64.b64decode(snapshot["state_base64"], validate=True)
             pixels = base64.b64decode(snapshot["pixels_base64"], validate=True)
+            audio = base64.b64decode(snapshot["audio_base64"], validate=True)
         except (ValueError, binascii.Error) as exc:
             raise EmulatorHostError("native_state_corrupt", "Native state encoding is invalid") from exc
         if len(state) != size or hashlib.sha256(state).hexdigest() != _sha(snapshot["state_sha256"]):
             raise EmulatorHostError("native_state_corrupt", "Native state binary identity differs")
         if hashlib.sha256(pixels).hexdigest() != frame["pixel_sha256"]:
             raise EmulatorHostError("native_state_corrupt", "Restored frame checksum differs")
+        if (
+            len(audio) != audio_size
+            or hashlib.sha256(audio).hexdigest() != _sha(snapshot["audio_sha256"])
+        ):
+            raise EmulatorHostError("native_state_corrupt", "Restored prior audio checksum differs")
         restore_metadata = {
             "controls": controls,
             "width": frame["width"],
@@ -1298,6 +1326,9 @@ class EmulatorEnvironment:
         self._controls = controls
         self._pixels = None
         self._accept_frame(frame, {"pixels": pixels, "audio": b""})
+        # This is host telemetry history, not libretro core state. Restoring
+        # it makes the NEXT native step's audio-onset/energy delta exact.
+        self._audio = audio
         observation = snapshot["observation"]
         if (
             not isinstance(observation, Mapping)
