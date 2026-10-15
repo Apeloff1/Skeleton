@@ -134,7 +134,7 @@ class LocalComparisonHandler(BaseHTTPRequestHandler):
             self._error("Unknown local studio endpoint",404)
 
     def do_POST(self) -> None:
-        if self.path not in ("/api/step","/api/reset","/api/disc_swap","/api/stop"):
+        if self.path not in ("/api/step","/api/reset","/api/disc_swap","/api/timing","/api/inspect","/api/stop"):
             self._error("Unknown local native action",404)
             return
         if not self._authorized(mutating=True):
@@ -160,6 +160,10 @@ class LocalComparisonHandler(BaseHTTPRequestHandler):
                 value=self.server.session.reset(packet["game_id"])
             elif self.path=="/api/disc_swap":
                 value=self.server.session.swap_disc(packet)
+            elif self.path=="/api/timing":
+                value=self.server.session.set_timing(packet)
+            elif self.path=="/api/inspect":
+                value=self.server.session.inspect(packet)
             else:
                 if packet!={}:
                     raise ValueError("Stop command cannot submit extra operations")
