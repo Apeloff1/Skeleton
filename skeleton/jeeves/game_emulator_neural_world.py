@@ -72,7 +72,8 @@ def _check_receipt(receipt: Mapping[str, Any]) -> None:
     if (
         type(receipt) is not dict
         or receipt.get("training_commit") is not True
-        or receipt.get("actual_steps", 0) < 1
+        or type(receipt.get("actual_steps")) is not int
+        or receipt["actual_steps"] < 1
         or receipt.get("actual_tabular_q_updates") != receipt["actual_steps"]
         or not isinstance(receipt.get("scrutiny_checks"), Mapping)
         or len(receipt["scrutiny_checks"]) != 10
@@ -111,6 +112,7 @@ def verify_neural_training_sources(
     raw = dict(evidence)
     claimed = raw.pop("report_digest", None)
     raw.pop("evidence_digest", None)
+    raw.pop("policy_snapshot_digest", None)
     raw["policy_snapshot"] = dict(policy)
     if type(claimed) is not str or _digest(raw) != claimed:
         raise EmulatorNeuralError("source evidence/parent policy report identity differs")
@@ -391,7 +393,7 @@ def train_neural_world_from_evidence(
     evidence: Mapping[str, Any], policy: Mapping[str, Any], *,
     config: NeuralWorldConfig = NeuralWorldConfig(),
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Execute actual bounded neural gradient updates on signed ROM Q receipts."""
+    """Execute actual bounded neural gradient updates on checksum-bound ROM receipts."""
     if not isinstance(config, NeuralWorldConfig):
         raise EmulatorNeuralError("neural world optimizer needs finite typed controls")
     samples, features, actions, source_digest = verify_neural_training_sources(evidence, policy)
