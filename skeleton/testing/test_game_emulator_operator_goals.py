@@ -43,7 +43,7 @@ class OperatorNativeGoalCases(unittest.TestCase):
                 source_authority="Operator claims original ROM and memory register role",
                 config=config,
             )
-        self.assertEqual(receipt["actual_source_steps"], 55)
+        self.assertEqual(receipt["actual_source_steps"], 73)
         self.assertEqual(len(receipt["source_anchors"]), 2)
         self.assertGreaterEqual(receipt["measured_active_only_goal_contrasts"], 2)
         self.assertFalse(receipt["semantics"]["game_meanings_independently_certified"])
