@@ -90,6 +90,12 @@ def _capture(machine: GameBoyMachine, index: int, pc_before: int, opcode: int) -
         "tma": machine.read(0xFF06),
         "tac": machine.memory[0xFF07] & 7,
         "pending_overflow_cycles": machine.timer_reload_delay,
+        "serial_sb": machine.read(0xFF01),
+        "serial_sc": machine.read(0xFF02),
+        "serial_active": machine.serial_active,
+        "serial_bits_transferred": machine.serial_bits,
+        "serial_t_cycle_phase": machine.serial_phase,
+        "serial_physical_peer_connected": False,
         "if": machine.read(0xFF0F), "ie": machine.read(0xFFFF),
     }
     sprite_dma = {
