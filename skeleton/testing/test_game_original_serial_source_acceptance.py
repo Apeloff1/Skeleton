@@ -18,7 +18,9 @@ class OwnedROMSerialLinkEvidenceTests(unittest.TestCase):
     def test_real_source_rom_initializes_serial_and_completes_internal_clock(self):
         row = _run(0x81)
         self.assertEqual(row["CPU_started_actual_SB_SC_writes"], 4)
-        self.assertEqual(row["actual_cpu_clock_advance_instructions"], 1024)
+        self.assertEqual(row["actual_cpu_clock_advance_instructions"], 1021)
+        self.assertEqual(row["source_program_cpu_instruction_calls"], 1025)
+        self.assertEqual(row["serial_start_opcode_clocked_tcycles"], 12)
         self.assertEqual(row["serial_final_SB"], 255)
         self.assertTrue(row["serial_interrupt_set"])
         self.assertFalse(row["serial_SC_still_active"])
@@ -34,7 +36,8 @@ class OwnedROMSerialLinkEvidenceTests(unittest.TestCase):
     def test_both_real_source_runs_produce_admissible_report(self):
         result = audit_serial_port()
         self.assertEqual(result["real_serial_cpu_modes"], 2)
-        self.assertEqual(result["actual_cpu_oscillator_steps"], 2048)
+        self.assertEqual(result["actual_cpu_oscillator_steps"], 2042)
+        self.assertEqual(result["actual_original_cpu_instruction_calls"], 2050)
         self.assertFalse(result["interconsole_link_gameplay_verified"])
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "original-serial-clock.json"
