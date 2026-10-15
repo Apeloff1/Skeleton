@@ -90,7 +90,7 @@ class FilenameSafetyTests(unittest.TestCase):
         self.assertTrue(check_paths(set(), {path}))
 
     def test_utf8_boundary_allows_portable_path(self):
-        path = "data/" + "a" * 229 + ".json"
+        path = "data/" + "a" * 180 + ".json"  # exactly 190 UTF-8/UTF-16 units
         self.assertEqual(unsafe_filename(path), [])
 
     def test_component_windows_utf16_limit(self):
