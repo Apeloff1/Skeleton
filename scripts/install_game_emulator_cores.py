@@ -512,6 +512,68 @@ PINNED_CORES.update(
 )
 
 
+# Additional software-only handheld and 8-bit cores. Shared VICE source is
+# pinned for each selected machine; builds remain isolated per core identity.
+PINNED_CORES.update(
+    {
+        "sameboy": {
+            "repository": "https://github.com/libretro/SameBoy.git",
+            "revision": "aa158a889a48b538a0302873704a34577c8eb67d",
+            "artifact": "libretro/sameboy_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile",
+            "build_directory": "libretro",
+            "targets": ["game_boy", "game_boy_color", "game_boy_pocket", "game_boy_light"],
+        },
+        "vba_next": {
+            "repository": "https://github.com/libretro/vba-next.git",
+            "revision": "788192f215ad0a1413f1625b40ebba3423fa0ade",
+            "artifact": "vba_next_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile.libretro",
+            "targets": ["game_boy_advance", "game_boy_micro", "game_boy_player"],
+        },
+        "a5200": {
+            "repository": "https://github.com/libretro/a5200.git",
+            "revision": "40c6f2f1ad4a3145b328d5baaf010fae6c7e752b",
+            "artifact": "a5200_libretro.so",
+            "license": "License.txt",
+            "makefile": "Makefile",
+            "targets": ["atari_5200"],
+            "firmware": ["5200.rom"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Operator-controlled rights-cleared Atari 5200 firmware and BIOS lookup need qualification"
+            ],
+        },
+    }
+)
+# VICE upstream selects each machine through EMUTYPE, and emits
+# vice_<machine>_libretro.so. None of these candidate recipes copy the
+# upstream Commodore/drive ROMs or imply that firmware is installed.
+for _vice_machine, _vice_target in (
+    ("x64sc", "commodore_64"),
+    ("x128", "commodore_128"),
+    ("xvic", "commodore_vic20"),
+    ("xplus4", "commodore_plus4"),
+    ("xpet", "commodore_pet"),
+):
+    PINNED_CORES["vice_" + _vice_machine] = {
+        "repository": "https://github.com/libretro/vice-libretro.git",
+        "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+        "artifact": "vice_" + _vice_machine + "_libretro.so",
+        "license": "COPYING",
+        "makefile": "Makefile",
+        "make_variables": {"EMUTYPE": _vice_machine},
+        "targets": [_vice_target],
+        "candidate_only": True,
+        "unavailable_requirements": [
+            "Full rights-cleared Commodore machine/drive ROM set and host runtime compatibility"
+        ],
+    }
+del _vice_machine, _vice_target
+
+
 def _environment(*, network: bool = False):
     # No inherited provider/Mongo credentials, user git configuration, dynamic
     # loader overrides, compiler injection flags or credential helpers.
