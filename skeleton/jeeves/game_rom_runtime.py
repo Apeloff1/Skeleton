@@ -42,14 +42,16 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
     if rom[0x143] == 0xC0:
         raise GameRomRuntimeError("Color-only cartridges are not supported by the DMG runtime")
     cartridge = rom[0x147]
-    if cartridge not in (0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x11, 0x12, 0x13, 0x19, 0x1A, 0x1B):
+    if cartridge not in (0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x08, 0x09, 0x11, 0x12, 0x13, 0x19, 0x1A, 0x1B):
         raise GameRomRuntimeError(f"Cartridge mapper 0x{cartridge:02x} is not supported")
     size_code = rom[0x148]
     if size_code > 8 or len(rom) != 32768 << size_code:
         raise GameRomRuntimeError("Cartridge bytes do not match the declared ROM bank count")
     if cartridge in (0x00, 0x08, 0x09) and size_code != 0:
         raise GameRomRuntimeError("ROM-only cartridges must have two ROM banks")
-    if cartridge < 0x19 and size_code > 6:
+    if cartridge in (0x05, 0x06) and size_code > 3:
+        raise GameRomRuntimeError("MBC2 supports no more than 16 ROM banks")
+    if cartridge in (0x01, 0x02, 0x03, 0x11, 0x12, 0x13) and size_code > 6:
         raise GameRomRuntimeError("MBC1/MBC3 ROM banking cannot address this cartridge size")
     checksum = 0
     for byte in rom[0x134:0x14D]:
@@ -60,6 +62,10 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
     if ram_code not in (0, 1, 2, 3, 4, 5):
         raise GameRomRuntimeError("Cartridge RAM size is unsupported")
     ram_bytes = (0, 2048, 8192, 32768, 131072, 65536)[ram_code]
+    if cartridge in (0x05, 0x06):
+        if ram_code != 0:
+            raise GameRomRuntimeError("MBC2 has fixed internal 512 x 4-bit RAM, not header external SRAM")
+        ram_bytes = 512
     if cartridge in (0, 1, 0x11, 0x19) and ram_bytes:
         raise GameRomRuntimeError("Cartridge type declares no external RAM")
     if cartridge in (2, 3, 0x08, 0x09, 0x12, 0x13, 0x1A, 0x1B) and not ram_bytes:
@@ -73,7 +79,13 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
         "rom_bytes": len(rom),
         "rom_banks": len(rom) // 16384,
         "ram_bytes": ram_bytes,
-        "mapper": ("mbc1" if cartridge in (1, 2, 3) else "mbc3" if cartridge in (0x11, 0x12, 0x13) else "mbc5" if cartridge in (0x19, 0x1A, 0x1B) else "rom_only"),
+        "mapper": (
+            "mbc1" if cartridge in (1, 2, 3)
+            else "mbc2" if cartridge in (0x05, 0x06)
+            else "mbc3" if cartridge in (0x11, 0x12, 0x13)
+            else "mbc5" if cartridge in (0x19, 0x1A, 0x1B)
+            else "rom_only"
+        ),
         "cartridge_type": cartridge,
         "title": rom[0x134:0x143].split(b"\0", 1)[0].decode("ascii", errors="replace"),
         "support": "experimental DMG CPU/raster; audio, RTC, color and cycle-perfect timing unavailable",
@@ -130,6 +142,8 @@ class GameBoyMachine:
         if 0xA000 <= address < 0xC000:
             if not self.external_ram or not self.ram_enabled:
                 return 255
+            if self.metadata["mapper"] == "mbc2":
+                return 0xF0 | (self.external_ram[(address - 0xA000) & 0x1FF] & 0x0F)
             bank = self.bank_high if self.metadata["mapper"] in ("mbc3", "mbc5") or self.bank_mode else 0
             return self.external_ram[(bank * 8192 + address - 0xA000) % len(self.external_ram)]
         if 0xE000 <= address < 0xFE00:
@@ -173,6 +187,13 @@ class GameBoyMachine:
                     self.bank_high = value & 3
                 else:
                     self.bank_mode = value & 1
+            elif mapper == "mbc2":
+                # MBC2 address bit A8 qualifies RAM-enable vs bank-select.
+                # 512 built-in four-bit registers mirror through A000-BFFF.
+                if address < 0x2000 and not address & 0x100:
+                    self.ram_enabled = value & 15 == 10
+                elif 0x2000 <= address < 0x4000 and address & 0x100:
+                    self.rom_bank = (value & 15) or 1
             elif mapper == "mbc3":
                 if address < 0x2000:
                     self.ram_enabled = value & 15 == 10
@@ -195,6 +216,9 @@ class GameBoyMachine:
             return
         if 0xA000 <= address < 0xC000:
             if self.external_ram and self.ram_enabled:
+                if self.metadata["mapper"] == "mbc2":
+                    self.external_ram[(address - 0xA000) & 0x1FF] = value & 0x0F
+                    return
                 bank = self.bank_high if self.metadata["mapper"] in ("mbc3", "mbc5") or self.bank_mode else 0
                 self.external_ram[(bank * 8192 + address - 0xA000) % len(self.external_ram)] = value
             return
@@ -738,7 +762,12 @@ class GameBoyMachine:
             "sp": 65535,
             "pc": 65535,
             "ime_delay": 2,
-            "rom_bank": 511 if self.metadata["mapper"] == "mbc5" else 127 if self.metadata["mapper"] == "mbc3" else 31,
+            "rom_bank": (
+                511 if self.metadata["mapper"] == "mbc5"
+                else 127 if self.metadata["mapper"] == "mbc3"
+                else 15 if self.metadata["mapper"] == "mbc2"
+                else 31
+            ),
             "bank_high": 15 if self.metadata["mapper"] == "mbc5" else 3,
             "bank_mode": 1,
             "buttons": 255,
@@ -759,6 +788,7 @@ class GameBoyMachine:
             registers["f"] & 15
             or (registers["rom_bank"] == 0 and self.metadata["mapper"] != "mbc5")
             or (self.metadata["mapper"] != "mbc1" and registers["bank_mode"] != 0)
+            or (self.metadata["mapper"] == "mbc2" and registers["bank_high"] != 0)
         ):
             raise GameRomRuntimeError("ROM snapshot flag/bank is invalid")
         if registers["instructions"] * 4 > registers["cycles"]:
@@ -783,6 +813,10 @@ class GameBoyMachine:
             pixel not in (0, 85, 170, 255) for pixel in decoded["framebuffer"]
         ):
             raise GameRomRuntimeError("ROM snapshot raster state is invalid")
+        if self.metadata["mapper"] == "mbc2" and any(
+            byte & 0xF0 for byte in decoded["external_ram"]
+        ):
+            raise GameRomRuntimeError("MBC2 state contains data outside four-bit internal RAM")
         for name, item in registers.items():
             setattr(self, name, item)
         self.memory, self.external_ram, self.framebuffer = (
