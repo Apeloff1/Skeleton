@@ -1210,3 +1210,12 @@ def test_gold_master_excludes_routine_evaluators() -> None:
             ("gm-1", "judge-1", "gm-3"),
             routine_evaluator_ids=("judge-1", "judge-2"),
         )
+
+
+def test_gold_master_cannot_omit_the_rights_review_gate() -> None:
+    from dataclasses import replace
+    bundle = _gold_bundle()
+    with pytest.raises(ValueError, match="explicit rights critical gate"):
+        replace(bundle, critical_gate_qualifications=tuple(
+            gate for gate in bundle.critical_gate_qualifications if gate.gate_id != "rights"
+        ))
