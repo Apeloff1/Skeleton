@@ -191,7 +191,13 @@ class LiveComparison:
             "core_id": lane.game["core_id"], "target_id": lane.game["target_id"],
             "content_sha256": lane.content_digest,
             "controller_layout": controller_layout_for_target(
-                lane.game["target_id"], lane.game["controller_devices"]
+                lane.game["target_id"], lane.game["controller_devices"],
+                core_input_descriptors=(
+                    getattr(lane.env,"_system_info",{}).get("core_input_descriptors",[])
+                ),
+            ),
+            "core_input_descriptors_reported":len(
+                getattr(lane.env,"_system_info",{}).get("core_input_descriptors",[])
             ),
             "status": lane.status, "error_class": lane.error_class,
             "episode_steps": lane.step_count, "lifetime_steps": lane.total_steps,

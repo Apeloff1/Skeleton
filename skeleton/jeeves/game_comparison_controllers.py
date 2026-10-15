@@ -57,7 +57,12 @@ _FACE_POS = ((78,31),(88,23),(68,23),(78,15),(68,6),(88,6),(57,6),(98,6))
 _DPAD = (("up",18,17),("left",9,28),("down",18,39),("right",27,28))
 
 
-def controller_layout_for_target(target_id: str, controller_devices: object = None) -> dict[str, Any]:
+def controller_layout_for_target(
+    target_id: str,
+    controller_devices: object = None,
+    *,
+    core_input_descriptors: object = None,
+) -> dict[str, Any]:
     targets = canonical_targets()
     if target_id not in targets:
         raise ValueError("Controller layout requires a canonical hardware identity")
@@ -86,7 +91,31 @@ def controller_layout_for_target(target_id: str, controller_devices: object = No
             "x":42+index*13,"y":43,"mask":_ACTIONS[action],
             "device":"joypad","input_kind":"bitmask",
         })
+    by_port: dict[int, dict[int, str]] = {}
+    if core_input_descriptors is not None:
+        if not isinstance(core_input_descriptors,list) or len(core_input_descriptors)>128:
+            raise ValueError("Core input descriptions exceed the bounded ABI reporting contract")
+        for entry in core_input_descriptors:
+            if not isinstance(entry,dict) or set(entry)!={"port","device","index","id","description"}:
+                raise ValueError("Core input metadata requires exact libretro descriptor shape")
+            port,dev,idx,bit=(
+                entry["port"],entry["device"],entry["index"],entry["id"]
+            )
+            name=entry["description"]
+            if (type(port) is not int or not 0<=port<4
+                or type(dev) is not int or dev not in (1,2,3,5,6)
+                or type(idx) is not int or not 0<=idx<=3
+                or type(bit) is not int or not 0<=bit<=511
+                or type(name) is not str or not 1<=len(name)<=95
+                or any(ord(ch)<32 for ch in name)):
+                raise ValueError("Actual native core input label is malformed or out of range")
+            if dev==1 and idx==0 and bit<=15:
+                controls=by_port.setdefault(port,{})
+                if bit in controls:
+                    raise ValueError("Actual core reported duplicate RetroPad labels")
+                controls[bit]=name
     slots=[]
+    core_labeled_count=0
     for port,device in enumerate(devices):
         slot={
             "port":port,
@@ -95,7 +124,18 @@ def controller_layout_for_target(target_id: str, controller_devices: object = No
             "controls":[],
         }
         if device in ("joypad","analog"):
-            slot["controls"] = buttons
+            labels=by_port.get(port,{})
+            slot["controls"]=[]
+            for control in buttons:
+                copied=dict(control)
+                idx=int(control["mask"]).bit_length()-1
+                if idx in labels:
+                    copied["legend"]=labels[idx]
+                    copied["legend_source"]="actual_native_libretro_core_descriptor"
+                    core_labeled_count+=1
+                else:
+                    copied["legend_source"]="generic_or_hardware_style_label"
+                slot["controls"].append(copied)
             if device == "analog":
                 slot["analog_axes"]=["left_x","left_y","right_x","right_y"]
         elif device == "keyboard":
@@ -122,12 +162,14 @@ def controller_layout_for_target(target_id: str, controller_devices: object = No
         "target_id":target_id,
         "profile_name":profile[0],
         "physical_layout_certified":False,
+        "core_reported_input_legend_count":core_labeled_count,
+        "core_labels_independently_qualified":False,
         "physical_legend_profile":key if exact else None,
         "generic_fallback":not exact,
         "mapping_kind":"libretro_retropad_semantic_overlay_below_game_screen",
         "input_space":"native host supported bitmask/keycode/analog/mouse/pointer only",
         "ports":slots,
-        "notes":"These panels visualize and draft real libretro input vectors, not confirmed authentic physical hardware or live browser input.",
+        "notes":"Labels reported by an actual installed libretro core are core declarations, not verified physical-controller fidelity. Panels are displayed below game video.",
     }
     payload["layout_sha256"]=digest(payload)
     return payload

@@ -911,6 +911,15 @@
       "no_transcription_or_neural_music_learning_claim": true,
       "tests_added": "tests/test_game_comparison_live.py bounded synthetic native PCM excerpt and under-screen ordering fixture",
       "native_real_game_audio_tested": false
+    },
+    "native_core_input_descriptor_bridge": {
+      "status": "Source implemented; actual libretro core runtime not yet qualified",
+      "worker": "skeleton/jeeves/game_emulator_worker.py implements bounded libretro RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS (command 11) capture: <=128 finite 4-port C ABI records",
+      "host": "Existing host captures wire-safe system_info; no changes to native ROM rights or approved binary core registry",
+      "controller": "controller_layout_for_target now accepts actual core descriptor metadata and replaces matching RetroPad legends while preserving exact ABI masks; fallbacks remain generic and core labels do not establish physical controller accuracy",
+      "live": "LiveComparison displays actual core reported descriptions for running lane's native controller ports directly below unobscured game screen",
+      "tests": "tests/test_game_comparison_core_input_descriptors.py added and wired into manual only focused-emulator-comparison workflow",
+      "actual_real_core_tested": false
     }
   }
 }
