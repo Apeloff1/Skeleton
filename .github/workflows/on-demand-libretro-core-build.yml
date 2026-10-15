@@ -1,0 +1,130 @@
+name: On-demand pinned libretro core build
+
+# Operator-run only. No push, PR, merge, schedule, or issue triggers.
+# Compiled source is NOT native gameplay verification or weight training.
+on:
+  workflow_dispatch:
+    inputs:
+      core:
+        description: "One upstream-pinned open-source emulator core"
+        required: true
+        type: choice
+        options:
+          - sameboy
+          - nestopia
+          - mesen
+          - snes9x2010
+          - mednafen_saturn
+
+permissions:
+  contents: read
+
+concurrency:
+  group: one-pinned-libretro-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pinned-core-source-build:
+    name: "Compile and inspect one pinned libretro artifact"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      CORE_SELECTION: ${{ inputs.core }}
+    steps:
+      - name: Checkout exact operator-selected ref
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configure Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check exact core allowlist and compiler prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$CORE_SELECTION" in
+            sameboy|nestopia|mesen|snes9x2010|mednafen_saturn) ;;
+            *) echo "Unapproved core selection" >&2; exit 2 ;;
+          esac
+          command -v /usr/bin/git
+          command -v /usr/bin/make
+          command -v gcc
+          command -v g++
+          command -v cmake
+          python -m py_compile scripts/install_game_emulator_cores.py skeleton/jeeves/game_emulator_catalog.py
+          mkdir -p "$RUNNER_TEMP/operator-core-receipts"
+          chmod 700 "$RUNNER_TEMP/operator-core-receipts"
+
+      - name: Build and inspect actual pinned upstream source
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/operator-core-receipts"
+          SOURCE_ROOT="$RUNNER_TEMP/source-${GITHUB_RUN_ID}"
+          INSTALL_ROOT="$RUNNER_TEMP/installed-${GITHUB_RUN_ID}"
+          set +e
+          python scripts/install_game_emulator_cores.py \
+            --source-root "$SOURCE_ROOT" \
+            --install-root "$INSTALL_ROOT" \
+            --core "$CORE_SELECTION" \
+            --fetch-sources --jobs 2 --timeout 1800 \
+            > "$OUT/operator-build.json" 2> "$OUT/operator-build-error.txt"
+          RC=$?
+          set -e
+          python - "$OUT" "$CORE_SELECTION" "$RC" <<'PY'
+          import json, pathlib, sys
+          out, selected, code = pathlib.Path(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+          payload = {}
+          try:
+              payload = json.loads((out / "operator-build.json").read_text())
+          except (ValueError, OSError):
+              payload = {}
+          items = payload.get("cores", [])
+          unique = (
+              isinstance(items, list) and len(items) == 1
+              and isinstance(items[0], dict) and items[0].get("core_id") == selected
+          )
+          core = items[0] if unique else {}
+          valid = (
+              code == 0 and unique and payload.get("status") == "compiled_artifacts_installed"
+              and core.get("library_sha256") and core.get("source_revision")
+          )
+          record = {
+              "schema_version": "skeleton.game.manual_pinned_core_build_result.v1",
+              "requested_core": selected,
+              "source_exact_revision": core.get("source_revision") if valid else None,
+              "compiled_native_binary_sha256": core.get("library_sha256") if valid else None,
+              "library_inspected": bool(valid),
+              "operator_approval_status": core.get("approval_status") if valid else None,
+              "real_libretro_core_execution_verified": False,
+              "rom_boot_verified": False,
+              "production_model_weights_modified": False,
+              "build_exit_code": code,
+              "status": "compiled_candidate" if valid else "build_failed_or_unproven",
+          }
+          (out / "source-build-receipt.json").write_text(
+              json.dumps(record, sort_keys=True, indent=2) + "\n"
+          )
+          print(json.dumps(record, sort_keys=True))
+          if not valid:
+              sys.exit(2)
+          PY
+          # Error propagated only after the receipt is written. The
+          # artifact action below runs even on failure.
+          if [ "$RC" -ne 0 ]; then exit "$RC"; fi
+
+      - name: Retain small build and failure receipts only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: one-pinned-libretro-core-receipt-${{ github.run_id }}
+          path: ${{ runner.temp }}/operator-core-receipts/
+          if-no-files-found: ignore
+          retention-days: 3
+          compression-level: 6
