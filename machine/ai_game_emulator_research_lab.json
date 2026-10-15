@@ -36,7 +36,9 @@
     "python scripts/audit_original_gameboy_mapper_matrix.py",
     "python scripts/audit_original_rom_instruction_divergence.py",
     "python scripts/audit_original_gameboy_cpu_opcodes.py",
-    "python scripts/audit_original_gameboy_alu_flags.py"
+    "python scripts/audit_original_gameboy_alu_flags.py",
+    "python scripts/audit_original_gameboy_interrupts.py",
+    "python scripts/audit_game_emulator_disc_first_boot.py"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -137,7 +139,9 @@
     "skeleton/testing/test_game_rom_cpu_timer.py",
     "skeleton/testing/test_game_rom_instruction_divergence.py",
     "skeleton/testing/test_game_rom_dma_timing.py",
-    "skeleton/testing/test_game_original_cpu_conformance.py"
+    "skeleton/testing/test_game_original_cpu_conformance.py",
+    "skeleton/testing/test_game_original_cpu_interrupts.py",
+    "skeleton/testing/test_game_emulator_disc_first_boot.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -151,7 +155,8 @@
     "Operator RAM hypotheses are only experimentally controlled numerical measurements, not independently established score/health/victory flags",
     "Pure-Python neural candidate optimizer is CPU bounded and not a production multimodal/transformer weight pipeline",
     "Experimental OAM DMA does not yet emulate DMG CPU bus lockout or exact sprite fetch contention",
-    "Source-hashed emulator runtime is already part of the ROM environment digest, but executable opcode/ALU tests and cycle-perfect PPU/CPU bus stages remain unverified"
+    "Source-hashed emulator runtime is already part of the ROM environment digest, but executable opcode/ALU tests and cycle-perfect PPU/CPU bus stages remain unverified",
+    "Native disc boot acceptance is a separate explicit operator command; CI only runs synthetic media tests and does not silently certify optical consoles"
   ],
   "operator_docs": [
     "docs/ROM_EMULATOR_COMPLETION.md",
@@ -323,6 +328,8 @@
     "entrypoint": "python scripts/run_game_rom_acceptance_suite.py",
     "readiness": "operator-only, source implementation committed but not yet run",
     "phases": [
+      "11 real source IRQ/IME/HALT/RETI/STOP source replay scenarios with 22 verified repetitions",
+      "64 conditional SM83 flag-controlled jump/call/return source experiments with actual PC/SP outcomes",
       "500 actual synthetically authored legal CPU opcode variants against pinned CC0 gbdev reference timing; 11 invalid opcodes refused",
       "5184 actual CPU ALU flag cases against independent mathematical reference",
       "actual original-ROM CPU instruction input divergence traces, independent save/replay and per-sample SHA256",
@@ -489,8 +496,12 @@
       "nonprefixed_base_instructions_executed": 244,
       "cb_subopcodes_executed": 256,
       "invalid_base_denied": 11,
-      "legal_single_step_instructions_and_replays": 1000,
-      "individual_reference_timing_comparisons": 500
+      "conditional_opcodes": 16,
+      "conditional_zc_flag_combinations": 4,
+      "conditional_source_branches_executed": 64,
+      "conditional_taken_cases": 32,
+      "legal_single_step_instructions_and_replays": 1128,
+      "individual_reference_timing_comparisons": 564
     },
     "arithmetic": {
       "real_flag_reference_cases": 5184,
@@ -516,6 +527,87 @@
     "test": "skeleton/testing/test_game_original_cpu_conformance.py",
     "current_execution_verified": false,
     "hardware_cycle_accuracy_certified": false,
-    "production_model_promotion": false
+    "production_model_promotion": false,
+    "conditional_branch_model": {
+      "tested_groups": [
+        "JR NZ/Z/NC/C",
+        "JP NZ/Z/NC/C",
+        "CALL NZ/Z/NC/C",
+        "RET NZ/Z/NC/C"
+      ],
+      "physical_controls": [
+        "flags 0x00",
+        "flags 0x10",
+        "flags 0x80",
+        "flags 0x90"
+      ],
+      "source_conditions": "independently expected PC/SP after executing original ROM opcode with actual flags, conditional taken versus not taken and restored replay",
+      "pending_execution_verification": true
+    }
+  },
+  "sm83_interrupt_control_oracle": {
+    "source": "scripts/audit_original_gameboy_interrupts.py",
+    "regression": "skeleton/testing/test_game_original_cpu_interrupts.py",
+    "source_media": "synthetic authored cartridge instructions only",
+    "real_engine": "skeleton.jeeves.game_rom_runtime.GameBoyMachine",
+    "scenarios": [
+      "IRQ0 VBlank priority vector 0x40",
+      "IRQ1 LCD STAT priority vector 0x48",
+      "IRQ2 TIMA priority vector 0x50",
+      "IRQ3 serial priority vector 0x58",
+      "IRQ4 joypad priority vector 0x60",
+      "EI enables only after next instruction",
+      "DI cancels pending EI",
+      "HALT bug repeats opcode byte",
+      "HALT wakes and services pending IRQ",
+      "RETI stack and immediate IME",
+      "STOP frozen until joypad edge"
+    ],
+    "replay_pairs": 22,
+    "scenarios_count": 11,
+    "source_acceptance": "scripts/run_game_rom_acceptance_suite.py",
+    "mid_instruction_bus_timing_certified": false,
+    "real_executions_verified_during_this_authoring_pass": 0,
+    "production_neural_weights_updated": 0
+  },
+  "native_disc_first_boot_gate": {
+    "operator_entrypoint": "python scripts/audit_game_emulator_disc_first_boot.py",
+    "scope": "Approved real libretro cores loading operator-owned multi-file optical/playlist media, not synthetic game simulator",
+    "media": [
+      "CUE/BIN",
+      "GDI",
+      "M3U",
+      "CHD",
+      "ISO",
+      "other extensions accepted by governed native content bundle"
+    ],
+    "source": "explicit absolute local paths/size/SHA256 and current-rights GameContentReference streaming",
+    "bounds": {
+      "max_cases": 8,
+      "max_files_per_case": 16,
+      "max_case_aggregate_bytes": 4294967296,
+      "max_prefix_bytes_per_file": 65536,
+      "one_pass_streamed_hash_check": true,
+      "exact_manifest_bounds_apply_to_programmatic_calls": true
+    },
+    "source_integrity": [
+      "preflight regular non-symlink source file metadata",
+      "digest-verified source descriptor",
+      "file SHA256 and size checked during actual bounded read",
+      "existing GameContentBundle descriptor dependency validator",
+      "streaming to private host-owned sandbox content root",
+      "core and firmware approval from exact registry"
+    ],
+    "real_native_acceptance": [
+      "real libretro frame",
+      "actual idle and A native source inputs",
+      "opaque savestate restore",
+      "identical observation reward transition and final saved state"
+    ],
+    "source_code": "scripts/audit_game_emulator_disc_first_boot.py",
+    "regression_source": "skeleton/testing/test_game_emulator_disc_first_boot.py",
+    "native_disc_boots_executed": 0,
+    "bios_or_disc_image_distributed": false,
+    "hardware_accuracy_certified": false
   }
 }
