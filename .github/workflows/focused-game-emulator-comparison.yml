@@ -58,6 +58,7 @@ jobs:
             tests.test_game_comparison_counterfactual \
             tests.test_game_comparison_counterfactual_integrity \
             tests.test_game_comparison_counterfactual_viewer \
+            tests.test_game_comparison_scientific_gates \
             tests.test_game_comparison_live_http \
             tests.test_game_comparison_raw_qualification_regression \
             tests.test_game_comparison_readiness \

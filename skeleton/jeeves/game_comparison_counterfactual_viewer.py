@@ -140,6 +140,8 @@ function render(){
   metric("Verified native steps",report.verified_native_actions),
   metric("Input step changed",game.perturbation_step),
   metric("Repeat-consistent",analysis.repeat_consistent_in_both_arms?"Yes":"No"),
+  metric("Pre-input evidence matched",analysis.pre_intervention_controls_matched?"Yes":"No"),
+  metric("Scientific evidence gate",analysis.scientific_evidence_status),
   metric("New AI weights",0)
  );
  const panel=$("trial");panel.replaceChildren(txt("h2",game.game_id+" · "+game.target_id+" · "+game.core_id));
@@ -148,6 +150,12 @@ function render(){
  panel.append(txt("p","Video first difference: "+(video.first_observed_difference_step??"none")+
  " · PCM first difference: "+(audio.first_observed_difference_step??"none")+
  " · video stable within each arm: "+String(video.baseline_same_across_fresh_repeats&&video.perturbed_same_across_fresh_repeats)));
+ const status=txt("p",
+  analysis.pre_intervention_controls_matched
+   ?"All recorded audio/video steps before changed input matched between paired arms."
+   :"IMPORTANT: video/audio differed before input change; response is confounded and must not be treated as causal.","");
+ status.className=analysis.post_intervention_observable_response_candidate?"good":"warning";
+ panel.append(status);
  const diffs=txt("div","");diffs.className="metrics";
  Object.entries(analysis.measured_objective_changes).forEach(([name,value])=>diffs.append(metric(name,Number(value).toFixed(6))));
  panel.append(diffs);

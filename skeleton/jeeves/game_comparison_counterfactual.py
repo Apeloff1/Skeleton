@@ -131,46 +131,118 @@ def _analyze_counterfactual(
     baseline: list[dict[str,Any]], variant: list[dict[str,Any]], *,
     perturbation_step:int,
 ) -> dict[str,Any]:
-    if not baseline or len(baseline)!=len(variant):
-        raise ComparativeExperimentError("Both controlled experiment arms require equal repetitions")
-    def stable(runs: list[dict[str,Any]], field: str) -> bool:
-        first=[entry[field] for entry in runs[0]["receipts"]]
-        return all(
-            [entry[field] for entry in run["receipts"]]==first
-            for run in runs[1:]
-        )
+    """Compare *paired native repeats* and reject pre-intervention divergence.
+
+    This measures frame/audio differences. Even a clean difference is not
+    proof of a game mechanic, generalized ability or production-model gain.
+    """
+    if (not baseline or len(baseline)!=len(variant)
+        or type(perturbation_step) is not int):
+        raise ComparativeExperimentError("Matched controlled experiment arms are required")
+    a_runs=[run["receipts"] for run in baseline]
+    b_runs=[run["receipts"] for run in variant]
+    n=len(a_runs[0])
+    if (not 1<=perturbation_step<=n
+        or any(len(row)!=n for row in a_runs+b_runs)):
+        raise ComparativeExperimentError("All actual native A/B tapes require identical step counts")
     outcomes={}
     for source_field,label in (
         ("native_frame_sha256","video"),("native_pcm_sha256","audio")
     ):
-        b=[run["receipts"] for run in baseline]
-        v=[run["receipts"] for run in variant]
-        n=len(b[0])
-        if any(len(x)!=n for x in b+v):
-            raise ComparativeExperimentError("Actual experiment arms returned unequal native step counts")
+        def stable(runs:list[list[dict[str,Any]]])->bool:
+            return all(
+                all(run[i][source_field]==runs[0][i][source_field]
+                    for i in range(n))
+                for run in runs[1:]
+            )
+        bstable=stable(a_runs)
+        vstable=stable(b_runs)
+        per_step_agreement=[]
+        for index in range(n):
+            comparisons=[
+                a[index][source_field]!=b[index][source_field]
+                for a,b in zip(a_runs,b_runs,strict=True)
+            ]
+            per_step_agreement.append({
+                "step":index+1,
+                "different_paired_repeats":sum(comparisons),
+                "total_paired_repeats":len(comparisons),
+                "consistently_different":all(comparisons),
+                "consistently_equal":not any(comparisons),
+            })
+        prefix_consistent=all(
+            entry["consistently_equal"]
+            for entry in per_step_agreement[:perturbation_step-1]
+        )
         changed=[
-            i+1 for i in range(n) if b[0][i][source_field]!=v[0][i][source_field]
+            item["step"] for item in per_step_agreement
+            if item["different_paired_repeats"]>0
+        ]
+        repeat_stable=bstable and vstable
+        post_consistently_changed=[
+            item["step"] for item in per_step_agreement[perturbation_step-1:]
+            if item["consistently_different"]
         ]
         outcomes[label]={
             "first_observed_difference_step":changed[0] if changed else None,
             "different_frame_or_audio_steps":changed,
             "difference_at_perturbed_input_step":perturbation_step in changed,
             "same_at_end":(n not in changed),
-            "baseline_same_across_fresh_repeats":stable(baseline,source_field),
-            "perturbed_same_across_fresh_repeats":stable(variant,source_field),
+            "baseline_same_across_fresh_repeats":bstable,
+            "perturbed_same_across_fresh_repeats":vstable,
+            "pre_intervention_equal_in_every_paired_run":prefix_consistent,
+            "first_repeatable_post_intervention_difference":(
+                post_consistently_changed[0] if post_consistently_changed else None
+            ),
+            "paired_repeat_differences_by_step":per_step_agreement,
+            "unconfounded_signal_response_observed":(
+                prefix_consistent and repeat_stable and bool(post_consistently_changed)
+            ),
         }
     measured_delta={}
+    per_pair_deltas={}
     for key in ("screen_mean","visual_change","audio_rms"):
-        a=baseline[0]["receipts"][perturbation_step-1]["observations"][key]
-        b=variant[0]["receipts"][perturbation_step-1]["observations"][key]
-        measured_delta[key+"_at_changed_step"]=round(b-a,8)
+        values=[
+            float(b[perturbation_step-1]["observations"][key])-
+            float(a[perturbation_step-1]["observations"][key])
+            for a,b in zip(a_runs,b_runs,strict=True)
+        ]
+        if any(not math.isfinite(value) for value in values):
+            raise ComparativeExperimentError("Invalid numeric native comparison result")
+        measured_delta[key+"_at_changed_step"]=round(sum(values)/len(values),8)
+        per_pair_deltas[key+"_paired_repeats"]=[
+            round(value,8) for value in values
+        ]
+    matched_prefix=all(
+        signal["pre_intervention_equal_in_every_paired_run"]
+        for signal in outcomes.values()
+    )
+    stable_arms=all(
+        signal["baseline_same_across_fresh_repeats"]
+        and signal["perturbed_same_across_fresh_repeats"]
+        for signal in outcomes.values()
+    )
+    post_response=any(
+        signal["unconfounded_signal_response_observed"]
+        for signal in outcomes.values()
+    )
+    if not matched_prefix:
+        status="invalid_pre_intervention_divergence"
+    elif not stable_arms:
+        status="insufficient_native_repeatability"
+    elif post_response:
+        status="controlled_observable_signal_response_candidate"
+    else:
+        status="no_repeatable_audiovisual_difference"
     return {
         "measured_objective_changes":measured_delta,
+        "paired_numeric_observation_deltas":per_pair_deltas,
         "signal_comparison":outcomes,
-        "repeat_consistent_in_both_arms":all(
-            values["baseline_same_across_fresh_repeats"]
-            and values["perturbed_same_across_fresh_repeats"]
-            for values in outcomes.values()
+        "repeat_consistent_in_both_arms":stable_arms,
+        "pre_intervention_controls_matched":matched_prefix,
+        "scientific_evidence_status":status,
+        "post_intervention_observable_response_candidate":(
+            matched_prefix and stable_arms and post_response
         ),
         "design_controls":{
             "same_approved_binary":True,
@@ -179,6 +251,7 @@ def _analyze_counterfactual(
             "same_frames_per_step":True,
             "only_one_user_input_token_modified":True,
             "repetitions_per_arm":len(baseline),
+            "pre_intervention_observations_identical":matched_prefix,
             "uncontrolled_game_randomness_excluded":False,
             "causal_game_mechanic_proven":False,
         },
@@ -388,6 +461,16 @@ def verify_counterfactual_input_result(report: Mapping[str,Any]) -> dict[str,Any
                     raise ComparativeExperimentError("A/B arm repetitions did not use identical declared controller tapes")
                 verified_runs+=1
                 verified_steps+=len(evidence)
+        # A forged/accidentally stale analysis can otherwise describe signal
+        # differences that are not present in its very own run receipts.
+        recomputed=_analyze_counterfactual(
+            arms["baseline"], arms["perturbed"],
+            perturbation_step=changed_step,
+        )
+        if digest(recomputed)!=digest(game.get("measured_analysis")):
+            raise ComparativeExperimentError(
+                "Controlled signal conclusions differ from native frame/audio receipts"
+            )
         base=tapes["baseline"]
         altered=tapes["perturbed"]
         if (len(base)!=len(altered) or changed_step>len(base)
