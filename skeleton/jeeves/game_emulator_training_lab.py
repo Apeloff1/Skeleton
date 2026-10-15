@@ -30,6 +30,23 @@ from .game_learning_parallel import GameEnvironmentRequest
 from .game_emulator_curriculum import ANGLES, EvidenceCurriculum
 
 SCHEMA = "skeleton.game.emulator_training_lab.v1"
+TRAINING_PROJECTION_FIELDS = (
+    "sequence", "observation", "action", "next_observation", "reward",
+    "reward_components", "terminated", "truncated",
+)
+
+
+def verified_training_projection(row: Mapping[str, Any]) -> str:
+    """Content digest for learning features from a fully audited source row.
+
+    Trace metadata remains independently committed by the original trace SHA.
+    This compact projection allows the later neural optimizer to demonstrate
+    that *its numeric inputs* correspond to that exact source episode without
+    trusting a separately rehashed candidate data export.
+    """
+    if not isinstance(row, Mapping) or not set(TRAINING_PROJECTION_FIELDS) <= set(row):
+        raise EmulatorTrainingError("source transition missing verified training fields")
+    return _digest({field: row[field] for field in TRAINING_PROJECTION_FIELDS})
 class EmulatorTrainingError(GameLearningError):
     """Training provenance, replay or resource bound invalid."""
 
@@ -398,6 +415,9 @@ def _collect_audited(
             "modalities": modality,
             "observed_reward": trace["return"],
             "trace_digest": trace["trace_digest"],
+            "verified_training_projection_sha256": [
+                verified_training_projection(row) for row in trace["transitions"]
+            ],
             "game_success_verified": False,
             "model_neural_weights_updated": 0,
         }
@@ -547,6 +567,7 @@ def run_emulator_training_lab(
                 "environment_digest": learner.descriptor["environment_digest"],
                 "seed": trace["seed"],
                 "sequence": row["sequence"],
+                "verified_training_projection_sha256": verified_training_projection(row),
                 "observation": row["observation"],
                 "action": row["action"],
                 "next_observation": row["next_observation"],
