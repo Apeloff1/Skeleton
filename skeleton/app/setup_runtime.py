@@ -186,6 +186,29 @@ def ensure_runtime_environment(
     else:
         preserved.append("SKL_ENGINE_SERVICE_TOKEN")
 
+    # The installed game-production stack needs stable secret protection,
+    # Forge HMAC identity and process signing across restarts. An empty seed
+    # makes the signing identity ephemeral and can invalidate earlier evidence.
+    # These are generated once; ordinary secret rotation must NEVER replace
+    # keys protecting stored ciphertext or signed historical artifacts.
+    for key in (
+        "SKELETON_MASTER_SECRET",
+        "GF_SEAL_SECRET",
+        "GF_KEYHOLDER_SEED",
+    ):
+        current = values.get(key, "")
+        if _is_placeholder(current):
+            generated = secrets.token_hex(32)
+            text = _replace_env_value(text, key, generated)
+            values[key] = generated
+            configured.append(key)
+        else:
+            preserved.append(key)
+
+    signing_seed = values["GF_KEYHOLDER_SEED"]
+    if len(signing_seed) != 64 or any(c not in "0123456789abcdefABCDEF" for c in signing_seed):
+        warnings.append("GF_KEYHOLDER_SEED must be exactly 32 bytes of hexadecimal data")
+
     user_uri = quote(username, safe="")
     password_uri = quote(password, safe="")
 
