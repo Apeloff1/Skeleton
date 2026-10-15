@@ -1,7 +1,7 @@
 """Bounded, experimental DMG cartridge execution for the Jeeves engine lab.
 
 This executes real cartridge instructions; it is not a complete or certified
-Game Boy emulator. It deliberately excludes audio, RTC, CGB-only cartridges,
+Game Boy emulator. It deliberately excludes audio, battery-backed wall-time RTC, CGB-only cartridges,
 cycle-perfect bus contention and unsupported mappers. No boot ROM is bundled.
 """
 
@@ -263,10 +263,12 @@ class GameBoyMachine:
                         raise GameRomRuntimeError("MBC3 unavailable RTC/RAM register")
                     self.bank_high = value
                 elif self.metadata["virtual_rtc"]:
-                    next_latch = value & 1
-                    if self.rtc_latch_prev == 0 and next_latch == 1:
-                        self.rtc_latched = list(self.rtc_regs)
-                    self.rtc_latch_prev = next_latch
+                    # Require an explicit 00 -> 01 command sequence.
+                    # Other values cannot silently synthesize a latch edge.
+                    if value in (0, 1):
+                        if self.rtc_latch_prev == 0 and value == 1:
+                            self.rtc_latched = list(self.rtc_regs)
+                        self.rtc_latch_prev = value
                 # RTC-free types ignore the latch command.
             elif mapper == "mbc5":
                 if address < 0x2000:
