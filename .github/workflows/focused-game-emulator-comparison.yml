@@ -44,6 +44,7 @@ jobs:
             skeleton/jeeves/game_comparison_studio.py \
             scripts/live_game_comparison.py \
             scripts/qualify_full_console_disc_cycle.py \
+            scripts/qualify_full_console_save_ram.py \
             scripts/qualify_live_game_comparison.py \
             scripts/doctor_game_comparison.py \
             scripts/audit_game_emulator_169_targets.py
@@ -54,6 +55,7 @@ jobs:
             tests.test_game_comparison_core_input_descriptors \
             tests.test_game_comparison_live_http \
             tests.test_game_emulator_disc_control \
+            tests.test_game_emulator_save_ram \
             tests.test_game_comparison_raw_qualification_regression \
             tests.test_game_comparison_readiness \
             tests.test_game_comparison_host_preflight \
