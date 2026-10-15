@@ -78,7 +78,7 @@ class EmulatorLabConfig:
             (self.seed, 0, 2**63 - 1, "training seed"),
         ):
             _integer(value, lo, hi, name)
-        if self.steps_per_run > 128 or self.max_runs * self.steps_per_run > 32768:
+        if self.steps_per_run > 128 or self.max_runs * self.steps_per_run > 8192:
             raise EmulatorTrainingError("cumulative emulation work exceeds explicit bounds")
 
 
@@ -239,6 +239,48 @@ def environment_snapshot_digest_from_payload(snapshot: Mapping[str, Any]) -> str
     return _digest(snapshot)
 
 
+
+def _controller_probes(
+    environment: Any, checkpoint: Mapping[str, Any], *,
+    cancel: Callable[[], bool] | None,
+    authorize: Callable[[], None] | None,
+) -> list[dict[str, Any]]:
+    """Execute REAL multi-button/multi-port native controller probes.
+
+    These are deliberately excluded from the finite policy action space:
+    fabricated surrogate 'multi-controller Q updates' are prohibited.
+    """
+    if not callable(getattr(environment, "input_step", None)):
+        return []
+    from .game_emulator_host import _policy_controls
+
+    probes = [
+        [_policy_controls("a_right")],
+        [_policy_controls("b_left")],
+        [_policy_controls("a"), _policy_controls("b")],
+        [_policy_controls("start"), _policy_controls("select"),
+         _policy_controls("up"), _policy_controls("down")],
+    ]
+    observations = []
+    for controls in probes:
+        _guard(cancel, authorize)
+        environment.restore(checkpoint)
+        native_step = environment.input_step(controls)
+        evidence = dict(native_step.info).get("evidence", {})
+        if not isinstance(evidence, Mapping) or not evidence.get("controller_only"):
+            raise EmulatorTrainingError("multi-controller probes must retain controller-only status")
+        observations.append({
+            "ports": len(controls),
+            "controller_digest": evidence["controller_digest"],
+            "actual_frame_sha256": _frame_digest(environment, native_step),
+            "measured_reward": native_step.reward,
+            "actual_native_runs": evidence.get("native_runs", 0),
+            "learned_as_policy_action": False,
+        })
+    environment.restore(checkpoint)
+    return observations
+
+
 def _collect_audited(
     request: GameEnvironmentRequest, learner: GamePolicyLearner, config: EmulatorLabConfig,
     *, run_index: int, seed: int, angle: str,
@@ -258,6 +300,7 @@ def _collect_audited(
         modality = []
         rng = random.Random(_digest([config.seed, run_index, angle]))
         counterfactual = []
+        multi_controller = []
         for index in range(config.steps_per_run):
             _guard(cancel, authorize)
             if index and index % config.checkpoint_stride == 0:
@@ -271,6 +314,10 @@ def _collect_audited(
                     _counterfactuals(environment, learner, checkpoint, action,
                                      config.counterfactual_actions, cancel=cancel, authorize=authorize)
                 )
+                if index == 0 and request.kind == "libretro":
+                    multi_controller = _controller_probes(
+                        environment, checkpoint, cancel=cancel, authorize=authorize
+                    )
                 observation = learner._observation(current_observation(environment, environment.restore(checkpoint)))
             step = environment.step(action)
             row = _normalize_step(
@@ -321,6 +368,22 @@ def _collect_audited(
         trace["trace_digest"] = _digest(trace)
         learner.validate_trace(trace)
         _json(trace, limit=learner.config.trace_byte_limit)
+        audit_checks = {
+            "core_and_content_spec_identity": _descriptor(environment.spec) == learner.descriptor,
+            "rights_authority_declared": learner.source_lineage.get("rights_acknowledged") is True,
+            "exact_initial_snapshot_recorded": bool(first_state),
+            "trace_sha256_validated": bool(trace["trace_digest"]),
+            "native_action_schema_verified": all(row["action"] in learner.spec.actions for row in transitions),
+            "finite_measured_reward": all(math.isfinite(row["reward"]) for row in transitions),
+            "frame_digests_grounded": all(len(item["actual_frame_sha256"]) == 64 for item in modality),
+            "observed_steps_accounted": len(transitions) == len(modality),
+            "reverse_checkpoint_replays_verified": all(item["end_state_matches"] for item in audit),
+            "unmodified_final_native_state": bool(audit) and all(
+                item["ending_snapshot_digest"] == final_snapshot for item in audit
+            ),
+        }
+        if len(audit_checks) != 10 or not all(audit_checks.values()):
+            raise EmulatorTrainingError("the ten independent training scrutiny controls are not satisfied")
         receipt = {
             "run_index": run_index,
             "angle": angle,
@@ -332,6 +395,8 @@ def _collect_audited(
             "actual_replay_steps": sum(row["replayed_steps"] for row in audit),
             "reverse_checkpoints": audit,
             "counterfactual_probes": counterfactual,
+            "multi_controller_probes": multi_controller,
+            "scrutiny_checks": audit_checks,
             "modalities": modality,
             "observed_reward": trace["return"],
             "trace_digest": trace["trace_digest"],
