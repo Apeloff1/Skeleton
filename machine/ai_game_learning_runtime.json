@@ -167,7 +167,21 @@
       ],
       "budgets": "pre-admit up to twelve auxiliary source-mirror episodes per changed-rule candidate per round; actual executed steps checked before committing",
       "scenario_efficiency": "bounded local parameter perturbations with canonical source digests and exclusion of previously explored committed settings",
-      "limitations": "not proof of neural generalization, human creative quality, model training completion or hardware frame rates"
+      "limitations": "not proof of neural generalization, human creative quality, model training completion or hardware frame rates",
+      "candidate_trainer": {
+        "owner": "skeleton/jeeves/game_studio_rule_training_cli.py",
+        "behavior": "scenario-balanced measured Q-policy sweeps; early-stop on two full entirely nonproductive sweeps, after all scenarios seen twice",
+        "metrics": [
+          "accepted action counts",
+          "rejected action counts",
+          "productive non-explicit-time state changes",
+          "distinct observed gameplay states",
+          "actual Q updates",
+          "real versus budgeted episode counts"
+        ],
+        "neural_corpus": "select most productive observed training trace per source scenario, rebuild source-authoritative examples, no heldout contamination or automatic model promotion",
+        "verification": "unexecuted regression test cases included; not a successful checkpoint model training claim"
+      }
     }
   }
 }

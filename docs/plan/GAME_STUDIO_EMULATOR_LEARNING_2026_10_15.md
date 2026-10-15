@@ -397,3 +397,35 @@ These are **implemented gate and telemetry contracts**, not claims
 that training metrics have been measured in a live compiled app. CI,
 native engine acceptance, all scripted tests and real hardware/emulator
 performance still need separate evidence before sign-off.
+
+## Measured candidate training utility and early-stop receipts
+
+`game_studio_rule_training_cli.py` now spends episodes in *complete
+round-robin scenario sweeps*, rather than eagerly consuming the entire
+requested training budget. It counts accepted game commands, rejected
+commands and productive changes in non-explicit-time observed gameplay
+features from the **authoritative recorded training trace**. After two
+full scenario sweeps with zero such changes across all scenarios, it
+stops spending further episode budget and reports
+`stopped_after_two_nonproductive_scenario_sweeps` and the exact
+`unused_training_episode_budget`. Other runs continue up to the
+operator's previously admitted maximum. No hidden extra optimization
+or unapproved model promotion is invoked.
+
+Each outcome now distinguishes the **maximum requested** episodes
+from **actually executed** episodes and Q-value updates. The optional
+checkpoint-derived neural training input uses the most productive
+observed *training* trajectory per scenario (favoring productive state
+changes, actual accepted commands and distinct states), still
+independently replays every source on publication and never consumes
+heldout evaluation episodes as optimizer examples. Informational
+features are proxies—not a scientific proof of eventual neural
+generalization or game design excellence. Existing campaign
+champion acceptance also requires measurable six-angle source
+differences and its independent Dragon, adversarial, heldout and
+regression constraints.
+
+These optimizations do not fix fundamentally absent native game
+runtimes, guarantee a successful game outcome, or turn popular-game
+sales into causally verified mechanics. Tests and actual candidate
+weight production remain pending.

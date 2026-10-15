@@ -16,7 +16,9 @@ from skeleton.jeeves.game_studio_rule_curriculum import (
     RuleCurriculumError, apply_rule_proposal, make_rule_curriculum,
     verify_rule_curriculum,
 )
-from skeleton.jeeves.game_studio_rule_training_cli import train_rule_curriculum
+from skeleton.jeeves.game_studio_rule_training_cli import (
+    train_rule_curriculum, _trace_effectiveness,
+)
 
 
 def source_hash(source):
@@ -216,6 +218,37 @@ class TestModelProposedEngineRules(unittest.TestCase):
         with self.assertRaises(GameLearningError):
             bad.build()
 
+    def test_effectiveness_excludes_clock_changes_and_rejected_commands(self):
+        baseline={
+            "progress":0.0,"score":0.0,"resources":0.0,
+            "health":1.0,"time":0.0,"success":0.0,"failure":0.0,
+        }
+        elapsed={**baseline,"time":0.25}
+        advanced={**elapsed,"score":0.5,"time":0.5}
+        trace={
+            "seed":19,"return":-0.5,"trace_digest":"0"*64,
+            "transitions":[
+                {
+                    "observation":baseline,"next_observation":elapsed,
+                    "info":{"evidence":{"accepted":False}},
+                },
+                {
+                    "observation":elapsed,"next_observation":advanced,
+                    "info":{"evidence":{"accepted":True}},
+                },
+            ],
+        }
+        signal=_trace_effectiveness(trace)
+        self.assertEqual(signal["accepted_actions"],1)
+        self.assertEqual(signal["rejected_actions"],1)
+        self.assertEqual(signal["productive_state_changes"],1)
+        self.assertEqual(signal["unique_gameplay_states"],2)
+        no_progress={
+            **trace,
+            "transitions":[trace["transitions"][0]],
+        }
+        self.assertEqual(_trace_effectiveness(no_progress)["productive_state_changes"],0)
+
     def test_actual_q_updates_and_disjoint_scenario_evaluation(self):
         with TemporaryDirectory() as folder:
             target=Path(folder)/"trained-rules.json"
@@ -233,6 +266,12 @@ class TestModelProposedEngineRules(unittest.TestCase):
             record=json.loads(target.read_text())
             self.assertEqual(report["circumstances"],3)
             self.assertEqual(report["episodes"],6)
+            self.assertEqual(report["maximum_training_episodes"],6)
+            self.assertEqual(report["unused_training_episode_budget"],0)
+            self.assertEqual(
+                report["actual_accepted_actions"]+report["actual_rejected_actions"],
+                sum(item["steps"] for item in record["training_effectiveness"]),
+            )
             self.assertGreater(report["actual_q_updates"],0)
             self.assertEqual(len(record["evaluation_by_circumstance"]),3)
             self.assertFalse(record["production_neural_weights_modified"])
