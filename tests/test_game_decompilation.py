@@ -26,6 +26,8 @@ from skeleton.jeeves.game_decompilation_assets import decode_tile_region, extrac
 from skeleton.jeeves.game_decompilation_code import disassemble_nes_nrom, disassemble_gb_sm83
 from skeleton.jeeves.game_decompilation_archives import analyze_zip_project
 from skeleton.jeeves.game_decompilation_formats import inspect_binary_structure
+from skeleton.jeeves.game_decompilation_arm import disassemble_gba_arm_entry
+from skeleton.jeeves.game_decompilation import analyze_authorized_native_frames
 from skeleton.jeeves.game_decompilation_learning import (
     make_human_labeled_candidate, train_shadow_asset_quality_model,
     infer_shadow_asset_quality,
@@ -67,6 +69,19 @@ def synthetic_gb() -> bytes:
     rom[0x14D]=checksum
     global_sum=(sum(rom)-rom[0x14E]-rom[0x14F])&65535
     rom[0x14E:0x150]=global_sum.to_bytes(2,"big")
+    return bytes(rom)
+
+
+def synthetic_gba() -> bytes:
+    rom=bytearray(4096)
+    # Verified ARM B to 0x080000C0. Every instruction is original fixture bytes.
+    rom[0:4]=(0xEA00002E).to_bytes(4,"little")
+    rom[0xAC:0xB0]=b"SKL0"
+    rom[0xB0:0xB2]=b"HB"
+    rom[0xB2]=0x96
+    rom[0xC0:0xC4]=(0xE3A00001).to_bytes(4,"little")
+    rom[0xC4:0xC8]=(0xE12FFF1E).to_bytes(4,"little")
+    rom[0xBD]=(-sum(rom[0xA0:0xBD])-0x19)&255
     return bytes(rom)
 
 
@@ -127,6 +142,19 @@ class RealStructureAndAssetContracts(unittest.TestCase):
         self.assertTrue(any(i["instruction_bytes"]=="3e42" for i in code["instructions"]))
         self.assertFalse(code["bank_switched_code_decompiled"])
 
+    def test_gba_arm_entry_has_real_branch_and_no_false_thumb_coverage(self):
+        rom=synthetic_gba()
+        code=disassemble_gba_arm_entry(rom,limit=20)
+        self.assertTrue(code["header_checksum_verified"])
+        self.assertTrue(any(edge["to"]==0x080000C0 for edge in code["control_flow_edges"]))
+        self.assertTrue(any(row["mnemonic_family"]=="MOV" for row in code["instructions"]))
+        self.assertFalse(code["thumb_state_disassembled"])
+        self.assertLess(code["instructions_emitted"],20)
+        result=decompile_authorized_game(
+            rom,"author.gba",grant=grant(rom),authorize=lambda *_:True,
+        )
+        self.assertTrue(result.report["code_analysis"]["supported"])
+
     def test_cannot_guess_or_overread_candidate_tile_region(self):
         data=synthetic_gb()
         with self.assertRaises(ValueError):
@@ -168,6 +196,21 @@ class RealStructureAndAssetContracts(unittest.TestCase):
         self.assertEqual(result["resource_inventory"][0]["pixels"],4)
         self.assertFalse(result["scripts_executed"])
         self.assertFalse(result["raw_game_assets_exported"])
+
+    def test_zip_pcm_wav_measures_samples_without_exporting_audio(self):
+        pcm=io.BytesIO()
+        with wave.open(pcm,"wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(16000)
+            w.writeframes(bytes([0,0])*256)
+        zipped=io.BytesIO()
+        with zipfile.ZipFile(zipped,"w",zipfile.ZIP_DEFLATED) as z:
+            z.writestr("audio/original_synth.wav",pcm.getvalue())
+        report=analyze_zip_project(zipped.getvalue())
+        self.assertEqual(report["resource_inventory"][0]["resource_kind"],"measured_pcm_wav")
+        self.assertEqual(report["resource_inventory"][0]["sample_rate"],16000)
+        self.assertNotIn("pcm",report["resource_inventory"][0])
 
     def test_zip_traversal_and_case_collisions_are_rejected(self):
         for names in (["../evil.png"],["Pack.png","pack.png"],[".hidden/file"]):
@@ -249,6 +292,46 @@ class RightsAndEvidenceContracts(unittest.TestCase):
                 label_evidence_digest="b"*64,training_rights_digest="c"*64,
                 authorize=lambda:True,
             )
+
+
+class RuntimeNativeRGBContracts(unittest.TestCase):
+    def test_verified_native_frames_capture_real_spatial_and_temporal_evidence(self):
+        original=bytes([0,0,0])*64
+        modified=bytes([255,0,0])*64
+        source=synthetic_nrom()
+        f1={"width":8,"height":8,"pixel_sha256":digest(original),
+            "native_run_cursor":12}
+        f2={"width":8,"height":8,"pixel_sha256":digest(modified),
+            "native_run_cursor":13}
+        report=analyze_authorized_native_frames(
+            [(f1,original),(f2,modified)],
+            grant=grant(source),core_binary_sha256="c"*64,
+            authorize=lambda *_:True,
+        )
+        self.assertEqual(report["frames_measured"],2)
+        self.assertEqual(report["mean_temporal_rgb_change"],1/3)
+        self.assertEqual(report["frame_reports"][1]["delta_native_runs"],1)
+        self.assertEqual(report["native_frames_executed_by_this_analyzer"],0)
+        self.assertEqual(report["frame_reports"][0]["visual_features"]["tile_columns"],8)
+        self.assertFalse(report["production_model_weights_updated"])
+
+    def test_native_rgb_frame_tampering_and_unexecuted_visual_change_rejected(self):
+        source=synthetic_nrom()
+        rgba=bytes([1,2,3])*64
+        bad=bytes([1,2,4])*64
+        meta={"width":8,"height":8,"pixel_sha256":digest(rgba),
+              "native_run_cursor":17}
+        call=lambda rows:analyze_authorized_native_frames(
+            rows,grant=grant(source),core_binary_sha256="c"*64,
+            authorize=lambda *_:True,
+        )
+        with self.assertRaises(ValueError):
+            call([(meta,bad)])
+        with self.assertRaises(ValueError):
+            call([(meta,rgba),
+                  ({**meta,"pixel_sha256":digest(bad)},bad)])
+        with self.assertRaises(ValueError):
+            call([(meta,rgba),({**meta,"native_run_cursor":16},rgba)])
 
 
 class ShadowQualityTrainingContracts(unittest.TestCase):
