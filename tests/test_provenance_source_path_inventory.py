@@ -50,6 +50,18 @@ LIVE_EXAMPLES = (
 
 
 class SourcePathInventoryTests(unittest.TestCase):
+    def test_reviewed_conversational_data_remains_bounded_first_party(self) -> None:
+        for path in (
+            "data/conversational/10X_CONVERSATIONAL_REPORT.md",
+            "data/conversational/DOUBLE_CONVERSATIONAL_REPORT.md",
+            "data/conversational/MEGA_CONVERSATIONAL_CORPUS_10X2.txt",
+            "data/conversational/README.md",
+            "data/conversational/conversations_20k.jsonl",
+            "data/conversational/pareto_snippets_500k.txt",
+        ):
+            self.assertEqual(policy.classify_path(path), "first-party")
+        self.assertEqual(policy.classify_path("data/unreviewed/untrusted.txt"), "unknown")
+
     def test_java_accelerators_are_first_party_not_canonical(self) -> None:
         for path in (
             "java-accelerators/observability/AcceleratorMain.java",
