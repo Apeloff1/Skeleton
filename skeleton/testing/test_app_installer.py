@@ -279,4 +279,3 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
     assert env["FRONTEND_BUILD_TARGET"] == "production"
     assert env["FRONTEND_CONTAINER_PORT"] == "8080"
     assert env["NODE_ENV"] == "production"
-
