@@ -75,13 +75,8 @@ def _admitted_path(raw: str, size: int, sha: str) -> Path:
     return path
 
 
-def _manifest(path: Path) -> list[dict[str, Any]]:
-    source = json.loads(_read(path, MAX_MANIFEST_BYTES))
-    if not isinstance(source, dict) or set(source) != {"schema_version", "cases"}:
-        raise DiscAcceptanceError("disc first boot requires exact typed manifest root")
-    if source["schema_version"] != SCHEMA:
-        raise DiscAcceptanceError("unsupported approved disc media manifest schema")
-    cases = source["cases"]
+def _validate_cases(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Apply exactly the same case/rights bounds to CLI and programmatic calls."""
     if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
         raise DiscAcceptanceError("disc media case count outside finite 1..8 budget")
     identities = set()
@@ -126,6 +121,15 @@ def _manifest(path: Path) -> list[dict[str, Any]]:
             raise DiscAcceptanceError("duplicate native disc media case cannot inflate core readiness")
         identities.add(key)
     return cases
+
+
+def _manifest(path: Path) -> list[dict[str, Any]]:
+    source = json.loads(_read(path, MAX_MANIFEST_BYTES))
+    if not isinstance(source, dict) or set(source) != {"schema_version", "cases"}:
+        raise DiscAcceptanceError("disc first boot requires exact typed manifest root")
+    if source["schema_version"] != SCHEMA:
+        raise DiscAcceptanceError("unsupported approved disc media manifest schema")
+    return _validate_cases(source["cases"])
 
 
 def _prefix(path: Path, size: int, sha: str) -> bytes:
@@ -292,6 +296,7 @@ def run_matrix(cases: list[dict[str, Any]], *, rights_acknowledged: bool, timeou
         or type(timeout) not in (int, float) or not 0.1 <= timeout <= 30
     ):
         raise DiscAcceptanceError("explicit legal rights and bounded native media work are required")
+    cases = _validate_cases(cases)
     registry = GameEmulatorRegistry.from_environment()
     checked, passed = [], 0
     for case in cases:
