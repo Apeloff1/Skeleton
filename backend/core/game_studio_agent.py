@@ -1642,6 +1642,90 @@ async def _context(scope, row, project, binding):
     return result, dependencies
 
 
+def _original_stage_owner_schemas(schemas, context, *, workflow_stage=None):
+    """Narrow fresh original stages to current owner-supported identities."""
+    if not isinstance(workflow_stage, str) or not workflow_stage.startswith("original_"):
+        return schemas
+    result = dict(schemas)
+
+    def subset(operation, omitted=()):
+        source = result[operation]
+        if set(omitted).intersection(source.get("required", [])):
+            raise GameLearningError(
+                "studio_planner_schema_missing", "Original stage cannot omit a required owner field.", 409
+            )
+        shape = {
+            **source,
+            "properties": {
+                key: value for key, value in source.get("properties", {}).items() if key not in omitted
+            },
+            "required": list(source.get("required", [])),
+        }
+        result[operation] = shape
+        return shape
+
+    def bind_identity(operation, field, identities):
+        identities = list(identities)
+        if not identities or any(
+            not isinstance(value, str) or not value or len(value) > 128 for value in identities
+        ):
+            raise GameLearningError(
+                "studio_planner_identity_unavailable",
+                "This stage requires an actual current issued identity.",
+                409,
+            )
+        identities = sorted(set(identities))
+        shape = subset(operation)
+        shape["properties"][field] = {**shape["properties"][field], "enum": identities}
+
+    if workflow_stage == "original_simulate":
+        shape = subset(
+            "simulate", ("source_id", "session_id", "expected_session_version", "reset", "action", "actions")
+        )
+        steps = shape["properties"]["steps"]
+        if "anyOf" in steps:
+            non_null = [item for item in steps["anyOf"] if item.get("type") != "null"]
+            if len(non_null) != 1:
+                raise GameLearningError(
+                    "studio_planner_schema_missing",
+                    "Positive simulation steps need one bounded owner form.",
+                    409,
+                )
+            steps = non_null[0]
+        if (
+            steps.get("type") != "integer"
+            or steps.get("minimum", 0) < 1
+            or not isinstance(steps.get("maximum"), int)
+        ):
+            raise GameLearningError(
+                "studio_planner_schema_missing",
+                "Positive simulation steps need finite positive owner bounds.",
+                409,
+            )
+        shape["properties"]["steps"] = steps
+        if "steps" not in shape["required"]:
+            shape["required"].append("steps")
+    elif workflow_stage == "original_review":
+        subset("project.review", ("source_id", "policy_id", "baseline_review_job_id", "actions"))
+    elif workflow_stage == "original_package":
+        subset("desktop.build", ("timeout_seconds",))
+        supported = set(schemas["desktop.build"]["properties"]["target_id"]["enum"])
+        ready = [
+            item["target_id"]
+            for item in context.get("original_project", {}).get("desktop_targets", [])
+            if item.get("binary_build_available") is True and item.get("target_id") in supported
+        ]
+        bind_identity("desktop.build", "target_id", ready)
+    elif workflow_stage == "original_adopt":
+        candidate = context.get("original_project", {}).get("candidate", {}).get("candidate_id")
+        for operation in ("successor.adopt", "successor.inspect"):
+            bind_identity(operation, "candidate_id", [candidate])
+    elif workflow_stage.startswith("original_export"):
+        artifacts = context.get("completion", {}).get("checks", {}).get("package", {}).get("artifacts", [])
+        bind_identity("artifact.export", "artifact_id", [item["artifact_id"] for item in artifacts])
+    return result
+
+
 async def _prepare(scope, row, token):
     project, binding = await _current(scope, row)
     allowed = READ | WORK | CONTROL | (EDIT if row["allow_edits"] else frozenset())
@@ -1694,6 +1778,9 @@ async def _prepare(scope, row, token):
     allowed = allowed & frozenset(schemas)
     context, dependencies = await _context(scope, row, project, binding)
     allowed, workflow = _workflow_stage(row, context, allowed)
+    schemas = _original_stage_owner_schemas(
+        schemas, context, workflow_stage=workflow.get("stage") if workflow else None
+    )
     prompt = json.dumps(
         {
             "goal": row["goal"],
@@ -3454,6 +3541,7 @@ async def _next_workflow_action(scope, row, token):
 
 def _planner_payload_schemas(schemas, allowed, context, *, workflow_stage=None):
     """Translate existing owner forms; no values/actions are fabricated here."""
+    schemas = _original_stage_owner_schemas(schemas, context, workflow_stage=workflow_stage)
     result = {}
     for operation in sorted(allowed):
         source = schemas[operation]
@@ -3525,7 +3613,18 @@ def _planner_payload_schemas(schemas, allowed, context, *, workflow_stage=None):
         for field in supplied:
             properties.pop(field, None)
         payload["required"] = [name for name in payload.get("required", []) if name not in supplied]
-        for field in _REF_FIELDS.intersection(properties):
+        bound_fields = (
+            {"candidate_id"}
+            if workflow_stage == "original_adopt" and operation in {"successor.adopt", "successor.inspect"}
+            else (
+                {"artifact_id"}
+                if isinstance(workflow_stage, str)
+                and workflow_stage.startswith("original_export")
+                and operation == "artifact.export"
+                else set()
+            )
+        )
+        for field in _REF_FIELDS.intersection(properties) - bound_fields:
             # The existing resolver handles only these exact top-level fields.
             properties[field] = {
                 "anyOf": [
@@ -3561,31 +3660,6 @@ def _planner_payload_schemas(schemas, allowed, context, *, workflow_stage=None):
                 and all(c in "0123456789abcdef" for c in manifest)
             ):
                 properties["expected_manifest_digest"]["enum"] = [manifest]
-        elif operation == "simulate" and workflow_stage == "original_simulate":
-            steps = properties["steps"]
-            if "anyOf" in steps:
-                non_null = [item for item in steps["anyOf"] if item.get("type") != "null"]
-                if len(non_null) != 1:
-                    raise GameLearningError(
-                        "studio_planner_schema_missing",
-                        "Positive simulation steps need one bounded owner form.",
-                        409,
-                    )
-                steps = non_null[0]
-            if (
-                steps.get("type") != "integer"
-                or steps.get("minimum", 0) < 1
-                or not isinstance(steps.get("maximum"), int)
-            ):
-                raise GameLearningError(
-                    "studio_planner_schema_missing",
-                    "Positive simulation steps need finite positive owner bounds.",
-                    409,
-                )
-            properties["steps"] = steps
-            properties.pop("action", None)
-            properties.pop("actions", None)
-            payload["required"] = [*payload.get("required", []), "steps"]
         elif operation == "world.edit":
             spec_digest = context.get("successor_spec_digest")
             if (
