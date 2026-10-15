@@ -30,6 +30,9 @@ python -m skeleton app status --live
 # Validate the repository-wide application assembly
 python -m skeleton app check
 
+# Before any release compilation: validate canonical contracts without building
+make precompile
+
 # Later launches retain the existing private .env and durable Docker volumes:
 python -m skeleton app up
 

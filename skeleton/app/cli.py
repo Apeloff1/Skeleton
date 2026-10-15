@@ -250,6 +250,19 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
     arguments = list(argv or ())
+    # The same pinned Jeeves candidate optimizer owns multidomain specialization.
+    if arguments and arguments[0] == "training-modules":
+        from skeleton.ai.training.jeeves_parallel_mirrors import main as training_main
+        return training_main(arguments[1:])
+    if arguments and arguments[0] == "cinematic-sim":
+        from skeleton.ai.training.jeeves_cinematic_simulation import main as cinema_main
+        return cinema_main(arguments[1:])
+    if arguments and arguments[0] == "adaptive-sim":
+        from skeleton.ai.training.jeeves_adaptive_sim_training import main as adaptive_main
+        return adaptive_main(arguments[1:])
+    if arguments and arguments[0] == "boomerang-queue":
+        from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
+        return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main

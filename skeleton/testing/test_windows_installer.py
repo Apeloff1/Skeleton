@@ -119,6 +119,20 @@ def test_windows_build_is_pinned_and_hashes_installer():
     source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
 
     assert '"pyinstaller==6.22.3"' in source
+    assert '"pydantic>=2.14.0,<3"' in source
+    assert '"pydantic-settings>=2.15.0,<3"' in source
+    assert 'Join-Path $PayloadDir "packaging\\windows\\launcher_entry.py"' in source
+    assert 'Join-Path $PayloadDir "packaging\\windows\\offline_cli_entry.py"' in source
+    assert 'Join-Path $PayloadDir "packaging\\windows\\SkeletonSetup.iss"' in source
+    assert '"--paths", $PayloadDir' in source
+    assert "Push-Location -LiteralPath $PayloadDir" in source
+    assert "Pop-Location" in source
+    assert '$env:PYTHONPATH = $PayloadDir' in source
+    assert '$env:PYTHONPATH = $PreviousPythonPath' in source
+    assert '"machine/manifest.json"' in source
+    assert "Installer version does not match archived SourceRef" in source
+    assert "& subst $ShortDrive /D | Out-Null" in source
+    assert '"--paths", $RepoRoot' not in source
     assert "$RuntimePaths = @(" in source
     assert '"backend"' in source
     assert '"frontend"' in source
@@ -128,6 +142,9 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "$MaxRuntimeRelativePathChars = 190" in source
     assert "$PathBudgetViolations" in source
     assert "& git @ArchiveArgs" in source
+    assert 'git -C $RepoRoot show "$($SourceRef):skeleton/app/manifest.json"' in source
+    assert '$RuntimePaths = @($RuntimePaths | Select-Object -Unique)' in source
+    assert 'Windows payload missing required assembly path' in source
     assert "Get-FileHash -Algorithm SHA256" in source
     assert "Skeleton-Setup-*-windows-x64.exe" in source
     assert "ISCC.exe" in source
@@ -156,6 +173,15 @@ def test_windows_runtime_payload_respects_portable_path_budget():
         text=True,
     )
     tracked_paths = [line.strip().replace("\\", "/") for line in completed.stdout.splitlines()]
+    # Assembly-required paths are archived even when outside the primary
+    # runtime roots. The same portability budget applies to those files.
+    import json
+
+    required = json.loads(
+        Path("skeleton/app/manifest.json").read_text(encoding="utf-8")
+    )["required_paths"]
+    tracked_paths.extend(required)
+    tracked_paths.append("machine/manifest.json")
     violations: list[tuple[int, str]] = []
 
     for relative in tracked_paths:
@@ -181,7 +207,8 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
 
     assert "runs-on: windows-latest" in source
-    assert 'PYTHON_VERSION: "3.14.7"' in source
+    assert 'PYTHON_VERSION: "3.11"' in source
+    assert '"pydantic>=2.14.0,<3"' in source
     assert "JRSoftware.InnoSetup.7" in source
     assert "--version 7.1.0" in source
     assert "core.longpaths true" in source
@@ -196,6 +223,67 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in source
     assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
+
+def test_windows_installer_packages_jeeves_curriculum_and_mirror_routes():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    builder = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    assert "/machine/jeeves_training_modules.json" in workflow
+    assert "test_jeeves_multidomain.py" in workflow
+    assert 'ArgumentList @("--training-modules")' in workflow
+    assert '"Jeeves Training Modules", self.inspect_jeeves_modules' in launcher
+    assert "No model weights were trained or promoted by this check." in launcher
+    assert '"skeleton.ai.training.jeeves_parallel_mirrors"' in builder
+    assert '"skeleton.ai.training.jeeves_multidomain"' in builder
+
+def test_windows_bundle_includes_cutscene_multi_sim_and_review_runtime():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    builder = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    assert "test_jeeves_cinematic_simulation.py" in workflow
+    assert '"--cinematic-sim", "--help"' in workflow
+    assert '"Cutscene Multi-Sim", self.run_cutscene_sim' in launcher
+    assert "args.cinematic_sim" not in launcher
+    assert '"skeleton.ai.training.jeeves_cinematic_simulation"' in builder
+
+def test_installed_adaptive_scenario_training_is_packaged_without_auto_training():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    app = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    builder = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    assert "test_jeeves_adaptive_sim_training.py" in workflow
+    assert '"--adaptive-sim", "--help"' in workflow
+    assert '"Adaptive Simulation", self.run_adaptive_sim' in app
+    assert '"skeleton.ai.training.jeeves_adaptive_sim_training"' in builder
+    assert '"source-bound rehearsals"' not in app.lower()
+
+def test_windows_capacity_growth_is_opt_in_candidate_only():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    installer = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    trainer = Path("skeleton/ai/training/jeeves_production_game_train.py").read_text(encoding="utf-8")
+    assert "test_jeeves_capacity_growth.py" in workflow
+    assert '"skeleton.ai.training.jeeves_capacity_growth"' in installer
+    assert '"--capacity-growth"' in trainer
+    assert '"--max-added-parameters"' in trainer
+    assert "candidate_promoted" in trainer
+
+def test_windows_packages_capability_replay_and_attested_parameter_training():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    installer = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    trainer = Path("skeleton/ai/training/jeeves_production_game_train.py").read_text(encoding="utf-8")
+    assert "test_jeeves_capability_replay.py" in workflow
+    assert '"skeleton.ai.training.jeeves_capability_replay"' in installer
+    assert '"--adaptive-replay"' in trainer
+    assert '"--max-scored-examples"' in trainer
+
+def test_installed_boomerang_sim_queue_is_source_pinned_and_review_only():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    packager = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    assert "test_jeeves_boomerang_queue.py" in workflow
+    assert '"--boomerang-queue", "--help"' in workflow
+    assert '"Boomerang Sim Queue", self.run_boomerang_queue' in launcher
+    assert '"skeleton.ai.training.jeeves_boomerang_queue"' in packager
+    assert "candidate evidence only" in launcher
 
 
 def test_windows_payload_covers_manifest_and_docker_copy_inputs():

@@ -90,7 +90,7 @@
         "backend/Dockerfile": {
           "context_ignore": "backend/Dockerfile.dockerignore",
           "layout": "backend_runtime_source",
-          "rule": "Same deny-all context; named runtime-source stage flattens backend and moves the canonical skeleton, machine and docs directories into /runtime before owned final runtime COPY."
+          "rule": "Same deny-all context; named runtime-source stage flattens backend and moves the canonical skeleton, machine, docs and scripts directories into /runtime before owned final runtime COPY."
         }
       }
     }

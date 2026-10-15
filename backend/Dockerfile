@@ -36,7 +36,7 @@ FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d75060
 WORKDIR /source
 COPY . .
 RUN mv backend /runtime \
-    && mv skeleton machine docs /runtime/
+    && mv skeleton machine docs scripts /runtime/
 
 # Stage 2: Production
 FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72 AS production

@@ -573,7 +573,7 @@ def _bundled_materialization_errors(
         expected = [
             "WORKDIR /source",
             "COPY . .",
-            "RUN mv backend /runtime && mv skeleton machine docs /runtime/",
+            "RUN mv backend /runtime && mv skeleton machine docs scripts /runtime/",
         ]
         if stage < 0 or instructions[stage + 1 : stage + 4] != expected:
             errors.append("backend source bundle flattening stage is not the declared layout")

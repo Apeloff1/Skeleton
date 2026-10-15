@@ -16,6 +16,9 @@
 !machine/ai_closure_evidence.json
 !machine/enterprise_ai_superiority.json
 !machine/enterprise_ai_implementation_notes_index.json
+!machine/jeeves_training_modules.json
+!scripts/
+!scripts/check_jeeves_training_modules.py
 !docs/
 !docs/AI_APP_CONSTRUCTION_MANUAL.md
 **/__pycache__/
