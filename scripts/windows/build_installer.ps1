@@ -100,8 +100,8 @@ if ($LASTEXITCODE -ne 0) {
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
 
 foreach ($RequiredPath in $SourceManifest.required_paths) {
-    $StagedPath = Join-Path $PayloadDir ($RequiredPath -replace '/', '\')
-    if (-not (Test-Path -LiteralPath $StagedPath)) {
+    $StagedPath = Join-Path $PayloadDir $RequiredPath
+    if (-not (Test-Path -LiteralPath $StagedPath -PathType Leaf)) {
         throw "Windows payload missing required assembly path: $RequiredPath"
     }
 }
