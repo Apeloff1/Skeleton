@@ -21,7 +21,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from core.model_catalog import model_catalog
+from core.chat_attachments import ChatAttachmentError, resolve_attachment_context
+from core.model_catalog import (
+    ModelSelectionError, model_catalog, resolve_selection, context_budget_for_selection,
+)
 from core.chat_turn_lifecycle import ChatTurnLifecycle
 from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
@@ -43,7 +46,7 @@ from skeleton.contracts.context import (
     ContextTrust,
 )
 from skeleton.contracts.conversation import ConversationAuthorType, ConversationMessage
-from skeleton.context.compiler import ContextCompiler
+from skeleton.context.compiler import ContextCompiler, ContextCompilationError
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
 from skeleton.ai.assistant.live_evidence import bind_provider_receipt_set
@@ -265,6 +268,8 @@ class AIChatMemoryPolicy(BaseModel):
 
 
 class AIChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str = Field(..., min_length=1, max_length=100_000, description="User message")
     thread_id: str = Field(..., min_length=1, max_length=64, description="Canonical conversation thread")
     idempotency_key: str = Field(..., min_length=1, max_length=1024, description="Stable client message identity")
@@ -282,6 +287,11 @@ class AIChatRequest(BaseModel):
             "result into canonical long-term memory."
         ),
     )
+    attachment_refs: tuple[str, ...] = Field(default=(), max_length=4)
+    provider_id: str | None = Field(default=None, min_length=1, max_length=128)
+    model_id: str | None = Field(default=None, min_length=1, max_length=256)
+    max_output_tokens: int | None = Field(default=None, ge=1, le=1000000)
+    temperature: float | None = Field(default=None, ge=0, le=2)
     response_mode: Literal["wait", "deferred"] = Field(
         default="wait",
         description=(
@@ -382,6 +392,11 @@ def _chat_request_digest(request: AIChatRequest) -> str:
         "idempotency_key": request.idempotency_key,
         "context_sha256": context_digest,
         "memory_policy": memory_policy,
+        "attachment_refs": list(request.attachment_refs),
+        "provider_id": request.provider_id,
+        "model_id": request.model_id,
+        "max_output_tokens": request.max_output_tokens,
+        "temperature": request.temperature,
     }
     encoded = json.dumps(
         payload,
@@ -416,6 +431,8 @@ def _chat_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail=str(exc))
     if isinstance(exc, ConversationStorageUnavailable):
         return HTTPException(status_code=503, detail="Conversation storage is unavailable")
+    if isinstance(exc, ChatAttachmentError):
+        return HTTPException(status_code=exc.status_code, detail=str(exc))
     if isinstance(exc, ChatTurnNotFound):
         return HTTPException(status_code=404, detail="Chat turn not found")
     if isinstance(exc, (ChatTurnConflict, ChatTurnCorruption)):
@@ -564,8 +581,7 @@ def _compile_chat_context(
             )
         )
 
-    # Derived Dragon snapshots are strictly untrusted and filtered through
-    # the canonical context compiler; they never become system instructions.
+    # Derived Dragon snapshots remain untrusted inputs to the canonical compiler.
     segments.extend(dragon_segments)
     segments.extend(attachment_segments)
     return ContextCompiler().compile(
@@ -1100,17 +1116,86 @@ async def ai_chat(
         )
 
     tenant_id, owner_id = _chat_identity(user)
+    try:
+        # Replay of an already committed assistant answer requires only durable
+        # conversation state, never a currently configured inference provider.
+        # Check the exact prior request digest to prevent a reused key from
+        # returning a different prompt's assistant answer.
+        existing_transcript = await conversation_authority.active_transcript(
+            request.thread_id, tenant_id=tenant_id, owner_id=owner_id,
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+    existing_turn_user, existing_turn_assistant = _chat_turn_messages(
+        existing_transcript, request.idempotency_key,
+    )
+    if existing_turn_assistant is not None:
+        if (
+            existing_turn_user is None
+            or _chat_request_identity_ref(request)
+            not in existing_turn_user.attachment_refs
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Saved chat request identity does not match this replay",
+            )
+        return await get_ai_chat_turn(
+            request.thread_id, idempotency_key=request.idempotency_key, user=user,
+        )
+
+    selected_model = None
+    selected_budget = CHAT_CONTEXT_BUDGET
+    # Validate requested execution semantics BEFORE committing any user message.
+    # A missing engine or a non-selectable model is never silently replaced by
+    # whichever provider happens to be configured as the default.
+    explicit_options = any(value is not None for value in (
+        request.provider_id, request.model_id,
+        request.max_output_tokens, request.temperature,
+    ))
+    if (request.provider_id is None) != (request.model_id is None):
+        raise HTTPException(status_code=422, detail="Select both provider and model")
+    if len(set(request.attachment_refs)) != len(request.attachment_refs):
+        raise HTTPException(status_code=422, detail="Duplicate attachment references")
+    # All governed chat turns require the canonical engine, including the
+    # automatic model route. Reject before persisting a user message when
+    # admission cannot possibly succeed. The compatibility call_llm facade
+    # also requires this exact engine and cannot rescue an unconfigured turn.
+    try:
+        configured_engine = EngineClient.from_env()
+    except EngineClientError as exc:
+        raise HTTPException(status_code=503, detail="AI engine configuration is unavailable") from exc
+    if configured_engine is None:
+        raise HTTPException(status_code=503, detail="A configured AI engine is required")
+    if explicit_options or request.attachment_refs:
+        if explicit_options:
+            inventory = await model_catalog(
+                configured_engine, actor_id=owner_id, tenant_id=tenant_id,
+            )
+            try:
+                selected_model = resolve_selection(
+                    inventory, provider_id=request.provider_id, model_id=request.model_id,
+                )
+                if request.temperature is not None and not selected_model["supports_temperature"]:
+                    raise ModelSelectionError("model_temperature_unsupported")
+                selected_budget = context_budget_for_selection(
+                    selected_model, output_tokens=request.max_output_tokens,
+                )
+            except ModelSelectionError as exc:
+                raise HTTPException(
+                    status_code=exc.status_code,
+                    detail={"code": exc.code, "message": str(exc)},
+                ) from exc
+        if request.attachment_refs:
+            try:
+                await resolve_attachment_context(
+                    thread_id=request.thread_id, tenant_id=tenant_id,
+                    owner_id=owner_id, attachment_refs=request.attachment_refs,
+                    created_at=datetime.now(timezone.utc),
+                )
+            except ChatAttachmentError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     retrying_incomplete_turn = False
     try:
-        existing_transcript = await conversation_authority.active_transcript(
-            request.thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-        existing_turn_user, existing_turn_assistant = _chat_turn_messages(
-            existing_transcript,
-            request.idempotency_key,
-        )
         if (
             existing_transcript
             and existing_transcript[-1].author_type
@@ -1135,7 +1220,7 @@ async def ai_chat(
                 + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
             )
         context_refs.append(_chat_request_identity_ref(request))
-        context_attachment_refs = tuple(context_refs)
+        context_attachment_refs = tuple((*context_refs, *request.attachment_refs))
 
         # Preserve the canonical active lineage for every replay of an existing
         # turn, whether the assistant already committed or the turn is still
@@ -1260,17 +1345,63 @@ async def ai_chat(
         () if dragon_context_reader is None
         else await dragon_context_reader(thread, request.message)
     )
-    context_envelope = _compile_chat_context(
-        thread=thread,
-        transcript=transcript,
-        user_message=user_message,
-        tenant_id=tenant_id,
-        operation_id=operation_id,
-        execution_id=execution_id,
-        request_context=request.context,
-        budget=dragon_context_budget(CHAT_CONTEXT_BUDGET),
-        dragon_segments=dragon_segments,
-    )
+    try:
+        admitted_files = await resolve_attachment_context(
+            thread_id=request.thread_id, tenant_id=tenant_id, owner_id=owner_id,
+            attachment_refs=request.attachment_refs, created_at=user_message.created_at,
+        ) if request.attachment_refs else None
+        context_envelope = _compile_chat_context(
+            thread=thread,
+            transcript=transcript,
+            user_message=user_message,
+            tenant_id=tenant_id,
+            operation_id=operation_id,
+            execution_id=execution_id,
+            request_context=request.context,
+            budget=dragon_context_budget(selected_budget),
+            attachment_segments=() if admitted_files is None else admitted_files.segments,
+            dragon_segments=dragon_segments,
+        )
+        # Source material is not admitted merely because a URI was accepted.
+        # Every attachment must survive the actual budgeted compiler selection.
+        if admitted_files is not None:
+            included = {
+                segment.segment_id for segment in context_envelope.selected_segments
+            }
+            if any(segment.segment_id not in included for segment in admitted_files.segments):
+                raise ChatAttachmentError(
+                    "Attachment text does not fit the selected model context", 413
+                )
+    except (ChatAttachmentError, ContextCompilationError) as exc:
+        # The user message already committed. Fail the durable turn and append
+        # a canonical closure marker so subsequent requests are not blocked
+        # behind a permanently incomplete context-compilation state.
+        source_failure = isinstance(exc, ChatAttachmentError)
+        code = ("attachment_context_unavailable" if source_failure
+                else "context_compilation_failed")
+        try:
+            await chat_turn_lifecycle.fail(
+                chat_turn, tenant_id=tenant_id, owner_id=owner_id,
+                reason_code=code,
+            )
+            current_thread = await conversation_authority.get_thread(
+                request.thread_id, tenant_id=tenant_id, owner_id=owner_id,
+            )
+            await _commit_chat_terminal_marker(
+                thread=current_thread, user_message=user_message,
+                tenant_id=tenant_id, owner_id=owner_id,
+                operation_id=operation_id, execution_id=execution_id,
+                terminal_state="failed", failure_code=code,
+            )
+        except Exception:
+            logger.exception(
+                "failed to close rejected compiled turn operation=%s", operation_id
+            )
+        raise HTTPException(
+            status_code=exc.status_code if source_failure else 422,
+            detail=str(exc) if source_failure else
+                   "Canonical context cannot be compiled within the model limits",
+        ) from exc
     try:
         chat_turn = await chat_turn_lifecycle.advance(
             chat_turn,
@@ -1423,10 +1554,21 @@ async def ai_chat(
                     max_model_turns=4,
                     max_tool_calls=1,
                     max_repeat_tool_batches=1,
+                    max_output_tokens=(
+                        None if selected_model is None else selected_budget.reserved_output_tokens
+                    ),
+                    provider_id=(
+                        None if selected_model is None else selected_model["selection_provider_id"]
+                    ),
+                    model_id=(
+                        None if selected_model is None else selected_model["selection_model_id"]
+                    ),
+                    temperature=request.temperature,
                     context_seed_refs=(
                         "conversation:" + thread.thread_id,
                         "conversation-message:" + user_message.message_id,
                         *context_attachment_refs,
+                        *(admitted_files.identity_refs if admitted_files is not None else ()),
                     ),
                     memory_write_intent=memory_write_intent,
                 )
