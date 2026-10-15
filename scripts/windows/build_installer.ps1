@@ -185,12 +185,17 @@ if ($MissingPayloadPaths.Count -gt 0) {
 # paths. This is checked before compilation so path regressions fail cheaply
 # and with the exact offending relative path.
 $MaxRuntimeRelativePathChars = 190
+$MaxRuntimeDefaultInstallChars = 240
+# Model a reasonably long local profile name; SUBST shortens the build only.
+$DefaultInstallRoot = "C:\\Users\\" + ("x" * 32) + "\\AppData\\Local\\Programs\\Skeleton"
 $PathBudgetViolations = @(
     Get-ChildItem -LiteralPath $PayloadDir -File -Recurse | ForEach-Object {
         $relative = [IO.Path]::GetRelativePath($PayloadDir, $_.FullName)
-        if ($relative.Length -gt $MaxRuntimeRelativePathChars) {
+        if ($relative.Length -gt $MaxRuntimeRelativePathChars -or
+            (Join-Path $DefaultInstallRoot $relative).Length -gt $MaxRuntimeDefaultInstallChars) {
             [PSCustomObject]@{
                 Length = $relative.Length
+                AbsoluteLength = (Join-Path $DefaultInstallRoot $relative).Length
                 Path = $relative
             }
         }
@@ -203,7 +208,7 @@ if ($PathBudgetViolations.Count -gt 0) {
         Format-Table -AutoSize |
         Out-String |
         Write-Host
-    throw "Runtime payload contains paths longer than $MaxRuntimeRelativePathChars characters"
+    throw "Runtime payload exceeds relative ($MaxRuntimeRelativePathChars) or installed ($MaxRuntimeDefaultInstallChars) path budget"
 }
 
 Write-Host "==> Building standalone Skeleton.exe"
