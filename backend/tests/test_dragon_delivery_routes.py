@@ -72,6 +72,7 @@ def test_end_to_end_authenticated_brief_generation_archive_and_retry(configured)
     assert created.status_code==200,created.text
     result=created.json()
     assert result['delivery_state']=='source_generated'
+    assert result['plan_digest']==body['plan_digest'] and result['gameplay_verified'] is False
     assert result['resource_execution']['done'] and result['compiled'] is False
     attempt=result['created_native']['attempt_id']
     charged=pool.executor(owner).governor.artifact_bytes
@@ -156,6 +157,8 @@ def test_project_synthesis_recovery_after_projection_failure(configured,monkeypa
     findings=client.get('/api/dragon-academy/delivery/almanacs/'+topic+'/learning')
     assert findings.status_code==200,findings.text
     rows=findings.json()['findings'];assert len(rows)==1
+    assert rows[0]['epistemic_state']=='unreviewed'
+    assert rows[0]['memory_promotion_authorized'] is False and rows[0]['training_authorized'] is False
     assert rows[0]['kind']=='source_synthesis'
     assert rows[0]['current_source_lineage'] and not rows[0]['empirical_truth_established']
     assert rows[0]['memory_promotion_authorized'] is False
