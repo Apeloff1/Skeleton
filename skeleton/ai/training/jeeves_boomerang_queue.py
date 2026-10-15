@@ -119,11 +119,11 @@ def _load_source(entry: dict) -> tuple[dict, dict]:
     src = entry["source"]
     path = Path(src["scene_file"])
     archive_path = Path(src["campaign_file"])
+    scene = _checked_file(path, 128 * 1024)
+    archive = _checked_file(archive_path, 16 * 1024 * 1024)
     _require(sha256(path.read_bytes()).hexdigest() == src["scene_sha256"]
              and sha256(archive_path.read_bytes()).hexdigest() == src["campaign_sha256"],
              "archived files changed after queue admission")
-    scene = _checked_file(path, 128 * 1024)
-    archive = _checked_file(archive_path, 16 * 1024 * 1024)
     original = _source_record(path, archive_path)
     _require(original["queue_id"] == entry["queue_id"] and
              original["source"] == src and
@@ -189,7 +189,14 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
                          "duplicate scenario, source splice or reverse audit failure")
                 seen.add(case["scenario_id"])
         if verify_sources:
-            _load_source(entry)
+            _scene, source_archive = _load_source(entry)
+            _require(entry["initial_case_count"] == source_archive["budget_requested"] and
+                     entry["initial_risk_families"] == source_archive["risk_families_observed"] and
+                     entry["initial_scenario_ids"] == sorted({
+                        row["scenario"]["scenario_id"] for row in source_archive["cases"]}) and
+                     entry["initial_trace_count"] ==
+                     source_archive["unique_controlled_trace_digests"],
+                     "archived original counters changed in queue entry")
     _require(queue["source_projects"] == sorted({
         e["source"]["project_id"] for e in queue["entries"]}),
         "source-project groups changed")
@@ -239,6 +246,9 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
     previous = _previous_rows(entry, archive)
     old_ids = {row["scenario"]["scenario_id"] for row in previous}
     old_families = set(archive["risk_families_observed"])
+    for old_pass in entry["passes"]:
+        for row in old_pass["results"]:
+            old_families.update(row["risk_counts"])
     old_risk_signatures = {
         _hash({"family": risk, "control": row["scenario"],
                "trace": row["trace_digest"]})
@@ -302,7 +312,8 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
             })
     # A new parametrization need not be a new *camera* trace (environment proxy
     # changes alone can leave the camera unchanged). Count these separately.
-    old_traces = {row["trace_digest"] for row in previous}
+    old_traces = {archive["baseline"]["trace_digest"]}
+    old_traces.update(row["trace_digest"] for row in previous)
     new_traces = {row["trace_digest"] for row in results} - old_traces
     batch = {
         "schema_version": "skeleton.jeeves.boomerang_pass.v1",
@@ -313,7 +324,8 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
         "reverse_observations": sum(row["frames_executed"] for row in results),
         "novel_failure_families": sorted(new_families),
         "novel_family_count": len(new_families),
-        "novel_risk_signatures": len(new_signatures),
+        "novel_control_context_risk_signatures": len(new_signatures),
+        "risk_signatures_not_independent_training_proof": True,
         "new_camera_trace_digests": len(new_traces),
         "comparisons": comparisons, "results": results,
         "source_project_id": entry["source"]["project_id"],
@@ -323,6 +335,9 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
         "actual_optimizer_updates": 0,
         "independent_game_design_quality_proven": False,
     }
+    # Keep historic pass receipts within bounded queue storage.
+    _require(len(_json(batch)) <= MAX_QUEUE_BYTES // MAX_REVISITS,
+             "boomerang pass artifact exceeds durable queue quota")
     batch["pass_sha256"] = _hash(batch)
     return batch
 
@@ -349,7 +364,11 @@ def advance_queue(queue: dict, *, max_entries: int = 1, probes: int = 8,
                                next_entry["revisits_completed"] == 1 else "complete")
     updated["parent_queue_sha256"] = queue["queue_sha256"]
     updated["generation"] += 1
-    return _receipt({k: v for k, v in updated.items() if k != "queue_sha256"})
+    output = _receipt({k: v for k, v in updated.items() if k != "queue_sha256"})
+    _require(len(_json(output)) <= MAX_QUEUE_BYTES,
+             "queue snapshot exceeds durable bounded artifact size")
+    verify_queue(output)
+    return output
 
 
 def retraining_review_drafts(queue: dict) -> tuple[dict, ...]:
