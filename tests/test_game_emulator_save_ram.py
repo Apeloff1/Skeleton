@@ -10,6 +10,7 @@ import hashlib
 import threading
 import unittest
 from types import SimpleNamespace
+from dataclasses import dataclass
 
 from skeleton.jeeves.game_emulator_host import EmulatorEnvironment, EmulatorHostError
 from skeleton.jeeves.game_emulator_worker import MAX_SAVE_RAM, NativeCore
@@ -33,6 +34,11 @@ def worker(data=b"initial-user-save"):
     return obj
 
 
+@dataclass(frozen=True)
+class FakeSpec:
+    environment_digest: str
+
+
 def empty_host(data=b"initial-user-save"):
     obj = EmulatorEnvironment.__new__(EmulatorEnvironment)
     obj._lock = threading.RLock()
@@ -43,7 +49,7 @@ def empty_host(data=b"initial-user-save"):
         "content_digest": "b" * 64, "firmware_digest": "c" * 64,
         "registry_digest": "d" * 64,
     }
-    obj.spec = SimpleNamespace(environment_digest="e" * 64)
+    obj.spec = FakeSpec(environment_digest="e" * 64)
     obj.close = lambda: None
     obj.native = worker(data)
     obj._exchange = lambda operation, payload, blocks=None: obj.native.command(
