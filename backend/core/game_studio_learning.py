@@ -2104,3 +2104,92 @@ async def _policy_dependencies(scope, row):
     return list({_digest(ref): ref for ref in sources}.values()), list(
         {_digest(ref): ref for ref in teachers}.values()
     )
+
+
+# Read-only spectator simulations are never a write path to training state.
+# This limits backend fan-out even when several users watch the same campaign.
+_scenario_spectator_slots = asyncio.Semaphore(2)
+
+
+async def scenario_mirror_views(scope, identifier, *, lanes=4, steps=12, sample=0):
+    """Owner-authorized, bounded parallel replay telemetry while campaigns train."""
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+    from skeleton.jeeves.game_studio_environment import parse_studio_source
+    from skeleton.jeeves.game_studio_scenario_lab import ANGLES, mirrored_simulations
+
+    if (type(lanes) is not int or not 1 <= lanes <= 6
+            or type(steps) is not int or not 1 <= steps <= 24
+            or type(sample) is not int or not 0 <= sample <= 255):
+        raise GameLearningError("spectator_bounds", "Bounded spectator controls required.", 422)
+    row = await _read(scope, identifier)
+    latest = (row.get("snapshot") or {}).get("champion_request")
+    executable = GameEnvironmentRequest.from_dict(latest or row["environment_request"])
+    if executable.kind != "studio" or executable.target_id != row["environment_request"]["target_id"]:
+        raise GameLearningError("spectator_engine", "Only original-engine studio campaigns have mirrored reference telemetry.", 409)
+    source = parse_studio_source(__import__("json").loads(executable.tree["game/studio/session.json"]))
+    # Sampling advances spectator seeds only, not campaign/training RNG or rows.
+    seed = ((row["config"]["seed"] + row["cursor"] * 257 + sample * 7)
+            % (2**31 - 16))
+    async with _scenario_spectator_slots:
+        result = await asyncio.to_thread(
+            mirrored_simulations, source,
+            seed=seed, steps=steps, angles=ANGLES[:lanes], workers=min(4,lanes),
+        )
+    return {
+        **result, "campaign_id": identifier, "campaign_cursor": row["cursor"],
+        "campaign_status": row["status"], "sample":sample,
+        "spectator_only":True,
+        "frames_show_training_episodes":False,
+        "native_gameplay_rendering_claimed":False,
+    }
+
+
+async def scenario_drafts(scope, identifier, *, limit=4):
+    """Draft original possible scenarios from actual committed campaign signals."""
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+    from skeleton.jeeves.game_studio_environment import parse_studio_source
+    from skeleton.jeeves.game_studio_scenario_lab import propose_scenarios
+
+    if type(limit) is not int or not 1 <= limit <= 5:
+        raise GameLearningError("scenario_bounds", "Scenario draft limit outside bounds.", 422)
+    row = await _read(scope, identifier)
+    req = GameEnvironmentRequest.from_dict(
+        (row.get("snapshot") or {}).get("champion_request") or row["environment_request"]
+    )
+    if req.kind != "studio":
+        raise GameLearningError("scenario_engine", "This campaign does not run an original studio engine.", 409)
+    source = parse_studio_source(__import__("json").loads(req.tree["game/studio/session.json"]))
+    records = await round_records.find({
+        **scope, "campaign_id":identifier, "kind":"round",
+        "round_index":{"$lte":row["cursor"]},
+    }).sort("round_index",-1).limit(16).to_list(length=16)
+    measured=[]
+    for item in records:
+        checked=_checked_round_record(row,item)
+        # Only recorded measurements, never user-supplied invented labels.
+        performance=checked.get("performance") or {}
+        vector=checked.get("objective_vector") or {}
+        value=vector.get("return",performance.get("return",0))
+        if type(value) not in (int,float):
+            value=0
+        measured.append({
+            "mean_return": max(-1e9,min(1e9,float(value))),
+            "failure_rate": 1.0 if checked.get("status") == "rejected" else 0.0,
+            "episodes": 1,
+        })
+    result=propose_scenarios(source,observations=measured,limit=limit)
+    return {
+        **result, "campaign_id":identifier,"measured_committed_rounds":len(measured),
+        "current_champion_source":True,"drafts_only":True,
+        "no_automatic_gameplay_promotion":True,
+    }
+
+
+async def scenario_engine_test_manifest(scope, editor):
+    """Authenticated inspect-only test matrix; pass status is never fabricated."""
+    from skeleton.jeeves.game_studio_scenario_lab import test_manifest
+    from skeleton.jeeves.game_learning import GameLearningError as LearnerError
+    try:
+        return test_manifest(editor)
+    except (ValueError, LearnerError) as exc:
+        raise GameLearningError("test_manifest_engine", "Unknown studio engine.", 404) from exc

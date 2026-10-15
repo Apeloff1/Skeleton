@@ -181,3 +181,36 @@ async def get_lessons(
     user=Depends(get_current_user),
 ):
     return await _call(learning.lessons(_scope(user), project_id, q, limit, cursor))
+
+
+@router.get("/campaigns/{campaign_id}/mirror-views")
+async def mirror_views(
+    campaign_id: str,
+    lanes: int = Query(default=4,ge=1,le=6),
+    steps: int = Query(default=12,ge=1,le=24),
+    sample: int = Query(default=0,ge=0,le=255),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.scenario_mirror_views(
+        _scope(user), campaign_id, lanes=lanes, steps=steps, sample=sample,
+    ))
+
+
+@router.get("/campaigns/{campaign_id}/scenario-drafts")
+async def scenario_drafts(
+    campaign_id: str,
+    limit: int = Query(default=4,ge=1,le=5),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.scenario_drafts(_scope(user),campaign_id,limit=limit))
+
+
+@router.get("/engines/{editor}/test-manifest")
+async def original_engine_test_manifest(editor: str,user=Depends(get_current_user)):
+    return await _call(learning.scenario_engine_test_manifest(_scope(user),editor))
+
+
+@router.get("/research/sales-informed-scenarios")
+async def sales_informed_design_references(user=Depends(get_current_user)):
+    from skeleton.jeeves.game_studio_scenario_lab import sales_informed_catalog
+    return sales_informed_catalog()

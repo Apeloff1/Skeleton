@@ -14,12 +14,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from hashlib import sha256
 import json
 import math
 import random
-import threading
 
 from skeleton.ai.game_builder.advanced_gameplay_runtime import ACTION_HELP, ENGINES
 from skeleton.ai.game_builder.system_editors import editor_spec
@@ -46,7 +44,7 @@ MOTIFS = (
      "rank":3,"units_millions":38.14,"editor":"fighting",
      "motif":"Original frame-window spacing and counterplay evaluation"},
     {"reference":"The Legend of Zelda: Breath of the Wild","chart":"nintendo_switch_2026_06_30",
-     "rank":4,"units_millions":34.06,"editor":"exploration",
+     "rank":4,"units_millions":34.06,"editor":"metroidvania",
      "motif":"Original traversal, curiosity and systemic environmental puzzles"},
     {"reference":"Super Mario Odyssey","chart":"nintendo_switch_2026_06_30",
      "rank":5,"units_millions":30.80,"editor":"platformer",
