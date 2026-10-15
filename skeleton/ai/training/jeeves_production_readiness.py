@@ -201,6 +201,10 @@ def inspect(
         raise ProductionCheckpointError("candidate directory must be an existing regular directory")
 
     blockers: list[str] = []
+    if require_attestation and dataset_manifest is None:
+        # The compact built-in Pareto set is a plumbing smoke curriculum, not
+        # a sufficient production game-design dataset.
+        blockers.append("rights_approved_external_game_corpus_required")
     source = os.environ.get("SKELETON_OWN", "").strip()
     receipt: dict[str, Any] | None = None
     if require_attestation:
