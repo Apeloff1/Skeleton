@@ -424,3 +424,24 @@ to approved source identities; voice, scene chronology and screen direction
 are kept invariant. Data includes shot-level camera range, occlusion, carry
 capacity, outfit mobility and reverse integrity statistics. This is a
 pre-render structural simulator, **not** a playable video-rendering engine.
+
+### Pause and resume an individual cinematic simulation
+
+The frame control plane supports in-process `pause`, `step`, `seek`,
+`resume`, `checkpoint` and hash-checked `from_checkpoint`. A paused
+run can also be saved and resumed from the app CLI:
+
+```bash
+python -m skeleton app cinematic-sim --scene original-scene.json \
+  --pause-after 32 --checkpoint-out paused-cinema.json
+
+python -m skeleton app cinematic-sim --scene original-scene.json \
+  --resume-checkpoint paused-cinema.json --output resumed-cinema-report.json
+
+python -m skeleton app cinematic-sim --audit-report resumed-cinema-report.json
+```
+
+The cursor stores already observed frames with a chained checksum. Restoration
+rejects tampered observations and changed source identities, then computes only
+remaining frames. It does not repeat earlier simulation steps or alter any
+model weights. Paused artifacts are private and require an unused output path.

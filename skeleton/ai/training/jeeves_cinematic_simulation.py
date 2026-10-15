@@ -749,12 +749,12 @@ def main(argv: list[str] | None = None) -> int:
                 _require(args.checkpoint_out is None,
                          "checkpoint output requires --pause-after")
                 variations = variation_controls(
-                offsets=tuple(args.yaw_offsets), pan_rates=tuple(args.pan_rates),
-                lens_offsets=tuple(args.fov_offsets),
-                item_mass_deltas=tuple(args.item_mass_deltas),
-                apparel_drag_deltas=tuple(args.apparel_drag_deltas),
-                seeds=tuple(args.seeds), item_variants=tuple(args.item_variants),
-                apparel_variants=tuple(args.apparel_variants), limit=args.limit)
+                    offsets=tuple(args.yaw_offsets), pan_rates=tuple(args.pan_rates),
+                    lens_offsets=tuple(args.fov_offsets),
+                    item_mass_deltas=tuple(args.item_mass_deltas),
+                    apparel_drag_deltas=tuple(args.apparel_drag_deltas),
+                    seeds=tuple(args.seeds), item_variants=tuple(args.item_variants),
+                    apparel_variants=tuple(args.apparel_variants), limit=args.limit)
                 output = run_batch(scene, variations=variations, workers=args.workers,
                                    frame_ms=args.frame_ms)
             if args.output is not None:

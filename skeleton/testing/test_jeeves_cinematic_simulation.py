@@ -218,3 +218,21 @@ def test_checkpoint_resume_without_restarting_scene_and_tamper_rejection():
     other["shots"][0]["lighting_id"] = "unauthorized_edit"
     with pytest.raises(CinematicSimError, match="source changed"):
         SimulationController.from_checkpoint(other, checkpoint)
+
+def test_operator_cli_pause_resume_and_reverse_report_without_restarting(tmp_path):
+    from skeleton.ai.training.jeeves_cinematic_simulation import main, _read_json
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps(scene()))
+    snapshot_path = tmp_path / "paused.json"
+    report_path = tmp_path / "resumed.json"
+    assert main(["--scene", str(source), "--pause-after", "9",
+                 "--checkpoint-out", str(snapshot_path)]) == 0
+    checkpoint = _read_json(snapshot_path, 8 * 1024 * 1024)
+    assert checkpoint["cursor"] == 9
+    assert main(["--scene", str(source), "--resume-checkpoint", str(snapshot_path),
+                 "--output", str(report_path)]) == 0
+    report = _read_json(report_path, 32 * 1024 * 1024)
+    assert verify_batch_report(report)["reverse_audit_verified"]
+    assert report["simulations_executed"] == 1
+    assert report["forward_observations"] == report["reverse_observations"] == 28
+    assert report["training_executed"] is False
