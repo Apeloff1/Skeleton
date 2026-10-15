@@ -308,3 +308,12 @@ def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypa
     ok, detail = launcher.open_running_application()
     assert ok
     assert "all services healthy" in detail
+
+def test_windows_ci_sparse_checkout_contains_every_installer_root():
+    source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    for required in (
+        "/machine/", "/docs/", "/AGENTS.md", "/CLAUDE.md",
+        "/GEMINI.md", "/.cursor/rules/architecture.mdc",
+        "/.github/copilot-instructions.md",
+    ):
+        assert required in source
