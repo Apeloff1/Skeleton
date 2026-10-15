@@ -99,6 +99,44 @@ def derive_game_quality_brief(
                 "correctness, AI sophistication or shipped source code."
             ),
         })
+    if asset_analysis and asset_analysis.get("pixel_count") is not None:
+        pixels = asset_analysis["pixel_count"]
+        uncovered = asset_analysis.get("nonopaque_pixel_count", 0)
+        if (type(pixels) is int and 1 <= pixels <= 1024 * 1024
+            and type(uncovered) is int and 0 <= uncovered <= pixels):
+            features.update(
+                decoded_image_pixels=pixels,
+                nonopaque_pixel_fraction=round(uncovered / pixels, 6),
+            )
+            findings.append({
+                "dimension": "original_image_legibility",
+                "observed": {
+                    "pixel_count": pixels,
+                    "nonopaque_pixel_ratio": round(uncovered / pixels, 6),
+                    "rgba_sha256": asset_analysis.get("rgba_sha256"),
+                },
+                "design_question": (
+                    "Review the original authored art at target display scale "
+                    "for silhouette clarity, aliasing, contrast, transparency "
+                    "fringing and accessibility."
+                ),
+                "interpretation_limit": "Pixel dimensions and alpha do not independently judge artistic quality",
+            })
+    if asset_analysis and asset_analysis.get("format") == "pcm_wav":
+        rate = asset_analysis.get("sample_rate")
+        seconds = asset_analysis.get("duration_seconds")
+        if (type(rate) is int and 8000 <= rate <= 96000
+            and type(seconds) in (int,float) and 0 <= seconds <= 10):
+            features.update(audio_sample_rate=rate, audio_duration_seconds=round(seconds,6))
+            findings.append({
+                "dimension": "original_audio_clarity",
+                "observed": {"sample_rate":rate, "duration_seconds":seconds},
+                "design_question": (
+                    "Audition original authored sound effects against cutscenes, "
+                    "input feedback and ambience for readability and clipping."
+                ),
+                "interpretation_limit": "Duration and sample rate are not fidelity or musical quality scores",
+            })
     if package_analysis:
         inventory = package_analysis.get("resource_inventory", [])
         counts = {}
