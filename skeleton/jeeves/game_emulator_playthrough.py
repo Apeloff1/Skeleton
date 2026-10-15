@@ -284,7 +284,7 @@ def run_native_full_playthrough(
 
         def persist(current_status: str) -> None:
             nonlocal last_checkpoint, previous_receipt, samples
-            if absolute == last_checkpoint and current_status == "running":
+            if absolute == last_checkpoint and checkpoint_path.exists():
                 return
             frame = environment._frame or {}
             receipt = {
@@ -368,7 +368,7 @@ def run_native_full_playthrough(
                 break
             if offset == instruction["repeat"]:
                 index, offset = index + 1, 0
-            if absolute - last_checkpoint >= checkpoint_every:
+            if absolute - last_checkpoint >= checkpoint_every and index < len(canonical["instructions"]):
                 persist("running")
         else:
             status = "input_exhausted"
