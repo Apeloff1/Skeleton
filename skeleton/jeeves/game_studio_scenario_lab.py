@@ -296,6 +296,7 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
         def state_key(state):
             return tuple(round(float(state[key]),6) for key in features)
         observed={state_key(observation)}
+        gameplay_transition_states=[state_key(observation)]
         for i in range(steps):
             if env.done: break
             action=_choose(env.spec.actions,angle,i,seed,observation)
@@ -309,6 +310,7 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
             if accepted is True and state_key(next_observation)!=state_key(observation):
                 productive_changes+=1
             observed.add(state_key(next_observation))
+            gameplay_transition_states.append(state_key(next_observation))
             observation=next_observation
             actions.append(action)
             if (i+1)%max(1,steps//(MAX_FRAMES-1))==0:
@@ -324,6 +326,7 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
             "accepted_actions":accepted_count,
             "productive_state_changes":productive_changes,
             "unique_gameplay_states":len(observed),
+            "gameplay_transition_states_digest":_hash(gameplay_transition_states),
             "accepted_action_rate":round(accepted_count/max(1,len(actions)),6),
             "productive_action_rate":round(productive_changes/max(1,len(actions)),6),
             # The emulator-compatible reference replays the full action log
@@ -410,6 +413,8 @@ def mirrored_rule_comparison(baseline: Mapping[str,object],
             "candidate_productive_state_changes":b["productive_state_changes"],
             "baseline_unique_gameplay_states":a["unique_gameplay_states"],
             "candidate_unique_gameplay_states":b["unique_gameplay_states"],
+            "baseline_gameplay_transition_states_digest":a["gameplay_transition_states_digest"],
+            "candidate_gameplay_transition_states_digest":b["gameplay_transition_states_digest"],
             "baseline_replayed_action_applications":a["replayed_action_applications"],
             "candidate_replayed_action_applications":b["replayed_action_applications"],
             "baseline_executed_steps":a["steps"],
@@ -437,6 +442,8 @@ def mirrored_rule_comparison(baseline: Mapping[str,object],
         item["return_difference"]!=0
         or item["baseline_unique_gameplay_states"]!=item["candidate_unique_gameplay_states"]
         or item["baseline_productive_state_changes"]!=item["candidate_productive_state_changes"]
+        or item["baseline_gameplay_transition_states_digest"]!=
+           item["candidate_gameplay_transition_states_digest"]
         for item in observations
     )
     # Avoid promoting settings which do not have any measured influence
