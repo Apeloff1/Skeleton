@@ -25,6 +25,7 @@ def main(argv:list[str]|None=None)->int:
     )
     from skeleton.jeeves.game_comparison_host_preflight import inspect_native_host_runtime
     from skeleton.ai.webcrawler.dragon_comparative_game_bridge import export_dragon_counterfactual_review
+    from skeleton.jeeves.game_comparison_counterfactual_viewer import render_counterfactual_game_dashboard
     from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry,REGISTRY_ENV
 
     parser=argparse.ArgumentParser(description=__doc__)
@@ -66,6 +67,8 @@ def main(argv:list[str]|None=None)->int:
             artifact,json.dumps(report,sort_keys=True,indent=2,allow_nan=False).encode(),
         )
         intake=export_dragon_counterfactual_review(report)
+        dashboard=output/(report["source_study_id"]+"_controlled_input.html")
+        _atomic_write(dashboard,render_counterfactual_game_dashboard(report).encode())
         dragon_report=output/(report["source_study_id"]+"_counterfactual_dragon_review.json")
         _atomic_write(
             dragon_report,
@@ -77,6 +80,7 @@ def main(argv:list[str]|None=None)->int:
             "fresh_native_runs":report["fresh_native_runs_completed"],
             "same_input_except_one_action":True,
             "result":str(artifact),
+            "offline_graph_dashboard":str(dashboard),
             "dragon_review_candidates":str(dragon_report),
             "production_llm_weights_changed":False,
             "game_mechanics_proven":False,

@@ -928,6 +928,7 @@
       "safety": "Native Linux sandbox preflight and approved registry, conservative disk budget, SHA-receipted content, no model weights changed",
       "outputs": [
         "<study>_controlled_input.json",
+        "<study>_controlled_input.html",
         "<study>_counterfactual_dragon_review.json"
       ],
       "evidence": "Every native frame, PCM, input action and transition is SHA-chain bound; controlled-experiment verifier rejects any intra-arm mismatch, missing run, corrupted receipt, core swap, or more than one altered action",
@@ -935,9 +936,12 @@
       "limitations": "No claim of proven mechanics, source rights, real hardware accuracy, intelligent game mastery or verified generalization",
       "tests": [
         "tests/test_game_comparison_counterfactual.py",
-        "tests/test_game_comparison_counterfactual_integrity.py"
+        "tests/test_game_comparison_counterfactual_integrity.py",
+        "tests/test_game_comparison_counterfactual_viewer.py"
       ],
-      "real_gameplay_executed_this_chat": false
+      "real_gameplay_executed_this_chat": false,
+      "offline_dashboard": "skeleton/jeeves/game_comparison_counterfactual_viewer.py",
+      "ui": "Hash-verified interactive offline visual-change and PCM RMS graphs, repeated native A/B arm stability, input perturbation and per-step controller/frame/PCM receipts, no source game media embedded"
     }
   }
 }
