@@ -145,7 +145,7 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
     before = environment.restore(start)
     if not isinstance(before, Mapping):
         raise CrossGameComparisonError("emulator failed to restore exact observation")
-    state_before, digest_before = _snapshot(environment)
+    _, digest_before = _snapshot(environment)
     if _digest(start) != digest_before:
         raise CrossGameComparisonError("same-core restore changed exact pre-intervention source state")
     previous_frame = _frame(environment)
@@ -160,15 +160,27 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
         reward = {str(k): float(v) for k, v in step.reward_components.items()}
         if any(not math.isfinite(value) for value in reward.values()):
             raise CrossGameComparisonError("source game reward is not finite")
-        transitions.append({
+        _, actual_state_digest = _snapshot(environment)
+        declared_digest = getattr(step, "transition_digest", "")
+        if declared_digest:
+            _sha(declared_digest)
+        # Source Game Boy ROM steps do not declare transition_digest;
+        # create an explicitly LOCAL projection hash of measured data,
+        # never falsely label it as an engine-declared native receipt.
+        projected = {
             "ordinal": sequence,
             "action": action,
             "actual_frame_sha256": frame,
             "source_observation_sha256": _digest(dict(step.observation)),
             "source_reward_components_sha256": _digest(reward),
-            "actual_transition_sha256": _sha(step.transition_digest),
+            "actual_machine_state_sha256": actual_state_digest,
+            "declared_native_transition_sha256": declared_digest or None,
             "terminated": step.terminated,
             "truncated": step.truncated,
+        }
+        transitions.append({
+            **projected,
+            "measured_source_projection_sha256": _digest(projected),
         })
         if (step.terminated or step.truncated) and sequence + 1 != len(program):
             raise CrossGameComparisonError("controlled program crosses a true source episode termination")
