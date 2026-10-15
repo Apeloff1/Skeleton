@@ -39,3 +39,19 @@ Relevant current domain suites: `tests/test_game_builder_advanced_procedural_wor
 These are **offline reference game runtimes**. They do not establish physical
 rendering, native hardware certification, independent release verification,
 or completion of the entire product.
+
+## Batch 2: original economy reference engine
+
+`advanced_economy_runtime.py` implements deterministic 1–100-node markets
+with finite good stocks, production reserves, consumption, scarcity-linked
+prices, trade taxation, actual cash settlement, cargo constraints, adjacent
+carriage, finite bank lending, repayment, investments, and evidence-gated
+nonterminal milestones. This is a newly built simulator, unlike the seven
+existing engines connected in Batch 1. It participates in the same authored
+scene custody and replay chain. It is not a financial market connector.
+
+The remaining editor-only set is now: `narrative`, `cinematics`, `audio`,
+`animation`, `ui_hud`, `accessibility`, `localization`, `networking`,
+`save_system`, `platform_profile`. These features need real product or
+presentation integration; they should not be labeled gameplay engines solely
+because typed editor forms exist.

@@ -7,6 +7,7 @@ No provider calls, shell commands, downloaded assets or new execution root.
 from __future__ import annotations
 
 from . import advanced_procedural_world_runtime as procedural_world_engine
+from . import advanced_economy_runtime as economy_engine
 from . import advanced_voxel_runtime as voxel_engine
 from . import advanced_parkour_runtime as parkour_engine
 from . import advanced_ecosystem_runtime as ecosystem_engine
@@ -16,6 +17,7 @@ from . import advanced_dialogue_runtime as dialogue_engine
 
 MODULES = {
     "procedural_world": procedural_world_engine,
+    "economy": economy_engine,
     "voxel": voxel_engine,
     "parkour": parkour_engine,
     "ecosystem": ecosystem_engine,
@@ -30,6 +32,7 @@ DEFAULT_LAYOUTS = {name: module.default_layout for name, module in MODULES.items
 NORMALIZE_LAYOUTS = {name: module.normalize_layout for name, module in MODULES.items()}
 APPLY_SCENES = {name: module.apply_scene for name, module in MODULES.items()}
 ERRORS = (procedural_world_engine.ProceduralWorldActionError,
+          economy_engine.EconomyActionError,
           voxel_engine.VoxelActionError,
           parkour_engine.ParkourActionError,
           ecosystem_engine.EcosystemActionError,
