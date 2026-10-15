@@ -221,6 +221,64 @@ def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
     }
 
 
+def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
+    report, reference = _json_file(directory / "original-cpu-opcodes.json")
+    _verify_digest(report, "report_digest")
+    if (
+        report.get("schema_version") != "skeleton.game.original_lr35902_opcode_matrix.v1"
+        or report.get("status") != "all_documented_opcodes_executed_and_replayed"
+        or report.get("actual_legal_base_opcodes") != 245
+        or report.get("actual_base_opcode_single_step_executed") != 244
+        or report.get("actual_cb_prefix_expansions_executed") != 256
+        or report.get("expected_illegal_base_opcodes_rejected") != 11
+        or report.get("actual_total_single_step_source_replays") != 1000
+        or report.get("native_libretro_corpus_tested") is not False
+        or report.get("hardware_instruction_cycle_accuracy_independently_proven") is not False
+        or report.get("production_jeeves_weights_modified") is not False
+    ):
+        raise AcceptanceSuiteError("original Game Boy CPU opcode coverage or replay provenance is incomplete")
+    from scripts.audit_original_gameboy_cpu_opcodes import INVALID_BASE
+
+    base = report.get("base_instruction_receipts")
+    cb = report.get("prefixed_instruction_receipts")
+    if not isinstance(base, list) or len(base) != 255 or not isinstance(cb, list) or len(cb) != 256:
+        raise AcceptanceSuiteError("all 256 CB variants and 255 non-CB base identities are required")
+    for index, case in enumerate(base):
+        opcode = index + (index >= 0xCB)
+        if not isinstance(case, dict) or case.get("opcode") != opcode or case.get("cb") is not None:
+            raise AcceptanceSuiteError("base LR35902 opcode identity or ordering changed")
+        if opcode in INVALID_BASE:
+            if case.get("expected_invalid_opcode_rejected") is not True or case.get("real_instruction_executed") is not False:
+                raise AcceptanceSuiteError("illegal LR35902 opcode was treated as a successful execution")
+        elif case.get("real_instruction_executed") is not True:
+            raise AcceptanceSuiteError("documented legal LR35902 opcode was not executed")
+    for index, case in enumerate(cb):
+        if not isinstance(case, dict) or case.get("opcode") != 0xCB or case.get("cb") != index:
+            raise AcceptanceSuiteError("CB-prefixed CPU opcode identity or ordering changed")
+        if case.get("real_instruction_executed") is not True:
+            raise AcceptanceSuiteError("documented CB subopcode did not execute")
+    for case in base + cb:
+        if case.get("real_instruction_executed") is True:
+            before = case.get("source_snapshot_after_sha256")
+            after = case.get("repeated_snapshot_sha256")
+            if (
+                case.get("real_independent_replay_executed") is not True
+                or type(before) is not str or len(before) != 64 or before != after
+                or type(case.get("emulated_t_cycles")) is not int
+                or case["emulated_t_cycles"] not in (4, 8, 12, 16, 20, 24)
+            ):
+                raise AcceptanceSuiteError("legal opcode lacks exact real CPU/memory/raster replay proof")
+    return {
+        "accepted": True,
+        "legal_base_opcode_variants": 245,
+        "actual_cb_prefixed_opcode_variants": 256,
+        "source_cpu_instruction_steps_replayed": 1000,
+        "invalid_opcodes_denied": 11,
+        "receipt_file": reference,
+        "hardware_accuracy_certified": False,
+    }
+
+
 def _verify_instruction_microtrace(directory: Path) -> dict[str, Any]:
     """Read a real original CPU branching trace and validate every source row."""
     report, reference = _json_file(directory / "original-cpu-instruction-divergence.json")
@@ -451,6 +509,16 @@ def run_acceptance_suite(
                 output_directory, "focused_synthetic_and_real_original_rom_regressions",
                 seconds=process_timeout_seconds,
             ))
+        opcode_path = output_directory / "original-cpu-opcodes.json"
+        processes.append(_run(
+            [
+                sys.executable, "scripts/audit_original_gameboy_cpu_opcodes.py",
+                "--evidence-file", str(opcode_path),
+            ],
+            output_directory, "original_lr35902_opcode_coverage",
+            seconds=process_timeout_seconds,
+        ))
+        opcode_matrix = _verify_cpu_opcode_matrix(output_directory)
         instruction_path = output_directory / "original-cpu-instruction-divergence.json"
         processes.append(_run(
             [
@@ -510,6 +578,7 @@ def run_acceptance_suite(
             "source_cpu_interpreter_executed": True,
             "original_cartridge_bus_matrix_verified": True,
             "source_instruction_replay_and_divergence_verified": True,
+            "all_legal_source_opcodes_replay_verified": True,
             "source_q_rewind_proven": True,
             "neural_candidate_optimized_and_scored": True,
             "source_goal_replay_and_neutral_control_verified": True,
@@ -517,6 +586,7 @@ def run_acceptance_suite(
             "original_goal_training": goal,
             "real_cartridge_bus_matrix": mapper,
             "source_cpu_instruction_divergence": instruction,
+            "original_cpu_opcode_coverage": opcode_matrix,
             "bounded_worker_receipts": processes,
             "real_libretro_installed_core_tested": False,
             "independent_game_hardware_accuracy_certified": False,
