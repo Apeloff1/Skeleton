@@ -909,8 +909,9 @@ class GameBoyMachine:
             raise GameRomRuntimeError("ROM snapshot flag/bank is invalid")
         if registers["instructions"] * 4 > registers["cycles"]:
             raise GameRomRuntimeError("ROM snapshot CPU counters are inconsistent")
-        if registers["timer_reload_delay"] and registers["cycles"] < 4:
-            raise GameRomRuntimeError("ROM snapshot timer overflow cannot predate source CPU execution")
+        # A DIV/TAC write can trigger timer overflow even at source cycle
+        # zero. The bounded pending phase is legal regardless of instruction
+        # count, so only its 0..4 range is validated above.
         decoded = {}
         for name, length in (
             ("memory", 65536),
