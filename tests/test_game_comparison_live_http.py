@@ -99,6 +99,25 @@ class LocalOriginContracts(unittest.TestCase):
             )
             self.assertEqual(status,400)
 
+    def test_branch_difference_export_is_read_only_and_token_protected(self):
+        from unittest.mock import patch
+        status,_=self._call("/api/branches")
+        self.assertEqual(status,403)
+        response={
+            "schema_version":"skeleton.game.live_branch_difference.v1",
+            "game_count":2,"games":[],
+            "native_snapshot_game_memory_or_pcm_exported":False,
+        }
+        with patch(
+            "skeleton.jeeves.game_comparison_branch_analysis.build_live_branch_difference_report",
+            return_value=response,
+        ) as build:
+            status,result=self._call("/api/branches",token=self.server.secret)
+        self.assertEqual(status,200)
+        self.assertEqual(result,response)
+        build.assert_called_once()
+        self.assertEqual(self.study.steps,0)
+
     def test_home_page_restrictive_security_policy(self):
         request=urllib.request.Request(self.base+"/")
         with urllib.request.urlopen(request,timeout=3) as response:

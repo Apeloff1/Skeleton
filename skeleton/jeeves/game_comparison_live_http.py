@@ -130,6 +130,15 @@ class LocalComparisonHandler(BaseHTTPRequestHandler):
                     self._json(self.server.session.export_evidence())
                 except (ValueError,RuntimeError) as exc:
                     self._error(type(exc).__name__,409)
+        elif self.path=="/api/branches":
+            if self._authorized(mutating=False):
+                try:
+                    from .game_comparison_branch_analysis import build_live_branch_difference_report
+                    self._json(build_live_branch_difference_report(
+                        self.server.session.export_evidence()
+                    ))
+                except (ValueError,RuntimeError) as exc:
+                    self._error(type(exc).__name__,409)
         else:
             self._error("Unknown local studio endpoint",404)
 

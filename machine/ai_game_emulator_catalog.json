@@ -1001,6 +1001,19 @@
         "tests/test_game_comparison_live_http.py"
       ],
       "real_commercial_rom_executed": false
+    },
+    "verified_native_checkpoint_branch_diff": {
+      "owner": "skeleton/jeeves/game_comparison_branch_analysis.py",
+      "inputs": "Only full source/core/step SHA-verified live session evidence; no raw savestate bytes, ROM, video pixels or PCM exported",
+      "browser": "Under-screen live viewer Compare rewind branches button, same-origin bearer-token protected read-only /api/branches endpoint; shows aligned input, video and PCM SHA differences per checkpoint",
+      "correctness": "Each branch comparison stops at next reset/rewind; repeated rewinds compare against immediately preceding branch rather than concatenating unrelated timelines",
+      "scope": "At most 256 lifetime native steps per game, 4 resets, 2 checkpoints and 2 rewinds; 2–10 local live games",
+      "scientific_gates": "Single-session observation only: no independent fresh-worker replay, no proof of causal game mechanics or AI weight gain",
+      "regressions": [
+        "tests/test_game_comparison_live.py",
+        "tests/test_game_comparison_live_http.py"
+      ],
+      "game_emulation_qualified_here": false
     }
   }
 }

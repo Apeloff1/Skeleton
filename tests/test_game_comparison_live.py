@@ -239,6 +239,44 @@ class NativeLiveComparisonContracts(unittest.TestCase):
         self.assertEqual(audited["total_native_checkpoint_events"],1)
         self.assertEqual(audited["total_native_rewind_events"],1)
 
+    def test_branch_difference_report_aligns_actual_native_input_after_rewind(self):
+        from skeleton.jeeves.game_comparison_branch_analysis import (
+            build_live_branch_difference_report,
+        )
+        session=self._session()
+        base={"buttons":1,"axes":[0,0,0,0],"keys":[],
+              "mouse":[0]*6,"pointer":[0]*3}
+        altered={"buttons":256,"axes":[0,0,0,0],"keys":[],
+                 "mouse":[0]*6,"pointer":[0]*3}
+        session.checkpoint("first")
+        session.step({"steps":[{"game_id":"first","controls":[base],"repeat":2}]})
+        session.rewind("first")
+        session.step({"steps":[{"game_id":"first","controls":[altered]}]})
+        report=build_live_branch_difference_report(session.export_evidence())
+        game=next(row for row in report["games"] if row["game_id"]=="first")
+        self.assertEqual(game["verified_rewind_count"],1)
+        branch=game["branch_comparisons"][0]
+        self.assertEqual(branch["original_path_native_steps"],2)
+        self.assertEqual(branch["rewound_path_native_steps"],1)
+        self.assertEqual(branch["first_controller_difference_offset"],1)
+        # This fixture's frame depends on step index, not the action input.
+        # Different input alone never qualifies a native visual effect.
+        self.assertIsNone(branch["first_video_difference_offset"])
+        self.assertFalse(branch["change_in_game_mechanics_or_training_proven"])
+        self.assertFalse(report["native_snapshot_game_memory_or_pcm_exported"])
+
+    def test_branch_report_rejects_modified_native_snapshot_sha_chain(self):
+        from skeleton.jeeves.game_comparison_branch_analysis import (
+            build_live_branch_difference_report,
+        )
+        session=self._session()
+        session.checkpoint("first")
+        session.rewind("first")
+        export=session.export_evidence()
+        export["lanes"]["first"]["native_events"][0]["receipt"]["native_state_sha256"]="0"*64
+        with self.assertRaises(LiveEvidenceError):
+            build_live_branch_difference_report(export)
+
     def test_private_snapshot_invalid_after_native_reset(self):
         session=self._session()
         session.checkpoint("first")
