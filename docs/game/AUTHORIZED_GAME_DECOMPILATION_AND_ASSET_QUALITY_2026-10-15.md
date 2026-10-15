@@ -31,7 +31,7 @@ Each call to `decompile_authorized_game(data, filename, grant=…, authorize=…
 3. Independent **human-labeled shadow training** scope for `prepare_reviewed_training_candidate`. Review label record separately binds numeric measurements, source SHA, human reviewer and evidence digest.
 4. No automatic network access, game-core execution, arbitrary command execution, copyright bypass, production model training or asset upload.
 
-Maximum in-memory game source is **32 MiB**, deterministic disassembly at most **4096 instructions**, at most **4** operator-declared extra tile ranges, at most **256** tile-region preview atlas tiles per group? Actual atlas limit is 1024 native 8×8 tiles, bank limited to 512 NES tiles. Source report bound **8 MiB**. Per-frame RGB cap is **4 MiB**, source runtime sequence max **16** frames.
+Maximum in-memory game source is **32 MiB**, deterministic disassembly at most **4096 instructions**, at most **4** operator-declared extra tile ranges, at most **1024 native 8×8 tiles per preview atlas**, and **512** native NES tiles per CHR bank. Source report bound **8 MiB**. Per-frame RGB cap is **4 MiB**, source runtime sequence max **16** frames.
 
 **Data custody:** report JSON contains source provenance, hashes, bounded opcode words, target addresses, asset metrics and design questions; not raw ROM, code file, PCM, game bytes or uncompressed RGB. Separate PNG previews are created **only** when preview scope is allowed, and those are reconstructive copies of source tiles that may themselves be copyrighted. A hash chain does not independently attest authentic console execution.
 
