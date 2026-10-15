@@ -199,6 +199,56 @@ class ClockedOAMSourceDMATests(unittest.TestCase):
         self.assertFalse(m._cpu_bus_active)
         self.assertEqual(m.read(0xC000), 0x80)
 
+    def test_CPU_video_bus_reads_are_denied_only_during_relevant_PPU_modes(self):
+        for address, cases in (
+            (0x8000, ((0, 0x6B), (99, 0xFF), (270, 0x6B))),
+            (0xFE00, ((0, 0xFF), (99, 0xFF), (270, 0x6B))),
+        ):
+            with self.subTest(address=address):
+                for cycle, expected in cases:
+                    m = make_machine()
+                    m.pc = 0x100
+                    # LD A,(HL); source test ROM has a controlled
+                    # original cartridge instruction in bank zero.
+                    cart = bytearray(m.rom)
+                    cart[0x100] = 0x7E
+                    m = GameBoyMachine(bytes(cart))
+                    m.memory[address] = 0x6B
+                    m._set_pair(2, address)
+                    m.line_cycles = cycle
+                    m.memory[0xFF44] = 0
+                    m.instruction()
+                    self.assertEqual(m.a, expected)
+
+    def test_CPU_video_bus_writes_respect_mode_and_LCDC_disable(self):
+        for address, blocked_cycle in ((0x8000, 90), (0xFE00, 20)):
+            with self.subTest(address=address):
+                rom = bytearray(synthetic_rom(0x00, 0, 0))
+                rom[0x100] = 0x77  # LD (HL),A
+                m = GameBoyMachine(bytes(rom))
+                m._set_pair(2, address)
+                m.a = 0xB3
+                m.memory[address] = 0x72
+                m.line_cycles = blocked_cycle
+                m.instruction()
+                self.assertEqual(m.memory[address], 0x72)
+                m.pc = 0x100
+                m.memory[0xFF40] &= ~0x80  # LCDC off: no video bus contention.
+                m.instruction()
+                self.assertEqual(m.memory[address], 0xB3)
+
+    def test_PPU_and_DMA_internal_memory_views_ignore_CPU_bus_access_flags(self):
+        m = make_machine()
+        m.memory[0x8000] = 0x4B
+        m.memory[0xFE00] = 0xB2
+        m.line_cycles = 100
+        self.assertEqual(m.read(0x8000), 0x4B)
+        self.assertEqual(m.read(0xFE00), 0xB2)
+        m.write(0xFF46, 0xC0)
+        m._advance(8)
+        self.assertEqual(m.memory[0xFE00], 0x80)
+        self.assertFalse(m._cpu_bus_active)
+
     def test_reject_unsupported_page_and_tampered_inflight_state(self):
         m = make_machine()
         with self.assertRaises(GameRomRuntimeError):
