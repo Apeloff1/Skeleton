@@ -322,6 +322,55 @@ def _evaluate(args) -> dict[str, Any]:
     }
 
 
+def _emulator_experiment(args) -> dict[str, Any]:
+    from .game_emulator_experiment_lab import (
+        EmulatorExperimentConfig,
+        MemoryWatch,
+        run_emulator_experiment_matrix,
+    )
+
+    if not args.rights_acknowledged:
+        raise ValueError("Rights-cleared source acknowledgement is required")
+    if args.project is not None or args.rom is None:
+        raise ValueError("Experimental emulator measurement requires a local owned ROM")
+    if args.evidence_file.exists():
+        raise FileExistsError("Experiment evidence destination already exists")
+    _, lineage, request = _factory(args)
+    watches = ()
+    if args.memory_watch_file is not None:
+        root = _json_read(args.memory_watch_file)
+        rows = root.get("watches")
+        if not isinstance(rows, list) or len(rows) > 8:
+            raise ValueError("Expected at most eight explicit memory watches")
+        watches = tuple(MemoryWatch(**value) for value in rows)
+    report = run_emulator_experiment_matrix(
+        request,
+        rights_acknowledged=True,
+        config=EmulatorExperimentConfig(
+            seed=args.seed,
+            anchors=args.anchors,
+            repeats=args.repeats,
+            longest_duration=args.longest_duration,
+            max_conditions=args.max_conditions,
+            max_native_steps=args.max_native_steps,
+            include_multiplayer=args.include_multiplayer,
+            include_keyboard=args.include_keyboard,
+            include_memory_audit=args.memory_watch_file is not None,
+        ),
+        watches=watches,
+    )
+    _write_json(args.evidence_file, report, replace=False)
+    return {
+        "status": "native_controlled_experiments_recorded",
+        "report_digest": report["report_digest"],
+        "actual_experiment_steps": report["actual_native_steps_including_probe_anchors"],
+        "repeated_trials_stable": report["all_trials_reproducible"],
+        "evidence_file": str(args.evidence_file),
+        "neural_weight_updates": 0,
+        "production_promotion": False,
+    }
+
+
 def _deep_emulator(args) -> dict[str, Any]:
     from .game_emulator_training_lab import EmulatorLabConfig, run_emulator_training_lab
 
@@ -416,6 +465,29 @@ def parser() -> argparse.ArgumentParser:
     native.add_argument("--output", type=Path, required=True)
     native.add_argument("--force", action="store_true")
 
+
+    experiment = commands.add_parser(
+        "experiment-emulator",
+        help="Run actual checkpointed ROM counterfactuals; never update model weights",
+    )
+    experiment.add_argument("--target", required=True)
+    experiment.add_argument("--rom", type=Path, required=True)
+    experiment.add_argument("--project", type=Path)
+    experiment.add_argument("--core")
+    experiment.add_argument("--frames-per-step", type=int, default=1)
+    experiment.add_argument("--cycles-per-step", type=int, default=1824)
+    experiment.add_argument("--episode-steps", type=int, default=32)
+    experiment.add_argument("--anchors", type=int, default=3)
+    experiment.add_argument("--repeats", type=int, default=2)
+    experiment.add_argument("--longest-duration", type=int, default=4)
+    experiment.add_argument("--max-conditions", type=int, default=32)
+    experiment.add_argument("--max-native-steps", type=int, default=1536)
+    experiment.add_argument("--seed", type=int, default=0)
+    experiment.add_argument("--include-multiplayer", action=argparse.BooleanOptionalAction, default=True)
+    experiment.add_argument("--include-keyboard", action=argparse.BooleanOptionalAction, default=True)
+    experiment.add_argument("--memory-watch-file", type=Path)
+    experiment.add_argument("--rights-acknowledged", action="store_true")
+    experiment.add_argument("--evidence-file", type=Path, required=True)
     deep = commands.add_parser(
         "train-emulator-deep",
         help="Actual native/DMG ROM Q training with reverse replay and ten-run saturation audits",
@@ -484,6 +556,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _evaluate(args)
         elif args.command == "train-emulator-deep":
             result = _deep_emulator(args)
+        elif args.command == "experiment-emulator":
+            result = _emulator_experiment(args)
         else:
             result = _native(args)
         print(json.dumps(result, sort_keys=True, allow_nan=False))
