@@ -40,3 +40,11 @@ The installer does not execute games; building BlastEm uses the upstream `core` 
 ## Remaining gap
 
 67 declared recipe IDs **is not 67 working emulators** and does not mean 67 of 169 machines are covered. Remaining work includes operator builds, controlled legal firmware, source and native runtime validation, mapper/peripheral/disk support, stable saves, real emulator evidence and per-target training quality before coverage percentages can be stated.
+
+## Read-only hardware/recipe gap report
+
+```bash
+python3 scripts/install_game_emulator_cores.py --coverage-matrix
+```
+
+The new command walks every canonical hardware identity and connects it to the installer's exact pinned candidate core IDs. It rejects unrecognized target/core pairs or duplicate target declarations and distinguishes hardware identities without recipes from ones with uncompiled source recipes. Installation and gameplay counts are returned as `null`, never inferred from recipe presence. It performs no ROM execution, source fetching, library loading or approval.

@@ -434,6 +434,12 @@
     "hardware_catalog_rows_not_emulators": 169,
     "compiled_or_executed_in_this_change": false,
     "tests_executed_in_this_change": false,
-    "no_copyrighted_rom_or_bios_bundled": true
+    "no_copyrighted_rom_or_bios_bundled": true,
+    "coverage_matrix_cli": {
+      "command": "python3 scripts/install_game_emulator_cores.py --coverage-matrix",
+      "semantics": "read_only; row for each canonical hardware identity plus pinned source-recipe options, no runtime or gameplay count inferred",
+      "prerequisites": "canonical hardware and core mappings must agree; fail closed on invalid target",
+      "confidence": "source declarations only"
+    }
   }
 }

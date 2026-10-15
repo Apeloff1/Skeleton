@@ -1345,6 +1345,49 @@ def install(args):
     }
 
 
+
+def _recipe_coverage_matrix():
+    """Report source-recipe opportunities across canonical hardware; never infer gameplay."""
+    from skeleton.jeeves.game_emulator_catalog import _CORE_TARGET_GROUPS, canonical_targets
+
+    hardware = canonical_targets()
+    matched = {identity: [] for identity in hardware}
+    for core_id, pin in sorted(PINNED_CORES.items()):
+        declared = set(_CORE_TARGET_GROUPS.get(core_id, ()))
+        requested = pin["targets"]
+        if not requested or len(requested) != len(set(requested)):
+            raise ValueError("Duplicate or empty core hardware target declaration: " + core_id)
+        for target_id in requested:
+            if target_id not in hardware or target_id not in declared:
+                raise ValueError("Unrecognized or incompatible pinned target: " + core_id + "/" + target_id)
+            matched[target_id].append({
+                "core_id": core_id,
+                "revision": pin["revision"],
+                "candidate_only": bool(pin.get("candidate_only")),
+                "status": "source_recipe_uncompiled_unqualified",
+            })
+    supported = sum(bool(cores) for cores in matched.values())
+    return {
+        "schema_version": "skeleton.game.emulator_recipe_coverage.v1",
+        "hardware_target_count": len(hardware),
+        "declared_source_recipe_count": len(PINNED_CORES),
+        "targets_with_source_recipes": supported,
+        "targets_without_source_recipes": len(hardware) - supported,
+        "installed_or_running_cores_count": None,
+        "gameplay_qualified_targets_count": None,
+        "denominator_warning": "Hardware targets include platform variants, ABI devices and modern consoles, not unique emulator core binaries.",
+        "runtime_evidence": "none; only static source-build recipe mapping",
+        "targets": [
+            {
+                "target_id": target_id,
+                "status": "source_recipe_candidates_only" if matched[target_id] else "no_declared_recipe",
+                "core_candidates": matched[target_id],
+            }
+            for target_id in sorted(hardware)
+        ],
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path)
@@ -1354,6 +1397,7 @@ def main(argv=None):
         "--profile", choices=("starter", "broad", "all"), default="starter",
         help="starter=original six, broad=all non-deferred recipes, all=include explicitly deferred candidates",
     )
+    parser.add_argument("--coverage-matrix", action="store_true", help="Read-only canonical hardware versus source-recipe audit; never claims execution")
     parser.add_argument(
         "--list-cores", action="store_true",
         help="Print exact pinned build recipes and blockers without acquiring source, compiling or approving anything",
@@ -1380,6 +1424,13 @@ def main(argv=None):
         help="Explicit canonical installed OpenGL library for software-fallback recipes; no runtime rendering permission is granted",
     )
     args = parser.parse_args(argv)
+    if args.coverage_matrix:
+        try:
+            print(json.dumps(_recipe_coverage_matrix(), indent=2))
+            return 0
+        except (ValueError, ImportError) as exc:
+            print(json.dumps({"status": "coverage_audit_rejected", "message": str(exc)}), file=sys.stderr)
+            return 2
     if args.list_cores:
         print(json.dumps({
             "status": "source_recipes_only_not_compiled",
