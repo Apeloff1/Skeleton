@@ -10,7 +10,8 @@ import pytest
 
 from skeleton.ai.training.jeeves_cinematic_simulation import (
     CinematicSimError, SimulationController, validate_scene, variation_controls,
-    simulate_once, run_batch, verify_batch_report, MAX_BATCH_FRAMES,
+    simulate_once, run_batch, verify_batch_report, quarantine_review_pairs,
+    MAX_BATCH_FRAMES,
 )
 
 
@@ -29,7 +30,8 @@ def scene():
             "id": "hero", "voice_id": "voice_hero", "appearance_id": "face_hero",
             "strength_g": 2000, "allowed_apparel": ["cloak", "armor"],
         }],
-        "items": [{"id": "lantern", "mass_g": 1500}],
+        "items": [{"id": "lantern", "mass_g": 1500},
+                  {"id": "shield", "mass_g": 500}],
         "apparel": [
             {"id": "cloak", "drag_pct": 12, "mobility_pct": 95},
             {"id": "armor", "drag_pct": 25, "mobility_pct": 35},
@@ -161,6 +163,34 @@ def test_report_tamper_and_invalid_multi_sim_limits_fail_closed():
     many["shots"][-1]["start_ms"] = 1700
     with pytest.raises(CinematicSimError, match="budget"):
         run_batch(many, variations=variation_controls(
-            offsets=(-20, 0, 20), pan_rates=(75, 100), lens_offsets=(-5, 0, 5),
-            item_mass_deltas=(0, 750), apparel_drag_deltas=(0, 25),
-            seeds=(0, 1), limit=48), frame_ms=25)
+            offsets=(-40, -20, 0, 20, 40), pan_rates=(50, 75, 100, 125),
+            lens_offsets=(-10, -5, 0, 5, 10),
+            item_mass_deltas=(-500, 0, 500, 1000),
+            apparel_drag_deltas=(-10, 0, 10, 20),
+            seeds=(0, 1, 2, 3), limit=512), frame_ms=25)
+
+def test_item_and_apparel_actual_identity_variation_and_review_pairs():
+    choices = variation_controls(item_variants=("lantern", "shield"),
+                                 apparel_variants=("cloak", "armor"))
+    report = run_batch(scene(), variations=choices, workers=1)
+    assert report["simulations_executed"] == 4
+    items = {r["item"] for v in report["simulators"]
+             for r in v["sampled_observations"] if r["item"]}
+    apparel = {r["apparel"] for v in report["simulators"]
+               for r in v["sampled_observations"]}
+    assert items == {"lantern", "shield"} and apparel == {"cloak", "armor"}
+    assert report["unique_trace_digests"] == 4
+    candidates = quarantine_review_pairs(report)
+    assert len(candidates) == 8
+    assert {c["perspective"] for c in candidates} == {
+        "forward_causality", "reverse_forensic_audit"}
+    assert len({c["paired_evidence_group"] for c in candidates}) == 4
+    assert all(not c["eligible_for_optimizer"] and not c["human_reviewed"]
+               and c["training_steps_performed"] == 0 for c in candidates)
+
+
+def test_unapproved_apparel_and_item_variants_rejected():
+    with pytest.raises(CinematicSimError, match="unknown authored item"):
+        simulate_once(scene(), controls(item_variant_id="copyrighted_sword"))
+    with pytest.raises(CinematicSimError, match="unapproved outfit"):
+        simulate_once(scene(), controls(apparel_variant_id="foreign_outfit"))
