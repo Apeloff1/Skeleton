@@ -791,6 +791,31 @@
       "authentic_controller_hardware_verified": false,
       "live_input_from_html_to_core": false,
       "actual_native_tested": false
+    },
+    "inspired_original_media_pipeline": {
+      "module": "skeleton/jeeves/game_comparison_inspiration.py",
+      "gallery": "skeleton/jeeves/game_comparison_inspiration_viewer.py",
+      "operator_cli": "scripts/generate_game_comparison_inspiration.py",
+      "supported_genres": [
+        "adventure",
+        "platformer",
+        "puzzle",
+        "racing",
+        "simulation",
+        "combat",
+        "strategy",
+        "rhythm",
+        "sandbox",
+        "exploration"
+      ],
+      "generated": "Three early/mid/after original 512x288 procedural SVG scenes, three actual mono 16kHz synthesized WAV files, three editable multi-shot cinematic camera pan/zoom/angle shot graphs, and three original mechanics drafts",
+      "evidence": "Full source study digest and per-game early/middle/after observation SHA receipts; 12 original generated file SHA receipts; provenance graph and 12 independently pending adversarial review dimensions",
+      "independence": "Reads verified study metadata/receipts and locally reviewed abstract note classifications, not game ROM bytes, frames, source audio, character sprites, score, source maps or cutscenes",
+      "viewing": "Private static HTML gallery shows generated SVG, plays generated WAV, links cutscene/mechanics JSON and review tasks; all available for user/Jeeves/Dragon",
+      "creativity": "Uses user-provided 4..240 printable character original creative brief, a genre and deterministic seed; aesthetic similarity/rights review is still required",
+      "no_compilation_or_video_claim": true,
+      "auto_train_weights": false,
+      "executed_on_real_game_content": false
     }
   }
 }
