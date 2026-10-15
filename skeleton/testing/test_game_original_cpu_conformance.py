@@ -33,10 +33,19 @@ class SourceCPUOpcodeConformanceCases(unittest.TestCase):
 
     def test_full_legal_CPU_opcodes_replay_from_original_machine_state(self):
         result = audit_cpu_opcode_matrix()
-        self.assertEqual(result["actual_total_single_step_source_replays"], 1000)
+        self.assertEqual(result["actual_total_single_step_source_replays"], 1128)
+        self.assertEqual(result["conditional_real_executions"], 64)
+        self.assertEqual(result["source_reference_opcodes_compared_to_actual_timing"], 564)
+        self.assertEqual(
+            len(result["conditional_source_receipts"]), 64
+        )
+        self.assertEqual(
+            sum(case["conditional_control_result"]["expected_branch_taken"]
+                for case in result["conditional_source_receipts"]), 32
+        )
         self.assertEqual(result["expected_illegal_base_opcodes_rejected"], 11)
         self.assertEqual(len(result["prefixed_instruction_receipts"]), 256)
-        self.assertEqual(result["source_reference_opcodes_compared_to_actual_timing"], 500)
+        self.assertEqual(result["source_reference_opcodes_compared_to_actual_timing"], 564)
         self.assertEqual(result["external_sm83_reference_commit"],
                          "376f61c86fdac2048f7ce5fe838ae756b306017e")
         with tempfile.TemporaryDirectory() as folder:
@@ -44,7 +53,7 @@ class SourceCPUOpcodeConformanceCases(unittest.TestCase):
             target.write_bytes(_canonical(result) + b"\n")
             accepted = _verify_cpu_opcode_matrix(Path(folder))
             self.assertTrue(accepted["accepted"])
-            self.assertEqual(accepted["source_cpu_instruction_steps_replayed"], 1000)
+            self.assertEqual(accepted["source_cpu_instruction_steps_replayed"], 1128)
             modified = copy.deepcopy(result)
             modified["prefixed_instruction_receipts"][255]["cb"] = 0
             from hashlib import sha256
@@ -69,6 +78,39 @@ class SourceCPUOpcodeConformanceCases(unittest.TestCase):
                 key: value for key, value in report.items() if key != "report_digest"
             })).hexdigest()
             p.write_bytes(_canonical(report) + b"\n")
+            with self.assertRaises(AcceptanceSuiteError):
+                _verify_cpu_opcode_matrix(Path(folder))
+
+    def test_all_conditional_branches_with_four_zc_states_and_real_stack_checks(self):
+        from scripts.audit_original_gameboy_cpu_opcodes import (
+            CONDITIONAL_BRANCHES, CONDITIONAL_FLAGS, _result,
+        )
+        from scripts.run_game_rom_acceptance_suite import _verify_cpu_opcode_matrix
+        results = [
+            _result(opcode, initial_flags=flags)
+            for opcode in CONDITIONAL_BRANCHES for flags in CONDITIONAL_FLAGS
+        ]
+        self.assertEqual(len(results), 64)
+        self.assertEqual(sum(row["conditional_control_result"]["expected_branch_taken"] for row in results), 32)
+        for row in results:
+            control = row["conditional_control_result"]
+            self.assertEqual(control["observed_pc_after"], control["expected_pc_after"])
+            self.assertEqual(control["observed_sp_after"], control["expected_sp_after"])
+            self.assertEqual(row["emulated_t_cycles"], row["reference_documented_t_cycles"])
+            self.assertEqual(row["source_snapshot_after_sha256"], row["repeated_snapshot_sha256"])
+
+    def test_rehashed_conditional_pc_record_cannot_pass_operator_acceptance(self):
+        report = audit_cpu_opcode_matrix()
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "original-cpu-opcodes.json"
+            report["conditional_source_receipts"][0]["conditional_control_result"][
+                "observed_pc_after"
+            ] += 1
+            from hashlib import sha256
+            report["report_digest"] = sha256(_canonical({
+                key: value for key, value in report.items() if key != "report_digest"
+            })).hexdigest()
+            path.write_bytes(_canonical(report) + b"\n")
             with self.assertRaises(AcceptanceSuiteError):
                 _verify_cpu_opcode_matrix(Path(folder))
 
