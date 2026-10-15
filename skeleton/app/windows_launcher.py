@@ -16,7 +16,7 @@ import sys
 import threading
 import webbrowser
 
-from skeleton.app.assembly import compose_command, load_manifest
+from skeleton.app.assembly import checks_ok, compose_command, load_manifest, preflight
 from skeleton.app.health import probe_application, probes_ok
 from skeleton.app.installer import InstallReceipt, install_application
 from skeleton.app.preloader import PreloadReport, inspect_host
@@ -556,6 +556,15 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
             if not args.quiet:
                 print("GGUF local acceptance failed: " + str(exc))
             return 1
+    if args.verify_payload:
+        # Docker-free verification of the real installed, frozen payload.
+        # Check the same architecture manifest paths that runtime setup uses.
+        checks = preflight(root, runtime=False, manifest=load_manifest())
+        if not args.quiet:
+            for check in checks:
+                state = "PASS" if check.ok else ("WARN" if not check.required else "FAIL")
+                print(f"[{state}] {check.code}: {check.message}")
+        return 0 if checks_ok(checks) else 1
     if args.check:
         report = check_host(root)
         if not args.quiet:
@@ -590,6 +599,8 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="Skeleton.exe")
     mode = result.add_mutually_exclusive_group()
+    mode.add_argument("--verify-payload", action="store_true",
+                      help="verify installed application source payload without Docker")
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--repair", action="store_true")
     mode.add_argument("--start", action="store_true")
