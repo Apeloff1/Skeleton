@@ -1733,7 +1733,9 @@ async def _prepare(scope, row, token):
     response_schema = _planner_response_schema(
         allowed,
         allow_done=allow_done,
-        payload_schemas=_planner_payload_schemas(schemas, allowed, context),
+        payload_schemas=_planner_payload_schemas(
+            schemas, allowed, context, workflow_stage=workflow.get("stage") if workflow else None
+        ),
     )
     _json({"prompt": prompt}, 256 * 1024)
     pending = {
@@ -3450,7 +3452,7 @@ async def _next_workflow_action(scope, row, token):
     return await _accept_response(scope, row, token)
 
 
-def _planner_payload_schemas(schemas, allowed, context):
+def _planner_payload_schemas(schemas, allowed, context, *, workflow_stage=None):
     """Translate existing owner forms; no values/actions are fabricated here."""
     result = {}
     for operation in sorted(allowed):
@@ -3559,6 +3561,31 @@ def _planner_payload_schemas(schemas, allowed, context):
                 and all(c in "0123456789abcdef" for c in manifest)
             ):
                 properties["expected_manifest_digest"]["enum"] = [manifest]
+        elif operation == "simulate" and workflow_stage == "original_simulate":
+            steps = properties["steps"]
+            if "anyOf" in steps:
+                non_null = [item for item in steps["anyOf"] if item.get("type") != "null"]
+                if len(non_null) != 1:
+                    raise GameLearningError(
+                        "studio_planner_schema_missing",
+                        "Positive simulation steps need one bounded owner form.",
+                        409,
+                    )
+                steps = non_null[0]
+            if (
+                steps.get("type") != "integer"
+                or steps.get("minimum", 0) < 1
+                or not isinstance(steps.get("maximum"), int)
+            ):
+                raise GameLearningError(
+                    "studio_planner_schema_missing",
+                    "Positive simulation steps need finite positive owner bounds.",
+                    409,
+                )
+            properties["steps"] = steps
+            properties.pop("action", None)
+            properties.pop("actions", None)
+            payload["required"] = [*payload.get("required", []), "steps"]
         elif operation == "world.edit":
             spec_digest = context.get("successor_spec_digest")
             if (
