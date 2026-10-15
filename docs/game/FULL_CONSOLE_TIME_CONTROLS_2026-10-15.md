@@ -13,7 +13,7 @@ These features do **not** magically enable non-libretro systems, GPU-render-only
 | Mode | Factor | Actual native work | Operator intent |
 |---|---:|---|---|
 | **Paused** | 0 | No `retro_run`, no state/step cursor change. Timing control and RGB inspection generate separate chained receipts. | Hold game scene for inspection |
-| **Slow** | 2, 4, 8 | Exactly **1** native `retro_run` per step; automatic viewer delay targets 1/2, 1/4 or 1/8 nominal cadence. | Locate transient assets, capture subtle effects and inspect movement |
+| **Slow** | 2, 4, 8 | Exactly **1** native `retro_run` per step; automatic viewer delay targets 1/2, 1/4 or 1/8 of the native core's reported nominal FPS (bounded 10–240 Hz, 60 Hz fallback). | Locate transient assets, capture subtle effects and inspect movement |
 | **Normal** | 1 | The approved game's configured 1–60 native frames per step. | Baseline observation and control |
 | **Fast** | 2, 4, 8 | 2/4/8 **separate real native steps** per batch with the game's configured frames per step. Each step has its own frame/audio/control evidence; only the final PNG preview is transferred. | Reduced browser/request overhead for bounded exploration and training-data collection |
 
