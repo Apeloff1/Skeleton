@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
 import {
   getStudioMirrorViews, getStudioScenarioDrafts,
-  getStudioEngineTestManifest, getStudioSalesReferences,
+  getStudioEngineTestManifest, getStudioSalesReferences, runStudioEngineProbePage,
   type StudioMirrorViews, type StudioScenarioDiscovery,
-  type StudioEngineTestManifest, type StudioSalesCatalog,
+  type StudioEngineTestManifest, type StudioSalesCatalog, type StudioEngineProbePage,
   type StudioCampaign,
 } from '../../src/product/gameStudioLearningClient';
 import { getAuthToken } from '../../src/auth/gameforgeAuth';
@@ -24,6 +24,8 @@ export default function GameStudioScenarioLabPanel({
   const [drafts, setDrafts] = useState<StudioScenarioDiscovery | null>(null);
   const [tests, setTests] = useState<StudioEngineTestManifest | null>(null);
   const [sales, setSales] = useState<StudioSalesCatalog | null>(null);
+  const [probePages, setProbePages] = useState<StudioEngineProbePage[]>([]);
+  const [probePending, setProbePending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sample = useRef(0);
@@ -36,6 +38,7 @@ export default function GameStudioScenarioLabPanel({
     setViews(null);
     setDrafts(null);
     setTests(null);
+    setProbePages([]);
     owner.current = campaign.campaign_id;
     tenantToken.current = getAuthToken();
   }, [campaign.campaign_id]);
@@ -95,6 +98,23 @@ export default function GameStudioScenarioLabPanel({
       if (owner.current === campaign.campaign_id && tenantToken.current === getAuthToken()) setTests(result);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : 'Cannot read this engine test plan.');
+    }
+  };
+  const probeEngine = async () => {
+    if (probePending) return;
+    const last = probePages[probePages.length - 1];
+    const offset = last ? last.actions.next_offset : 0;
+    if (offset === null) return;
+    setProbePending(true);
+    setError(null);
+    try {
+      const result = await runStudioEngineProbePage(editor, offset);
+      if (owner.current !== campaign.campaign_id || tenantToken.current !== getAuthToken()) return;
+      setProbePages(current => [...current, result]);
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : 'The engine action probe failed.');
+    } finally {
+      setProbePending(false);
     }
   };
   const loadSales = async () => {
@@ -173,6 +193,7 @@ export default function GameStudioScenarioLabPanel({
       <View style={group}>
         {button('Draft from committed evidence', () => { void loadDrafts(); })}
         {button('Per-engine exhaustive checklist', () => { void loadTests(); })}
+        {button(probePending ? 'Executing action replay…' : 'Run next 8 engine actions', () => { void probeEngine(); })}
         {button('Sales-informed design references', () => { void loadSales(); })}
       </View>
       {drafts && <View style={{ gap: 7 }}>
@@ -198,6 +219,18 @@ export default function GameStudioScenarioLabPanel({
         </Text>)}
         {tests.mandatory_checks.map(item => <Text key={item.id} style={muted}>☐ {item.id.replace(/_/g, ' ')}</Text>)}
         <Text selectable style={muted}>Registered actions: {tests.registered_actions.join(', ')}</Text>
+      </View>}
+      {!!probePages.length && <View style={{ gap: 8 }}>
+        <Text style={heading}>Actual engine action probes · {probePages.reduce((sum, page) => sum + page.actions.count, 0)} executed</Text>
+        <Text style={muted}>Each command is separately reset, executed and independently replayed. Invalid-in-initial-state actions are recorded as rejected, not successful gameplay. The full engine remains uncertified.</Text>
+        {probePages.map(page => <View key={page.actions.start} style={{ gap: 3 }}>
+          <Text style={heading}>Actions {page.actions.start + 1}–{page.actions.start + page.actions.count} of {page.actions.registered_action_count}</Text>
+          {page.actions.action_probes.map(probe => <Text key={probe.action} style={muted}>
+            {probe.accepted_in_initial_state ? '✓ accepted' : '◌ rejected in initial state'} · {probe.action} · independently replayed
+          </Text>)}
+        </View>)}
+        {probePages[probePages.length - 1].actions.next_offset === null
+          && <Text style={muted}>All declared actions visited. This does not establish complete state, native hardware or game quality coverage.</Text>}
       </View>}
       {sales && <View style={{ gap: 8 }}>
         <Text style={heading}>Ranked game design research · commercial signals, not game-quality labels</Text>

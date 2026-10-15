@@ -214,3 +214,15 @@ async def original_engine_test_manifest(editor: str,user=Depends(get_current_use
 async def sales_informed_design_references(user=Depends(get_current_user)):
     from skeleton.jeeves.game_studio_scenario_lab import sales_informed_catalog
     return sales_informed_catalog()
+
+
+@router.get("/engines/{editor}/probes")
+async def executable_engine_test_page(
+    editor: str,
+    offset: int = Query(default=0,ge=0,le=100000),
+    limit: int = Query(default=8,ge=1,le=16),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.engine_probe_page(
+        _scope(user),editor,offset=offset,limit=limit,
+    ))

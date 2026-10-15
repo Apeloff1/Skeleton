@@ -153,3 +153,36 @@ export async function getStudioSalesReferences(input: LearningRequest = {}) {
   ) invalid('Original game design references contain invalid ranking evidence.');
   return result;
 }
+
+export type StudioEngineProbePage = {
+  engine: string; release_certified: false; full_engine_state_exhausted: false;
+  contract: { engine: string; source_validation: true; same_seed_replay: true;
+    snapshot_reexecution: true; foreign_game_control_rejected: true; digest: string };
+  actions: {
+    engine: string; start: number; count: number; registered_action_count: number;
+    next_offset: number | null; action_protocol_passes: number;
+    accepted_initial_actions: number; rejected_initial_actions: number;
+    action_probes: {
+      action: string; accepted_in_initial_state: boolean;
+      rejected_in_initial_state: boolean; replay_verified: true; end_state_digest: string;
+    }[];
+    digest: string;
+  };
+};
+export async function runStudioEngineProbePage(
+  editor: string, offset = 0, input: LearningRequest = {},
+): Promise<StudioEngineProbePage> {
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) invalid('Engine test offset outside bounds.');
+  const value = await request<StudioEngineProbePage>(
+    'get', '/engines/' + id(editor) + '/probes?offset=' + offset + '&limit=8',
+    null, input,
+  );
+  if (value.engine !== editor || value.release_certified !== false
+      || value.full_engine_state_exhausted !== false
+      || value.actions.start !== offset || value.actions.count > 8
+      || !Array.isArray(value.actions.action_probes)
+      || value.actions.action_probes.length !== value.actions.count
+      || value.actions.action_probes.some(entry => entry.replay_verified !== true)
+      || JSON.stringify(value).length > 65536) invalid('Executable engine probe evidence differs.');
+  return value;
+}

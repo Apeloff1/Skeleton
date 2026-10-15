@@ -2193,3 +2193,32 @@ async def scenario_engine_test_manifest(scope, editor):
         return test_manifest(editor)
     except (ValueError, LearnerError) as exc:
         raise GameLearningError("test_manifest_engine", "Unknown studio engine.", 404) from exc
+
+
+_engine_probe_slots = asyncio.Semaphore(1)
+
+
+async def engine_probe_page(scope, editor, *, offset=0, limit=8):
+    """Read-only, owner-authenticated executable controls, never synthetic pass."""
+    if (type(offset) is not int or not 0 <= offset <= 100000
+            or type(limit) is not int or not 1 <= limit <= 16):
+        raise GameLearningError("engine_test_bounds", "Engine diagnostics page exceeds safe limits.", 422)
+    from skeleton.jeeves.game_studio_engine_diagnostics import (
+        run_engine_contract_diagnostics, engine_action_diagnostics,
+    )
+    from skeleton.jeeves.game_studio_scenario_lab import ScenarioLabError
+    from skeleton.jeeves.game_studio_engine_diagnostics import EngineDiagnosticsError
+    try:
+        async with _engine_probe_slots:
+            contract, actions = await asyncio.to_thread(
+                lambda: (
+                    run_engine_contract_diagnostics(editor),
+                    engine_action_diagnostics(editor,offset=offset,limit=limit),
+                )
+            )
+    except (ScenarioLabError, EngineDiagnosticsError, ValueError) as exc:
+        raise GameLearningError(
+            "engine_test_failed", "Actual engine diagnostic failed; no verified pass is claimed.", 409,
+        ) from exc
+    return {"engine":editor, "contract":contract, "actions":actions,
+            "release_certified":False,"full_engine_state_exhausted":False}
