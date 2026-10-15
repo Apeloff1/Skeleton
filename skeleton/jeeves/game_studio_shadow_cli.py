@@ -96,7 +96,7 @@ def execute_shadow_room(
                 train_policy=train_policy,
                 authorized=authorized,rights_cleared=rights_cleared,
             )
-        if verify_shadow_receipts(document) is not True:
+        if verify_shadow_receipts(document,source=source) is not True:
             raise ShadowSaturationError("source-bound shadow report failed receipt-chain verification")
         records=[row for sim in document["simulations"] for row in sim["receipts"]]
         by_digest={row["digest"]:row for row in records}
@@ -153,6 +153,65 @@ def execute_shadow_room(
         raise
 
 
+def verify_shadow_certificate(path:Path,ledger_path:Path,source:dict) -> dict:
+    """Offline independent full-engine re-execution and persisted ledger check."""
+    canonical=parse_studio_source(source)
+    doc=_read_json(Path(path),limit=16*1024*1024)
+    if (type(doc) is not dict or doc.get("schema_version")!=
+            "skeleton.game_builder.shadow_training_certificate.v1"
+            or doc.get("production_neural_weights_modified") is not False
+            or doc.get("universal_training_exhaustion_proven") is not False
+            or doc.get("automatic_production_promotion") is not False):
+        raise ShadowSaturationError("certificate cannot confer unverified production authority")
+    expected=sha256(json.dumps(
+        canonical,sort_keys=True,separators=(",",":"),allow_nan=False,
+    ).encode()).hexdigest()
+    if doc["source_digest"]!=expected:
+        raise ShadowSaturationError("independent original source differs from certificate")
+    if not verify_shadow_receipts(doc["laboratory"],source=canonical):
+        raise ShadowSaturationError("saved run cannot be re-executed against original engine")
+    ledger=Path(ledger_path)
+    if ledger.is_symlink() or not ledger.is_file() or ledger.stat().st_size>16*1024*1024:
+        raise ShadowSaturationError("ledger path changed or exceeds forensic capacity")
+    data=ledger.read_bytes()
+    if sha256(data).hexdigest()!=doc["ledger_sha256"]:
+        raise ShadowSaturationError("append-only log content differs from signed certificate")
+    available={
+        row["digest"]:row
+        for sim in doc["laboratory"]["simulations"]
+        for row in sim["receipts"]
+    }
+    count=0
+    found=set()
+    for line in data.splitlines():
+        try:
+            row=json.loads(line)
+        except (TypeError,ValueError) as exc:
+            raise ShadowSaturationError("corrupted append-only scrutiny log") from exc
+        count+=1
+        if (type(row) is not dict or
+                set(row)!={"schema_version","sequence","angle",
+                          "cycle","receipt_digest","receipt"} or
+                row["schema_version"]!=LEDGER_SCHEMA or
+                row["sequence"]!=count or
+                row["receipt_digest"] in found or
+                row["receipt_digest"] not in available or
+                row["receipt"]!=available[row["receipt_digest"]]):
+            raise ShadowSaturationError("persisted log event identity or sequence differs")
+        found.add(row["receipt_digest"])
+    if count!=doc["ledger_event_count"] or count!=len(available):
+        raise ShadowSaturationError("lost or duplicated durable scrutiny events")
+    return {
+        "independently_verified":True,
+        "source_engine":canonical["editor"],
+        "log_receipts_reexecuted":count,
+        "simulations_verified":doc["laboratory"]["parent_sim_count"],
+        "saturated_within_bounds":doc["laboratory"]["all_saturated_within_bounds"],
+        "universal_exhaustion_proven":False,
+        "production_neural_weights_modified":False,
+    }
+
+
 def main(argv=None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     group=parser.add_mutually_exclusive_group(required=True)
@@ -168,6 +227,7 @@ def main(argv=None) -> int:
     parser.add_argument("--workers",type=int,default=2)
     parser.add_argument("--angles",nargs="+",choices=ANGLES,default=list(ANGLES))
     parser.add_argument("--spectator-only",action="store_true")
+    parser.add_argument("--verify-only",action="store_true")
     parser.add_argument("--authorized",action="store_true")
     parser.add_argument("--rights-cleared",action="store_true")
     args=parser.parse_args(argv)
@@ -178,6 +238,10 @@ def main(argv=None) -> int:
     else:
         settings=json.loads(args.settings_json) if args.settings_json else None
         source=make_studio_source(args.engine,settings)
+    if args.verify_only:
+        result=verify_shadow_certificate(args.output,args.ledger,source)
+        print(json.dumps(result,sort_keys=True))
+        return 0
     result=execute_shadow_room(
         source=source,output=args.output,ledger_path=args.ledger,
         authorized=args.authorized,rights_cleared=args.rights_cleared,

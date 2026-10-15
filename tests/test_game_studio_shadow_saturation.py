@@ -12,7 +12,9 @@ from skeleton.jeeves.game_studio_shadow_saturation import (
     DRY_CYCLES_REQUIRED, ShadowSaturationError,
     run_shadow_saturation, verify_shadow_receipts,
 )
-from skeleton.jeeves.game_studio_shadow_cli import execute_shadow_room
+from skeleton.jeeves.game_studio_shadow_cli import (
+    execute_shadow_room, verify_shadow_certificate,
+)
 
 
 class ShadowSaturationTests(unittest.TestCase):
@@ -122,6 +124,16 @@ class ShadowSaturationTests(unittest.TestCase):
             self.assertTrue(outcome["all_saturated_within_bounds"])
             envelope=json.loads(target.read_text())
             self.assertTrue(verify_shadow_receipts(envelope["laboratory"]))
+            audited=verify_shadow_certificate(target,journal,self.source)
+            self.assertTrue(audited["independently_verified"])
+            self.assertEqual(audited["log_receipts_reexecuted"],
+                             outcome["ledger_event_count"])
+            changed=make_studio_source(
+                "economy",{"market_nodes":2,"goods":10,"trade_tax":11},
+                actions=("inspect",),
+            )
+            with self.assertRaises(ShadowSaturationError):
+                verify_shadow_certificate(target,journal,changed)
             self.assertEqual(
                 len(journal.read_text().splitlines()),
                 outcome["ledger_event_count"],

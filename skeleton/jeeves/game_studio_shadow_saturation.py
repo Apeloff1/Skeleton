@@ -334,6 +334,8 @@ def _one(source:dict,angle:str,base_seed:int,steps:int,
     out={
         "schema_version":"skeleton.game_builder.shadow_sim_result.v1",
         "editor":source["editor"],"angle":angle,
+        "source_digest":_digest(source),
+        "episode_step_budget":steps,
         "base_seed":base_seed,
         "cycles_executed":len(receipts),
         "total_primary_and_shadow_runs":2*len(receipts),
@@ -433,15 +435,21 @@ def run_shadow_saturation(source:Mapping[str,object], *, seed:int=0,
     return {**outcome,"digest":_digest(outcome)}
 
 
-def verify_shadow_receipts(document:dict) -> bool:
-    """Check exact log/digest lineage; source replay lives in generation."""
+def verify_shadow_receipts(document:dict, *,
+                           source:Mapping[str,object]|None=None) -> bool:
+    """Check every log chain; optionally re-execute the complete source again."""
     if type(document) is not dict or document.get("schema_version")!=SCHEMA:
         raise ShadowSaturationError("unknown shadow room receipt schema")
     value={k:v for k,v in document.items() if k!="digest"}
     if _digest(value)!=document.get("digest"):
         raise ShadowSaturationError("overall shadow room digest changed")
+    original=parse_studio_source(source) if source is not None else None
+    if original is not None and original["editor"]!=document["source_editor"]:
+        raise ShadowSaturationError("independent game source identity differs")
     for sim in document["simulations"]:
         payload={k:v for k,v in sim.items() if k!="digest"}
+        if original is not None and sim["source_digest"]!=_digest(original):
+            raise ShadowSaturationError("saved shadow source differs from independent replay source")
         if _digest(payload)!=sim["digest"]:
             raise ShadowSaturationError("shadow simulation evidence changed")
         previous=_digest({
@@ -471,6 +479,35 @@ def verify_shadow_receipts(document:dict) -> bool:
             dry=0 if gain else dry+1
             if row["zero_novelty_streak"]!=dry:
                 raise ShadowSaturationError("stalled-cycle count inconsistent with receipts")
+            if original is not None:
+                step_budget=sim["episode_step_budget"]
+                primary_commands=[x["action"] for x in row["primary_step_receipts"]]
+                shadow_commands=[x["action"] for x in row["shadow_step_receipts"]]
+                primary=_lane(
+                    original,sim["angle"],row["seed"],step_budget,
+                    scripted_actions=tuple(primary_commands),
+                )
+                cloned=_lane(
+                    original,sim["angle"],row["seed"],step_budget,
+                    scripted_actions=tuple(shadow_commands),
+                )
+                if (primary["digest"]!=row["primary_digest"]
+                    or cloned["digest"]!=row["shadow_digest"]
+                    or primary["multispectral"]["digest"]!=row["primary_multispectral_digest"]
+                    or cloned["multispectral"]["digest"]!=row["shadow_multispectral_digest"]):
+                    raise ShadowSaturationError(
+                        "independently rerun original source diverges from persisted cycle"
+                    )
+                # Reconstruct the actual branching checkpoint again, including
+                # its alternative action, rather than trusting a fork label.
+                witness,witness_proof=_fork(
+                    original,primary,sim["angle"],row["seed"],
+                    step_budget,row["cycle"]-1,
+                )
+                if witness["digest"]!=cloned["digest"] or (
+                    witness_proof!=row["fork"]
+                ):
+                    raise ShadowSaturationError("independent saved shadow fork differs")
             previous=row["digest"]
         if (previous!=sim["receipt_chain_head"] or
                 len(seen)!=sim["observed_unique_semantic_behaviors"] or

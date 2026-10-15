@@ -614,3 +614,28 @@ real GPU optics, all physically possible world outcomes and the
 production Jeeves transformer remain separate unsatisfied release
 requirements. Regression tests exist but exact-head execution,
 perf soak and E2E still require verification.
+
+### Reverify receipts against the actual source after completion
+
+The saved certificate is not accepted just because its JSON hashes
+match. A second independent, operator-invoked verification can re-run
+every recorded primary and shadow path against the same canonical
+source, reconstruct each saved intermediate fork and alternate action,
+confirm original-game transition digests, and match every persistent
+ledger entry to the recovered receipt set and its precise write order.
+
+```bash
+python -m skeleton.jeeves.game_studio_shadow_cli \
+  --engine economy --output /private/receipts/game-shadow-certificate.json \
+  --ledger /private/receipts/game-shadow.ndjson \
+  --verify-only
+```
+
+This mode **reads** existing saved files, does not issue new candidate
+training or change original worlds, and refuses certificates if the
+source, receipt history, source action replay, checkpoint fork or
+serialized append-only log differs. The default training command now
+runs this same independent source reconstruction before issuing its
+own final certificate. The live spectator endpoint does not perform
+these exhaustive post-hoc full-room reverifications on each request
+because it is intentionally restricted to short read-only previews.
