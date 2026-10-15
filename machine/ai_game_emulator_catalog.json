@@ -583,5 +583,30 @@
     "qualifier": "run_emulator_qualification accepts either actions or controller_tape; operator CLI --controller-tape-json uses strict size, schema and duplicate-key validation",
     "safety": "1–64 frames, maximum four controller ports, 2–10 replay runs, bounded native worker, no ROM/firmware fetching, no automatic game or model success promotion",
     "limits": "No instrument-specific accuracy, controller emulation completeness, rights verification, game playability or weight gain established"
+  },
+  "boomerang_emulator_exploration_2026_10_15": {
+    "state": "Implemented native operator-run exploration; actual native execution and model training not performed during code update",
+    "entrypoint": "run_emulator_exploration in skeleton/jeeves/game_emulator_exploration.py",
+    "command": "python3 scripts/qualify_game_emulator.py --registry /path/cores.json --target nes --core fceumm --source /path/lawful-homebrew.nes --action idle --action a --explore-scenarios 24 --stagnation-window 10 --runs 2",
+    "candidate_transformations": [
+      "baseline",
+      "reverse input order",
+      "direction mirror",
+      "single/half rotation",
+      "edge-to-center interleave",
+      "bounded seeded single-action perturbations"
+    ],
+    "boomerang": "After each 4 evaluations, seeded revisit of an earlier scenario; shuffle all previous templates after queue exhaustion and periodically prioritize baseline",
+    "budgets": {
+      "maximum_scenarios": 80,
+      "maximum_requested_frame_and_reset_budget": 131072,
+      "replays_per_scenario": "2..10",
+      "stagnation_window": "3..20",
+      "actions_per_scenario": "1..64"
+    },
+    "novelty": "Distinct observed final video/audio SHA-256 combinations across real fresh sandboxed worker runs; no claim of learning gain",
+    "stop": "Ten consecutive no-new-observation scenarios by default, or explicit maximum scenario budget, whichever occurs first",
+    "promotion": "No model weight updates or rights, hardware compatibility, game victory or human-level proof; actual training only through separately gated model training",
+    "no_rom_or_bios_fetched": true
   }
 }

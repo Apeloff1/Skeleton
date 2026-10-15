@@ -87,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     from skeleton.jeeves.game_emulator_host import _ACTIONS, _KEY_ACTIONS
     from skeleton.jeeves.game_emulator_qualification import run_emulator_qualification
+    from skeleton.jeeves.game_emulator_exploration import run_emulator_exploration
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--registry", type=Path, required=True, help="Approved local cores.json (no download)")
@@ -96,7 +97,9 @@ def main(argv: list[str] | None = None) -> int:
     tape_group = parser.add_mutually_exclusive_group(required=True)
     tape_group.add_argument("--action", action="append", choices=sorted((*_ACTIONS, *_KEY_ACTIONS)))
     tape_group.add_argument("--controller-tape-json", type=Path, help="Explicit 1–64 step JSON input tape for four-player button/axis/key/mouse/pointer controls")
-    parser.add_argument("--runs", type=int, default=3, help="2–10 independent isolated worker sessions")
+    parser.add_argument("--runs", type=int, default=3, help="2–10 independent isolated worker sessions per scenario")
+    parser.add_argument("--explore-scenarios", type=int, help="Explicit bounded deterministic boomerang exploration, 2–80 total scenarios")
+    parser.add_argument("--stagnation-window", type=int, default=10, help="Stop exploration after 3–20 scenarios with no new audiovisual outcome (default 10)")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--frames-per-step", type=int, default=1)
     parser.add_argument("--controller-device", action="append", choices=("none", "joypad", "mouse", "keyboard", "analog", "pointer"))
@@ -116,22 +119,44 @@ def main(argv: list[str] | None = None) -> int:
         registry.resolve_core(args.core)
         os.environ[REGISTRY_ENV] = str(registry_path)
         tape = _read_controller_tape(args.controller_tape_json) if args.controller_tape_json is not None else None
-        result = run_emulator_qualification(
-            args.target,
-            core_id=args.core,
-            expected_registry_digest=registry.registry_digest,
-            rom_source=source,
-            filename=name,
-            actions=args.action,
-            controller_tape=tape,
-            runs=args.runs,
-            seed=args.seed,
-            frames_per_step=args.frames_per_step,
-            controller_devices=args.controller_device,
-            timeout_seconds=args.timeout_seconds,
-            rights_evidence_digest=args.rights_evidence_digest,
-            include_traces=args.include_traces,
-        )
+        if args.explore_scenarios is not None:
+            if tape is not None:
+                raise ValueError("Boomerang exploration currently requires policy actions; raw multi-port tapes use regular qualification")
+            if args.include_traces:
+                raise ValueError("Boomerang exploration returns bounded receipts, not large raw trace exports")
+            result = run_emulator_exploration(
+                args.target,
+                core_id=args.core,
+                expected_registry_digest=registry.registry_digest,
+                rom_source=source,
+                filename=name,
+                actions=args.action,
+                runs_per_scenario=args.runs,
+                max_scenarios=args.explore_scenarios,
+                stagnation_window=args.stagnation_window,
+                seed=args.seed,
+                frames_per_step=args.frames_per_step,
+                controller_devices=args.controller_device,
+                timeout_seconds=args.timeout_seconds,
+                rights_evidence_digest=args.rights_evidence_digest,
+            )
+        else:
+            result = run_emulator_qualification(
+                args.target,
+                core_id=args.core,
+                expected_registry_digest=registry.registry_digest,
+                rom_source=source,
+                filename=name,
+                actions=args.action,
+                controller_tape=tape,
+                runs=args.runs,
+                seed=args.seed,
+                frames_per_step=args.frames_per_step,
+                controller_devices=args.controller_device,
+                timeout_seconds=args.timeout_seconds,
+                rights_evidence_digest=args.rights_evidence_digest,
+                include_traces=args.include_traces,
+            )
         print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
         return 0
     except (ValueError, OSError, RuntimeError) as exc:
