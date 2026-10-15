@@ -95,6 +95,16 @@ class JeevesGameCorpusTests(unittest.TestCase):
             self.assertFalse(receipt["heldout_used_for_training"])
             self.assertTrue(receipt["benchmark_overlap_checked"])
 
+    def test_short_embedded_game_question_is_not_a_safe_holdout(self) -> None:
+        from skeleton.ai.training.jeeves_game_corpus import _split_contamination
+        self.assertTrue(_split_contamination(
+            "Unlock hidden gate", "When exploring ruins, unlock hidden gate before sunset."
+        ))
+        self.assertTrue(_split_contamination("choose an ending", "choose an ending"))
+        self.assertFalse(_split_contamination(
+            "Repair a forest bridge", "Negotiate peace with strangers near the harbor."
+        ))
+
     def test_file_modification_invalidates_admission_sha(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
