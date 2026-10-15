@@ -77,6 +77,7 @@ def _preview(env: Any) -> dict[str, Any]:
         "audio_sha256": frame["audio_sha256"],
         "audio_frames": frame["audio_frames"],
         "frame_calls": frame["runs"],
+        "native_fps": frame.get("fps"),
         "video_callbacks": frame["video_callbacks"],
         "width": frame["width"],
         "height": frame["height"],
