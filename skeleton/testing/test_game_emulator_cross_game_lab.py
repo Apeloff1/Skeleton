@@ -58,6 +58,9 @@ class ControlledSourceMultiGameExperiments(unittest.TestCase):
         self.assertEqual(len(result["pairwise_measured_evidence"]), 1)
         self.assertFalse(result["pairwise_measured_evidence"][0]["gameplay_skill_or_causation_established"])
         self.assertEqual(result["ai_training_gradient_updates"], 0)
+        self.assertEqual(result["candidate_numeric_source_rows"], 16)
+        self.assertEqual(len(result["candidate_numeric_dataset_sha256"]), 64)
+        self.assertFalse(result["cross_game_feature_alignment_inferred"])
         for game in result["game_receipts"]:
             self.assertEqual(len(game["controller_programs"]), 4)
             self.assertEqual(game["source_kind"], "builtin")
@@ -68,6 +71,10 @@ class ControlledSourceMultiGameExperiments(unittest.TestCase):
                 for transition in phase["controlled_source_step_receipts"]:
                     self.assertEqual(len(transition["measured_source_projection_sha256"]), 64)
                     self.assertIsNone(transition["declared_native_transition_sha256"])
+                    self.assertIsInstance(transition["source_observation"], dict)
+                    self.assertIsInstance(transition["source_next_observation"], dict)
+                    self.assertIsInstance(transition["source_reward_components"], dict)
+                    self.assertIsInstance(transition["source_visual_change_observed"], bool)
 
     def test_rehashed_fake_frame_and_pairwise_metrics_cannot_pass_source_gate(self):
         real = compare_real_emulator_games(
@@ -89,6 +96,13 @@ class ControlledSourceMultiGameExperiments(unittest.TestCase):
                 )),
             ("invented_neural_learning", lambda item:
                 item.__setitem__("ai_training_gradient_updates", 99)),
+            ("fabricated_numeric_reward", lambda item:
+                item["game_receipts"][0]["controller_programs"][0][
+                    "controlled_source_step_receipts"][0]["source_reward_components"].__setitem__(
+                        "visual_change", 0.875
+                    )),
+            ("tampered_numeric_dataset_digest", lambda item:
+                item.__setitem__("candidate_numeric_dataset_sha256", "f" * 64)),
         )
         for label, change in cases:
             with self.subTest(label=label):
