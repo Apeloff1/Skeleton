@@ -1035,6 +1035,16 @@ class EmulatorEnvironment:
                 "emulator_episode_inactive", "Reset an active native episode before stepping"
             )
         controls = _controls(controls)
+        # Inert input on disconnected ports is not accepted as training evidence.
+        # Never record an action as applied if no hardware port can receive it.
+        for port, row in enumerate(controls):
+            if self._controller_devices[port] == "none" and (
+                row["buttons"] or any(row["axes"]) or row["keys"]
+                or any(row["mouse"]) or any(row["pointer"])
+            ):
+                raise EmulatorHostError(
+                    "invalid_emulator_controller", "Unconnected native controller port carries input"
+                )
         previous = self._chain
         metadata, blocks = self._exchange("step", {"frames": self.frames_per_step, "controls": controls})
         self._steps += 1
