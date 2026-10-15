@@ -248,4 +248,30 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
     return train_texts, heldout_texts, receipt
 
 
+def main(argv: list[str] | None = None) -> int:
+    """Validate a rights-approved corpus without opening a model or running SGD."""
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        _training, _heldout, receipt = load_approved_corpus(args.manifest)
+        print(json.dumps({
+            "status": "valid_dataset_pending_independent_rights_confirmation",
+            **receipt,
+            "model_weights_modified": False,
+            "training_executed": False,
+        }, indent=2, sort_keys=True, allow_nan=False))
+        return 0
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
+        print(json.dumps({"status": "blocked", "reason": str(exc)[:400]}), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
 __all__ = ["SCHEMA", "RIGHTS_SCHEMA", "FAMILIES", "load_approved_corpus"]
