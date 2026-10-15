@@ -184,10 +184,19 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           epochs: int, lr: float, min_coverage: float, max_domain_regression: float,
           expand_vocabulary: bool = False,
           max_optimizer_steps: int = 25000,
-          max_training_seconds: int = 1200) -> dict[str, Any]:
+          max_training_seconds: int = 1200,
+          progress_directory: Path | None = None,
+          progress_run_id: str | None = None,
+          resume: bool = False) -> dict[str, Any]:
     from skeleton.cortex.transformer import TinyTransformer
     from skeleton.cortex.bpe import BytePairEncoder
 
+    if type(resume) is not bool:
+        raise ValueError("resume must be boolean")
+    if (progress_directory is None) != (progress_run_id is None):
+        raise ValueError("progress_directory and progress_run_id must be supplied together")
+    if resume and progress_directory is None:
+        raise ProductionCheckpointError("resume requires a pinned progress directory and run ID")
     if type(max_optimizer_steps) is not int or not 1 <= max_optimizer_steps <= 1000000:
         raise ValueError("max_optimizer_steps must be an integer in [1, 1000000]")
     if type(max_training_seconds) is not int or not 1 <= max_training_seconds <= 86400:
@@ -272,21 +281,76 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "real game curriculum optimizer updates exceed operator budget: "
             + str(expected_steps) + " > " + str(max_optimizer_steps)
         )
-    # Bound work by small batches, checking a monotonic deadline between them.
-    # A single in-progress document is not preemptible by this mechanism.
-    deadline = time.monotonic() + max_training_seconds
+    # Stage a full clone after each small batch. Every persisted cursor binds
+    # to the same parent, curriculum bytes, model selection and optimizer plan.
+    batches = [
+        dataset[offset:offset + 8]
+        for _ in range(epochs)
+        for offset in range(0, len(dataset), 8)
+    ]
+    progress = None
+    start_batch = 0
     observed_steps = 0
-    for _ in range(epochs):
-        for offset in range(0, len(dataset), 8):
-            if time.monotonic() >= deadline:
-                raise ProductionCheckpointError("training time budget expired")
-            batch = dataset[offset:offset + 8]
+    if progress_directory is not None:
+        from .jeeves_training_progress import CandidateProgress
+        config_digest = sha256(json.dumps({
+            "dataset": list(dataset),
+            "heldout": heldout,
+            "epochs": epochs,
+            "learning_rate": lr,
+            "max_optimizer_steps": max_optimizer_steps,
+            "min_coverage": min_coverage,
+            "max_domain_regression": max_domain_regression,
+            "native_vocabulary_expansion": expand_vocabulary,
+            "active_model_key": selected_key,
+            "architecture": "torch-stack" if torch_stack else "TinyTransformer",
+            "expected_optimizer_updates": expected_steps,
+            "batch_size": 8,
+        }, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            allow_nan=False).encode("utf-8")).hexdigest()
+        progress = CandidateProgress(
+            directory=progress_directory, run_id=progress_run_id,
+            parent_sha256=parent_sha, config_digest=config_digest,
+            total_batches=len(batches), parent_steps=steps_before,
+            selected_model_key=selected_key,
+        )
+        restored = progress.latest(resume=resume)
+        if restored is None:
+            progress.write(0, model.snapshot())
+        else:
+            start_batch, state = restored
+            resumed_snapshot = state["snapshot"]
+            # The resumable architecture and token IDs must match the exact
+            # parent-derived candidate we would have trained from scratch.
+            if resumed_snapshot.get("itos") != model.itos:
+                raise ProductionCheckpointError("resumed tokenizer vocabulary differs from the pinned corpus")
             if torch_stack:
-                observed_steps += model.fit(batch, lr=lr)
+                model = TorchTransformer.from_snapshot(resumed_snapshot)
+                if model.snapshot().get("state") != resumed_snapshot.get("state"):
+                    raise ProductionCheckpointError("resumed Torch weights differ from committed optimizer stage")
             else:
-                observed_steps += model.fit(batch, lr=lr, schedule="cosine")
-            if time.monotonic() >= deadline:
-                raise ProductionCheckpointError("training time budget expired after batch")
+                model = TinyTransformer.from_snapshot(resumed_snapshot)
+                model.bpe = BytePairEncoder.from_snapshot(original["bpe"])
+                if model.snapshot().get("E") != resumed_snapshot.get("E"):
+                    raise ProductionCheckpointError("resumed native weights differ from committed optimizer stage")
+            observed_steps = state["receipt"]["completed_updates"]
+            if model.steps - steps_before != observed_steps:
+                raise ProductionCheckpointError("resumed weight cursor differs from recorded SGD steps")
+    deadline = time.monotonic() + max_training_seconds
+    for batch_index in range(start_batch, len(batches)):
+        if time.monotonic() >= deadline:
+            raise ProductionCheckpointError("training time budget expired; committed cursor is resumable")
+        batch = batches[batch_index]
+        if torch_stack:
+            observed_steps += model.fit(batch, lr=lr)
+        else:
+            observed_steps += model.fit(batch, lr=lr, schedule="cosine")
+        # Commit progress BEFORE checking the deadline after each batch.
+        # An elapsed-time rejection must preserve the last completed work.
+        if progress is not None:
+            progress.write(batch_index + 1, model.snapshot())
+        if time.monotonic() >= deadline:
+            raise ProductionCheckpointError("training time budget expired; committed cursor is resumable")
     if observed_steps != expected_steps or model.steps - steps_before != expected_steps:
         raise ProductionCheckpointError("actual optimizer steps differ from admitted budget")
     trained_snapshot = model.snapshot()
@@ -316,6 +380,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "observed_optimizer_updates": observed_steps,
         "max_optimizer_steps": max_optimizer_steps,
         "max_training_seconds": max_training_seconds,
+        "resumed_from_committed_batch": start_batch,
+        "committed_training_batches": len(batches) if progress is not None else 0,
+        "progress_run_id": progress_run_id,
+        "training_resume_supported": progress is not None,
         "vocabulary_coverage_before": vocab_coverage_before,
         "vocabulary_coverage": vocab_coverage,
         "vocabulary_expansion": expansion,
@@ -357,6 +425,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--max-optimizer-steps", type=int, default=25000)
     parser.add_argument("--max-training-seconds", type=int, default=1200)
+    parser.add_argument("--progress-directory", type=Path)
+    parser.add_argument("--run-id")
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--learning-rate", type=float, default=0.005)
     parser.add_argument("--min-coverage", type=float, default=0.80)
     parser.add_argument("--expand-vocabulary", action="store_true",
@@ -370,7 +441,10 @@ def main(argv: list[str] | None = None) -> int:
                        max_domain_regression=args.max_domain_regression,
                        expand_vocabulary=args.expand_vocabulary,
                        max_optimizer_steps=args.max_optimizer_steps,
-                       max_training_seconds=args.max_training_seconds)
+                       max_training_seconds=args.max_training_seconds,
+                       progress_directory=args.progress_directory,
+                       progress_run_id=args.run_id,
+                       resume=args.resume)
         print(json.dumps({k: v for k, v in result.items() if not k.startswith("generated_")},
                          sort_keys=True, allow_nan=False))
         return 0 if result["status"] != "rejected_evaluation_gate" else 3
