@@ -24,6 +24,8 @@ def main(argv:list[str]|None=None)->int:
     parser.add_argument("--output-dir",type=Path,required=True)
     parser.add_argument("--deep-hash",action="store_true",
                         help="Read and SHA-256 all declared local disc/media files; can take substantial disk I/O")
+    parser.add_argument("--probe-sandbox",action="store_true",
+                        help="Actually launch a minimal bwrap sandbox containing only /usr/bin/true; no ROM or model")
     args=parser.parse_args(argv)
     try:
         if args.registry.is_symlink() or args.output_dir.is_symlink():
@@ -35,14 +37,18 @@ def main(argv:list[str]|None=None)->int:
             raise ValueError("Operator core registry was changed before readiness check")
         model=_read_json_file(args.manifest,MAX_MANIFEST_BYTES)
         report=inspect_game_comparison_readiness(
-            model,deep_hash=args.deep_hash,registry=registry,
+            model,deep_hash=args.deep_hash,probe_sandbox=args.probe_sandbox,registry=registry,
         )
         out=args.output_dir.resolve()
         out.mkdir(parents=True,exist_ok=True)
         destination=out/(report["study_id"]+".readiness.json")
         _atomic_write(destination,json.dumps(report,indent=2,sort_keys=True,allow_nan=False).encode())
-        prepared=sum(
+        source_prepared=sum(
             b["source_and_core_admitted"] and b["disk_issue"] is None
+            for b in report["cohorts"]
+        )
+        prepared=sum(
+            b["ready_for_simultaneous_live_desk"]
             for b in report["cohorts"]
         )
         print(json.dumps({
@@ -50,7 +56,10 @@ def main(argv:list[str]|None=None)->int:
             "study_id":report["study_id"],
             "games":report["game_count"],
             "preflight_admitted_games":report["game_preflight_pass_count"],
+            "source_preflight_cohorts":source_prepared,
             "ready_study_cohorts":prepared,
+            "host_runtime_blockers":report["host_runtime"]["blockers"],
+            "sandbox_probe":report["host_runtime"]["sandbox_probe"],
             "total_study_cohorts":len(report["cohorts"]),
             "full_disc_hash_checked":args.deep_hash,
             "report":str(destination),

@@ -92,12 +92,16 @@ def _bundle_file_audit(game: Mapping[str,Any], *, deep_hash: bool) -> dict[str,A
 def inspect_game_comparison_readiness(
     study: Mapping[str,Any], *,
     deep_hash: bool = False,
+    probe_sandbox: bool = False,
     registry: GameEmulatorRegistry | None = None,
     free_temp_bytes: int | None = None,
 ) -> dict[str,Any]:
     """Report precise build/install blockers without launching a libretro core."""
-    if type(deep_hash) is not bool:
-        raise ComparisonReadinessError("Deep media checksum mode must be explicit")
+    if type(deep_hash) is not bool or type(probe_sandbox) is not bool:
+        raise ComparisonReadinessError("Host and media probes must be exact booleans")
+    from .game_comparison_host_preflight import inspect_native_host_runtime
+
+    host=inspect_native_host_runtime(probe_sandbox=probe_sandbox)
     model=validate_study(dict(study))
     plan=plan_study(model)
     installed=registry if registry is not None else GameEmulatorRegistry.from_environment()
@@ -166,6 +170,12 @@ def inspect_game_comparison_readiness(
             "source_and_core_admitted":all(games[id]["source_and_registry_preflight_passed"] for id in batch["game_ids"]),
             "temporary_disk_budget_bytes":budget,
             "disk_issue":disk_error,
+            "host_runtime_prerequisites_passed":host["native_launch_preflight_passed"],
+            "ready_for_simultaneous_live_desk":(
+                len(concurrency)==1 and disk_error is None
+                and host["native_launch_preflight_passed"]
+                and all(games[identity]["source_and_registry_preflight_passed"] for identity in batch["game_ids"])
+            ),
         })
     compact=sorted(games)
     report={
@@ -177,6 +187,8 @@ def inspect_game_comparison_readiness(
         "maximum_simultaneous_games":model["max_active"],
         "pair_count":len(model["pairs"]),
         "available_temporary_disk_bytes_at_preflight":free_temp_bytes,
+        "host_runtime":host,
+        "ready_for_all_live_study_cohorts":all(c["ready_for_simultaneous_live_desk"] for c in cohorts),
         "game_preflight_pass_count":sum(x["source_and_registry_preflight_passed"] for x in games.values()),
         "core_input_hardware_qualified_count":0,
         "full_media_hash_checks_performed":deep_hash,
