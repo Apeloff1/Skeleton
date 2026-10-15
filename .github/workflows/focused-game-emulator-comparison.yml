@@ -71,8 +71,6 @@ jobs:
             tests.test_game_comparison_scientific_gates \
             tests.test_game_comparison_boomerang \
             tests.test_game_comparison_multispectral \
-            tests.test_game_emulator_homebrew_native_abi \
-            tests.test_game_emulator_homebrew_bwrap_host \
             tests.test_game_comparison_live_http \
             tests.test_game_comparison_raw_qualification_regression \
             tests.test_game_comparison_readiness \
@@ -83,6 +81,21 @@ jobs:
             tests.test_game_comparison_signal_features \
             tests.test_game_comparison_inspiration \
             tests.test_game_comparison_uptake
+      - name: Prove compiled homebrew core and isolated Bubblewrap host actually executed
+        run: |
+          python - <<'PY'
+          import unittest
+          from tests.test_game_emulator_homebrew_native_abi import NativeCompiledLibretroAbiContracts
+          from tests.test_game_emulator_homebrew_bwrap_host import NativeIsolatedHomebrewCoreContract
+
+          suite=unittest.TestSuite()
+          for cls in (NativeCompiledLibretroAbiContracts,NativeIsolatedHomebrewCoreContract):
+              suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(cls))
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          if result.testsRun != 2 or result.skipped or result.errors or result.failures:
+              raise SystemExit("Native host qualification must EXECUTE both tests; skipped is not a pass")
+          print("Qualified actual homebrew libretro ABI and isolated Bubblewrap worker; no commercial ROM tested.")
+          PY
       - name: Verify no source test invoked native ROM qualification
         if: success()
         run: |

@@ -91,3 +91,26 @@ def test_same_source_id_cannot_be_replaced_with_different_content():
             mime_type="text/plain",payload=b"Tampered",
         )
     assert intake._assets["stable"].size_bytes==len(b"Original")
+
+
+def test_governed_corpus_real_verified_wav_roundtrip_and_tamper_guard():
+    from skeleton.ai.runtime.learning_foundation.multimodal import (
+        LearningModality, MultimodalCorpus, MultimodalFoundationError,
+    )
+    corpus=MultimodalCorpus()
+    record=corpus.ingest(
+        record_id="operator-homebrew-audio",
+        modality=LearningModality.AUDIO,
+        media_type="audio/wav",
+        payload=_wav(),
+        source_refs=("source:homebrew-fixture",),
+        rights_refs=("rights:synthetic-testing",),
+        verified=True,
+    )
+    assert corpus.get(record.record_id)==record
+    source=corpus.intake._assets[record.record_id]
+    assert isinstance(source,VerifiedMultimodalAsset)
+    assert corpus._asset_validation_digests[record.record_id]==source.validation.digest
+    corpus._asset_validation_digests[record.record_id]="0"*64
+    with pytest.raises(MultimodalFoundationError):
+        corpus.get(record.record_id)
