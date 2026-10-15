@@ -224,6 +224,53 @@ def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
     }
 
 
+def _verify_cpu_bus_arbitration(directory: Path) -> dict[str, Any]:
+    document, ref = _json_file(directory / "original-cpu-bus.json")
+    _verify_digest(document, "report_digest")
+    from scripts.audit_original_gameboy_bus_arbitration import SCHEMA as BUS_SCHEMA
+    findings = document.get("tested_source_bus_constraints")
+    if (
+        document.get("schema_version") != BUS_SCHEMA
+        or document.get("status") != "original_DMG_source_bus_arbitration_passed"
+        or document.get("source") != "real_GameBoyMachine_CPU_HRAM_video_and_DMA_source"
+        or document.get("synthetic_original_cartridges_only") is not True
+        or not isinstance(findings, list) or len(findings) != 21
+        or len(set(findings)) != len(findings)
+        or document.get("actual_CPU_memory_and_DMA_reference_checks") != len(findings)
+        or document.get("cpu_dma_hram_only") is not True
+        or document.get("cpu_video_ppu_mode_lockout") is not True
+        or document.get("real_DMA_and_PPU_source_memories_unblocked") is not True
+        or document.get("exact_inflight_DMA_savestate_replay") is not True
+        or document.get("source_video_timing_dot_perfect") is not False
+        or document.get("cpu_DMA_interrupt_bus_microcycles_certified") is not False
+        or document.get("production_model_weights_updated") is not False
+    ):
+        raise AcceptanceSuiteError("real source Game Boy CPU bus arbitration evidence incomplete")
+    if not isinstance(document.get("machine_rom_digest"), str) or len(document["machine_rom_digest"]) != 64:
+        raise AcceptanceSuiteError("owned source CPU bus ROM identity unavailable")
+    expected = {
+        "active_DMA_CPU_external_WRAM_read_is_open_bus",
+        "active_DMA_CPU_WRAM_write_ignored",
+        "active_DMA_CPU_HRAM_read_allowed",
+        "active_DMA_CPU_HRAM_write_allowed",
+        "unmodeled_external_opcode_fetch_fails_closed",
+        "PPU_VRAM_mode3_read_blocked",
+        "PPU_OAM_mode2_read_blocked",
+        "PPU_OAM_mode3_read_blocked",
+        "LCDC_off_OAM_write_allowed",
+        "inflight_OAM_DMA_full_replay_identical",
+    }
+    if not expected.issubset(set(findings)):
+        raise AcceptanceSuiteError("critical DMA/PPU source bus cases absent from CPU proof")
+    return {
+        "accepted": True,
+        "original_cpu_bus_checks": len(findings),
+        "inflight_DMA_rewind_reproducible": True,
+        "reference": ref,
+        "full_electrical_hardware_accurate": False,
+    }
+
+
 def _verify_interrupt_matrix(directory: Path) -> dict[str, Any]:
     result, reference = _json_file(directory / "original-interrupt-control.json")
     _verify_digest(result, "report_digest")
@@ -627,6 +674,14 @@ def run_acceptance_suite(
                 output_directory, "focused_synthetic_and_real_original_rom_regressions",
                 seconds=process_timeout_seconds,
             ))
+        bus_path = output_directory / "original-cpu-bus.json"
+        processes.append(_run(
+            [sys.executable, "scripts/audit_original_gameboy_bus_arbitration.py",
+             "--evidence-file", str(bus_path)],
+            output_directory, "original_dmg_cpu_dma_ppu_bus_arbitration",
+            seconds=process_timeout_seconds,
+        ))
+        cpu_bus = _verify_cpu_bus_arbitration(output_directory)
         interrupt_path = output_directory / "original-interrupt-control.json"
         processes.append(_run(
             [
@@ -719,6 +774,7 @@ def run_acceptance_suite(
             "all_legal_source_opcodes_replay_verified": True,
             "independent_cpu_alu_flags_reference_verified": True,
             "real_interrupt_priority_and_IME_control_replay_verified": True,
+            "cpu_DMA_and_PPU_bus_arbitration_verified": True,
             "source_q_rewind_proven": True,
             "neural_candidate_optimized_and_scored": True,
             "source_goal_replay_and_neutral_control_verified": True,
@@ -729,6 +785,7 @@ def run_acceptance_suite(
             "original_cpu_opcode_coverage": opcode_matrix,
             "original_cpu_alu_reference": alu_reference,
             "original_cpu_interrupt_control": interrupts,
+            "original_cpu_bus_arbitration": cpu_bus,
             "bounded_worker_receipts": processes,
             "real_libretro_installed_core_tested": False,
             "independent_game_hardware_accuracy_certified": False,
