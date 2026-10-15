@@ -28,10 +28,13 @@ from .game_studio_rule_curriculum import (
 )
 
 SCHEMA = "skeleton.game_builder.scenario_lab.v1"
-MAX_LANES = 6
+MAX_LANES = 10
 MAX_STEPS = 48
-MAX_FRAMES = 5
-ANGLES = ("explore", "progress", "safety", "economy", "adversary", "boundary")
+MAX_FRAMES = 3
+ANGLES = (
+    "explore", "progress", "safety", "economy", "adversary",
+    "boundary", "temporal", "causal", "perturbation", "recovery",
+)
 MOTIFS = (
     # Publisher reported worldwide unit sales, 2026-06-30.
     {"reference":"Mario Kart 8 Deluxe","chart":"nintendo_switch_2026_06_30",
@@ -293,6 +296,10 @@ def _choose(actions: tuple[str,...], angle: str, step: int, seed: int,
         "economy": ("sell:1","buy:1","collect","craft","harvest","survey"),
         "adversary": ("left","back","wait","inspect","down","retreat"),
         "boundary": ("inspect","tick","wait","end_turn","survey"),
+        "temporal": ("tick","wait","advance","inspect","turn","end_turn"),
+        "causal": ("buy:1","sell:1","produce","invest","craft","use","play"),
+        "perturbation": ("jump","back","left","down","dodge","guard","inspect"),
+        "recovery": ("rest","heal","repair","save:0","load:0","retreat","inspect"),
     }[angle]
     usable=[x for x in actions if any(x==p or x.startswith(p+":") for p in candidates)]
     if angle=="boundary" and step%3==0:
@@ -367,6 +374,11 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
             "frames":previews,
             "native_frames":False,
         }
+        # Every lane is independently replayed under all ten scrutiny gates,
+        # with ten numeric analysis channels and reverse prefix checks.
+        from .game_studio_multispectral import audit_simulation
+        result["multispectral"]=audit_simulation(source,result,steps=steps)
+        result["audit_passed"]=result["multispectral"]["passed_count"]==10
         return {**result,"digest":_hash(result)}
     finally:
         env.close()
@@ -376,9 +388,9 @@ def mirrored_simulations(source: Mapping[str,object], *,
                          seed: int=0, steps: int=12,
                          angles: Sequence[str]=ANGLES,
                          workers: int=4) -> dict:
-    """Actually runs 1..6 independent simulations in bounded threads."""
+    """Execute up to ten independently replayed, ten-pass-audited mirror runs."""
     original=parse_studio_source(_plain(source))
-    if (type(seed) is not int or not 0<=seed<=2**31-7
+    if (type(seed) is not int or not 0<=seed<=2**31-MAX_LANES-1
             or type(steps) is not int or not 1<=steps<=MAX_STEPS
             or type(workers) is not int or not 1<=workers<=4
             or type(angles) not in (tuple,list)
@@ -397,6 +409,12 @@ def mirrored_simulations(source: Mapping[str,object], *,
         "angles":list(angles),"lanes":results,
         "workers_requested":workers,"workers_used":min(workers,len(angles)),
         "concurrent_reference_simulations_executed":len(results),
+        "scrutiny_checks_per_run":10,
+        "scrutiny_checked_runs":sum(bool(row["audit_passed"]) for row in results),
+        "multispectral_analysis_channels":list(
+            results[0]["multispectral"]["spectral_channels"]
+        ),
+        "actual_spectral_sensor_hardware":False,
         "view_kind":"sampled_reference_telemetry_not_native_game_frames",
         "training_candidate_mutated":False,
         "learning_metrics_derived_from_actual_runtime":True,
