@@ -78,6 +78,7 @@ $RuntimePaths = @(
     "skeleton",
     "scripts",
     "packaging",
+    "machine/manifest.json",
     # Historical MasterMap progression snapshots are repository evidence, not
     # runtime inputs. Some intentionally verbose names breach Win32's legacy
     # destination-path boundary when installed under a normal user profile.
@@ -207,6 +208,9 @@ $PyInstallerArgs = @(
     "--hidden-import", "tkinter",
     $EntryPoint
 )
+# Force both freezes to resolve first-party modules from the staged revision.
+$PreviousPythonPath = $env:PYTHONPATH
+$env:PYTHONPATH = $PayloadDir
 Push-Location -LiteralPath $PayloadDir
 try {
 & python @PyInstallerArgs
@@ -243,6 +247,7 @@ if (-not (Test-Path -LiteralPath $ConsoleExe)) {
 Copy-Item -LiteralPath $ConsoleExe -Destination (Join-Path $PayloadDir "SkeletonOffline.exe") -Force
 } finally {
     Pop-Location
+    $env:PYTHONPATH = $PreviousPythonPath
 }
 
 
