@@ -184,11 +184,14 @@ def inspect(
     maximum_age_seconds: int = 900,
     minimum_free_bytes: int = MIN_FREE_BYTES,
     require_attestation: bool = True,
+    allow_vocabulary_expansion: bool = False,
 ) -> dict[str, Any]:
     """Read-only preflight with actionable blockers; never trains or copies weights."""
     from skeleton.cortex.bpe import BytePairEncoder
     from skeleton.cortex.transformer import TinyTransformer
 
+    if type(allow_vocabulary_expansion) is not bool:
+        raise ValueError("vocabulary expansion must be an explicit boolean")
     if not 1 <= maximum_age_seconds <= MAX_ATTESTATION_AGE_SECONDS:
         raise ValueError("attestation maximum age must be between 1 and 3600 seconds")
     if type(minimum_free_bytes) is not int or not 0 <= minimum_free_bytes <= 2**40:
@@ -244,8 +247,15 @@ def inspect(
                 train, heldout = _texts()
                 all_cases = train + tuple(case for examples in heldout.values() for case in examples)
                 coverage = _token_coverage(model, all_cases)
+                planned_new_tokens = 0
                 if coverage < 0.80:
-                    blockers.append("game_curriculum_vocabulary_coverage_below_80_percent")
+                    if allow_vocabulary_expansion and not is_torch:
+                        from .jeeves_game_vocabulary import planned_new_pieces
+                        planned_new_tokens = len(planned_new_pieces(model, all_cases))
+                    else:
+                        blockers.append("game_curriculum_vocabulary_coverage_below_80_percent")
+                elif allow_vocabulary_expansion:
+                    planned_new_tokens = 0
                 diagnostics.update({
                     "checkpoint_path": str(path.resolve()),
                     "checkpoint_sha256": live_hash,
@@ -257,6 +267,9 @@ def inspect(
                     "training_examples": len(train),
                     "evaluation_examples": sum(map(len, heldout.values())),
                     "vocabulary_coverage": round(coverage, 6),
+                    "vocabulary_expansion_requested": allow_vocabulary_expansion,
+                    "vocabulary_new_token_budget": planned_new_tokens,
+                    "existing_weights_must_be_preserved": True,
                 })
                 if receipt is not None:
                     weight_hash = _sha(_canonical({
@@ -292,6 +305,7 @@ def prepare_training_copy(
     candidate_directory: Path,
     copy_destination: Path,
     maximum_age_seconds: int = 900,
+    allow_vocabulary_expansion: bool = False,
 ) -> dict[str, Any]:
     """Create an immutable, checksum-bound backup before any training.
 
@@ -303,6 +317,7 @@ def prepare_training_copy(
         attestation=attestation,
         candidate_directory=candidate_directory,
         maximum_age_seconds=maximum_age_seconds,
+        allow_vocabulary_expansion=allow_vocabulary_expansion,
     )
     if receipt["status"] != "ready_for_operator_training":
         raise ProductionCheckpointError("preflight blocked: " + ";".join(receipt["blockers"]))
@@ -336,11 +351,13 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument("--max-age-seconds", type=int, default=900)
     scan.add_argument("--min-free-bytes", type=int, default=MIN_FREE_BYTES)
     scan.add_argument("--allow-unattested-inspection", action="store_true")
+    scan.add_argument("--allow-vocabulary-expansion", action="store_true")
     backup = sub.add_parser("backup", help="Exclusive verified backup of active production checkpoint")
     backup.add_argument("--attestation", type=Path, required=True)
     backup.add_argument("--candidate-directory", type=Path, required=True)
     backup.add_argument("--output", type=Path, required=True)
     backup.add_argument("--max-age-seconds", type=int, default=900)
+    backup.add_argument("--allow-vocabulary-expansion", action="store_true")
     args = parser.parse_args(argv)
     try:
         if args.command == "preflight":
@@ -350,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
                 maximum_age_seconds=args.max_age_seconds,
                 minimum_free_bytes=args.min_free_bytes,
                 require_attestation=not args.allow_unattested_inspection,
+                allow_vocabulary_expansion=args.allow_vocabulary_expansion,
             )
         else:
             result = prepare_training_copy(
@@ -357,6 +375,7 @@ def main(argv: list[str] | None = None) -> int:
                 candidate_directory=args.candidate_directory,
                 copy_destination=args.output,
                 maximum_age_seconds=args.max_age_seconds,
+                allow_vocabulary_expansion=args.allow_vocabulary_expansion,
             )
         print(json.dumps(result, indent=2, sort_keys=True, allow_nan=False))
         return 0 if result["status"] != "blocked" else 3
