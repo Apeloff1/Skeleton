@@ -21,6 +21,8 @@ class OwnedROMSerialLinkEvidenceTests(unittest.TestCase):
         self.assertEqual(row["actual_cpu_clock_advance_instructions"], 1021)
         self.assertEqual(row["source_program_cpu_instruction_calls"], 1025)
         self.assertEqual(row["serial_start_opcode_clocked_tcycles"], 12)
+        self.assertEqual(row["actual_source_SB_SC_program_tcycles"], 40)
+        self.assertEqual(row["real_serial_phase_just_after_SC_opcode"], 12)
         self.assertEqual(row["serial_final_SB"], 255)
         self.assertTrue(row["serial_interrupt_set"])
         self.assertFalse(row["serial_SC_still_active"])
@@ -32,6 +34,8 @@ class OwnedROMSerialLinkEvidenceTests(unittest.TestCase):
         self.assertEqual(row["serial_final_SB"], 0x6A)
         self.assertFalse(row["serial_interrupt_set"])
         self.assertTrue(row["serial_SC_still_active"])
+        self.assertEqual(row["real_serial_phase_just_after_SC_opcode"], 0)
+        self.assertEqual(row["actual_source_SB_SC_program_tcycles"], 40)
 
     def test_both_real_source_runs_produce_admissible_report(self):
         result = audit_serial_port()
