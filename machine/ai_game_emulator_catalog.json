@@ -127,7 +127,15 @@
     "parallel_n64": "a8280501a71c1bcd4c85c5b8bfe75cfa62cd6127",
     "fbneo": "abe41e850b515c4ffc4dca054d1d61b828e9200c",
     "ppsspp": "e26225c99b401f259a670e45d25be4f4615bdbc5",
-    "flycast": "6b41116a315bc372d6f813439e1bd04a57718b1c"
+    "flycast": "6b41116a315bc372d6f813439e1bd04a57718b1c",
+    "nestopia": "06a8949e0b3cf60e3a38a374b1426bf40fccb9a0",
+    "mesen": "0102910c39ad1a62bc3f784466f3f67ca9eae335",
+    "bluemsx": "e3086eb5d36d77fa11704cf53dc176686e70127d",
+    "fmsx": "4de11755ce4f196ac1c8a7bb20bb4eccbc87a7d4",
+    "vice_x64": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "px68k": "0ad84d7058a12b7db4f7f7a906e87fad4e2f26f6",
+    "quasi88": "7884be5277776a5d8c4fdc4e574e9b5b589945c9",
+    "mednafen_saturn": "faef2779a7568c1734addc4fe63cc76e9fa2566b"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -283,5 +291,48 @@
     "license_aliases": "An upstream license symlink may be resolved only to a nonsymlink regular file inside the exact pinned source root. Copy its actual text under an immutable regular destination and record the source alias/target; external targets and unsafe installed-library paths remain rejected.",
     "bootstrap_pins_count": 35,
     "static_compilation_scope": "34 ELF libretro core libraries built locally at this wave end, including28 additional.29 operator-approved mappings cover46 canonical hardware targets; 4 firmware-missing candidates and1 hardware-rendering candidate remain inactive. No automated tests or actual game compatibility verification. Local artifact evidence is separate from portable checked-in source."
+  },
+  "recipe_expansion_2026_10_15": {
+    "status": "source_recipe_added_unbuilt_unexecuted",
+    "additional_recipes": 8,
+    "current_pinned_recipe_count": 43,
+    "default_profile": "starter preserves six original recipes; broad includes nondeferred software recipes; all explicitly includes candidate-only",
+    "upstream_pins": {
+      "nestopia": {
+        "repository": "https://github.com/libretro/nestopia.git",
+        "revision": "06a8949e0b3cf60e3a38a374b1426bf40fccb9a0"
+      },
+      "mesen": {
+        "repository": "https://github.com/libretro/mesen.git",
+        "revision": "0102910c39ad1a62bc3f784466f3f67ca9eae335"
+      },
+      "bluemsx": {
+        "repository": "https://github.com/libretro/blueMSX-libretro.git",
+        "revision": "e3086eb5d36d77fa11704cf53dc176686e70127d"
+      },
+      "fmsx": {
+        "repository": "https://github.com/libretro/fmsx-libretro.git",
+        "revision": "4de11755ce4f196ac1c8a7bb20bb4eccbc87a7d4"
+      },
+      "vice_x64": {
+        "repository": "https://github.com/libretro/vice-libretro.git",
+        "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
+      },
+      "px68k": {
+        "repository": "https://github.com/libretro/px68k-libretro.git",
+        "revision": "0ad84d7058a12b7db4f7f7a906e87fad4e2f26f6"
+      },
+      "quasi88": {
+        "repository": "https://github.com/libretro/quasi88-libretro.git",
+        "revision": "7884be5277776a5d8c4fdc4e574e9b5b589945c9"
+      },
+      "mednafen_saturn": {
+        "repository": "https://github.com/libretro/beetle-saturn-libretro.git",
+        "revision": "faef2779a7568c1734addc4fe63cc76e9fa2566b"
+      }
+    },
+    "assets": "blueMSX copies only pinned C-BIOS machine profiles and databases into /system; no proprietary firmware bundled",
+    "admission": "firmware-dependent and unqualified runtime cores remain deferred; build eligibility does not prove emulator execution",
+    "verification": "Public upstream revisions, build artifacts and valid_extensions checked at source level; no native compilation or game run completed in this change."
   }
 }
