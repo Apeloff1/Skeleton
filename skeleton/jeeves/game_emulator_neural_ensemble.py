@@ -21,6 +21,7 @@ from .game_emulator_neural_world import (
     NeuralWorldConfig,
     _forward,
     _prepare,
+    _baseline_loss,
     _split,
     train_neural_world_from_evidence,
     validate_neural_world_checkpoint,
@@ -195,10 +196,20 @@ def train_emulator_neural_ensemble(
         heldout_disagreement.append(prediction["normalized_rms_member_disagreement"])
     mean_holdout_mse = math.fsum(heldout_mse) / len(heldout_mse)
     mean_spread = math.fsum(heldout_disagreement) / len(heldout_disagreement)
-    mean_baseline = math.fsum(
-        report["baseline_train_mean_predictor_holdout_mse"]
-        for report in training_reports
-    ) / len(training_reports)
+    # Fair comparison: use a constant predictor fitted to exactly the same
+    # source TRAIN subset and scored on exactly the same selected holdout rows.
+    # Previous full-heldout model baselines may have different sample counts.
+    reference = candidates[0]
+    mean = reference["normalization_means_train_only"]
+    std = reference["normalization_std_train_only"]
+    scale = reference["reward_scale_train_only"]
+    train_vectors = [
+        _prepare(row, mean, std, scale, len(actions)) for row in training
+    ]
+    selected_vectors = [
+        _prepare(row, mean, std, scale, len(actions)) for row in chosen_heldout
+    ]
+    mean_baseline = _baseline_loss(train_vectors, selected_vectors)
     successful = sum(
         report["candidate_status"] == "candidate_predictive_gain_measured"
         for report in training_reports
@@ -250,6 +261,7 @@ def train_emulator_neural_ensemble(
         "measured_holdout_examples_used_for_calibration_only": len(chosen_heldout),
         "ensemble_heldout_mse": mean_holdout_mse,
         "ensemble_train_mean_baseline_heldout_mse": mean_baseline,
+        "baseline_and_ensemble_compared_on_identical_holdout_samples": True,
         "mean_member_disagreement": mean_spread,
         "max_allowable_disagreement": config.max_mean_normalized_spread,
         "qualified_for_physical_native_confirmation": passed,
