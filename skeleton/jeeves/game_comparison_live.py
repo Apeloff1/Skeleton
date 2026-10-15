@@ -92,6 +92,7 @@ class _Lane:
     step_count: int = 0
     total_steps: int = 0
     reset_count: int = 0
+    disc_change_count: int = 0
     receipts: list[dict[str, Any]] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     status: str = "running"
@@ -202,6 +203,12 @@ class LiveComparison:
             "status": lane.status, "error_class": lane.error_class,
             "episode_steps": lane.step_count, "lifetime_steps": lane.total_steps,
             "reset_count": lane.reset_count,
+            "native_disc_change_count": lane.disc_change_count,
+            "native_disc_status": (
+                lane.env.disc_status()
+                if lane.status != "native_execution_failed" and hasattr(lane.env, "disc_status")
+                else {"supported": False, "image_count": 0}
+            ),
             "max_lifetime_steps": self._max_steps,
             "initial_chain_sha256": lane.first_chain,
             "latest_event_chain_sha256": lane.chain,
@@ -392,6 +399,73 @@ class LiveComparison:
                     "all_succeeded":all(x["complete"] and x["status"]!="native_execution_failed" for x in results),
                     "model_training_performed":False}
 
+    def swap_disc(self, raw: object) -> dict[str, Any]:
+        """Operator-selected preloaded disc, never dynamic source file injection."""
+        with self._lock:
+            self._check()
+            if not isinstance(raw, dict) or set(raw) != {"game_id", "image_index"}:
+                raise LiveComparisonError("Disc change requires exact game ID and bounded index")
+            game_id, index = raw["game_id"], raw["image_index"]
+            if type(game_id) is not str or game_id not in self._lanes:
+                raise LiveComparisonError("Unknown approved live game lane")
+            if type(index) is not int or not 0 <= index <= 31:
+                raise LiveComparisonError("Native disc index must be 0–31")
+            lane = self._lanes[game_id]
+            if lane.status != "running" or lane.disc_change_count >= 32:
+                raise LiveComparisonError("Native disc changes are unavailable or exhausted")
+            if not hasattr(lane.env, "swap_disc"):
+                raise LiveComparisonError("This native lane has no disc switching capability")
+            try:
+                operation = lane.env.swap_disc(index)
+                if not operation["changed"]:
+                    return {
+                        "game_id": game_id, "changed": False,
+                        "disc_status": operation["disc_status"],
+                        "native_frame_advanced": False,
+                        "receipt_chain_sha256": lane.chain,
+                    }
+                status = operation["disc_status"]
+                receipt = {
+                    "schema_version": "skeleton.game.live_native_disc_swap_receipt.v1",
+                    "game_id": game_id,
+                    "index": lane.disc_change_count + 1,
+                    "episode_step": lane.step_count,
+                    "reset_generation": lane.reset_count,
+                    "source_content_sha256": lane.content_digest,
+                    "core_sha256": lane.env.core.library_sha256,
+                    "native_host_disc_receipt_sha256": operation["receipt"]["receipt_sha256"],
+                    "previous_image_index": operation["receipt"]["previous_image_index"],
+                    "selected_image_index": status["image_index"],
+                    "registered_disc_count": status["image_count"],
+                    "interface_version": status["interface_version"],
+                    "previous_chain_sha256": lane.chain,
+                    "native_frame_advanced": False,
+                }
+                lane.chain = digest(receipt)
+                receipt["receipt_sha256"] = lane.chain
+                lane.events.append({
+                    "event_kind": "native_disc_swap", "receipt": receipt,
+                    "receipt_sha256": lane.chain,
+                })
+                lane.disc_change_count += 1
+                return {
+                    "game_id": game_id, "changed": True,
+                    "disc_status": status,
+                    "receipt": receipt,
+                    "receipt_chain_sha256": lane.chain,
+                    "native_frame_advanced": False,
+                    "model_training_performed": False,
+                }
+            except BaseException as exc:
+                lane.status = "native_execution_failed"
+                lane.error_class = type(exc).__name__
+                lane.env.close()
+                return {
+                    "game_id": game_id, "status": lane.status,
+                    "error_class": lane.error_class,
+                    "native_receipt_created": False,
+                }
+
     def reset(self, game_id: str) -> dict[str, Any]:
         with self._lock:
             self._check()
@@ -455,6 +529,7 @@ class LiveComparison:
                         "final_chain_sha256":lane.chain,
                         "step_count":lane.total_steps,
                         "reset_count":lane.reset_count,
+                        "disc_change_count":lane.disc_change_count,
                         "native_events":list(lane.events),
                         "source_game_assets_included":False,
                     }
