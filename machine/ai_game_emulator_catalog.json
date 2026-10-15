@@ -848,6 +848,15 @@
         "tests/test_game_comparison_raw_qualification_regression.py"
       ],
       "native_execution_tested": false
+    },
+    "operator_readiness_doctor": {
+      "state": "Source implemented, user-specific installed core/game scan not executed in this session",
+      "module": "skeleton/jeeves/game_comparison_readiness.py",
+      "operator_cli": "scripts/doctor_game_comparison.py",
+      "scope": "Up to thirty study entries, all scheduled <=10-game cohorts, exact approved core target mapping, local single-file media SHA, optional full SHA over every declared disc/media track, 169-target controller UI coverage and temporary disk wave budget",
+      "report": "Each game's admitted source/core state, legacy physical controller layout uncertainty and exact source rights receipt presence; per-cohort available TMPDIR and whether all selected lanes fit concurrently",
+      "denied_claims": "No ROM run, BIOS download, network content acquisition, physical controller accuracy certificate, independent rights verification, AI model learning or actual gameplay success",
+      "tests": "tests/test_game_comparison_readiness.py added synthetic tests for file hash tampering, missing cores, low disk and successful source admission"
     }
   }
 }
