@@ -172,5 +172,66 @@ def grow_feedforward(model: Any, *, profile: str,
     }
 
 
+def main(argv: list[str] | None = None) -> int:
+    """Inspect actual live Torch FFN growth opportunities without making weights."""
+    import argparse
+    from pathlib import Path
+    import sys
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--checkpoint", type=Path, required=True,
+                        help="operator-pinned SKELETON_OWN checkpoint, never a demo model")
+    parser.add_argument("--expected-sha256", required=True,
+                        help="independently confirmed SHA of active checkpoint")
+    parser.add_argument("--max-added-parameters", type=int, default=500000)
+    parser.add_argument("--profile", choices=tuple(PROFILE_FACTORS),
+                        help="report one growth profile, or all profiles")
+    args = parser.parse_args(argv)
+    try:
+        from .jeeves_production_game_train import (
+            _production_source, _active_snapshot, ProductionCheckpointError,
+        )
+        _path, blob, digest = _production_source(args.checkpoint, args.expected_sha256)
+        selected, snapshot, mouth = _active_snapshot(blob)
+        if snapshot.get("kind") != "torch-stack":
+            raise CapacityGrowthError(
+                "active production speaking weights are not Torch-stack; cannot widen safely")
+        from skeleton.cortex.torch_lm import TorchTransformer
+        model = TorchTransformer.from_snapshot(snapshot)
+        requested = (args.profile,) if args.profile else tuple(PROFILE_FACTORS)
+        options = []
+        for profile in requested:
+            try:
+                plan = growth_plan(model, profile)
+                plan["within_operator_budget"] = (
+                    plan["new_trainable_parameters"] <= args.max_added_parameters)
+                options.append(plan)
+            except CapacityGrowthError as exc:
+                options.append({"profile": profile, "status": "not_admitted",
+                                "reason": str(exc)[:200]})
+        result = {
+            "schema_version": "skeleton.jeeves.capacity_plan.v1",
+            "source_checkpoint_sha256": digest,
+            "selected_speaking_model": selected, "speaking_mouth": mouth,
+            "source_trainable_parameters": parameter_count(model),
+            "planned_profiles": options,
+            "actual_parameter_growth_executed": False,
+            "optimizer_steps_executed": 0,
+            "production_weights_modified": False,
+            "candidate_promoted": False,
+        }
+        print(json.dumps(result, sort_keys=True))
+        return 0
+    except (CapacityGrowthError, ProductionCheckpointError,
+            ValueError, OSError, RuntimeError, TypeError) as exc:
+        print(json.dumps({"status": "blocked",
+                          "reason": str(exc)[:350],
+                          "production_weights_modified": False}), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
 __all__ = ["CapacityGrowthError", "PROFILE_FACTORS", "growth_plan",
-           "parameter_count", "grow_feedforward"]
+           "parameter_count", "grow_feedforward", "main"]
