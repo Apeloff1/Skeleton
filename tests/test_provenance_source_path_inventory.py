@@ -50,6 +50,21 @@ LIVE_EXAMPLES = (
 
 
 class SourcePathInventoryTests(unittest.TestCase):
+    def test_conversational_corpus_is_explicitly_classified(self) -> None:
+        for path in (
+            "data/conversational/README.md",
+            "data/conversational/10X_CONVERSATIONAL_REPORT.md",
+            "data/conversational/DOUBLE_CONVERSATIONAL_REPORT.md",
+            "data/conversational/MEGA_CONVERSATIONAL_CORPUS_10X2.txt",
+            "data/conversational/conversations_20k.jsonl",
+            "data/conversational/pareto_snippets_500k.txt",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(policy.classify_path(path), "first-party")
+
+        # Keep inventory admission narrow; unrelated new data roots still fail closed.
+        self.assertEqual(policy.classify_path("data/unreviewed/new_corpus.txt"), "unknown")
+
     def test_java_accelerators_are_first_party_not_canonical(self) -> None:
         for path in (
             "java-accelerators/observability/AcceleratorMain.java",
