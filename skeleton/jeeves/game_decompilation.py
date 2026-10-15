@@ -234,6 +234,32 @@ def decompile_authorized_game(
         raise ValueError("Decompilation report exceeds bounded eight-MiB evidence contract")
     return DecompilationResult(body, tuple(previews))
 
+def analyze_authorized_native_frames(
+    frames: Sequence[tuple[Mapping[str, Any], bytes]], *,
+    grant: GameDecompilationGrant,
+    authorize: Callable[[str, GameDecompilationGrant], bool],
+    core_binary_sha256: str,
+) -> dict[str, Any]:
+    """Bounded genuine native framebuffer measurements for any libretro core.
+
+    Frames must be captured by the legitimate emulator host separately.
+    This analyzer does not call retro_run or scrape game RAM.
+    """
+    from .game_decompilation_runtime import observe_native_frames
+
+    if not isinstance(grant, GameDecompilationGrant):
+        raise PermissionError("Native pixel analysis requires source-bound rights grant")
+    _authorize(grant, SCOPE_STRUCTURE, authorize)
+    _authorize(grant, SCOPE_ASSETS, authorize)
+    return observe_native_frames(
+        frames,
+        game_content_sha256=grant.source_sha256,
+        core_binary_sha256=core_binary_sha256,
+        rights_evidence_digest=grant.rights_evidence_digest,
+        authorize=lambda: authorize(SCOPE_ASSETS, grant) is True,
+    )
+
+
 def prepare_reviewed_training_candidate(
     result: DecompilationResult, *, grant: GameDecompilationGrant,
     authorize: Callable[[str, GameDecompilationGrant], bool],
