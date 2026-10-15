@@ -322,6 +322,14 @@ export type FactorialScrutinySummary = {
   schema_version: string; axes: string[]; source_axis_positions: number[];
   seed_count_requested: number; complete_seed_cubes: number;
   source_replayed_corner_count: number; audited_checks_count: number;
+  reversed_order_independent_replays: number;
+  reversed_order_scrutiny_checks: number;
+  reordered_action_scrutiny_runs: number;
+  reordered_action_scrutiny_checks: number;
+  total_audited_source_episode_checks: number;
+  observed_action_order_regression_count: number;
+  observed_action_order_mechanics_difference_count: number;
+  robust_joint_gain_under_tested_orders: boolean;
   source_factorial_design_complete: boolean;
   whole_joint_variant_examined: boolean;
   other_active_axes_not_examined: string[];
@@ -330,10 +338,21 @@ export type FactorialScrutinySummary = {
   mean_matched_seed_delta: number | null;
   worst_seed_joint_return_delta: number | null;
   observed_joint_gain_proven: boolean;
+  adversarial_reexamination_priority: {
+    score: number; reasons: string[]; recommended: boolean;
+    proposed_additional_source_seeds: number[];
+    additional_gameplay_sims_executed: 0;
+    targeted_followup_requires_new_authorized_run: true;
+  };
   sensitivity: {
     order: number; factors: string[]; per_seed_contrasts: number[];
     mean: number; min: number; max: number;
     range: number; sign_reversal_between_seeds: boolean;
+    population_standard_deviation: number;
+    negative_seed_count: number;
+    positive_seed_count: number;
+    zero_seed_count: number;
+    statistical_significance_established: false;
   }[];
   digest: string;
 };
@@ -419,8 +438,14 @@ export async function getMultifactorExperiments(
           x.factorial_scrutiny.seed_count_requested!==2
           || x.factorial_scrutiny.source_replayed_corner_count>16
           || x.factorial_scrutiny.audited_checks_count!==
-             x.factorial_scrutiny.source_replayed_corner_count*10
+             x.factorial_scrutiny.source_replayed_corner_count*10 +
+             x.factorial_scrutiny.reversed_order_scrutiny_checks +
+             x.factorial_scrutiny.reordered_action_scrutiny_checks
           || x.factorial_scrutiny.sensitivity.length>7
+          || x.factorial_scrutiny.adversarial_reexamination_priority?.score<0
+          || x.factorial_scrutiny.adversarial_reexamination_priority?.score>100
+          || x.factorial_scrutiny.sensitivity.some(effect =>
+              effect.statistical_significance_established !== false)
           || !/^[a-f0-9]{64}$/.test(x.factorial_scrutiny.digest)
         )))
       || JSON.stringify(value).length>524288) invalid('Source-bound multi-factor probe receipt differs.');

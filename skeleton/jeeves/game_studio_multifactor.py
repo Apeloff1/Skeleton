@@ -594,7 +594,7 @@ def execute_multifactor_scenarios(
                 "factorial_interaction_weight_attribution_authorized":(
                     factorial is not None
                     and factorial["whole_joint_variant_examined"]
-                    and factorial["observed_joint_gain_proven"]
+                    and factorial["robust_joint_gain_under_tested_orders"]
                     and heldout["mean_return_difference"]>=0
                     and all_selected_exercised
                 ),

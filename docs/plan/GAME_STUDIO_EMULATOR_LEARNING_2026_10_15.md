@@ -775,3 +775,78 @@ ability or music action that is unavailable or rejected at that
 actual world state is flagged as unexecuted; it must not be treated
 as effective factor-training evidence merely because its command
 name appears in a planned schedule.
+
+## Exact factorial source scrutiny, temporal noncommutativity and Q-weight distribution
+
+A dedicated `skeleton/jeeves/game_studio_factorial_scrutiny.py`
+analyzer complements the original multi-factor scenario planner.
+For a selected two-factor case it executes the *complete four-corner*
+on/off intervention lattice per seed; three factors execute the
+*complete eight-corner* lattice per seed. Each experiment uses
+actual registered game settings and actions, validated against
+the original editor's source rules, with ten independent
+multispectral checks per corner, explicit accepted/rejected
+action slots, per-step state/reward/transition receipts and
+source-controlled game snapshots.
+
+Default viewer scrutiny compares two independent matched game seeds;
+the rights-admitted CLI supports **three**. Per seed, every main effect,
+pair interaction and (if selected) triple interaction uses the
+exact signed inclusion/exclusion/Möbius contrast of the corresponding
+source-executed cells. Results expose per-seed effect size, mean,
+minimum, maximum, population spread, sign reversal and the worst
+observed joint-world regression. Small samples **never** claim
+statistical significance or transferable causal identification.
+Illegal intermediate source worlds remain explicit constraint
+failures, not discarded silently or replaced with cherry-picked
+favorable seeds.
+
+After the factorial cube, the original baseline and full joint
+worlds are re-executed **in reverse world execution order**. All
+transition, telemetry and source receipts must match their original
+world run to establish execution-order independence of the reference
+game; this is different from changing the in-game action order.
+
+A *second, distinct* stress layer reverses the **actual sequence of
+registered gameplay commands** within a completed joint world.
+The changed action order is independently replayed with its own
+ten-check audit and complete per-step evidence. Only real differences
+in gameplay-state trajectories, accepted/rejected controls and
+recorded reward—not the inevitable difference between action-log
+hashes—are labeled order-dependent mechanics. Original-sequence
+success does not imply success under another sequence. The
+`robust_joint_gain_under_tested_orders` gate requires nonregression
+on the tested action orderings in addition to measured positive
+joint returns, actual accepted interventions and complete seed
+coverage.
+
+Instability, illegal intermediate worlds, missing interventions,
+negative matched-seed returns or action-order regression create
+specific source-derived reasons in a bounded adversarial
+re-examination queue. The queue gives proposed *new, disjoint*
+source-game seeds, but performs **zero** hidden background runs.
+Further sampling requires fresh authorized execution; reaching a
+budget ceiling remains explicitly incomplete.
+
+Each genuine local `GamePolicyLearner` candidate now records an
+expanded per-parameter evidence distribution: newly visited
+state-action values, signed and absolute Q-value movement, positive
+versus negative changes, numbers of source-state bins before/after,
+quantiles of absolute Q changes (median/p90/p99), change counts and
+weight movement by registered action index, highest-magnitude
+parameter update samples and truncation status, plus an unambiguous
+digest over the *full* source-bound Q snapshot. Evaluating a
+neural candidate still requires the separate, existing
+checkpoint-derived optimizer; these tabular Q deltas are **not**
+transformer weight tensors.
+
+The deterministic factorial replay verifier can reconstruct
+every saved source variation, intervention, per-seed action transcript
+and multi-angle receipt to reject tampering. Authenticated user
+views now show exact lattice coverage, source-replayed check counts,
+seed variability, action ordering sensitivity and reasons for
+additional scrutiny. Tests were authored for complete 4/8-cell
+lattices, tampered receipts, source-rights protection, invalid
+source combinations, quantitative Q deltas, reverse order
+re-execution and descriptive risk flags. Their exact-head
+execution and production behavior have **not yet been verified**.

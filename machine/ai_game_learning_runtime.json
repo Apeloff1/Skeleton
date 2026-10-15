@@ -315,6 +315,26 @@
       "production_neural_parameters_modified": false,
       "native_media_supported_without_runtime": false,
       "successful_exact_head_execution_confirmed": false
+    },
+    "factorial_scrutiny": {
+      "status": "source_committed_pending_exact_head_execution",
+      "owner": "skeleton/jeeves/game_studio_factorial_scrutiny.py",
+      "execution": "complete 2^k factorial source-game intervention lattice for k=2 or 3 selected active axes, each on 2 or 3 disjoint seeds; original registered actions and source-validated settings only",
+      "per_corner": "ten-pass independently replayed multispectral audit, complete original-game action/observation/reward/transition receipts",
+      "reverse": "re-execute fully modified and unmodified worlds in reverse execution order on each tested seed and reject divergent receipts",
+      "action_order": "replay genuine reverse command sequences on matching world/seed and record reward, action acceptance and state-trajectory differences",
+      "effects": "exact signed main, pair and triple inclusion/exclusion contrasts with per-seed mean, worst, min/max, spread and sign-reversal evidence",
+      "risk_queue": "bounded ordered source-derived reasons and proposed seeds; no automatically scheduled or executed followup",
+      "parameter_scrutiny": "signed Q-value deltas, positive/negative counts, absolute drift quantiles p50/p90/p99, top 96 sampled state-action before/after changes, per-action weight movement, full Q snapshot digest",
+      "viewer": "Jeeves panel displays factorial coverage, order effects, adversarial followup recommendations",
+      "claims_excluded": [
+        "full original-game causal identification",
+        "real native audiovisual sensor fidelity",
+        "statistical significance with two or three seeds",
+        "production neural weight improvements",
+        "automatic policy or world promotion"
+      ],
+      "verification": "tests added; exact-head CI and integration not yet complete"
     }
   }
 }

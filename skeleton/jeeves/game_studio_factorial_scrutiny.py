@@ -153,6 +153,7 @@ def scrutinize_interactions(
     responses=[]
     original_digest=_digest(base)
     reversed_execution_checks=0
+    reversed_action_order_checks=0
     for offset in range(seed_count):
         # Independent stress seeds avoid both local optimizer seeds (+9000)
         # and heldout seeds (+14000). All corners within one cube get
@@ -204,6 +205,7 @@ def scrutinize_interactions(
                 "transition_digests":run["transition_digests"],
                 "complete_step_receipts":run["step_receipts"],
                 "trace_digest":run["digest"],
+                "gameplay_trajectory_digest":run["gameplay_transition_states_digest"],
                 "multispectral_audit_digest":run["multispectral"]["digest"],
                 "checks_passed":run["multispectral"]["passed_count"],
                 "physical_sensor_metrics_verified":False,
@@ -235,6 +237,46 @@ def scrutinize_interactions(
             reversed_execution_checks+=1
         if _digest(base)!=original_digest:
             raise FactorialScrutinyError("factor interventions changed original source")
+        # A joint world with multiple timed controls is also probed using
+        # the reverse sequence. Action composition need not commute in a
+        # game; expose ordering-sensitive outcomes and rejection changes.
+        original_actions=tuple(corners[-1]["actions"])
+        reversed_actions=tuple(reversed(original_actions))
+        order_receipt=None
+        if len(original_actions)>1 and original_actions!=reversed_actions:
+            joint_source=_state_for_corner(base,axes,levels,indexes)
+            reversed_run=_lane(
+                joint_source,"causal",trial_seed,steps,
+                scripted_actions=reversed_actions,
+            )
+            if reversed_run["audit_passed"] is not True:
+                raise FactorialScrutinyError("permuted multi-action episode lacks actual source audit")
+            reversed_action_order_checks+=1
+            order_receipt={
+                "original_registered_action_sequence":list(original_actions),
+                "reversed_registered_action_sequence":list(reversed_actions),
+                "forward_trace_digest":corners[-1]["trace_digest"],
+                "reordered_trace_digest":reversed_run["digest"],
+                "reordered_multispectral_audit_digest":reversed_run["multispectral"]["digest"],
+                "reordered_steps":reversed_run["steps"],
+                "reordered_step_receipts":reversed_run["step_receipts"],
+                "forward_reward":corners[-1]["reward"],
+                "reordered_reward":reversed_run["total_reward"],
+                "reordered_minus_forward_return":round(
+                    reversed_run["total_reward"]-corners[-1]["reward"],7
+                ),
+                "rejected_action_change":(
+                    reversed_run["rejected_actions"]-corners[-1]["rejected_controls"]
+                ),
+                "mechanical_order_sensitivity_observed":(
+                    reversed_run["gameplay_transition_states_digest"]!=
+                    corners[-1]["gameplay_trajectory_digest"]
+                    or reversed_run["total_reward"]!=corners[-1]["reward"]
+                    or reversed_run["accepted_actions"]!=corners[-1]["accepted_controls"]
+                    or reversed_run["rejected_actions"]!=corners[-1]["rejected_controls"]
+                ),
+                "order_generalization_certified":False,
+            }
         # Fully observed cube, not just a joint-world minus baseline score.
         main_effects=[]
         interaction_effects=[]
@@ -259,6 +301,7 @@ def scrutinize_interactions(
             "corners":corners,
             "main_effects":main_effects,
             "interaction_effects":interaction_effects,
+            "reordered_actions_scrutiny":order_receipt,
             "paired_joint_return_delta":round(
                 scores[(1<<len(indexes))-1]-scores[0],7,
             ),
@@ -302,6 +345,34 @@ def scrutinize_interactions(
             ),
             "statistical_significance_established":False,
         })
+    # Risk is grounded in the sampled source evidence and is only a
+    # scheduler priority for further scrutiny. It is not a substitute
+    # for actual heldout policy metrics, causal identification or safety.
+    order_regressions=sum(
+        row["reordered_actions_scrutiny"] is not None and
+        row["reordered_actions_scrutiny"]["reordered_minus_forward_return"]<0
+        for row in cube
+    )
+    action_rejections=sum(
+        not row["joint_all_action_interventions_accepted"]
+        for row in cube
+    )
+    sign_flips=sum(row["sign_reversal_between_seeds"] for row in sensitivity)
+    negative_seeds=sum(value<0 for value in responses)
+    reasons=[]
+    if not complete:reasons.append("incomplete_or_illegal_intervention_cube")
+    if sign_flips:reasons.append("factor_interaction_reverses_sign_between_seeds")
+    if negative_seeds:reasons.append("joint_reward_regression_on_matched_seed")
+    if order_regressions:reasons.append("reversed_action_order_worse_than_forward")
+    if action_rejections:reasons.append("selected_factor_action_rejected")
+    if any(level and i not in indexes for i,level in enumerate(levels)):
+        reasons.append("some_changed_factors_not_examined")
+    priority=min(100,
+        12*len(reasons)
+        +min(20,5*negative_seeds)
+        +min(15,5*sign_flips)
+        +min(15,5*order_regressions)
+    )
     report={
         "schema_version":SCHEMA,
         "base_source_digest":_digest(base),
@@ -318,17 +389,29 @@ def scrutinize_interactions(
         "source_replayed_corner_count":sum(len(row["corners"]) for row in cube),
         "audited_checks_count":sum(
             entry["checks_passed"] for row in cube for entry in row["corners"]
-        )+10*reversed_execution_checks,
+        )+10*(reversed_execution_checks+reversed_action_order_checks),
         "reversed_order_independent_replays":reversed_execution_checks,
         "reversed_order_scrutiny_checks":10*reversed_execution_checks,
+        "reordered_action_scrutiny_runs":reversed_action_order_checks,
+        "reordered_action_scrutiny_checks":10*reversed_action_order_checks,
         "total_audited_source_episode_checks":10*(
             sum(len(row["corners"]) for row in cube)
-            +reversed_execution_checks
+            +reversed_execution_checks+reversed_action_order_checks
         ),
         "seed_cubes":cube,
         "constraint_violations":violations,
         "sensitivity":sensitivity,
         "matched_seed_joint_return_differences":responses,
+        "adversarial_reexamination_priority":{
+            "score":priority,
+            "reasons":reasons,
+            "recommended":bool(reasons),
+            "proposed_additional_source_seeds":[seed+4000,seed+5000]
+                 if reasons else [],
+            "additional_gameplay_sims_executed":0,
+            "no_background_automation_claimed":True,
+            "targeted_followup_requires_new_authorized_run":True,
+        },
         "mean_matched_seed_delta":(
             round(math.fsum(responses)/len(responses),7)
             if responses else None
@@ -343,8 +426,25 @@ def scrutinize_interactions(
                              for row in cube)
             and all(v>0 for v in responses)
         ),
+        "robust_joint_gain_under_tested_orders":(
+            complete and all(row["joint_all_action_interventions_accepted"]
+                             for row in cube)
+            and all(v>0 for v in responses)
+            and order_regressions==0
+        ),
         "source_unmodified_by_interventions":_digest(base)==original_digest,
         "source_simulation_order_invariance_tested":reversed_execution_checks>0,
+        "permuted_action_order_tested":reversed_action_order_checks>0,
+        "observed_action_order_regression_count":sum(
+            1 for row in cube
+            if row["reordered_actions_scrutiny"] is not None
+            and row["reordered_actions_scrutiny"]["reordered_minus_forward_return"]<0
+        ),
+        "observed_action_order_mechanics_difference_count":sum(
+            1 for row in cube
+            if row["reordered_actions_scrutiny"] is not None
+            and row["reordered_actions_scrutiny"]["mechanical_order_sensitivity_observed"]
+        ),
         "sample_scope_only":True,
         "causal_identification_generalized":False,
         "training_weight_updates":0,

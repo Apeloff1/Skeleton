@@ -373,6 +373,30 @@ export default function GameStudioScenarioLabPanel({
                   {row.factorial_scrutiny.constraint_violations.length}
                   {' illegal intermediate states; source-causal proof is incomplete.'}
                 </Text>}
+              <Text style={muted}>
+                {row.factorial_scrutiny.reversed_order_independent_replays}
+                {' independently reordered world executions · '}
+                {row.factorial_scrutiny.reordered_action_scrutiny_runs}
+                {' permuted action-sequence audits'}
+              </Text>
+              <Text style={muted}>
+                {row.factorial_scrutiny.observed_action_order_mechanics_difference_count}
+                {' contexts with order-dependent outcomes · '}
+                {row.factorial_scrutiny.observed_action_order_regression_count}
+                {' observed sequence regressions'}
+              </Text>
+              <Text style={muted}>
+                Robust positive reward gain on tested seeds and action orders:
+                {' '}{row.factorial_scrutiny.robust_joint_gain_under_tested_orders
+                  ? 'yes, bounded evidence only' : 'not established'}
+              </Text>
+              {row.factorial_scrutiny.adversarial_reexamination_priority.recommended &&
+                <Text style={{ color: '#f6c6a5' }}>
+                  Further adversarial scrutiny recommended:
+                  {' '}{row.factorial_scrutiny.adversarial_reexamination_priority.reasons
+                    .map(reason => reason.replace(/_/g,' ')).join('; ')}
+                  {' · priority '}{row.factorial_scrutiny.adversarial_reexamination_priority.score}/100
+                </Text>}
               <Text selectable style={muted}>
                 Independent lattice digest: {row.factorial_scrutiny.digest.slice(0,24)}
               </Text>
