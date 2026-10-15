@@ -951,9 +951,12 @@ class EmulatorEnvironment:
             type(value["interface_version"]) is not int
             or value["interface_version"] not in (0, 1)
             or type(value["image_count"]) is not int or not 1 <= value["image_count"] <= 32
-            or type(value["image_index"]) is not int
-            or not 0 <= value["image_index"] < value["image_count"]
             or type(value["ejected"]) is not bool
+            or not (
+                (value["image_index"] is None and value["ejected"] is True)
+                or (type(value["image_index"]) is int
+                    and 0 <= value["image_index"] < value["image_count"])
+            )
         ):
             self.close()
             raise EmulatorHostError("native_disc_status_corrupt", "Native disk geometry exceeds bounds")
