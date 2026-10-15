@@ -125,6 +125,9 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert '"--paths", $PayloadDir' in source
     assert "Push-Location -LiteralPath $PayloadDir" in source
     assert "Pop-Location" in source
+    assert '$env:PYTHONPATH = $PayloadDir' in source
+    assert '$env:PYTHONPATH = $PreviousPythonPath' in source
+    assert '"machine/manifest.json"' in source
     assert "Installer version does not match archived SourceRef" in source
     assert "& subst $ShortDrive /D | Out-Null" in source
     assert '"--paths", $RepoRoot' not in source
@@ -166,6 +169,15 @@ def test_windows_runtime_payload_respects_portable_path_budget():
         text=True,
     )
     tracked_paths = [line.strip().replace("\\", "/") for line in completed.stdout.splitlines()]
+    # Assembly-required paths are archived even when outside the primary
+    # runtime roots. The same portability budget applies to those files.
+    import json
+
+    required = json.loads(
+        Path("skeleton/app/manifest.json").read_text(encoding="utf-8")
+    )["required_paths"]
+    tracked_paths.extend(required)
+    tracked_paths.append("machine/manifest.json")
     violations: list[tuple[int, str]] = []
 
     for relative in tracked_paths:
