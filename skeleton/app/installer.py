@@ -17,6 +17,7 @@ from skeleton.app.assembly import (
     find_repo_root,
     load_manifest,
     preflight,
+    public_service_urls,
 )
 from skeleton.app.preloader import PreloadReport, inspect_host
 from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment
@@ -207,6 +208,12 @@ def install_application(
     if not compose_validate.ok or not start:
         return InstallReceipt(root=root, phases=tuple(phases))
 
+    try:
+        host_urls = public_service_urls(root, manifest=manifest)
+    except ValueError as exc:
+        phases.append(InstallPhase("public-endpoints", False, str(exc)))
+        return InstallReceipt(root=root, phases=tuple(phases))
+
     command = compose_command(
         "up",
         manifest=manifest,
@@ -242,6 +249,7 @@ def install_application(
             timeout=3.0,
             attempts=12,
             delay=1.0,
+            public_url_overrides=host_urls,
         )
         healthy = probes_ok(results)
         failed = [result.service for result in results if not result.ok]
