@@ -69,6 +69,39 @@ def _write_candidate(output: Path, record: dict) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _trace_effectiveness(trace: dict) -> dict:
+    """Only source-measured changes, not requested actions, count as learning evidence."""
+    accepted=0
+    productive=0
+    invalid=0
+    unique_states=set()
+    game_keys=("progress","score","resources","health","success","failure")
+    def signature(observed):
+        return tuple(round(float(observed[key]),6) for key in game_keys)
+    transitions=trace["transitions"]
+    if transitions:
+        unique_states.add(signature(transitions[0]["observation"]))
+    for move in transitions:
+        evidence=(move.get("info") or {}).get("evidence") or {}
+        valid=evidence.get("accepted") is True
+        accepted+=int(valid)
+        invalid+=int(not valid)
+        before=signature(move["observation"])
+        after=signature(move["next_observation"])
+        productive+=int(valid and after!=before)
+        unique_states.add(after)
+    return {
+        "seed":trace["seed"],
+        "steps":len(transitions),
+        "accepted_actions":accepted,
+        "rejected_actions":invalid,
+        "productive_state_changes":productive,
+        "unique_gameplay_states":len(unique_states),
+        "reward":trace["return"],
+        "trace_digest":trace["trace_digest"],
+    }
+
+
 def train_rule_curriculum(
     *, base_source: dict, proposals: list[dict], output: Path,
     authorized: bool, rights_cleared: bool, seed: int = 0,
@@ -135,11 +168,31 @@ def train_rule_curriculum(
     heldout = [eval_base + scenario for scenario in range(circumstances)]
     if set(train_seeds).intersection(heldout):
         raise RuleCurriculumError("training and evaluation scenario seeds overlap")
-    result = learner.train(
-        request.build,
-        episodes=count, seeds=train_seeds,
-    )
-    if result.updates <= 0:
+    # Each source-bound scenario receives one episode per sweep. Stop after
+    # two complete sweeps that yield no productive *non-time* state changes.
+    # This saves replay-quadratic simulation work instead of repeating
+    # useless rejected-action episodes through the whole maximum budget.
+    accumulated_traces=[]
+    effectiveness=[]
+    total_updates=0
+    stop_reason="allocated_episode_budget_completed"
+    completed_sweeps=0
+    no_progress_sweeps=0
+    for sweep in range(episodes_per_scenario):
+        batch=train_seeds[sweep*circumstances:(sweep+1)*circumstances]
+        trained=learner.train(request.build, episodes=len(batch), seeds=batch)
+        total_updates+=trained.updates
+        accumulated_traces.extend(trained.traces)
+        measures=[_trace_effectiveness(t) for t in trained.traces]
+        effectiveness.extend(measures)
+        completed_sweeps+=1
+        no_progress_sweeps=(no_progress_sweeps+1 if all(
+            row["productive_state_changes"]==0 for row in measures
+        ) else 0)
+        if no_progress_sweeps>=2 and sweep+1<episodes_per_scenario:
+            stop_reason="stopped_after_two_nonproductive_scenario_sweeps"
+            break
+    if total_updates <= 0:
         raise RuleCurriculumError("no real learning updates were committed")
     evaluation = learner.evaluate(
         request.build,
@@ -154,7 +207,7 @@ def train_rule_curriculum(
                 row["source"], sort_keys=True, separators=(",", ":"),
                 ensure_ascii=True,
             ).encode("utf-8")).hexdigest(),
-            "train_seed_count": episodes_per_scenario,
+            "train_seed_count": completed_sweeps,
             "heldout_seed": heldout[i],
             "heldout_return_difference": details["episodes"][i]["return_difference"],
             "heldout_candidate_return": details["episodes"][i]["candidate"]["return"],
@@ -188,14 +241,23 @@ def train_rule_curriculum(
         "environment_request_digest": request.digest,
         "training_algorithm": "measured_tabular_q_learning",
         "policy_snapshot": learner.snapshot(),
-        "actual_policy_updates": result.updates,
-        "trained_episodes": count,
+        "actual_policy_updates": total_updates,
+        "trained_episodes": len(accumulated_traces),
+        "maximum_training_episodes": count,
+        "unused_training_episode_budget": count-len(accumulated_traces),
+        "training_stop_reason":stop_reason,
+        "training_effectiveness":effectiveness,
+        "actual_productive_state_changes":sum(
+            row["productive_state_changes"] for row in effectiveness
+        ),
+        "actual_accepted_actions":sum(row["accepted_actions"] for row in effectiveness),
+        "actual_rejected_actions":sum(row["rejected_actions"] for row in effectiveness),
         "training_episode_evidence": [
             {
                 "seed": trace["seed"], "trace_digest": trace["trace_digest"],
                 "environment_digest": trace["environment"]["environment_digest"],
             }
-            for trace in result.traces
+            for trace in accumulated_traces
         ],
         "evaluation": details,
         "evaluation_by_circumstance": records,
@@ -217,12 +279,24 @@ def train_rule_curriculum(
         # One actual witnessed training episode for every distinct scenario.
         # This keeps the trainer budget bounded and preserves the disjoint
         # independent heldout episodes (never exported for optimization).
-        for trace in result.traces[:circumstances]:
-            scenario = plan["scenarios"][trace["seed"] % circumstances]
+        for i,scenario in enumerate(plan["scenarios"]):
+            eligible=[
+                (trace,_trace_effectiveness(trace))
+                for trace in accumulated_traces
+                if trace["seed"]%circumstances==i
+            ]
+            if not eligible:
+                raise RuleCurriculumError("no actual training episode exists for one scenario")
+            trace,quality=max(eligible,key=lambda entry:(
+                entry[1]["productive_state_changes"],
+                entry[1]["accepted_actions"],
+                entry[1]["unique_gameplay_states"],
+                -entry[1]["steps"],
+            ))
             examples.append({
-                "scenario_id": scenario["scenario_id"],
-                "seed": trace["seed"],
-                "actions": [row["action"] for row in trace["transitions"]],
+                "scenario_id":scenario["scenario_id"],
+                "seed":trace["seed"],
+                "actions":[step["action"] for step in trace["transitions"]],
             })
         corpus = build_rule_training_corpus(
             plan, examples, authorized=authorized, rights_cleared=rights_cleared,
@@ -245,8 +319,16 @@ def train_rule_curriculum(
         "rule_plan_digest": plan["digest"],
         "editor": base_source["editor"],
         "circumstances": circumstances,
-        "episodes": count,
-        "actual_q_updates": result.updates,
+        "episodes":len(accumulated_traces),
+        "maximum_training_episodes": count,
+        "unused_training_episode_budget": count-len(accumulated_traces),
+        "training_stop_reason":stop_reason,
+        "actual_productive_state_changes":sum(
+            row["productive_state_changes"] for row in effectiveness
+        ),
+        "actual_accepted_actions":sum(row["accepted_actions"] for row in effectiveness),
+        "actual_rejected_actions":sum(row["rejected_actions"] for row in effectiveness),
+        "actual_q_updates":total_updates,
         "heldout_seed_count": len(heldout),
         "heldout_mean_return_difference": details["mean_return_difference"],
         "per_circumstance_evaluation": records,
