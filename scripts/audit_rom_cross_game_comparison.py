@@ -60,8 +60,14 @@ def _manifest(path: Path):
         or not 2 <= len(raw["games"]) <= 30
     ):
         raise CrossGameComparisonError("cross-game manifest requires 2..30 exact input ROM identities")
-    cases, seen = [], set()
-    for row in raw["games"]:
+    return _validate_cases(raw["games"])
+
+
+def _validate_cases(cases):
+    if not isinstance(cases, list) or not 2 <= len(cases) <= 30:
+        raise CrossGameComparisonError("programmatic comparison needs 2..30 actual ROMs")
+    admitted, seen = [], set()
+    for row in cases:
         if (
             not isinstance(row, dict)
             or set(row) != {
@@ -91,13 +97,14 @@ def _manifest(path: Path):
         if identity in seen:
             raise CrossGameComparisonError("repeated media cannot inflate source-game comparison coverage")
         seen.add(identity)
-        cases.append(row)
-    return cases
+        admitted.append(row)
+    return admitted
 
 
 def run_manifest(cases, *, seed: int = 42, rights_acknowledged: bool, programs=DEFAULT_PROGRAMS):
     if rights_acknowledged is not True or not isinstance(cases, list) or not 2 <= len(cases) <= 30:
         raise CrossGameComparisonError("explicit lawful local game rights and 2..30 ROMs required")
+    cases = _validate_cases(cases)
     requests = []
     registry = None
     for case in cases:
