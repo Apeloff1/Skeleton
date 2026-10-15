@@ -10,6 +10,7 @@ This pass advances Skeleton from “core listed in a registry” toward operator
 - Host: disc_status(), swap_disc(index), and disc_receipts() methods with exact response schemas, maximum 32 accepted changes, SHA-256 receipts, and per-core/per-content/per-environment provenance. Disc operations and savestate operations are serialized.
 - Savestate: a disc-bearing snapshot captures the active index, tray state and media-change chain. Restore refuses incompatible disc context. Cartridge/other no-disc snapshot formats remain unchanged.
 - Operator CLI: scripts/qualify_full_console_disc_cycle.py performs real, rights-gated native multi-file console boot, bounded controller steps before and after swapping, audiovisual frame receipt collection, and optional savestate roundtrip.
+- Live desk: /api/disc_swap is loopback/token/same-origin controlled, strictly bounded, and records full host disc receipts inside each lane native event chain. A below-screen disc selector exposes it without obscuring gameplay. Offline verifier checks event/source/core/media hashes, indices, chronological counts and reset generation.
 - Source-only regressions: tests/test_game_emulator_disc_control.py uses fake ABI callbacks and mocked host authority; it does not certify real console compatibility. Existing manual-only focused qualification workflow now includes these tests and command compilation, without enabling any new push, pull-request or schedule triggers.
 
 ## Operator procedure
@@ -33,7 +34,7 @@ A successful invocation writes a small JSON report with real native boot, input,
 2. Software-frame-only native host currently lacks OpenGL/Vulkan hardware render contexts required by some contemporary cores. Unsupported cores fail, not silently fall back to pretend execution.
 3. Specialized physical peripherals, light guns, motion/haptics and multitap subdevice modes remain nonqualified.
 4. Durable save RAM, console memory cards and independent per-game governed persistence remain a separate capability from temporary sandbox state.
-5. The dual-screen live comparison desk has not been wired to invoke disc swapping; this operator CLI is the full native disc lifecycle path in this slice.
+5. The dual-screen local comparison desk now has an authenticated, operator-only disc selector mounted below each game/controller panel. Its native swap events include nested host-media receipts in the replay chain and are exported for offline verification. Only registered, preloaded media can be selected; disc changes do not claim a new rendered frame until the next native input step.
 6. The 169-target matrix still distinguishes declared mappings, approved installations and real observed boots. A listed target is not a completed emulator.
 
 Real native execution, physical-console timing accuracy, gameplay completion, source rights, and production AI training gains are not inferred from these code changes.
