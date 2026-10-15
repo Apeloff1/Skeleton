@@ -79,6 +79,11 @@ def analyze_live_comparison_evidence(packet: Mapping[str, Any]) -> dict[str, Any
                 episode = {"generation": generation, "steps": 0, "frame_changes": 0, "audio_changes": 0}
                 previous_frame = previous_audio = None
                 continue
+            if event["event_kind"] == "native_disc_swap":
+                # A disc swap changes native media state but does NOT execute
+                # a game input step, produce new pixels or synchronize time.
+                # The upstream live verifier authenticates its host receipt.
+                continue
             observed = _signals(p.get("objective_observations"))
             active = _input_activity(p["controller_ports"])
             key = (generation, p["episode_step"])
@@ -107,6 +112,7 @@ def analyze_live_comparison_evidence(packet: Mapping[str, Any]) -> dict[str, Any
             "core_sha256": attested["core_sha256"],
             "native_input_steps": attested["native_input_steps_verified"],
             "native_resets": attested["native_resets_verified"],
+            "native_disc_swaps": attested.get("native_disc_swaps_verified", 0),
             "active_input_steps": active_input_steps,
             "distinct_frame_hashes": len(frames),
             "distinct_audio_hashes": len(audio),
