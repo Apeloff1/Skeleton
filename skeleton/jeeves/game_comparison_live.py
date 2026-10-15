@@ -1,7 +1,7 @@
 """Explicit operator-owned, loopback-only live comparative libretro sessions.
 
 Only pre-approved game rows from a validated 30-game study may be started.
-Two to ten live lanes; actual native screen frames; <=256 steps/lane,
+Two to ten live lanes; actual native screen frames; <=4096 steps/lane,
 independent errors, bounded receipt history, no ROM bytes in HTTP responses.
 No model weights/Dragon custody are changed. Browser controls never execute code.
 """
@@ -26,14 +26,14 @@ from .game_emulator_catalog import GameEmulatorRegistry
 
 SCHEMA = "skeleton.game.live_comparison.v1"
 MAX_LANES = 10
-MAX_STEPS_PER_LANE = 256
+MAX_STEPS_PER_LANE = 4096
 MAX_RESET_PER_LANE = 4
 MAX_CHECKPOINTS_PER_LANE = 2
 MAX_REWINDS_PER_LANE = 2
 MAX_REQUEST_LANES = 10
 MAX_BURST_STEPS = 8
 MAX_IMAGE_URI = 320_000
-MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+MAX_RESPONSE_BYTES = 64 * 1024 * 1024
 
 
 class LiveComparisonError(ValueError):
@@ -247,7 +247,7 @@ class LiveComparison:
                 "model_training_or_promotion": False,
             }
             if len(json.dumps(result,allow_nan=False).encode()) > MAX_RESPONSE_BYTES:
-                raise LiveComparisonError("Live report exceeds five MiB; reset session or reduce lane count")
+                raise LiveComparisonError("Live report exceeds 64 MiB; reset session or reduce lane count")
             return result
 
     def _execute_one(self, lane: _Lane, controls: list[dict[str, Any]], *, include_preview: bool = True) -> dict[str, Any]:
@@ -610,7 +610,7 @@ class LiveComparison:
                 "learning_or_production_weight_promoted":False,
             }
             if len(json.dumps(result,sort_keys=True,allow_nan=False).encode())>MAX_RESPONSE_BYTES:
-                raise LiveComparisonError("Full live native receipts exceed the bounded five-MiB export")
+                raise LiveComparisonError("Full live native receipts exceed the bounded 64-MiB export")
             return result
 
     def close(self) -> None:
