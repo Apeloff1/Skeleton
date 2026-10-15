@@ -341,7 +341,6 @@ class NativeLiveComparisonContracts(unittest.TestCase):
         self.assertIn('request("/api/timing"',page)
         self.assertIn('request("/api/inspect"',page)
         self.assertIn("function autoAdvance",page)
-        self.assertIn("16",str(16))
         self.assertLess(page.index("root.append(stage);"),
                         page.index("root.append(timingDeckFor(id));"))
         self.assertLess(page.index("root.append(timingDeckFor(id));"),
