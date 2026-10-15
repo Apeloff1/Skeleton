@@ -228,5 +228,12 @@
     "workflow": "Rights-cleared original studio gameplay produces independently replay-verified text examples, pinned by SHA256 and admitted as candidate-only training examples to the authentic SKELETON_OWN checkpoint-derived Jeeves optimizer; separately declared Pareto heldout is preserved.",
     "boundaries": "No new service/provider. No automatic training, model promotion or live serving-weight changes; operator initiates the pinned candidate with the checkpoint and attestation.",
     "status_limit": "No live checkpoint was accessed or neural optimizer executed during this GitHub-only authoring session; local tests and exact-head CI remain required."
+  },
+  "studio_engine_project_creation": {
+    "status": "implementation_candidate_pending_ci",
+    "owner": "backend/core/game_learning.py",
+    "catalog_ui": "frontend/features/Jeeves/GameLearningWorkspace.tsx",
+    "catalog_contract": "frontend/src/product/gameLearningClient.ts",
+    "action": "Existing authenticated create-project now accepts studio:<registered_engine> and creates pinned game/studio/session.json. Existing simulate/record/train routes use the exact same emulator-style episode transport."
   }
 }

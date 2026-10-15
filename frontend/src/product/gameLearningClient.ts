@@ -15,8 +15,14 @@ export type LearningConsole = {
   supported_formats?: string[]; limits?: Record<string, number>;
 };
 export type LearningAlgorithm = { id: string; label: string; available: boolean; readiness?: LearningReadiness | null };
+export type StudioLearningEngine = {
+  id: string; target_id: string; runtime_kind: string; request_kind: 'studio';
+  learning_available: boolean; action_count: number; native_hardware_verified: boolean;
+  neural_training_automatic: boolean; source_path: string;
+};
 export type LearningCatalogue = {
   schema_version?: string | number; consoles: LearningConsole[]; algorithms: LearningAlgorithm[];
+  studio_engines?: StudioLearningEngine[];
   limits?: Record<string, number>; readiness?: LearningReadiness | null;
   generation_genres?: { id: string; label: string }[];
 };

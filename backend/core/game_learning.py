@@ -312,9 +312,28 @@ class GameLearningWorkspace:
         from skeleton.jeeves.game_learning_runtime import GameLearningEnvironment
 
         await self.ensure_indexes()
-        target = resolve_console(body["console_id"])
+        requested = body["console_id"]
+        studio = requested.startswith("studio:") and len(requested) <= 128
+        if studio:
+            from skeleton.jeeves.game_studio_environment import (
+                make_studio_source, studio_request_tree,
+            )
+            from skeleton.ai.game_builder.advanced_gameplay_runtime import ENGINES
+            editor = requested.removeprefix("studio:")
+            if editor not in ENGINES:
+                raise GameLearningError(
+                    "studio_engine_unavailable",
+                    "Requested original-game engine is not registered as executable.", 409,
+                )
+            target = None
+            initial_studio = studio_request_tree(make_studio_source(editor))
+            resolved_target_id = requested
+        else:
+            target = resolve_console(requested)
+            initial_studio = None
+            resolved_target_id = target.target_id
         project_id = _key(scope["tenant_id"] + ":" + scope["owner_id"], "project", body["idempotency_key"])
-        request_digest = _digest({"name": body["name"], "console_id": target.target_id})
+        request_digest = _digest({"name": body["name"], "console_id": resolved_target_id})
         existing = await self.projects.find_one({"_id": project_id, **scope})
         if existing is not None:
             if existing["request_digest"] != request_digest:
@@ -323,7 +342,12 @@ class GameLearningWorkspace:
                 )
             return await self.get_project(scope, project_id)
         files = (
-            []
+            _files([
+                {"path": path, "content": content, "language": "json"}
+                for path, content in initial_studio.items()
+            ])
+            if studio
+            else []
             if not target.reference_supported
             else _files(
                 [
@@ -347,9 +371,11 @@ class GameLearningWorkspace:
             "schema_version": "skeleton.game_learning.project.v1",
             "project_id": project_id,
             "name": body["name"],
-            "console_id": target.target_id,
-            "engine_era": target.era.value,
+            "console_id": resolved_target_id,
+            "engine_era": "studio_reference" if studio else target.era.value,
             "execution_mode": (
+                "reference"
+                if studio else
                 "rom"
                 if target.requires_rom
                 else (
@@ -1335,7 +1361,21 @@ class GameLearningWorkspace:
                 "A prepared editor save must finish or recover before starting new work.",
                 409,
             )
-        target = resolve_console(project["console_id"])
+        studio_project = project["console_id"].startswith("studio:")
+        if studio_project:
+            from skeleton.jeeves.game_studio_environment import studio_source_target
+            tree = {item["path"]: item["content"] for item in project["files"]}
+            actual = studio_source_target(
+                {"game/studio/session.json": tree["game/studio/session.json"]}
+            ) if "game/studio/session.json" in tree else None
+            if actual != project["console_id"]:
+                raise GameLearningError(
+                    "studio_source_changed",
+                    "Project studio identity no longer matches saved executable source.", 409,
+                )
+            target = None
+        else:
+            target = resolve_console(project["console_id"])
         selected = source_id or project.get("default_source_id")
         sources = (
             await self.sources.find(
@@ -1361,7 +1401,7 @@ class GameLearningWorkspace:
             in {"game/generated/game.json", "game/editor/console.json", "game/successor/spec.json"}
             for item in project["files"]
         )
-        if target.requires_rom and not generated_grid and not compiled:
+        if target is not None and target.requires_rom and not generated_grid and not compiled:
             selected = selected or next(
                 (row["source_id"] for row in sources if row["kind"] in {"rom", "content_bundle"}), None
             )

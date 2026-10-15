@@ -101,3 +101,17 @@ The checkpoint trainer must still have a real independently pinned
 `SKELETON_OWN` model, does actual optimizer updates only on a **candidate**,
 and independently evaluates its held-out outputs. This does not automatically
 train or promote live production weights, or prove improved game design.
+
+## Create a game-engine project directly in Jeeves's learning workspace
+
+The existing authenticated learning application now admits `console_id=
+"studio:economy"` (and every registered original-game engine) in the
+regular create-project route. It builds the actual default
+`game/studio/session.json` from the canonical editor schema, not a fake
+console profile. Native/libretro paths are unchanged. The normal project
+get/simulate/record/train and replay-fenced source writes retain the tenant
+and rights boundaries. Source types cannot be silently swapped across two
+authoritative engines. The existing React Native learning-workspace console
+picker now shows searchable **Original game** engine options from the same
+backend catalogue. No parallel ungoverned API or fake hardware renderer was
+introduced.
