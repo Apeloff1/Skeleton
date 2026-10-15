@@ -239,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
             file.write(payload)
             file.flush()
             os.fsync(file.fileno())
-        print(json.dumps({"status": result["status"], "actual_replayed_interrupt_scenarios": report["actual_independently_replayed_scenarios"], "hardware_bus_phase_certified": False}))
+        print(json.dumps({"status": report["status"], "actual_replayed_interrupt_scenarios": report["actual_independently_replayed_scenarios"], "hardware_bus_phase_certified": False}))
         return 0
     except (ValueError, TypeError, OSError, RuntimeError) as exc:
         print(json.dumps({"status": "source_interrupt_oracle_failed", "error": str(exc)[:600]}), file=sys.stderr)
