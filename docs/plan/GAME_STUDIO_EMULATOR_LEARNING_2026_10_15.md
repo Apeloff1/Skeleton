@@ -61,3 +61,18 @@ and number of measured action-derived optimizer updates.
 This action-learning path is explicitly consent and rights-gated. It cannot
 accept an uploaded unchecked label as sufficient proof and cannot silently
 write production neural weights.
+
+## Canonical application routing
+
+The existing authenticated `backend/core/game_learning.py` workspace now
+recognizes the exact `game/studio/session.json` project file, rejects
+ambiguous engine roots, resolves `studio:<editor>` from the strictly
+validated source rather than a fictional console ID, and advertises registered
+studio engines through the existing catalog response. Normal project
+simulation, human demonstration, local policy jobs, parallel actors and studio
+campaigns can resolve the engine through the existing workspace authority.
+Episode replay depth is limited to 128 even where a generic job asks for more.
+
+This does **not** create a second ungoverned API or skip tenant/project/source
+authority. Frontend integration and exact-head application tests remain
+necessary before release.

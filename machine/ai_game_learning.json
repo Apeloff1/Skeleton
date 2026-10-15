@@ -85,7 +85,10 @@
     "studio_agent_product": "frontend/features/Jeeves/GameStudioAssistantPanel.tsx",
     "studio_agent_client": "frontend/src/product/gameStudioAgentClient.ts",
     "studio_recovery_scheduler": "backend/core/scheduler.py",
-    "studio_review_product": "frontend/features/Jeeves/GameStudioReviewPanel.tsx"
+    "studio_review_product": "frontend/features/Jeeves/GameStudioReviewPanel.tsx",
+    "studio_reference_adapter": "skeleton/jeeves/game_studio_environment.py",
+    "studio_policy_training_cli": "skeleton/jeeves/game_studio_policy_cli.py",
+    "studio_editor_runtime": "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
   },
   "dependencies": {
     "simulation": "Existing Jeeves legacy/3D/modern runtime families and explicitly registered existing ROM execution implementations only",
@@ -203,5 +206,18 @@
     "integration_target_utc": "2026-10-14T07:55:00Z",
     "automated_tests_authorized": false
   },
-  "advanced_work_report": "docs/plan/JEEVES_STUDIO_ADVANCED_2026-10-14.md"
+  "advanced_work_report": "docs/plan/JEEVES_STUDIO_ADVANCED_2026-10-14.md",
+  "studio_engine_environment_extension": {
+    "status": "implementation_candidate_pending_exact_head_verification",
+    "app_owner": "backend/core/game_learning.py",
+    "catalog": "Existing /game-learning catalog exposes studio_engines without mixing native emulators with reference engines.",
+    "source": "Projects may admit game/studio/session.json; it is typed/seed-bound and selected only when no competing generated/editor/successor authoritative source exists.",
+    "request": "Original editor ID becomes studio:<editor>; max episode replay length is capped to 128, including from existing application jobs.",
+    "training": "Existing authenticated GameLearningWorkspace and StudioLearningCampaign routes can use GameEnvironmentRequest(kind='studio') and existing measured Q-learning, demonstration, and local rollout actors.",
+    "limitations": [
+      "API/frontend access depends on project authoring support and exact-head execution validation",
+      "No native hardware pixels from authoring-only engines",
+      "No automatic live production transformer weight updates"
+    ]
+  }
 }

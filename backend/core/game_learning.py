@@ -275,8 +275,25 @@ class GameLearningWorkspace:
             else:
                 row["actions"] = []
             consoles.append(row)
+        from skeleton.ai.game_builder.advanced_gameplay_runtime import ENGINES as STUDIO_ENGINES
+        from skeleton.ai.game_builder.advanced_gameplay_runtime import ACTION_HELP as STUDIO_ACTIONS
+
         return {
             "consoles": consoles,
+            "studio_engines": [
+                {
+                    "id": editor,
+                    "target_id": "studio:" + editor,
+                    "runtime_kind": "original_game_reference_runtime",
+                    "request_kind": "studio",
+                    "learning_available": True,
+                    "action_count": len(STUDIO_ACTIONS[editor]),
+                    "native_hardware_verified": False,
+                    "neural_training_automatic": False,
+                    "source_path": "game/studio/session.json",
+                }
+                for editor in STUDIO_ENGINES
+            ],
             "generation_genres": [{"id": value, "label": value.replace("_", " ")} for value in ERA_IDS],
             "algorithms": [
                 {
@@ -444,7 +461,9 @@ class GameLearningWorkspace:
                 kind = self.authored_environment_kind(tree)
                 current_environment = (
                     GameEnvironmentRequest(
-                        project["console_id"], kind=kind, tree=self.authored_runtime_tree(tree, kind)
+                        self.authored_runtime_target(tree, kind, project["console_id"]),
+                        kind=kind, tree=self.authored_runtime_tree(tree, kind),
+                        max_steps=64 if kind == "studio" else 256,
                     ).build()
                     if kind
                     else create_game_environment(
@@ -3137,10 +3156,11 @@ class GameLearningWorkspace:
         authored_kind = self.authored_environment_kind(tree)
         if authored_kind and not compiled:
             return GameEnvironmentRequest(
-                binding["console_id"],
+                self.authored_runtime_target(tree, authored_kind, binding["console_id"]),
                 kind=authored_kind,
                 tree=self.authored_runtime_tree(tree, authored_kind),
-                max_steps=binding["episode_steps"],
+                max_steps=(min(128, binding["episode_steps"]) if authored_kind == "studio"
+                           else binding["episode_steps"]),
             ).as_dict()
         generated = "game/generated/game.json" in tree and not compiled
         rom, content, filename = None, None, "game.bin"
@@ -3223,14 +3243,33 @@ class GameLearningWorkspace:
 
     @staticmethod
     def authored_environment_kind(tree):
-        if "game/successor/spec.json" in tree:
-            return "successor"
-        if "game/editor/console.json" in tree:
-            return "console_editor"
-        return None
+        markers = {
+            "game/successor/spec.json": "successor",
+            "game/editor/console.json": "console_editor",
+            "game/studio/session.json": "studio",
+        }
+        present = [kind for path, kind in markers.items() if path in tree]
+        if len(present) > 1 or (present and "game/generated/game.json" in tree):
+            raise GameLearningError(
+                "ambiguous_engine_source",
+                "A project cannot execute multiple competing authored engine roots.", 409,
+            )
+        return present[0] if present else None
+
+    @staticmethod
+    def authored_runtime_target(tree, kind, fallback):
+        if kind == "studio":
+            from skeleton.jeeves.game_studio_environment import studio_source_target
+
+            return studio_source_target(
+                {"game/studio/session.json": tree["game/studio/session.json"]}
+            )
+        return fallback
 
     @staticmethod
     def authored_runtime_tree(tree, kind):
+        if kind == "studio":
+            return {"game/studio/session.json": tree["game/studio/session.json"]}
         if kind == "console_editor":
             from skeleton.jeeves.game_console_editor import file_manifest_digest
 

@@ -387,9 +387,13 @@ class StudioGameEnvironment:
         self._seed = None
 
 
-def create_studio_game_environment(
-    tree: Mapping[str, str], *, target_id: str, max_steps: int = 64
-) -> StudioGameEnvironment:
+def studio_source_target(tree: Mapping[str, str]) -> str:
+    """Resolve an admitted studio engine without a console-target fallback."""
+    source = _parse_tree(tree)
+    return "studio:" + source["editor"]
+
+
+def _parse_tree(tree: Mapping[str, str]) -> dict[str, object]:
     if (not isinstance(tree, Mapping) or set(tree) != {"game/studio/session.json"}
             or not isinstance(tree["game/studio/session.json"], str)):
         raise StudioEnvironmentError("exact original-game learning source tree required")
@@ -411,7 +415,13 @@ def create_studio_game_environment(
                                 StudioEnvironmentError("nonfinite studio source")))
     except (ValueError, UnicodeError, RecursionError) as exc:
         raise StudioEnvironmentError("invalid bounded original studio JSON") from exc
-    source = parse_studio_source(source)
+    return parse_studio_source(source)
+
+
+def create_studio_game_environment(
+    tree: Mapping[str, str], *, target_id: str, max_steps: int = 64
+) -> StudioGameEnvironment:
+    source = _parse_tree(tree)
     if target_id != "studio:" + source["editor"]:
         raise StudioEnvironmentError("requested engine identity differs from original source")
     return StudioGameEnvironment(source, max_steps=max_steps)
@@ -421,4 +431,5 @@ __all__ = [
     "SOURCE_SCHEMA", "SNAPSHOT_SCHEMA", "StudioEnvironmentError",
     "make_studio_source", "parse_studio_source", "studio_request_tree",
     "StudioGameEnvironment", "create_studio_game_environment",
+    "studio_source_target",
 ]
