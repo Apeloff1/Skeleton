@@ -198,7 +198,7 @@ jobs:
           )
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as target:
               for name in required:
-                  target.write(f"{name}={secrets.token_hex(32)}\\n")
+                  target.write(f"{name}={secrets.token_hex(32)}\n")
           print(f"Initialized {len(required)} ephemeral test secret identities")
           PY
 
