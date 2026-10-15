@@ -109,3 +109,62 @@ or emulator-compatible agent interface as a booted executable game.
 - Tests, native boot sessions, installer execution or hardware runs performed
   during this change: **none**.
 - Current status: implementation on a review branch; release authority false.
+
+
+## Native first boot and rewind acceptance gate
+
+The new `scripts/audit_game_emulator_first_boot.py` audits only operator-approved
+native cores with privately provided, hash-pinned, lawfully owned single-file
+ROMs. **It does not download or distribute game data, build ROMs, approve
+firmware, trust reference simulation, or auto-promote a newly compiled core.**
+
+Example `/private/research/first-boot-cases.json`:
+
+```json
+{
+  "schema_version": "skeleton.game.native_emulator_first_boot_matrix.v1",
+  "cases": [
+    {
+      "core_id": "gambatte",
+      "target_id": "game_boy",
+      "rom_path": "/private/roms/owned-original.gb",
+      "filename": "owned-original.gb",
+      "rom_sha256": "<replace with 64-hex actual SHA-256 of your owned ROM>"
+    },
+    {
+      "core_id": "sameboy",
+      "target_id": "game_boy",
+      "rom_path": "/private/roms/owned-original.gb",
+      "filename": "owned-original.gb",
+      "rom_sha256": "<replace with the same actual SHA-256>"
+    }
+  ]
+}
+```
+
+Once each native core has been independently compiled and approved in the
+operator registry, execute:
+
+```bash
+python scripts/audit_game_emulator_first_boot.py \
+  --manifest-file /private/research/first-boot-cases.json \
+  --evidence-file /private/research/first-boot-evidence.json \
+  --rights-acknowledged --timeout 5
+```
+
+The gate requires an actual native boot frame, a real idle action and button
+action, an opaque source savestate, and exact observation, reward-component,
+transition-digest and final savestate equality after rewinding and repeating
+the same action. Failure of one core does not falsely mark other cores as
+operational. Missing approval, emulator sandbox, firmware, savestate
+capability, legal content, native callbacks or deterministic replay is a
+failed case; the command returns a nonzero status if any case failed.
+
+The operator report distinguishes **per-core actual native first-boot and
+replay acceptance** from the much larger independent hardware accuracy,
+reliability, licensing and AI-training acceptance requirements. No core has
+been accepted by this new gate during this source authoring pass.
+
+See [advanced emulator training and research](ROM_EMULATOR_ADVANCED_RESEARCH.md)
+for neural parameter fitting, source-confirmed action planning and controlled
+game-objective hypotheses.
