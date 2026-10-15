@@ -144,7 +144,8 @@ def _token_coverage(model: Any, corpus: tuple[str, ...]) -> float:
     return 0.0 if total == 0 else (total - unseen) / total
 
 
-def _heldout(model: Any, cases: dict[str, tuple[str, ...]]) -> tuple[dict[str, float], dict[str, list[dict[str, Any]]]]:
+def _heldout(model: Any, cases: dict[str, tuple[str, ...]],
+             *, deadline: float | None = None) -> tuple[dict[str, float], dict[str, list[dict[str, Any]]]]:
     """Score held-out sequences and save actual generation for independent review."""
     loss: dict[str, float] = {}
     samples: dict[str, list[dict[str, Any]]] = {}
@@ -152,6 +153,8 @@ def _heldout(model: Any, cases: dict[str, tuple[str, ...]]) -> tuple[dict[str, f
         values: list[float] = []
         examples: list[dict[str, Any]] = []
         for index, case in enumerate(rows):
+            if deadline is not None and time.monotonic() >= deadline:
+                raise ProductionCheckpointError("model evaluation time budget expired")
             prompt = case.partition(" Jeeves: ")[0]
             # Log probability is a limited language-model measure, not a design score.
             lp = float(model.logprob(case))
@@ -159,6 +162,8 @@ def _heldout(model: Any, cases: dict[str, tuple[str, ...]]) -> tuple[dict[str, f
                 raise ProductionCheckpointError("non-finite held-out loss")
             values.append(-lp)
             generated = model.decode(prompt, n=32, seed=index + 41)
+            if deadline is not None and time.monotonic() >= deadline:
+                raise ProductionCheckpointError("model evaluation time budget expired")
             examples.append({"prompt": prompt, "output": generated, "reference": case})
         loss[family] = sum(values) / len(values)
         samples[family] = examples
@@ -248,10 +253,14 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     curriculum_and_eval = dataset + tuple(
         case for rows in heldout.values() for case in rows
     )
+    # The budget covers baseline evaluation, optimizer work and post-fit
+    # evaluation. Long-running individual model calls cannot be preempted
+    # by Python; the guard is enforced between independent cases/batches.
+    deadline = time.monotonic() + max_training_seconds
     # Capture *actual parent* outputs before even the optional vocabulary
     # growth. The post-growth but pre-SGD loss is a different tokenizer
     # baseline, so never mislabel it as production-model improvement.
-    parent_heldout, parent_generations = _heldout(model, heldout)
+    parent_heldout, parent_generations = _heldout(model, heldout, deadline=deadline)
     vocab_coverage_before = _token_coverage(model, curriculum_and_eval)
     expansion: dict[str, Any] | None = None
     if expand_vocabulary and vocab_coverage_before < min_coverage:
@@ -281,7 +290,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             f"production vocabulary coverage {vocab_coverage:.4f} < {min_coverage:.4f}; "
             "refusing ineffective UNK-token specialization"
         )
-    before, sample_before = _heldout(model, heldout)
+    before, sample_before = _heldout(model, heldout, deadline=deadline)
     steps_before = model.steps
     if torch_stack:
         from skeleton.cortex.port import tokens
@@ -368,7 +377,6 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             observed_steps = state["receipt"]["completed_updates"]
             if model.steps - steps_before != observed_steps:
                 raise ProductionCheckpointError("resumed weight cursor differs from recorded SGD steps")
-    deadline = time.monotonic() + max_training_seconds
     for batch_index in range(start_batch, len(batches)):
         if time.monotonic() >= deadline:
             raise ProductionCheckpointError("training time budget expired; committed cursor is resumable")
@@ -388,7 +396,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     trained_snapshot = model.snapshot()
     if model.steps <= steps_before or trained_snapshot == original_snapshot:
         raise ProductionCheckpointError("production-derived weights did not change")
-    after, sample_after = _heldout(model, heldout)
+    after, sample_after = _heldout(model, heldout, deadline=deadline)
     regressions = [name for name in before
                    if after[name] > before[name] * (1 + max_domain_regression)]
     mean_before = sum(before.values()) / len(before)
