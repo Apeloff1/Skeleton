@@ -921,3 +921,95 @@ clone GitHub for local execution, and no native disc/core or generated
 ROM end-to-end neural acceptance execution took place in this pass.
 The gates describe **what must actually run to count**, not measured
 success, game mastery, model-weight improvement or finished production.
+
+
+## R. CPU-owned DMG memory bus and video/DMA acceptance
+
+The experimental Game Boy interpreter now differentiates **actual CPU
+bus accesses** from OAM DMA, the video renderer, and host-owned source
+inspection. This is required before generated emulator observations may
+be trusted as training evidence. On DMG, the CPU can access only HRAM
+`FF80–FFFE` while OAM DMA is running. External CPU reads are treated as
+a conservative `FF` open bus; external writes are ignored. A ROM/WRAM
+opcode fetch or interrupt-service microcycle whose behavior is not
+implemented fails closed rather than inventing a valid game transition.
+
+During the existing approximate PPU Mode 3 window, the source CPU
+cannot read/write VRAM; during Modes 2 or 3, it cannot read/write OAM.
+These blocks disappear when LCDC is disabled or in the accessible
+video modes. Actual DMA/PPU reads bypass the CPU-only restriction and
+continue to advance on real simulated T-cycles.
+
+The explicit original ROM operator
+`scripts/audit_original_gameboy_bus_arbitration.py` executes **21
+source bus constraints**, including HRAM instruction/data access under
+active DMA, blocked WRAM reads/writes, CPU fetch refusal, source DMA
+independence, video mode gates, LCDC-off access and source-replayed
+in-flight DMA state. Every outcome must be supported by a local original
+cartridge and canonical source machine evidence.
+
+```bash
+python scripts/audit_original_gameboy_bus_arbitration.py \
+  --evidence-file /private/research/original-dmg-bus.json
+```
+
+The manual-only original ROM AI acceptance suite now requires this
+report even when optional focused regressions are skipped. It refuses
+missing, altered or inflated bus-check evidence. Focused tests:
+`skeleton/testing/test_game_original_cpu_bus_arbitration.py` and
+`skeleton/testing/test_game_rom_dma_timing.py`.
+
+**Known hardware limitations:** The PPU mode-3 boundary is still a
+fixed approximate dot window; pixel-fetch stalls and electrical bus
+float values are not certified. Full mid-instruction bus sequencing,
+DMA interrupt service, audio arbitration, CGB dual-bus rules and
+full independent hardware timing remain unimplemented.
+
+## S. Disconnected Game Boy serial clock with source-replayed interrupts
+
+The original DMG `FF01` (SB) and `FF02` (SC) serial registers now
+support **real emulated internal-clock transfer**. A clocked byte
+shifts MSB-first, one bit every 512 emulated T-cycles (8,192 Hz),
+and completes after 4,096 T-cycles. With no link peer, the data
+input line stays high and a complete internal transfer yields `FF`,
+clears the SC start bit and requests the serial IF interrupt.
+
+External-clock mode preserves a pending transfer with zero fake clock
+edges: **no independent peer or multiplayer connection is simulated**.
+STOP freezes the serial oscillator; HALT continues it. Starting/cancelling
+or restarting SC has bounded behavior, and unsupported mid-transfer SB
+rewrites fail closed rather than inventing link data. In-progress bit
+count and T-cycle phase are included in exact CPU/memory/PPU savestates.
+
+`scripts/audit_original_gameboy_serial_port.py` runs an entirely
+original authored LR35902 ROM that **actually executes CPU opcodes**
+writing SB and SC, then checks internal completion against external
+waiting. Both cases independently replay from the same half-transfer
+savestate; the native and provider model paths remain unchanged:
+
+```bash
+python scripts/audit_original_gameboy_serial_port.py \
+  --evidence-file /private/research/original-dmg-serial.json
+```
+
+The source acceptance suite verifies both source reports and correct
+interrupt, data, phase and replay values even with optional focused
+unit tests disabled. The existing instruction-level replay lab now
+records actual serial register, clock phase and disconnection metadata
+alongside CPU IRQ, timer, OAM DMA, RAM and framebuffer evidence.
+Source regressions:
+`skeleton/testing/test_game_rom_serial_port.py`,
+`skeleton/testing/test_game_original_serial_source_acceptance.py`.
+
+**Further work required:** A dual-machine physical or virtual link
+cable with synchronized peer clock, bidirectional bit exchange, multiple
+cartridge timing and independent native multiplayer correctness is
+*not implemented*. The new serial subsystem is only an original-DMG
+disconnected-cable, source-emulated input/interrupt path. Emulator
+hardware certification and production AI weight training remain
+independently unverified.
+
+**Proof status:** These operator commands, mirrors and regression
+sources are committed to PR #3935 but none has been executed in this
+turn's environment. No operational console, learned policy improvement,
+native libretro boot or hardware accuracy is claimed from source alone.
