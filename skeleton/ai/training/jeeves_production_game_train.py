@@ -191,12 +191,17 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           max_optimizer_steps: int = 25000,
           max_training_seconds: int = 1200,
           dataset_manifest: Path | None = None,
+          training_view: str | None = None,
           progress_directory: Path | None = None,
           progress_run_id: str | None = None,
           resume: bool = False) -> dict[str, Any]:
     from skeleton.cortex.transformer import TinyTransformer
     from skeleton.cortex.bpe import BytePairEncoder
 
+    if training_view is not None and training_view not in ("constructive", "adversarial"):
+        raise ValueError("training view must be constructive or adversarial")
+    if training_view is not None and dataset_manifest is None:
+        raise ProductionCheckpointError("mirror training requires rights-approved multidomain corpus")
     if type(resume) is not bool:
         raise ValueError("resume must be boolean")
     if (progress_directory is None) != (progress_run_id is None):
@@ -235,7 +240,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         }
     else:
         from .jeeves_multidomain import load_training_corpus
-        dataset, heldout, dataset_receipt = load_training_corpus(dataset_manifest)
+        dataset, heldout, dataset_receipt = load_training_corpus(
+            dataset_manifest, training_view=training_view)
     selected_key, original_snapshot, mouth = _active_snapshot(original)
     torch_stack = original_snapshot.get("kind") == "torch-stack"
     if torch_stack:
@@ -323,6 +329,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "dataset": list(dataset),
             "heldout": heldout,
             "dataset_receipt": dataset_receipt,
+            "training_view": training_view,
             "epochs": epochs,
             "learning_rate": lr,
             "max_optimizer_steps": max_optimizer_steps,
@@ -414,6 +421,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "candidate_promoted": False,
         "curriculum_exposures_per_epoch": len(dataset),
         "dataset_receipt": dataset_receipt,
+        "training_view": training_view or "all",
         "built_in_smoke_curriculum_only": dataset_manifest is None,
         "epochs": epochs,
         "training_steps_before": steps_before,

@@ -378,3 +378,10 @@ read-only catalogue panel. It validates the same manifest checksum and
 specialization schema without initializing the model or changing any weights.
 Windows installer CI now runs the specialist data-partition tests and executes
 the installed catalogue check before native inference smoke tests.
+
+The two real optimizer arms now select **disjoint rights-reviewed teaching
+lenses**: constructive work (construct, repair, resource, portability) and
+adversarial work (counterexample, edge cases, security, verification).
+Both are scored against the same untouched held-out examples. If either view
+lacks sufficient reviewed material in gaming, AI and coding, training aborts
+before spawning optimizers; synthetic placeholder data is not substituted.

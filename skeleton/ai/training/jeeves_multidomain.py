@@ -24,6 +24,10 @@ CATALOG = ROOT / "machine/jeeves_training_modules.json"
 DOMAINS = ("gaming", "ai", "coding")
 LENSES = ("construct", "counterexample", "repair", "edge_cases",
           "resource", "security", "portability", "verification")
+TRAINING_VIEWS = {
+    "constructive": frozenset(("construct", "repair", "resource", "portability")),
+    "adversarial": frozenset(("counterexample", "edge_cases", "security", "verification")),
+}
 _ID = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{2,127}\Z")
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -166,7 +170,7 @@ def _split_guard(train: tuple[dict[str, Any], ...], test: tuple[dict[str, Any], 
             raise _error("corpus contaminates immutable game benchmark")
 
 
-def load_multidomain_corpus(manifest_path: Path) -> tuple[tuple[str, ...], dict[str, tuple[str, ...]], dict[str, Any]]:
+def load_multidomain_corpus(manifest_path: Path, *, training_view: str | None = None) -> tuple[tuple[str, ...], dict[str, tuple[str, ...]], dict[str, Any]]:
     """Load operator-reviewed original records, not synthetic fill-in examples."""
     if (manifest_path.is_symlink() or not manifest_path.is_file()
             or not 32 <= manifest_path.stat().st_size <= 64 * 1024):
@@ -185,7 +189,19 @@ def load_multidomain_corpus(manifest_path: Path) -> tuple[tuple[str, ...], dict[
     train = _rows(manifest_path.parent / names[0], config.get("train_sha256"), "train", set(modules))
     test = _rows(manifest_path.parent / names[1], config.get("heldout_sha256"), "heldout", set(modules))
     _split_guard(train, test)
-    if len(train) < 18 or len(test) < 9:
+    if training_view is not None:
+        if training_view not in TRAINING_VIEWS:
+            raise _error("unknown optimizer training view")
+        allowed_lenses = TRAINING_VIEWS[training_view]
+        train = tuple(row for row in train
+                      if modules[row["module_id"]]["lens"] in allowed_lenses)
+        # Different optimizer arms must receive actual distinct reviewed examples.
+        if len(train) < 12 or any(
+            sum(modules[row["module_id"]]["domain"] == domain for row in train) < 4
+            for domain in DOMAINS
+        ):
+            raise _error(f"{training_view} training view lacks independently reviewed examples")
+    if len(train) < (12 if training_view is not None else 18) or len(test) < 9:
         raise _error("require 18 train and 9 heldout examples at minimum")
     for domain in DOMAINS:
         if (sum(modules[r["module_id"]]["domain"] == domain for r in train) < 4 or
@@ -214,6 +230,7 @@ def load_multidomain_corpus(manifest_path: Path) -> tuple[tuple[str, ...], dict[
                "manifest_sha256": sha256(raw).hexdigest(),
                "train_sha256": config["train_sha256"], "heldout_sha256": config["heldout_sha256"],
                "train_examples": len(train), "heldout_examples": len(test),
+               "training_view": training_view or "all",
                "active_modules": active, "registered_modules": len(modules),
                "independent_projects": True, "heldout_used_for_training": False,
                "legal_rights_independently_verified": False,
@@ -221,16 +238,18 @@ def load_multidomain_corpus(manifest_path: Path) -> tuple[tuple[str, ...], dict[
     return training, heldout, receipt
 
 
-def load_training_corpus(manifest_path: Path):
+def load_training_corpus(manifest_path: Path, *, training_view: str | None = None):
     """Preserve the existing game corpus loader while admitting multidomain."""
     if (manifest_path.is_symlink() or not manifest_path.is_file()
             or not 32 <= manifest_path.stat().st_size <= 64 * 1024):
         raise _error("training corpus manifest missing or oversized")
     schema = _strict_object(manifest_path.read_bytes()).get("schema_version")
     if schema == SCHEMA:
-        return load_multidomain_corpus(manifest_path)
+        return load_multidomain_corpus(manifest_path, training_view=training_view)
     from .jeeves_game_corpus import SCHEMA as GAME_SCHEMA, load_approved_corpus
     if schema == GAME_SCHEMA:
+        if training_view is not None:
+            raise _error("parallel optimizer views require approved multidomain corpus")
         return load_approved_corpus(manifest_path)
     raise _error("unknown approved training corpus schema")
 

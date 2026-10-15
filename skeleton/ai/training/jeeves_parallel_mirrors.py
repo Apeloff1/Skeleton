@@ -80,10 +80,12 @@ def _candidate_worker(
         source, expected=parent_sha, candidate=candidate, report=report,
         epochs=epochs, lr=lr, min_coverage=.80, max_domain_regression=0.0,
         expand_vocabulary=expand_vocabulary, dataset_manifest=manifest,
+        training_view=name,
         max_optimizer_steps=max_optimizer_steps,
         max_training_seconds=max_training_seconds)
     return {
-        "arm": name, "learning_rate": lr, "epochs": epochs,
+        "arm": name, "training_view": name,
+        "learning_rate": lr, "epochs": epochs,
         "status": result["status"],
         "real_optimizer_updates": result["observed_optimizer_updates"],
         "candidate_sha256": result.get("candidate_sha256"),
@@ -115,6 +117,16 @@ def run_parallel_candidates(
         raise ProductionCheckpointError("receipt must be a new file under candidate output directory")
     catalog = validate_catalog(catalog_path)
     _train, _heldout, corpus = load_multidomain_corpus(manifest_path)
+    # Fail BEFORE starting either real optimizer if either perspective lacks
+    # rights-reviewed data. Both use the same untouched held-out split.
+    view_receipts: dict[str, dict[str, Any]] = {}
+    for name, _lr, _epochs in ARMS:
+        _view_train, _view_heldout, view_receipts[name] = load_multidomain_corpus(
+            manifest_path, training_view=name)
+    constructive = set(view_receipts["constructive"]["active_modules"])
+    adversarial = set(view_receipts["adversarial"]["active_modules"])
+    if not constructive or not adversarial or constructive == adversarial:
+        raise ProductionCheckpointError("parallel optimizer mirrors require distinct reviewed specialist modules")
     source, parent_sha = _source(attestation_path)
     if shutil.disk_usage(output_directory).free < 1024 ** 3:
         raise ProductionCheckpointError("at least 1 GiB free disk is required")
@@ -166,6 +178,11 @@ def run_parallel_candidates(
         "registered_modules": catalog["modules"],
         "active_modules": len(corpus["active_modules"]),
         "candidate_arms": results,
+        "optimizer_views": {
+            name: {"train_examples": receipt["train_examples"],
+                   "training_view": receipt["training_view"]}
+            for name, receipt in sorted(view_receipts.items())
+        },
         "separate_training_processes": 2,
         "data_mirror_evidence": mirrors["mirrors"],
         "independent_quality_review_complete": False,

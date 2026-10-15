@@ -103,3 +103,12 @@ def test_missing_live_attestation_does_not_create_weights(tmp_path, monkeypatch)
             manifest_path=m, attestation_path=tmp_path / "missing-attestation.json",
             output_directory=output, receipt_path=output / "receipt.json")
     assert list(output.iterdir()) == []
+
+def test_optimizer_mirrors_refuse_unreviewed_adversarial_examples(tmp_path):
+    m = _fixture(tmp_path / "one-sided")
+    train, heldout, receipt = load_multidomain_corpus(m, training_view="constructive")
+    assert len(train) == 18 and receipt["training_view"] == "constructive"
+    with pytest.raises(ValueError, match="adversarial training view lacks"):
+        load_multidomain_corpus(m, training_view="adversarial")
+    with pytest.raises(ValueError, match="unknown optimizer training view"):
+        load_multidomain_corpus(m, training_view="unreviewed")
