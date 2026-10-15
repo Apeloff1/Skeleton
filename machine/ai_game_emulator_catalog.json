@@ -955,7 +955,10 @@
       "scientific_status": "Response signature novelty is descriptive observed native AV behavior; no causality of game mechanics, no generalization guarantee, no neural model weight changes",
       "deterministic_source_and_revisit_plan": true,
       "test_file": "tests/test_game_comparison_boomerang.py",
-      "native_cores_qualified_in_this_turn": false
+      "native_cores_qualified_in_this_turn": false,
+      "resume_hardening": "SHA-verified contiguous checkpoint prefix, exact prior approved native core registry, --max-new-treatments for finite incremental work, --approve-native-runs for only the fresh native work; no silent reruns or false all-complete flags",
+      "novelty_semantics": "Response fingerprints omit treatment identity/source hashes and require matched pre-intervention observations plus stable native A/B repeats and a post-intervention audiovisual difference; unchanged/confounded/unstable results yield no new signal score",
+      "native_execution_verified_in_this_pass": false
     },
     "native_multispectral_training_observation": {
       "owner": "skeleton/jeeves/game_comparison_multispectral.py",
