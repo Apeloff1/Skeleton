@@ -766,7 +766,7 @@ class EmulatorEnvironment:
         self.spec = GameEnvironmentSpec(
             "libretro:" + core.core_id + ":" + materialized_digest[:24],
             _digest(self._descriptor),
-            (*_ACTIONS, *_KEY_ACTIONS, "controller_input"),
+            (*_ACTIONS, *_KEY_ACTIONS),
             {key: bins for key in ("screen_mean", "visual_change", "audio_rms", "step_fraction")},
             ("visual_change",),
             self.max_steps,
@@ -2078,8 +2078,12 @@ def capture_emulator_trace(
         raise EmulatorHostError("emulator_trace_source", "An active native emulator environment is required")
     if not isinstance(actions, (list, tuple)) or not 1 <= len(actions) <= environment.max_steps:
         raise EmulatorHostError("emulator_trace_budget", "Trace actions exceed the bounded episode horizon")
-    if not all(type(action) is str and action in environment.spec.actions for action in actions):
-        raise EmulatorHostError("emulator_trace_action", "Trace controls must use declared policy actions")
+    declared_actions = environment.spec.actions if controller_tape is None else ("controller_input",)
+    if not all(type(action) is str and action in declared_actions for action in actions):
+        raise EmulatorHostError(
+            "emulator_trace_action",
+            "Trace controls must use the declared policy or exact controller-tape interface",
+        )
     if controller_tape is None:
         if "controller_input" in actions:
             raise EmulatorHostError(
@@ -2168,6 +2172,11 @@ def capture_emulator_trace(
                 )
             break
     spec = environment.spec.as_dict()
+    if normalized_tape is not None:
+        # This transcript records a richer input interface, not a callable
+        # primitive policy action. Exact policy-descriptor admission therefore
+        # refuses this trace unless an owner explicitly handles its real tape.
+        spec["actions"] = [*spec["actions"], "controller_input"]
     descriptor = environment.descriptor
     lineage = {
         "runtime_kind": "installed_libretro_emulator",
@@ -2194,6 +2203,8 @@ def capture_emulator_trace(
             "reward_semantics", "visual difference signal, not gameplay quality or victory"
         ),
     }
+    if normalized_tape is not None:
+        lineage["action_semantics"] = "controller_tape_only_not_policy_dispatch"
     if "native_observation" in descriptor:
         lineage["native_observation_digest"] = descriptor["native_observation"]["descriptor_digest"]
     episode_identity = _digest(
