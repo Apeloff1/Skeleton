@@ -19,6 +19,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 
 SCHEMA = "skeleton.jeeves.cinematic_sim.v1"
 REPORT_SCHEMA = "skeleton.jeeves.cinematic_multisim_report.v1"
@@ -176,6 +177,8 @@ def validate_scene(scene: dict[str, Any]) -> dict[str, Any]:
 def variation_controls(*, offsets: tuple[int, ...] = (0,), pan_rates: tuple[int, ...] = (100,),
                        lens_offsets: tuple[int, ...] = (0,), item_mass_deltas: tuple[int, ...] = (0,),
                        apparel_drag_deltas: tuple[int, ...] = (0,), seeds: tuple[int, ...] = (0,),
+                       item_variants: tuple[str, ...] = ("",),
+                       apparel_variants: tuple[str, ...] = ("",),
                        limit: int = MAX_SIMULATIONS) -> tuple[dict[str, int], ...]:
     """Product-space variations with deterministic order and strict admission."""
     _bounded_int(limit, 1, MAX_SIMULATIONS, "simulation cap")
@@ -190,9 +193,16 @@ def variation_controls(*, offsets: tuple[int, ...] = (0,), pan_rates: tuple[int,
                  len(set(values)) == len(values), "invalid " + name + " choices")
         for value in values:
             _bounded_int(value, lo, hi, name)
-    combos = product(*(entry[0] for entry in ranges))
+    for values, title in ((item_variants, "item"), (apparel_variants, "apparel")):
+        _require(type(values) is tuple and 1 <= len(values) <= 16 and
+                 len(set(values)) == len(values), "invalid " + title + " variant set")
+        for identity in values:
+            _require(identity == "" or (type(identity) is str and ID.fullmatch(identity)),
+                     "invalid " + title + " variant identity")
+    combos = product(*(entry[0] for entry in ranges), item_variants, apparel_variants)
     names = ("yaw_offset_deg", "pan_rate_pct", "fov_offset_deg",
-             "item_mass_delta_g", "apparel_drag_delta_pct", "seed")
+             "item_mass_delta_g", "apparel_drag_delta_pct", "seed",
+             "item_variant_id", "apparel_variant_id")
     out = []
     for values in combos:
         if len(out) >= limit:
@@ -229,7 +239,17 @@ class SimulationController:
             lens_offsets=(controls["fov_offset_deg"],),
             item_mass_deltas=(controls["item_mass_delta_g"],),
             apparel_drag_deltas=(controls["apparel_drag_delta_pct"],),
-            seeds=(controls["seed"],))
+            seeds=(controls["seed"],), item_variants=(controls["item_variant_id"],),
+            apparel_variants=(controls["apparel_variant_id"],))
+        items = {x["id"] for x in scene["items"]}
+        wardrobes = {x["id"]: set(x["allowed_apparel"]) for x in scene["actors"]}
+        if controls["item_variant_id"]:
+            _require(controls["item_variant_id"] in items,
+                     "item+sim refers to unknown authored item")
+        if controls["apparel_variant_id"]:
+            _require(all(controls["apparel_variant_id"] in wardrobes[shot["actor_id"]]
+                         for shot in scene["shots"]),
+                     "apparel+sim cannot override an actor with unapproved outfit")
         self.scene, self.controls, self.frame_ms = scene, controls, frame_ms
         self.times = tuple(range(0, self.validation["total_ms"], frame_ms)) + (
             self.validation["total_ms"],)
@@ -270,9 +290,11 @@ class SimulationController:
         fov = round(cam["fov_start_deg"] +
                     (cam["fov_end_deg"] - cam["fov_start_deg"]) * eased +
                     self.controls["fov_offset_deg"], 4)
-        item = next((x for x in self.scene["items"] if x["id"] == shot["item_id"]), None)
+        item_id = (self.controls["item_variant_id"] or shot["item_id"]) if shot["item_id"] else ""
+        outfit_id = self.controls["apparel_variant_id"] or shot["apparel_id"]
+        item = next((x for x in self.scene["items"] if x["id"] == item_id), None)
         actor = next(x for x in self.scene["actors"] if x["id"] == shot["actor_id"])
-        apparel = next(x for x in self.scene["apparel"] if x["id"] == shot["apparel_id"])
+        apparel = next(x for x in self.scene["apparel"] if x["id"] == outfit_id)
         mass = max(0, (item["mass_g"] if item else 0) + self.controls["item_mass_delta_g"]) if item else 0
         drag = max(0, min(100, apparel["drag_pct"] + self.controls["apparel_drag_delta_pct"]))
         mobility = round(apparel["mobility_pct"] * (100 - drag) / 100, 2)
@@ -292,8 +314,8 @@ class SimulationController:
                 "fov_deg": fov, "camera_mm": origin, "focus_mm": look,
                 "focus_distance_mm": round(distance, 2),
                 "actor": actor["id"], "voice": actor["voice_id"],
-                "item": shot["item_id"], "item_mass_g": mass,
-                "apparel": apparel["id"], "mobility_pct": mobility,
+                "item": item_id, "item_mass_g": mass,
+                "apparel": outfit_id, "mobility_pct": mobility,
                 "lighting": shot["lighting_id"], "dialogue": shot["dialogue_ids"],
                 "issues": issues}
 
@@ -379,7 +401,7 @@ def run_batch(scene: dict[str, Any], *, variations: tuple[dict[str, int], ...],
     _bounded_int(frame_ms, 25, 250, "frame_ms")
     _require(type(variations) is tuple and 1 <= len(variations) <= MAX_SIMULATIONS,
              "multi-simulation run outside budget")
-    frames_per_sim = validated["total_ms"] // frame_ms + 1
+    frames_per_sim = (validated["total_ms"] + frame_ms - 1) // frame_ms + 1
     _require(frames_per_sim * len(variations) <= MAX_BATCH_FRAMES,
              "multi-simulation aggregate frame budget exceeded")
     _require(len({_hash(v) for v in variations}) == len(variations),
@@ -490,6 +512,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--item-mass-deltas", type=int, nargs="+", default=[0, 250])
     parser.add_argument("--apparel-drag-deltas", type=int, nargs="+", default=[0, 15])
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1])
+    parser.add_argument("--item-variants", nargs="+", default=[""])
+    parser.add_argument("--apparel-variants", nargs="+", default=[""])
     args = parser.parse_args(argv)
     try:
         if args.audit_report is not None:
@@ -504,7 +528,8 @@ def main(argv: list[str] | None = None) -> int:
                 lens_offsets=tuple(args.fov_offsets),
                 item_mass_deltas=tuple(args.item_mass_deltas),
                 apparel_drag_deltas=tuple(args.apparel_drag_deltas),
-                seeds=tuple(args.seeds), limit=args.limit)
+                seeds=tuple(args.seeds), item_variants=tuple(args.item_variants),
+                apparel_variants=tuple(args.apparel_variants), limit=args.limit)
             output = run_batch(scene, variations=variations, workers=args.workers,
                                frame_ms=args.frame_ms)
             if args.output is not None:
