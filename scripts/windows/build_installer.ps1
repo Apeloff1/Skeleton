@@ -50,12 +50,9 @@ if (Test-Path $ShortDrive) {
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ShortDrive)) {
     throw "Unable to create short Windows build drive $ShortDrive"
 }
-# Every terminating error after SUBST must unmap the temporary build drive.
-# Otherwise a failed local build makes the next attempt fail before staging.
-trap {
-    & subst $ShortDrive /D | Out-Null
-    break
-}
+# Only clean up a drive mapping after the successful SUBST above. A global
+# trap can also catch failures before SUBST (including a user-owned W: drive).
+try {
 New-Item -ItemType Directory -Force -Path $PayloadDir, $LauncherDist, $LauncherWork, $LauncherSpec | Out-Null
 
 Write-Host "==> Staging curated application payload from $SourceRef via $ShortDrive"
@@ -304,4 +301,7 @@ Write-Host "Windows installer built successfully:"
 Write-Host "  $($Installer.FullName)"
 Write-Host "  SHA256 $($Hash.Hash)"
 
-& subst $ShortDrive /D
+}
+finally {
+    & subst $ShortDrive /D | Out-Null
+}
