@@ -246,3 +246,50 @@ separate gates. The initial test uses only basic controller inputs; it
 does not establish complete game functionality, victory, legal ownership
 or independent emulator hardware cycle accuracy. No native multi-file
 disc was boot-verified during this source authoring pass.
+
+
+## On-demand native compilation, without CI congestion
+
+`.github/workflows/on-demand-libretro-core-build.yml` is a
+**manual-dispatch-only**, single-job Linux build/inspect entrypoint.
+It has no push, PR, schedule or merge triggers. Once present on the
+repository's default branch and enabled by GitHub Actions, select
+**Actions → On-demand pinned libretro core build → Run workflow**
+and choose exactly one of:
+
+- SameBoy (`sameboy`): Game Boy family
+- Nestopia (`nestopia`): NES
+- Mesen (`mesen`): NES
+- Snes9x2010 (`snes9x2010`): SNES, independent upstream licensing review
+- Beetle Saturn (`mednafen_saturn`): Sega Saturn; required legal firmware
+  is **not** supplied by this workflow
+
+The workflow checks out the requested commit, validates a fixed core
+allowlist, fetches the corresponding **exact upstream pinned revision**,
+attempts a bounded local Linux compilation, inspects the ELF/libretro
+library through the existing approved catalog, and writes
+`source-build-receipt.json`. This JSON deliberately separates:
+
+- `compiled_native_binary_sha256`: the actual candidate library built
+  and inspected in that workflow run, **only if** the installer succeeded.
+- `operator_approval_status`: the installer/registry's *separate*
+  approval or candidate designation, including blocked firmware.
+- `real_libretro_core_execution_verified=false` and
+  `rom_boot_verified=false`: no native game was executed in the build job.
+- `production_model_weights_modified=false`: source builds are not
+  neural parameter training.
+
+The artifact retains small receipts and diagnostics for three days,
+not core binaries, third-party ROMs, proprietary BIOS, build trees or
+long-term mutable shared libraries. The job is serialized per ref, has a
+45-minute outer timeout, and cancels superseded work on that ref.
+A failed build remains a GitHub Actions failure and cannot be reported
+as an operational console.
+
+**Important limitation:** The workflow was authored on draft
+PR #3935 and has not executed. GitHub generally requires manually
+dispatchable workflow files on the repository default branch before
+they appear in the normal Actions run-workflow UI. It must be merged
+and explicitly dispatched before obtaining any verified native build
+receipts. The separate operator-controlled first-boot gates remain
+required afterward for actual emulator functionality.
