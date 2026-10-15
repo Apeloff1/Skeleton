@@ -249,7 +249,6 @@ def test_setup_preserves_external_mongo_when_local_credentials_are_repaired(tmp_
 
 
 def test_installer_validates_compose_with_start_mode_environment(tmp_path, monkeypatch):
-    from skeleton.app.assembly import load_manifest
     report = PreloadReport(
         root=tmp_path,
         platform="test",
@@ -266,7 +265,6 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
             "env_path": tmp_path / ".env", "configured_keys": (),
         })(),
     )
-    manifest = load_manifest()
     commands = []
     def runner(command, **kwargs):
         commands.append((tuple(command), kwargs.get("env", {})))
