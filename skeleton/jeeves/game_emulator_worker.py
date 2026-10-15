@@ -31,6 +31,7 @@ MAX_AUDIO_FRAMES = 131072
 MAX_STATE = 64 * 1024 * 1024
 MAX_ROM = 32 * 1024 * 1024
 MAX_MEMORY_READ = 1024 * 1024
+MAX_SAVE_RAM = 8 * 1024 * 1024
 REQUIRED_SYMBOLS = (
     "retro_api_version",
     "retro_set_environment",
@@ -521,9 +522,13 @@ class NativeCore:
         if not 1 <= count <= 32:
             raise ValueError("native_disk_count_outside_bound")
         index = int(self._disk_call("get_image_index", C.c_uint)())
-        if not 0 <= index < count:
-            raise ValueError("native_disk_index_outside_bound")
         ejected = bool(self._disk_call("get_eject_state", C.c_bool)())
+        # The libretro sentinel UINT_MAX may represent no inserted disc.
+        # Accept it only with the tray ejected, never as a selected image.
+        if index == 0xFFFFFFFF and ejected:
+            index = None
+        elif not 0 <= index < count:
+            raise ValueError("native_disk_index_outside_bound")
         return {
             "supported": True, "interface_version": self.disk_interface_version,
             "image_count": count, "image_index": index, "ejected": ejected,
@@ -714,6 +719,17 @@ class NativeCore:
             raise ValueError("native PCM bytes differ from libretro callback frame count")
         return metadata, {"pixels": pixels, "audio": audio}
 
+    def _save_ram_access(self) -> tuple[int, int]:
+        """Libretro RETRO_MEMORY_SAVE_RAM=0; fail without a valid live region."""
+        size = int(self.core.retro_get_memory_size(0))
+        if not 1 <= size <= MAX_SAVE_RAM:
+            raise ValueError("native_save_ram_unavailable_or_oversized")
+        pointer = int(self.core.retro_get_memory_data(0) or 0)
+        if not pointer:
+            raise ValueError("native_save_ram_pointer_unavailable")
+        self._check()
+        return pointer, size
+
     def command(
         self, operation: str, payload: dict[str, object], blocks: dict[str, bytes]
     ) -> tuple[dict[str, object], dict[str, bytes]]:
@@ -752,6 +768,40 @@ class NativeCore:
             if set(payload) != {"image_index"} or blocks:
                 raise ValueError("native_disc_swap_request_invalid")
             return self.swap_disc(payload["image_index"]), {}
+        if operation == "save_ram_export":
+            if payload or blocks:
+                raise ValueError("native_save_ram_export_requires_empty_request")
+            pointer, size = self._save_ram_access()
+            raw = C.string_at(pointer, size)
+            return {
+                "memory_region": 0,
+                "size": size, "sha256": hashlib.sha256(raw).hexdigest(),
+                "format": "raw_libretro_save_ram",
+            }, {"save_ram": raw}
+        if operation == "save_ram_import":
+            if set(payload) != {"memory_region", "size", "sha256"} or set(blocks) != {"save_ram"}:
+                raise ValueError("native_save_ram_import_schema_invalid")
+            if type(payload["memory_region"]) is not int or payload["memory_region"] != 0:
+                raise ValueError("native_save_ram_region_forbidden")
+            expected_size = _integer(payload["size"], 1, MAX_SAVE_RAM, "native save RAM size")
+            raw = blocks["save_ram"]
+            if (not isinstance(raw, bytes) or len(raw) != expected_size
+                or type(payload["sha256"]) is not str
+                or hashlib.sha256(raw).hexdigest() != payload["sha256"]):
+                raise ValueError("native_save_ram_source_corrupt")
+            pointer, actual_size = self._save_ram_access()
+            if actual_size != expected_size:
+                raise ValueError("native_save_ram_exact_size_mismatch")
+            C.memmove(pointer, raw, expected_size)
+            if hashlib.sha256(C.string_at(pointer, expected_size)).hexdigest() != payload["sha256"]:
+                raise ValueError("native_save_ram_writeback_changed")
+            self._check()
+            return {
+                "memory_region": 0,
+                "size": actual_size,
+                "sha256": payload["sha256"],
+                "readback_verified": True,
+            }, {}
         if operation == "state_info":
             size = self.core.retro_serialize_size()
             return {"state_size": size}, {}
