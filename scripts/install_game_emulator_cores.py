@@ -397,6 +397,183 @@ PINNED_CORES.update(
 )
 
 
+# Source revisions and build paths are pinned from their real upstream trees.
+# Hardware mappings already exist in game_emulator_catalog; these recipes
+# convert previously catalog-only software cores into operator build candidates.
+# BIOS/firmware, copyrighted game content, and runtime qualification are NOT
+# included in a build recipe.
+PINNED_CORES.update(
+    {
+        "nestopia": {
+            "repository": "https://github.com/libretro/nestopia.git",
+            "revision": "06a8949e0b3cf60e3a38a374b1426bf40fccb9a0",
+            "artifact": "libretro/nestopia_libretro.so",
+            "license": "COPYING",
+            "build_directory": "libretro",
+            "makefile": "Makefile",
+            "targets": ["nes"],
+            "feature_limits": "NES cartridge support only; Famicom Disk System BIOS not included",
+        },
+        "mesen": {
+            "repository": "https://github.com/libretro/mesen.git",
+            "revision": "0102910c39ad1a62bc3f784466f3f67ca9eae335",
+            "artifact": "Libretro/mesen_libretro.so",
+            "license": "LICENSE",
+            "build_directory": "Libretro",
+            "makefile": "Makefile",
+            "targets": ["nes"],
+            "feature_limits": "NES cartridge support only; Famicom Disk System BIOS not included",
+        },
+        "bluemsx": {
+            "repository": "https://github.com/libretro/blueMSX-libretro.git",
+            "revision": "e3086eb5d36d77fa11704cf53dc176686e70127d",
+            "artifact": "bluemsx_libretro.so",
+            "license": "license.txt",
+            "makefile": "Makefile.libretro",
+            "targets": ["msx1", "msx2"],
+            "system_assets": {
+                "system/bluemsx/Databases": "Databases",
+                "system/bluemsx/Machines/MSX - C-BIOS": "Machines/MSX - C-BIOS",
+                "system/bluemsx/Machines/MSX2 - C-BIOS": "Machines/MSX2 - C-BIOS",
+                "system/bluemsx/Machines/MSX2+ - C-BIOS": "Machines/MSX2+ - C-BIOS",
+            },
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Isolated worker compatibility with C-BIOS machine inventory is not independently qualified"
+            ],
+            "feature_limits": "Only pinned upstream libre C-BIOS profiles are copied; no proprietary BIOS ROMs",
+        },
+        "fmsx": {
+            "repository": "https://github.com/libretro/fmsx-libretro.git",
+            "revision": "4de11755ce4f196ac1c8a7bb20bb4eccbc87a7d4",
+            "artifact": "fmsx_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile",
+            "targets": ["msx1", "msx2"],
+            "firmware": ["MSX.ROM"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Firmware search location and full MSX2 ROM set require qualified operator setup"
+            ],
+        },
+        "vice_x64": {
+            "repository": "https://github.com/libretro/vice-libretro.git",
+            "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+            "artifact": "vice_x64_libretro.so",
+            "license": "COPYING",
+            "makefile": "Makefile",
+            "make_variables": {"EMUTYPE": "x64"},
+            "targets": ["commodore_64"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Operator-supplied rights-cleared C64 and drive ROM directory is required; no VICE ROMs copied"
+            ],
+        },
+        "px68k": {
+            "repository": "https://github.com/libretro/px68k-libretro.git",
+            "revision": "0ad84d7058a12b7db4f7f7a906e87fad4e2f26f6",
+            "artifact": "px68k_libretro.so",
+            "license": "COPYING",
+            "makefile": "Makefile.libretro",
+            "targets": ["sharp_x68000"],
+            "firmware": ["iplrom.dat", "cgrom.dat"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Rights-cleared X68000 boot/graphics firmware and runtime disk-path compatibility"
+            ],
+        },
+        "quasi88": {
+            "repository": "https://github.com/libretro/quasi88-libretro.git",
+            "revision": "7884be5277776a5d8c4fdc4e574e9b5b589945c9",
+            "artifact": "quasi88_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile",
+            "targets": ["nec_pc_8801"],
+            "firmware": ["N88.ROM"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Rights-cleared complete PC-88 firmware and runtime disk-path compatibility"
+            ],
+        },
+        "mednafen_saturn": {
+            "repository": "https://github.com/libretro/beetle-saturn-libretro.git",
+            "revision": "faef2779a7568c1734addc4fe63cc76e9fa2566b",
+            "artifact": "mednafen_saturn_libretro.so",
+            "license": "COPYING",
+            "makefile": "Makefile",
+            "targets": ["saturn"],
+            "firmware": ["sega_101.bin"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Approved region-specific Saturn firmware and deterministic disc control need qualification"
+            ],
+        },
+    }
+)
+
+
+# Additional software-only handheld and 8-bit cores. Shared VICE source is
+# pinned for each selected machine; builds remain isolated per core identity.
+PINNED_CORES.update(
+    {
+        "sameboy": {
+            "repository": "https://github.com/libretro/SameBoy.git",
+            "revision": "aa158a889a48b538a0302873704a34577c8eb67d",
+            "artifact": "libretro/sameboy_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile",
+            "build_directory": "libretro",
+            "targets": ["game_boy", "game_boy_color", "game_boy_pocket", "game_boy_light"],
+        },
+        "vba_next": {
+            "repository": "https://github.com/libretro/vba-next.git",
+            "revision": "788192f215ad0a1413f1625b40ebba3423fa0ade",
+            "artifact": "vba_next_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile.libretro",
+            "targets": ["game_boy_advance", "game_boy_micro", "game_boy_player"],
+        },
+        "a5200": {
+            "repository": "https://github.com/libretro/a5200.git",
+            "revision": "40c6f2f1ad4a3145b328d5baaf010fae6c7e752b",
+            "artifact": "a5200_libretro.so",
+            "license": "License.txt",
+            "makefile": "Makefile",
+            "targets": ["atari_5200"],
+            "firmware": ["5200.rom"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Operator-controlled rights-cleared Atari 5200 firmware and BIOS lookup need qualification"
+            ],
+        },
+    }
+)
+# VICE upstream selects each machine through EMUTYPE, and emits
+# vice_<machine>_libretro.so. None of these candidate recipes copy the
+# upstream Commodore/drive ROMs or imply that firmware is installed.
+for _vice_machine, _vice_target in (
+    ("x64sc", "commodore_64"),
+    ("x128", "commodore_128"),
+    ("xvic", "commodore_vic20"),
+    ("xplus4", "commodore_plus4"),
+    ("xpet", "commodore_pet"),
+):
+    PINNED_CORES["vice_" + _vice_machine] = {
+        "repository": "https://github.com/libretro/vice-libretro.git",
+        "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+        "artifact": "vice_" + _vice_machine + "_libretro.so",
+        "license": "COPYING",
+        "makefile": "Makefile",
+        "make_variables": {"EMUTYPE": _vice_machine},
+        "targets": [_vice_target],
+        "candidate_only": True,
+        "unavailable_requirements": [
+            "Full rights-cleared Commodore machine/drive ROM set and host runtime compatibility"
+        ],
+    }
+del _vice_machine, _vice_target
+
+
 def _environment(*, network: bool = False):
     # No inherited provider/Mongo credentials, user git configuration, dynamic
     # loader overrides, compiler injection flags or credential helpers.
@@ -607,7 +784,14 @@ def install(args):
     for name in ("cores", "system", "licenses", "logs", "identities"):
         _private_directory(args.install_root / name)
     records = []
-    selected = args.core or list(DEFAULT_CORES)
+    selected = args.core or (
+        list(DEFAULT_CORES)
+        if args.profile == "starter"
+        else [
+            identity for identity, pin in PINNED_CORES.items()
+            if args.profile == "all" or not pin.get("candidate_only")
+        ]
+    )
     if len(selected) != len(set(selected)):
         raise ValueError("Core selection cannot repeat")
     for identity in selected:
@@ -882,9 +1066,17 @@ def install(args):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--install-root", type=Path, required=True)
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--install-root", type=Path)
     parser.add_argument("--core", action="append", choices=sorted(PINNED_CORES))
+    parser.add_argument(
+        "--profile", choices=("starter", "broad", "all"), default="starter",
+        help="starter=original six, broad=all non-deferred recipes, all=include explicitly deferred candidates",
+    )
+    parser.add_argument(
+        "--list-cores", action="store_true",
+        help="Print exact pinned build recipes and blockers without acquiring source, compiling or approving anything",
+    )
     parser.add_argument("--fetch-sources", action="store_true")
     parser.add_argument(
         "--adopt-built", action="store_true", help="Inspect/install already compiled pinned source artifacts"
@@ -907,6 +1099,27 @@ def main(argv=None):
         help="Explicit canonical installed OpenGL library for software-fallback recipes; no runtime rendering permission is granted",
     )
     args = parser.parse_args(argv)
+    if args.list_cores:
+        print(json.dumps({
+            "status": "source_recipes_only_not_compiled",
+            "cores": [
+                {
+                    "core_id": identity,
+                    "revision": pin["revision"],
+                    "repository": pin["repository"],
+                    "targets": pin["targets"],
+                    "requires_firmware": pin.get("firmware", []),
+                    "candidate_only": pin.get("candidate_only", False),
+                    "unavailable_requirements": pin.get("unavailable_requirements", []),
+                    "in_starter_profile": identity in DEFAULT_CORES,
+                    "execution_checked": False,
+                }
+                for identity, pin in sorted(PINNED_CORES.items())
+            ],
+        }, indent=2))
+        return 0
+    if args.source_root is None or args.install_root is None:
+        parser.error("installation requires --source-root and --install-root")
     if not 1 <= args.jobs <= 8 or not 30 <= args.timeout <= 3600:
         parser.error("jobs must be 1..8 and command timeout30..3600 seconds")
     try:
