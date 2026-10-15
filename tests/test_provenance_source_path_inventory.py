@@ -50,6 +50,19 @@ LIVE_EXAMPLES = (
 
 
 class SourcePathInventoryTests(unittest.TestCase):
+    def test_conversational_data_is_repository_owned(self) -> None:
+        # Regression: provenance workflow rejected data/conversational/* as unknown.
+        paths = (
+            "data/conversational/10X_CONVERSATIONAL_REPORT.json",
+            "data/conversational/training/corpus.jsonl",
+        )
+        for path in paths:
+            self.assertEqual(policy.classify_path(path), "first-party")
+        self.assertEqual(policy.validate_source_path_inventory(list(paths)), [])
+
+    def test_unreviewed_top_level_remains_unknown(self) -> None:
+        self.assertEqual(policy.classify_path("unreviewed_data/corpus.jsonl"), "unknown")
+
     def test_java_accelerators_are_first_party_not_canonical(self) -> None:
         for path in (
             "java-accelerators/observability/AcceleratorMain.java",
