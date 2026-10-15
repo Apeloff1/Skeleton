@@ -322,6 +322,66 @@ def _evaluate(args) -> dict[str, Any]:
     }
 
 
+def _deep_emulator(args) -> dict[str, Any]:
+    from .game_emulator_training_lab import EmulatorLabConfig, run_emulator_training_lab
+
+    if not args.rights_acknowledged:
+        raise ValueError("Explicit source rights acknowledgement is required to train on ROM content")
+    if args.project is not None or args.rom is None:
+        raise ValueError("Deep emulator training requires a local rights-cleared ROM, not a reference project")
+    if args.policy_file.exists() or args.evidence_file.exists() or args.checkpoint_file.exists():
+        raise ValueError("Deep emulator outputs must be new files; use distinct destinations")
+    targets = {
+        args.policy_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+        args.checkpoint_file.resolve(strict=False),
+    }
+    if len(targets) != 3:
+        raise ValueError("Policy, evidence and checkpoint must use distinct destination files")
+    _, lineage, request = _factory(args)
+    lineage["rights_acknowledged"] = True
+    config = EmulatorLabConfig(
+        max_runs=args.max_runs, steps_per_run=args.episode_steps,
+        stagnation_runs=args.stagnation_runs,
+        checkpoint_stride=args.checkpoint_stride,
+        counterfactual_actions=args.counterfactual_actions,
+        boomerang_interval=args.boomerang_interval,
+        boomerang_retained=args.boomerang_retained,
+        heldout_episodes=args.heldout_episodes,
+        seed=args.seed,
+    )
+
+    def checkpoint(snapshot, progress):
+        # The operator selected the destination before starting. This is a
+        # private crash-recovery record; it is NOT a production model promotion.
+        _write_json(
+            args.checkpoint_file,
+            {"schema_version": "skeleton.game.emulator_lab_checkpoint.v1",
+             "policy_snapshot": snapshot, "progress": progress,
+             "production_promotion_authorized": False},
+            replace=True,
+        )
+
+    result = run_emulator_training_lab(
+        request, source_lineage=lineage, config=config,
+        policy_id=args.policy_id, on_checkpoint=checkpoint,
+    )
+    _write_json(args.policy_file, result["policy_snapshot"], replace=False)
+    evidence = {key: value for key, value in result.items() if key != "policy_snapshot"}
+    _write_json(args.evidence_file, evidence, replace=False)
+    return {
+        "status": result["status"],
+        "policy_file": str(args.policy_file),
+        "evidence_file": str(args.evidence_file),
+        "checkpoint_file": str(args.checkpoint_file),
+        "report_digest": result["report_digest"],
+        "real_q_updates": result["actual_q_table_updates"],
+        "real_neural_weight_updates": 0,
+        "runs": result["run_count"],
+        "hardware_compatibility_verified": False,
+    }
+
+
 def _native(args) -> dict[str, Any]:
     from .game_rom_generation import build_original_dmg_game
 
@@ -355,6 +415,31 @@ def parser() -> argparse.ArgumentParser:
     native.add_argument("--title", default="Signal Garden")
     native.add_argument("--output", type=Path, required=True)
     native.add_argument("--force", action="store_true")
+
+    deep = commands.add_parser(
+        "train-emulator-deep",
+        help="Actual native/DMG ROM Q training with reverse replay and ten-run saturation audits",
+    )
+    deep.add_argument("--target", required=True)
+    deep.add_argument("--rom", required=True, type=Path)
+    deep.add_argument("--core")
+    deep.add_argument("--project", type=Path)
+    deep.add_argument("--frames-per-step", type=int, default=1)
+    deep.add_argument("--cycles-per-step", type=int, default=1824)
+    deep.add_argument("--episode-steps", type=int, default=24)
+    deep.add_argument("--max-runs", type=int, default=48)
+    deep.add_argument("--stagnation-runs", type=int, default=10)
+    deep.add_argument("--checkpoint-stride", type=int, default=6)
+    deep.add_argument("--counterfactual-actions", type=int, default=3)
+    deep.add_argument("--boomerang-interval", type=int, default=5)
+    deep.add_argument("--boomerang-retained", type=int, default=4)
+    deep.add_argument("--heldout-episodes", type=int, default=2)
+    deep.add_argument("--seed", type=int, default=0)
+    deep.add_argument("--policy-id", default="emulator-deep-local-candidate")
+    deep.add_argument("--policy-file", type=Path, required=True)
+    deep.add_argument("--evidence-file", type=Path, required=True)
+    deep.add_argument("--checkpoint-file", type=Path, required=True)
+    deep.add_argument("--rights-acknowledged", action="store_true")
     for name in ("train", "evaluate"):
         command = commands.add_parser(name)
         command.add_argument("--target", required=True)
@@ -397,6 +482,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _train(args)
         elif args.command == "evaluate":
             result = _evaluate(args)
+        elif args.command == "train-emulator-deep":
+            result = _deep_emulator(args)
         else:
             result = _native(args)
         print(json.dumps(result, sort_keys=True, allow_nan=False))
