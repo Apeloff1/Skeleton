@@ -243,19 +243,22 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     vocab_coverage_before = _token_coverage(model, curriculum_and_eval)
     expansion: dict[str, Any] | None = None
     if expand_vocabulary and vocab_coverage_before < min_coverage:
+        original_snapshot_sha256 = sha256(json.dumps(
+            original_snapshot, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
         if torch_stack:
-            raise ProductionCheckpointError(
-                "torch-stack production vocabulary expansion is not implemented; "
-                "never substitute a native transformer"
+            from .jeeves_torch_game_vocabulary import expand_torch_game_words
+            expansion = expand_torch_game_words(
+                model, curriculum_and_eval,
+                expected_snapshot_digest=original_snapshot_sha256,
             )
-        from .jeeves_game_vocabulary import expand_native_game_pieces
-        expansion = expand_native_game_pieces(
-            model, curriculum_and_eval,
-            expected_snapshot_digest=sha256(json.dumps(
-                original_snapshot, sort_keys=True, separators=(",", ":"),
-                ensure_ascii=False, allow_nan=False,
-            ).encode("utf-8")).hexdigest(),
-        )
+        else:
+            from .jeeves_game_vocabulary import expand_native_game_pieces
+            expansion = expand_native_game_pieces(
+                model, curriculum_and_eval,
+                expected_snapshot_digest=original_snapshot_sha256,
+            )
     vocab_coverage = _token_coverage(model, curriculum_and_eval)
     # The tiny default cortex vocabulary typically cannot represent arbitrary
     # game-design language. Fail closed rather than training mostly <UNK> ids.
@@ -445,7 +448,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--learning-rate", type=float, default=0.005)
     parser.add_argument("--min-coverage", type=float, default=0.80)
     parser.add_argument("--expand-vocabulary", action="store_true",
-                        help="explicitly add missing original BPE pieces to a cloned native LM only")
+                        help="explicitly add missing BPE pieces or Torch tokens to the cloned active production LM only")
     parser.add_argument("--max-domain-regression", type=float, default=0.0)
     args = parser.parse_args(argv)
     try:
