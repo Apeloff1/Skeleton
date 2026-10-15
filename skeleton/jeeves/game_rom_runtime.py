@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-MAX_ROM_BYTES = 2_097_152
+MAX_ROM_BYTES = 8_388_608
 FRAME_CYCLES = 70_224
 WIDTH, HEIGHT = 160, 144
 Z, N, H, C = 0x80, 0x40, 0x20, 0x10
@@ -42,10 +42,10 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
     if rom[0x143] == 0xC0:
         raise GameRomRuntimeError("Color-only cartridges are not supported by the DMG runtime")
     cartridge = rom[0x147]
-    if cartridge not in (0x00, 0x01, 0x02, 0x03, 0x08, 0x09):
+    if cartridge not in (0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x11, 0x12, 0x13, 0x19, 0x1A, 0x1B):
         raise GameRomRuntimeError(f"Cartridge mapper 0x{cartridge:02x} is not supported")
     size_code = rom[0x148]
-    if size_code > 6 or len(rom) != 32768 << size_code:
+    if size_code > 8 or len(rom) != 32768 << size_code:
         raise GameRomRuntimeError("Cartridge bytes do not match the declared ROM bank count")
     if cartridge in (0x00, 0x08, 0x09) and size_code != 0:
         raise GameRomRuntimeError("ROM-only cartridges must have two ROM banks")
@@ -55,11 +55,15 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
     if checksum != rom[0x14D]:
         raise GameRomRuntimeError("Cartridge header checksum does not match")
     ram_code = rom[0x149]
-    if ram_code not in (0, 1, 2, 3):
+    if ram_code not in (0, 1, 2, 3, 4, 5):
         raise GameRomRuntimeError("Cartridge RAM size is unsupported")
-    ram_bytes = (0, 2048, 8192, 32768)[ram_code]
-    if cartridge in (0, 1) and ram_bytes:
+    ram_bytes = (0, 2048, 8192, 32768, 131072, 65536)[ram_code]
+    if cartridge in (0, 1, 0x11, 0x19) and ram_bytes:
         raise GameRomRuntimeError("Cartridge type declares no external RAM")
+    if cartridge in (2, 3, 0x08, 0x09, 0x12, 0x13, 0x1A, 0x1B) and not ram_bytes:
+        raise GameRomRuntimeError("Cartridge type requires external RAM")
+    if ram_bytes > 32768 and cartridge not in (0x1A, 0x1B):
+        raise GameRomRuntimeError("Declared RAM exceeds this mapper's address space")
     return {
         "platform": "game_boy",
         "mode": "experimental_dmg_rom",
@@ -67,7 +71,7 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
         "rom_bytes": len(rom),
         "rom_banks": len(rom) // 16384,
         "ram_bytes": ram_bytes,
-        "mapper": "mbc1" if cartridge in (1, 2, 3) else "rom_only",
+        "mapper": ("mbc1" if cartridge in (1, 2, 3) else "mbc3" if cartridge in (0x11, 0x12, 0x13) else "mbc5" if cartridge in (0x19, 0x1A, 0x1B) else "rom_only"),
         "cartridge_type": cartridge,
         "title": rom[0x134:0x143].split(b"\0", 1)[0].decode("ascii", errors="replace"),
         "support": "experimental DMG CPU/raster; audio, RTC, color and cycle-perfect timing unavailable",
@@ -118,13 +122,13 @@ class GameBoyMachine:
             if address < 0x4000:
                 bank = (self.bank_high << 5) if self.bank_mode and self.metadata["mapper"] == "mbc1" else 0
             else:
-                bank = self.rom_bank | self.bank_high << 5
+                bank = self.rom_bank | (self.bank_high << 5 if self.metadata["mapper"] == "mbc1" else 0)
             bank %= self.metadata["rom_banks"]
             return self.rom[bank * 16384 + (address & 0x3FFF)]
         if 0xA000 <= address < 0xC000:
             if not self.external_ram or not self.ram_enabled:
                 return 255
-            bank = self.bank_high if self.bank_mode else 0
+            bank = self.bank_high if self.metadata["mapper"] in ("mbc3", "mbc5") or self.bank_mode else 0
             return self.external_ram[(bank * 8192 + address - 0xA000) % len(self.external_ram)]
         if 0xE000 <= address < 0xFE00:
             address -= 0x2000
@@ -157,7 +161,8 @@ class GameBoyMachine:
     def write(self, address: int, value: int) -> None:
         address, value = address & 65535, value & 255
         if address < 0x8000:
-            if self.metadata["mapper"] == "mbc1":
+            mapper = self.metadata["mapper"]
+            if mapper == "mbc1":
                 if address < 0x2000:
                     self.ram_enabled = value & 15 == 10
                 elif address < 0x4000:
@@ -166,10 +171,29 @@ class GameBoyMachine:
                     self.bank_high = value & 3
                 else:
                     self.bank_mode = value & 1
+            elif mapper == "mbc3":
+                if address < 0x2000:
+                    self.ram_enabled = value & 15 == 10
+                elif address < 0x4000:
+                    self.rom_bank = (value & 127) or 1
+                elif address < 0x6000:
+                    if value > 3:
+                        raise GameRomRuntimeError("MBC3 RTC register access is unsupported")
+                    self.bank_high = value
+                # RTC-free types ignore the latch command.
+            elif mapper == "mbc5":
+                if address < 0x2000:
+                    self.ram_enabled = value & 15 == 10
+                elif address < 0x3000:
+                    self.rom_bank = (self.rom_bank & 256) | value
+                elif address < 0x4000:
+                    self.rom_bank = (self.rom_bank & 255) | ((value & 1) << 8)
+                elif address < 0x6000:
+                    self.bank_high = value & 15
             return
         if 0xA000 <= address < 0xC000:
             if self.external_ram and self.ram_enabled:
-                bank = self.bank_high if self.bank_mode else 0
+                bank = self.bank_high if self.metadata["mapper"] in ("mbc3", "mbc5") or self.bank_mode else 0
                 self.external_ram[(bank * 8192 + address - 0xA000) % len(self.external_ram)] = value
             return
         if 0xE000 <= address < 0xFE00:
@@ -712,8 +736,8 @@ class GameBoyMachine:
             "sp": 65535,
             "pc": 65535,
             "ime_delay": 2,
-            "rom_bank": 31,
-            "bank_high": 3,
+            "rom_bank": 511 if self.metadata["mapper"] == "mbc5" else 127 if self.metadata["mapper"] == "mbc3" else 31,
+            "bank_high": 15 if self.metadata["mapper"] == "mbc5" else 3,
             "bank_mode": 1,
             "buttons": 255,
             "cycles": 2**53 - 1,
@@ -729,7 +753,11 @@ class GameBoyMachine:
                     raise GameRomRuntimeError("ROM snapshot boolean is invalid")
             elif type(item) is not int or not 0 <= item <= bounds[name]:
                 raise GameRomRuntimeError("ROM snapshot register is outside bounds")
-        if registers["f"] & 15 or registers["rom_bank"] == 0:
+        if (
+            registers["f"] & 15
+            or (registers["rom_bank"] == 0 and self.metadata["mapper"] != "mbc5")
+            or (self.metadata["mapper"] != "mbc1" and registers["bank_mode"] != 0)
+        ):
             raise GameRomRuntimeError("ROM snapshot flag/bank is invalid")
         if registers["instructions"] * 4 > registers["cycles"]:
             raise GameRomRuntimeError("ROM snapshot CPU counters are inconsistent")
@@ -740,7 +768,7 @@ class GameBoyMachine:
             ("framebuffer", WIDTH * HEIGHT),
         ):
             raw = value.get(name)
-            if not isinstance(raw, str) or len(raw) > 90000:
+            if not isinstance(raw, str) or len(raw) > ((length + 2) // 3) * 4:
                 raise GameRomRuntimeError("ROM snapshot memory encoding is invalid")
             try:
                 data = base64.b64decode(raw, validate=True)
