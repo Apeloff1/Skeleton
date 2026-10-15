@@ -21,7 +21,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from skeleton.jeeves.game_rom_runtime import GameBoyMachine, GameRomRuntimeError
+from skeleton.jeeves.game_rom_runtime import (
+    GameBoyMachine, GameRomRuntimeError, RTC_CYCLES_PER_SECOND,
+)
 
 
 SCHEMA = "skeleton.game.original_mapper_bus_matrix.v1"
@@ -31,6 +33,8 @@ _CASES = (
     ("mbc1_ram", 0x03, 4, 3),    # 512 KiB, 32 banks, 32 KiB SRAM
     ("mbc2", 0x06, 3, 0),  # 256 KiB, 16 banks, 512 internal nibbles
     ("mbc3", 0x13, 6, 3), # 2 MiB, 128 banks, 32 KiB SRAM; no RTC
+    ("mbc3_timer_only", 0x0F, 2, 0),  # virtual RTC and no SRAM
+    ("mbc3_timer_ram", 0x10, 2, 3),  # virtual RTC plus four SRAM banks
     ("mbc5", 0x1B, 8, 4), # 8 MiB, 512 banks, 128 KiB SRAM
 )
 
@@ -86,7 +90,11 @@ def _probe(label: str, kind: int, size: int, ram: int) -> dict[str, Any]:
     source_hash = hashlib.sha256(raw).hexdigest()
     machine = GameBoyMachine(raw)
     _assert(machine.metadata["rom_digest"] == source_hash, "source cartridge SHA256 identity changed")
-    expected_type = "mbc1" if label.startswith("mbc1_") else label
+    expected_type = (
+        "mbc1" if label.startswith("mbc1_")
+        else "mbc3" if label.startswith("mbc3_")
+        else label
+    )
     _assert(machine.metadata["mapper"] == expected_type, "source emulator mapper type resolution differs")
     checkpoints = []
 
@@ -166,6 +174,39 @@ def _probe(label: str, kind: int, size: int, ram: int) -> dict[str, Any]:
             checkpoints.append("RTC_register_rejected")
         else:
             raise MapperAuditError("unsupported MBC3 clock latch was falsely accepted")
+    elif label in ("mbc3_timer_only", "mbc3_timer_ram"):
+        check("virtual_cpu_cycle_rtc_only", machine.metadata["virtual_rtc"] is True)
+        machine.write(0x0000, 10)
+        machine.write(0x4000, 8)
+        machine.write(0xA000, 58)
+        machine.write(0x6000, 0)
+        machine.write(0x6000, 1)
+        check("latched_seconds_are_58", machine.read(0xA000) == 58)
+        machine._rtc_advance(3 * RTC_CYCLES_PER_SECOND)
+        check("source_latch_remains_stable", machine.read(0xA000) == 58)
+        machine.write(0x6000, 0)
+        machine.write(0x6000, 1)
+        check("seconds_wrap_after_CPU_clock", machine.read(0xA000) == 1)
+        machine.write(0x4000, 9)
+        check("minute_advances", machine.read(0xA000) == 1)
+        machine.write(0x4000, 12)
+        machine.write(0xA000, 0x40)
+        old_clock = tuple(machine.rtc_regs)
+        machine._rtc_advance(5 * RTC_CYCLES_PER_SECOND)
+        check("RTC_halt_disables_virtual_ticks", tuple(machine.rtc_regs) == old_clock)
+        machine.write(0xA000, 0)
+        machine._rtc_advance(RTC_CYCLES_PER_SECOND)
+        check("RTC_resume_works", machine.rtc_regs[0] == 2)
+        if label == "mbc3_timer_only":
+            machine.write(0x4000, 0)
+            check("timer_only_has_no_external_SRAM", machine.read(0xA123) == 255)
+        else:
+            machine.write(0x4000, 3)
+            machine.write(0xA123, 0xB7)
+            machine.write(0x4000, 0)
+            check("timer_board_RAM_banks_independent", machine.read(0xA123) == 0)
+            machine.write(0x4000, 3)
+            check("timer_board_RAM_bank_restored", machine.read(0xA123) == 0xB7)
     elif label == "mbc5":
         machine.write(0x2000, 0)
         machine.write(0x3000, 1)
@@ -221,8 +262,8 @@ def _probe(label: str, kind: int, size: int, ram: int) -> dict[str, Any]:
 
 def audit_mapper_matrix() -> dict[str, Any]:
     items = [_probe(label, code, size, ram) for label, code, size, ram in _CASES]
-    if len(items) != 6 or any(not item["actual_memory_cpu_savestate_roundtrip"] for item in items):
-        raise MapperAuditError("not all six original cartridge geometry profiles completed source bus checks")
+    if len(items) != 8 or any(not item["actual_memory_cpu_savestate_roundtrip"] for item in items):
+        raise MapperAuditError("not all eight original cartridge/RTC profiles completed source bus checks")
     result = {
         "schema_version": SCHEMA,
         "status": "original_cartridge_mapper_bus_checks_passed",
