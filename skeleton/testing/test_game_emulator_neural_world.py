@@ -170,6 +170,26 @@ class MeasuredNeuralWorldModelTests(unittest.TestCase):
                 }, "idle",
             )
 
+    def test_optimizer_work_budget_refuses_large_unbounded_python_run(self):
+        evidence, policy = fixture()
+        with self.assertRaises(EmulatorNeuralError):
+            train_neural_world_from_evidence(
+                evidence, policy,
+                config=NeuralWorldConfig(
+                    width=64, epochs=40, max_samples=8192,
+                    max_compute_units=100000,
+                ),
+            )
+
+    def test_optimizer_cancel_refuses_before_any_gradient(self):
+        evidence, policy = fixture()
+        with self.assertRaises(EmulatorNeuralError):
+            train_neural_world_from_evidence(
+                evidence, policy,
+                config=NeuralWorldConfig(width=8, epochs=2),
+                cancel=lambda: True,
+            )
+
     def test_neural_optimization_is_strictly_bounded(self):
         with self.assertRaises(EmulatorNeuralError):
             NeuralWorldConfig(width=512)
