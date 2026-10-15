@@ -131,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         if not destination.is_dir() or destination.is_symlink():
             raise ComparativeStudyError("Output destination is not a safe ordinary local directory")
         name = manifest["study_id"]
+        evidence_name = name + (".batch-" + str(args.batch) if args.batch is not None else "")
         _atomic_write(destination / (name + ".plan.json"), json.dumps(plan, indent=2, sort_keys=True).encode())
         if not args.run:
             print(json.dumps({
@@ -163,14 +164,16 @@ def main(argv: list[str] | None = None) -> int:
             authorize_training=authorize_training if args.train_shadow_policy else None,
             timeout_seconds=args.timeout_seconds,
         )
-        _atomic_write(destination / (name + ".result.json"), json.dumps(result, indent=2, sort_keys=True, allow_nan=False).encode())
+        _atomic_write(destination / (evidence_name + ".result.json"), json.dumps(result, indent=2, sort_keys=True, allow_nan=False).encode())
         viewer = render_comparison_html(result)
-        _atomic_write(destination / (name + ".viewer.html"), viewer.encode("utf-8"))
+        _atomic_write(destination / (evidence_name + ".viewer.html"), viewer.encode("utf-8"))
         dragon = export_dragon_comparison_intake(result)
-        _atomic_write(destination / (name + ".dragon-intake.json"), json.dumps(dragon, indent=2, sort_keys=True).encode())
+        _atomic_write(destination / (evidence_name + ".dragon-intake.json"), json.dumps(dragon, indent=2, sort_keys=True).encode())
         print(json.dumps({
             "status": "comparative_native_execution_completed_with_evidence_and_failures",
             "study_id": name,
+            "batch_index": args.batch,
+            "result_partition_id": evidence_name,
             "sessions_attempted": result["actual_game_sessions_attempted"],
             "games_with_real_observations": result["game_observations_completed"],
             "maximum_parallel_game_sessions": result["maximum_parallel_native_game_sessions"],
@@ -178,9 +181,9 @@ def main(argv: list[str] | None = None) -> int:
             "note_count": len(result["observer_notes"]),
             "reviewed_knowledge_candidates": dragon["observer_card_count"],
             "games_with_local_q_policy_updates": result["games_with_study_local_q_updates"],
-            "report_path": str(destination / (name + ".result.json")),
-            "viewer_path": str(destination / (name + ".viewer.html")),
-            "dragon_intake_path": str(destination / (name + ".dragon-intake.json")),
+            "report_path": str(destination / (evidence_name + ".result.json")),
+            "viewer_path": str(destination / (evidence_name + ".viewer.html")),
+            "dragon_intake_path": str(destination / (evidence_name + ".dragon-intake.json")),
             "model_weights_changed": False,
         }, indent=2))
         return 0 if result["game_observations_completed"] == result["actual_game_sessions_attempted"] else 3

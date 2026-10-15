@@ -29,6 +29,7 @@ def merge_comparative_series(reports: Sequence[Mapping[str, Any]]) -> dict[str, 
     if not isinstance(reports, (list, tuple)) or not 1 <= len(reports) <= MAX_STUDIES:
         raise SeriesLedgerError("Series ledger requires 1–128 complete study reports")
     seen = set()
+    seen_game_versions: dict[tuple[str, str], tuple[str, str]] = {}
     studies: list[dict[str, Any]] = []
     series: dict[str, list[dict[str, Any]]] = defaultdict(list)
     notes: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -40,16 +41,24 @@ def merge_comparative_series(reports: Sequence[Mapping[str, Any]]) -> dict[str, 
         if total_bytes > MAX_SOURCE_BYTES:
             raise SeriesLedgerError("Series study inputs exceed 128 MiB evidence budget")
         study_id, saved_digest = raw.get("study_id"), raw.get("result_sha256")
+        batch = raw.get("selected_batch")
+        if type(batch) is not int and batch is not None:
+            raise SeriesLedgerError("Comparative source partition has an invalid batch identity")
+        if batch is not None and not 0 <= batch <= 29:
+            raise SeriesLedgerError("Comparative source batch is outside the 30-title bound")
         if type(study_id) is not str or not study_id or type(saved_digest) is not str:
             raise SeriesLedgerError("Study lacks unique source identity and complete SHA-256 receipt")
+        source_partition = study_id + (":batch-" + str(batch) if batch is not None else ":full")
         computed = digest({k: v for k, v in raw.items() if k != "result_sha256"})
         if computed != saved_digest:
             raise SeriesLedgerError("Study result bytes differ from the hash-chained saved source")
-        if study_id in seen:
-            raise SeriesLedgerError("Duplicate study ID is not another observation")
-        seen.add(study_id)
+        if source_partition in seen:
+            raise SeriesLedgerError("Duplicate study/batch source is not another observation")
+        seen.add(source_partition)
         studies.append({
             "study_id": study_id,
+            "source_partition_id": source_partition,
+            "batch_index": batch,
             "result_sha256": saved_digest,
             "planned_game_count": raw["planned_total_game_count"],
             "actual_game_sessions_attempted": raw["actual_game_sessions_attempted"],
@@ -63,6 +72,13 @@ def merge_comparative_series(reports: Sequence[Mapping[str, Any]]) -> dict[str, 
                 raise SeriesLedgerError("Series game row is not an identified object")
             if game.get("status") != "actual_native_observations_captured":
                 continue
+            unique_version = (study_id, game_id)
+            current_bytes = (game.get("source_sha256"), game.get("core_sha256"))
+            if unique_version in seen_game_versions:
+                if seen_game_versions[unique_version] != current_bytes:
+                    raise SeriesLedgerError("The same study game identity changed ROM/core bytes across batches")
+                continue
+            seen_game_versions[unique_version] = current_bytes
             sid, order = game.get("series_id"), game.get("release_order")
             if type(sid) is not str or type(order) is not int or not 1 <= order <= 1000000:
                 raise SeriesLedgerError("Series identity/release order is invalid")
@@ -76,7 +92,8 @@ def merge_comparative_series(reports: Sequence[Mapping[str, Any]]) -> dict[str, 
                     raise SeriesLedgerError("Series stage is missing actual native evidence identity")
                 receipts[phase] = sha
             series[sid].append({
-                "study_id": study_id, "game_id": game_id, "title": game["title"],
+                "study_id": source_partition, "original_study_id": study_id,
+                "game_id": game_id, "title": game["title"],
                 "release_order": order, "release_year": game.get("release_year"),
                 "series_phase": game["series_phase"],
                 "core_id": game["core_id"], "core_sha256": game["core_sha256"],
@@ -99,7 +116,7 @@ def merge_comparative_series(reports: Sequence[Mapping[str, Any]]) -> dict[str, 
             }
             for sid in claimed_series:
                 notes[sid].append({
-                    "study_id": study_id,
+                    "study_id": source_partition,
                     "note_id": card["note_id"],
                     "author": card["author"],
                     "dimension": card["dimension"],

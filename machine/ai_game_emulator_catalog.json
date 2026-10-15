@@ -701,6 +701,13 @@
       "legal": "Operator rights acknowledgment is not independent IP/consent certification; existing auth/registry validated per step",
       "production": "No production model weights or canonical shadow-weight pipeline promotion, independent evaluation required",
       "execution_performed_in_this_change": false
+    },
+    "cross_study_batch_identity": {
+      "source_partition": "Each selected 0-based --batch N now has a distinct <study_id>.batch-N.result.json / HTML / Dragon intake filename; full-study output retains its normal name",
+      "ledger_identity": "Series ledger distinguishes <study_id>:batch-N from <study_id>:full and deduplicates a game repeated between a batch and full report by pinned ROM/core identity",
+      "guard": "Same study/game ID with different pinned ROM/core bytes across batches fails closed",
+      "purpose": "Allows multiple 10-game cohorts of one 30-title study to coexist and be merged without silently overwriting or double-counting outcomes",
+      "native_execution_verified_in_patch": false
     }
   }
 }
