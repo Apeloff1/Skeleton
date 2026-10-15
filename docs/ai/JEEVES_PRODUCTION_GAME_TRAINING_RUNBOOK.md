@@ -39,14 +39,14 @@ To inspect what is missing without authorizing a training run:
       --candidate-directory /PRIVATE_PATH/operator/candidates \
       --allow-unattested-inspection
 
-For native TinyTransformer only, an explicit vocabulary plan may permit adding missing original BPE pieces to a cloned candidate without reindexing or replacing existing learned rows:
+For TinyTransformer or Torch-stack, an explicit vocabulary plan may permit adding missing original BPE pieces (native) or word tokens (Torch) to a cloned candidate without reindexing or replacing existing learned rows:
 
     skeleton-jeeves-production-preflight preflight \
       --attestation /PRIVATE_PATH/operator/jeeves-training-attestation.json \
       --candidate-directory /PRIVATE_PATH/operator/candidates \
       --allow-vocabulary-expansion
 
-The opt-in is bounded to 512 new pieces, 4096 total tokens. Torch-stack vocabulary expansion is not implemented; it fails closed when token coverage is insufficient.
+Native growth is bounded to 512 BPE pieces, 4096 total tokens. Torch-stack growth is bounded to 1024 word tokens, 8192 total tokens; it preserves existing embedding/projection rows, rebinds the SGD optimizer and requires exact token order on checkpoint restore. Both refuse exceeding their budgets.
 
 ## 4. Dry-run before training
 
@@ -69,7 +69,7 @@ A dry run never changes model weights or publishes a candidate. It returns block
       --max-optimizer-steps 25000 \
       --max-training-seconds 1200
 
-The operator must use a new run ID for every attempt. Append --expand-vocabulary only when explicitly approved by the preflight plan on a native TinyTransformer. Training is not triggered by compiling.
+The operator must use a new run ID for every attempt. Append --expand-vocabulary only when explicitly approved by the preflight plan for the active native or Torch model. Training is not triggered by compiling.
 
 Training protects the original parent checkpoint, writes an immutable verified backup, fits only a cloned active speaking model, enforces optimizer-update quotas and batch-boundary elapsed-time quotas, evaluates held-out loss on eight training domains and saves generated parent/candidate answers on 24 further never-trained game-design prompts. A time limit is checked between batches, not as hard preemption inside an individual optimizer call.
 
@@ -158,7 +158,8 @@ Run:
       skeleton.testing.test_jeeves_production_training_operator \
       skeleton.testing.test_jeeves_cortex_persisted_bpe \
       skeleton.testing.test_jeeves_game_design_review_gate \
-      skeleton.testing.test_jeeves_training_progress
+      skeleton.testing.test_jeeves_training_progress \
+      skeleton.testing.test_jeeves_torch_game_vocabulary
 
 Separately run the app installer, native runtime, game builder, security, model serving and end-to-end validation after compiling. Source commits alone do not prove those gates passed. No new noisy Actions workflows have been added.
 
@@ -166,6 +167,6 @@ Separately run the app installer, native runtime, game builder, security, model 
 
 - A real compiled serving process, real SKELETON_OWN checkpoint and in-process attestations are not accessible in this authoring environment.
 - An independent evaluation and controlled game playtesting process must establish whether candidate generations materially improve design; lexical/loss metrics are insufficient.
-- Torch-stack BPE vocabulary growth is not implemented; low-coverage runs fail closed.
+- Torch-stack vocabulary growth now supports preserved token IDs, but compiled GPU/CPU training performance and post-reload behavior remain to be verified end-to-end.
 - Interrupted candidate training can resume from immutable per-batch optimizer cursors, but the actual compiled-app restart path still requires end-to-end qualification.
 - End-to-end installer/compiled runtime proof and signed model promotion remain open until execution and separate authorization.
