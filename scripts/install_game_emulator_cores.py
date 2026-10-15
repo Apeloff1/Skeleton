@@ -574,6 +574,132 @@ for _vice_machine, _vice_target in (
 del _vice_machine, _vice_target
 
 
+# Pinned to inspected upstream Linux libretro build targets. These eight
+# independently identified cores extend the existing operator bootstrap; a
+# build recipe is NOT an installed, runnable, hardware-qualified emulator.
+# Canonical hardware IDs are constrained again by _CORE_TARGET_GROUPS during
+# registry admission. Candidate-only recipes never automatically gain approval.
+PINNED_CORES.update(
+    {
+        "bsnes": {
+            "repository": "https://github.com/libretro/bsnes.git",
+            "revision": "63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+            "artifact": "bsnes_libretro.so",
+            "license": "LICENSE.txt",
+            "makefile": "Makefile",
+            "targets": ["snes"],
+            "feature_limits": "SNES software libretro core; special cartridge enhancement hardware needs independent qualification",
+        },
+        "puae": {
+            "repository": "https://github.com/libretro/libretro-uae.git",
+            "revision": "7387937066b1b693816c3b4e2b7a0c601d41363d",
+            "artifact": "puae_libretro.so",
+            "license": "COPYING",
+            "makefile": "Makefile",
+            "targets": ["amiga_500", "amiga_1200", "amiga_cd32"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Operator-provided rights-cleared Kickstart or equivalent verified boot firmware",
+                "Qualified disk swapping and Amiga storage/controller configuration",
+            ],
+            "feature_limits": "No proprietary Kickstart or Workbench disks are downloaded or copied",
+        },
+        "np2kai": {
+            "repository": "https://github.com/libretro/NP2kai.git",
+            "revision": "1ea561cd7fd62b33f4e7b3f1c2e30fc3e6089f28",
+            "artifact": "sdl/np2kai_libretro.so",
+            "license": "LICENSE",
+            "build_directory": "sdl",
+            "makefile": "Makefile.libretro",
+            "targets": ["nec_pc_9801"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Operator-reviewed PC-98 font/firmware and disk layout",
+                "Qualified Japanese keyboard and drive handling",
+            ],
+        },
+        "dosbox_svn": {
+            "repository": "https://github.com/libretro/dosbox-svn.git",
+            "revision": "46a3164fc0f1e808ae56143d81698b00fb6b4781",
+            "artifact": "libretro/dosbox_svn_libretro.so",
+            "license": "COPYING",
+            "build_directory": "libretro",
+            "makefile": "Makefile.libretro",
+            "make_variables": {"WITH_FAKE_SDL": "1"},
+            "targets": ["dos_8086", "dos_vga", "dos_cga", "dos_ega", "dos_vesa", "windows_31"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Qualification of executable/disk selection and virtual DOS filesystem within the bounded host",
+            ],
+            "feature_limits": "DOS/Win16 software emulator only; not a Windows 95/98 compatibility claim",
+        },
+        "yabause": {
+            "repository": "https://github.com/libretro/yabause.git",
+            "revision": "8926b0c6c347f8c5c755911ddb0ac695420ffbf8",
+            "artifact": "yabause/src/libretro/yabause_libretro.so",
+            "license": "yabause/COPYING",
+            "build_directory": "yabause/src/libretro",
+            "makefile": "Makefile",
+            "targets": ["saturn"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Qualified Saturn boot firmware or validated core HLE mode",
+                "Disc swap, CD audio and software-rendered video runtime qualification",
+            ],
+            "feature_limits": "Only software-rendered mode may be admitted by the isolated host",
+        },
+        "hatari": {
+            "repository": "https://github.com/libretro/hatari.git",
+            "revision": "a82e014ce2b05fc7724add284febba3816e4112a",
+            "artifact": "core-build/src/hatari_libretro.so",
+            "license": "gpl.txt",
+            "build_kind": "cmake",
+            "cmake_target": "hatari_libretro",
+            "cmake_options": {
+                "ENABLE_LIBRETRO": "ON",
+                "LIBRETRO_STATIC": "OFF",
+                "ENABLE_HATARI": "OFF",
+                "ENABLE_TOOLS": "OFF",
+                "CMAKE_BUILD_TYPE": "Release",
+            },
+            "targets": ["atari_st", "atari_falcon"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Operator-provided rights-cleared TOS image or qualified alternative",
+                "Qualified Falcon DSP/disk mode and input behavior",
+            ],
+        },
+        "swanstation": {
+            "repository": "https://github.com/libretro/swanstation.git",
+            "revision": "e436e9b85374def58d211df7f78880f0f4a917b4",
+            "artifact": "swanstation_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile.libretro",
+            "targets": ["ps1"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Approved PlayStation firmware/HLE policy",
+                "No hardware-rendered context is available in the isolated worker",
+            ],
+            "feature_limits": "Software-renderer and disc handling not independently qualified",
+        },
+        "mupen64plus_next": {
+            "repository": "https://github.com/libretro/mupen64plus-libretro-nx.git",
+            "revision": "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5",
+            "artifact": "mupen64plus_next_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile",
+            "targets": ["nintendo_64"],
+            "candidate_only": True,
+            "unavailable_requirements": [
+                "Requires audited hardware/graphics-context support; the worker rejects hardware-frame callbacks",
+                "Qualify CPU/interpreter and graphics/RSP plugins separately",
+            ],
+            "build_dependency": "Upstream native build may require OpenGL development libraries",
+        },
+    }
+)
+
 def _environment(*, network: bool = False):
     # No inherited provider/Mongo credentials, user git configuration, dynamic
     # loader overrides, compiler injection flags or credential helpers.
