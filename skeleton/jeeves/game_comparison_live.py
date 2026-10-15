@@ -86,6 +86,7 @@ class _Lane:
     game: dict[str, Any]
     env: Any
     content_digest: str
+    native_content_digest: str
     controls_digest: str
     chain: str
     first_chain: str
@@ -174,6 +175,9 @@ class LiveComparison:
                 ])
                 self._lanes[game["id"]] = _Lane(
                     game=game, env=env, content_digest=content_digest,
+                    native_content_digest=(
+                        getattr(env, "descriptor", {}).get("content_digest", content_digest)
+                    ),
                     controls_digest=digest(game["controller_devices"]), chain=chain,
                     first_chain=chain,
                 )
@@ -191,6 +195,7 @@ class LiveComparison:
             "series_id": lane.game["series_id"],
             "core_id": lane.game["core_id"], "target_id": lane.game["target_id"],
             "content_sha256": lane.content_digest,
+            "native_content_digest": lane.native_content_digest,
             "controller_layout": controller_layout_for_target(
                 lane.game["target_id"], lane.game["controller_devices"],
                 core_input_descriptors=(
@@ -432,6 +437,7 @@ class LiveComparison:
                     "episode_step": lane.step_count,
                     "reset_generation": lane.reset_count,
                     "source_content_sha256": lane.content_digest,
+                    "native_content_digest": lane.native_content_digest,
                     "core_sha256": lane.env.core.library_sha256,
                     "native_host_disc_receipt_sha256": operation["receipt"]["receipt_sha256"],
                     "native_host_disc_receipt": dict(operation["receipt"]),
@@ -523,6 +529,7 @@ class LiveComparison:
                         "core_id":lane.game["core_id"],
                         "target_id":lane.game["target_id"],
                         "source_media_sha256":lane.content_digest,
+                        "native_content_digest":lane.native_content_digest,
                         "core_sha256":lane.env.core.library_sha256,
                         "native_environment_sha256":lane.env.spec.environment_digest,
                         "seed":lane.game["seed"],
