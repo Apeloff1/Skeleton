@@ -236,3 +236,20 @@ def test_operator_cli_pause_resume_and_reverse_report_without_restarting(tmp_pat
     assert report["simulations_executed"] == 1
     assert report["forward_observations"] == report["reverse_observations"] == 28
     assert report["training_executed"] is False
+
+def test_reverse_semantic_oracle_rejects_self_consistent_forged_hash_chain():
+    # A hash-only audit would accept these attacker-recalculated digests.
+    from skeleton.ai.training.jeeves_cinematic_simulation import _hash, ZERO
+    controller = SimulationController(scene(), controls())
+    controller.run()
+    controller.trace[12]["item"] = "forged_item"
+    prior = ZERO
+    for entry in controller.trace:
+        entry["previous_digest"] = prior
+        original = {k: v for k, v in entry.items()
+                    if k not in ("previous_digest", "digest")}
+        entry["digest"] = _hash({"frame": original, "previous_digest": prior})
+        prior = entry["digest"]
+    controller.previous_digest = prior
+    audit = controller.reverse_audit()
+    assert not audit["passed"] and 12 in audit["first_failure_indices"]
