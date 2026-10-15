@@ -115,6 +115,9 @@ def _load_split(root: Path, *, filename: Any, digest: Any, split: str) -> list[d
             raise ProductionCheckpointError("corpus record id is missing or malformed")
         if row.get("family") not in FAMILIES:
             raise ProductionCheckpointError("unknown game-design curriculum family")
+        project = row.get("source_project_id")
+        if not isinstance(project, str) or not _ID.fullmatch(project):
+            raise ProductionCheckpointError("each production example requires a source project ID")
         prompt = _text(row.get("prompt"), label="prompt", minimum=10, maximum=MAX_PROMPT_CHARS)
         answer = _text(row.get("answer"), label="answer", minimum=20, maximum=MAX_ANSWER_CHARS)
         words_loaded += len(prompt.split()) + len(answer.split())
@@ -179,6 +182,12 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
         unique_text[normalized] = identity
         dest = per_family_train if row["split"] == "train" else per_family_eval
         dest[row["family"]].append(chat)
+    train_projects = {row["source_project_id"] for row in training}
+    heldout_projects = {row["source_project_id"] for row in heldout}
+    if train_projects & heldout_projects:
+        raise ProductionCheckpointError("same source project cannot appear in both training and held-out")
+    if len(train_projects) < 2 or len(heldout_projects) < 2:
+        raise ProductionCheckpointError("production game corpus needs multiple independent projects per split")
     if any(
         len(per_family_train[family]) < MIN_TRAIN_PER_FAMILY or
         len(per_family_eval[family]) < MIN_HOLDOUT_PER_FAMILY
@@ -192,8 +201,11 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
     benchmark_prompts = [prompt for _, prompt, _ in BENCHMARK]
     seen_benchmark = {_normalize(p) for p in benchmark_prompts}
     for p in train_prompts + test_prompts:
-        if _normalize(p) in seen_benchmark:
-            raise ProductionCheckpointError("game corpus overlaps immutable third-split design benchmark")
+        if (_normalize(p) in seen_benchmark or
+                any(_split_contamination(p, question) for question in benchmark_prompts)):
+            raise ProductionCheckpointError(
+                "game corpus overlaps or near-copies immutable third-split design benchmark"
+            )
     # Indexed six-gram probes catch near-copies without quadratic all-pair
     # comparisons across up to 20,000 records. Exact string identity is
     # checked for all rows above.
@@ -249,6 +261,9 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
         "heldout_examples": len(heldout),
         "families": sorted(FAMILIES),
         "heldout_used_for_training": False,
+        "independent_project_partition_verified": True,
+        "training_project_count": len(train_projects),
+        "heldout_project_count": len(heldout_projects),
         "benchmark_overlap_checked": True,
         "all_records_declared_training_permitted": True,
         "independent_rights_verification_still_required": True,
