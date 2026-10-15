@@ -1518,6 +1518,10 @@ class StudioLearningCampaign:
                 steps=min(6, self.config.episode_steps), angles=ANGLES,
             )
         constraints = {
+            "mirrored_rule_has_observed_mechanics_effect": (
+                scenario_mirror is None or
+                scenario_mirror["informative_for_rule_selection"]
+            ),
             "mirrored_original_rule_nonregression": (
                 scenario_mirror is None
                 or scenario_mirror["worst_return_difference"]
@@ -1642,6 +1646,18 @@ class StudioLearningCampaign:
                 "mean_step_wall_ms": mean_step_ms,
                 "limit_ms": self.config.max_mean_step_ms,
                 "render_time_included": False,
+                "mirrored_effectiveness": (
+                    None if scenario_mirror is None else {
+                        "informative": scenario_mirror["informative_for_rule_selection"],
+                        "classification": scenario_mirror["effectiveness_classification"],
+                        "measured_behavior_differences": scenario_mirror["measured_behavior_differences"],
+                        "productive_state_changes": scenario_mirror["productive_state_changes"],
+                        "total_executed_steps": scenario_mirror["total_executed_steps"],
+                        "actual_replayed_action_applications": scenario_mirror["total_replayed_action_applications"],
+                        "novelty_per_100_replayed_actions": scenario_mirror["novelty_per_100_replayed_actions"],
+                        "worst_return_difference": scenario_mirror["worst_return_difference"],
+                    }
+                ),
             },
             "bandit_observation": {
                 "arm_id": mutation["proposal_selection"]["arm_id"],
@@ -1741,10 +1757,18 @@ class StudioLearningCampaign:
             raise GameLearningError("campaign already executing a slice")
         if self.cursor + count > self.config.round_limit:
             raise GameLearningError("campaign requested beyond admitted total round budget")
+        # Account for the possible twelve additional baseline/candidate
+        # angle episodes. Their real steps are not free and must be admitted
+        # *before* a campaign slice starts, not only after checkpointing.
+        studio_mirror_allowance = (
+            12 * min(6, self.config.episode_steps)
+            if self.champion.kind == "studio" else 0
+        )
         planned = (
-            count
-            * (self.config.episodes_per_round + 4 * self.config.evaluation_seeds)
-            * self.config.episode_steps
+            count * (
+                (self.config.episodes_per_round + 4 * self.config.evaluation_seeds)
+                * self.config.episode_steps + studio_mirror_allowance
+            )
         )
         if planned > self.config.max_slice_steps:
             raise GameLearningError("campaign planned slice exceeds cumulative step budget")
@@ -1756,6 +1780,8 @@ class StudioLearningCampaign:
             for _ in range(count):
                 previous = self.snapshot()
                 report, candidate, policy, counterexamples = self._round(self.cursor + 1, cancel, authorize)
+                if actual + report["actual_steps"] > self.config.max_slice_steps:
+                    raise GameLearningError("executed campaign steps exceeded admitted slice budget")
                 _guard(cancel, authorize)
                 if _implementation() != self.implementation_digest:
                     raise GameLearningError("studio code changed before round commit")

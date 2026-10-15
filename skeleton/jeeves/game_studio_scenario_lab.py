@@ -286,17 +286,30 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
         previews=[env.preview()]
         actions=[]
         rejected=0
+        accepted_count=0
+        productive_changes=0
         total=0.0
         digests=[]
+        # The time coordinate increases even for no-op actions. Only actual
+        # gameplay features count toward the novel-state evidence metric.
+        features=tuple(key for key in sorted(observation) if key!="time")
+        def state_key(state):
+            return tuple(round(float(state[key]),6) for key in features)
+        observed={state_key(observation)}
         for i in range(steps):
             if env.done: break
             action=_choose(env.spec.actions,angle,i,seed,observation)
             measured=env.step(action)
             accepted=measured.info.get("evidence",{}).get("accepted",False)
             rejected+=int(accepted is not True)
+            accepted_count+=int(accepted is True)
             total+=measured.reward
             digests.append(measured.transition_digest)
-            observation=dict(measured.observation)
+            next_observation=dict(measured.observation)
+            if accepted is True and state_key(next_observation)!=state_key(observation):
+                productive_changes+=1
+            observed.add(state_key(next_observation))
+            observation=next_observation
             actions.append(action)
             if (i+1)%max(1,steps//(MAX_FRAMES-1))==0:
                 previews.append(env.preview())
@@ -308,6 +321,15 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
         result={
             "angle":angle,"seed":seed,"steps":len(actions),
             "actions":actions,"rejected_actions":rejected,
+            "accepted_actions":accepted_count,
+            "productive_state_changes":productive_changes,
+            "unique_gameplay_states":len(observed),
+            "accepted_action_rate":round(accepted_count/max(1,len(actions)),6),
+            "productive_action_rate":round(productive_changes/max(1,len(actions)),6),
+            # The emulator-compatible reference replays the full action log
+            # at each step. Count real replayed action applications as the
+            # cost proxy, not just the visible number of requested steps.
+            "replayed_action_applications":sum(range(1,len(actions)+1)),
             "total_reward":round(total,6),
             "source_digest":env.source_digest,
             "environment_digest":env.spec.environment_digest,
@@ -382,6 +404,14 @@ def mirrored_rule_comparison(baseline: Mapping[str,object],
             "return_difference":round(b["total_reward"]-a["total_reward"],6),
             "baseline_rejected_actions":a["rejected_actions"],
             "candidate_rejected_actions":b["rejected_actions"],
+            "baseline_accepted_actions":a["accepted_actions"],
+            "candidate_accepted_actions":b["accepted_actions"],
+            "baseline_productive_state_changes":a["productive_state_changes"],
+            "candidate_productive_state_changes":b["productive_state_changes"],
+            "baseline_unique_gameplay_states":a["unique_gameplay_states"],
+            "candidate_unique_gameplay_states":b["unique_gameplay_states"],
+            "baseline_replayed_action_applications":a["replayed_action_applications"],
+            "candidate_replayed_action_applications":b["replayed_action_applications"],
             "baseline_executed_steps":a["steps"],
             "candidate_executed_steps":b["steps"],
             "baseline_snapshot":a["snapshot_digest"],
@@ -389,15 +419,54 @@ def mirrored_rule_comparison(baseline: Mapping[str,object],
             "baseline_evidence_digest":a["digest"],
             "candidate_evidence_digest":b["digest"],
         })
+    total_actions=sum(
+        item["baseline_executed_steps"]+item["candidate_executed_steps"]
+        for item in observations
+    )
+    total_replays=sum(
+        item["baseline_replayed_action_applications"]
+        +item["candidate_replayed_action_applications"]
+        for item in observations
+    )
+    productive_pairs=sum(
+        item["baseline_productive_state_changes"]
+        +item["candidate_productive_state_changes"]
+        for item in observations
+    )
+    measured_differences=sum(
+        item["return_difference"]!=0
+        or item["baseline_unique_gameplay_states"]!=item["candidate_unique_gameplay_states"]
+        or item["baseline_productive_state_changes"]!=item["candidate_productive_state_changes"]
+        for item in observations
+    )
+    # Avoid promoting settings which do not have any measured influence
+    # under sampled play. Short traces can only be inconclusive, never
+    # a claimed game-design success or generalization proof.
+    informative=(
+        total_actions>=4 and productive_pairs>=2
+        and measured_differences>=1
+        and sum(item["candidate_accepted_actions"] for item in observations)>=2
+    )
     result={
         "schema_version":"skeleton.game_builder.mirrored_rule_comparison.v1",
         "engine":baseline["editor"],
         "baseline_source_digest":source_digest(baseline),
         "candidate_source_digest":source_digest(candidate),
         "mirrors":observations,
+        "total_executed_steps":total_actions,
+        "total_replayed_action_applications":total_replays,
+        "productive_state_changes":productive_pairs,
+        "measured_behavior_differences":measured_differences,
+        "novelty_per_100_replayed_actions":round(
+            100*productive_pairs/max(1,total_replays),6,
+        ),
+        "informative_for_rule_selection":informative,
+        "effectiveness_classification":(
+            "measured_difference" if informative else "insufficient_behavioral_evidence"
+        ),
         "mean_return_difference":round(sum(x["return_difference"] for x in observations)/len(observations),6),
         "worst_return_difference":min(x["return_difference"] for x in observations),
-        "possibly_viable_under_bounded_mirror_checks":all(
+        "possibly_viable_under_bounded_mirror_checks":informative and all(
             x["return_difference"]>=-1 for x in observations
         ),
         "independent_human_review_required":True,
