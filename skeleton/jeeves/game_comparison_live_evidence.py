@@ -32,12 +32,15 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         if type(game_id) is not str or not isinstance(lane,dict) or lane.get("game_id")!=game_id:
             raise LiveEvidenceError("Native evidence source game IDs differ")
         source=lane.get("source_media_sha256")
+        native_source=lane.get("native_content_digest",source)
         core_sha=lane.get("core_sha256")
         if (type(core_sha) is not str or len(core_sha)!=64
             or any(ch not in "0123456789abcdef" for ch in core_sha)):
             raise LiveEvidenceError("Native core binary SHA-256 is absent or invalid")
-        if type(source) is not str or len(source)!=64:
-            raise LiveEvidenceError("Original game media hash is not recorded")
+        if (type(source) is not str or len(source)!=64 or
+            type(native_source) is not str or len(native_source)!=64 or
+            any(ch not in "0123456789abcdef" for ch in native_source)):
+            raise LiveEvidenceError("Original game source or native bundle digest is not recorded")
         initial=lane.get("initial_chain_sha256")
         env_sha=lane.get("native_environment_sha256")
         seed=lane.get("seed")
@@ -98,7 +101,7 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
             elif row["event_kind"]=="native_disc_swap":
                 required={
                     "schema_version", "game_id", "index", "episode_step",
-                    "reset_generation", "source_content_sha256", "core_sha256",
+                    "reset_generation", "source_content_sha256", "native_content_digest", "core_sha256",
                     "native_host_disc_receipt_sha256", "native_host_disc_receipt",
                     "previous_image_index", "selected_image_index",
                     "registered_disc_count", "interface_version",
@@ -111,6 +114,7 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                     or payload["episode_step"]!=episode_step
                     or payload["reset_generation"]!=reset_generation
                     or payload["source_content_sha256"]!=source
+                    or payload["native_content_digest"]!=native_source
                     or payload["core_sha256"]!=core_sha
                     or payload["native_frame_advanced"] is not False):
                     raise LiveEvidenceError("Native disc event counters or source differ")
@@ -139,7 +143,7 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                 host_data={k:v for k,v in host.items() if k!="receipt_sha256"}
                 if (host["schema_version"]!="skeleton.game.native_disc_swap_receipt.v1"
                     or host["core_sha256"]!=core_sha
-                    or host["content_digest"]!=source
+                    or host["content_digest"]!=native_source
                     or host["environment_digest"]!=env_sha
                     or host["event_index"]!=disc_changes+1
                     or host["episode_step_before_swap"]!=episode_step
