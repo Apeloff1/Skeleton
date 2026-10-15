@@ -18,7 +18,7 @@ from skeleton.jeeves.game_studio_environment import (
 from skeleton.jeeves.game_studio_scenario_lab import (
     ANGLES, CHARTS, MOTIFS, ScenarioLabError,
     sales_informed_catalog, test_manifest, all_engine_test_manifests,
-    propose_scenarios, mirrored_simulations,
+    propose_scenarios, mirrored_simulations, mirrored_rule_comparison,
 )
 from skeleton.jeeves.game_studio_rule_curriculum import apply_rule_proposal
 
@@ -75,6 +75,31 @@ class StudioEngineScenarioLabTests(unittest.TestCase):
             [x["digest"] for x in repeat["lanes"]],
             [x["digest"] for x in report["lanes"]],
         )
+
+    def test_paired_all_angle_evaluation_is_original_source_bound(self):
+        source=make_studio_source("economy",{"market_nodes":3,"goods":10})
+        other=make_studio_source("economy",{"market_nodes":3,"goods":10,
+                                          "trade_tax":15})
+        comparison=mirrored_rule_comparison(source,other,seed=10,steps=3,
+                                           angles=ANGLES)
+        self.assertEqual(len(comparison["mirrors"]),6)
+        self.assertFalse(comparison["source_promotion_authorized"])
+        self.assertTrue(comparison["independent_human_review_required"])
+        self.assertEqual(len(comparison["digest"]),64)
+        self.assertNotEqual(comparison["baseline_source_digest"],
+                            comparison["candidate_source_digest"])
+        for i,row in enumerate(comparison["mirrors"]):
+            self.assertEqual(row["angle"],ANGLES[i])
+            self.assertEqual(row["seed"],10+i)
+            self.assertEqual(len(row["baseline_evidence_digest"]),64)
+            self.assertEqual(len(row["candidate_evidence_digest"]),64)
+        same=mirrored_rule_comparison(source,source,seed=10,steps=3)
+        self.assertEqual(same["worst_return_difference"],0.0)
+        self.assertEqual(same["mean_return_difference"],0.0)
+        with self.assertRaises(ScenarioLabError):
+            mirrored_rule_comparison(
+                source,make_studio_source("animation"),seed=10,steps=2,
+            )
 
     def test_readonly_mirrors_do_not_mutate_original_game_source(self):
         source=make_studio_source("save_system")

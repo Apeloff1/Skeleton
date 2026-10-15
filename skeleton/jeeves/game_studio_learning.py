@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 import json
 import math
 import random
@@ -1425,30 +1426,45 @@ class StudioLearningCampaign:
         all_eval = ordinary_seeds + jitter_seeds
         if len(set(all_eval)) != len(all_eval) or blocked.intersection(all_eval):
             raise GameLearningError("campaign evaluation partitions collide with current/inherited training")
-        baseline, measured, baseline_adv, measured_adv = [], [], [], []
-        for seed in ordinary_seeds:
-            baseline.append(
-                self._play(
-                    self.champion,
-                    seed,
-                    self.champion_policy,
-                    jitter=False,
-                    cancel=cancel,
-                    authorize=authorize,
-                )
+        # All scenario comparisons are read-only, seed-paired and independent.
+        # Studio reference engines support concurrently isolated instances;
+        # native emulator providers keep their existing sequential evaluation.
+        evaluations = [
+            (self.champion, seed, self.champion_policy, False, "baseline")
+            for seed in ordinary_seeds
+        ] + [
+            (candidate, seed, policy, False, "measured")
+            for seed in ordinary_seeds
+        ] + [
+            (self.champion, seed, self.champion_policy, True, "baseline_adv")
+            for seed in jitter_seeds
+        ] + [
+            (candidate, seed, policy, True, "measured_adv")
+            for seed in jitter_seeds
+        ]
+
+        def evaluate_one(item):
+            req, sample_seed, evaluator, perturbed, role = item
+            return role, self._play(
+                req, sample_seed, evaluator, jitter=perturbed,
+                cancel=cancel, authorize=authorize,
             )
-            measured.append(
-                self._play(candidate, seed, policy, jitter=False, cancel=cancel, authorize=authorize)
-            )
-        for seed in jitter_seeds:
-            baseline_adv.append(
-                self._play(
-                    self.champion, seed, self.champion_policy, jitter=True, cancel=cancel, authorize=authorize
-                )
-            )
-            measured_adv.append(
-                self._play(candidate, seed, policy, jitter=True, cancel=cancel, authorize=authorize)
-            )
+
+        if self.champion.kind == "studio" and candidate.kind == "studio":
+            with ThreadPoolExecutor(
+                max_workers=min(4, len(evaluations)),
+                thread_name_prefix="jeeves-round-evaluation",
+            ) as workers:
+                results = list(workers.map(evaluate_one, evaluations))
+        else:
+            results = [evaluate_one(item) for item in evaluations]
+        grouped = {role: [] for role in (
+            "baseline", "measured", "baseline_adv", "measured_adv"
+        )}
+        for role, execution in results:
+            grouped[role].append(execution)
+        baseline, measured = grouped["baseline"], grouped["measured"]
+        baseline_adv, measured_adv = grouped["baseline_adv"], grouped["measured_adv"]
         if any(
             p["environment_digest"] != candidate_spec.environment_digest for p in measured + measured_adv
         ) or any(
@@ -1480,7 +1496,33 @@ class StudioLearningCampaign:
         death_regression = max(
             before["survival"] - after["survival"], adv_before["survival"] - adv_after["survival"]
         )
+        scenario_mirror = None
+        # The six additional angles are evidence-based conservative gates;
+        # they never automatically certify subjective game quality or cause
+        # changes in production weights. Full training-seed holds remain
+        # disjoint from this measured evaluation.
+        if (self.champion.kind == "studio" and candidate.kind == "studio"
+                and mutation.get("supported") and candidate.digest != self.champion.digest):
+            from .game_studio_environment import parse_studio_source
+            from .game_studio_scenario_lab import ANGLES, mirrored_rule_comparison
+
+            original = parse_studio_source(
+                json.loads(self.champion.tree["game/studio/session.json"])
+            )
+            variant = parse_studio_source(
+                json.loads(candidate.tree["game/studio/session.json"])
+            )
+            scenario_mirror = mirrored_rule_comparison(
+                original, variant,
+                seed=self._seed(index, "mirrored-angles") % (2**31 - 7),
+                steps=min(6, self.config.episode_steps), angles=ANGLES,
+            )
         constraints = {
+            "mirrored_original_rule_nonregression": (
+                scenario_mirror is None
+                or scenario_mirror["worst_return_difference"]
+                >= -self.config.max_worst_seed_regression - 1e-9
+            ),
             "visual_source_resource_floor": dragon["passed"],
             "typed_proposal_valid": not mutation.get("proposal_rejected", False),
             "ordinary_mean_return_nonregression": improvement >= -1e-9,
@@ -1521,6 +1563,8 @@ class StudioLearningCampaign:
         for play in baseline + measured + baseline_adv + measured_adv:
             play.pop("_trace", None)
         steps = trained.updates + sum(p["steps"] for p in baseline + measured + baseline_adv + measured_adv)
+        if scenario_mirror is not None:
+            steps += sum(2 * min(6, self.config.episode_steps) for _ in scenario_mirror["mirrors"])
         curriculum = {
             "kind": self.config.curriculum,
             "training_seeds": training_seeds,
@@ -1560,6 +1604,7 @@ class StudioLearningCampaign:
                 "evaluations": measured_adv,
                 "champion_evaluations": baseline_adv,
                 "seed_partitions_disjoint": True,
+                "source_bound_six_angle_mirror": scenario_mirror,
                 "semantic_generalization_claim": False,
             },
         }
@@ -1608,6 +1653,10 @@ class StudioLearningCampaign:
                 "ordinary_return_delta": improvement,
                 "adversarial_return_delta": adversarial_delta,
                 "worst_seed_return_delta": min(ordinary_pairs + adv_pairs),
+                "mirrored_worst_return_delta": (
+                    None if scenario_mirror is None
+                    else scenario_mirror["worst_return_difference"]
+                ),
                 "death_rate_regression": death_regression,
                 "minimum_improvement": self.config.min_improvement,
                 "minimum_improvement_unit": "weighted_normalized_objective_gain",
