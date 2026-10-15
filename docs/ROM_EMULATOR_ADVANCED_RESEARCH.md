@@ -255,7 +255,7 @@ Example private `/private/research/operator-goals.json` file:
     {
       "label": "operator-claimed-objective-counter",
       "region": 0,
-      "offset": 8192,
+      "offset": 0,
       "bytes_per_value": 2,
       "direction": "increase",
       "threshold": 1,
@@ -306,3 +306,29 @@ Actual local native ROM execution, Python regression runs, release CI,
 per-core accuracy, learned gameplay improvement and production model
 promotion are **not yet verified**. Operator-run source evidence must precede
 any claim that the corresponding hardware features work.
+
+
+## Candidate neural checkpoint safety
+
+`fit-emulator-world-model` now accepts
+`--max-compute-units 50000000` (default). Before allocating optimizer
+moments, the trainer estimates dense pure-Python work from the **actual
+admitted train partition**, layer width, action/sensor dimensionality and
+epoch budget. A run exceeding the configured maximum fails before the
+first optimizer step. The maximum operator override is 300 million estimated
+units, not an unbounded compute promise. A caller with an active cancellation
+probe can stop between minibatches; cancellation must not be reported as a
+finished model.
+
+The speculative inference path also **validates imported checkpoint tensor
+shapes**, 4–64 hidden units, source observation/action labels, finite weights,
+normalization coefficients, exact parameter count and training provenance.
+A rehashed but malformed candidate JSON is not treated as a valid neural
+model. These checks prevent obvious structural abuse; a self-computed hash
+is not a cryptographic source authorization, and every actual source
+hypothesis still needs independent game/core execution.
+
+Focused regression sources cover altered savestate audio, source planning
+versus neutral controls, rehashed malformed neural tensors, optimizer CPU
+limits, finite cancellation, and operator-authored native memory hypotheses.
+They have not been executed in this authoring session.
