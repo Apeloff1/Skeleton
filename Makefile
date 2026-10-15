@@ -1,4 +1,4 @@
-.PHONY: install dev app app-preload app-setup app-install windows-installer app-check app-status app-down test test-feature smoke verify quality ci lint clean
+.PHONY: install dev app app-preload app-setup app-install windows-installer app-check app-status app-down precompile test test-feature smoke verify quality ci lint clean
 
 install:
 	pip install -r requirements.txt
@@ -22,6 +22,17 @@ windows-installer:
 	pwsh ./scripts/windows/build_installer.ps1
 
 app-check:
+	python -m skeleton app check
+
+# Read-only precompilation contract pass; not a compiled/runtime release verdict.
+# Keep execution local to avoid unnecessary GitHub Actions runs.
+precompile:
+	python scripts/check_architecture_map.py
+	python scripts/check_ai_app_construction.py
+	python scripts/check_capability_interfaces.py
+	python scripts/check_provider_bootstrap.py
+	python scripts/check_app_assembly.py
+	python scripts/check_toolchain_contract.py
 	python -m skeleton app check
 
 app-status:
