@@ -9,6 +9,8 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from skeleton.jeeves.game_studio_environment import make_studio_source
+from skeleton.jeeves.game_learning import GameLearningError
+from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
 from skeleton.jeeves.game_studio_rule_curriculum import (
     PLAN_SCHEMA, PROPOSAL_SCHEMA, RuleCurriculumEnvironment,
     RuleCurriculumError, apply_rule_proposal, make_rule_curriculum,
@@ -177,6 +179,38 @@ class TestModelProposedEngineRules(unittest.TestCase):
             verify_rule_curriculum(forged)
         with self.assertRaises(RuleCurriculumError):
             make_rule_curriculum(self.base,[self.tax,self.tax])
+
+    def test_isolated_rollout_request_replays_same_rule_spec(self):
+        plan=make_rule_curriculum(self.base,[self.tax,self.market],max_steps=5)
+        source=json.dumps(plan,sort_keys=True,separators=(",", ":"),ensure_ascii=True)
+        request=GameEnvironmentRequest(
+            "studio-rules:economy",kind="studio_rules",
+            tree={"game/studio/rule_curriculum.json":source},
+            max_steps=5,
+        )
+        imported=GameEnvironmentRequest.from_dict(request.as_dict())
+        self.assertEqual(imported.digest,request.digest)
+        env=imported.build()
+        baseline=RuleCurriculumEnvironment(plan)
+        try:
+            self.assertEqual(env.spec.as_dict(),baseline.spec.as_dict())
+            self.assertEqual(env.reset(2),baseline.reset(2))
+            self.assertEqual(env.step("inspect").transition_digest,
+                             baseline.step("inspect").transition_digest)
+        finally:
+            env.close()
+            baseline.close()
+        with self.assertRaises(GameLearningError):
+            GameEnvironmentRequest(
+                "studio-rules:foreign",kind="studio_rules",
+                tree={"game/studio/session.json":source},max_steps=5,
+            )
+        bad=GameEnvironmentRequest(
+            "studio-rules:economy",kind="studio_rules",
+            tree={"game/studio/rule_curriculum.json":source},max_steps=4,
+        )
+        with self.assertRaises(GameLearningError):
+            bad.build()
 
     def test_actual_q_updates_and_disjoint_scenario_evaluation(self):
         with TemporaryDirectory() as folder:

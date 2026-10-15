@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 
 from .game_learning import GameLearningConfig, GamePolicyLearner
+from .game_learning_parallel import GameEnvironmentRequest
 from .game_studio_environment import make_studio_source, parse_studio_source
 from .game_studio_rule_curriculum import (
     PLAN_SCHEMA, PROPOSAL_SCHEMA, RuleCurriculumEnvironment,
@@ -88,7 +89,14 @@ def train_rule_curriculum(
     count = circumstances * episodes_per_scenario
     if count > 128:
         raise RuleCurriculumError("training policy episode capacity exceeded")
-    env = RuleCurriculumEnvironment(plan)
+    request = GameEnvironmentRequest(
+        "studio-rules:" + plan["base_source"]["editor"], kind="studio_rules",
+        tree={"game/studio/rule_curriculum.json": json.dumps(
+            plan, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        )},
+        max_steps=max_steps,
+    )
+    env = request.build()
     try:
         spec = env.spec
     finally:
@@ -127,13 +135,13 @@ def train_rule_curriculum(
     if set(train_seeds).intersection(heldout):
         raise RuleCurriculumError("training and evaluation scenario seeds overlap")
     result = learner.train(
-        lambda: RuleCurriculumEnvironment(plan),
+        request.build,
         episodes=count, seeds=train_seeds,
     )
     if result.updates <= 0:
         raise RuleCurriculumError("no real learning updates were committed")
     evaluation = learner.evaluate(
-        lambda: RuleCurriculumEnvironment(plan),
+        request.build,
         heldout_seeds=heldout, baseline_snapshot=previous,
     )
     details = evaluation.as_dict()
@@ -157,6 +165,7 @@ def train_rule_curriculum(
         "candidate_status": "trained_not_promoted",
         "plan": plan,
         "environment_spec": spec.as_dict(),
+        "environment_request_digest": request.digest,
         "training_algorithm": "measured_tabular_q_learning",
         "policy_snapshot": learner.snapshot(),
         "actual_policy_updates": result.updates,

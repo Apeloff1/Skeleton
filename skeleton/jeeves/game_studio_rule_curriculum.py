@@ -16,6 +16,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from hashlib import sha256
 import json
+from pathlib import Path
 import re
 
 from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
@@ -375,7 +376,8 @@ class RuleCurriculumEnvironment:
             "studio-rules:" + self.sources[0]["editor"],
             _sha({"rule_plan_digest": self.plan["digest"],
                   "runtime_digests": child_digests,
-                  "environment_schema": PLAN_SCHEMA}),
+                  "environment_schema": PLAN_SCHEMA,
+                  "rule_executor_sha256": sha256(Path(__file__).read_bytes()).hexdigest()}),
             child.actions, bins, child.reward_components, self.plan["max_steps"],
         )
         self._active: StudioGameEnvironment | None = None
