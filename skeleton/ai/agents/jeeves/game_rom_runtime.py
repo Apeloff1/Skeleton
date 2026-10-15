@@ -72,6 +72,14 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
         raise GameRomRuntimeError("Cartridge type requires external RAM")
     if ram_bytes > 32768 and cartridge not in (0x1A, 0x1B):
         raise GameRomRuntimeError("Declared RAM exceeds this mapper's address space")
+    # Standard MBC1 boards cannot wire the two upper selector bits to
+    # extended ROM and four-bank RAM simultaneously: >512 KiB needs the
+    # selector for ROM and therefore exposes at most one 8 KiB RAM bank.
+    # Multi-game MBC1M wiring is not modeled by this single-cartridge core.
+    if cartridge in (0x01, 0x02, 0x03) and size_code >= 5 and ram_bytes > 8192:
+        raise GameRomRuntimeError(
+            "MBC1 cartridges above 512 KiB cannot expose four RAM banks"
+        )
     return {
         "platform": "game_boy",
         "mode": "experimental_dmg_rom",
