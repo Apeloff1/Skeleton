@@ -52,6 +52,10 @@ services:
       - SKL_ENGINE_QUOTA_STATE_PATH=/app/data/engine_quota.sqlite
       - SKL_ENGINE_PRESSURE_STATE_PATH=/app/data/engine_pressure.sqlite
       - SKL_GOVERNANCE_LIFECYCLE_PATH=/app/data/governance_lifecycle.sqlite
+      # Engine-owned forge seals and sealed-vault material persist across
+      # container replacement; values come from local setup, never the image.
+      - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}
+      - SKELETON_MASTER_SECRET=${SKELETON_MASTER_SECRET:?SKELETON_MASTER_SECRET must be initialized by Skeleton setup}
       # Runtime model selection is owned by the Skeleton engine process.
       # Local mode uses a model artifact placed in the persistent skeleton_data
       # volume (default /app/data/local-model.json) and requires no provider key.
@@ -108,6 +112,11 @@ services:
       - DEBUG=${DEBUG:-false}
       # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
+      # GameForge authenticates and signs requests in the backend process.
+      # Keep its identity stable across upgrades and Docker image recreation.
+      - GAMEFORGE_JWT_SECRET=${GAMEFORGE_JWT_SECRET:?GAMEFORGE_JWT_SECRET must be initialized by Skeleton setup}
+      - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}
+      - GF_KEYHOLDER_SEED=${GF_KEYHOLDER_SEED:?GF_KEYHOLDER_SEED must be initialized by Skeleton setup}
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
       - SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}
