@@ -45,6 +45,39 @@ class FilenameSafetyTests(unittest.TestCase):
         new = "archive/" + "g" * 235 + ".txt"
         self.assertTrue(check_paths({old}, {new}))
 
+    def test_legacy_case_directory_collision_is_grandfathered(self):
+        paths = {"snapshots/components/UI/index.ts", "snapshots/components/ui/icon.ts"}
+        self.assertEqual(check_paths(paths, paths), [])
+
+    def test_new_file_beneath_legacy_colliding_dir_is_rejected(self):
+        previous = {"snapshots/components/UI/index.ts", "snapshots/components/ui/icon.ts"}
+        current = previous | {"snapshots/components/ui/another.ts"}
+        issues = check_paths(previous, current)
+        self.assertTrue(any("ambiguous" in issue for issue in issues), issues)
+
+    def test_unrelated_new_file_with_old_collision_is_allowed(self):
+        previous = {"snapshots/components/UI/index.ts", "snapshots/components/ui/icon.ts"}
+        current = previous | {"scripts/portable.py"}
+        self.assertEqual(check_paths(previous, current), [])
+
+    def test_removing_legacy_collision_is_safe(self):
+        previous = {"snapshots/components/UI/index.ts", "snapshots/components/ui/icon.ts"}
+        current = {"snapshots/components/UI/index.ts"}
+        self.assertEqual(check_paths(previous, current), [])
+
+    def test_utf16_length_not_just_python_character_count(self):
+        # Non-BMP codepoints count twice toward the classic Windows MAX_PATH.
+        name = "😀" * 45 + "/" + "😀" * 45 + "/" + "😀" * 40
+        self.assertLess(len(name), 240)
+        self.assertTrue(any("UTF-16" in issue for issue in unsafe_filename(name)))
+
+    def test_windows_extended_reserved_devices(self):
+        for name in ("COM¹", "COM².txt", "LPT³.log", "CONIN$", "CONOUT$.txt"):
+            with self.subTest(name=name):
+                self.assertTrue(
+                    any("reserved Windows" in issue for issue in unsafe_filename("folder/" + name))
+                )
+
     def test_remove_existing_bad_file(self):
         old = "legacy/con.txt"
         self.assertEqual(check_paths({old}, set()), [])
