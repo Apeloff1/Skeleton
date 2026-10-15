@@ -49,6 +49,8 @@ TEST_MODULES = (
     "skeleton.testing.test_game_rom_cpu_timer",
     "skeleton.testing.test_game_rom_dma_timing",
     "skeleton.testing.test_game_original_cpu_bus_arbitration",
+    "skeleton.testing.test_game_rom_serial_port",
+    "skeleton.testing.test_game_original_serial_source_acceptance",
     "skeleton.testing.test_game_original_cpu_conformance",
     "skeleton.testing.test_game_original_cpu_interrupts",
     "skeleton.testing.test_game_rom_instruction_divergence",
