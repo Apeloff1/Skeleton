@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.audit_original_gameboy_bus_arbitration import (
     OriginalBusError,
@@ -49,6 +50,18 @@ class OriginalCPUAndVideoBusProofs(unittest.TestCase):
             )
             with self.assertRaises(AcceptanceSuiteError):
                 _verify_cpu_bus_arbitration(Path(d))
+
+    def test_dropped_HRAM_write_cannot_pass_original_source_bus_audit(self):
+        original_write = GameBoyMachine.write
+
+        def invalid_write(core, address, value):
+            if core._cpu_bus_active and (address & 0xFFFF) == 0xFF90:
+                return
+            return original_write(core, address, value)
+
+        with patch.object(GameBoyMachine, "write", invalid_write):
+            with self.assertRaises(OriginalBusError):
+                audit_original_bus_arbitration()
 
     def test_CPU_bus_context_is_cleared_after_decode_errors(self):
         machine = GameBoyMachine(_cartridge(0xD3))
