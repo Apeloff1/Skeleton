@@ -53,6 +53,7 @@ class DMGEdgeTimerCases(unittest.TestCase):
         self.assertEqual(core.read(0xFF05), 2)
         core.write(0xFF07, 0xFD)
         self.assertEqual(core.memory[0xFF07], 5)
+        self.assertEqual(core.read(0xFF07), 0xFD)  # Unused TAC bits read high on DMG.
 
     def test_tima_overflow_reloads_tma_after_four_t_cycles(self):
         core = machine()
