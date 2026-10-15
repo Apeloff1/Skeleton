@@ -52,9 +52,9 @@ def fixture():
             "actual_steps": 12,
             "actual_tabular_q_updates": 12,
             "training_commit": True,
+            "verified_training_projection_sha256": [],
             "scrutiny_checks": {"check_" + str(i): True for i in range(10)},
         }
-        receipt["receipt_digest"] = _digest(receipt)
         receipts.append(receipt)
         for index in range(1, 13):
             action = ("idle", "a", "left")[(index + episode) % 3]
@@ -82,6 +82,23 @@ def fixture():
                 "truncated": index == 12,
                 "source": "independently_replayed_emulator_transition",
             })
+            sample = samples[-1]
+            projection = {
+                "sequence": sample["sequence"],
+                "observation": sample["observation"],
+                "action": sample["action"],
+                "next_observation": sample["next_observation"],
+                "reward": sample["measured_reward"],
+                "reward_components": sample["measured_reward_components"],
+                "terminated": sample["terminated"],
+                "truncated": sample["truncated"],
+            }
+            sample["verified_training_projection_sha256"] = _digest(projection)
+            receipt["verified_training_projection_sha256"].append(
+                sample["verified_training_projection_sha256"]
+            )
+    for receipt in receipts:
+        receipt["receipt_digest"] = _digest(receipt)
     policy["snapshot_digest"] = _digest(policy)
     dataset = {
         "schema_version": "skeleton.game.emulator_neural_candidate_data.v1",
@@ -147,6 +164,32 @@ class MeasuredNeuralWorldModelTests(unittest.TestCase):
     def test_training_evidence_tampering_is_not_a_source_receipt(self):
         evidence, policy = fixture()
         evidence["neural_candidate_dataset"]["candidate_samples"][0]["measured_reward"] = 999
+        with self.assertRaises(EmulatorNeuralError):
+            verify_neural_training_sources(evidence, policy)
+
+    def test_rehashed_candidate_cannot_swap_source_verified_action_or_reward(self):
+        evidence, policy = fixture()
+        candidate = evidence["neural_candidate_dataset"]["candidate_samples"][0]
+        candidate["action"] = "a" if candidate["action"] != "a" else "left"
+        candidate["verified_training_projection_sha256"] = _digest({
+            "sequence": candidate["sequence"],
+            "observation": candidate["observation"],
+            "action": candidate["action"],
+            "next_observation": candidate["next_observation"],
+            "reward": candidate["measured_reward"],
+            "reward_components": candidate["measured_reward_components"],
+            "terminated": candidate["terminated"],
+            "truncated": candidate["truncated"],
+        })
+        dataset = evidence["neural_candidate_dataset"]
+        dataset["dataset_digest"] = _digest(dataset["candidate_samples"])
+        reconstructed = {k: v for k, v in evidence.items()
+                         if k not in ("report_digest", "evidence_digest", "policy_snapshot_digest")}
+        reconstructed["policy_snapshot"] = policy
+        evidence["report_digest"] = _digest(reconstructed)
+        evidence["evidence_digest"] = _digest({
+            k: v for k, v in evidence.items() if k != "evidence_digest"
+        })
         with self.assertRaises(EmulatorNeuralError):
             verify_neural_training_sources(evidence, policy)
 
