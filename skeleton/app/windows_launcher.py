@@ -150,9 +150,9 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
         return False, f"Unable to stop services: {type(exc).__name__}: {exc}"
     if completed.returncode == 0:
         return True, "Skeleton services stopped."
-    detail = (completed.stderr or completed.stdout or "").strip().splitlines()
-    tail = detail[-1][:300] if detail else f"exit {completed.returncode}"
-    return False, f"Stop command failed: {tail}"
+    # Docker may echo environment values in diagnostics. Do not surface
+    # unredacted child stderr/stdout in the installed GUI or CLI.
+    return False, f"Stop command failed with exit {completed.returncode}"
 
 
 def runtime_status(root: Path | None = None) -> tuple[bool, str]:
