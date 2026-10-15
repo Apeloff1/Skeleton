@@ -13,6 +13,7 @@ from skeleton.jeeves.game_comparison_live_http import LocalComparisonServer
 class FakeStudy:
     def __init__(self):
         self.steps=0
+        self.swaps=0
         self.closed=False
     def state(self):
         return {"schema_version":"synthetic-test-view","lanes":{}}
@@ -21,6 +22,9 @@ class FakeStudy:
         return {"status":"fake-test-only","accepted":packet}
     def reset(self,game_id):
         return {"status":"synthetic-reset","game_id":game_id}
+    def swap_disc(self, packet):
+        self.swaps+=1
+        return {"status":"synthetic_disc_transaction","request":packet}
     def export_evidence(self):
         return {"schema_version":"synthetic-no-native-evidence"}
     def close(self):
@@ -74,6 +78,27 @@ class LocalOriginContracts(unittest.TestCase):
         )
         self.assertEqual(status,200)
         self.assertEqual(self.study.steps,1)
+
+    def test_disc_swap_requires_origin_token_and_cannot_accept_unauthorized_calls(self):
+        packet={"game_id":"synthetic","image_index":1}
+        status,_=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            origin=self.base,
+        )
+        self.assertEqual(status,403)
+        status,_=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            token=self.server.secret,origin="https://other.example",
+        )
+        self.assertEqual(status,403)
+        self.assertEqual(self.study.swaps,0)
+        status,result=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            token=self.server.secret,origin=self.base,
+        )
+        self.assertEqual(status,200)
+        self.assertEqual(result["status"],"synthetic_disc_transaction")
+        self.assertEqual(self.study.swaps,1)
 
     def test_home_page_restrictive_security_policy(self):
         request=urllib.request.Request(self.base+"/")
