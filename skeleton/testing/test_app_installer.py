@@ -338,3 +338,23 @@ def test_setup_reconciles_local_mongo_uri_with_preserved_root_credentials(tmp_pa
     assert f"admin:{root_password}@mongo:27017" in values["SKL_MONGO_URI"]
     assert {"MONGO_URL", "SKL_MONGO_URI"} <= set(result.configured_keys)
     assert not ensure_runtime_environment(tmp_path).changed
+
+def test_failed_compose_receipts_never_include_child_process_secrets(tmp_path):
+    from skeleton.app.installer import _run
+
+    secret = "super-secret-bootstrap-password"
+    def runner(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command, 17,
+            stdout=f"MONGO_URL=mongodb://admin:{secret}@mongo:27017/app",
+            stderr=f"JWT_SECRET={secret}",
+        )
+    phase = _run(
+        ("docker", "compose", "config"),
+        root=tmp_path, runner=runner, label="compose-config",
+    )
+    assert phase.ok is False
+    assert "exited 17" in phase.detail
+    assert secret not in repr(phase.to_dict())
+    assert "MONGO_URL" not in repr(phase.to_dict())
+    assert "JWT_SECRET" not in repr(phase.to_dict())
