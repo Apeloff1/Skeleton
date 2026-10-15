@@ -337,6 +337,45 @@ def _runtime_env(root: Path, environ: Mapping[str, str] | None) -> dict[str, str
     return values
 
 
+def public_service_urls(
+    root: Path,
+    *,
+    manifest: AssemblyManifest | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Resolve host-facing service addresses from the same Compose port inputs.
+
+    The application manifest documents default public URLs, while Compose
+    permits changing published host ports to avoid conflicts. The launcher
+    and installed readiness checks must probe the actual configured ports.
+    Invalid port overrides fail closed rather than probing the wrong service.
+    """
+    from urllib.parse import urlsplit, urlunsplit
+
+    manifest = manifest or load_manifest()
+    values = _runtime_env(root, environ)
+    ports = {
+        "frontend": "FRONTEND_PORT",
+        "backend": "BACKEND_PORT",
+        "skeleton": "SKELETON_PORT",
+    }
+    result: dict[str, str] = {}
+    for service_name, key in ports.items():
+        port_text = values.get(key, "").strip()
+        if not port_text:
+            continue
+        if not port_text.isascii() or not port_text.isdecimal() or not 1 <= int(port_text) <= 65535:
+            raise ValueError(f"{key} must be an integer between 1 and 65535")
+        original = manifest.service(service_name).public_url
+        parsed = urlsplit(original)
+        if parsed.scheme not in {"http", "https"} or parsed.hostname not in {"localhost", "127.0.0.1"}:
+            raise ValueError(f"{service_name} has a non-local public URL; port override rejected")
+        result[service_name] = urlunsplit(
+            (parsed.scheme, f"{parsed.hostname}:{int(port_text)}", parsed.path, "", "")
+        )
+    return result
+
+
 def _usable_secret(value: str) -> bool:
     stripped = value.strip()
     if not stripped:
