@@ -520,6 +520,14 @@
       "conditions": "Fail closed on mismatched declared pins, unsafe relative paths, unknown hardware targets or approved ELF/firmware mismatch",
       "statuses": "static-pinned, deferred, approved-ELF-inspected, approved-invalid; none prove native game execution, emulator correctness or learned model weights",
       "notes": "This adds read-only audits and does not trigger compilation, native execution or CI workflows"
+    },
+    "native_audio_evidence": {
+      "worker": "Per-command s16le PCM SHA-256; assert recorded sample count agrees with exactly 4 bytes per stereo frame.",
+      "host": "Reject native frame metadata, PCM byte count or SHA mismatch before accepting audio observations or training traces.",
+      "savestates": "Restoring a previous savestate never fabricates old emitted PCM; restored frame has empty audio hash/counters.",
+      "trace": "Canonical offline native episode exports bind frame/PCM SHA-256 to controls and upstream source lineage.",
+      "verified_native_runtime": false,
+      "tests_run_in_this_change": false
     }
   }
 }

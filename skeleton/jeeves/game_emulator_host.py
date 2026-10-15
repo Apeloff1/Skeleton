@@ -175,6 +175,7 @@ def _frame_metadata(value: object) -> dict[str, object]:
         "video_callbacks",
         "runs",
         "audio_frames",
+        "audio_sha256",
         "sample_rate",
         "fps",
         "audio_available",
@@ -199,6 +200,7 @@ def _frame_metadata(value: object) -> dict[str, object]:
     ):
         _int(value[key], lower, upper, key)
     _sha(value["pixel_sha256"])
+    _sha(value["audio_sha256"])
     for key, upper in (("sample_rate", 384000), ("fps", 1000)):
         item = value[key]
         if item is not None and (
@@ -874,6 +876,8 @@ class EmulatorEnvironment:
             or not isinstance(audio, bytes)
             or len(audio) % 4
             or len(audio) > 131072 * 4
+            or len(audio) // 4 != metadata["audio_frames"]
+            or hashlib.sha256(audio).hexdigest() != metadata["audio_sha256"]
         ):
             raise EmulatorHostError("native_frame_corrupt", "Actual frame/audio geometry or checksum differs")
         change = (
@@ -958,6 +962,7 @@ class EmulatorEnvironment:
             "native_runs": metadata["runs"],
             "video_callbacks": metadata["video_callbacks"],
             "audio_frames": metadata["audio_frames"],
+            "audio_sha256": metadata["audio_sha256"],
             "reward_components": rewards,
             "observation": observation,
             "previous_transition_digest": previous,
@@ -1144,7 +1149,15 @@ class EmulatorEnvironment:
         self._audio_generation = audio_generation
         self._controls = controls
         self._pixels = None
-        self._accept_frame(frame, {"pixels": pixels, "audio": b""})
+        # Audio callback buffers are not savestate content. The restored state
+        # has an empty PCM boundary even if the saved frame emitted audio.
+        restored_frame = {
+            **frame,
+            "audio_frames": 0,
+            "audio_available": False,
+            "audio_sha256": hashlib.sha256(b"").hexdigest(),
+        }
+        self._accept_frame(restored_frame, {"pixels": pixels, "audio": b""})
         observation = snapshot["observation"]
         if (
             not isinstance(observation, Mapping)
@@ -1275,6 +1288,7 @@ def capture_emulator_trace(
                 "native_runs": evidence["native_runs"],
                 "video_callbacks": evidence["video_callbacks"],
                 "audio_frames": evidence["audio_frames"],
+                "audio_sha256": evidence["audio_sha256"],
             },
         }
         transitions.append(row)

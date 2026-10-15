@@ -539,12 +539,16 @@ class NativeCore:
             "video_callbacks": self.video_calls,
             "runs": self.runs,
             "audio_frames": self.audio_frames,
+            "audio_sha256": hashlib.sha256(self.audio).hexdigest(),
             "sample_rate": self.av.timing.sample_rate or None,
             "fps": self.av.timing.fps or None,
             "audio_available": self.audio_frames > 0,
             "shutdown": self.shutdown,
         }
-        return metadata, {"pixels": pixels, "audio": bytes(self.audio)}
+        audio = bytes(self.audio)
+        if len(audio) != self.audio_frames * 4:
+            raise ValueError("native PCM bytes differ from libretro callback frame count")
+        return metadata, {"pixels": pixels, "audio": audio}
 
     def command(
         self, operation: str, payload: dict[str, object], blocks: dict[str, bytes]
