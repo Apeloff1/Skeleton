@@ -248,18 +248,30 @@ def inspect(
                 all_cases = train + tuple(case for examples in heldout.values() for case in examples)
                 coverage = _token_coverage(model, all_cases)
                 planned_new_tokens = 0
+                effective_coverage = coverage
                 if coverage < 0.80:
                     if allow_vocabulary_expansion:
+                        # Simulate token expansion on this private restored
+                        # CLONE, using training examples only. Never build
+                        # a token dictionary from held-out reference strings.
+                        from hashlib import sha256 as _hash
+                        seed_digest = _hash(_canonical(snap)).hexdigest()
                         if is_torch:
-                            from .jeeves_torch_game_vocabulary import planned_new_words
-                            planned_new_tokens = len(planned_new_words(model, all_cases))
+                            from .jeeves_torch_game_vocabulary import expand_torch_game_words
+                            changed = expand_torch_game_words(
+                                model, train, expected_snapshot_digest=seed_digest,
+                            )
                         else:
-                            from .jeeves_game_vocabulary import planned_new_pieces
-                            planned_new_tokens = len(planned_new_pieces(model, all_cases))
+                            from .jeeves_game_vocabulary import expand_native_game_pieces
+                            changed = expand_native_game_pieces(
+                                model, train, expected_snapshot_digest=seed_digest,
+                            )
+                        planned_new_tokens = changed["new_tokens"]
+                        effective_coverage = _token_coverage(model, all_cases)
+                        if effective_coverage < 0.80:
+                            blockers.append("vocabulary_still_below_80_percent_after_train_only_growth")
                     else:
                         blockers.append("game_curriculum_vocabulary_coverage_below_80_percent")
-                elif allow_vocabulary_expansion:
-                    planned_new_tokens = 0
                 diagnostics.update({
                     "checkpoint_path": str(path.resolve()),
                     "checkpoint_sha256": live_hash,
@@ -271,6 +283,8 @@ def inspect(
                     "training_examples": len(train),
                     "evaluation_examples": sum(map(len, heldout.values())),
                     "vocabulary_coverage": round(coverage, 6),
+                    "predicted_coverage_after_train_only_growth": round(effective_coverage, 6),
+                    "heldout_tokens_used_for_vocabulary_growth": False,
                     "vocabulary_expansion_requested": allow_vocabulary_expansion,
                     "vocabulary_new_token_budget": planned_new_tokens,
                     "existing_weights_must_be_preserved": True,
