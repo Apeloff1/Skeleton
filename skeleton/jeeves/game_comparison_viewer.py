@@ -121,6 +121,11 @@ function card(id,phase){
  if(g.study_local_tabular_training){c.append(txt("div","Study-local Q updates: "+g.study_local_tabular_training.updates_applied+" • policy "+g.study_local_tabular_training.trained_policy_sha256+" • NOT production LLM weights","meta"))}
  c.append(txt("div","Frame "+p.frame_sha256+" • evidence "+p.evidence_sha256,"meta"));
  c.append(txt("div","Mean pixel brightness "+Number(p.observations.screen_mean).toFixed(4)+" • Audio RMS "+Number(p.observations.audio_rms).toFixed(4),"meta"));
+ if(p.signal_features){
+  const v=p.signal_features.video||{},a=p.signal_features.audio||{};
+  c.append(txt("div","Visual structure: luminance entropy "+Number(v.luminance_entropy_bits||0).toFixed(3)+" bits • edge ratio "+Number(v.scan_edge_ratio||0).toFixed(4)+" • mean color spread "+Number(v.mean_channel_range||0).toFixed(4),"meta"));
+  c.append(txt("div","Audio texture: silence fraction "+Number(a.silence_fraction||0).toFixed(4)+" • zero crossings "+Number(a.zero_crossing_fraction||0).toFixed(4)+" • stereo difference "+Number(a.stereo_energy_imbalance||0).toFixed(4),"meta"));
+ }
  return c
 }
 function renderSynthesis(){
@@ -149,6 +154,19 @@ function render(){
     ["Brightness absolute difference",Number(phaseMatch.screen_mean_absolute_difference).toFixed(6)],
     ["Audio RMS absolute difference",Number(phaseMatch.audio_rms_absolute_difference).toFixed(6)]
   ]){const box=txt("div","", "stat");box.append(txt("small",label),txt("strong",value));$("stats").append(box)}
+  const texture=phaseMatch.non_reconstructive_signal_texture_differences||{};
+  for(const [name,label] of [
+   ["video_luminance_entropy_bits_absolute_difference","Luminance entropy difference"],
+   ["video_scan_edge_ratio_absolute_difference","Visual edge difference"],
+   ["audio_zero_crossing_fraction_absolute_difference","Audio texture zero-crossing difference"],
+   ["audio_silence_fraction_absolute_difference","Audio silence difference"]
+  ]){
+   if(Number.isFinite(texture[name])){
+    const box=txt("div","", "stat");
+    box.append(txt("small",label),txt("strong",Number(texture[name]).toFixed(6)));
+    $("stats").append(box);
+   }
+  }
  }else{$("stats").append(txt("p","One or both games have no qualified native observations in this report.","warning"))}
  const ids=new Set([p.left_id,p.right_id]);
  const relevant=(report.series||[]).filter(row=>row.ordered_installments.some(item=>ids.has(item.game_id)));

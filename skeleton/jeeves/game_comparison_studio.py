@@ -76,6 +76,7 @@ def _observe_one(
     timeout_seconds: float,
 ) -> dict[str, Any]:
     from .game_emulator_host import create_emulator_environment
+    from .game_comparison_signal_features import describe_native_frame, describe_native_audio
 
     if cancelled is not None and cancelled():
         raise ComparativeStudyError("Operator cancelled the comparative study")
@@ -131,6 +132,10 @@ def _observe_one(
                     "observations": {
                         name: float(step.observation[name])
                         for name in ("screen_mean", "visual_change", "audio_rms", "step_fraction")
+                    },
+                    "signal_features": {
+                        "video": describe_native_frame(env._pixels, frame["width"], frame["height"]),
+                        "audio": describe_native_audio(env._audio, frame["sample_rate"]),
                     },
                     "reward_semantics": "visual difference, not victory",
                     "transition_sha256": step.transition_digest,
@@ -209,8 +214,11 @@ def _pair_report(pair: Mapping[str, Any], results: Mapping[str, dict]) -> dict[s
     if not a or not b or a.get("status") != "actual_native_observations_captured" or b.get("status") != "actual_native_observations_captured":
         return report
     report["status"] = "paired_native_observations_available"
+    from .game_comparison_signal_features import compare_native_texture
+
     for phase in PHASES:
         left, right = a["phases"][phase], b["phases"][phase]
+        texture = compare_native_texture(left["signal_features"], right["signal_features"])
         report["phase_comparisons"].append({
             "phase": phase,
             "left_evidence_ref": left["evidence_ref"],
@@ -222,6 +230,7 @@ def _pair_report(pair: Mapping[str, Any], results: Mapping[str, dict]) -> dict[s
             "screen_mean_absolute_difference": abs(left["observations"]["screen_mean"] - right["observations"]["screen_mean"]),
             "audio_rms_absolute_difference": abs(left["observations"]["audio_rms"] - right["observations"]["audio_rms"]),
             "resolution_equal": (left["width"], left["height"]) == (right["width"], right["height"]),
+            "non_reconstructive_signal_texture_differences": texture,
             "accuracy_winner": None,
         })
     return report

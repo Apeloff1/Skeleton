@@ -747,6 +747,29 @@
       "evidence": "Comparative result includes per-batch preflight free bytes, budget bytes, wave sizes and actual peak session limit",
       "hardware_tested": false,
       "unit_contract_tests": "tests/test_game_comparison_scheduler.py added; no native ROM run in this code patch"
+    },
+    "av_texture_features": {
+      "status": "Implemented, native gameplay qualification not performed in code session",
+      "owner": "skeleton/jeeves/game_comparison_signal_features.py",
+      "visual_features": [
+        "bounded 16-bin luminance histogram",
+        "luminance entropy",
+        "dark and bright pixel ratios",
+        "scanline edge-change density",
+        "normalized RGB means and channel spread"
+      ],
+      "audio_features": [
+        "actual PCM mono and per-channel RMS",
+        "stereo RMS imbalance",
+        "zero crossing fraction",
+        "normalized sample step changes",
+        "near-silence fraction",
+        "saturation peak fraction"
+      ],
+      "sampling_bounds": "At most 8192 RGB pixels and 4096 stereo PCM frames sampled per stage; no reconstruction or original content storage in feature record",
+      "integration": "All three per-game native checkpoints and their pairwise objective comparisons, Dragon/Jeeves synthesis and HTML viewer",
+      "semantics": "Signal texture is not a sound/music genre classifier, camera tracker, plot comprehension model, mechanical quality winner or AI weight gain",
+      "tests": "tests/test_game_comparison_signal_features.py added; no native-game run"
     }
   }
 }

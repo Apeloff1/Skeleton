@@ -79,6 +79,7 @@ def synthesize_comparative_report(report: Mapping[str, object]) -> dict[str, Any
                     "audio_rms_difference": p["audio_rms_absolute_difference"],
                     "same_pixel_bytes": p["same_exact_frame_sha256"],
                     "same_pcm_bytes": p["same_exact_audio_sha256"],
+                    "non_reconstructive_av_texture_differences": p.get("non_reconstructive_signal_texture_differences", {}),
                     "evidence_refs": [p["left_evidence_ref"], p["right_evidence_ref"]],
                     "same_gameplay_quality": None,
                 }
