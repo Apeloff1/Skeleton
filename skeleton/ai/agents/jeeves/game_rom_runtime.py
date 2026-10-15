@@ -127,6 +127,14 @@ class GameBoyMachine:
         # An overflow enters a four T-cycle TIMA=00 interval before TMA
         # reload and timer IF bit request. This is saved with CPU state.
         self.timer_reload_delay = 0
+        # DMG OAM DMA: four-T-cycle startup followed by one byte per four
+        # T-cycles. The source is the cartridge/WRAM bus, never fabricated
+        # pre-copied OAM; unsupported FF46 source pages fail closed.
+        self.dma_active = False
+        self.dma_source = 0
+        self.dma_index = 0
+        self.dma_tcycles = 0
+        self.dma_startup = 0
         # Battery-backed wall time is intentionally unavailable. RTC grows
         # only through executed CPU cycles and is sealed in source snapshots.
         self.rtc_regs = [0, 0, 0, 0, 0]
@@ -167,6 +175,24 @@ class GameBoyMachine:
     def _timer_apply_edge(self, old_signal: bool) -> None:
         if old_signal and not self._timer_signal():
             self._timer_tick()
+
+    def _dma_tick(self) -> None:
+        if not self.dma_active:
+            return
+        if self.dma_startup:
+            self.dma_startup -= 1
+            return
+        self.dma_tcycles += 1
+        if self.dma_tcycles < 4:
+            return
+        self.dma_tcycles = 0
+        # This CPU interpreter has not yet implemented DMA CPU bus blocking.
+        # Read the source on the actual transfer tick, not at FF46 write.
+        # The PPU can therefore observe the in-flight OAM byte progression.
+        self.memory[0xFE00 + self.dma_index] = self.read(self.dma_source + self.dma_index)
+        self.dma_index += 1
+        if self.dma_index == 160:
+            self.dma_active = False
 
     def _rtc_advance(self, cycles: int) -> None:
         """Advance the virtual clock in O(1), never using host wall time."""
@@ -343,9 +369,16 @@ class GameBoyMachine:
                 self.memory[0xFF0F] |= 0x10
             return
         if address == 0xFF46:
+            if value > 0xDF:
+                # $E0-$FF source pages have bus-dependent DMG behavior not
+                # modeled by this interpreter: reject rather than invent.
+                raise GameRomRuntimeError("Unsupported OAM DMA source outside ROM/WRAM bus pages")
             self.memory[address] = value
-            for i in range(160):
-                self.memory[0xFE00 + i] = self.read(value * 256 + i)
+            self.dma_source = value << 8
+            self.dma_index = 0
+            self.dma_tcycles = 0
+            self.dma_startup = 4
+            self.dma_active = True
             return
         if address == 0xFF40 and not value & 0x80:
             self.memory[0xFF44] = self.line_cycles = 0
@@ -735,6 +768,7 @@ class GameBoyMachine:
             old_signal = self._timer_signal()
             self.divider = (self.divider + 1) & 65535
             self._timer_apply_edge(old_signal)
+            self._dma_tick()
         self.cycles += cycles
         self._rtc_advance(cycles)
         if not self.memory[0xFF40] & 0x80:
@@ -835,6 +869,11 @@ class GameBoyMachine:
             "instructions",
             "stat_line",
             "timer_reload_delay",
+            "dma_active",
+            "dma_source",
+            "dma_index",
+            "dma_tcycles",
+            "dma_startup",
         )
         result = {
             "schema_version": 1,
@@ -890,6 +929,10 @@ class GameBoyMachine:
             "pc": 65535,
             "ime_delay": 2,
             "timer_reload_delay": 4,
+            "dma_source": 0xDF00,
+            "dma_index": 160,
+            "dma_tcycles": 3,
+            "dma_startup": 4,
             "rom_bank": (
                 511 if self.metadata["mapper"] == "mbc5"
                 else 127 if self.metadata["mapper"] == "mbc3"
@@ -922,6 +965,18 @@ class GameBoyMachine:
             raise GameRomRuntimeError("ROM snapshot flag/bank is invalid")
         if registers["instructions"] * 4 > registers["cycles"]:
             raise GameRomRuntimeError("ROM snapshot CPU counters are inconsistent")
+        if (
+            registers["dma_source"] & 255
+            or (registers["dma_active"] and registers["dma_index"] == 160)
+            or (not registers["dma_active"] and (
+                registers["dma_tcycles"] or registers["dma_startup"]
+                or registers["dma_index"] not in (0, 160)
+            ))
+            or (registers["dma_startup"] and (
+                registers["dma_index"] != 0 or registers["dma_tcycles"] != 0
+            ))
+        ):
+            raise GameRomRuntimeError("ROM snapshot contains impossible in-flight OAM DMA state")
         # A DIV/TAC write can trigger timer overflow even at source cycle
         # zero. The bounded pending phase is legal regardless of instruction
         # count, so only its 0..4 range is validated above.
@@ -941,6 +996,8 @@ class GameBoyMachine:
             if len(data) != length:
                 raise GameRomRuntimeError("ROM snapshot memory length is invalid")
             decoded[name] = bytearray(data)
+        if registers["dma_active"] and decoded["memory"][0xFF46] != registers["dma_source"] >> 8:
+            raise GameRomRuntimeError("OAM DMA source and programmed bus register differ")
         if decoded["memory"][0xFF44] > 153 or any(
             pixel not in (0, 85, 170, 255) for pixel in decoded["framebuffer"]
         ):
