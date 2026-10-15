@@ -424,6 +424,7 @@ def run_emulator_training_lab(
     )
     seen: set[str] = set()
     evidence: list[dict[str, Any]] = []
+    neural_candidate_samples: list[dict[str, Any]] = []
     boomerangs: list[dict[str, Any]] = []
     ring: list[dict[str, Any]] = []
     measured_runs = 0
@@ -447,6 +448,24 @@ def run_emulator_training_lab(
         updates += result.updates
         steps += trace["steps"]
         measured_runs += 1
+        # Rights-admitted, exact replay-verified state/action examples become
+        # candidate training DATA only, never a promoted neural checkpoint.
+        # Held-out evaluator trajectories are deliberately excluded.
+        for row in trace["transitions"]:
+            neural_candidate_samples.append({
+                "trace_digest": trace["trace_digest"],
+                "environment_digest": learner.descriptor["environment_digest"],
+                "seed": trace["seed"],
+                "sequence": row["sequence"],
+                "observation": row["observation"],
+                "action": row["action"],
+                "next_observation": row["next_observation"],
+                "measured_reward": row["reward"],
+                "measured_reward_components": row["reward_components"],
+                "terminated": row["terminated"],
+                "truncated": row["truncated"],
+                "source": "independently_replayed_emulator_transition",
+            })
         receipt["new_visual_state_signatures"] = len(new_signatures)
         receipt["actual_tabular_q_updates"] = result.updates
         receipt["policy_snapshot_digest_after"] = learner.snapshot_digest
@@ -504,6 +523,18 @@ def run_emulator_training_lab(
         "stagnation_threshold": config.stagnation_runs,
         "audited_run_receipts": evidence,
         "boomerang_replay_receipts": boomerangs,
+        "neural_candidate_dataset": {
+            "schema_version": "skeleton.game.emulator_neural_candidate_data.v1",
+            "format": "finite_numeric_observation_action_reward_pairs",
+            "source": "replayed_emulator_q_training_only",
+            "training_sample_count": len(neural_candidate_samples),
+            "train_only_no_heldout_examples": True,
+            "candidate_samples": neural_candidate_samples,
+            "dataset_digest": _digest(neural_candidate_samples),
+            "training_executed": False,
+            "weights_updated": 0,
+            "production_promotion_authorized": False,
+        },
         "heldout_evaluation": evaluated,
         "limits": {
             "seed_does_not_guarantee_native_rng_control": request.kind == "libretro",
