@@ -51,7 +51,6 @@ class NativeTimePolicyContracts(unittest.TestCase):
 
     def test_partial_tiles_cover_non_divisible_geometry(self):
         width, height = 23, 17
-        pixels = bytes(range(3*width*height % 256))  # Overridden below with exact geometry.
         pixels = bytes(range(256)) * 4 + bytes(range(3*width*height-1024))
         report = inspect_rgb_frame(pixels, width, height, hashlib.sha256(pixels).hexdigest(), "b"*64, 1)
         total = sum(t["width"]*t["height"] for t in report["tiles"])
