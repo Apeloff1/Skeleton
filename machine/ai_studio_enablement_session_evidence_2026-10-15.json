@@ -99,14 +99,14 @@
     }
   },
   "final_integration_qualification": {
-    "status": "all_source_implemented_native_fix_requalification_and_final_image_pending",
+    "status": "completed_with_declared_scope_and_limits",
     "native_api_union": {
       "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/integration/native-api-union.json",
       "sha256": "b88e11dba866f95ecfcca33334644e59c439274152dead8b7dc67c88f97f629b"
     },
     "source_health": {
-      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/final-source-ready-health.json",
-      "sha256": "866adfd050bad449fba27a9738d6e273134cea58d7a93e2a3a784fc697d9b5e6"
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/final-native-actions-source-ready-health.json",
+      "sha256": "3aa5669dbc79c8ebc6ccec05c486a5678458daf5c2299babeeadbf7b68e33109"
     },
     "native_builder": {
       "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/combined-native-tools-20261015-01/receipt.json",
@@ -114,7 +114,7 @@
     },
     "source_validation": {
       "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/changed-source-validation.json",
-      "sha256": "fdf98c72f617c46285c5b4f98faf40042ad179e22c9e12dfe5f277a53f6586cf"
+      "sha256": "c0f6dead595f13b1580fd8134c7c0c83755c3230607470a8f1648a2e27f46b44"
     },
     "lint_delta": {
       "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/lint-delta.json",
@@ -179,6 +179,53 @@
       "actual_ui_native_steps": 16,
       "final_javascript_errors": 0,
       "automated_tests_run": false
+    },
+    "runtime_code_commit": "fe29da41ba1cab0ddb59745c8fa9d6a469dabd05",
+    "production_image_build_snapshot": "97c3ad55c483c1c9c398382e946b30f45c774dcf",
+    "native_learning_and_play": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-native-v2/receipt.json",
+      "sha256": "ca1c1a6ba2c61ec85620a2e825001390dc0b62b6ba17c5f8662c11fd0bfe046d"
+    },
+    "production_image": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/final-native-actions-backend-proof/actual-production-backend-upgrade-qualification.json",
+      "sha256": "ef034537625cb7b4d45297e75f7f08665f71134ffb79190541a692e65c7980a8"
+    },
+    "quiescence": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/final-studio-quiescence.json",
+      "sha256": "24b644b38bf1257ff55287d88aedc33334fa37bf849a6f701220420ddcebd24d"
+    },
+    "qualified_repository_source_snapshot": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/qualified-repository-sources.json",
+      "sha256": "2d591a46d1f5828075904b1aab91188540038a722725140f06b10a3c2b6a0c5a"
+    },
+    "native_observations": {
+      "artifact_sha256": "7fe00d91fe474502536ea3f128571032c6d95e68fb10ec883e41271e9f3f17d5",
+      "actual_actors": 2,
+      "committed_episodes": 2,
+      "committed_updates": 32,
+      "policy_id": "c4b75d12-78be-5304-835f-4e7872869dff",
+      "actual_play_steps": 16,
+      "play_status": "stopped",
+      "all_observed_actor_processes_exited": true,
+      "finite_actions": 31,
+      "trusted_authored_kernel_ram": true,
+      "commercial_rom_semantics_inferred": false,
+      "paired_heldout_seeds": 1,
+      "general_quality_certified": false
+    },
+    "production_observations": {
+      "image_id": "sha256:8bfbd3b38fcc518b41c7156f8c813082f060bf47f3ea84fc6ea61bf75d2cf522",
+      "image_bytes": 1110002995,
+      "uid": 10001,
+      "all_materialized_files": 45201,
+      "all_source_bytes_match_build_snapshot": true,
+      "source_overlays_present": false,
+      "auth_and_private_store_upgrade_restart_verified": true,
+      "runtime_containers_retired": true,
+      "volumes_models_and_image_retained": true,
+      "engine_configured_in_container": false,
+      "full_stack_or_native_execution_in_container_proven": false,
+      "later_evidence_only_commit": "The final evidence file is a metadata descendant of97c3ad55. Runtime code remains fe29da41; no self-referential image/exact-final-metadata claim."
     }
   },
   "limitations": [
@@ -213,7 +260,7 @@
     },
     "first_output": "Premature completion blocked against four unverified host checks; no fabricated work",
     "strict_output": "Real console.edit decision with empty payload blocked by owner before mutation; no fabricated edit",
-    "next_correction": "Operation-specific schemas are implemented and statically compiled for all41 operations; bounded actual model committed edit and binary build.",
+    "next_correction": "No source correction pending in this session. Operation-specific forms are implemented; reliable autonomous planning and source-export completion remain model-quality limitations.",
     "ai_built_complete_game_verified": false,
     "operation_specific_schema": {
       "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/typed-schema-compilation-final-bounded.json",
@@ -232,11 +279,33 @@
     "binary_build_verified": true,
     "preview_verified": false,
     "export_verified": false,
-    "final_status": "blocked",
     "remaining_model_limitation": "Third decision supplied an invalid preview action; owner blocked it without fabricating playback. A complete autonomous workflow is unverified.",
     "transport_recovery": {
       "initial_http_status": 504,
       "steps_per_resumed_advance": 1,
+      "terminal_retries": 0
+    },
+    "three_call_status": "blocked",
+    "latest_full_checklist_run": {
+      "receipt": {
+        "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/full-checklist-model-goal-20261015-final-01/receipt.json",
+        "sha256": "dad159d66e272026e84318d974913c8cbbc21625169b1f1b63a0c5c915784ae1"
+      },
+      "status": "blocked",
+      "model_calls": 8,
+      "committed_steps": 8,
+      "host_checks": {
+        "build": true,
+        "edit": true,
+        "export": false,
+        "preview": true
+      },
+      "full_checklist_verified": false,
+      "actual_native_preview_steps": 64,
+      "binary_export_executed": true,
+      "source_export_verified": false,
+      "limitation": "The small qualification model repeated binary export and omitted source export until its exact8-call budget stopped it. No completed workflow or game-quality claim.",
+      "transport_timeouts": 0,
       "terminal_retries": 0
     }
   },
@@ -255,9 +324,73 @@
     },
     "fixed_finite_policy_actions": 31,
     "rich_controller_apis_preserved": true,
-    "fresh_qualification_status": "pending_source_reload_and_fresh_job_no_old_checkpoint_relabel"
+    "fresh_qualification_status": "completed_fresh_job_policy_and_live_play_under_corrected_runtime",
+    "fresh_qualification": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-native-v2/receipt.json",
+      "sha256": "ca1c1a6ba2c61ec85620a2e825001390dc0b62b6ba17c5f8662c11fd0bfe046d"
+    }
   },
   "automated_tests_authored": false,
   "production_promotion_authorized": false,
-  "masterplan_completion_authorized": false
+  "masterplan_completion_authorized": false,
+  "required_source_gates": {
+    "architecture_map": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/architecture-final-publish.log",
+      "sha256": "cd93298aa9c93da31eca2b2a3a9a0f98a18715100f809fd76b88eb76c12a0599"
+    },
+    "app_construction": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/app-final-publish.log",
+      "sha256": "d53bdafe028f6863c4441a54a74a7484f7b40b26541a6c4bc7bda581038658d6"
+    },
+    "capability_interfaces": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/capabilities-final-publish.log",
+      "sha256": "e7079909f1187da2c36cad3e85658e5475a4f296d723733155baa4c3d9bd74f5"
+    },
+    "state_topology": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/state-final-publish.log",
+      "sha256": "b70ba568b5946ec1cbbfd573c9eeb50d84d62d3a74424a5bc3fa3e717f2f2dd8"
+    },
+    "enterprise_superiority": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/enterprise-final-publish.json",
+      "sha256": "4485054712b6bf575e2b057168e052ac7d090d66f3f15e62d3d759872dae67f6"
+    },
+    "enterprise_notes": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/enterprise-notes-final-publish.json",
+      "sha256": "4f705a30843b1f6db6c69bd5d18911f4a478bd678e474b5619552ba00237b9fc"
+    },
+    "ai_file_tree": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/file-tree-final-publish.log",
+      "sha256": "9e45935096fc8c0c6cfbe3171c839183be4967944e57a93e9c89a61c521ed43d"
+    },
+    "provider_bootstrap": {
+      "status": "pass",
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/provider-bootstrap-combined.log",
+      "sha256": "31b5b83189cbf6222a2b4796eac5f39f62da6446788ef03c58b3c43892b1b20a",
+      "scope_note": "Whole-tree provider gate passed during combined integration. Final typed planner/native-action corrections also passed final changed-source ownership/AST/compilation and lint-delta validation; no new provider/network surface."
+    }
+  },
+  "final_static_observations": {
+    "changed_python_sources_checked": 78,
+    "introduced_lint_diagnostics": 0,
+    "governed_mappings": 179,
+    "all_tool_schemas_compiled": 41,
+    "general_schema_engine_serialization_bytes": 60355,
+    "existing_schema_byte_cap": 65536,
+    "frontend_sources_qualified": 822,
+    "test_suites_added_or_run": false
+  },
+  "all_requested_features_complete": false,
+  "outstanding_scope": [
+    "Universal console/hardware coverage and complete per-console native editors are not established by the catalogue.",
+    "Arbitrary commercial ROM semantic understanding and game mastery remain unverified.",
+    "The small model did not complete the full autonomous export checklist, although real edit/build/preview/binary-export actions executed.",
+    "100,000-iteration quality improvement, AAA fidelity and guaranteed outperformance are unverified."
+  ]
 }
