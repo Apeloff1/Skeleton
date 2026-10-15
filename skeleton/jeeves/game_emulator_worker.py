@@ -86,6 +86,23 @@ class InputDescriptor(C.Structure):
     ]
 
 
+class DiskControlCallbacks(C.Structure):
+    """Stable first seven pointers in libretro v0 and v1 disk control ABI.
+
+    The v1 struct appends three fields. We intentionally read only the
+    compatible subset: no dynamic paths, replacing discs, or adding content.
+    """
+    _fields_ = [
+        ("set_eject_state", C.c_void_p),
+        ("get_eject_state", C.c_void_p),
+        ("get_image_index", C.c_void_p),
+        ("set_image_index", C.c_void_p),
+        ("get_num_images", C.c_void_p),
+        ("replace_image_index", C.c_void_p),
+        ("add_image_index", C.c_void_p),
+    ]
+
+
 class Geometry(C.Structure):
     _fields_ = [
         ("base_width", C.c_uint),
@@ -211,6 +228,8 @@ class NativeCore:
             raise ValueError("Native controller port topology is not a supported bounded declaration")
         self.controller_port_devices = tuple(declared_ports)
         self.input_descriptors: list[dict[str, object]] = []
+        self.disk_callbacks: dict[str, int] | None = None
+        self.disk_interface_version: int | None = None
         self.buffers: dict[str, object] = {}
         self.keys_previous: set[int] = set()
         self.keyboard = None
@@ -317,6 +336,7 @@ class NativeCore:
         # snapshot them into wire-safe metadata only after both phases.
         self.info["core_input_descriptors"] = list(self.input_descriptors)
         self.info["core_input_descriptors_are_user_defined"] = True
+        self.info["disk_control_interface_version"] = self.disk_interface_version
         self._check()
 
     def _buffer(self, key: str, value: str) -> int:
@@ -349,8 +369,25 @@ class NativeCore:
             if command == 7:
                 self.shutdown = True
                 return True
+            if command in (13, 58):
+                # libretro allows deregistration with NULL, e.g. on unload.
+                if not data:
+                    self.disk_callbacks = None
+                    self.disk_interface_version = None
+                    return True
+                table = C.cast(data, C.POINTER(DiskControlCallbacks)).contents
+                mandatory = ("set_eject_state", "get_eject_state", "get_image_index",
+                             "set_image_index", "get_num_images")
+                if any(not getattr(table, name) for name in mandatory):
+                    return False
+                self.disk_callbacks = {name: int(getattr(table, name)) for name in mandatory}
+                self.disk_interface_version = 1 if command == 58 else 0
+                return True
             if not data:
                 return False
+            if command == 57:
+                C.cast(data, C.POINTER(C.c_uint))[0] = 1
+                return True
             if command == 1:
                 rotation = C.cast(data, C.POINTER(C.c_uint))[0]
                 if rotation > 3:
@@ -459,6 +496,61 @@ class NativeCore:
         ) as exc:
             self.error = str(exc)[:512]
             return False
+
+    def _disk_call(self, name: str, restype, *arguments):
+        if self.disk_callbacks is None or name not in self.disk_callbacks:
+            raise ValueError("native_disk_control_unavailable")
+        return C.CFUNCTYPE(restype, *arguments)(self.disk_callbacks[name])
+
+    def disk_status(self) -> dict[str, object]:
+        if self.disk_callbacks is None:
+            return {
+                "supported": False, "interface_version": None,
+                "image_count": 0, "image_index": None, "ejected": None,
+            }
+        # Do not trust an arbitrary native library's declared capacity.
+        count = int(self._disk_call("get_num_images", C.c_uint)())
+        if not 1 <= count <= 32:
+            raise ValueError("native_disk_count_outside_bound")
+        index = int(self._disk_call("get_image_index", C.c_uint)())
+        if not 0 <= index < count:
+            raise ValueError("native_disk_index_outside_bound")
+        ejected = bool(self._disk_call("get_eject_state", C.c_bool)())
+        return {
+            "supported": True, "interface_version": self.disk_interface_version,
+            "image_count": count, "image_index": index, "ejected": ejected,
+        }
+
+    def swap_disc(self, index: int) -> dict[str, object]:
+        """Eject -> select a core-preloaded image -> insert; abort on any error.
+
+        There is deliberately no replace_image_index/add_image_index facility:
+        all media was pinned readonly when the sandbox started. On a partial
+        callback failure the worker returns an error and is torn down by host.
+        """
+        previous = self.disk_status()
+        if not previous["supported"] or previous["image_count"] < 2:
+            raise ValueError("native_multiple_discs_unavailable")
+        wanted = _integer(index, 0, previous["image_count"] - 1, "selected disc index")
+        if previous["ejected"]:
+            raise ValueError("native_disc_tray_unexpectedly_open")
+        if wanted == previous["image_index"]:
+            return {**previous, "previous_image_index": wanted, "changed": False}
+        eject = self._disk_call("set_eject_state", C.c_bool, C.c_bool)
+        select = self._disk_call("set_image_index", C.c_bool, C.c_uint)
+        if not eject(True):
+            raise ValueError("native_disc_eject_rejected")
+        if not self.disk_status()["ejected"]:
+            raise ValueError("native_disc_eject_not_confirmed")
+        if not select(wanted):
+            raise ValueError("native_disc_select_rejected")
+        if not eject(False):
+            raise ValueError("native_disc_insert_rejected")
+        current = self.disk_status()
+        if current["ejected"] or current["image_index"] != wanted or current["image_count"] != previous["image_count"]:
+            raise ValueError("native_disc_switch_unverified")
+        self._check()
+        return {**current, "previous_image_index": previous["image_index"], "changed": True}
 
     def _video(self, pointer: int, width: int, height: int, pitch: int) -> None:
         try:
@@ -644,6 +736,14 @@ class NativeCore:
                 if operation == "reset" and self.raw_video is not None:
                     break
             return self.frame()
+        if operation == "disc_status":
+            if payload or blocks:
+                raise ValueError("native_disc_status_request_requires_no_arguments")
+            return self.disk_status(), {}
+        if operation == "disc_swap":
+            if set(payload) != {"image_index"} or blocks:
+                raise ValueError("native_disc_swap_request_invalid")
+            return self.swap_disc(payload["image_index"]), {}
         if operation == "state_info":
             size = self.core.retro_serialize_size()
             return {"state_size": size}, {}
