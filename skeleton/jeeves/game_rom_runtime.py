@@ -234,6 +234,8 @@ class GameBoyMachine:
 
     def read(self, address: int) -> int:
         address &= 65535
+        if self._cpu_bus_active and self.dma_active and not 0xFF80 <= address <= 0xFFFE:
+            return 0xFF
         if address < 0x8000:
             if address < 0x4000:
                 bank = (self.bank_high << 5) if self.bank_mode and self.metadata["mapper"] == "mbc1" else 0
@@ -286,6 +288,8 @@ class GameBoyMachine:
 
     def write(self, address: int, value: int) -> None:
         address, value = address & 65535, value & 255
+        if self._cpu_bus_active and self.dma_active and not 0xFF80 <= address <= 0xFFFE:
+            return
         if address < 0x8000:
             mapper = self.metadata["mapper"]
             if mapper == "mbc1":
