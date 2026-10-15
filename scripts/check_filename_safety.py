@@ -44,11 +44,18 @@ def unsafe_filename(path: str) -> list[str]:
     """Return portability failures for a newly added/renamed path."""
     errors: list[str] = []
     try:
-        path.encode("utf-8", errors="strict")
+        utf8_length = len(path.encode("utf-8", errors="strict"))
+        utf16_length = len(path.encode("utf-16-le")) // 2
     except UnicodeEncodeError:
         return [f"{path!r}: path is not valid UTF-8"]
-    if not path or len(path.encode("utf-16-le")) // 2 > MAX_NEW_PATH_LENGTH:
-        errors.append(f"{path!r}: exceeds {MAX_NEW_PATH_LENGTH} Windows UTF-16 code-unit portable path limit")
+    # Git transports pathnames as UTF-8. Windows counts UTF-16 code units.
+    # Bound both, since a UTF-16-only check misses long UTF-8 names on
+    # byte-limited Linux, macOS and archive tooling.
+    if not path or max(utf8_length, utf16_length) > MAX_NEW_PATH_LENGTH:
+        errors.append(
+            f"{path!r}: exceeds {MAX_NEW_PATH_LENGTH}-unit portable path limit "
+            f"({utf8_length} UTF-8 bytes; {utf16_length} Windows UTF-16 units)"
+        )
     for component in path.split("/"):
         if not component or component in {".", ".."}:
             errors.append(f"{path!r}: empty or relative path component")
