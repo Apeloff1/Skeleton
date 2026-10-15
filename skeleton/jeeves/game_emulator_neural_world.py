@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 import random
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -39,6 +39,7 @@ class NeuralWorldConfig:
     clip_gradient: float = 3.0
     max_samples: int = 2048
     min_relative_holdout_gain: float = 0.01
+    max_compute_units: int = 50_000_000
 
     def __post_init__(self) -> None:
         for key, minimum, maximum in (
@@ -47,6 +48,7 @@ class NeuralWorldConfig:
             ("epochs", 1, 40),
             ("minibatch", 1, 64),
             ("max_samples", 32, 8192),
+            ("max_compute_units", 100_000, 300_000_000),
         ):
             item = getattr(self, key)
             if type(item) is not int or not minimum <= item <= maximum:
@@ -392,6 +394,8 @@ def _baseline_loss(
 def train_neural_world_from_evidence(
     evidence: Mapping[str, Any], policy: Mapping[str, Any], *,
     config: NeuralWorldConfig = NeuralWorldConfig(),
+    cancel: Callable[[], bool] | None = None,
+    authorize: Callable[[], None] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Execute actual bounded neural gradient updates on checksum-bound ROM receipts."""
     if not isinstance(config, NeuralWorldConfig):
@@ -402,6 +406,21 @@ def train_neural_world_from_evidence(
     train_rows = [_prepare(item, mean, std, reward_scale, len(actions)) for item in training]
     heldout_rows = [_prepare(item, mean, std, reward_scale, len(actions)) for item in validation]
     n_input, n_output, width = len(features) + len(actions), len(features) + 1, config.width
+    # The naive dense Python backprop kernel grows quadratically with hidden
+    # width. Bound its actual expected train-only sample count before any
+    # optimizer allocation. A budget failure does not create a checkpoint.
+    expected_compute_units = (
+        config.epochs * len(train_rows)
+        * (width * width + width * (n_input + n_output))
+    )
+    if expected_compute_units > config.max_compute_units:
+        raise EmulatorNeuralError(
+            "requested pure-Python neural workload exceeds the explicit preflight compute budget"
+        )
+    if cancel is not None and cancel():
+        raise EmulatorNeuralError("neural optimization cancelled before first step")
+    if authorize is not None:
+        authorize()
     params = _init_parameters(n_input, width, n_output, config.seed)
     moments = {name: [0.0] * len(items) for name, items in params.items()}
     squared = {name: [0.0] * len(items) for name, items in params.items()}
@@ -415,6 +434,10 @@ def train_neural_world_from_evidence(
         random.Random(int(_digest(["epoch", config.seed, epoch])[:15], 16)).shuffle(order)
         total_train_loss = 0.0
         for batch_start in range(0, len(order), config.minibatch):
+            if cancel is not None and cancel():
+                raise EmulatorNeuralError("neural optimization cancelled before an optimizer minibatch")
+            if authorize is not None:
+                authorize()
             indices = order[batch_start:batch_start + config.minibatch]
             gradients = {name: [0.0] * len(values) for name, values in params.items()}
             for index in indices:
@@ -511,6 +534,8 @@ def train_neural_world_from_evidence(
             "weight_decay": config.weight_decay,
             "gradient_clip_global_norm": config.clip_gradient,
             "seed": config.seed,
+            "actual_preflight_compute_units": expected_compute_units,
+            "maximum_approved_compute_units": config.max_compute_units,
         },
         "real_neural_optimizer_steps": optimizer_steps,
         "real_processed_source_training_examples": gradient_evaluations,
