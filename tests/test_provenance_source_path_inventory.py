@@ -37,6 +37,10 @@ LIVE_EXAMPLES = (
     ("packaging/windows/launcher_entry.py", "first-party"),
     ("README.md", "first-party"),
     ("satellites/gameforge-middleware/README.md", "first-party"),
+    ("data/conversational/README.md", "first-party"),
+    ("data/conversational/10X_CONVERSATIONAL_REPORT.md", "first-party"),
+    ("data/conversational/conversations_20k.jsonl", "first-party"),
+    ("data/conversational/pareto_snippets_500k.txt", "first-party"),
     ("skeleton/testing/data/frontier_npc_source_fixture.json", "fixture"),
     ("frontend/assets/images/icon.png", "binary"),
     ("backend/godot.artifact.json", "canonical"),
@@ -96,6 +100,11 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("volume_forge/assembly.py"), "first-party")
         self.assertEqual(policy.classify_path("volume_forge/subdir/manifest.json"), "first-party")
         self.assertEqual(policy.classify_path("volume_forge_not_owned/x.py"), "unknown")
+
+    def test_conversational_data_is_owned_without_whitelisting_other_data(self) -> None:
+        self.assertEqual(policy.classify_path("data/conversational/README.md"), "first-party")
+        self.assertEqual(policy.classify_path("data/conversational/pareto_snippets_500k.txt"), "first-party")
+        self.assertEqual(policy.classify_path("data/unreviewed/secret.csv"), "unknown")
 
     def test_skeleton_build_package_is_canonical_not_generated(self) -> None:
         self.assertEqual(
