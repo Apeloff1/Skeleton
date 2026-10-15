@@ -373,6 +373,27 @@ def simulate_once(scene: dict[str, Any], controls: dict[str, int], *,
             issues[issue] = issues.get(issue, 0) + 1
     sampled = [dict(trace[i]) for i in sorted({0, len(trace)//4, len(trace)//2,
                                                3*len(trace)//4, len(trace)-1})]
+    # Capture per-shot pan ranges, actor props, costume and failure rates.
+    # Data is recorded for each executed frame; metrics do not invent video.
+    metrics = []
+    for shot in controller.scene["shots"]:
+        rows = [e for e in trace if e["shot"] == shot["id"]]
+        metrics.append({
+            "shot_id": shot["id"], "camera_mode": shot["camera"]["mode"],
+            "frames": len(rows),
+            "yaw_range_deg": [min(x["yaw_deg"] for x in rows),
+                              max(x["yaw_deg"] for x in rows)],
+            "pitch_range_deg": [min(x["pitch_deg"] for x in rows),
+                                max(x["pitch_deg"] for x in rows)],
+            "fov_range_deg": [min(x["fov_deg"] for x in rows),
+                              max(x["fov_deg"] for x in rows)],
+            "minimum_focus_distance_mm": min(x["focus_distance_mm"] for x in rows),
+            "item_variants_seen": sorted({x["item"] for x in rows}),
+            "apparel_variants_seen": sorted({x["apparel"] for x in rows}),
+            "issue_frames": sum(bool(x["issues"]) for x in rows),
+            "first_observation_digest": rows[0]["digest"],
+            "last_observation_digest": rows[-1]["digest"],
+        })
     summary = {
         "schema_version": "skeleton.jeeves.cinematic_sim_receipt.v1",
         "source_digest": controller.validation["source_digest"],
@@ -384,6 +405,7 @@ def simulate_once(scene: dict[str, Any], controls: dict[str, int], *,
                               "issues": issues, "source_verified": True},
                   "reverse": reverse},
         "sampled_observations": sampled,
+        "per_shot_metrics": metrics,
         "camera_motion_observed": True, "cinematic_quality_established": False,
         "cloth_physics_rendered": False, "audio_generated": False,
         "video_rendered": False, "training_steps": 0,
@@ -428,6 +450,10 @@ def run_batch(scene: dict[str, Any], *, variations: tuple[dict[str, int], ...],
     # A different seed with exactly the same deterministic trace is still NOT
     # novel data. Report unique traces separately from executed variants.
     distinct_traces = len({r["forward_head_digest"] for r in results})
+    aggregate_issues: dict[str, int] = {}
+    for row in results:
+        for issue, count in row["audit"]["forward"]["issues"].items():
+            aggregate_issues[issue] = aggregate_issues.get(issue, 0) + count
     report = {
         "schema_version": REPORT_SCHEMA, "project": validated["project"],
         "scene_source_sha256": validated["source_digest"],
@@ -436,6 +462,13 @@ def run_batch(scene: dict[str, Any], *, variations: tuple[dict[str, int], ...],
         "audit_passes_on_same_data": 2, "independent_sgd_exposures": 0,
         "unique_trace_digests": distinct_traces,
         "duplicates_not_counted_as_new_training": len(results) - distinct_traces,
+        "aggregate_issue_counts": aggregate_issues,
+        "camera_modes_observed": sorted({
+            shot["camera"]["mode"] for shot in scene["shots"]}),
+        "item_variants_observed": sorted({
+            shot["item"] for result in results for shot in result["sampled_observations"]}),
+        "apparel_variants_observed": sorted({
+            shot["apparel"] for result in results for shot in result["sampled_observations"]}),
         "reverse_audit_failures": audit_failures,
         "simulators": results, "source_rights_reviewed": True,
         "candidate_status": "quarantined_pending_independent_review",
@@ -456,6 +489,12 @@ def verify_batch_report(report: dict[str, Any]) -> dict[str, Any]:
     rows = report.get("simulators")
     _require(type(rows) is list and len(rows) == report["simulations_executed"],
              "simulator batch count changed")
+    _require(report["reverse_observations"] == report["forward_observations"] ==
+             sum(row["frames_executed"] for row in rows), "forward/reverse counts differ")
+    _require(report["unique_trace_digests"] == len({
+        row["forward_head_digest"] for row in rows}), "duplicate lineage accounting changed")
+    _require(report["duplicates_not_counted_as_new_training"] ==
+             len(rows) - report["unique_trace_digests"], "duplicate accounting changed")
     for row in rows:
         _require(row.get("receipt_sha256") == _hash({
             k: v for k, v in row.items() if k != "receipt_sha256"
@@ -469,6 +508,50 @@ def verify_batch_report(report: dict[str, Any]) -> dict[str, Any]:
             "source_digest": report["scene_source_sha256"],
             "simulations": len(rows), "reverse_audit_verified": True,
             "model_training_executed": False}
+
+
+def quarantine_review_pairs(report: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    """Forward and reverse teaching prompts from each *unique* trace.
+
+    The two perspectives share one evidence group. Neither is training data
+    until independent source-rights and answer-quality adjudication.
+    """
+    verify_batch_report(report)
+    seen = set()
+    cases = []
+    for row in report["simulators"]:
+        head = row["forward_head_digest"]
+        if head in seen:
+            continue
+        seen.add(head)
+        group = _hash({"scene": row["source_digest"], "head": head})
+        for perspective in ("forward_causality", "reverse_forensic_audit"):
+            instruction = (
+                "Explain whether the authored camera angle, pan-to motion, item "
+                "and apparel choices satisfy shot continuity using the evidence."
+                if perspective == "forward_causality" else
+                "Trace the recorded cutscene outcomes backward to their source "
+                "camera, wardrobe, dialogue and item constraints; identify faults."
+            )
+            cases.append({
+                "schema_version": "skeleton.jeeves.cinematic_review_candidate.v1",
+                "source_project_id": report["project"],
+                "source_scene_digest": row["source_digest"],
+                "paired_evidence_group": group,
+                "candidate_id": _hash({"group": group, "perspective": perspective}),
+                "perspective": perspective, "instruction": instruction,
+                "evidence_digest": head, "controls": row["controls"],
+                "quality_issues": row["audit"]["forward"]["issues"],
+                "reverse_audit_failures": row["audit"]["reverse"]["failures"],
+                "example_independence_group": group,
+                "approval": "quarantined", "human_reviewed": False,
+                "rights_independently_cleared": False,
+                "eligible_for_optimizer": False,
+                "training_steps_performed": 0,
+            })
+    _require(len(cases) == 2 * report["unique_trace_digests"],
+             "reverse candidate count drift")
+    return tuple(cases)
 
 
 def _read_json(path: Path, max_bytes: int) -> dict[str, Any]:
@@ -487,15 +570,27 @@ def _read_json(path: Path, max_bytes: int) -> dict[str, Any]:
     return value
 
 
-def _write_new(path: Path, content: dict[str, Any]):
+def _write_new_bytes(path: Path, payload: bytes):
     _require(not path.exists() and not path.is_symlink() and
              path.parent.is_dir() and not path.parent.is_symlink(),
              "output must be a new file in an existing directory")
-    payload = _json(content) + b"\n"
-    with path.open("xb") as handle:
-        handle.write(payload)
-        handle.flush()
-        os.fsync(handle.fileno())
+    staged = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, mode="wb",
+                                         prefix=".cinema-", delete=False) as handle:
+            staged = Path(handle.name)
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(staged, 0o600)
+        os.link(staged, path)  # exclusive publication; never replace a file
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
+def _write_new(path: Path, content: dict[str, Any]):
+    _write_new_bytes(path, _json(content) + b"\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -503,6 +598,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scene", type=Path)
     parser.add_argument("--audit-report", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--candidate-output", type=Path,
+                        help="new quarantined two-direction training review JSONL")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--limit", type=int, default=64)
     parser.add_argument("--frame-ms", type=int, default=100)
@@ -519,7 +616,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.audit_report is not None:
             _require(args.scene is None and args.output is None,
                      "reverse-only audit cannot start another simulation")
-            output = verify_batch_report(_read_json(args.audit_report, 32 * 1024 * 1024))
+            source_report = _read_json(args.audit_report, 32 * 1024 * 1024)
+            output = verify_batch_report(source_report)
+            if args.candidate_output is not None:
+                cases = quarantine_review_pairs(source_report)
+                _write_new_bytes(args.candidate_output, b"".join(
+                    _json(case) + b"\n" for case in cases))
+                output["quarantined_review_cases"] = len(cases)
         else:
             _require(args.scene is not None, "operator scene source required")
             scene = _read_json(args.scene, 128 * 1024)
@@ -534,6 +637,11 @@ def main(argv: list[str] | None = None) -> int:
                                frame_ms=args.frame_ms)
             if args.output is not None:
                 _write_new(args.output, output)
+            if args.candidate_output is not None:
+                cases = quarantine_review_pairs(output)
+                _write_new_bytes(args.candidate_output, b"".join(
+                    _json(case) + b"\n" for case in cases))
+                output["quarantined_review_cases"] = len(cases)
         print(json.dumps({key: value for key, value in output.items()
                           if key != "simulators"}, sort_keys=True))
         return 0
