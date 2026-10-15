@@ -182,6 +182,64 @@
         "neural_corpus": "select most productive observed training trace per source scenario, rebuild source-authoritative examples, no heldout contamination or automatic model promotion",
         "verification": "unexecuted regression test cases included; not a successful checkpoint model training claim"
       }
+    },
+    "ten_run_multispectral": {
+      "status": "committed_implementation_pending_exact_head_execution",
+      "executor": "skeleton/jeeves/game_studio_scenario_lab.py",
+      "auditor": "skeleton/jeeves/game_studio_multispectral.py",
+      "local_training_cli": "skeleton/jeeves/game_studio_multispectral_training.py",
+      "lenses": [
+        "explore",
+        "progress",
+        "safety",
+        "economy",
+        "adversary",
+        "boundary",
+        "temporal",
+        "causal",
+        "perturbation",
+        "recovery"
+      ],
+      "analysis_bands": [
+        "motion",
+        "economy",
+        "vitals",
+        "objectives",
+        "reward",
+        "events",
+        "control",
+        "temporal",
+        "novelty",
+        "safety"
+      ],
+      "audit_gates": [
+        "source_custody",
+        "runtime_identity",
+        "seed_bounds",
+        "action_allowlist",
+        "transition_chain",
+        "reward_finiteness",
+        "terminal_and_command_counts",
+        "final_state_custody",
+        "reverse_checkpoint_replay",
+        "channel_derivation"
+      ],
+      "simulation_runs_per_default_spectator": 10,
+      "maximum_spectator_workers_per_request": 4,
+      "maximum_spectator_steps_per_run": 24,
+      "maximum_new_campaign_training_episodes_per_round": 10,
+      "maximum_mirrored_candidate_scenario_runs": 20,
+      "candidate_training": "ten actual source-game Q policy episodes prioritized using ten source-audited exploratory mirrors; three independent heldout seeds; consent and rights required; no automatic production promotion",
+      "evidence_sources": [
+        "original_game_runtime",
+        "independent_source_replay",
+        "real_numeric_telemetry",
+        "real_local_Q_updates"
+      ],
+      "physical_hardware_spectra_claimed": false,
+      "native_renderer_camera_training_claimed": false,
+      "production_neural_checkpoint_modified": false,
+      "independent_test_verification": "not verified; new tests committed but not executed"
     }
   }
 }

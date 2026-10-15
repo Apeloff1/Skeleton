@@ -429,3 +429,86 @@ These optimizations do not fix fundamentally absent native game
 runtimes, guarantee a successful game outcome, or turn popular-game
 sales into causally verified mechanics. Tests and actual candidate
 weight production remain pending.
+
+## Ten-run multispectral mirror-room training and post-simulation scrutiny
+
+Implementation:
+* `skeleton/jeeves/game_studio_multispectral.py`: ten-pass, independent
+  source-bound postrun audit and ten derived numeric gameplay channels for
+  **each** completed simulation. Every supplied step is replayed separately
+  against the actual engine; the registered action palette, code/runtime
+  digest, episode seed, complete transition digest chain, scalar rewards,
+  terminal/command accounting and final observation/snapshot are checked.
+  Intermediate original-game snapshots are reconstructed in **reverse
+  checkpoint order**, using independently replayed prefixes (not time
+  reversal of a physical world), and every analysis band is computed
+  from real source projections. A failure raises and blocks acceptance.
+* `skeleton/jeeves/game_studio_scenario_lab.py`: ten distinct analytical
+  mirror perspectives: exploration, progress, safety, economy,
+  adversarial pressure, boundary, temporal, causal, perturbation and
+  recovery. Ten independent seed/angle scenarios are executed by a
+  bounded four-worker executor; each includes multispectral evidence and
+  **ten checks**. Every 43-family source runtime is eligible, subject to
+  its actual declared features and actions. Different perspectives do not
+  constitute independent cameras or prove exhaustiveness of world states.
+* `backend/core/game_studio_learning.py` and
+  `backend/routes/game_studio_learning.py`: source-scoped authenticated
+  spectator route can request 1–10 runs, default 10, at 1–24 steps each;
+  network responses contain explicit passed-run and sensor-hardware
+  metadata. Spectator runs remain **independent of live policy updates**.
+* `frontend/features/Jeeves/GameStudioScenarioLabPanel.tsx`: 10-run
+  mirror control and per-run compact presentation of all ten analysis
+  means, peaks, reverse checkpoints and strict audit counts.
+* `skeleton/jeeves/game_studio_learning.py`: non-native studio candidate
+  gameplay rounds now admit ten real **training** episodes each (1–10
+  supported) and independently check ten source-matched mirror angles.
+  Where changed-rule scrutiny executes paired baseline and candidate
+  mirrors, the preflight reserves at most twenty such **auxiliary**
+  source episodes (in addition to the normal training/evaluation budget);
+  the actual executed work is rechecked before committing each round.
+  Existing native emulator source budget, governance and review boundaries
+  remain unchanged.
+* `skeleton/jeeves/game_studio_multispectral_training.py`: standalone,
+  operator- and rights-gated **actual Q-learning** from ten independently
+  audited mirror seeds, ordered by witnessed source-state novelty, accepted
+  actions and replay-work cost; executes ten additional real local
+  game-action learning episodes and three separate heldout policy
+  evaluation seeds. Produces candidate snapshots and digest receipts,
+  **never** production Jeeves neural weights or automatic policy promotion.
+
+Example, after entering a rights-cleared, original source and an
+existing private candidate directory:
+
+```bash
+python -m skeleton.jeeves.game_studio_multispectral_training \
+  --engine economy --seed 13 --max-steps 8 \
+  --output /private/candidates/ten-run-original-game.json \
+  --authorized --rights-cleared
+```
+
+The 10 numeric analysis channels per source episode are **motion,
+economy, vitals, objectives, reward, events, control, temporal, novelty
+and safety**. They derive from the same actual engine's observed
+gameplay states, accepted/rejected commands, recorded reward components
+and authored event list. This is *multiband game telemetry*, NOT
+physical multispectral photometry, independently measured thermal
+emission, RGB camera/depth sensor stacks or real GPU image semantics.
+It is mathematically unsound to market ten projections from one state
+as ten independent sensors; the audit records that distinction.
+
+Research inspiration, without implementation-identity or metric claims:
+* DreamerV3 general world-model training and replay ratio:
+  https://www.nature.com/articles/s41586-025-08744-2
+* Prioritized Level Replay, revisiting productive levels:
+  https://proceedings.mlr.press/v139/jiang21b.html
+* Structured domain randomization with semantics preserved:
+  https://link.springer.com/article/10.1007/s10462-025-11431-3
+* EnvDreamer (October 2026): validator-admitted environment variety:
+  https://arxiv.org/abs/2610.04301
+
+The implementation draws from these ideas but does not claim
+DreamerV3, TD-error PLR, true real-to-sim multispectral sensors,
+native 3D/graphics/audio simulation, proprietary game content,
+trained live model checkpoints or automatically verified increases
+in game-model accuracy. Training tests and all 43 real engine
+integration gates must run on the exact PR head before release.
