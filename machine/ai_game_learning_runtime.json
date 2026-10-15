@@ -259,6 +259,62 @@
       "universal_exhaustion_claimed": false,
       "production_neural_weights_changed": false,
       "verification": "focused tests committed; not run at exact head"
+    },
+    "multifactor_training": {
+      "status": "candidate_implementation_committed_pending_exact_head_tests",
+      "owner": "skeleton/jeeves/game_studio_multifactor.py",
+      "local_q_cli": "skeleton/jeeves/game_studio_multifactor_cli.py",
+      "neural_corpus": "skeleton/ai/training/jeeves_studio_multifactor_corpus.py",
+      "neural_checkpoint_entry": "skeleton/ai/training/jeeves_production_game_train.py (optional separately pinned studio_corpus input)",
+      "coverage": "up to 8 executable axes per source bank and 512 bounded candidate worlds for greedy pair/three-way covering",
+      "categories": [
+        "items",
+        "abilities",
+        "weapons",
+        "tools",
+        "style",
+        "movement",
+        "expression",
+        "reaction",
+        "consequence",
+        "actions",
+        "environment",
+        "ambience",
+        "music",
+        "apparel",
+        "status_effects",
+        "npc_behavior",
+        "quests",
+        "physics",
+        "economy",
+        "camera",
+        "time",
+        "accessibility",
+        "localization",
+        "network",
+        "save_load"
+      ],
+      "real_execution": "Only runtime-declared settings and approved action palette. All absent controls report unimplemented_for_this_engine.",
+      "measurements": [
+        "base vs joint on identical seed",
+        "ten-pass source-audited action traces",
+        "one-at-a-time factor removals",
+        "selected two-factor difference-of-differences",
+        "actual local Q parameter delta",
+        "newly visited Q state-action pairs",
+        "sum/max signed Q changes",
+        "heldout 2-seed baseline vs candidate performance"
+      ],
+      "default_training": "3 source-matched local-Q episodes per selected combo (operator rights admission required), 2 disjoint heldout seeds; up to 8 combos",
+      "independent_neural": "Only independently replayed, operator-SHA-pinned training data can enter an existing checkpoint candidate optimizer, not automatic model promotion",
+      "ui": [
+        "GET /campaigns/{id}/multifactor-capabilities",
+        "GET /campaigns/{id}/multifactor-plan",
+        "GET /campaigns/{id}/multifactor-experiments"
+      ],
+      "production_neural_parameters_modified": false,
+      "native_media_supported_without_runtime": false,
+      "successful_exact_head_execution_confirmed": false
     }
   }
 }

@@ -483,6 +483,11 @@ def execute_multifactor_scenarios(
                 "parameter_gain":_gain(before,after),
                 "actual_training_updates":observed.updates,
                 "training_trace_digests":[t["trace_digest"] for t in observed.traces],
+                "training_episode_actions":[{
+                    "seed":trace["seed"],
+                    "actions":[event["action"] for event in trace["transitions"]],
+                    "trace_digest":trace["trace_digest"],
+                } for trace in observed.traces],
                 "heldout_evaluation":heldout,
                 "heldout_seeds":[trial_seed+14000+i for i in range(2)],
                 "candidate_policy_snapshot":after,

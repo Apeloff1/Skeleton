@@ -244,3 +244,34 @@ async def shadow_audit(
         _scope(user),campaign_id,angle=angle,steps=steps,
         max_cycles=max_cycles,replay_budget=replay_budget,
     ))
+
+
+@router.get("/campaigns/{campaign_id}/multifactor-capabilities")
+async def multifactor_capabilities(campaign_id:str,user=Depends(get_current_user)):
+    return await _call(learning.multifactor_control_catalog(_scope(user),campaign_id))
+
+
+@router.get("/campaigns/{campaign_id}/multifactor-plan")
+async def multifactor_plan(
+    campaign_id:str,
+    axis_offset:int=Query(default=0,ge=0,le=63),
+    count:int=Query(default=6,ge=2,le=8),
+    order:int=Query(default=3,ge=2,le=3),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.multifactor_plan_preview(
+        _scope(user),campaign_id,axis_offset=axis_offset,count=count,order=order,
+    ))
+
+
+@router.get("/campaigns/{campaign_id}/multifactor-experiments")
+async def multifactor_experiments(
+    campaign_id:str,
+    axis_offset:int=Query(default=0,ge=0,le=63),
+    count:int=Query(default=2,ge=2,le=3),
+    steps:int=Query(default=2,ge=1,le=4),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.multifactor_verified_experiments(
+        _scope(user),campaign_id,axis_offset=axis_offset,count=count,steps=steps,
+    ))

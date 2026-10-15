@@ -205,6 +205,12 @@ def load_studio_curriculum(path: Path, *, expected_sha256: str) -> tuple[tuple[s
     ):
         from .jeeves_studio_rule_corpus import verify_rule_training_corpus
         return verify_rule_training_corpus(document), expected_sha256
+    if type(document) is dict and (
+        document.get("schema_version") ==
+        "skeleton.jeeves.multifactor_training_corpus.v1"
+    ):
+        from .jeeves_studio_multifactor_corpus import verify_multifactor_training_corpus
+        return verify_multifactor_training_corpus(document), expected_sha256
     return verify_studio_curriculum(document), expected_sha256
 
 

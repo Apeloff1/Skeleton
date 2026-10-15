@@ -639,3 +639,116 @@ runs this same independent source reconstruction before issuing its
 own final certificate. The live spectator endpoint does not perform
 these exhaustive post-hoc full-room reverifications on each request
 because it is intentionally restricted to short read-only previews.
+
+## High-order multi-item/ability/weapon/tool/movement/sensory factor training
+
+The new `skeleton/jeeves/game_studio_multifactor.py` defines 26
+independent *declared factor categories*: items, abilities, weapons,
+tools, style, movement, expression, reaction, consequence, actions,
+environment, ambience, music, apparel, status effects, NPC behavior,
+quests, physics, economy, camera, time, accessibility, localization,
+network, and save/load plus the runtime's remaining typed controls.
+A requested factor is only executable when the original game editor
+exposes an actual validated setting or the game engine registers an
+action with matching semantics. The catalogue reports **unimplemented
+for this engine** otherwise. It cannot fake playable music, facial
+expressions, atmosphere, weapons, acoustic spectrograms, photometric
+measurements or native avatar movement by inventing a string label.
+
+**Multi-combinations instead of single-control tests.** A finite,
+source-valid three-way interaction planner composes existing original
+engine settings and approved actions. It considers up to 512 typed
+candidate worlds, greedily choosing bounded variants that cover new
+one-, two- and three-way factor-interaction witnesses. Each design
+bank handles at most eight simultaneous axes; **axis offset** allows
+the next bank of actual controls to be studied without silently
+ignoring remaining categories. Each action plan executes a sequence
+of multiple real registered commands; every setting combination is
+revalidated by the original editor including all cross-constraints.
+The plan records source and design hashes, source-control axes, and
+fraction of *offered interaction opportunities* covered—not a claim
+that all possible game states were explored.
+
+**Meticulous source measurements.** A bounded experiment compares
+a multi-factor world with the unchanged original world at the *same
+seed*, using an identical action schedule where possible and
+independent source-replay multispectral audits. It then explicitly
+removes each of up to four active factors and executes each
+counterfactual world again, with source custody, accepted controls,
+reward and productive-state evidence. A selected two-factor
+difference-of-differences estimates the **measured interaction
+contrast**. This is evidence of an observed conditional difference,
+not proof of global causal generalization or real-world performance.
+
+**Actual parameter/weight gain.** With explicit rights admission,
+each source-combination has its *own* GamePolicyLearner and three
+actual local Q-learning episodes; no training policy from one
+environment is blindly copied to another. Each candidate records:
+exact pre/post policy snapshot digests, actual update count,
+newly visited state-action parameters, changed Q parameters,
+signed per-parameter Q delta, maximum/summed absolute Q-weight
+changes, trace digests, and two separately held-out evaluation seeds
+and results. All candidate weights remain local and
+**no neural production weights are changed automatically**.
+Unsupported sensory/cinematic functionality cannot claim parameter
+gain for a modality it did not execute.
+
+**Replay-verifiable neural candidate input.** The new
+`skeleton/ai/training/jeeves_studio_multifactor_corpus.py` derives
+a training-only multi-source text corpus from the actual *training
+episode actions* of each original engine variant—not from heldout
+evaluation episodes or from arbitrary claimed success. Every
+original source, setting interaction, action, transition label and
+source-verified reward is independently replayed on publication
+and loading. `load_studio_curriculum` now recognizes this
+schema with an operator-pinned SHA-256, so the existing
+`jeeves_production_game_train` checkpoint-derived
+candidate optimizer can ingest it, with the same independent
+holdout and no auto-promotion restrictions. **No actual production
+checkpoint optimizer run is claimed by these code changes.**
+
+Operator entry points:
+
+```bash
+# Design only. Inspect which categories really execute in this engine.
+python -m skeleton.jeeves.game_studio_multifactor_cli \
+  --editor economy --plan-only --interaction-order 3 \
+  --axis-offset 0 --scenarios 8 \
+  --output /private/factors/plan.json
+
+# Execute actual factor ablations and source-bound local Q training,
+# then prepare a separately pinned, training-only neural candidate corpus.
+python -m skeleton.jeeves.game_studio_multifactor_cli \
+  --editor economy --interaction-order 3 \
+  --axis-offset 0 --scenarios 8 --steps 4 --seed 11 \
+  --train-local-q --authorized --rights-cleared \
+  --output /private/factors/weight-candidates.json \
+  --neural-corpus-output /private/factors/replayed-neural-input.json
+```
+
+To run actual neural optimizer steps against an *independently
+verified live production checkpoint*, admit the pinned corpus
+through the already existing
+`jeeves_production_game_session` / `jeeves_production_game_train`
+`--studio-corpus` and `--studio-corpus-expected-sha256`
+arguments, plus that trainer's source/holdout/optimizer controls.
+The checkpoint remains untouched until the operator separately
+accepts a verified candidate. A generated text corpus by itself
+has zero transformer weight updates.
+
+The authenticated `/game-studio-learning` frontend now displays
+all declared categories with explicit missing capabilities,
+control-bank navigation, bounded three-way source designs and
+on-demand read-only dual-scenario experiments with per-factor
+ablations and interaction contrasts. Owner-scoped backend routes
+deny foreign/non-studio inputs and restrict each UI measurement
+call to at most three legal variants and four gameplay steps.
+Model-training weight updates require the separate rights-gated
+CLI; viewing a scenario never changes campaign policies.
+
+**Unverified release gates:** Exact-head regression tests and
+TypeScript build, actual production transformer optimizer runs,
+native multimedia rendering, full weapon/ability/tool
+simulation fidelity, user-perceived emotion/music quality,
+per-modality benchmark improvements, load/soak/E2E, and
+all-engine production completeness remain pending.

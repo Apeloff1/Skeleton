@@ -2291,3 +2291,92 @@ async def scenario_shadow_audit(
         "complete_run_proof_scope":"ten_consecutive_zero_gain_cycles_only_if_reached",
         "native_spectral_camera_claim":False,
     }
+
+
+_multifactor_probe_slots=asyncio.Semaphore(1)
+
+
+async def _multifactor_original_source(scope, identifier):
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+    from skeleton.jeeves.game_studio_environment import parse_studio_source
+    row=await _read(scope,identifier)
+    pinned=(row.get("snapshot") or {}).get("champion_request")
+    req=GameEnvironmentRequest.from_dict(pinned or row["environment_request"])
+    if (req.kind!="studio" or
+            req.target_id!=row["environment_request"]["target_id"]):
+        raise GameLearningError(
+            "multifactor_source",
+            "Multi-factor training requires an authorized original-game studio source.",409,
+        )
+    source=parse_studio_source(__import__("json").loads(req.tree["game/studio/session.json"]))
+    return row,source
+
+
+async def multifactor_control_catalog(scope, identifier):
+    from skeleton.jeeves.game_studio_multifactor import multifactor_capabilities
+    row,source=await _multifactor_original_source(scope,identifier)
+    return {
+        **multifactor_capabilities(source),
+        "campaign_id":identifier,"campaign_cursor":row["cursor"],
+        "automatic_neural_training":False,
+        "native_multimedia_simulation_assumed":False,
+    }
+
+
+async def multifactor_plan_preview(scope, identifier, *, axis_offset=0, count=6, order=3):
+    from skeleton.jeeves.game_studio_multifactor import (
+        plan_multifactor_scenarios, MultiFactorError,
+    )
+    if (type(axis_offset) is not int or not 0<=axis_offset<=63
+        or type(count) is not int or not 2<=count<=8
+        or type(order) is not int or order not in (2,3)):
+        raise GameLearningError("multifactor_limits","Factor design bounds differ.",422)
+    row,source=await _multifactor_original_source(scope,identifier)
+    try:
+        design=await asyncio.to_thread(
+            plan_multifactor_scenarios,source,interaction_order=order,
+            axis_offset=axis_offset,max_scenarios=count,
+        )
+    except MultiFactorError as exc:
+        raise GameLearningError(
+            "multifactor_plan","No source-legal combination is available in the selected control bank.",409,
+        ) from exc
+    return {
+        **design,"campaign_id":identifier,"campaign_cursor":row["cursor"],
+        "training_performed":False,"production_neural_weights_changed":False,
+    }
+
+
+async def multifactor_verified_experiments(
+    scope,identifier,*,axis_offset=0,count=2,steps=2,
+):
+    """Authorized campaign owner requests audited source-control experiments only.
+
+    Separate CLI needs explicit operator rights to update local Q candidates.
+    Network reader never promotes weights, adopts worlds, or trains models.
+    """
+    from skeleton.jeeves.game_studio_multifactor import (
+        execute_multifactor_scenarios, MultiFactorError,
+    )
+    if (type(axis_offset) is not int or not 0<=axis_offset<=63
+        or type(count) is not int or not 2<=count<=3
+        or type(steps) is not int or not 1<=steps<=4):
+        raise GameLearningError("multifactor_limits","Factor experiment budgets exceeded.",422)
+    row,source=await _multifactor_original_source(scope,identifier)
+    seed=(row["config"]["seed"]+row["cursor"]*163)%(2**31-22000)
+    try:
+        async with _multifactor_probe_slots:
+            result=await asyncio.to_thread(
+                execute_multifactor_scenarios,source,interaction_order=3,
+                axis_offset=axis_offset,max_scenarios=count,
+                steps=steps,seed=seed,train=False,
+            )
+    except MultiFactorError as exc:
+        raise GameLearningError(
+            "multifactor_execution",
+            "A source-verified multi-factor experiment could not be completed.",409,
+        ) from exc
+    return {
+        **result,"campaign_id":identifier,"campaign_cursor":row["cursor"],
+        "spectator_only":True,"actual_production_weights_changed":False,
+    }

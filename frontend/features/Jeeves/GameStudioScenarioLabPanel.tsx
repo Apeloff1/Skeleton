@@ -3,10 +3,13 @@ import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-na
 import {
   getStudioMirrorViews, getStudioScenarioDrafts,
   getStudioEngineTestManifest, getStudioSalesReferences, runStudioEngineProbePage,
-  getStudioShadowAudit,
+  getStudioShadowAudit, getMultifactorCapabilities,
+  getMultifactorPlan, getMultifactorExperiments,
   type StudioMirrorViews, type StudioScenarioDiscovery,
   type StudioEngineTestManifest, type StudioSalesCatalog, type StudioEngineProbePage,
   type StudioCampaign, type StudioShadowAuditResult,
+  type MultifactorControlManifest, type MultifactorExperimentPlan,
+  type MultifactorVerifiedExperiments,
 } from '../../src/product/gameStudioLearningClient';
 import { getAuthToken } from '../../src/auth/gameforgeAuth';
 
@@ -30,6 +33,11 @@ export default function GameStudioScenarioLabPanel({
   const [shadowAngle, setShadowAngle] = useState('explore');
   const [shadow, setShadow] = useState<StudioShadowAuditResult | null>(null);
   const [shadowPending, setShadowPending] = useState(false);
+  const [factors, setFactors] = useState<MultifactorControlManifest | null>(null);
+  const [factorPlan, setFactorPlan] = useState<MultifactorExperimentPlan | null>(null);
+  const [factorEvidence, setFactorEvidence] = useState<MultifactorVerifiedExperiments | null>(null);
+  const [factorOffset, setFactorOffset] = useState(0);
+  const [factorPending, setFactorPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sample = useRef(0);
@@ -44,6 +52,10 @@ export default function GameStudioScenarioLabPanel({
     setTests(null);
     setProbePages([]);
     setShadow(null);
+    setFactors(null);
+    setFactorPlan(null);
+    setFactorEvidence(null);
+    setFactorOffset(0);
     owner.current = campaign.campaign_id;
     tenantToken.current = getAuthToken();
   }, [campaign.campaign_id]);
@@ -138,6 +150,27 @@ export default function GameStudioScenarioLabPanel({
       setError(issue instanceof Error ? issue.message : 'Shadow scrutiny was not verified.');
     } finally {
       setShadowPending(false);
+    }
+  };
+  const inspectFactors = async (task: 'catalog' | 'plan' | 'execute') => {
+    if (factorPending) return;
+    setFactorPending(true);
+    setError(null);
+    try {
+      if (task === 'catalog') {
+        const result=await getMultifactorCapabilities(campaign.campaign_id);
+        if (owner.current === campaign.campaign_id && tenantToken.current===getAuthToken()) setFactors(result);
+      } else if (task === 'plan') {
+        const result=await getMultifactorPlan(campaign.campaign_id,factorOffset);
+        if (owner.current === campaign.campaign_id && tenantToken.current===getAuthToken()) setFactorPlan(result);
+      } else {
+        const result=await getMultifactorExperiments(campaign.campaign_id,factorOffset);
+        if (owner.current === campaign.campaign_id && tenantToken.current===getAuthToken()) setFactorEvidence(result);
+      }
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : 'Multi-factor simulation evidence unavailable.');
+    } finally {
+      setFactorPending(false);
     }
   };
   const loadSales = async () => {
@@ -236,6 +269,73 @@ export default function GameStudioScenarioLabPanel({
           </View>
         </View>
       )}
+      <View style={{ gap: 8 }}>
+        <Text style={heading}>Multi-factor combinatorial engine laboratory</Text>
+        <Text style={muted}>
+          Joint source-verified item, ability, weapon, tool, movement, style, expression,
+          reaction, consequence, environment, ambience, music, and other
+          factor challenges. Controls missing from this engine are explicitly unavailable;
+          no fabricated audio or animation is used.
+        </Text>
+        <View style={group}>
+          {button('Inspect executable factors', () => { void inspectFactors('catalog'); })}
+          {button('Design triple interactions', () => { void inspectFactors('plan'); })}
+          {button(factorPending ? 'Replaying factor worlds…' : 'Run two audited factor worlds',
+            () => { void inspectFactors('execute'); })}
+          {button('Next factor bank', () => {
+            if (!factors || !factors.total_executable_axes) return;
+            setFactorOffset(current => (current+8<factors.total_executable_axes ? current+8 : 0));
+            setFactorPlan(null);setFactorEvidence(null);
+          })}
+        </View>
+        {factors && <View style={{ gap: 3 }}>
+          <Text style={muted}>
+            {factors.total_executable_axes} executable axes · {factors.unsupported_category_count}
+            unsupported categories · selected bank {factorOffset+1}–{Math.min(factorOffset+8,factors.total_executable_axes)}
+          </Text>
+          {factors.categories.map(item => <Text key={item.category} style={muted}>
+            {item.status === 'executable_logic' ? '✓' : '—'} {item.category.replace(/_/g,' ')}
+            {' · '}{item.status==='executable_logic'
+              ? item.registered_controls.slice(0,4).join(', ') : 'no executable controls in this engine'}
+          </Text>)}
+        </View>}
+        {factorPlan && <View style={{ gap: 3 }}>
+          <Text style={heading}>Three-way verified design · {factorPlan.scenarios.length} legal variants</Text>
+          <Text style={muted}>
+            {factorPlan.covered_interactions}/{factorPlan.valid_interaction_opportunities} declared
+            interaction witnesses covered ({(factorPlan.coverage_fraction*100).toFixed(1)}%);
+            this is sampled covering design, not a full Cartesian proof.
+          </Text>
+          {factorPlan.scenarios.map(entry => <Text key={entry.index} style={muted}>
+            #{entry.index+1} {entry.changed_axes.join(' + ')} ·
+            {entry.new_coverage_witnesses} newly covered interactions
+          </Text>)}
+        </View>}
+        {factorEvidence && <View style={{ gap: 4 }}>
+          <Text style={heading}>Executed matched-seed experiments · {factorEvidence.scenarios_executed}</Text>
+          <Text style={muted}>Read-only game execution: baseline versus combined source;
+            each source undergoes its own audit. Separate operator-admitted CLI
+            performs Q training and exports replay-verified neural candidate data.
+          </Text>
+          {factorEvidence.experiments.map(row => <View key={row.index} style={{
+            padding: 7,borderColor:'#526173',borderWidth:1,borderRadius:7,gap:3,
+          }}>
+            <Text style={muted}>Combined: {row.axes.join(' + ')}</Text>
+            <Text style={muted}>Observed reward difference {row.reward_delta.toFixed(3)} ·
+              baseline {row.control_productive_changes} vs modified {row.variant_productive_changes} state changes
+            </Text>
+            {row.factor_ablation_receipts.map((ablation,i) =>
+              <Text key={i} style={muted}>Remove {ablation.removed_axes.join(', ')}
+                {' → reward contrast '}{ablation.reward_difference_to_joint.toFixed(3)}
+              </Text>)}
+            {row.pairwise_interaction_witness &&
+              <Text style={muted}>Interaction {row.pairwise_interaction_witness.axes.join(' × ')}
+                {' · measured difference-of-differences '}
+                {row.pairwise_interaction_witness.difference_of_differences.toFixed(3)}
+              </Text>}
+          </View>)}
+        </View>}
+      </View>
       <View style={{ gap: 8 }}>
         <Text style={heading}>Shadow-clone convergence room</Text>
         <Text style={muted}>Choose a parent perspective. Each cycle forks a real checkpoint into an isolated shadow, independently replays both branches, increases scrutiny, and records hash-chained step evidence. Ten consecutive cycles without new verified knowledge are required; a resource stop is inconclusive.</Text>

@@ -294,3 +294,98 @@ export async function getStudioShadowAudit(
   }
   return value;
 }
+
+export type MultifactorControlManifest = {
+  schema_version: string; editor: string; source_digest: string; digest: string;
+  total_executable_axes: number; maximum_simultaneous_axes: number;
+  unsupported_category_count: number;
+  categories: { category: string; status: 'executable_logic' | 'unimplemented_for_this_engine';
+    registered_controls: string[]; real_physical_modality_certified: false }[];
+  available_axes: { id: string; category: string; kind: 'source_field' | 'registered_action';
+    levels: unknown[]; field: string | null }[];
+  native_music_audio_expression_rendering_assumed: false;
+  campaign_id: string; campaign_cursor: number;
+};
+export type MultifactorExperimentPlan = {
+  schema_version: string; editor: string; axis_offset: number;
+  interaction_order: number; digest: string; covered_interactions: number;
+  valid_interaction_opportunities: number; coverage_fraction: number;
+  axes: MultifactorControlManifest['available_axes'];
+  scenarios: {
+    index: number; changed_axes: string[]; source_digest: string;
+    selected_registered_actions: string[];
+    new_coverage_witnesses: number;
+  }[];
+  campaign_id: string; campaign_cursor: number; training_performed: false;
+};
+export type MultifactorVerifiedExperiments = {
+  schema_version: string; editor: string; campaign_id: string;
+  scenarios_executed: number; spectator_only: true;
+  actual_q_weight_updates: 0; newly_visited_q_parameters: 0;
+  production_neural_weights_modified: false; digest: string;
+  experiments: {
+    index: number; axes: string[]; source_digest: string; digest: string;
+    seed: number; scripted_actions: string[];
+    reward_delta: number; source_behavior_differs: boolean;
+    variant_accepted: number; control_accepted: number;
+    variant_productive_changes: number; control_productive_changes: number;
+    variant_source_verified: true;
+    factor_ablation_receipts: {
+      removed_axes: string[]; reward_difference_to_joint: number;
+      source_verified: true; audit_digest: string;
+    }[];
+    pairwise_interaction_witness: {
+      axes: string[]; difference_of_differences: number;
+      mechanical_causal_generalization_proven: false;
+    } | null;
+    actual_weight_training: null;
+  }[];
+};
+export async function getMultifactorCapabilities(
+  campaignId: string, input: LearningRequest = {},
+): Promise<MultifactorControlManifest> {
+  const value=await request<MultifactorControlManifest>(
+    'get','/campaigns/'+id(campaignId)+'/multifactor-capabilities',null,input,
+  );
+  if (value.campaign_id!==campaignId || !Array.isArray(value.categories)
+      || value.categories.length<20 || value.categories.length>40
+      || !Array.isArray(value.available_axes)
+      || value.available_axes.length>64
+      || value.native_music_audio_expression_rendering_assumed!==false
+      || JSON.stringify(value).length>131072) invalid('Engine multifactor capability proof differs.');
+  return value;
+}
+export async function getMultifactorPlan(
+  campaignId:string, axisOffset=0, input: LearningRequest = {},
+): Promise<MultifactorExperimentPlan> {
+  if (!Number.isSafeInteger(axisOffset) || axisOffset<0 || axisOffset>63) invalid('Engine factor bank is outside bounds.');
+  const value=await request<MultifactorExperimentPlan>(
+    'get','/campaigns/'+id(campaignId)+'/multifactor-plan?axis_offset='+
+    axisOffset+'&count=6&order=3',null,input,
+  );
+  if (value.campaign_id!==campaignId || value.axis_offset!==axisOffset
+      || value.interaction_order!==3 || !Array.isArray(value.scenarios)
+      || value.scenarios.length>6 || value.scenarios.some(v=>v.changed_axes.length>8)
+      || JSON.stringify(value).length>524288) invalid('Original-game interaction design differs.');
+  return value;
+}
+export async function getMultifactorExperiments(
+  campaignId:string, axisOffset=0, input: LearningRequest = {},
+): Promise<MultifactorVerifiedExperiments> {
+  if (!Number.isSafeInteger(axisOffset) || axisOffset<0 || axisOffset>63) invalid('Engine factor bank is outside bounds.');
+  const value=await request<MultifactorVerifiedExperiments>(
+    'get','/campaigns/'+id(campaignId)+'/multifactor-experiments?axis_offset='+
+    axisOffset+'&count=2&steps=2',null,input,
+  );
+  if (value.campaign_id!==campaignId || value.spectator_only!==true
+      || value.scenarios_executed!==value.experiments?.length
+      || value.scenarios_executed>2
+      || value.production_neural_weights_modified!==false
+      || value.actual_q_weight_updates!==0
+      || value.experiments.some(x=>
+        x.variant_source_verified!==true || x.actual_weight_training!==null
+        || !Array.isArray(x.factor_ablation_receipts)
+        || x.factor_ablation_receipts.length>4)
+      || JSON.stringify(value).length>262144) invalid('Source-bound multi-factor probe receipt differs.');
+  return value;
+}

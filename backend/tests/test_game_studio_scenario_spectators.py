@@ -67,6 +67,32 @@ class TestStudioScenarioSpectators(unittest.IsolatedAsyncioTestCase):
                 self.scope,"campaign-fixture",angle="foreign_python",
             )
 
+    async def test_source_bound_multifactor_capability_and_two_real_experiments(self):
+        with patch.object(game_studio_learning,"_read",new_callable=AsyncMock) as reader:
+            reader.return_value=self.row
+            catalog=await game_studio_learning.multifactor_control_catalog(
+                self.scope,"campaign-fixture",
+            )
+            design=await game_studio_learning.multifactor_plan_preview(
+                self.scope,"campaign-fixture",axis_offset=0,count=2,order=3,
+            )
+            experiment=await game_studio_learning.multifactor_verified_experiments(
+                self.scope,"campaign-fixture",axis_offset=0,count=2,steps=1,
+            )
+            self.assertEqual(reader.await_count,3)
+        self.assertEqual(catalog["editor"],"economy")
+        self.assertGreater(catalog["total_executable_axes"],1)
+        self.assertTrue(design["scenarios"])
+        self.assertTrue(experiment["spectator_only"])
+        self.assertEqual(experiment["actual_q_weight_updates"],0)
+        self.assertEqual(experiment["scenarios_executed"],2)
+        self.assertFalse(experiment["production_neural_weights_modified"])
+        self.assertEqual(self.row["cursor"],7)
+        with self.assertRaises(GameLearningError):
+            await game_studio_learning.multifactor_verified_experiments(
+                self.scope,"campaign-fixture",count=17,
+            )
+
     async def test_malformed_parallel_and_campaign_source_rejected(self):
         with self.assertRaises(GameLearningError):
             await game_studio_learning.scenario_mirror_views(
