@@ -28,6 +28,7 @@ FAMILIES = frozenset((
 ))
 MAX_DATASET_BYTES = 64 * 1024 * 1024
 MAX_ROWS_PER_SPLIT = 10000
+MAX_HOLDOUT_ROWS = 256
 MAX_WORDS_PER_SPLIT = 200000
 MAX_PROMPT_CHARS = 4096
 MAX_ANSWER_CHARS = 12000
@@ -104,6 +105,8 @@ def _load_split(root: Path, *, filename: Any, digest: Any, split: str) -> list[d
             raise ProductionCheckpointError("empty JSONL records are not allowed")
         if line_number > MAX_ROWS_PER_SPLIT:
             raise ProductionCheckpointError("game corpus exceeds 10000 records per split")
+        if split == "heldout" and line_number > MAX_HOLDOUT_ROWS:
+            raise ProductionCheckpointError("held-out game-design evaluation exceeds 256 examples")
         row = _strict_json(raw_line)
         if row.get("split") != split:
             raise ProductionCheckpointError("game corpus split mismatch")
