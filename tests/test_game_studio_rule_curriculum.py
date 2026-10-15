@@ -72,6 +72,10 @@ class TestModelProposedEngineRules(unittest.TestCase):
         self.assertEqual(fields["trade_tax"]["minimum"],0)
         self.assertEqual(fields["trade_tax"]["maximum"],100)
         self.assertIn("add",fields["trade_tax"]["operators"])
+        sample=contract["sample_operation"]
+        self.assertIsNotNone(sample)
+        self.assertEqual(sample["scope"],"settings")
+        self.assertNotEqual(sample["value"],self.base["settings"][sample["path"]])
         protected=make_studio_source("platform_profile")
         gates=rule_authoring_contract(protected)
         self.assertNotIn("homebrew_only",{

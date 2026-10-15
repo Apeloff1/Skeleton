@@ -217,3 +217,25 @@ integration, runtime security checks, actual campaign trials, actual
 neural optimizer run, independent domain benchmarks and engine/world quality.
 No complete engine/app, hardware, audio, rendering or real-world
 generalization quality claim follows merely from these registrations.
+
+## Parallel emulator-style rule-curriculum workers
+
+`GameEnvironmentRequest(kind="studio_rules",
+target_id="studio-rules:<editor>", max_steps=<plan.max_steps>,
+tree={"game/studio/rule_curriculum.json": <canonical-plan-json>})`
+now reconstructs the exact scenario graph through the existing isolated
+emulator-style rollout actor interface. The request admits one exact
+source file, rejects unapproved content/ROM/registry data and derives its
+environment specification from the same source-verified plan.
+
+Both the scenario scheduler's own source SHA and every underlying studio
+game implementation digest bind the learning environment. Changes to
+the rule engine or gameplay logic invalidate stale policy evidence.
+Snapshots independently replay the scheduled scenario and command log;
+policy training uses `GamePolicyLearner`, and the existing parallel
+rollout actors can execute this request without inventing an emulator.
+
+The training CLI itself now uses this `GameEnvironmentRequest` factory
+for local measured updates and heldout evaluation. It does not
+automatically start parallel workers, and CI/live worker execution
+has not been independently observed for this commit.

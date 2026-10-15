@@ -176,6 +176,26 @@ def rule_authoring_contract(base_source: Mapping[str, object]) -> dict[str, obje
                 else ["set"]
             ),
         })
+    example = None
+    for field in fields:
+        value = field["current"]
+        if field["type"] == "int" and field["minimum"] != field["maximum"]:
+            proposed = (
+                field["minimum"] if value != field["minimum"] else field["maximum"]
+            )
+            example = {"scope":"settings","path":field["path"],
+                       "op":"set","value":proposed}
+            break
+        if field["type"] == "bool":
+            example = {"scope":"settings","path":field["path"],
+                       "op":"toggle","value":None}
+            break
+        if field["type"] == "enum":
+            proposed = next((x for x in field["options"] if x != value),None)
+            if proposed is not None:
+                example = {"scope":"settings","path":field["path"],
+                           "op":"set","value":proposed}
+                break
     return {
         "schema_version": "skeleton.game_builder.ai_rule_authoring_contract.v1",
         "proposal_schema_version": PROPOSAL_SCHEMA,
@@ -193,12 +213,7 @@ def rule_authoring_contract(base_source: Mapping[str, object]) -> dict[str, obje
             "schema_version", "proposal_id", "base_digest", "reason",
             "scene_seed", "operations"
         ],
-        "sample_operation": {
-            "scope": "settings",
-            "path": fields[0]["path"] if fields else None,
-            "op": "set",
-            "value": fields[0]["current"] if fields else None,
-        },
+        "sample_operation": example,
         "neural_weight_training_automatic": False,
         "automatic_rule_promotion": False,
     }

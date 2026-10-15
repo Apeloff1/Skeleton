@@ -86,6 +86,14 @@
       "no rule/policy promotion without separate authorization",
       "no hardware game execution claim"
     ],
-    "verification": "Not yet passed exact-head runtime tests, security and benchmark review."
+    "verification": "Not yet passed exact-head runtime tests, security and benchmark review.",
+    "isolated_worker_request": {
+      "kind": "studio_rules",
+      "target_id": "studio-rules:<registered_editor>",
+      "exact_tree_file": "game/studio/rule_curriculum.json",
+      "fixed_environment_identity": "source_digest + rule_plan_digest + gameplay implementation digest + rule executor source digest",
+      "status": "implementation_candidate_pending_exact_head_actor_verification",
+      "note": "Current local CLI instantiates the same typed request; the existing parallel worker supports this kind, but no worker run was executed in this conversation."
+    }
   }
 }
