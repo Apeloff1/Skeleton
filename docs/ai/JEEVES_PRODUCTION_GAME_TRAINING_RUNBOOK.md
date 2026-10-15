@@ -85,14 +85,55 @@ A completed candidate run writes the following separate output files:
 
 Training a candidate is not automatic production activation. The app's existing shadow-weight ledger, independent admission, reviewer signoff, rollback and serving-pointer activation remain the only paths to promotion. Keyword matches or prediction-loss improvements are NOT proof of better game design.
 
-## 7. Tests and compile gates
+## 7. Blinded independent game-design review
+
+Production model learning is not considered effective just because perplexity
+falls. Prepare a genuinely blinded game-design comparison from the operator's
+game-review file:
+
+    skeleton-jeeves-game-review prepare \
+      --benchmark /PRIVATE_PATH/operator/candidates/game-001-game-review.json \
+      --packet /PRIVATE_PATH/operator/reviews/blind-packet.json \
+      --private-key /PRIVATE_PATH/operator/private/candidate-key.json
+
+The private identity key must stay with the adjudicator. Give only
+blind-packet.json to two independent reviewers. Create empty review sheets:
+
+    skeleton-jeeves-game-review worksheet \
+      --packet /PRIVATE_PATH/operator/reviews/blind-packet.json \
+      --reviewer-id reviewer-alpha \
+      --output /PRIVATE_PATH/operator/reviews/reviewer-alpha.json
+
+Repeat with a distinct reviewer ID and destination. Every blank sheet contains
+all 24 prompts, six criteria per response, critical-defect flags, and empty
+evidence notes. **No scores are filled in automatically.**
+
+After independent reviewers have completed all scores and factual evidence
+notes, adjudicate the two worksheets:
+
+    skeleton-jeeves-game-review adjudicate \
+      --packet /PRIVATE_PATH/operator/reviews/blind-packet.json \
+      --private-key /PRIVATE_PATH/operator/private/candidate-key.json \
+      --reviewer-a /PRIVATE_PATH/operator/reviews/reviewer-alpha.json \
+      --reviewer-b /PRIVATE_PATH/operator/reviews/reviewer-beta.json \
+      --output /PRIVATE_PATH/operator/private/adjudication.json
+
+A candidate must improve average ratings, avoid critical defects, avoid
+meaningful domain regressions, and pass at least 20 of 24 non-regression
+comparisons agreed upon by both reviewers. This gate only makes a candidate
+eligible for a *separate* governed promotion proposal. It never activates
+production weights. Reviewer judgments remain subjective and should ultimately
+be complemented by playable tests with real players.
+
+## 8. Tests and compile gates
 
 Run:
 
     python -m unittest \
       skeleton.testing.test_jeeves_production_game_train \
       skeleton.testing.test_jeeves_production_training_operator \
-      skeleton.testing.test_jeeves_cortex_persisted_bpe
+      skeleton.testing.test_jeeves_cortex_persisted_bpe \
+      skeleton.testing.test_jeeves_game_design_review_gate
 
 Separately run the app installer, native runtime, game builder, security, model serving and end-to-end validation after compiling. Source commits alone do not prove those gates passed. No new noisy Actions workflows have been added.
 
