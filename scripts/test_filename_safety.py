@@ -78,6 +78,21 @@ class FilenameSafetyTests(unittest.TestCase):
                     any("reserved Windows" in issue for issue in unsafe_filename("folder/" + name))
                 )
 
+    def test_utf8_path_budget_with_short_utf16_name(self):
+        path = "data/" + "漢" * 90 + ".json"
+        self.assertLess(len(path), 240)
+        issues = unsafe_filename(path)
+        self.assertTrue(any("UTF-8" in issue for issue in issues), issues)
+
+    def test_legacy_utf8_long_path_remains_unchanged(self):
+        path = "legacy/" + "漢" * 90 + ".json"
+        self.assertEqual(check_paths({path}, {path}), [])
+        self.assertTrue(check_paths(set(), {path}))
+
+    def test_utf8_boundary_allows_portable_path(self):
+        path = "data/" + "a" * 229 + ".json"
+        self.assertEqual(unsafe_filename(path), [])
+
     def test_remove_existing_bad_file(self):
         old = "legacy/con.txt"
         self.assertEqual(check_paths({old}, set()), [])
