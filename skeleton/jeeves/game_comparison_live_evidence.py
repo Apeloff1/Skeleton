@@ -12,6 +12,7 @@ from typing import Any
 
 from .game_comparison_schema import digest
 from .game_emulator_host import _controls
+from .game_emulator_timing import normalize_timing, native_execution_budget
 
 SCHEMA="skeleton.game.live_evidence_verification.v1"
 EXPORT="skeleton.game.live_evidence_export.v1"
@@ -32,12 +33,15 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         if type(game_id) is not str or not isinstance(lane,dict) or lane.get("game_id")!=game_id:
             raise LiveEvidenceError("Native evidence source game IDs differ")
         source=lane.get("source_media_sha256")
+        native_source=lane.get("native_content_digest",source)
         core_sha=lane.get("core_sha256")
         if (type(core_sha) is not str or len(core_sha)!=64
             or any(ch not in "0123456789abcdef" for ch in core_sha)):
             raise LiveEvidenceError("Native core binary SHA-256 is absent or invalid")
-        if type(source) is not str or len(source)!=64:
-            raise LiveEvidenceError("Original game media hash is not recorded")
+        if (type(source) is not str or len(source)!=64 or
+            type(native_source) is not str or len(native_source)!=64 or
+            any(ch not in "0123456789abcdef" for ch in native_source)):
+            raise LiveEvidenceError("Original game source or native bundle digest is not recorded")
         initial=lane.get("initial_chain_sha256")
         env_sha=lane.get("native_environment_sha256")
         seed=lane.get("seed")
@@ -50,9 +54,20 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         if initial!=expect:
             raise LiveEvidenceError("First native state hash differs from the initial approved environment")
         events=lane.get("native_events")
-        if not isinstance(events,list) or len(events)>4104:
-            raise LiveEvidenceError("Native event recording exceeds the 4096-step + 4-reset + 2-checkpoint + 2-rewind cap")
+        if not isinstance(events,list) or len(events)>4192:
+            raise LiveEvidenceError("Native event recording exceeds the 4096-step + 4-reset + 2-checkpoint + 2-rewind + 32-disc + 32-timing + 24-inspection cap")
         reset_generation=0
+        disc_changes=0
+        timing_changes=0
+        inspections=0
+        timing_mode, timing_factor = "normal", 1
+        configured_frames = lane.get("configured_frames_per_step", 1)
+        if type(configured_frames) is not int or not 1 <= configured_frames <= 60:
+            raise LiveEvidenceError("Native core base frame timing is outside approved bounds")
+        last_frame_sha = None
+        last_run_cursor = None
+        disc_image=None
+        host_disc_chain=digest(["native_disc_control",env_sha])
         episode_step=0
         steps=0
         checkpoints=0
@@ -79,6 +94,20 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                     or payload.get("source_content_sha256")!=source
                     or payload.get("core_sha256")!=core_sha):
                     raise LiveEvidenceError("Actual native episode step index or source was modified")
+                if not {"requested_native_frames", "timing_mode", "timing_factor"} <= set(payload):
+                    raise LiveEvidenceError("Actual native frame pacing fields were removed")
+                frames = payload["requested_native_frames"]
+                expected_frames, _ = native_execution_budget(timing_mode, timing_factor, configured_frames)
+                if (type(frames) is not int or frames != expected_frames
+                    or payload["timing_mode"] != timing_mode
+                    or payload["timing_factor"] != timing_factor
+                    or type(payload.get("native_frame_calls")) is not int
+                    or payload["native_frame_calls"] < frames
+                    or (last_run_cursor is not None
+                        and payload["native_frame_calls"] - last_run_cursor != frames)):
+                    raise LiveEvidenceError("Native pacing differs from the actual receipted frame count")
+                last_run_cursor = payload["native_frame_calls"]
+                last_frame_sha = payload.get("frame_sha256")
                 controls=payload.get("controller_ports")
                 if not isinstance(controls,list) or not 1<=len(controls)<=4:
                     raise LiveEvidenceError("Replayable native controller tape is missing")
@@ -95,6 +124,136 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                 steps+=1
                 episode_step+=1
                 episodes[-1].append(controls)
+            elif row["event_kind"]=="native_timing_change":
+                required = {
+                    "schema_version","game_id","index","episode_step","reset_generation",
+                    "previous_mode","previous_factor","mode","factor",
+                    "native_frame_sha256","native_run_cursor",
+                    "source_content_sha256","core_sha256","previous_chain_sha256",
+                    "native_frame_advanced","receipt_sha256",
+                }
+                if (set(payload)!=required
+                    or payload["schema_version"]!="skeleton.game.live_native_timing_receipt.v1"
+                    or payload["index"]!=timing_changes+1
+                    or payload["episode_step"]!=episode_step
+                    or payload["reset_generation"]!=reset_generation
+                    or payload["source_content_sha256"]!=source
+                    or payload["core_sha256"]!=core_sha
+                    or payload["native_frame_advanced"] is not False
+                    or payload["previous_mode"]!=timing_mode
+                    or payload["previous_factor"]!=timing_factor):
+                    raise LiveEvidenceError("Native timing source, generation or mode transition differs")
+                try:
+                    mode,factor=normalize_timing(payload["mode"],payload["factor"])
+                except ValueError as exc:
+                    raise LiveEvidenceError("Native speed profile is outside bounded modes") from exc
+                if mode==timing_mode and factor==timing_factor:
+                    raise LiveEvidenceError("Native timing receipt duplicates unchanged mode")
+                if (last_frame_sha is not None and payload["native_frame_sha256"]!=last_frame_sha
+                    or type(payload["native_run_cursor"]) is not int
+                    or payload["native_run_cursor"]<0
+                    or (last_run_cursor is not None and payload["native_run_cursor"]!=last_run_cursor)):
+                    raise LiveEvidenceError("Native pause or speed switch changed the current frame")
+                last_frame_sha=payload["native_frame_sha256"]
+                last_run_cursor=payload["native_run_cursor"]
+                timing_mode,timing_factor=mode,factor
+                timing_changes+=1
+                if timing_changes>32:
+                    raise LiveEvidenceError("Native speed changes exceeded 32 receipts")
+            elif row["event_kind"]=="native_frame_inspection":
+                required={
+                    "schema_version","game_id","index","episode_step","reset_generation",
+                    "native_frame_sha256","native_run_cursor","inspection_sha256",
+                    "tile_count","source_content_sha256","core_sha256",
+                    "previous_chain_sha256","native_frame_advanced","receipt_sha256",
+                }
+                if (set(payload)!=required
+                    or payload["schema_version"]!="skeleton.game.live_native_inspection_receipt.v1"
+                    or payload["index"]!=inspections+1
+                    or payload["episode_step"]!=episode_step
+                    or payload["reset_generation"]!=reset_generation
+                    or payload["source_content_sha256"]!=source
+                    or payload["core_sha256"]!=core_sha
+                    or payload["native_frame_advanced"] is not False
+                    or timing_mode!="paused"
+                    or type(payload["tile_count"]) is not int
+                    or not 1<=payload["tile_count"]<=256
+                    or type(payload["inspection_sha256"]) is not str
+                    or len(payload["inspection_sha256"])!=64):
+                    raise LiveEvidenceError("Native frozen-frame inspection lacks a valid tile commitment")
+                if (last_frame_sha is not None and payload["native_frame_sha256"]!=last_frame_sha
+                    or type(payload["native_run_cursor"]) is not int
+                    or payload["native_run_cursor"]<0
+                    or (last_run_cursor is not None and payload["native_run_cursor"]!=last_run_cursor)):
+                    raise LiveEvidenceError("Paused inspection advanced or replaced the native frame")
+                last_frame_sha=payload["native_frame_sha256"]
+                last_run_cursor=payload["native_run_cursor"]
+                inspections+=1
+                if inspections>24:
+                    raise LiveEvidenceError("Frozen inspections exceeded 24 receipts")
+            elif row["event_kind"]=="native_disc_swap":
+                required={
+                    "schema_version", "game_id", "index", "episode_step",
+                    "reset_generation", "source_content_sha256", "native_content_digest", "core_sha256",
+                    "native_host_disc_receipt_sha256", "native_host_disc_receipt",
+                    "previous_image_index", "selected_image_index",
+                    "registered_disc_count", "interface_version",
+                    "previous_chain_sha256", "native_frame_advanced",
+                    "receipt_sha256",
+                }
+                if (set(payload)!=required
+                    or payload["schema_version"]!="skeleton.game.live_native_disc_swap_receipt.v1"
+                    or payload["index"]!=disc_changes+1
+                    or payload["episode_step"]!=episode_step
+                    or payload["reset_generation"]!=reset_generation
+                    or payload["source_content_sha256"]!=source
+                    or payload["native_content_digest"]!=native_source
+                    or payload["core_sha256"]!=core_sha
+                    or payload["native_frame_advanced"] is not False):
+                    raise LiveEvidenceError("Native disc event counters or source differ")
+                count=payload["registered_disc_count"]
+                old=payload["previous_image_index"]
+                new=payload["selected_image_index"]
+                if (type(count) is not int or not 2<=count<=32
+                    or type(old) is not int or not 0<=old<count
+                    or type(new) is not int or not 0<=new<count
+                    or new==old
+                    or (disc_image is not None and old!=disc_image)
+                    or type(payload["interface_version"]) is not int
+                    or payload["interface_version"] not in (0,1)):
+                    raise LiveEvidenceError("Disc swap did not select a valid distinct preloaded image")
+                host=payload["native_host_disc_receipt"]
+                host_fields={
+                    "schema_version", "core_sha256", "content_digest",
+                    "environment_digest", "event_index", "episode_step_before_swap",
+                    "previous_image_index", "selected_image_index", "registered_disc_count",
+                    "interface_version", "previous_disc_chain_sha256",
+                    "prior_game_transition_sha256", "rendered_frame_after_swap",
+                    "receipt_sha256",
+                }
+                if not isinstance(host,dict) or set(host)!=host_fields:
+                    raise LiveEvidenceError("Native host media provenance receipt is missing")
+                host_data={k:v for k,v in host.items() if k!="receipt_sha256"}
+                if (host["schema_version"]!="skeleton.game.native_disc_swap_receipt.v1"
+                    or host["core_sha256"]!=core_sha
+                    or host["content_digest"]!=native_source
+                    or host["environment_digest"]!=env_sha
+                    or host["event_index"]!=disc_changes+1
+                    or host["episode_step_before_swap"]!=episode_step
+                    or host["previous_image_index"]!=old
+                    or host["selected_image_index"]!=new
+                    or host["registered_disc_count"]!=count
+                    or host["interface_version"]!=payload["interface_version"]
+                    or host["previous_disc_chain_sha256"]!=host_disc_chain
+                    or host["rendered_frame_after_swap"] is not False
+                    or digest(host_data)!=host["receipt_sha256"]
+                    or host["receipt_sha256"]!=payload["native_host_disc_receipt_sha256"]):
+                    raise LiveEvidenceError("Native disc host receipt chain diverged")
+                disc_changes+=1
+                if disc_changes>32:
+                    raise LiveEvidenceError("Native disc swap lifetime exceeded 32 events")
+                disc_image=new
+                host_disc_chain=host["receipt_sha256"]
             elif row["event_kind"]=="native_checkpoint":
                 number=checkpoints+1
                 if (payload.get("schema_version")!="skeleton.game.live_native_checkpoint_receipt.v1"
@@ -141,6 +300,9 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                     or payload.get("source_content_sha256")!=source):
                     raise LiveEvidenceError("Native reset generation was mutated")
                 reset_generation+=1
+                last_frame_sha=payload.get("frame_sha256")
+                last_run_cursor=None
+                disc_image=None
                 episode_step=0
                 saved=None
                 episodes.append([])
@@ -150,6 +312,9 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         if (lane.get("final_chain_sha256")!=previous
             or lane.get("step_count")!=steps
             or lane.get("reset_count")!=reset_generation
+            or lane.get("disc_change_count",0)!=disc_changes
+            or lane.get("timing_change_count",0)!=timing_changes
+            or lane.get("inspection_count",0)!=inspections
             or lane.get("checkpoint_count")!=checkpoints
             or lane.get("rewind_count")!=rewinds):
             raise LiveEvidenceError("Final native evidence count/root differs from committed events")
@@ -159,6 +324,12 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
             "native_events_verified":len(events),
             "native_input_steps_verified":steps,
             "native_resets_verified":reset_generation,
+            "native_disc_swaps_verified":disc_changes,
+            "native_timing_changes_verified":timing_changes,
+            "native_frozen_inspections_verified":inspections,
+            "last_timing_mode":timing_mode,
+            "last_timing_factor":timing_factor,
+            "last_native_disc_chain_sha256":host_disc_chain,
             "native_checkpoints_verified":checkpoints,
             "native_rewinds_verified":rewinds,
             "episode_tape_lengths":[len(ep) for ep in episodes],
@@ -178,6 +349,9 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         "game_count":len(rows),
         "total_real_reported_native_steps":sum(x["native_input_steps_verified"] for x in rows),
         "total_native_reset_events":sum(x["native_resets_verified"] for x in rows),
+        "total_native_disc_swaps_verified":sum(x["native_disc_swaps_verified"] for x in rows),
+        "total_native_timing_changes_verified":sum(x["native_timing_changes_verified"] for x in rows),
+        "total_frozen_frame_inspections_verified":sum(x["native_frozen_inspections_verified"] for x in rows),
         "total_native_checkpoint_events":sum(x["native_checkpoints_verified"] for x in rows),
         "total_native_rewind_events":sum(x["native_rewinds_verified"] for x in rows),
         "private_savestate_bytes_exported":False,

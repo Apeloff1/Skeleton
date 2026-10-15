@@ -13,6 +13,9 @@ from skeleton.jeeves.game_comparison_live_http import LocalComparisonServer
 class FakeStudy:
     def __init__(self):
         self.steps=0
+        self.swaps=0
+        self.timings=0
+        self.inspections=0
         self.closed=False
     def state(self):
         return {"schema_version":"synthetic-test-view","lanes":{}}
@@ -21,6 +24,15 @@ class FakeStudy:
         return {"status":"fake-test-only","accepted":packet}
     def reset(self,game_id):
         return {"status":"synthetic-reset","game_id":game_id}
+    def swap_disc(self, packet):
+        self.swaps+=1
+        return {"status":"synthetic_disc_transaction","request":packet}
+    def set_timing(self, packet):
+        self.timings+=1
+        return {"status":"synthetic_timing","request":packet}
+    def inspect(self, packet):
+        self.inspections+=1
+        return {"status":"synthetic_inspection","request":packet}
     def checkpoint(self,game_id):
         return {"status":"synthetic-private-checkpoint","game_id":game_id}
     def rewind(self,game_id):
@@ -78,6 +90,43 @@ class LocalOriginContracts(unittest.TestCase):
         )
         self.assertEqual(status,200)
         self.assertEqual(self.study.steps,1)
+
+    def test_disc_swap_requires_origin_token_and_cannot_accept_unauthorized_calls(self):
+        packet={"game_id":"synthetic","image_index":1}
+        status,_=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            origin=self.base,
+        )
+        self.assertEqual(status,403)
+        status,_=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            token=self.server.secret,origin="https://other.example",
+        )
+        self.assertEqual(status,403)
+        self.assertEqual(self.study.swaps,0)
+        status,result=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            token=self.server.secret,origin=self.base,
+        )
+        self.assertEqual(status,200)
+        self.assertEqual(result["status"],"synthetic_disc_transaction")
+        self.assertEqual(self.study.swaps,1)
+
+    def test_timing_and_inspection_enforce_same_origin_authentication(self):
+        speed={"game_id":"synthetic","mode":"slow","factor":4}
+        freeze={"game_id":"synthetic"}
+        for path,packet in (("/api/timing",speed),("/api/inspect",freeze)):
+            unauthenticated,_=self._call(path,method="POST",body=packet,origin=self.base)
+            self.assertEqual(unauthenticated,403)
+            foreign,_=self._call(path,method="POST",body=packet,
+                token=self.server.secret,origin="https://cross-origin.example")
+            self.assertEqual(foreign,403)
+            success,payload=self._call(path,method="POST",body=packet,
+                token=self.server.secret,origin=self.base)
+            self.assertEqual(success,200)
+            self.assertEqual(payload["request"],packet)
+        self.assertEqual(self.study.timings,1)
+        self.assertEqual(self.study.inspections,1)
 
     def test_checkpoint_and_rewind_are_authenticated_same_origin_only(self):
         for endpoint in ("/api/checkpoint","/api/rewind"):

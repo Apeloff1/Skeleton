@@ -40,6 +40,8 @@ jobs:
         run: |
           python -m compileall -q \
             skeleton/jeeves/game_comparison_live.py \
+            skeleton/jeeves/game_emulator_timing.py \
+            skeleton/jeeves/game_emulator_host.py \
             skeleton/jeeves/game_comparison_pairwise.py \
             skeleton/jeeves/game_comparison_portfolio.py \
             skeleton/jeeves/game_comparison_controllers.py \
@@ -58,6 +60,9 @@ jobs:
             skeleton/jeeves/game_emulator_target_gap_matrix.py \
             skeleton/jeeves/game_comparison_studio.py \
             scripts/live_game_comparison.py \
+            scripts/qualify_full_console_disc_cycle.py \
+            scripts/qualify_full_console_save_ram.py \
+            tests/fixtures/verify_homebrew_disc_sram.py \
             scripts/analyze_live_game_comparison.py \
             scripts/analyze_game_comparison_portfolio.py \
             scripts/qualify_live_game_comparison.py \
@@ -69,6 +74,7 @@ jobs:
         run: |
           python -m unittest -v \
             tests.test_game_comparison_live \
+            tests.test_game_emulator_timing \
             tests.test_game_comparison_core_input_descriptors \
             tests.test_game_comparison_counterfactual \
             tests.test_game_comparison_counterfactual_integrity \
@@ -77,6 +83,9 @@ jobs:
             tests.test_game_comparison_boomerang \
             tests.test_game_comparison_multispectral \
             tests.test_game_comparison_live_http \
+            tests.test_game_emulator_disc_control \
+            tests.test_game_emulator_save_ram \
+            tests.test_game_emulator_homebrew_disc_sram_abi \
             tests.test_game_comparison_pairwise \
             tests.test_game_comparison_portfolio \
             tests.test_game_comparison_raw_qualification_regression \

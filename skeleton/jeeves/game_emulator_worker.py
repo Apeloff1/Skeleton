@@ -31,6 +31,7 @@ MAX_AUDIO_FRAMES = 131072
 MAX_STATE = 64 * 1024 * 1024
 MAX_ROM = 32 * 1024 * 1024
 MAX_MEMORY_READ = 1024 * 1024
+MAX_SAVE_RAM = 8 * 1024 * 1024
 REQUIRED_SYMBOLS = (
     "retro_api_version",
     "retro_set_environment",
@@ -91,6 +92,23 @@ class InputDescriptor(C.Structure):
         ("port", C.c_uint), ("device", C.c_uint),
         ("index", C.c_uint), ("id", C.c_uint),
         ("description", C.c_void_p),
+    ]
+
+
+class DiskControlCallbacks(C.Structure):
+    """Stable first seven pointers in libretro v0 and v1 disk control ABI.
+
+    The v1 struct appends three fields. We intentionally read only the
+    compatible subset: no dynamic paths, replacing discs, or adding content.
+    """
+    _fields_ = [
+        ("set_eject_state", C.c_void_p),
+        ("get_eject_state", C.c_void_p),
+        ("get_image_index", C.c_void_p),
+        ("set_image_index", C.c_void_p),
+        ("get_num_images", C.c_void_p),
+        ("replace_image_index", C.c_void_p),
+        ("add_image_index", C.c_void_p),
     ]
 
 
@@ -220,6 +238,8 @@ class NativeCore:
         self.controller_port_devices = tuple(declared_ports)
         self.controller_capabilities: list[list[dict[str, object]]] | None = None
         self.input_descriptors: list[dict[str, object]] = []
+        self.disk_callbacks: dict[str, int] | None = None
+        self.disk_interface_version: int | None = None
         self.buffers: dict[str, object] = {}
         self.keys_previous: set[int] = set()
         self.keyboard = None
@@ -333,6 +353,7 @@ class NativeCore:
         # snapshot them into wire-safe metadata only after both phases.
         self.info["core_input_descriptors"] = list(self.input_descriptors)
         self.info["core_input_descriptors_are_user_defined"] = True
+        self.info["disk_control_interface_version"] = self.disk_interface_version
         self.info["controller_capabilities"] = self.controller_capabilities
         self.info["input_descriptors"] = [
             {"port": row["port"], "device": row["device"],
@@ -382,8 +403,25 @@ class NativeCore:
             if command == 7:
                 self.shutdown = True
                 return True
+            if command in (13, 58):
+                # libretro allows deregistration with NULL, e.g. on unload.
+                if not data:
+                    self.disk_callbacks = None
+                    self.disk_interface_version = None
+                    return True
+                table = C.cast(data, C.POINTER(DiskControlCallbacks)).contents
+                mandatory = ("set_eject_state", "get_eject_state", "get_image_index",
+                             "set_image_index", "get_num_images")
+                if any(not getattr(table, name) for name in mandatory):
+                    return False
+                self.disk_callbacks = {name: int(getattr(table, name)) for name in mandatory}
+                self.disk_interface_version = 1 if command == 58 else 0
+                return True
             if not data:
                 return False
+            if command == 57:
+                C.cast(data, C.POINTER(C.c_uint))[0] = 1
+                return True
             if command == 1:
                 rotation = C.cast(data, C.POINTER(C.c_uint))[0]
                 if rotation > 3:
@@ -519,6 +557,73 @@ class NativeCore:
         ) as exc:
             self.error = str(exc)[:512]
             return False
+
+    def _disk_call(self, name: str, restype, *arguments):
+        if self.disk_callbacks is None or name not in self.disk_callbacks:
+            raise ValueError("native_disk_control_unavailable")
+        return C.CFUNCTYPE(restype, *arguments)(self.disk_callbacks[name])
+
+    def disk_status(self) -> dict[str, object]:
+        if self.disk_callbacks is None:
+            return {
+                "supported": False, "interface_version": None,
+                "image_count": 0, "image_index": None, "ejected": None,
+            }
+        # Do not trust an arbitrary native library's declared capacity.
+        count = int(self._disk_call("get_num_images", C.c_uint)())
+        if count == 0:
+            # Some cores register the ABI before discovering whether the
+            # loaded image contains a multidisc set. Do not break regular
+            # boot/step paths merely because there are no registered disks.
+            return {
+                "supported": False, "interface_version": None,
+                "image_count": 0, "image_index": None, "ejected": None,
+            }
+        if not 1 <= count <= 32:
+            raise ValueError("native_disk_count_outside_bound")
+        index = int(self._disk_call("get_image_index", C.c_uint)())
+        ejected = bool(self._disk_call("get_eject_state", C.c_bool)())
+        # The libretro sentinel UINT_MAX may represent no inserted disc.
+        # Accept it only with the tray ejected, never as a selected image.
+        if index == 0xFFFFFFFF and ejected:
+            index = None
+        elif not 0 <= index < count:
+            raise ValueError("native_disk_index_outside_bound")
+        return {
+            "supported": True, "interface_version": self.disk_interface_version,
+            "image_count": count, "image_index": index, "ejected": ejected,
+        }
+
+    def swap_disc(self, index: int) -> dict[str, object]:
+        """Eject -> select a core-preloaded image -> insert; abort on any error.
+
+        There is deliberately no replace_image_index/add_image_index facility:
+        all media was pinned readonly when the sandbox started. On a partial
+        callback failure the worker returns an error and is torn down by host.
+        """
+        previous = self.disk_status()
+        if not previous["supported"] or previous["image_count"] < 2:
+            raise ValueError("native_multiple_discs_unavailable")
+        wanted = _integer(index, 0, previous["image_count"] - 1, "selected disc index")
+        if previous["ejected"]:
+            raise ValueError("native_disc_tray_unexpectedly_open")
+        if wanted == previous["image_index"]:
+            return {**previous, "previous_image_index": wanted, "changed": False}
+        eject = self._disk_call("set_eject_state", C.c_bool, C.c_bool)
+        select = self._disk_call("set_image_index", C.c_bool, C.c_uint)
+        if not eject(True):
+            raise ValueError("native_disc_eject_rejected")
+        if not self.disk_status()["ejected"]:
+            raise ValueError("native_disc_eject_not_confirmed")
+        if not select(wanted):
+            raise ValueError("native_disc_select_rejected")
+        if not eject(False):
+            raise ValueError("native_disc_insert_rejected")
+        current = self.disk_status()
+        if current["ejected"] or current["image_index"] != wanted or current["image_count"] != previous["image_count"]:
+            raise ValueError("native_disc_switch_unverified")
+        self._check()
+        return {**current, "previous_image_index": previous["image_index"], "changed": True}
 
     def _video(self, pointer: int, width: int, height: int, pitch: int) -> None:
         try:
@@ -674,6 +779,17 @@ class NativeCore:
             raise ValueError("native PCM bytes differ from libretro callback frame count")
         return metadata, {"pixels": pixels, "audio": audio}
 
+    def _save_ram_access(self) -> tuple[int, int]:
+        """Libretro RETRO_MEMORY_SAVE_RAM=0; fail without a valid live region."""
+        size = int(self.core.retro_get_memory_size(0))
+        if not 1 <= size <= MAX_SAVE_RAM:
+            raise ValueError("native_save_ram_unavailable_or_oversized")
+        pointer = int(self.core.retro_get_memory_data(0) or 0)
+        if not pointer:
+            raise ValueError("native_save_ram_pointer_unavailable")
+        self._check()
+        return pointer, size
+
     def command(
         self, operation: str, payload: dict[str, object], blocks: dict[str, bytes]
     ) -> tuple[dict[str, object], dict[str, bytes]]:
@@ -704,6 +820,48 @@ class NativeCore:
                 if operation == "reset" and self.raw_video is not None:
                     break
             return self.frame()
+        if operation == "disc_status":
+            if payload or blocks:
+                raise ValueError("native_disc_status_request_requires_no_arguments")
+            return self.disk_status(), {}
+        if operation == "disc_swap":
+            if set(payload) != {"image_index"} or blocks:
+                raise ValueError("native_disc_swap_request_invalid")
+            return self.swap_disc(payload["image_index"]), {}
+        if operation == "save_ram_export":
+            if payload or blocks:
+                raise ValueError("native_save_ram_export_requires_empty_request")
+            pointer, size = self._save_ram_access()
+            raw = C.string_at(pointer, size)
+            return {
+                "memory_region": 0,
+                "size": size, "sha256": hashlib.sha256(raw).hexdigest(),
+                "format": "raw_libretro_save_ram",
+            }, {"save_ram": raw}
+        if operation == "save_ram_import":
+            if set(payload) != {"memory_region", "size", "sha256"} or set(blocks) != {"save_ram"}:
+                raise ValueError("native_save_ram_import_schema_invalid")
+            if type(payload["memory_region"]) is not int or payload["memory_region"] != 0:
+                raise ValueError("native_save_ram_region_forbidden")
+            expected_size = _integer(payload["size"], 1, MAX_SAVE_RAM, "native save RAM size")
+            raw = blocks["save_ram"]
+            if (not isinstance(raw, bytes) or len(raw) != expected_size
+                or type(payload["sha256"]) is not str
+                or hashlib.sha256(raw).hexdigest() != payload["sha256"]):
+                raise ValueError("native_save_ram_source_corrupt")
+            pointer, actual_size = self._save_ram_access()
+            if actual_size != expected_size:
+                raise ValueError("native_save_ram_exact_size_mismatch")
+            C.memmove(pointer, raw, expected_size)
+            if hashlib.sha256(C.string_at(pointer, expected_size)).hexdigest() != payload["sha256"]:
+                raise ValueError("native_save_ram_writeback_changed")
+            self._check()
+            return {
+                "memory_region": 0,
+                "size": actual_size,
+                "sha256": payload["sha256"],
+                "readback_verified": True,
+            }, {}
         if operation == "state_info":
             size = self.core.retro_serialize_size()
             return {"state_size": size}, {}

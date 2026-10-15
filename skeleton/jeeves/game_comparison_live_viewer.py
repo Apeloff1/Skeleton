@@ -28,6 +28,7 @@ main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
 .player{min-width:0;background:#1b2839;border:1px solid #3c4c62;padding:15px;border-radius:12px}
 .screen{aspect-ratio:16/10;background:#05080e;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;margin-top:10px}
 .screen img{max-width:100%;max-height:100%;object-fit:contain}
+.screen.frozen{outline:2px solid #e6b77c}.screen.zoomed img{max-width:200%;max-height:200%;transform:scale(1.5);image-rendering:pixelated}
 .deck{border:2px solid #405d7b;background:#24334b;border-radius:15px;padding:12px;margin-top:13px}
 .deckface{position:relative;height:150px;background:#142034;border-radius:24px;margin-top:9px}
 .inputbutton{position:absolute;transform:translate(-50%,-50%);padding:8px;min-width:36px;max-width:76px;font-size:11px;border-radius:20px}
@@ -80,6 +81,7 @@ let current=null;
 const selected={left:null,right:null};
 const pressed=new Map(),numeric=new Map();
 const notes=[];
+const playing=new Set(), inspections=new Map(), zoomed=new Set();
 const dims=["movement","input","combat","navigation","story","dialogue","camera","cutscene","character","npc","environment","pacing","challenge","reward","audio","music","ambience","visuals","interface","accessibility","emergence","economy","physics","mission","level_design","consequence","world_design","other"];
 dims.forEach(x=>$("dimension").append(choose(x,x)));
 const key=(id,port)=>id+"::"+port;
@@ -132,14 +134,99 @@ async function step(ids){
  if(!current)return;
  try{
   msg("Running "+ids.length+" actual native game worker(s)…");
-  const repeat=Number($("repeat").value)||1;
-  const response=await request("/api/step",{steps:ids.map(id=>({game_id:id,controls:vector(id),repeat}))});
+    const response=await request("/api/step",{steps:ids.map(id=>({game_id:id,controls:vector(id),repeat:burstFor(id)}))});
   ids.forEach(clearInputs);await load();
-  msg(response.all_succeeded?"Real native frames updated · "+repeat+" receipt(s) per game":"One or more native bursts failed or reached a limit; inspect the per-game evidence");
+  msg(response.all_succeeded?"Actual native frames committed under selected timing":"Native burst stopped or failed; inspect receipts");
  }catch(e){msg("Native step rejected: "+e.message)}
 }
 async function resetGame(id){
  try{await request("/api/reset",{game_id:id});clearInputs(id);await load();msg("Actual native core reset, not a fake frame")}catch(e){msg("Reset rejected: "+e.message)}
+}
+function burstFor(id){
+ const lane=current.lanes[id];
+ return lane.timing_mode==="fast"?lane.timing_factor:
+    lane.timing_mode==="slow"?1:(Number($("repeat").value)||1)
+}
+async function timingSet(id,mode,factor){
+ playing.delete(id);
+ try{await request("/api/timing",{game_id:id,mode,factor});
+  await load();msg("Native timing updated; zero emulator frames advanced");
+ }catch(e){msg("Timing rejected: "+e.message);await load()}
+}
+async function inspectFrozen(id){
+ try{const packet=await request("/api/inspect",{game_id:id});
+  inspections.set(id,packet);await load();
+  msg("Native frame inspected: "+packet.inspection.total_tiles+" full-detail RGB tile hashes");
+ }catch(e){msg("Inspection rejected: "+e.message);await load()}
+}
+async function autoAdvance(id){
+ if(!playing.has(id)||!current?.lanes?.[id])return;
+ const lane=current.lanes[id],repeat=burstFor(id);
+ if(lane.status!=="running"||lane.timing_mode==="paused"||
+   lane.lifetime_steps+repeat>lane.max_lifetime_steps){
+  playing.delete(id);render();return
+ }
+ try{
+  const response=await request("/api/step",{steps:[{game_id:id,controls:vector(id),repeat}]});
+  await load();
+  if(!playing.has(id))return;
+  if(!response.all_succeeded){playing.delete(id);render();return}
+  const after=current.lanes[id];
+  const nominalHz=Number(after.native_preview?.native_fps);
+  const hz=Number.isFinite(nominalHz)&&nominalHz>=10&&nominalHz<=240?nominalHz:60;
+  const ms=after.timing_mode==="slow"?Math.ceil(1000/hz*after.timing_factor):
+   after.timing_mode==="normal"?Math.ceil(1000/hz*after.native_frames_per_step*repeat):0;
+  setTimeout(()=>autoAdvance(id),ms)
+ }catch(e){playing.delete(id);msg("Autoplay stopped: "+e.message);await load()}
+}
+function timingDeckFor(id){
+ const lane=current.lanes[id],section=txt("section","","deck");
+ section.append(txt("strong","Emulator time controls · core-neutral native execution"));
+ const bar=txt("div","","inline"),speed=document.createElement("select");
+ speed.setAttribute("aria-label","Choose native emulation timing profile");
+ [["paused:0","Pause / freeze"],["slow:8","Slow ⅛×"],["slow:4","Slow ¼×"],
+  ["slow:2","Slow ½×"],["normal:1","Normal 1×"],
+  ["fast:2","Fast 2× batch"],["fast:4","Fast 4× batch"],
+  ["fast:8","Fast 8× batch"]].forEach(([v,n])=>speed.append(choose(v,n)));
+ speed.value=lane.timing_mode+":"+lane.timing_factor;
+ speed.disabled=lane.status==="native_execution_failed"||lane.timing_change_count>=lane.max_timing_changes;
+ speed.onchange=()=>{const [m,n]=speed.value.split(":");timingSet(id,m,Number(n))};
+ bar.append(speed);
+ const play=txt("button",playing.has(id)?"Stop":"Auto-advance");
+ play.disabled=lane.status!=="running"||lane.timing_mode==="paused"||
+  lane.lifetime_steps>=lane.max_lifetime_steps;
+ play.onclick=()=>{if(playing.has(id)){playing.delete(id);render()}
+  else{playing.add(id);render();autoAdvance(id)}};
+ bar.append(play);
+ const inspect=txt("button","Inspect paused frame");
+ inspect.disabled=lane.timing_mode!=="paused"||lane.inspection_count>=lane.max_inspections;
+ inspect.onclick=()=>inspectFrozen(id);bar.append(inspect);
+ const zoom=txt("button",zoomed.has(id)?"Normal zoom":"Pixel zoom");
+ zoom.onclick=()=>{zoomed.has(id)?zoomed.delete(id):zoomed.add(id);render()};
+ bar.append(zoom);section.append(bar);
+ section.append(txt("small",
+  "Slow executes one native frame per action; pause holds pixels without retro_run; "+
+  "fast batches 2/4/8 actual receipted steps. Real wall-clock speed depends on core and hardware."));
+ const packet=inspections.get(id);
+ if(packet?.inspection){
+  const data=packet.inspection,details=document.createElement("details");
+  details.append(txt("summary","Asset RGB tile audit: "+data.width+"×"+data.height+
+    ", "+data.total_tiles+" fully hashed tiles"));
+  const save=txt("button","Export full tile evidence JSON");
+  save.onclick=()=>exportJSON(id+"_native_frame_inspection",packet);
+  details.append(save);
+  details.append(txt("div","Frame SHA-256 "+data.pixel_sha256+
+   " · native runs "+data.native_run_cursor+" · no advance for inspection","stats"));
+  const high=[...data.tiles].sort((a,b)=>
+   (b.sampled_luminance_range[1]-b.sampled_luminance_range[0])-
+   (a.sampled_luminance_range[1]-a.sampled_luminance_range[0]));
+  high.slice(0,12).forEach(tile=>details.append(txt("div",
+   "Region "+tile.x+","+tile.y+" · RGB "+tile.sampled_rgb_mean.join(",")+
+   " · luma "+tile.sampled_luminance_range.join("–")+
+   " · SHA "+tile.tile_rgb_sha256,"stats")));
+  section.append(details)
+ }
+ return section
 }
 async function checkpointGame(id){
  try{
@@ -260,6 +347,55 @@ function nativeAudioMonitor(frame){
  region.append(button,player,description);
  return region
 }
+function discDeckFor(id){
+ const lane=current.lanes[id],status=lane.native_disc_status;
+ const section=txt("section","","deck");
+ section.append(txt("strong","Native console media · installed core only"));
+ if(!status?.supported||status.image_count<2){
+  section.append(txt("small","No multi-disc interface registered by this native core."));
+  return section
+ }
+ const summary=txt("p","Disc "+(status.image_index===null?"not inserted":(status.image_index+1))+
+    " of "+status.image_count+" · "+(status.ejected?"tray ejected":"tray closed")+
+    " · swaps "+lane.native_disc_change_count+"/32","subtle");
+ const controls=txt("div","","inline"),select=document.createElement("select");
+ select.setAttribute("aria-label","Select previously loaded console disc");
+ for(let i=0;i<status.image_count;i++)select.append(choose(String(i),"Disc "+(i+1)));
+ select.value=String(status.image_index??0);
+ const button=txt("button","Switch to selected disc");
+ button.type="button";
+ button.disabled=lane.status!=="running"||status.ejected||lane.native_disc_change_count>=32;
+ button.onclick=async()=>{
+  const target=Number(select.value);
+  if(!Number.isInteger(target)||target<0||target>=status.image_count){
+   msg("Disc change rejected: invalid preloaded disc");return
+  }
+  if(target===status.image_index){
+   msg("That native disc is already inserted");return
+  }
+  try{
+   msg("Requesting actual libretro eject/select/insert transaction…");
+   const result=await request("/api/disc_swap",{game_id:id,image_index:target});
+   await load();
+   msg(result.changed?"Native core changed disc; advance a frame to observe game response":
+       "Native disc unchanged or worker rejected the swap; inspect lane status")
+  }catch(error){msg("Native disc switch rejected: "+error.message);await load()}
+ };
+ controls.append(select,button);
+ section.append(summary,controls);
+ const discEvents=(lane.recent_native_events||[]).filter(x=>x.event_kind==="native_disc_swap");
+ const details=document.createElement("details");
+ details.append(txt("summary","Disc-change evidence · "+discEvents.length+" recent receipt(s)"));
+ discEvents.forEach(event=>{
+  const r=event.receipt;
+  details.append(txt("div","Disc "+(r.previous_image_index+1)+" → "+(r.selected_image_index+1)+
+     " · step "+r.episode_step+" · host "+r.native_host_disc_receipt_sha256.slice(0,12)+
+     " · chain "+r.receipt_sha256.slice(0,12),"stats"))
+ });
+ section.append(details);
+ section.append(txt("small","Only core-preloaded, hash-pinned media. No new files, automatic model learning or claimed console fidelity."));
+ return section
+}
 function panel(side){
  const root=$(side),id=selected[side],lane=current.lanes[id];
  root.replaceChildren();
@@ -271,27 +407,33 @@ function panel(side){
    current.native_game_ids.find(k=>k!==sel.value)}
   render()
  };heading.append(sel);root.append(heading);
- const stage=txt("div","","screen"),frame=lane.native_preview;
+ const stage=txt("div","","screen"+(lane.timing_mode==="paused"?" frozen":"")+(zoomed.has(id)?" zoomed":"")),frame=lane.native_preview;
  if(frame?.image_data_uri){const img=document.createElement("img");img.src=frame.image_data_uri;
   img.alt="Actual isolated libretro frame from "+lane.title;stage.append(img)
  }else stage.append(txt("p",lane.status==="running"?"Actual frame exceeds bounded preview limit":lane.status,"subtle"));
  root.append(stage);
+ root.append(timingDeckFor(id));
  root.append(deckFor(id));
+ root.append(discDeckFor(id));
  root.append(nativeAudioMonitor(frame));
  const actions=txt("div","","inline"),doStep=txt("button","Advance native frame"),doReset=txt("button","Reset this emulator"),
   doCheckpoint=txt("button","Save private checkpoint"),doRewind=txt("button","Rewind to checkpoint");
- doStep.disabled=lane.status!=="running"||lane.lifetime_steps>=lane.max_lifetime_steps;
- doReset.disabled=lane.status==="native_execution_failed"||lane.reset_count>=4;
+ doStep.disabled=lane.status!=="running"||lane.timing_mode==="paused"||lane.lifetime_steps>=lane.max_lifetime_steps;
+ doReset.disabled=lane.status==="native_execution_failed"||lane.timing_mode==="paused"||lane.reset_count>=4;
  doCheckpoint.disabled=lane.status!=="running"||lane.checkpoint_count>=lane.max_checkpoints;
  doRewind.disabled=!lane.has_private_checkpoint||lane.status==="native_execution_failed"||
   lane.rewind_count>=lane.max_rewinds||lane.lifetime_steps>=lane.max_lifetime_steps;
  doStep.onclick=()=>step([id]);doReset.onclick=()=>resetGame(id);
  doCheckpoint.onclick=()=>checkpointGame(id);doRewind.onclick=()=>rewindGame(id);
  actions.append(doStep,doCheckpoint,doRewind,doReset);root.append(actions);
- root.append(txt("p",lane.status+" · lifetime "+lane.lifetime_steps+"/"+lane.max_lifetime_steps+
+ root.append(txt("p",lane.status+" · timing "+lane.timing_mode+" "+lane.timing_factor+" · lifetime "+lane.lifetime_steps+"/"+lane.max_lifetime_steps+
     " native actions · checkpoint "+lane.checkpoint_count+"/"+lane.max_checkpoints+
     " · rewinds "+lane.rewind_count+"/"+lane.max_rewinds+
     " · resets "+lane.reset_count+"/4","stats"));
+ root.append(txt("div","Last measured native throughput: "+
+    (lane.last_burst_native_fps===null?"not measured":lane.last_burst_native_fps+" receipted frames/s")+
+    " · "+(lane.last_burst_wall_ms??"—")+" ms for "+lane.last_burst_receipted_frames+
+    " frames · host wall time only, not guaranteed speed","stats"));
  root.append(txt("div","Frame SHA-256 "+(frame?.frame_sha256||"unavailable")+
     " · native evidence root "+lane.latest_event_chain_sha256,"stats"));
  root.append(graphFor(lane))
@@ -302,9 +444,9 @@ function render(){
  panel("left");panel("right")
 }
 $("all").onclick=()=>{if(!current)return;
- const repeat=Number($("repeat").value)||1;
  const ids=current.native_game_ids.filter(id=>current.lanes[id].status==="running"
-    && current.lanes[id].lifetime_steps+repeat<=current.lanes[id].max_lifetime_steps);
+    && current.lanes[id].timing_mode!=="paused"
+    && current.lanes[id].lifetime_steps+burstFor(id)<=current.lanes[id].max_lifetime_steps);
  if(ids.length)step(ids);else msg("No active games can advance")
 };
 $("branches").onclick=async()=>{try{

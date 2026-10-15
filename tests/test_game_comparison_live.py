@@ -359,6 +359,197 @@ class NativeLiveComparisonContracts(unittest.TestCase):
         self.assertLess(page.index("root.append(deckFor(id));"),
                         page.index("root.append(nativeAudioMonitor(frame));"))
 
+    def _controls_idle(self):
+        return [{"buttons":0,"axes":[0,0,0,0],"keys":[],
+                 "mouse":[0]*6,"pointer":[0]*3}]
+
+    def test_per_core_pause_inspect_slow_and_fast_evidence(self):
+        session=self._session()
+        env=session._lanes["first"].env
+        before=dict(env._frame)
+        pause=session.set_timing({"game_id":"first","mode":"paused","factor":0})
+        self.assertTrue(pause["changed"])
+        self.assertFalse(pause["native_frame_advanced"])
+        self.assertEqual(env._frame,before)
+        with self.assertRaises(LiveComparisonError):
+            session.step({"steps":[{"game_id":"first","controls":self._controls_idle()}]})
+        with self.assertRaises(LiveComparisonError):
+            session.reset("first")
+        with self.assertRaises(LiveComparisonError):
+            session.inspect({"game_id":"second"})
+        # Synthetic pixel fixture; no native retro_run occurs.
+        def fake_inspection():
+            return {"schema_version":"test-only-inspection",
+                    "pixel_sha256":env._frame["pixel_sha256"],
+                    "audio_sha256":env._frame["audio_sha256"],
+                    "native_run_cursor":env._frame["runs"],
+                    "total_tiles":1,"native_frames_executed_for_inspection":0}
+        env.inspect_frame=fake_inspection
+        result=session.inspect({"game_id":"first"})
+        self.assertEqual(result["inspection"]["native_run_cursor"],before["runs"])
+        self.assertEqual(env._frame,before)
+        self.assertFalse(result["native_frame_advanced"])
+        slow=session.set_timing({"game_id":"first","mode":"slow","factor":8})
+        self.assertTrue(slow["changed"])
+        # This mock has only the one-frame input_step path.
+        executed=session.step({"steps":[
+            {"game_id":"first","controls":self._controls_idle()},
+        ]})
+        self.assertEqual(executed["results"][0]["native_frames_per_step"],1)
+        self.assertEqual(executed["results"][0]["completed_native_steps"],1)
+        audit=verify_live_evidence(session.export_evidence())
+        first=next(row for row in audit["games"] if row["game_id"]=="first")
+        self.assertEqual(first["native_timing_changes_verified"],2)
+        self.assertEqual(first["native_frozen_inspections_verified"],1)
+        self.assertEqual(first["last_timing_mode"],"slow")
+        self.assertEqual(first["last_timing_factor"],8)
+        session.set_timing({"game_id":"first","mode":"fast","factor":4})
+        burst=session.step({"steps":[{"game_id":"first","controls":self._controls_idle()}]})
+        self.assertEqual(burst["results"][0]["completed_native_steps"],4)
+        self.assertEqual(burst["results"][0]["fully_receipted_native_frames"],4)
+        self.assertGreaterEqual(burst["results"][0]["observed_native_frames_per_wall_second"],0)
+        self.assertGreater(burst["results"][0]["measured_wall_ms"],0)
+        self.assertTrue(burst["all_succeeded"])
+        self.assertEqual(verify_live_evidence(session.export_evidence())[
+            "total_real_reported_native_steps"],5)
+        self.assertEqual(session.state(images=False)["lanes"]["second"]["timing_mode"],"normal")
+
+    def test_paused_inspection_forged_frame_cursor_is_rejected(self):
+        session=self._session()
+        env=session._lanes["first"].env
+        env.inspect_frame=lambda:{
+            "pixel_sha256":env._frame["pixel_sha256"],
+            "native_run_cursor":env._frame["runs"],
+            "total_tiles":1,"native_frames_executed_for_inspection":0,
+        }
+        session.set_timing({"game_id":"first","mode":"paused","factor":0})
+        session.inspect({"game_id":"first"})
+        exported=session.export_evidence()
+        lane=exported["lanes"]["first"]
+        event=lane["native_events"][-1]
+        event["receipt"]["native_run_cursor"]+=1
+        event["receipt"]["receipt_sha256"]=digest({k:v for k,v in event["receipt"].items()
+                                                    if k!="receipt_sha256"})
+        event["receipt_sha256"]=event["receipt"]["receipt_sha256"]
+        lane["final_chain_sha256"]=event["receipt_sha256"]
+        with self.assertRaises(LiveEvidenceError):
+            verify_live_evidence(exported)
+
+    def test_speed_profile_validations_are_atomic_before_native_step(self):
+        session=self._session()
+        for payload in (
+            {"game_id":"first","mode":"fast","factor":16},
+            {"game_id":"first","mode":"slow","factor":True},
+            {"game_id":"first","mode":"paused","factor":1},
+            {"game_id":"first","mode":"fast","factor":2,"rom_path":"/private/x"},
+            {"game_id":"not_selected","mode":"fast","factor":2},
+        ):
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                session.set_timing(payload)
+        self.assertEqual(session.export_evidence()["lanes"]["first"]["timing_change_count"],0)
+        self.assertEqual(session.export_evidence()["lanes"]["first"]["step_count"],0)
+
+    def test_viewer_renders_native_timing_and_inspection_below_screen(self):
+        page=render_live_comparison_page("a"*64,"b"*32)
+        self.assertIn('request("/api/timing"',page)
+        self.assertIn('request("/api/inspect"',page)
+        self.assertIn("function autoAdvance",page)
+        self.assertLess(page.index("root.append(stage);"),
+                        page.index("root.append(timingDeckFor(id));"))
+        self.assertLess(page.index("root.append(timingDeckFor(id));"),
+                        page.index("root.append(deckFor(id));"))
+
+    def _disc_session(self):
+        session=self._session()
+        lane=session._lanes["first"]
+        lane.native_content_digest=digest(["admitted_native_bundle",lane.content_digest])
+        state={"supported":True,"interface_version":1,"image_count":3,
+               "image_index":0,"ejected":False}
+        tracked={"count":0,"sha":digest([
+            "native_disc_control",lane.env.spec.environment_digest,
+        ])}
+        def fake_status():
+            return dict(state)
+        def fake_swap(index):
+            old=state["image_index"]
+            if index==old:
+                return {"changed":False,"disc_status":fake_status()}
+            receipt={
+                "schema_version":"skeleton.game.native_disc_swap_receipt.v1",
+                "core_sha256":lane.env.core.library_sha256,
+                "content_digest":lane.native_content_digest,
+                "environment_digest":lane.env.spec.environment_digest,
+                "event_index":tracked["count"]+1,
+                "episode_step_before_swap":lane.step_count,
+                "previous_image_index":old,
+                "selected_image_index":index,
+                "registered_disc_count":3,
+                "interface_version":1,
+                "previous_disc_chain_sha256":tracked["sha"],
+                "prior_game_transition_sha256":digest(["fake_native_step"]),
+                "rendered_frame_after_swap":False,
+            }
+            tracked["sha"]=digest(receipt)
+            tracked["count"]+=1
+            receipt["receipt_sha256"]=tracked["sha"]
+            state["image_index"]=index
+            return {"changed":True,"disc_status":fake_status(),"receipt":receipt}
+        lane.env.disc_status=fake_status
+        lane.env.swap_disc=fake_swap
+        return session,tracked
+
+    def test_live_disc_swap_updates_exported_native_hash_chain(self):
+        session,tracked=self._disc_session()
+        first=session.swap_disc({"game_id":"first","image_index":2})
+        self.assertTrue(first["changed"])
+        self.assertFalse(first["native_frame_advanced"])
+        self.assertEqual(tracked["count"],1)
+        packet=session.export_evidence()
+        self.assertEqual(packet["lanes"]["first"]["disc_change_count"],1)
+        audit=verify_live_evidence(packet)
+        self.assertEqual(audit["total_native_disc_swaps_verified"],1)
+        self.assertEqual(audit["games"][0]["native_disc_swaps_verified"],1)
+        controls={"buttons":0,"axes":[0,0,0,0],"keys":[],
+                  "mouse":[0]*6,"pointer":[0]*3}
+        session.step({"steps":[{"game_id":"first","controls":[controls]}]})
+        after_step=verify_live_evidence(session.export_evidence())
+        self.assertEqual(after_step["total_native_disc_swaps_verified"],1)
+        self.assertEqual(after_step["total_real_reported_native_steps"],1)
+        same=session.swap_disc({"game_id":"first","image_index":2})
+        self.assertFalse(same["changed"])
+        self.assertEqual(tracked["count"],1)
+
+    def test_live_disc_receipt_tampering_is_rejected(self):
+        session,_=self._disc_session()
+        session.swap_disc({"game_id":"first","image_index":1})
+        packet=session.export_evidence()
+        receipt=packet["lanes"]["first"]["native_events"][0]["receipt"]
+        receipt["native_host_disc_receipt"]["selected_image_index"]=2
+        with self.assertRaises(LiveEvidenceError):
+            verify_live_evidence(packet)
+
+    def test_live_disc_switch_rejects_invalid_core_slot_or_game_without_mutation(self):
+        session,tracked=self._disc_session()
+        for raw in (
+            {"game_id":"first","image_index":32},
+            {"game_id":"first","image_index":True},
+            {"game_id":"third","image_index":1},
+            {"game_id":"first","image_index":1,"path":"/host/sneaky.cue"},
+        ):
+            with self.subTest(raw=raw),self.assertRaises(LiveComparisonError):
+                session.swap_disc(raw)
+        self.assertEqual(tracked["count"],0)
+        self.assertEqual(session.export_evidence()["lanes"]["first"]["disc_change_count"],0)
+
+    def test_browser_disc_selector_is_below_native_screen_and_controller(self):
+        page=render_live_comparison_page("a"*64,"b"*32)
+        self.assertIn("root.append(discDeckFor(id));",page)
+        self.assertIn('request("/api/disc_swap"',page)
+        self.assertLess(page.index("root.append(stage);"),
+                        page.index("root.append(deckFor(id));"))
+        self.assertLess(page.index("root.append(deckFor(id));"),
+                        page.index("root.append(discDeckFor(id));"))
+
     def test_browser_uses_below_screen_controllers(self):
         page=render_live_comparison_page("a"*64,"b"*32)
         self.assertIn("root.append(stage);",page)
