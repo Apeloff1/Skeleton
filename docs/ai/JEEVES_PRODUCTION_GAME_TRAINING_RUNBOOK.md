@@ -10,6 +10,45 @@ Install and compile Skeleton using the existing installer/build pipeline. Config
 
 The path must be private to the serving account, not inside GitHub or a public download directory. The existing production model must have been restored from that file. A new genesis model or a copied scratch checkpoint does NOT establish production custody.
 
+### Optional first-boot production initialization (no existing checkpoint)
+
+A newly compiled deployment with no actual serving checkpoint cannot be passed
+off as previously trained. To create the **app's own** initial trained weights,
+use explicit maintenance/bootstrap mode before accepting any user requests:
+
+    export SKELETON_JEEVES_PROFILE=desktop
+    export SKELETON_JEEVES_DEVICE=auto
+    export SKELETON_JEEVES_BOOTSTRAP=1
+    export SKELETON_OWN="/PRIVATE_PATH/jeeves-live-own.json"
+
+The legacy profile remains the default when SKELETON_JEEVES_PROFILE is absent.
+Explicit profiles are legacy (8-dimensional native), mobile (32-dimensional
+Torch), desktop (128-dimensional Torch), and workstation (256-dimensional
+Torch). Nonlegacy profiles require installing the opt-in
+jeeves-production-training package extra and compatible PyTorch hardware.
+Explicit CUDA or Apple MPS device requests never silently fall back to CPU.
+
+Inside the **same compiled app process** that has initialized its Jeeves
+singleton in maintenance mode, call the privileged local Python API:
+
+    from skeleton.cortex.live import get_live, initialize_persisted_production
+    get_live()
+    receipt = initialize_persisted_production(epochs=1)
+
+This executes actual initial curriculum SGD on that exact app-owned Jeeves,
+not a second scratch object. It refuses an existing checkpoint, previously
+loaded state, a missing private state path, or more than one epoch. It saves
+the initial production checkpoint atomically and requires a FULL app restart
+with the same SKELETON_OWN path. Disable SKELETON_JEEVES_BOOTSTRAP after
+initialization; restart and confirm the existing weights were restored before
+requesting an attestation. This initial curriculum is not evidence of
+high-quality game design; game specialization and evaluation follow below.
+
+Choosing a larger profile does **not** upgrade any existing persisted model.
+A previously trained checkpoint always controls the restored weight shapes.
+Never delete an existing production checkpoint just to change its model size;
+use the separate governed architecture migration process.
+
 ## 2. Obtain an in-process production attestation
 
 Inside the already running, operator-authorized compiled app process, use:
@@ -159,13 +198,14 @@ Run:
       skeleton.testing.test_jeeves_cortex_persisted_bpe \
       skeleton.testing.test_jeeves_game_design_review_gate \
       skeleton.testing.test_jeeves_training_progress \
-      skeleton.testing.test_jeeves_torch_game_vocabulary
+      skeleton.testing.test_jeeves_torch_game_vocabulary \
+      skeleton.testing.test_jeeves_production_profile
 
 Separately run the app installer, native runtime, game builder, security, model serving and end-to-end validation after compiling. Source commits alone do not prove those gates passed. No new noisy Actions workflows have been added.
 
 ## Work remaining before production readiness
 
-- A real compiled serving process, real SKELETON_OWN checkpoint and in-process attestations are not accessible in this authoring environment.
+- A real compiled serving process, real SKELETON_OWN checkpoint and in-process attestations are not accessible in this authoring environment; the guarded first-boot flow is implemented but remains unverified on a compiled installation.
 - An independent evaluation and controlled game playtesting process must establish whether candidate generations materially improve design; lexical/loss metrics are insufficient.
 - Torch-stack vocabulary growth now supports preserved token IDs, but compiled GPU/CPU training performance and post-reload behavior remain to be verified end-to-end.
 - Interrupted candidate training can resume from immutable per-batch optimizer cursors, but the actual compiled-app restart path still requires end-to-end qualification.
