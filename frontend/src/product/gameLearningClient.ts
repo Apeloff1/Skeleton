@@ -209,10 +209,12 @@ export async function simulateLearningProject(current: LearningProject, simulati
 export async function startLearningTraining(current: LearningProject, config: {
   sessionIds: string[]; algorithm: string; epochs: number; seed: number; episodeSteps?: number; sourceId?: string;
   freshPolicy?: boolean; workers?: number; demonstrationIds?: string[]; resourceProfile?: string;
+  alpha?: number; gamma?: number; epsilon?: number; epsilonDecay?: number; minEpsilon?: number; rewardClip?: number; imitationStrength?: number; explorationStrategy?: string; nStep?: number; evaluationSeeds?: number; minImprovement?: number; maxWorstSeedRegression?: number; executionSeconds?: number;
 }, input: LearningRequest = {}, key = learningRequestKey('train')): Promise<LearningJob> {
   const result = await data(api.post<{ job: LearningJob }>(path(current.project_id) + '/train', {
     expected_version: current.version, idempotency_key: key, session_ids: config.sessionIds,
     algorithm: config.algorithm, epochs: config.epochs, seed: config.seed, episode_steps: config.episodeSteps, source_id: config.sourceId, fresh_policy: config.freshPolicy, workers: config.workers, demonstration_ids: config.demonstrationIds, resource_profile: config.resourceProfile,
+    alpha: config.alpha ?? .25, gamma: config.gamma ?? .95, epsilon: config.epsilon ?? .3, epsilon_decay: config.epsilonDecay ?? .98, min_epsilon: config.minEpsilon ?? .03, reward_clip: config.rewardClip ?? 100, imitation_strength: config.imitationStrength ?? 1, exploration_strategy: config.explorationStrategy ?? 'uniform', n_step: config.nStep ?? 1, evaluation_seeds: config.evaluationSeeds ?? 4, min_improvement: config.minImprovement ?? 0, max_worst_seed_regression: config.maxWorstSeedRegression ?? 0, execution_seconds: config.executionSeconds ?? 300,
   }, options(input, key)), 'Local training could not be started.');
   return job(result.job, current.project_id);
 }

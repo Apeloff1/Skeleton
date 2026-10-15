@@ -6,12 +6,20 @@ import { ChatClientError, chatApiError } from './chatErrors';
 
 export type CrawlerReadiness = { available: boolean; configured: boolean; code: string; message: string; action?: string | null; network_reachability_verified?: boolean; limits: Record<string, number>; capabilities: Record<string, boolean> };
 export type CrawlUsage = { requests: number; bytes: number; documents: number; failures: number; reserved_bytes?: number };
+export type CrawlAutomation = {
+  enabled: boolean; state: 'authorized' | 'running' | 'waiting' | 'stopped' | 'disabled' | 'blocked' | 'not_authorized';
+  epoch: number; slices_started: number; max_slices: number;
+  expires_at: string | null; next_run_at: string | null; stop_reason: string | null;
+};
+export type CrawlWorker = { active: boolean; quiescent: boolean; local: boolean; lease_until: string | null; confirmation?: string; recovery_eligible?: boolean };
+export type CrawlCapabilities = { can_run: boolean; can_pause: boolean; can_resume: boolean; can_cancel: boolean; can_erase: boolean; can_automate: boolean };
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
   limits: { max_requests: number; max_documents: number; max_total_bytes: number; max_depth: number; [key: string]: unknown };
   counters: CrawlUsage; frontier_count: number; source_count: number; consent_current: boolean; consent_expires_at: string;
   next_ready_at?: number | null; stop_reason?: string | null; error?: { code?: string; message?: string } | null;
+  automation?: CrawlAutomation; worker?: CrawlWorker; capabilities?: CrawlCapabilities;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type CapturedSource = { source_id: string; url: string; canonical_url?: string; title: string; text?: string; content_digest: string; fetched_at: string; review_state: string; provenance: Record<string, unknown>; text_truncated?: boolean };
@@ -43,6 +51,19 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
   for (const count of Object.values(value.counters)) if (!integer(count, 33554432)) invalid('The crawler counters are invalid.');
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
   for (const row of value.queue) if (!row || typeof row.url !== 'string' || row.url.length > 4096 || !integer(row.depth, 3) || !integer(row.attempts, 128) || typeof row.ready_at !== 'number' || !Number.isFinite(row.ready_at)) invalid('The crawler queue is invalid.');
+  if (value.automation) {
+    const a = value.automation;
+    if (typeof a.enabled !== 'boolean' || !['authorized', 'running', 'waiting', 'stopped', 'disabled', 'blocked', 'not_authorized'].includes(a.state)
+      || !integer(a.epoch) || !integer(a.slices_started, 64) || !integer(a.max_slices, 64) || a.slices_started > a.max_slices
+      || a.enabled && a.max_slices < 1 || a.expires_at !== null && !Number.isFinite(Date.parse(a.expires_at))
+      || a.next_run_at !== null && !Number.isFinite(Date.parse(a.next_run_at))
+      || a.stop_reason !== null && (typeof a.stop_reason !== 'string' || a.stop_reason.length > 4096)) invalid('The crawler automation authorization is invalid.');
+  }
+  if (value.worker && (['active', 'quiescent', 'local'].some(key => typeof value.worker![key as keyof CrawlWorker] !== 'boolean')
+    || value.worker.lease_until !== null && !Number.isFinite(Date.parse(value.worker.lease_until))
+    || value.worker.confirmation !== undefined && (typeof value.worker.confirmation !== 'string' || value.worker.confirmation.length > 256)
+    || value.worker.recovery_eligible !== undefined && typeof value.worker.recovery_eligible !== 'boolean')) invalid('The crawler worker projection is invalid.');
+  if (value.capabilities && ['can_run', 'can_pause', 'can_resume', 'can_cancel', 'can_erase', 'can_automate'].some(key => typeof value.capabilities![key as keyof CrawlCapabilities] !== 'boolean')) invalid('The crawler command capabilities are invalid.');
   return value;
 }
 function source(value: CapturedSource, id?: string): CapturedSource {
@@ -108,4 +129,53 @@ export async function eraseCrawl(id: string, body: CrawlCommand, signal?: AbortS
     if (!response.ok) throw chatApiError({ ok: false, status: response.status, data: value, error: null, rid: response.headers.get('x-request-id') }, 'Source erasure was not confirmed. Retry the same command.');
     if (value.session_id !== id || value.status !== 'deleted' || !integer(value.version)) invalid('The crawler deletion receipt belongs to another session.');
   } finally { clearTimeout(timer); signal?.removeEventListener('abort', stop); }
+}
+
+
+export type CrawlTextPage = {
+  session_id: string; source_id: string; version: number; offset: number; end: number; total_chars: number;
+  text: string; next_offset: number | null; content_digest: string; chunk_digest: string;
+  offset_unit: 'unicode_code_points'; source_classification: string;
+};
+export type CrawlSearchHit = {
+  source_id: string; canonical_url: string; title: string; content_hash: string; preserved_text_hash: string;
+  passage_hash: string; start: number; end: number; text: string; lexical_score: number;
+  review_state: string; authority: string; instruction_risks: { risk: string; start: number; end: number; detail: string }[];
+};
+export type CrawlSearchPage = { schema_version: string; run_id: string; session_id: string; version: number; query: string; hits: CrawlSearchHit[]; evidence_digest: string };
+export async function authorizeCrawlAutomation(id: string, body: CrawlCommand & { enabled: boolean; max_slices: number; max_seconds: number }, signal?: AbortSignal): Promise<CrawlSession> {
+  if (typeof body.enabled !== 'boolean' || !integer(body.max_slices, 64) || body.max_slices < 1 || !integer(body.max_seconds, 3600) || body.max_seconds < 15) throw new ChatClientError('Choose 1–64 bounded slices and 15–3,600 seconds.', { kind: 'validation' });
+  const value = await read(api.post<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id) + '/automation', body, options(signal)), getAuthToken(), 'Automatic capture was not confirmed. Retry the same saved request or refresh its state.');
+  return session(value.session, id);
+}
+export async function getCrawlText(id: string, sourceId: string, offset = 0, digest?: string, signal?: AbortSignal): Promise<CrawlTextPage> {
+  if (!integer(offset, 2097152) || digest !== undefined && !HASH.test(digest)) invalid('The source text cursor is invalid.');
+  const token = getAuthToken();
+  const value = await read(api.get<CrawlTextPage>(ROOT + '/sessions/' + identifier(id) + '/sources/' + identifier(sourceId) + '/text?offset=' + offset + '&max_chars=8000' + (digest ? '&expected_content_digest=' + digest : ''), options(signal)), token, 'The preserved source passage could not be read.');
+  if (!value || value.session_id !== id || value.source_id !== sourceId || !integer(value.version) || value.offset !== offset || value.offset_unit !== 'unicode_code_points'
+    || !integer(value.end, 2097152) || !integer(value.total_chars, 2097152) || value.end < offset || value.end > value.total_chars
+    || typeof value.text !== 'string' || Array.from(value.text).length !== value.end - offset || new TextEncoder().encode(value.text).byteLength > 64000
+    || !HASH.test(value.content_digest) || digest && value.content_digest !== digest || !HASH.test(value.chunk_digest)
+    || value.next_offset !== null && (value.next_offset !== value.end || value.end >= value.total_chars)
+    || value.next_offset === null && value.end !== value.total_chars || typeof value.source_classification !== 'string') invalid('The preserved source text page is invalid.');
+  const measured = await digestStringAsync(CryptoDigestAlgorithm.SHA256, value.text);
+  if (signal?.aborted || token !== getAuthToken()) throw new ChatClientError('The source read was detached or your account changed.', { kind: 'authorization' });
+  if (measured !== value.chunk_digest) invalid('The preserved source text bytes changed.');
+  return value;
+}
+export async function searchCrawlSources(id: string, query: string, signal?: AbortSignal): Promise<CrawlSearchPage> {
+  const text = query.trim(); if (!text || text.length > 512) throw new ChatClientError('Enter a source query of 1–512 characters.', { kind: 'validation' });
+  const token = getAuthToken();
+  const value = await read(api.get<CrawlSearchPage>(ROOT + '/sessions/' + identifier(id) + '/search?query=' + encodeURIComponent(text) + '&limit=8', options(signal)), getAuthToken(), 'The captured source search could not be read.');
+  if (!value || value.session_id !== id || value.query !== text || typeof value.schema_version !== 'string' || !integer(value.version) || !HASH.test(value.evidence_digest) || !Array.isArray(value.hits) || value.hits.length > 8) invalid('The source search returned an invalid scope.');
+  for (const hit of value.hits) {
+    if (!hit || !ID.test(hit.source_id) || typeof hit.canonical_url !== 'string' || hit.canonical_url.length > 4096 || typeof hit.title !== 'string'
+      || !HASH.test(hit.content_hash) || !HASH.test(hit.preserved_text_hash) || !HASH.test(hit.passage_hash) || !integer(hit.start, 2097152) || !integer(hit.end, 2097152)
+      || hit.end <= hit.start || typeof hit.text !== 'string' || Array.from(hit.text).length !== hit.end - hit.start || hit.text.length > 16000
+      || typeof hit.lexical_score !== 'number' || !Number.isFinite(hit.lexical_score) || typeof hit.review_state !== 'string' || typeof hit.authority !== 'string'
+      || !Array.isArray(hit.instruction_risks) || hit.instruction_risks.length > 32 || hit.instruction_risks.some(risk => !risk || typeof risk.risk !== 'string' || risk.risk.length > 256 || typeof risk.detail !== 'string' || risk.detail.length > 4096 || !integer(risk.start, 16000) || !integer(risk.end, 16000) || risk.end < risk.start)) invalid('A source search passage is invalid.');
+    if (await digestStringAsync(CryptoDigestAlgorithm.SHA256, hit.text) !== hit.passage_hash) invalid('The captured search passage bytes changed.');
+    if (signal?.aborted || token !== getAuthToken()) throw new ChatClientError('The source search was detached or your account changed.', { kind: 'authorization' });
+  }
+  return value;
 }

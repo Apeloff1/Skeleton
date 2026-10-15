@@ -49,6 +49,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     doctor.add_argument("--timeout", type=float, default=3.0, help="per-probe timeout, at most 10 seconds")
     doctor.add_argument("--json", action="store_true", dest="as_json")
+    doctor.add_argument(
+        "--studio", action="store_true",
+        help="inspect actual local SDK/core prerequisites separately from server readiness",
+    )
+    doctor.add_argument(
+        "--auth-token-file", type=Path,
+        help="private existing bearer-token file for authenticated --studio --live server readiness",
+    )
 
     plan = sub.add_parser("plan", help="show dependency-aware application startup order")
     plan.add_argument("--full", action="store_true", help="include optional full-profile services")
@@ -299,8 +307,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.app.first_install import first_install_report
 
         try:
-            report = first_install_report(live=bool(args.live), timeout=args.timeout)
-        except (OSError, ValueError) as exc:
+            report = first_install_report(
+                live=bool(args.live), timeout=args.timeout,
+                studio=bool(args.studio), auth_token_file=args.auth_token_file,
+            )
+        except (OSError, ValueError, TypeError) as exc:
             print("doctor could not inspect the application: " + type(exc).__name__)
             return 2
         if args.as_json:
@@ -329,6 +340,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 + ")"
             )
             print("Product: " + report["endpoints"]["product"])
+            if args.studio:
+                studio_report = report["studio"]
+                local = studio_report["local_host"]
+                print("Studio host inventory: " + ("observed" if local.get("observed") else "unavailable"))
+                print("Studio server inventory: " + ("observed" if studio_report["server"].get("observed") else "not observed"))
+                print("Native target prerequisites and Dragon runtime details: use --json.")
             for step in report["next_steps"]:
                 print("Next: " + step)
         ok = (

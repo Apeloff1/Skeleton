@@ -202,5 +202,60 @@
     "owner": "backend/core/game_studio_health.py",
     "actual_problem": "RealcoldSDK/corediagnosticquerytook50.8s andouterAPIcorrectlytimedout30s",
     "fix": "Atmostoneinflightnative+onecompilerderivedprobeperprocess;4secondboundedjoin,30secondfreshderivedcache,explicitobservedfalsependingprojection. These arediagnosticsnotexecutiongrants;everybuild/play/trainstillreauthorizesexactoperator/source/runtime. Noautomaticinstallation ornewstore."
+  },
+  "builder_workflows_extension": {
+    "status": "implementation_candidate",
+    "owners": [
+      "backend/core/game_studio_agent.py",
+      "backend/core/game_studio_tools.py",
+      "backend/core/game_console_build.py",
+      "skeleton/jeeves/game_studio_tools.py"
+    ],
+    "operations": [
+      "build.inspect",
+      "artifact.preview",
+      "project.export",
+      "artifact.export",
+      "knowledge.search",
+      "knowledge.practice"
+    ],
+    "preflight": "Safe allowlisted exact-source compiler plan/tool hashes/output paths; no private SDK paths/commands in application projection; no compiler invocation.",
+    "preview": "Existing completed artifact admission and approved native runtime through GameLearningWorkspace.simulate; at most256 actual actions per command, fixed caller-independent isolation, current rights/core/artifact/source identity. NOOP or explicit legal inputs, never a policy/mastery proof.",
+    "exports": "Generate current canonical source export and fully verify exact completed binary bytes; return authorized download references and SHA256/size/filename, no arbitrary filesystem paths. Prepared export is not proof of client download.",
+    "completion_requirements": "Optional finite edit/build/preview/export checklist on original sealed goal intent. Completion only after successful exact-current-head owner receipts; build means actual binary_ready not queued/source_only. Preview must bind that completed artifact and a real committed simulation receipt. Export requires both current source JSON and same compiled binary receipts. No source/model/teacher rights granted.",
+    "evidence": "Optional planner evidence_refs may name only actual current scoped source/job/lesson/step identities exposed in frozen context. Revalidate original source dependencies before action/final settlement; model URLs cannot become authority.",
+    "compatibility": "Older goals omit new optional fields from sealed state and retain unverified completion semantics. Never rewrite historical request hashes/receipts.",
+    "bounds": {
+      "preview_actions": 256,
+      "goal_actions": 16,
+      "evidence_refs": 16
+    },
+    "new_runtime": false,
+    "new_store": false,
+    "validation": "Source checks and genuine bounded homebrew app workflow; no automated tests per user.",
+    "physical_drain": "Existing build and successor worker helpers use raw executor Futures, shielded wait and repeated-cancellation drain; global Task cancellation cannot masquerade as physical thread/process quiescence. Existing worker/cancellation owners retained.",
+    "reviewed_design_knowledge": {
+      "search_operation": "knowledge.search",
+      "owner": "existing backend/core/dragon_runtime.py reviewed-reference projection",
+      "classification": "human_reviewed_design_reference, truth_verified=false, training_allowed=false",
+      "authority": "exact actor/tenant source/revision/review/consent pins, rechecked before model dispatch, tools and final workflow completion; reviewed text is untrusted design context only",
+      "bounds": {
+        "retrieval_limit": 8,
+        "query_characters": 300,
+        "goal_context_limit": 4,
+        "practice_references": 16
+      },
+      "lineage": "existing sealed goal evidence_dependencies and actual issued citation references; no new knowledge store or provider",
+      "scope_adapter": "Existing reviewed_scope_from_workspace converts only already authenticated workspace tenant/account email to the exact canonical Academy owner SHA; no role or source permission is granted.",
+      "practice_operation": "knowledge.practice",
+      "practice": "Read only exact completed source-bound measured practice receipt; separate sealed practice_references pins bind candidate/practice/receipt/runtime and current source/review/consent, rechecked before model/tool dispatch and final settlement. Factual observations only, not truth verification, XP or policy training permission."
+    },
+    "typed_training_compatibility": "Existing typed studio training adapters use the canonical inherited TrainRequest.admitted_request helper so newly added omitted controls do not silently alter historical same-key request identity; the job still freezes full resolved numerical configuration.",
+    "capacity_bound_planning": {
+      "authority": "Existing canonical EngineClient + model_catalog/resolve_selection/context_budget_for_selection/estimate_context_tokens. No provider choice, approximate tokenizer substitution, engine budget increase or direct inference.",
+      "projection": "New preparations only: when full source/tool context exceeds actual admitted model capacity, retain exact goal, current source/manifest/workflow identities and strict current-stage owner forms. Actual current completion receipts select prerequisite stage edit/build/preview/export; the model still chooses each typed action or done under existing finite grant. Optional evidence/observations are added only when they fit, with explicit whole-context digest/omission disclosure.",
+      "framing": "Measure exact declared token profile plus actual LocalInferenceRequest rendered system/user framing. Respect compiler protected policy reservation and segment cap. Persist safe capacity/projection receipt in existing pending record.",
+      "compatibility": "Existing frozen pending prompts/model keys remain untouched; typed capacity errors never become fabricated model steps. Historical failed/unknown goals retain original evidence."
+    }
   }
 }

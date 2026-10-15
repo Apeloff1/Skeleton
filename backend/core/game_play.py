@@ -73,7 +73,7 @@ def resource_profiles():
     actors = min(8, max(1, capacity - 1)) if capacity else 0
     live = min(4, max(1, capacity - actors)) if capacity else 0
     shared = capacity == 1
-    return {
+    result = {
         "profiles": [
             {
                 "profile_id": "cpu",
@@ -85,7 +85,7 @@ def resource_profiles():
                 "max_live_plays": live,
                 "available": capacity > 0,
                 "readiness": {
-                    "code": "cpu_memory_ready" if capacity else "native_memory_capacity_unavailable",
+                    "code": ("cpu_memory_ready" if capacity else "native_memory_capacity_unavailable"),
                     "message": (
                         "Native-compatible CPU/memory admission is available"
                         if capacity
@@ -102,6 +102,30 @@ def resource_profiles():
         "gpu_available": False,
         "interactive_capacity_reserved": capacity > 1,
     }
+    balanced = result["profiles"][0]
+    actor_credits = ["game-learning-actor:" + str(index) for index in range(actors)]
+    balanced["training_credit_ids"] = actor_credits
+    balanced["interactive_capacity_reserved"] = capacity > 1
+    # Borrow the SAME live-play credits when the operator explicitly selects
+    # throughput. Inventing actor:N slots here would overbook a running player.
+    borrowed = [] if shared else ["game-learning-play:" + str(index) for index in range(live)]
+    throughput_credits = (actor_credits + borrowed)[: min(8, balanced["combined_instance_capacity"])]
+    if len(throughput_credits) > actors:
+        result["profiles"].append(
+            {
+                **balanced,
+                "profile_id": "cpu_throughput",
+                "label": "Training throughput — borrow idle play slots",
+                "max_training_workers": len(throughput_credits),
+                "training_credit_ids": throughput_credits,
+                "interactive_capacity_reserved": False,
+                "readiness": {
+                    **balanced["readiness"],
+                    "message": "Uses existing CPU/memory credits including idle play slots. Active human play retains its credit; new live play may wait for training to finish.",
+                },
+            }
+        )
+    return result
 
 
 def _worker(request, options, commands, outputs, stopped):

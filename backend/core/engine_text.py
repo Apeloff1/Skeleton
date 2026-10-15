@@ -46,6 +46,12 @@ class EngineTextError(RuntimeError):
     """A backend compatibility text request cannot be executed safely."""
 
 
+class EngineTextContextError(EngineTextError):
+    """The current prompt/framing was not admitted by canonical context policy."""
+
+    code = "engine_context_too_small"
+
+
 def _text(value: object, field: str, *, maximum: int) -> str:
     if not isinstance(value, str) or not value.strip():
         raise EngineTextError(f"{field} must be non-empty text")
@@ -603,12 +609,17 @@ async def execute_engine_text(
         _stable_uuid("backend-engine-prompt", operation_id + ":prompt:" + request.request_identity_digest),
         hashlib.sha256(request.prompt.encode("utf-8")).hexdigest(),
     )
-    if expected_prompt not in set(envelope.source_snapshot):
-        raise EngineTextError("current prompt does not fit the compiled model context")
+    selected_prompts = {
+        (segment.segment_id, segment.content_digest)
+        for segment in envelope.evidence_segments
+        if segment.kind is ContextKind.USER_MESSAGE
+    }
+    projection = project_provider_context(envelope)
+    if expected_prompt not in selected_prompts or projection.prompt != request.prompt:
+        raise EngineTextContextError("current prompt does not fit the selected model context")
     if selection["context_tokenizer"] in {"utf8_bytes", "reference_tokens"}:
         from skeleton.ai.runtime.inference.local import LocalInferenceRequest, _TOKEN
 
-        projection = project_provider_context(envelope)
         rendered = LocalInferenceRequest(
             prompt=projection.prompt,
             instructions=projection.instructions,
@@ -620,7 +631,7 @@ async def execute_engine_text(
             else sum(1 for _ in _TOKEN.finditer(rendered))
         )
         if estimate > envelope.budget.input_capacity(tools_enabled=False):
-            raise EngineTextError("complete framed conversation does not fit the selected model")
+            raise EngineTextContextError("complete framed conversation does not fit the selected model")
     command = command_from_context(
         context=envelope,
         actor_id=request.actor_id,
@@ -692,6 +703,7 @@ async def execute_engine_text(
 
 
 __all__ = [
+    "EngineTextContextError",
     "EngineTextError",
     "EngineTextRequest",
     "EngineTextResponse",

@@ -20,6 +20,8 @@ MAX_RESULT = 512 * 1024
 READ_OPERATIONS = (
     "catalog",
     "project.inspect",
+    "project.export",
+    "build.inspect",
     "source.inspect",
     "console.inspect",
     "console.handoff",
@@ -29,7 +31,10 @@ READ_OPERATIONS = (
     "campaign.inspect",
     "campaign.rounds",
     "lessons.search",
+    "knowledge.search",
+    "knowledge.practice",
     "artifact.inspect",
+    "artifact.export",
     "campaign.champion.handoff",
     "campaign.attempts",
 )
@@ -46,6 +51,7 @@ WRITE_OPERATIONS = (
     "artifact.admit",
     "artifact.train",
     "artifact.play",
+    "artifact.preview",
     "artifact.campaign",
     "job.resume",
     "job.cancel",

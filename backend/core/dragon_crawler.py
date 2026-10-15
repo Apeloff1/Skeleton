@@ -28,6 +28,9 @@ MAX_SESSIONS = 32
 MAX_OPERATIONS = 128
 LEASE_SECONDS = 120
 MAX_CONCURRENT_SLICES = 4
+MAX_AUTO_SLICES = 64
+MAX_AUTO_SECONDS = 3600
+TERMINAL_STATES = {"completed", "budget_exhausted", "cancelled", "deleted"}
 
 
 class CrawlerError(RuntimeError):
@@ -116,6 +119,8 @@ class DragonCrawlerApplication:
         except EngineClientError:
             self.engine = None
         self._indexes_ready = False
+        # Handles only: Mongo owns intent, reservations, leases and snapshots.
+        self._workers: dict[str, tuple[threading.Event, asyncio.Future]] = {}
 
     async def ensure_indexes(self):
         if not self._indexes_ready:
@@ -123,6 +128,9 @@ class DragonCrawlerApplication:
                 [("tenant_id", ASCENDING), ("owner_id", ASCENDING), ("_id", DESCENDING)]
             )
             await self.sessions.create_index([("status", ASCENDING), ("lease_until", ASCENDING)])
+            await self.sessions.create_index(
+                [("automation.enabled", ASCENDING), ("automation.next_run_at", ASCENDING)]
+            )
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -160,6 +168,12 @@ class DragonCrawlerApplication:
         return self._readiness_payload(available, code, message)
 
     def _readiness_payload(self, available: bool, code: str, message: str) -> dict:
+        from core.scheduler import scheduler_status
+
+        observed = scheduler_status()
+        scheduled = bool(
+            observed["running"] and any(job["id"] == "crawler_recovery" for job in observed["jobs"])
+        )
         return {
             "ok": True,
             "configured": self.engine is not None,
@@ -175,12 +189,14 @@ class DragonCrawlerApplication:
             "network_reachability_verified": False,
             "capabilities": {
                 "manual_crawl": available,
+                "finite_autonomous_crawl": available and scheduled,
                 "durable_resume": available,
                 "source_export": available,
                 "automatic_review": False,
                 "model_training": False,
                 "trusted_device_idle": False,
             },
+            "scheduler": {"running": bool(observed["running"]), "crawler_job_registered": scheduled},
             "limits": {
                 "seed_urls": 16,
                 "sessions": MAX_SESSIONS,
@@ -194,6 +210,8 @@ class DragonCrawlerApplication:
                 "source_page": 32,
                 "session_page": 32,
                 "concurrent_slices": MAX_CONCURRENT_SLICES,
+                "autonomous_slices": MAX_AUTO_SLICES,
+                "autonomous_seconds": MAX_AUTO_SECONDS,
             },
         }
 
@@ -250,8 +268,58 @@ class DragonCrawlerApplication:
             )
         return row
 
-    @staticmethod
-    def _projection(row: dict) -> dict:
+    def _worker_state(self, row: dict) -> dict:
+        handle = self._workers.get(row.get("worker_token"))
+        local = handle is not None
+        active = (
+            not handle[1].done()
+            if local
+            else bool(
+                row.get("worker_token") and row.get("lease_until") and _utc(row["lease_until"]) > _now()
+            )
+        )
+        unconfirmed = not local and (
+            bool(row.get("worker_token")) or row.get("last_worker_exit_confirmed") is False
+        )
+        return {
+            "active": active,
+            "quiescent": not active and not unconfirmed,
+            "local": local,
+            "lease_until": _utc(row["lease_until"]).isoformat() if row.get("lease_until") else None,
+            "confirmation": (
+                "local_executor"
+                if local
+                else (
+                    "remote_lease_active"
+                    if active
+                    else (
+                        "lease_fenced_physical_unconfirmed"
+                        if unconfirmed
+                        else "durable_completion" if row.get("worker_epoch", 0) else "no_worker_claim"
+                    )
+                )
+            ),
+            "recovery_eligible": not active,
+        }
+
+    async def _drain(self, row: dict) -> dict:
+        handle = self._workers.get(row.get("worker_token"))
+        if handle is not None:
+            handle[0].set()
+            # wait() never cancels the physical executor on timeout/detach.
+            await asyncio.wait({handle[1]}, timeout=15)
+            if handle[1].done():
+                return {
+                    "active": False,
+                    "quiescent": True,
+                    "local": True,
+                    "lease_until": None,
+                    "confirmation": "local_executor_joined",
+                    "recovery_eligible": True,
+                }
+        return self._worker_state(row)
+
+    def _projection(self, row: dict) -> dict:
         _, run_type = _core()
         runtime = run_type.from_snapshot(_plain(row["snapshot"]))
         status = dict(runtime.status())
@@ -268,12 +336,37 @@ class DragonCrawlerApplication:
             consent_expires_at=_utc(row["consent_expires_at"]).isoformat(),
             error=row.get("error"),
             last_event=row.get("last_event"),
+            autonomous_slices_total=int(row.get("automation_slices_total", 0)),
             review_state="unreviewed",
             source_classification="untrusted_external_material",
             automatic_review=False,
             counters=status.get("usage", {}),
             limits=row["request"],
         )
+        worker = self._worker_state(row)
+        grant = row.get("automation")
+        status["worker"] = worker
+        status["automation"] = (
+            {
+                key: (_utc(value).isoformat() if isinstance(value, datetime) else value)
+                for key, value in grant.items()
+                if key not in {"principal_email", "scope", "consent_id", "request_digest"}
+            }
+            if grant
+            else {"enabled": False, "state": "not_authorized", "slices_started": 0}
+        )
+        current = status["consent_current"]
+        status["capabilities"] = {
+            "can_run": current
+            and row["status"] in {"queued", "interrupted"}
+            and not worker["active"]
+            and not (grant and grant.get("enabled")),
+            "can_pause": row["status"] in {"queued", "running", "interrupted"},
+            "can_resume": current and row["status"] in {"paused", "interrupted"} and not worker["active"],
+            "can_cancel": row["status"] not in TERMINAL_STATES,
+            "can_erase": True,
+            "can_automate": current and row["status"] not in TERMINAL_STATES and not worker["active"],
+        }
         return status
 
     async def _reconcile(self, scope: dict[str, str], row: dict) -> dict:
@@ -305,10 +398,11 @@ class DragonCrawlerApplication:
                         "status": restored,
                         "operations": operations,
                         "updated_at": _now(),
+                        "last_worker_exit_confirmed": False,
                         "error": (
                             {
                                 "code": "crawler_worker_expired",
-                                "message": "The previous worker stopped; resume from its last committed snapshot.",
+                                "message": "The previous worker lease expired; recovery uses its last committed snapshot without claiming physical exit.",
                             }
                             if restored == "interrupted"
                             else None
@@ -435,13 +529,15 @@ class DragonCrawlerApplication:
                 ) from None
         return await self.get(scope, identifier)
 
-    def _prior(self, row: dict, operation: str, digest: str) -> dict | None:
+    def _prior(self, row: dict, operation: str, digest: str, *, safety: bool = False) -> dict | None:
         previous = row.get("operations", {}).get(operation)
+        if previous is None and row.get("safety_control", {}).get("operation") == operation:
+            previous = row["safety_control"]
         if previous is not None and previous["request_digest"] != digest:
             raise CrawlerError(
                 "crawler_idempotency_conflict", "Operation key is bound to a different command.", 409
             )
-        if previous is None and len(row.get("operations", {})) >= MAX_OPERATIONS:
+        if previous is None and len(row.get("operations", {})) >= MAX_OPERATIONS and not safety:
             raise CrawlerError(
                 "crawler_command_limit",
                 "Session command history reached its bound; create another bounded session.",
@@ -449,15 +545,137 @@ class DragonCrawlerApplication:
             )
         return previous
 
+    async def _grant_principal(self, scope: dict[str, str], grant: dict) -> None:
+        user = await self.database["gameforge_users"].find_one(
+            {"email": grant.get("principal_email"), "disabled": {"$ne": True}},
+            {"email": 1, "tenant_id": 1, "role": 1, "disabled": 1},
+        )
+        if user is None or user.get("role") not in {"editor", "admin"} or authenticated_scope(user) != scope:
+            raise CrawlerError(
+                "crawler_grant_revoked",
+                "The authorizing account no longer has current capture permission.",
+                403,
+            )
+
+    async def automation(
+        self, scope: dict[str, str], identifier: str, body: dict, *, principal: dict
+    ) -> dict:
+        if authenticated_scope(principal) != scope or (
+            body.get("enabled") is True and principal.get("role") not in {"editor", "admin"}
+        ):
+            raise CrawlerError("crawler_grant_denied", "Current editor authority is required.", 403)
+        if type(body.get("enabled")) is not bool:
+            raise CrawlerError("crawler_grant_invalid", "Choose an explicit finite execution intent.")
+        slices, seconds = body.get("max_slices", 16), body.get("max_seconds", 900)
+        if (
+            type(slices) is not int
+            or not 1 <= slices <= MAX_AUTO_SLICES
+            or type(seconds) is not int
+            or not 15 <= seconds <= MAX_AUTO_SECONDS
+        ):
+            raise CrawlerError("crawler_grant_bounds", "Autonomous execution exceeds its finite bounds.")
+        row = await self._reconcile(scope, await self._owned(scope, identifier))
+        operation, digest = _operation(body["idempotency_key"]), _digest(body)
+        if self._prior(row, operation, digest, safety=body["enabled"] is False):
+            return self._projection(row)
+        if row["version"] != body["expected_version"]:
+            raise CrawlerError(
+                "crawler_conflict", "Reload the crawler before changing its execution grant.", 409
+            )
+        if row["status"] in TERMINAL_STATES:
+            raise CrawlerError("crawler_terminal", "This capture has already stopped permanently.", 409)
+        if body["enabled"] and self._worker_state(row)["active"]:
+            raise CrawlerError(
+                "crawler_busy", "Drain the current worker before authorizing another run.", 409
+            )
+        now = _now()
+        expiry = min(_utc(row["consent_expires_at"]), now + timedelta(seconds=seconds))
+        if body["enabled"] and _utc(row["consent_expires_at"]) <= now + timedelta(seconds=15):
+            raise CrawlerError(
+                "crawler_consent_expired", "The original capture consent is too close to expiry.", 403
+            )
+        epoch = int(row.get("automation", {}).get("epoch", 0)) + 1
+        grant = {
+            "schema_version": "skeleton.dragon.crawler_execution_grant.v1",
+            "enabled": body["enabled"],
+            "state": "authorized" if body["enabled"] else "disabled",
+            "epoch": epoch,
+            "scope": dict(scope),
+            "principal_email": principal["email"].strip().lower(),
+            "consent_id": row["consent"]["consent_id"],
+            "request_digest": row["request_digest"],
+            "authorized_at": now,
+            "expires_at": expiry,
+            "max_slices": slices,
+            "slices_started": 0,
+            "next_run_at": now,
+            "stop_reason": None if body["enabled"] else "operator_disabled",
+        }
+        if body["enabled"]:
+            await self._grant_principal(scope, grant)
+        _, run_type = _core()
+        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        if body["enabled"]:
+            if runtime.status()["state"] == "running":
+                runtime.pause()
+            if runtime.status()["state"] == "paused":
+                runtime.resume()
+            state = "queued"
+        else:
+            runtime.pause()
+            state = "paused"
+        snapshot = runtime.snapshot()
+        receipt = await self._admit(
+            scope,
+            identifier,
+            {
+                "snapshot": snapshot,
+                "grant": {
+                    **grant,
+                    "authorized_at": now.isoformat(),
+                    "expires_at": expiry.isoformat(),
+                    "next_run_at": now.isoformat(),
+                },
+            },
+        )
+        changed = await self.sessions.update_one(
+            {"_id": identifier, **scope, "version": row["version"]},
+            {
+                "$set": {
+                    "automation": grant,
+                    "snapshot": snapshot,
+                    "status": state,
+                    "storage_receipt": receipt,
+                    "updated_at": now,
+                    (
+                        "safety_control"
+                        if len(row.get("operations", {})) >= MAX_OPERATIONS
+                        else "operations." + operation
+                    ): {
+                        "operation": operation,
+                        "request_digest": digest,
+                        "action": "automation",
+                        "state": "completed",
+                    },
+                },
+                "$inc": {"version": 1},
+            },
+        )
+        if not changed.modified_count:
+            raise CrawlerError("crawler_conflict", "Crawler changed before authorization was committed.", 409)
+        if not body["enabled"]:
+            await self._drain(row)
+        return await self.get(scope, identifier)
+
     async def control(self, scope: dict[str, str], identifier: str, body: dict) -> dict:
         row = await self._reconcile(scope, await self._owned(scope, identifier))
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
-        if self._prior(row, operation, digest):
+        action = body["action"]
+        if self._prior(row, operation, digest, safety=action in {"pause", "cancel"}):
             return self._projection(row)
         if row["version"] != body["expected_version"]:
             raise CrawlerError("crawler_conflict", "Reload the crawler session before changing it.", 409)
-        action = body["action"]
-        if action == "resume" and row["status"] == "running":
+        if action == "resume" and self._worker_state(row)["active"]:
             raise CrawlerError("crawler_busy", "The current worker must drain before resuming.", 409)
         _, run_type = _core()
         runtime = run_type.from_snapshot(_plain(row["snapshot"]))
@@ -481,14 +699,33 @@ class DragonCrawlerApplication:
                     "status": state,
                     "updated_at": _now(),
                     "storage_receipt": receipt,
-                    "operations."
-                    + operation: {"request_digest": digest, "action": action, "state": "completed"},
+                    (
+                        "safety_control"
+                        if len(row.get("operations", {})) >= MAX_OPERATIONS
+                        else "operations." + operation
+                    ): {
+                        "operation": operation,
+                        "request_digest": digest,
+                        "action": action,
+                        "state": "completed",
+                    },
+                    **(
+                        {
+                            "automation.enabled": False,
+                            "automation.state": "disabled",
+                            "automation.stop_reason": "operator_" + action,
+                        }
+                        if row.get("automation") and action != "resume"
+                        else {}
+                    ),
                 },
                 "$inc": {"version": 1},
             },
         )
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict", "Crawler changed while applying the command.", 409)
+        if action != "resume":
+            await self._drain(row)
         return await self.get(scope, identifier)
 
     async def _live(
@@ -510,6 +747,23 @@ class DragonCrawlerApplication:
                                 {"$add": ["$$NOW", 15000]} if network_margin else "$$NOW",
                             ]
                         },
+                        {
+                            "$or": [
+                                {"$eq": [{"$ifNull": ["$worker_automation_epoch", None]}, None]},
+                                {
+                                    "$and": [
+                                        {"$eq": ["$automation.enabled", True]},
+                                        {"$eq": ["$automation.epoch", "$worker_automation_epoch"]},
+                                        {
+                                            "$gt": [
+                                                "$automation.expires_at",
+                                                {"$add": ["$$NOW", 15000]} if network_margin else "$$NOW",
+                                            ]
+                                        },
+                                    ]
+                                },
+                            ]
+                        },
                     ]
                 },
             }
@@ -518,9 +772,27 @@ class DragonCrawlerApplication:
             raise CrawlerError(
                 "crawler_worker_fenced", "Crawler worker lost its live session authority.", 409
             )
+        if row.get("worker_automation_epoch") is not None:
+            grant = row.get("automation", {})
+            margin = timedelta(seconds=15 if network_margin else 0)
+            if (
+                grant.get("enabled") is not True
+                or grant.get("epoch") != row["worker_automation_epoch"]
+                or grant.get("scope") != scope
+                or grant.get("request_digest") != row["request_digest"]
+                or grant.get("consent_id") != row["consent"]["consent_id"]
+                or not isinstance(grant.get("expires_at"), datetime)
+                or _utc(grant["expires_at"]) <= _now() + margin
+            ):
+                raise CrawlerError(
+                    "crawler_grant_expired", "Autonomous capture authority is no longer current.", 403
+                )
+            await self._grant_principal(scope, grant)
         return row
 
-    async def run(self, scope: dict[str, str], identifier: str, body: dict) -> dict:
+    async def run(
+        self, scope: dict[str, str], identifier: str, body: dict, *, automation_epoch: int | None = None
+    ) -> dict:
         row = await self._reconcile(scope, await self._owned(scope, identifier))
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         previous = self._prior(row, operation, digest)
@@ -536,6 +808,24 @@ class DragonCrawlerApplication:
             raise CrawlerError(
                 "crawler_consent_expired", "Capture consent expired; create a newly authorized crawl.", 403
             )
+        grant = row.get("automation", {})
+        if automation_epoch is None and grant.get("enabled"):
+            raise CrawlerError(
+                "crawler_automation_active", "Pause autonomous execution before running a manual slice.", 409
+            )
+        if automation_epoch is not None:
+            if (
+                grant.get("enabled") is not True
+                or grant.get("epoch") != automation_epoch
+                or grant.get("scope") != scope
+                or grant.get("request_digest") != row["request_digest"]
+                or grant.get("consent_id") != row["consent"]["consent_id"]
+                or grant.get("slices_started", MAX_AUTO_SLICES) >= grant.get("max_slices", 0)
+                or not isinstance(grant.get("expires_at"), datetime)
+                or _utc(grant["expires_at"]) <= _now() + timedelta(seconds=15)
+            ):
+                raise CrawlerError("crawler_grant_expired", "The finite autonomous grant has stopped.", 403)
+            await self._grant_principal(scope, grant)
         quota_id, token = _digest(scope), str(uuid4())
         now, epoch = _now(), int(row["worker_epoch"]) + 1
         credit = await self.limits.find_one_and_update(
@@ -602,8 +892,18 @@ class DragonCrawlerApplication:
                 {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
             )
             raise
+        claim = {"_id": identifier, **scope, "version": row["version"], "status": row["status"]}
+        if automation_epoch is not None:
+            claim.update(
+                {
+                    "automation.enabled": True,
+                    "automation.epoch": automation_epoch,
+                    "automation.slices_started": grant["slices_started"],
+                    "$expr": {"$gt": ["$automation.expires_at", {"$add": ["$$NOW", 15000]}]},
+                }
+            )
         changed = await self.sessions.update_one(
-            {"_id": identifier, **scope, "version": row["version"], "status": row["status"]},
+            claim,
             {
                 "$set": {
                     "status": "running",
@@ -613,9 +913,24 @@ class DragonCrawlerApplication:
                     "updated_at": now,
                     "operations."
                     + operation: {"request_digest": digest, "action": "run", "state": "running"},
+                    **(
+                        {"worker_automation_epoch": automation_epoch, "automation.state": "running"}
+                        if automation_epoch is not None
+                        else {}
+                    ),
                 },
-                "$inc": {"version": 1},
-                "$unset": {"error": ""},
+                "$inc": {
+                    "version": 1,
+                    **(
+                        {"automation.slices_started": 1, "automation_slices_total": 1}
+                        if automation_epoch is not None
+                        else {}
+                    ),
+                },
+                "$unset": {
+                    "error": "",
+                    **({"worker_automation_epoch": ""} if automation_epoch is None else {}),
+                },
             },
         )
         if not changed.modified_count:
@@ -636,6 +951,7 @@ class DragonCrawlerApplication:
             raw = _plain(snapshot)
             await self._live(scope, identifier, token, epoch)
             receipt = await self._admit(scope, identifier, raw)
+            await self._live(scope, identifier, token, epoch)
             result = await self.sessions.update_one(
                 {
                     "_id": identifier,
@@ -643,10 +959,20 @@ class DragonCrawlerApplication:
                     "worker_token": token,
                     "worker_epoch": epoch,
                     "status": "running",
+                    **(
+                        {"automation.enabled": True, "automation.epoch": automation_epoch}
+                        if automation_epoch is not None
+                        else {}
+                    ),
                     "$expr": {
                         "$and": [
                             {"$gt": ["$lease_until", "$$NOW"]},
                             {"$gt": ["$consent_expires_at", "$$NOW"]},
+                            *(
+                                [{"$gt": ["$automation.expires_at", "$$NOW"]}]
+                                if automation_epoch is not None
+                                else []
+                            ),
                         ]
                     },
                 },
@@ -684,6 +1010,7 @@ class DragonCrawlerApplication:
         # shutdown cancels all Tasks, including a shielded to_thread Task.
         # The Future remains joinable while the actual HTTP thread drains.
         worker = loop.run_in_executor(None, work)
+        self._workers[token] = (cancelled, worker)
         failure: BaseException | None = None
         interrupted = False
         try:
@@ -698,6 +1025,7 @@ class DragonCrawlerApplication:
             current = await self._live(scope, identifier, token, epoch)
             snapshot = _plain(snapshot)
             receipt = await self._admit(scope, identifier, snapshot)
+            current = await self._live(scope, identifier, token, epoch)
             _, run_type = _core()
             state = str(run_type.from_snapshot(snapshot).status()["state"])
             state = "queued" if state in {"ready", "created", "queued", "running"} else state
@@ -727,6 +1055,30 @@ class DragonCrawlerApplication:
                 "result_digest": _digest(summary),
                 "event_digests": [event["event_digest"] for event in summary.get("slice_events", [])],
             }
+            automation_update = {}
+            if automation_epoch is not None:
+                latest_grant = current["automation"]
+                stopped = (
+                    state in TERMINAL_STATES or latest_grant["slices_started"] >= latest_grant["max_slices"]
+                )
+                reason = state if state in TERMINAL_STATES else ("slice_budget" if stopped else None)
+                if _utc(latest_grant["expires_at"]) <= _now() + timedelta(seconds=15):
+                    stopped, reason = True, "authorization_expired"
+                ready_at = summary.get("next_ready_at")
+                due = _now() + timedelta(seconds=1)
+                if isinstance(ready_at, (int, float)):
+                    due = max(
+                        due,
+                        datetime.fromtimestamp(
+                            min(ready_at, _utc(latest_grant["expires_at"]).timestamp()), tz=timezone.utc
+                        ),
+                    )
+                automation_update = {
+                    "automation.enabled": not stopped,
+                    "automation.state": "stopped" if stopped else "waiting",
+                    "automation.stop_reason": reason,
+                    "automation.next_run_at": due,
+                }
             result = await self.sessions.update_one(
                 {
                     "_id": identifier,
@@ -735,10 +1087,20 @@ class DragonCrawlerApplication:
                     "status": "running",
                     "worker_token": token,
                     "worker_epoch": epoch,
+                    **(
+                        {"automation.enabled": True, "automation.epoch": automation_epoch}
+                        if automation_epoch is not None
+                        else {}
+                    ),
                     "$expr": {
                         "$and": [
                             {"$gt": ["$lease_until", "$$NOW"]},
                             {"$gt": ["$consent_expires_at", "$$NOW"]},
+                            *(
+                                [{"$gt": ["$automation.expires_at", "$$NOW"]}]
+                                if automation_epoch is not None
+                                else []
+                            ),
                         ]
                     },
                 },
@@ -749,9 +1111,11 @@ class DragonCrawlerApplication:
                         "storage_receipt": receipt,
                         "updated_at": _now(),
                         "operations." + operation: operation_receipt,
+                        "last_worker_exit_confirmed": True,
+                        **automation_update,
                     },
                     "$inc": {"version": 1},
-                    "$unset": {"worker_token": "", "lease_until": ""},
+                    "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
                 },
             )
             if not result.modified_count:
@@ -779,8 +1143,12 @@ class DragonCrawlerApplication:
             await self.sessions.update_one(
                 {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch},
                 {
-                    "$set": {"updated_at": _now(), "operations." + operation: operation_receipt},
-                    "$unset": {"worker_token": "", "lease_until": ""},
+                    "$set": {
+                        "updated_at": _now(),
+                        "operations." + operation: operation_receipt,
+                        "last_worker_exit_confirmed": True,
+                    },
+                    "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
                 },
             )
             await self.sessions.update_one(
@@ -797,6 +1165,8 @@ class DragonCrawlerApplication:
                 },
             )
         finally:
+            if worker.done():
+                self._workers.pop(token, None)
             await self.limits.update_many(
                 {"worker_token": token},
                 {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
@@ -815,7 +1185,13 @@ class DragonCrawlerApplication:
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         previous = row.get("deletion")
         if previous and previous.get("operation") == operation and previous.get("request_digest") == digest:
-            return {"ok": True, "session_id": identifier, "status": "deleted", "version": int(row["version"])}
+            return {
+                "ok": True,
+                "session_id": identifier,
+                "status": "deleted",
+                "version": int(row["version"]),
+                "worker": await self._drain(row),
+            }
         if row["version"] != body["expected_version"]:
             raise CrawlerError(
                 "crawler_conflict", "Reload the current session version before deleting it.", 409
@@ -837,6 +1213,9 @@ class DragonCrawlerApplication:
                     "operations": "",
                     "last_event": "",
                     "storage_receipt": "",
+                    "automation": "",
+                    "worker_automation_epoch": "",
+                    "safety_control": "",
                 },
             },
         )
@@ -845,7 +1224,13 @@ class DragonCrawlerApplication:
         # A live worker's physical lease is deliberately retained until its
         # actual thread drains; status='deleted' fences its final publication.
         await self.limits.update_one({"_id": _digest(scope), **scope}, {"$pull": {"session_ids": identifier}})
-        return {"ok": True, "session_id": identifier, "status": "deleted", "version": int(row["version"]) + 1}
+        return {
+            "ok": True,
+            "session_id": identifier,
+            "status": "deleted",
+            "version": int(row["version"]) + 1,
+            "worker": await self._drain(row),
+        }
 
     async def events(
         self, scope: dict[str, str], identifier: str, *, after_sequence: int = 0, limit: int = 32
@@ -879,19 +1264,48 @@ class DragonCrawlerApplication:
         return result
 
     async def sources(
-        self, scope: dict[str, str], identifier: str, *, cursor: str | None = None, limit: int = 16
+        self,
+        scope: dict[str, str],
+        identifier: str,
+        *,
+        cursor: str | None = None,
+        limit: int = 16,
+        after_sequence: int | None = None,
     ) -> dict:
         row = await self._owned(scope, identifier)
         _, run_type = _core()
-        sources = run_type.from_snapshot(_plain(row["snapshot"])).sources()
+        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        sources = runtime.sources()
+        snapshot = runtime.snapshot()
+        if after_sequence is not None and (
+            type(after_sequence) is not int or not 0 <= after_sequence <= snapshot["sequence"]
+        ):
+            raise CrawlerError(
+                "crawler_cursor_invalid", "The source cursor is outside the current capture history.", 409
+            )
+        events = snapshot["events"]
+        truncated = bool(after_sequence is not None and events and after_sequence < events[0]["sequence"] - 1)
+        captures = {event["source_id"]: event["sequence"] for event in events if event.get("source_id")}
+        if after_sequence is not None and not truncated:
+            sources = [source for source in sources if captures.get(source["source_id"], 0) > after_sequence]
         ordered = sorted(sources, key=lambda item: item["source_id"])
         if cursor:
             ordered = [source for source in ordered if source["source_id"] > cursor]
         page = ordered[:limit]
         return {
             "ok": True,
-            "sources": [self._source_projection(source, text=False) for source in page],
+            "sources": [
+                {
+                    **self._source_projection(source, text=False),
+                    "capture_sequence": captures.get(source["source_id"]),
+                }
+                for source in page
+            ],
             "next_cursor": page[-1]["source_id"] if len(ordered) > limit else None,
+            "sequence": snapshot["sequence"],
+            "version": int(row["version"]),
+            "history_truncated": truncated,
+            "session_id": identifier,
         }
 
     async def source(self, scope: dict[str, str], identifier: str, source_id: str) -> dict:
@@ -902,6 +1316,93 @@ class DragonCrawlerApplication:
         except ValueError:
             raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404)
         return self._source_projection(source)
+
+    async def source_evidence(self, scope: dict[str, str], identifier: str, source_id: str) -> dict:
+        row = await self._owned(scope, identifier)
+        _, run_type = _core()
+        try:
+            source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
+        except ValueError:
+            raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
+        reference = {
+            "schema_version": "skeleton.dragon.crawler_reference.v1",
+            "session_id": identifier,
+            "source_id": source_id,
+            "source_digest": _digest(source),
+            "request_digest": row["request_digest"],
+            "consent_id": row["consent"]["consent_id"],
+        }
+        await self.assert_context(scope, [reference])
+        return {
+            "source": self._source_projection(source),
+            "reference": reference,
+            "valid_until": _utc(row["consent_expires_at"]).isoformat(),
+        }
+
+    async def source_chunk(
+        self,
+        scope: dict[str, str],
+        identifier: str,
+        source_id: str,
+        *,
+        offset: int = 0,
+        max_chars: int = 8000,
+        expected_content_digest: str | None = None,
+    ) -> dict:
+        if type(offset) is not int or offset < 0 or type(max_chars) is not int or not 1 <= max_chars <= 16000:
+            raise CrawlerError("crawler_chunk_bounds", "Source text offsets exceed their finite bounds.")
+        evidence = await self.source_evidence(scope, identifier, source_id)
+        source = evidence["source"]
+        text = source["text"]
+        if expected_content_digest is not None and expected_content_digest != source["preserved_text_hash"]:
+            raise CrawlerError("crawler_source_changed", "The source content identity differs.", 409)
+        if offset > len(text):
+            raise CrawlerError("crawler_chunk_bounds", "Source text offset exceeds preserved content.")
+        chunk = text[offset : offset + max_chars]
+        row = await self._owned(scope, identifier)
+        await self.assert_context(scope, [evidence["reference"]])
+        return {
+            "ok": True,
+            "session_id": identifier,
+            "source_id": source_id,
+            "version": int(row["version"]),
+            "offset": offset,
+            "end": offset + len(chunk),
+            "total_chars": len(text),
+            "text": chunk,
+            "next_offset": offset + len(chunk) if offset + len(chunk) < len(text) else None,
+            "content_digest": source["preserved_text_hash"],
+            "chunk_digest": hashlib.sha256(chunk.encode()).hexdigest(),
+            "offset_unit": "unicode_code_points",
+            "source_classification": "untrusted_external_material",
+            "source_url": source["canonical_url"],
+            "title": source["title"],
+            "captured_at": source["fetched_at"],
+        }
+
+    async def search(self, scope: dict[str, str], identifier: str, query: str, *, limit: int = 8) -> dict:
+        row = await self._owned(scope, identifier)
+        if row["status"] == "cancelled" or _utc(row["consent_expires_at"]) <= _now():
+            raise CrawlerError(
+                "crawler_context_revoked", "Current capture/use consent is required for retrieval.", 403
+            )
+        _, run_type = _core()
+        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        evidence = runtime.search(query, limit=limit)
+        references = []
+        for source_id in dict.fromkeys(hit["source_id"] for hit in evidence["hits"]):
+            references.append(
+                {
+                    "schema_version": "skeleton.dragon.crawler_reference.v1",
+                    "session_id": identifier,
+                    "source_id": source_id,
+                    "source_digest": _digest(runtime.source_read(source_id)),
+                    "request_digest": row["request_digest"],
+                    "consent_id": row["consent"]["consent_id"],
+                }
+            )
+        await self.assert_context(scope, references)
+        return {**evidence, "session_id": identifier, "version": int(row["version"])}
 
     async def context(self, scope: dict[str, str], query: str, max_docs: int, max_chars: int) -> dict:
         import re
@@ -1035,8 +1536,138 @@ class DragonCrawlerApplication:
             if _digest(source) != reference["source_digest"]:
                 raise CrawlerError("crawler_context_changed", "The captured source evidence changed.", 403)
 
+    async def recover(self, *, limit: int = 16) -> dict:
+        """Consume only persisted finite grants in the existing scheduler."""
+        if type(limit) is not int or not 1 <= limit <= 16:
+            raise ValueError("Crawler recovery scans at most16 records")
+        await self.ensure_indexes()
+        rows = (
+            await self.sessions.find({"automation.enabled": True, "automation.next_run_at": {"$lte": _now()}})
+            .sort("automation.next_run_at", ASCENDING)
+            .limit(limit)
+            .max_time_ms(2000)
+            .to_list(length=limit)
+        )
+        selected, owners = [], set()
+        for row in rows:
+            owner = (row["tenant_id"], row["owner_id"])
+            if owner not in owners:
+                owners.add(owner)
+                selected.append(row)
+            if len(selected) == MAX_CONCURRENT_SLICES:
+                break
+
+        async def pulse(item):
+            scope = {key: item[key] for key in ("tenant_id", "owner_id")}
+            identifier, epoch = item["_id"], item["automation"]["epoch"]
+            try:
+                row = await self._reconcile(scope, await self._owned(scope, identifier))
+                grant = row.get("automation", {})
+                if not grant.get("enabled") or grant.get("epoch") != epoch:
+                    return "superseded"
+                reason = None
+                if row["status"] in TERMINAL_STATES or row["status"] == "paused":
+                    reason = row["status"]
+                elif _utc(grant["expires_at"]) <= _now() + timedelta(seconds=15):
+                    reason = "authorization_expired"
+                elif grant["slices_started"] >= grant["max_slices"]:
+                    reason = "slice_budget"
+                elif len(row.get("operations", {})) >= MAX_OPERATIONS:
+                    reason = "command_budget"
+                if reason:
+                    await self.sessions.update_one(
+                        {"_id": identifier, **scope, "automation.epoch": epoch},
+                        {
+                            "$set": {
+                                "automation.enabled": False,
+                                "automation.state": "stopped",
+                                "automation.stop_reason": reason,
+                            },
+                            "$inc": {"version": 1},
+                        },
+                    )
+                    return "stopped"
+                if self._worker_state(row)["active"]:
+                    return "waiting"
+                await self._grant_principal(scope, grant)
+                _, run_type = _core()
+                ready = run_type.from_snapshot(_plain(row["snapshot"])).status()["next_ready_at"]
+                if ready is not None and ready > _now().timestamp():
+                    await self.sessions.update_one(
+                        {"_id": identifier, **scope, "version": row["version"], "automation.epoch": epoch},
+                        {
+                            "$set": {
+                                "automation.next_run_at": datetime.fromtimestamp(
+                                    min(ready, _utc(grant["expires_at"]).timestamp()), tz=timezone.utc
+                                ),
+                                "automation.state": "waiting",
+                            },
+                            "$inc": {"version": 1},
+                        },
+                    )
+                    return "waiting"
+                body = {
+                    "expected_version": int(row["version"]),
+                    "idempotency_key": f"autonomous:{epoch}:{grant['slices_started'] + 1}",
+                    "max_steps": 4,
+                }
+                result = await self.run(scope, identifier, body, automation_epoch=epoch)
+                return "executed" if result.get("ok") else "interrupted"
+            except CrawlerError as exc:
+                retry = exc.status in {409, 429, 503} and exc.code not in {
+                    "crawler_integrity",
+                    "crawler_grant_revoked",
+                }
+                await self.sessions.update_one(
+                    {"_id": identifier, **scope, "automation.epoch": epoch, "automation.enabled": True},
+                    {
+                        "$set": {
+                            "automation.next_run_at": _now() + timedelta(seconds=10),
+                            "automation.enabled": retry,
+                            "automation.state": "waiting" if retry else "blocked",
+                            "automation.stop_reason": exc.code,
+                        },
+                        "$inc": {"version": 1},
+                    },
+                )
+                return "waiting" if retry else "blocked"
+            except (ValueError, TypeError, KeyError):
+                # Old/invalid runtime or grant evidence never gets silently upgraded.
+                await self.sessions.update_one(
+                    {"_id": identifier, **scope, "automation.epoch": epoch},
+                    {
+                        "$set": {
+                            "automation.enabled": False,
+                            "automation.state": "blocked",
+                            "automation.stop_reason": "crawler_integrity",
+                        },
+                        "$inc": {"version": 1},
+                    },
+                )
+                return "blocked"
+
+        outcomes = await asyncio.gather(*(pulse(row) for row in selected), return_exceptions=True)
+        result = {
+            "scanned": len(rows),
+            "selected": len(selected),
+            "executed": 0,
+            "waiting": 0,
+            "stopped": 0,
+            "blocked": 0,
+            "interrupted": 0,
+            "superseded": 0,
+            "failures": 0,
+        }
+        for value in outcomes:
+            result[value if isinstance(value, str) and value in result else "failures"] += 1
+        return result
+
 
 crawler_application = DragonCrawlerApplication()
+
+
+async def recover_crawler_runs(*, limit: int = 16) -> dict:
+    return await crawler_application.recover(limit=limit)
 
 
 async def read_crawler_context(user: dict, query: str, max_docs: int = 4, max_chars: int = 16000) -> dict:

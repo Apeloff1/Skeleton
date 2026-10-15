@@ -1,0 +1,67 @@
+{
+  "schema_version": "skeleton.application.studio_installation.v1",
+  "status": "implementation_candidate_unpromoted",
+  "owner": "skeleton/app",
+  "plane": "deployment-release",
+  "implementation": [
+    "skeleton/app/studio_readiness.py",
+    "skeleton/app/first_install.py",
+    "skeleton/app/cli.py",
+    "scripts/install_game_desktop_toolchains.py",
+    "docker-compose.yml",
+    ".env.example"
+  ],
+  "reused_owners": {
+    "console_build": "skeleton/jeeves/game_console_build.py",
+    "desktop_export": "skeleton/jeeves/game_desktop_export.py",
+    "core_registry": "skeleton/jeeves/game_emulator_catalog.py",
+    "core_installer": "scripts/install_game_emulator_cores.py",
+    "server_readiness": "backend/core/game_studio_health.py",
+    "dragon_runtime": "backend/core/dragon_runtime.py"
+  },
+  "interfaces": {
+    "studio_readiness_report": "Optional bounded read-only local process snapshot from canonical build/desktop/core inventories; separate authenticated server projection from existing /api/game-studio-health.",
+    "doctor": "app doctor --studio [--live --auth-token-file PRIVATE_FILE] --json; no raw token argument, provider call, model load, game/core execution or crawl.",
+    "toolchains": "Existing install_game_desktop_toolchains.py selects explicit --tool names; no network without --download, local archive/source cache supported; existing --cc65/--rgbds accepted without acquiring unrequested Go/SDL."
+  },
+  "limits": {
+    "local_probe_seconds": 20,
+    "local_probe_output_bytes": 2097152,
+    "auth_token_file_bytes": 8192,
+    "archive_bytes": 157286400,
+    "expanded_archive_bytes": 629145600,
+    "archive_members": 32768,
+    "toolchain_build_seconds": 900,
+    "toolchain_build_jobs": 1,
+    "log_bytes": 4194304,
+    "minimum_free_bytes": 2147483648,
+    "remote_probe_seconds": 10,
+    "installation_lock_seconds": 10
+  },
+  "invariants": [
+    "Keep five existing services and existing canonical data owners; no shadow emulator, builder, trainer or knowledge store.",
+    "Host toolchain availability is explicitly scoped to this CLI process, never treated as readiness inside another container/server.",
+    "Approved core ELF/firmware checks do not execute native code, prove title compatibility, approve ROM rights or establish complete hardware emulation.",
+    "No default games, ROMs, BIOS, firmware, proprietary SDKs or model weights are acquired.",
+    "Offline provisioning never starts fetch/clone/submodule/network commands; archives/source revision and immutable output receipts must be checked before reuse.",
+    "Compile only fixed pinned public build-tool sources; use stripped compiler environment, bounded private logs, single build job and process-group timeout cleanup.",
+    "Do not reuse partially installed or altered SDK directories as trusted completed installs; installation publishes atomically from private staging and records exact source/tool/license identities.",
+    "Existing approved-core installer remains authoritative and already requires explicit --fetch-sources; recipes/candidates are distinct from installed approval and actual gameplay qualification.",
+    "The default backend Alpine image does not gain native glibc tooling or weakened sandbox permissions; doctor must report the actual server prerequisites and direct operators to supported Linux host configuration.",
+    "Dragon bootstrap creates only empty existing schemas under backend_data, is idempotent and fail-closed on unsafe/corrupt state, and grants no reviewed knowledge, scheduler authority, model calls or training rights.",
+    "Authenticated readiness sends a private operator token only to configured HTTPS backend or loopback HTTP; diagnostics return no tokens or raw exceptions.",
+    "Local and authenticated HTTP probes run in bounded one-shot subprocesses; a slow peer cannot leave a detached diagnostic thread or retain the parent beyond its wall deadline."
+  ],
+  "qualification": {
+    "automated_tests_run": false,
+    "production_promoted": false,
+    "masterplan_completion_granted": false
+  },
+  "documentation": "docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md",
+  "toolchain_pins": {
+    "go": "1.27.2 SHA256 ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5",
+    "sdl2_headers": "2.32.4+dfsg-1 SHA256 277dc6373473df2079ed44ac8661575b97b39fa263bfa424b0324c1501d21413",
+    "cc65": "git e47ac5060b28a8be899871c814644aa04d21c221",
+    "rgbds": "git 6818759a8ca8cd11bf092aa052e2a992b52ac8e5"
+  }
+}

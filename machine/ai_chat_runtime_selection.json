@@ -38,6 +38,12 @@
     "wall": "Every local dispatch has a finite ResourceBudget.max_wall_seconds ceiling; earlier explicit deadline wins; cooperative cancellation drains real worker. No unbounded deadline-free dispatch.",
     "authority": "Existing engine admission remains quota authority; no new admission/store/provider owner."
   },
+  "backend_prompt_admission": {
+    "owner": "backend/core/engine_text.py",
+    "authority": "Existing canonical ContextCompiler/model-catalog budgets and EngineClient only; no additional provider, transport or fallback.",
+    "invariant": "The exact current USER segment ID/content SHA must be present in selected evidence_segments and project_provider_context must materialize exactly the requested current prompt. source_snapshot is an input inventory and cannot prove selection; omitted input never reaches local request construction or engine admission.",
+    "failure": "EngineTextContextError (existing EngineTextError subclass, code engine_context_too_small) reports a bounded context-capacity failure without prompt/source text. Complete rendered local framing must also fit the selected canonical input budget; no budget relaxation or token heuristic replacement."
+  },
   "current_main_compatibility": {
     "context_keys": "Canonical new commands use model_selection/temperature. Existing main commands may use provider_selection/provider_temperature. One canonical resolver validates either spelling, rejects unequal dual keys and never silently ignores explicit selection or sampling. Original prepared request bytes and digest remain unchanged on replay.",
     "provider_inventory": "Existing engine provider inventory remains the sole status authority. Backend tenant_model_inventory(actor_id,tenant_id) adapts the current scoped client contract to that same tenant-authorized endpoint and allowlisted projection; no global status fallback, new route, provider probe or credential exposure.",

@@ -6,7 +6,7 @@ from pathlib import PurePosixPath
 from urllib.parse import quote
 
 from fastapi import APIRouter, Response
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from core.game_console_build import (
     build_catalog,
@@ -17,6 +17,8 @@ from core.game_console_build import (
     start_artifact_play,
     start_artifact_training,
     start_artifact_campaign,
+    inspect_build_plan,
+    preview_artifact,
 )
 from core.game_learning import workspace
 from routes.game_learning import Request, User, WriteRequest, PlayRequest, TrainRequest, _call, _scope
@@ -35,7 +37,44 @@ class ConsoleBuildBody(Request):
     timeout_seconds: int = Field(default=60, ge=5, le=120, strict=True)
 
 
+class ConsoleBuildPlanBody(Request):
+    expected_version: int = Field(ge=1, strict=True)
+    target_id: str = Field(min_length=1, max_length=128)
+    style_id: str = Field(default="arcade_score_attack", min_length=1, max_length=64)
+    optimization: int = Field(default=1, ge=0, le=2, strict=True)
+    debug: bool = Field(default=False, strict=True)
+    timeout_seconds: int = Field(default=60, ge=5, le=120, strict=True)
+
+
+class ArtifactPreview(WriteRequest):
+    actions: list[str] | None = Field(default=None, min_length=1, max_length=256)
+    steps: int | None = Field(default=None, ge=1, le=256, strict=True)
+    seed: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
+
+    @model_validator(mode="after")
+    def bounded_inputs(self):
+        if self.actions is not None and self.steps is not None:
+            raise ValueError("select explicit actions or a NOOP step count")
+        if self.actions and any(not action or len(action) > 64 for action in self.actions):
+            raise ValueError("preview actions must be bounded runtime identifiers")
+        return self
+
+
 register_console_build_handler()
+
+
+@router.post("/projects/{project_id}/build-plan")
+async def get_console_build_plan(project_id: str, body: ConsoleBuildPlanBody, user: User):
+    return {"plan": await _call(inspect_build_plan(_scope(user), project_id, body.model_dump()))}
+
+
+@router.post("/projects/{project_id}/build-artifacts/{artifact_id}/preview")
+async def preview_compiled_source(project_id: str, artifact_id: str, body: ArtifactPreview, user: User):
+    return {
+        "preview": await _call(
+            preview_artifact(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
+        )
+    }
 
 
 @router.get("/build-catalog")
@@ -108,7 +147,7 @@ async def play_compiled_source(project_id: str, artifact_id: str, body: Artifact
 @router.post("/projects/{project_id}/build-artifacts/{artifact_id}/train")
 async def train_compiled_source(project_id: str, artifact_id: str, body: ArtifactTrain, user: User):
     return await _call(
-        start_artifact_training(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
+        start_artifact_training(_scope(user), project_id, artifact_id, body.admitted_request())
     )
 
 

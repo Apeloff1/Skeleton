@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from contextvars import ContextVar
+from functools import partial
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import Any
@@ -26,6 +27,7 @@ from skeleton.jeeves.game_console_build import (
     MAX_ARTIFACTS,
     MAX_OUTPUT,
     BuildSourceTree,
+    ConsoleBuildError,
     ConsoleBuildRequest,
     build_runner,
     console_build_catalog,
@@ -46,6 +48,97 @@ async def build_catalog() -> dict[str, Any]:
         "targets": await asyncio.to_thread(console_build_catalog),
         "isolated_runner_required": True,
         "hardware_execution_verified": False,
+    }
+
+
+async def inspect_build_plan(scope, project_id: str, body):
+    """Prepare the actual fixed compiler plan, exposing only its public identity."""
+    project = await workspace._project(project_id, scope, body["expected_version"])
+    binding = await workspace._input(scope, project, require_execution=False)
+    await workspace._authority(scope, binding)
+    try:
+        request = _request({"request": body, "input": binding})
+        plan = await asyncio.to_thread(build_runner.plan, request)
+    except ConsoleBuildError as exc:
+        raise GameLearningError("build_plan_invalid", str(exc), 422) from exc
+    await workspace._authority(scope, binding)
+    current = await workspace._project(project_id, scope, project["version"])
+    if json_digest(current["files"]) != json_digest(project["files"]):
+        raise GameLearningError("build_source_changed", "Project changed during compiler preflight.", 409)
+    adapter = plan["adapter"]
+    missing = [
+        "operator_sdk_missing" if str(item).startswith("/") else str(item)
+        for item in plan["missing_dependencies"]
+    ]
+    state = (
+        "source_only"
+        if adapter["reason"]
+        else "toolchain_missing" if missing else "build_available_unexecuted"
+    )
+    return {
+        "schema_version": "skeleton.console_build.preflight.v1",
+        "project_id": project_id,
+        "project_version": project["version"],
+        "head_digest": json_digest(project["files"]),
+        "target_id": request.target_id,
+        "style_id": request.style_id,
+        "state": state,
+        "reason": adapter["reason"],
+        "missing_dependencies": sorted(set(missing)),
+        "source_digest": plan["source_digest"],
+        "source_manifest_digest": binding["tree_digest"],
+        "plan_digest": plan["plan_digest"],
+        "runtime_digest": plan["runtime_digest"],
+        "recipe_digest": plan["recipe_digest"],
+        "compiler_class": adapter["class"],
+        "tools": {name: {"sha256": item["digest"]} for name, item in plan["tools"].items()},
+        "expected_outputs": plan["expected_outputs"],
+        "source_files": len(plan["source_inventory"]),
+        "compilation_executed": False,
+        "hardware_execution_verified": False,
+    }
+
+
+async def prepare_project_export(scope, project_id: str, expected_version: int):
+    """Materialize genuine canonical source export without returning its private body to a planner."""
+    project = await workspace._project(project_id, scope, expected_version)
+    exported = await workspace.export_project(scope, project_id, expected_version=expected_version)
+    await workspace._project(project_id, scope, expected_version)
+    return {
+        "schema_version": "skeleton.console_build.source_export.v1",
+        "project_id": project_id,
+        "project_version": expected_version,
+        "head_digest": json_digest(project["files"]),
+        "filename": exported["filename"],
+        "content_digest": exported["content_digest"],
+        "bytes": len(exported["content"].encode("utf-8")),
+        "media_type": exported["media_type"],
+        "download_path": f"/game-learning/projects/{project_id}/export?expected_version={expected_version}",
+        "state": "export_prepared",
+        "client_download_verified": False,
+    }
+
+
+async def prepare_artifact_export(scope, project_id: str, artifact_id: str):
+    record, job = await _completed_artifact(scope, project_id, artifact_id)
+    name, data, digest = await download_build_artifact(scope, project_id, artifact_id)
+    project = await workspace._project(project_id, scope)
+    await workspace._authority(scope, job["input"])
+    return {
+        "schema_version": "skeleton.console_build.binary_export.v1",
+        "project_id": project_id,
+        "project_version": project["version"],
+        "head_digest": json_digest(project["files"]),
+        "artifact_id": artifact_id,
+        "artifact_digest": digest,
+        "bytes": len(data),
+        "filename": PurePosixPath(name).name,
+        "format": record["format"],
+        "producer_job_id": job["job_id"],
+        "producer_input_digest": json_digest(job["input"]),
+        "download_path": f"/game-learning/projects/{project_id}/build-artifacts/{artifact_id}",
+        "state": "export_prepared",
+        "client_download_verified": False,
     }
 
 
@@ -178,8 +271,8 @@ async def handle_console_build(scope, job, cancelled, emit_event):
             future.cancel()
             raise
 
-    worker = asyncio.create_task(
-        asyncio.to_thread(build_runner.run, request, cancel=cancelled.is_set, on_event=event)
+    worker = loop.run_in_executor(
+        None, partial(build_runner.run, request, cancel=cancelled.is_set, on_event=event)
     )
     try:
         result = await asyncio.shield(worker)
@@ -798,6 +891,74 @@ async def admit_artifact_source(scope, project_id, artifact_id, body):
         "project": await workspace.get_project(scope, project_id),
         "source": _public(actual),
         "playback": await artifact_playback(scope, project_id, artifact_id),
+    }
+
+
+async def preview_artifact(scope, project_id, artifact_id, body):
+    """Observe an exact compiler output through the existing approved simulation owner."""
+    if body.get("actions") is not None:
+        if (
+            not isinstance(body["actions"], list)
+            or not 1 <= len(body["actions"]) <= 256
+            or body.get("steps") is not None
+        ):
+            raise GameLearningError(
+                "artifact_preview_limit", "Choose at most256 explicit inputs or a step count.", 422
+            )
+    elif type(body.get("steps", 60)) is not int or not 1 <= body.get("steps", 60) <= 256:
+        raise GameLearningError("artifact_preview_limit", "Preview contains at most256 actual inputs.", 422)
+    admitted = await admit_artifact_source(
+        scope,
+        project_id,
+        artifact_id,
+        {
+            "expected_version": body["expected_version"],
+            "idempotency_key": "preview:" + json_digest(body["idempotency_key"]),
+        },
+    )
+    request = {
+        "expected_version": body["expected_version"],
+        "idempotency_key": "artifact-preview:" + json_digest(body["idempotency_key"]),
+        "source_id": admitted["source"]["source_id"],
+        "seed": body.get("seed", 0),
+        "episode_steps": 256,
+        "reset": True,
+        **({"actions": body["actions"]} if body.get("actions") else {"steps": body.get("steps") or 60}),
+    }
+    project, result = await workspace.simulate(scope, project_id, request)
+    record, job = await _completed_artifact(scope, project_id, artifact_id)
+    receipt_id = _key(project_id, "simulation", request["idempotency_key"])
+    proof = await workspace.receipts.find_one({"_id": receipt_id, **scope, "project_id": project_id})
+    if proof is None or proof["request_digest"] != json_digest(request) or proof["result"] != result:
+        raise GameLearningError(
+            "artifact_preview_uncommitted", "The actual preview receipt is unavailable.", 503
+        )
+    transitions = result.get("transitions", [])
+    return {
+        "schema_version": "skeleton.console_build.preview.v1",
+        "project_id": project_id,
+        "project_version": project["version"],
+        "head_digest": json_digest(project["files"]),
+        "artifact_id": artifact_id,
+        "artifact_digest": record["digest"],
+        "producer_job_id": job["job_id"],
+        "producer_input_digest": json_digest(job["input"]),
+        "toolchain_plan_digest": job["result"].get("receipt", {}).get("plan_digest"),
+        "source_manifest_digest": job["input"]["tree_digest"],
+        "source_id": admitted["source"]["source_id"],
+        "simulation_receipt_id": receipt_id,
+        "simulation_request_digest": proof["request_digest"],
+        "simulation_result_digest": json_digest(result),
+        "session_id": result["session_id"],
+        "session_version": result["version"],
+        "snapshot_digest": result["snapshot_digest"],
+        "steps": result["steps"],
+        "transition_count": len(transitions),
+        "transitions_digest": json_digest(transitions),
+        "frame": result.get("last_frame"),
+        "native_instrumentation": admitted["playback"]["native_instrumentation"],
+        "state": "preview_observed",
+        "scope": "Actual bounded inputs and frame from approved emulator; no learned policy or game mastery claim",
     }
 
 

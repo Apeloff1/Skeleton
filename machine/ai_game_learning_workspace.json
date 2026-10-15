@@ -18,7 +18,8 @@
     "audit": "Episode audit projection is prepared before the single authoritative full snapshot-plus-trace job update. Prepared audit/source/job records confer no membership or policy authority.",
     "live_play": "Existing scoped game-learning plays/recordings with rotating controller epochs and tokens, durable source/input/worker fences, snapshot resume and actual TTL frame projections. See ai_game_play.json.",
     "parallel_learning": "Native one-to-eight process actors use a persisted frozen batch and acknowledged checkpoint prefix; each pending/committed batch-state update shares the authoritative full snapshot/trace job document. Interactive and actor capacity are separately reserved.",
-    "media": "Existing upload authority materializes large content through scoped immutable manifests; source registration pins exact content digest/rights/epoch and defaults to the admitted content. Legacy cartridges above2MiB use private hash-bound descriptors."
+    "media": "Existing upload authority materializes large content through scoped immutable manifests; source registration pins exact content digest/rights/epoch and defaults to the admitted content. Legacy cartridges above2MiB use private hash-bound descriptors.",
+    "policy_default": "The admission-observed default pointer is frozen with each new training job. A passing gate may replace only that exact comparator pointer under unchanged project version/input epoch. Seeded-random comparison only selects a default when no default existed. Rejected candidates remain issued and explicitly selectable; old historical rows are not rewritten."
   },
   "bounds": {
     "projects_per_owner": 64,
@@ -67,5 +68,30 @@
     "The 300-second cooperative computation deadline drains bounded in-flight storage/adapter work before reporting terminal state.",
     "Revocation denies further source/policy reuse and removes stored uploaded byte chunks; it does not claim numerical unlearning or deletion of downloaded exports.",
     "Local policy learning uses real bounded tabular Q updates and paired actual environment evaluation; this is not neural training or verified native hardware compatibility."
-  ]
+  ],
+  "simulation_execution_extension": {
+    "status": "candidate_implementation",
+    "owner": "backend/core/game_learning.py",
+    "authority": "existing scoped game_learning_simulation_receipts and game_learning_sessions in CORE_DB",
+    "dispatch": "A durable same-key reservation precedes native execution. A reserved or failed operation without a prepared result never authorizes automatic re-execution.",
+    "recovery": "The exact bounded prepared session and result can finish publication after interruption without another adapter execution. Session membership, current source rights, input epoch and session version remain fenced.",
+    "physical_cleanup": "A raw executor Future is shielded and drained through repeated request cancellation before returning. Every environment closes in finally.",
+    "deadline_seconds": 120,
+    "deadline_scope": "Cooperative whole-operation deadline with bounded adapter-call cleanup; timeout does not claim the process was stopped before physical cleanup.",
+    "prepared_receipt_bytes": 8388608,
+    "unresolved_dispatch": "Explicit simulation_dispatch_pending or simulation_dispatch_failed; use a new request only as a new authorized operation, never as an exact replay.",
+    "production_promotion_authorized": false
+  },
+  "training_resource_profiles": {
+    "owner": "backend/core/game_play.py",
+    "consumer": "backend/core/game_learning.py",
+    "default": "cpu",
+    "profiles": {
+      "cpu": "Current observed CPU/memory partition preserving interactive credits.",
+      "cpu_throughput": "Only offered when borrowing idle existing interactive credits increases allowed actors; immutable request selects this mode explicitly."
+    },
+    "claims": "Both profiles expose server-owned training_credit_ids. Existing actor/play Mongo credit rows are claimed atomically with token/job/lease; no new actor ID or extra capacity. An active human play blocks that same credit until physical quiescence.",
+    "limits": "Same observed effective CPU count,2GiB per native-compatible instance plus application reserve, global8-actor ceiling; zero capacity remains unavailable.",
+    "compatibility": "Old requests/jobs default cpu. No policy snapshot identity, numerical counter, source/teacher authority or pending actor batch is rewritten."
+  }
 }

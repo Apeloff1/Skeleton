@@ -18,11 +18,12 @@ export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadine
   const account = await checkMe();
   const token = getAuthToken();
   const opts = { signal, headers: authHeaders(), timeoutMs: 12000, retries: 0 };
-  const [healthResult, studio, chat, crawler] = await Promise.allSettled([
+  const [healthResult, studio, chat, crawler, dragon] = await Promise.allSettled([
     healthPromise,
     api.get<Record<string, unknown>>('/api/game-studio-health', opts),
     api.get<Record<string, unknown>>('/api/ai/chat/readiness', opts),
     api.get<Record<string, unknown>>('/api/dragon-academy/crawler/readiness', opts),
+    api.get<Record<string, unknown>>('/api/dragon-academy/runtime/readiness', opts),
   ]);
   if (signal?.aborted) throw new Error('Readiness check cancelled.');
   if (token !== getAuthToken()) throw new Error('Your account changed. Check readiness again.');
@@ -45,12 +46,12 @@ export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadine
   checks.push({ id: 'storage', label: 'Durable storage', status: storage?.connected === true && storage.admitter_configured === true ? 'ready' : storage ? 'blocked' : 'unknown',
     message: storage ? storage.connected !== true ? 'The application database is unavailable.' : storage.admitter_configured !== true ? 'The engine storage admission connection is not configured.' : 'The database and storage admission are configured.' : 'Sign in and refresh to check durable storage.',
     action: 'python -m skeleton app check --runtime' });
-  for (const [id, label, result] of [['chat', 'AI conversations', chat], ['crawler', 'Web capture', crawler]] as const) {
+  for (const [id, label, result] of [['chat', 'AI conversations', chat], ['crawler', 'Web capture', crawler], ['dragon', 'Dragon review & reference practice', dragon]] as const) {
     const response = result.status === 'fulfilled' ? result.value : null;
     const data = response?.ok ? response.data : null;
     checks.push({ id, label, status: data?.available === true ? 'ready' : response?.status === 401 || response?.status === 403 ? 'sign_in' : data && typeof data.available === 'boolean' ? 'blocked' : 'unknown',
-      message: detail(data?.message, id === 'chat' && data && typeof data.available === 'boolean' ? data.available ? 'The conversation store, engine and configured model are ready.' : 'AI chat prerequisites are incomplete. Open AI chat for the model catalog or run host diagnostics.' : response?.status === 401 || response?.status === 403 ? 'Sign in to inspect this capability.' : 'Readiness has not been observed. Refresh after the application is running.'),
-      action: detail(data?.action, id === 'chat' ? 'python -m skeleton app check --runtime' : 'Check database and engine storage admission configuration.') });
+      message: detail(data?.message, data && typeof data.available === 'boolean' ? data.available ? id === 'dragon' ? 'Dragon reference storage and measured local practice are ready. Approval remains a separate human decision.' : 'The conversation store, engine and configured model are ready.' : id === 'dragon' ? 'Dragon persistence or reference practice prerequisites need operator setup. Open Review & practice for the observed checks.' : 'AI chat prerequisites are incomplete. Open AI chat for the model catalog or run host diagnostics.' : response?.status === 401 || response?.status === 403 ? 'Sign in to inspect this capability.' : 'Readiness has not been observed. Refresh after the application is running.'),
+      action: detail(data?.action, id === 'dragon' ? 'Configure private Dragon persistence and enable the operator-approved empty-store bootstrap, then inspect Review & practice.' : id === 'chat' ? 'python -m skeleton app check --runtime' : 'Check database and engine storage admission configuration.') });
   }
   return { observedAt: Date.now(), checks, health };
 }

@@ -1,0 +1,68 @@
+{
+  "schema_version": "skeleton.ai.dragon_knowledge_runtime.v1",
+  "status": "implementation_candidate",
+  "owners": {
+    "application_adapter": "backend/core/dragon_runtime.py",
+    "canonical_review_adapter": "skeleton/ai/game_builder/dragon_source_review.py",
+    "reviewed_knowledge": "skeleton/ai/game_builder/reviewed_knowledge.py",
+    "practice": "skeleton/ai/webcrawler/dragon_practice_lab.py",
+    "api": "backend/routes/dragon_academy.py",
+    "startup": "backend/server.py",
+    "measured_practice_adapter": "backend/core/dragon_reference_practice.py",
+    "route_registration": "backend/routes/dragon_knowledge.py"
+  },
+  "authority": "Existing owner-scoped ReviewedKnowledgeStore and DragonPracticeLab SQLite files in backend_data. Crawler source references remain CORE_DB/CrawlRun authoritative. No new database, store service, provider boundary, scheduler or promotion authority.",
+  "bootstrap": {
+    "enabled": "SKL_DRAGON_RUNTIME_BOOTSTRAP=1 explicitly supplied by operator/normal installer; absence disables initialization",
+    "practice_path": "SKL_DRAGON_PRACTICE_DB_PATH",
+    "knowledge_path": "SKL_DRAGON_KNOWLEDGE_DB_PATH",
+    "behavior": "Initialize EMPTY canonical schemas only, private regular files, reject symlinks/corruption/unsupported configuration. No keys, lessons, XP, approvals, jobs or training grants minted. Existing files/identities retained; no empty fallback after storage disappearance.",
+    "file_admission": "Canonical ReviewedKnowledgeStore(existing_only=True) opens URI mode=rw after regular-file identity checks, preventing an absent authority from being silently recreated by a runtime request. Operator bootstrap alone may exclusively create private mode0600 files."
+  },
+  "source_review": {
+    "candidate": "Exact current scoped crawler source/reference, codepoint span and SHA; candidate text is proposed untrusted material, not reviewed knowledge. Payload<=16KiB, <=64 candidates/owner, exact stable idempotency and optimistic version. Store candidates/review command receipts in same knowledge SQLite.",
+    "decision": "Authenticated editor/admin explicit human approval or rejection, rationale and separate research/design rights attestation; exact quote revalidated against CURRENT preserved source bytes and consent. Human annotation is not independent empirical truth. No caller supplied approval receipts, probability, XP or training grants.",
+    "publication": "Existing ReviewedKnowledgeStore.import_document owns canonical revisions. Review intent precedes external/canonical commit; deterministic reserved source ID+exact revision recover publication without duplicate notes. Exact note/revision IDs returned. Confidence=0 uncalibrated; shared unverified crawler dependence group prevents fabricated independence.",
+    "bindings": "Reserved crawler-review:<candidateid> knowledge namespace requires immutable exact revision/source binding and live trusted source_verifier. Missing binding/verifier/revoked/expired capture fails closed during search/brief/export/practice; normal legacy standalone documents unchanged. Binding persisted after import; any crash window remains hidden. Runtime verifies current crawler owner/consent/source before and after materialization. No cross-Mongo/SQLite atomic transaction claim.",
+    "rights": "Only research and design_reference scopes, bounded by capture/use consent expiry and explicit attestation. No training_candidate/weight updates/automatic promotion. Full calibrated promotion and ApprovedLesson gates remain unchanged.",
+    "citation_runtime": "search_reviewed_references and assert_reviewed_references expose exact immutable canonical review/source pins; optional measured practice summary is linked as factual reference-environment observation only.",
+    "erasure": "Existing ReviewedKnowledgeStore.erase_owner atomically erases this owner\u2019s adjacent candidates/review intents/bindings along with canonical knowledge revisions. Existing crawler and measured practice owners retain their separately governed erasure/retention scope; no global-copy erasure claim.",
+    "recovery": "Candidate GET/list exposes prepared_review (bounded frozen review_id/decision/rationale/rights/time, no owner/request internals) when an intent awaits publication. Explicit current editor may resume ONLY that exact durable intent via review/resume; no new decision, grant, rationale, key, or expiry is minted. Current candidate, issued intent, source/span and consent are revalidated before/after canonical publication; completed same-intent replay remains stable. Pure canonical document/span/HTTPS/title/rights/size admissibility is checked before issuing a new immutable review intent, preventing unsupported captures from stranding a candidate behind an unfinishable approval."
+  },
+  "practice": {
+    "runtime": "Existing coded GameLearningEnvironment fixed eight_bit_tile_1983 reference environment; no ROM execution or arbitrary uploaded code. Actual reset/step transitions under deterministic fixed controller based on observation, measured reward components and terminal/truncated state; source annotation chooses supported exercise label only.",
+    "limits": {
+      "max_steps": 512,
+      "default_steps": 128,
+      "max_seconds": 10,
+      "max_practice_attempts_per_owner_day": 16,
+      "max_trace_bytes": 1048576,
+      "max_attempts_per_request": 3,
+      "max_intents_per_owner": 512,
+      "max_live_exercises_global": 2,
+      "max_live_exercises_per_owner": 1
+    },
+    "persistence": "Same practice SQLite, request/attempt identity+runtime/source/review digests before execution; bounded durable checkpoint chunks, live lease and source/consent checks. Replays return exact committed receipt; interrupted work remains explicit and never counted complete. No hidden daemon or per-source automatic loop.",
+    "claims": "Measured local reference exercise observations only. No claim source proposition is true, arbitrary game was played, hardware was emulated, policy trained, mastery established or XP awarded. Existing Lab progress remains source of truth.",
+    "retrieval": "Exact completed immutable receipt SHA + original source/version/review and runtime digest; no raw trace/image in typed knowledge.practice context. Current canonical source/consent/review is checked before and after materialization and on every subsequent cited use. The workspace account-email namespace is converted only inside a trusted adapter to the existing crawler owner hash; authentication/role/project scope remain with existing route/tool authorities.",
+    "discovery": "knowledge.search may expose at most one latest completed practice_receipts [{practice_id,receipt_digest}] per current reference, selected from at most two recent attempt summaries and verified through exact completed receipt read plus live candidate/source checks. No metrics/lesson text is injected by discovery; knowledge.practice must retrieve and pin the exact measured receipt separately."
+  },
+  "interfaces": [
+    "GET /api/dragon-academy/runtime/readiness",
+    "POST /api/dragon-academy/knowledge/candidates",
+    "GET /api/dragon-academy/knowledge/candidates",
+    "GET /api/dragon-academy/knowledge/candidates/{candidate_id}",
+    "POST /api/dragon-academy/knowledge/candidates/{candidate_id}/review",
+    "GET /api/dragon-academy/knowledge/search",
+    "POST /api/dragon-academy/knowledge/candidates/{candidate_id}/practice",
+    "GET /api/dragon-academy/knowledge/candidates/{candidate_id}/practice",
+    "async search_reviewed_references(scope, query, limit<=8)",
+    "async assert_reviewed_references(scope, pins)",
+    "reviewed_scope_from_workspace(verified_workspace_scope)",
+    "async inspect_reference_practice(scope,candidate_id,practice_id)",
+    "async assert_reference_practice(scope,pins<=16)",
+    "GET /api/dragon-academy/knowledge/candidates/{candidate_id}/practice/{practice_id}",
+    "POST /api/dragon-academy/knowledge/candidates/{candidate_id}/review/resume {review_id}"
+  ],
+  "validation": "Static source/compile/style and actual authenticated API/workloads only; user prohibits tests/framework runs. Candidate implementation, no production/masterplan completion claim."
+}

@@ -42,7 +42,8 @@
     "durability": "Request slot and maximum possible response bytes are checkpointed BEFORE network as pending_dispatch; outcome atomically settles known bytes and content. Uncertain outcome retains reservation across recovery; committed source IDs dedupe. Full frontier, robots, retry timers and source text in same application snapshot.",
     "recovery": "Backend fences old worker before restore. Pending dispatch becomes unknown outcome with full cap retained and bounded retry; external IO is at-least-once, not exactly-once.",
     "control": "Explicit pause/resume/cancel; no OS idle/activity inference; consent must remain current before network and commit",
-    "accounting": "usage.bytes is measured accepted transport-body bytes; usage.reserved_bytes is conservative allowance for in-flight or unknown failed response bytes. Both consume total byte budget. Request count is reserved dispatch attempts, not independently attested remote server requests."
+    "accounting": "usage.bytes is measured accepted transport-body bytes; usage.reserved_bytes is conservative allowance for in-flight or unknown failed response bytes. Both consume total byte budget. Request count is reserved dispatch attempts, not independently attested remote server requests.",
+    "autonomous_application": "Application may consume explicit finite CORE_DB grants through the existing backend scheduler. Pure run_slice remains at most4steps/45seconds; no independent pure background loop, storage, scheduler or authority. Canonical code binding and pre-IO reservation remain unchanged."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",

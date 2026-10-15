@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, SafeAreaView, ScrollView, Share, Switch, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
-import * as Clipboard from 'expo-clipboard';
+import { ActivityIndicator, Alert, AppState, Platform, SafeAreaView, ScrollView, Share, Switch, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import StudioLoginGate, { useStudioAuth } from '../../src/auth/StudioLoginGate';
 import { getAuthToken } from '../../src/auth/gameforgeAuth';
-import { createCrawl, controlCrawl, crawlRequestKey, eraseCrawl, getCrawlEvents, exportCrawlSource, getCrawl, getCrawlerReadiness, getCrawlSource, listCrawls, listCrawlSources, runCrawl, type CapturedSource, type CrawlCreate, type CrawlEvent, type CrawlerReadiness, type CrawlSession, type SourceExport } from '../../src/product/crawlerClient';
+import { createCrawl, controlCrawl, crawlRequestKey, eraseCrawl, getCrawlEvents, exportCrawlSource, getCrawl, getCrawlerReadiness, listCrawls, listCrawlSources, runCrawl, type CapturedSource, type CrawlCreate, type CrawlEvent, type CrawlerReadiness, type CrawlSession, type SourceExport } from '../../src/product/crawlerClient';
 import { ChatClientError } from '../../src/product/chatErrors';
 import s, { colors } from './CrawlerWorkspace.styles';
+import CrawlerAutomationPanel from './CrawlerAutomationPanel';
+import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourceLibrary';
+import DragonKnowledgePanel from './DragonKnowledgePanel';
 
-const TERMINAL = new Set(['completed', 'cancelled', 'budget_exhausted', 'failed']);
 function bytes(value: number): string { return value < 1024 ? `${value} B` : value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1048576).toFixed(1)} MB`; }
 function label(value: string): string { return value.replaceAll('_', ' '); }
 async function saveExport(file: SourceExport): Promise<void> {
@@ -29,17 +30,25 @@ function Button({ title, onPress, disabled = false }: { title: string; onPress: 
 }
 function CrawlerContent() {
   const router = useRouter(); const { width } = useWindowDimensions(); const auth = useStudioAuth();
+  const params = useLocalSearchParams<{ session?: string; pane?: string }>();
+  const requestedSession = typeof params.session === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(params.session) ? params.session : null;
+  const [pane, setPane] = useState<'capture' | 'review'>(params.pane === 'review' ? 'review' : 'capture');
+  const [reviewDraft, setReviewDraft] = useState<CrawlPassageSelection | null>(null);
+  const restoredSession = useRef<string | null>(null);
+  const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const choosePane = (value: 'capture' | 'review') => { setPane(value); router.setParams({ pane: value }); scroll.current?.scrollTo({ y: 0, animated: false }); };
+  useEffect(() => { if (params.pane === 'capture' || params.pane === 'review') setPane(params.pane); }, [params.pane]);
   const [readiness, setReadiness] = useState<CrawlerReadiness | null>(null);
   const [sessions, setSessions] = useState<CrawlSession[]>([]); const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [active, setActive] = useState<CrawlSession | null>(null); const activeRef = useRef<CrawlSession | null>(null);
-  const [sources, setSources] = useState<CapturedSource[]>([]); const [sourceCursor, setSourceCursor] = useState<string | null>(null); const [source, setSource] = useState<CapturedSource | null>(null);
+  const [sources, setSources] = useState<CapturedSource[]>([]); const [sourceCursor, setSourceCursor] = useState<string | null>(null);
   const [events, setEvents] = useState<CrawlEvent[]>([]); const [truncatedEvents, setTruncatedEvents] = useState(false);
   const [title, setTitle] = useState(''); const [seeds, setSeeds] = useState(''); const [topics, setTopics] = useState('');
   const [requests, setRequests] = useState('24'); const [documents, setDocuments] = useState('16'); const [megabytes, setMegabytes] = useState('8'); const [depth, setDepth] = useState('1');
   const [consent, setConsent] = useState(false); const [rights, setRights] = useState(false); const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(''); const [running, setRunning] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [retry, setRetry] = useState<(() => Promise<void>) | null>(null);
-  const generation = useRef(0); const sourceGeneration = useRef(0); const requestsRef = useRef(new Set<AbortController>()); const token = useRef(getAuthToken());
+  const generation = useRef(0); const requestsRef = useRef(new Set<AbortController>()); const token = useRef(getAuthToken());
   const canWrite = auth.role === 'editor' || auth.role === 'admin';
   const accept = useCallback((value: CrawlSession) => {
     setSessions(rows => { const found = rows.find(row => row.session_id === value.session_id); if (found && found.version > value.version) return rows; return [value, ...rows.filter(row => row.session_id !== value.session_id)].slice(0, 128); });
@@ -62,23 +71,29 @@ function CrawlerContent() {
     });
   }, [perform]);
   useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current++; requestsRef.current.forEach(row => row.abort()); requestsRef.current.clear(); }; }, [refresh]));
-  useEffect(() => { const timer = setInterval(() => { if (token.current !== getAuthToken()) { token.current = getAuthToken(); generation.current++; requestsRef.current.forEach(row => row.abort()); activeRef.current = null; setActive(null); setReadiness(null); setBusy(''); setRunning(false); setSessions([]); setSources([]); setSource(null); setEvents([]); setSeeds(''); setTopics(''); setConsent(false); setRights(false); setRetry(null); setError('Your account changed. Reopen web capture to load its sources.'); } }, 1000); return () => clearInterval(timer); }, []);
+  useEffect(() => { const timer = setInterval(() => { if (token.current !== getAuthToken()) { token.current = getAuthToken(); generation.current++; requestsRef.current.forEach(row => row.abort()); activeRef.current = null; setActive(null); setReadiness(null); setBusy(''); setRunning(false); setSessions([]); setSources([]); setEvents([]); setReviewDraft(null); setSeeds(''); setTopics(''); setConsent(false); setRights(false); setRetry(null); setError('Your account changed. Reopen web capture to load its sources.'); } }, 1000); return () => clearInterval(timer); }, []);
   useEffect(() => {
-    if (!active || !['running', 'queued', 'interrupted'].includes(active.status)) return;
+    if (!active || !(active.automation?.enabled || active.worker?.active || active.worker?.quiescent === false || ['running', 'queued'].includes(active.status))) return;
     let stopped = false; const current = new AbortController(); let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => { try { const value = await getCrawl(active.session_id, current.signal); if (!stopped) accept(value); } catch {} finally { if (!stopped) timer = setTimeout(() => void poll(), 3000); } };
+    const poll = async () => { try { if (!['active', 'unknown'].includes(AppState.currentState)) return; const value = await getCrawl(active.session_id, current.signal); if (!stopped) accept(value); } catch {} finally { if (!stopped) timer = setTimeout(() => void poll(), 3000); } };
     timer = setTimeout(() => void poll(), 3000); return () => { stopped = true; clearTimeout(timer); current.abort(); };
-  }, [active?.session_id, active?.status, accept]);
+  }, [active?.session_id, active?.status, active?.automation?.enabled, active?.worker?.active, active?.worker?.quiescent, accept]);
   useEffect(() => {
     if (!active) return;
     const current = new AbortController(); const id = active.session_id;
     void getCrawlEvents(id, current.signal).then(page => { if (!current.signal.aborted && activeRef.current?.session_id === id) { setEvents(page.events); setTruncatedEvents(page.history_truncated); } }).catch(() => {});
     return () => current.abort();
   }, [active?.session_id, active?.version]);
-  const open = (row: CrawlSession) => {
-    generation.current++; requestsRef.current.forEach(item => item.abort()); activeRef.current = row; setActive(row); setSource(null); setSources([]); setEvents([]); setError(''); setRetry(null); setCreating(false); setRunning(false); setBusy('');
-    void perform(async signal => { const [current, page] = await Promise.all([getCrawl(row.session_id, signal), listCrawlSources(row.session_id, undefined, signal)]); if (!signal.aborted && activeRef.current?.session_id === row.session_id) { accept(current); setSources(page.sources); setSourceCursor(page.next_cursor); } });
-  };
+  const open = useCallback((row: CrawlSession, preservePane = false) => {
+    restoredSession.current = row.session_id; if (!preservePane) setPane('capture'); router.setParams({ session: row.session_id, ...(preservePane ? {} : { pane: 'capture' }) });
+    generation.current++; requestsRef.current.forEach(item => item.abort()); activeRef.current = row; setActive(row); setSources([]); setEvents([]); setError(''); setRetry(null); setCreating(false); setRunning(false); setBusy('');
+    void perform(async signal => { const [current, page, observed] = await Promise.all([getCrawl(row.session_id, signal), listCrawlSources(row.session_id, undefined, signal), getCrawlerReadiness(signal).catch(() => null)]); if (!signal.aborted && activeRef.current?.session_id === row.session_id) { accept(current); setSources(page.sources); setSourceCursor(page.next_cursor); if (observed) setReadiness(observed); } });
+  }, [perform, accept, router]);
+  useEffect(() => {
+    if (!requestedSession || restoredSession.current === requestedSession) return;
+    restoredSession.current = requestedSession;
+    void perform(async signal => { const value = await getCrawl(requestedSession, signal); if (!signal.aborted) open(value, true); });
+  }, [requestedSession, perform, open]);
   const mutate = async (name: string, operation: (signal: AbortSignal) => Promise<CrawlSession>, isRun = false) => {
     const epoch = generation.current; setError(''); setRetry(null); if (isRun) setRunning(true); else setBusy(name);
     await perform(async signal => {
@@ -115,7 +130,7 @@ function CrawlerContent() {
     const operation = async () => {
       const epoch = generation.current; setBusy('Erasing sources'); setError(''); setRetry(null);
       await perform(async signal => {
-        try { await eraseCrawl(id, body, signal); if (!signal.aborted && epoch === generation.current) { setSessions(rows => rows.filter(row => row.session_id !== id)); activeRef.current = null; setActive(null); setSources([]); setSource(null); setEvents([]); setNotice('The server erased this crawl and its captured content. Exported copies remain outside the app.'); } }
+        try { await eraseCrawl(id, body, signal); if (!signal.aborted && epoch === generation.current) { setSessions(rows => rows.filter(row => row.session_id !== id)); activeRef.current = null; setActive(null); setSources([]); setEvents([]); setNotice('The server erased this crawl and its captured content. Exported copies remain outside the app.'); } }
         catch (err) { if (!signal.aborted && epoch === generation.current && (!(err instanceof ChatClientError) || ['network', 'timeout', 'unavailable'].includes(err.kind))) setRetry(() => operation); throw err; }
       });
       if (epoch === generation.current) setBusy('');
@@ -125,19 +140,20 @@ function CrawlerContent() {
     else Alert.alert('Erase captured sources?', message, [{ text: 'Keep sources', style: 'cancel' }, { text: 'Erase', style: 'destructive', onPress: () => void operation() }]);
   };
   const refreshActive = () => { if (!active) { void refresh(); return; } const id = active.session_id; void perform(async signal => { const [value, page] = await Promise.all([getCrawl(id, signal), listCrawlSources(id, undefined, signal)]); if (!signal.aborted && activeRef.current?.session_id === id) { accept(value); setSources(page.sources); setSourceCursor(page.next_cursor); } }); };
-  const inspectSource = (item: CapturedSource) => { const id = active?.session_id; if (!id) return; const selection = ++sourceGeneration.current; setSource(item); void perform(async signal => { const value = await getCrawlSource(id, item.source_id, signal); if (!signal.aborted && activeRef.current?.session_id === id && selection === sourceGeneration.current) setSource(value); }); };
-  return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={[s.page, { maxWidth: 1480 }]} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView style={s.safe}><ScrollView ref={scroll} contentContainerStyle={[s.page, { maxWidth: 1480 }]} keyboardShouldPersistTaps="handled">
     <View style={s.row}><View style={[s.grow, width < 600 && { flexBasis: '100%', flexGrow: 0, flexShrink: 0 }]}><Text style={s.eyebrow}>DRAGON · WEB KNOWLEDGE</Text><Text style={s.title}>Capture with a clear scope</Text></View><Button title="Setup" onPress={() => router.push('/setup' as never)} /><Button title="AI chat" onPress={() => router.push('/jeeves-chat' as never)} /><Button title="Home" onPress={() => router.push('/product' as never)} /></View>
     <Text style={s.subtitle}>Choose public URLs, authorize a bounded crawl and inspect what was actually captured. Capture does not review a source or train a model.</Text>
     <View style={s.card}><View style={s.row}><Text style={[s.heading, s.grow]}>{readiness ? readiness.available ? 'Capture service ready' : 'Capture needs setup' : 'Readiness not observed'}</Text><Button title="Refresh" onPress={() => { setError(''); void refresh(); refreshActive(); }} /></View><Text style={s.message}>{readiness?.message || 'Check the application and your account to inspect crawler readiness.'}</Text>{!readiness?.available && readiness?.action && <Text style={s.small}>{readiness.action}</Text>}<Text style={s.small}>Live reachability is checked when a request runs. Public host policy, robots rules, limits and consent are enforced by the crawler.</Text>{!canWrite && <Text style={s.error}>Your account can inspect sources. An editor or administrator is required to create or control a crawl.</Text>}</View>
     {!!error && <View style={s.card} accessibilityRole="alert"><Text style={s.error}>{error}</Text><View style={s.row}>{retry && <Button title="Retry the same request" disabled={!!busy || running} onPress={() => void retry()} />}<Button title="Refresh current state" onPress={refreshActive} /><Button title="Dismiss" onPress={() => setError('')} /></View></View>}
     {!!notice && <Text accessibilityLiveRegion="polite" style={s.small}>{notice}</Text>}
-    <View style={[s.twoColumns, width < 900 && { flexDirection: 'column' }]}><View style={[s.column, s.card, { flexBasis: 280, maxWidth: width > 900 ? 360 : undefined }]}><View style={s.row}><Text style={[s.heading, s.grow]}>Your crawls</Text><Button title="New" disabled={!canWrite || !!busy || running} onPress={() => { setCreating(true); setSource(null); setError(''); }} /></View>
+    <View style={s.row} accessibilityRole="tablist"><TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: pane === 'capture' }} onPress={() => choosePane('capture')} style={s.button}><Text style={s.buttonText}>Capture operations</Text></TouchableOpacity><TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: pane === 'review' }} onPress={() => choosePane('review')} style={s.button}><Text style={s.buttonText}>Review & practice{reviewDraft ? ' · selected passage' : ''}</Text></TouchableOpacity></View>
+    <View style={pane === 'capture' ? undefined : { display: 'none' }}>
+    <View style={[s.twoColumns, width < 900 && { flexDirection: 'column' }]}><View style={[s.column, s.card, { flexBasis: 280, maxWidth: width > 900 ? 360 : undefined }]}><View style={s.row}><Text style={[s.heading, s.grow]}>Your crawls</Text><Button title="New" disabled={!canWrite || !!busy || running} onPress={() => { setCreating(true); setError(''); }} /></View>
       {!sessions.length && <Text style={s.small}>No captured sessions loaded. Create one after readiness and permissions are confirmed.</Text>}
       {sessions.map(row => <TouchableOpacity key={row.session_id} accessibilityRole="button" accessibilityState={{ selected: active?.session_id === row.session_id }} style={[s.check, active?.session_id === row.session_id && { backgroundColor: '#251f38', padding: 12, borderRadius: 8 }]} onPress={() => open(row)}><Text style={s.label}>{row.title}</Text><Text style={s.small}>{label(row.status)} · {row.counters.documents} captures · {row.counters.requests} requests</Text></TouchableOpacity>)}
       {nextCursor && <Button title="Load more crawls" onPress={() => void perform(async signal => { const page = await listCrawls(nextCursor, signal); if (!signal.aborted) { setSessions(rows => [...rows, ...page.sessions.filter(row => !rows.some(old => old.session_id === row.session_id))].slice(0, 128)); setNextCursor(page.next_cursor); } })} />}
     </View><View style={[s.column, { flexBasis: 620, gap: 20 }]}>
-      {(creating || !active) && <View style={s.card}><Text style={s.heading}>New bounded crawl</Text><Text style={s.small}>Only explicitly selected seed hosts are admitted. Consent expires within 24 hours. Start runs one bounded slice at a time.</Text>
+      {(creating || !active) && <View style={s.card}><Text style={s.heading}>New bounded crawl</Text><Text style={s.small}>Only explicitly selected seed hosts are admitted. Consent expires within 24 hours. Create the source scope first, then authorize a finite automatic run or one manual slice.</Text>
         <Text style={s.label}>Name (optional)</Text><TextInput accessibilityLabel="Crawl name" value={title} onChangeText={setTitle} maxLength={160} style={field} placeholder="Engine documentation" placeholderTextColor={colors.muted} />
         <Text style={s.label}>Seed URLs · one per line</Text><TextInput accessibilityLabel="Seed URLs" value={seeds} onChangeText={setSeeds} maxLength={32768} multiline style={[field, { minHeight: 110 }]} placeholder={'https://example.org/docs/\nhttps://example.org/guide/'} placeholderTextColor={colors.muted} autoCapitalize="none" />
         <Text style={s.label}>Topics (optional, comma separated)</Text><TextInput accessibilityLabel="Crawl topics" value={topics} onChangeText={setTopics} maxLength={1280} style={field} placeholder="movement, tools, scripting" placeholderTextColor={colors.muted} />
@@ -146,18 +162,27 @@ function CrawlerContent() {
         <Button title={busy === 'Creating crawl' ? 'Creating…' : 'Create crawl'} disabled={!canWrite || readiness?.available !== true || !consent || !rights || !seeds.trim() || !!busy || running} onPress={create} />
       </View>}
       {active && !creating && <><View style={s.card}><View style={s.row}><Text style={[s.heading, s.grow]}>{active.title}</Text><View style={s.badge}><Text style={s.badgeText}>{label(active.status)}</Text></View></View>
-        <Text style={s.small}>Last committed snapshot: {new Date(active.updated_at).toLocaleString()}</Text><Text style={s.small}>{active.consent_current ? `Capture consent valid until ${new Date(active.consent_expires_at).toLocaleString()}` : 'Capture consent expired. Create a new scoped crawl to continue.'}</Text>
-        <View style={s.row}>{[['Requests', `${active.counters.requests} / ${active.limits.max_requests}`], ['Captures', `${active.counters.documents} / ${active.limits.max_documents}`], ['Downloaded', `${bytes(active.counters.bytes)} / ${bytes(active.limits.max_total_bytes)}`], ['Failures', active.counters.failures], ['Queued URLs', active.frontier_count]].map(([name, value]) => <View key={name} style={{ minWidth: 110, flex: 1, gap: 5 }}><Text style={s.small}>{name}</Text><Text style={s.heading}>{value}</Text></View>)}</View>
+        <Text style={s.small}>Last committed snapshot: {new Date(active.updated_at).toLocaleString()}</Text>
+        <Text style={s.small}>{active.consent_current ? `Capture consent valid until ${new Date(active.consent_expires_at).toLocaleString()}` : 'Capture consent expired. Inspect retained records or create a new authorized crawl.'}</Text>
+        <Text style={s.message}>Measured downloads: {bytes(active.counters.bytes)} / {bytes(active.limits.max_total_bytes)}</Text>
         {typeof active.counters.reserved_bytes === 'number' && active.counters.reserved_bytes > 0 && <Text style={s.small}>Unconfirmed transport allowance: {bytes(active.counters.reserved_bytes)} reserved separately from measured downloaded bytes.</Text>}
-        {active.stop_reason && <Text style={s.message}>Stopped: {label(active.stop_reason)}</Text>}{active.error?.message && <Text style={s.error}>{active.error.message}</Text>}
-        <View style={s.row}><Button title={running ? 'Slice running…' : 'Run up to 4 requests'} disabled={!canWrite || readiness?.available !== true || !!busy || running || !active.consent_current || !['queued', 'ready', 'interrupted'].includes(active.status)} onPress={() => { const id = active.session_id; const body = { idempotency_key: crawlRequestKey('run'), expected_version: active.version, max_steps: 4 }; void mutate('Run', signal => runCrawl(id, body, signal), true); }} />
-          <Button title="Pause" disabled={!canWrite || !!busy || TERMINAL.has(active.status) || active.status === 'paused'} onPress={() => control('pause')} /><Button title="Resume" disabled={!canWrite || !!busy || active.status !== 'paused' || !active.consent_current} onPress={() => control('resume')} /><Button title="Cancel crawl" disabled={!canWrite || !!busy || TERMINAL.has(active.status)} onPress={() => control('cancel')} /><Button title="Erase captured sources" disabled={!canWrite || !!busy} onPress={erase} /><Button title="Refresh" onPress={refreshActive} />{(running || !!busy) && <ActivityIndicator color={colors.accent} />}</View>
-        <Text style={s.small}>Leaving this screen detaches the request; it does not cancel the server worker. Pause or Cancel must be confirmed by the server.</Text>
-      </View><View style={s.card}><Text style={s.heading}>Actual URL queue</Text>{active.queue.length ? active.queue.map((item, index) => <View key={`${item.url}-${index}`} style={s.check}><Text selectable style={s.message}>{item.url}</Text><Text style={s.small}>Depth {item.depth} · {item.attempts} attempts · {item.ready_at * 1000 <= Date.now() ? 'eligible now' : `next eligible ${new Date(item.ready_at * 1000).toLocaleTimeString()}`}</Text></View>) : <Text style={s.small}>No pending URL is listed in the current snapshot.</Text>}{active.frontier_count > active.queue.length && <Text style={s.small}>Showing the first {active.queue.length} of {active.frontier_count} queued URLs.</Text>}</View>
+        {active.error?.message && <Text style={s.error}>{active.error.message}</Text>}
+        <View style={s.row}><Button title="Erase this crawl and its captured sources" disabled={!!busy || running || (active.capabilities ? !active.capabilities.can_erase : !canWrite)} onPress={erase} />{(running || !!busy) && <ActivityIndicator color={colors.accent} />}</View>
+      </View>
+      <CrawlerAutomationPanel key={active.session_id} session={active} canWrite={canWrite} busy={!!busy || running}
+        run={(name, operation) => { void mutate(name, operation); }} control={control} refresh={refreshActive}
+        manual={() => { const id = active.session_id; const body = { idempotency_key: crawlRequestKey('run'), expected_version: active.version, max_steps: 4 }; void mutate('Run', signal => runCrawl(id, body, signal), true); }} />
+      <View style={s.card}><Text style={s.heading}>Actual URL queue</Text>{active.queue.length ? active.queue.map((item, index) => <View key={`${item.url}-${index}`} style={s.check}><Text selectable style={s.message}>{item.url}</Text><Text style={s.small}>Depth {item.depth} · {item.attempts} attempts · {item.ready_at * 1000 <= Date.now() ? 'eligible now' : `next eligible ${new Date(item.ready_at * 1000).toLocaleTimeString()}`}</Text></View>) : <Text style={s.small}>No pending URL is listed in the current snapshot.</Text>}{active.frontier_count > active.queue.length && <Text style={s.small}>Showing the first {active.queue.length} of {active.frontier_count} queued URLs.</Text>}</View>
       <View style={s.card}><Text style={s.heading}>Recent crawl events</Text>{truncatedEvents && <Text style={s.small}>The runtime retains a bounded event tail. Older events are unavailable; no history has been reconstructed.</Text>}{events.length ? [...events].reverse().map(event => <View key={event.sequence} style={s.check}><Text style={s.label}>{label(event.kind)}</Text><Text style={s.small}>{new Date(event.at * 1000).toLocaleTimeString()}{event.reason ? ` · ${label(event.reason)}` : ''}</Text>{event.url && <Text selectable style={s.small}>{event.url}</Text>}</View>) : <Text style={s.small}>No event is recorded in the current bounded history.</Text>}</View>
-      <View style={s.card}><Text style={s.heading}>Captured knowledge</Text><Text style={s.small}>External material remains unreviewed. Opening a source does not grant instruction authority or model-training rights.</Text>{sources.map(item => <TouchableOpacity key={item.source_id} accessibilityRole="button" style={s.check} onPress={() => inspectSource(item)}><Text style={s.label}>{item.title || item.url}</Text><Text numberOfLines={2} style={s.small}>{item.url}</Text><Text style={s.small}>{label(item.review_state)} · {new Date(item.fetched_at).toLocaleString()}</Text></TouchableOpacity>)}{!sources.length && <Text style={s.message}>No committed source is available yet.</Text>}{sourceCursor && <Button title="Load more captures" onPress={() => void perform(async signal => { const page = await listCrawlSources(active.session_id, sourceCursor, signal); if (!signal.aborted) { setSources(rows => [...rows, ...page.sources.filter(row => !rows.some(old => old.source_id === row.source_id))]); setSourceCursor(page.next_cursor); } })} />}</View></>}
-      {source && active && <View style={s.card}><View style={s.row}><Text style={[s.heading, s.grow]}>{source.title || 'Captured source'}</Text><Button title="Close source" onPress={() => { sourceGeneration.current++; setSource(null); }} /></View><Text selectable style={s.small}>{source.url}</Text><Text style={s.badgeText}>{label(source.review_state)} · external content</Text><Text selectable style={s.message}>{source.text ?? 'Loading captured text…'}</Text>{source.text_truncated && <Text style={s.small}>The preserved source text was bounded by the capture limit.</Text>}<View style={s.row}><Button title="Copy captured text" disabled={!source.text} onPress={() => { void Clipboard.setStringAsync(source.text || '').then(() => setNotice('Captured text copied.')); }} />{(['json', 'markdown'] as const).map(format => <Button key={format} title={`Export ${format === 'json' ? 'JSON' : 'Markdown'}`} onPress={() => void perform(async signal => { const file = await exportCrawlSource(active.session_id, source.source_id, format, signal); if (!signal.aborted) await saveExport(file); })} />)}</View><Text style={s.small}>Capture digest</Text><Text selectable style={s.small}>{source.content_digest}</Text></View>}
+      <CrawlerSourceLibrary key={active.session_id + ':' + token.current} session={active} sources={sources} more={!!sourceCursor} busy={!!busy || running}
+        refresh={refreshActive}
+        loadMore={() => { if (sourceCursor) void perform(async signal => { const page = await listCrawlSources(active.session_id, sourceCursor, signal); if (!signal.aborted && activeRef.current?.session_id === active.session_id) { setSources(rows => [...rows, ...page.sources.filter(row => !rows.some(old => old.source_id === row.source_id))].slice(0, 64)); setSourceCursor(page.next_cursor); } }); }}
+        onReview={passage => { setReviewDraft(passage); choosePane('review'); }}
+        exportSource={(item, format) => { void perform(async signal => { const file = await exportCrawlSource(active.session_id, item.source_id, format, signal); if (!signal.aborted) await saveExport(file); }); }} />
+      </>}
     </View></View>
+    </View>
+    <View style={pane === 'review' ? undefined : { display: 'none' }}><DragonKnowledgePanel key={token.current} visible={pane === 'review'} canWrite={canWrite} draft={reviewDraft} clearDraft={() => setReviewDraft(null)} /></View>
   </ScrollView></SafeAreaView>;
 }
 const field = { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.edge, borderRadius: 9, padding: 12, color: colors.text, fontSize: 14, textAlignVertical: 'top' as const };

@@ -2462,6 +2462,11 @@ from core.dragon_delivery_routes import register_delivery_routes as _register_de
 
 _register_delivery_routes(router, _principal, _lab, lambda: time.time())
 
+# Reuse this authenticated Academy surface for consent-bound reference review.
+from routes.dragon_knowledge import register_knowledge_routes as _register_knowledge_routes
+
+_register_knowledge_routes(router)
+
 
 class CrawlerRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -2486,7 +2491,8 @@ class CrawlerCreateRequest(CrawlerRequest):
         if self.idempotency_key != self.idempotency_key.strip():
             raise ValueError("idempotency key must be normalized")
         if any(
-            not isinstance(url, str) or not 1 <= len(url) <= 2048 or url != url.strip() for url in self.seeds
+            not isinstance(url, str) or not 1 <= len(url) <= 2048 or url != url.strip()
+            for url in self.seeds
         ):
             raise ValueError("seed URLs must be bounded normalized strings")
         if len(set(self.seeds)) != len(self.seeds):
@@ -2513,6 +2519,12 @@ class CrawlerRunRequest(CrawlerWriteRequest):
 
 class CrawlerControlRequest(CrawlerWriteRequest):
     action: str = Field(pattern=r"^(pause|resume|cancel)$")
+
+
+class CrawlerAutomationRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    max_slices: int = Field(default=16, ge=1, le=64, strict=True)
+    max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
 
 
 def _crawler_scope(user: dict | None = Depends(get_current_user)) -> dict[str, str]:
@@ -2551,7 +2563,10 @@ async def _crawler_result(operation):
     except LookupError:
         raise HTTPException(
             status_code=404,
-            detail={"code": "crawler_not_found", "message": "Crawler session or captured source not found."},
+            detail={
+                "code": "crawler_not_found",
+                "message": "Crawler session or captured source not found.",
+            },
         ) from None
     except (TypeError, ValueError):
         raise HTTPException(
@@ -2586,7 +2601,9 @@ async def crawler_sessions(
 
 
 @router.post("/crawler/sessions")
-async def crawler_create(body: CrawlerCreateRequest, scope: dict = Depends(_crawler_write_scope)) -> dict:
+async def crawler_create(
+    body: CrawlerCreateRequest, scope: dict = Depends(_crawler_write_scope)
+) -> dict:
     return {
         "ok": True,
         "session": await _crawler_result(crawler_application.create(scope, body.model_dump())),
@@ -2614,12 +2631,48 @@ async def crawler_run(
 async def crawler_control(
     body: CrawlerControlRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
-    scope: dict = Depends(_crawler_write_scope),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    if body.action == "resume" and user.get("role") not in {"editor", "admin"}:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "crawler_write_denied",
+                "message": "Editor permission is required to resume capture.",
+            },
+        )
+    return {
+        "ok": True,
+        "session": await _crawler_result(
+            crawler_application.control(scope, session_id, body.model_dump())
+        ),
+    }
+
+
+@router.post("/crawler/sessions/{session_id}/automation")
+async def crawler_automation(
+    session_id: str,
+    body: CrawlerAutomationRequest,
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
 ) -> dict:
     return {
         "ok": True,
-        "session": await _crawler_result(crawler_application.control(scope, session_id, body.model_dump())),
+        "session": await _crawler_result(
+            crawler_application.automation(scope, session_id, body.model_dump(), principal=user)
+        ),
     }
+
+
+@router.get("/crawler/sessions/{session_id}/search")
+async def crawler_search(
+    session_id: str,
+    query: str = Query(min_length=1, max_length=512),
+    limit: int = Query(default=8, ge=1, le=8),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.search(scope, session_id, query, limit=limit))
 
 
 @router.get("/crawler/sessions/{session_id}/sources")
@@ -2627,16 +2680,21 @@ async def crawler_sources(
     session_id: str = URLPath(min_length=1, max_length=128),
     cursor: str | None = Query(default=None, min_length=1, max_length=128),
     limit: int = Query(default=16, ge=1, le=32),
+    after_sequence: int | None = Query(default=None, ge=0),
     scope: dict = Depends(_crawler_scope),
 ) -> dict:
-    return await _crawler_result(crawler_application.sources(scope, session_id, cursor=cursor, limit=limit))
+    return await _crawler_result(
+        crawler_application.sources(
+            scope, session_id, cursor=cursor, limit=limit, after_sequence=after_sequence
+        )
+    )
 
 
 @router.delete("/crawler/sessions/{session_id}")
 async def crawler_delete(
     body: CrawlerWriteRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
-    scope: dict = Depends(_crawler_write_scope),
+    scope: dict = Depends(_crawler_scope),
 ) -> dict:
     return await _crawler_result(crawler_application.delete(scope, session_id, body.model_dump()))
 
@@ -2663,6 +2721,27 @@ async def crawler_source(
         "ok": True,
         "source": await _crawler_result(crawler_application.source(scope, session_id, source_id)),
     }
+
+
+@router.get("/crawler/sessions/{session_id}/sources/{source_id}/text")
+async def crawler_source_text(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    source_id: str = URLPath(min_length=1, max_length=128),
+    offset: int = Query(default=0, ge=0, le=24000),
+    max_chars: int = Query(default=8000, ge=1, le=16000),
+    expected_content_digest: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(
+        crawler_application.source_chunk(
+            scope,
+            session_id,
+            source_id,
+            offset=offset,
+            max_chars=max_chars,
+            expected_content_digest=expected_content_digest,
+        )
+    )
 
 
 @router.get("/crawler/sessions/{session_id}/sources/{source_id}/export")
@@ -2694,7 +2773,10 @@ async def crawler_source_export(
     if len(raw) > 2 * 1024 * 1024:
         raise HTTPException(
             status_code=413,
-            detail={"code": "crawler_export_limit", "message": "Captured source exceeds the export bound."},
+            detail={
+                "code": "crawler_export_limit",
+                "message": "Captured source exceeds the export bound.",
+            },
         )
     return {
         "ok": True,

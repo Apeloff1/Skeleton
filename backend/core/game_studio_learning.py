@@ -161,6 +161,22 @@ async def _read(
     row = await campaigns.find_one({"_id": identifier, **scope})
     if row is None:
         raise GameLearningError("campaign_not_found", "Owned learning campaign not found.", 404)
+    # Normalize only declared runtime JSON envelopes. Mongo's signed Int64
+    # wrapper is a JSON integer, but strict pure validators correctly require
+    # plain Python ints; retain exact values/digests rather than coercing schema.
+    for name in (
+        "binding",
+        "config",
+        "context",
+        "lineage",
+        "environment_request",
+        "policy_snapshot",
+        "snapshot",
+        "pending_reports",
+        "proposal_priors",
+    ):
+        if name in row:
+            row[name] = workspace._stored_evidence(row[name])
     if historical:
         dependencies = [{**ref, "project_id": row["project_id"]} for ref in row["binding"]["sources"]]
         dependencies += row["binding"].get("external_sources", []) + row["binding"].get("derived_sources", [])
@@ -195,7 +211,7 @@ async def _read(
                     else {}
                 ),
             )
-        for role in ("parent_policy", "generation_policy", "review_policy"):
+        for role in ("parent_policy", "generation_policy", "review_policy", "review_baseline_policy"):
             pin = row["binding"].get(role)
             if pin:
                 policy = await workspace._admitted_policy(
@@ -230,6 +246,7 @@ async def _read(
 def _checked_report(row, report):
     from skeleton.jeeves.game_studio_learning import digest as runtime_digest
 
+    report = workspace._stored_evidence(report)
     _json(report, 262144)
     if (
         report.get("round_digest") != runtime_digest({k: v for k, v in report.items() if k != "round_digest"})
@@ -257,7 +274,7 @@ def _checked_round_record(row, record):
 def _checked_lesson(row, record):
     from skeleton.jeeves.game_studio_learning import digest as runtime_digest, validate_lesson
 
-    lesson = record["lesson"]
+    lesson = workspace._stored_evidence(record["lesson"])
     _json(lesson, 262144)
     if record["lesson_digest"] != _digest(lesson) or record["context"] != row["context"]:
         raise GameLearningError("lesson_evidence_corrupt", "Committed lesson evidence differs.", 503)
@@ -1142,6 +1159,61 @@ async def rounds(scope, identifier, after=0, limit=32):
         "campaign_id": identifier,
         "rounds": [_checked_round_record(row, record) for record in rows],
         "next_cursor": rows[-1]["round_index"] if rows and rows[-1]["round_index"] < row["cursor"] else None,
+    }
+
+
+async def export_evidence(scope, identifier, *, after=0, limit=16):
+    """Export a bounded exact committed window, not a configured run count."""
+    if type(limit) is not int or not 1 <= limit <= 16:
+        raise GameLearningError("campaign_export_limit", "Export at most16 completed rounds.")
+    row = await _read(scope, identifier, historical=True)
+    page = await rounds(scope, identifier, after, limit)
+    snapshot = row.get("snapshot") or {}
+    reports = [report for report in page["rounds"] if report["round_index"] <= row["cursor"]]
+    payload = {
+        "schema_version": "skeleton.game.studio_evidence_export.v1",
+        "campaign_id": identifier,
+        "project_id": row["project_id"],
+        "campaign_version": row["version"],
+        "captured_head_cursor": row["cursor"],
+        "head_snapshot_digest": snapshot.get("snapshot_digest"),
+        "history_digest": snapshot.get("history_digest"),
+        "context": row["context"],
+        "configuration": row["config"],
+        "after_round": after,
+        "rounds": [],
+        "next_after": None,
+        "production_promotion_authorized": False,
+        "scope": "committed role/comparison/acceptance/lesson evidence; no unexecuted rounds or import authority",
+    }
+    # Honor the byte bound without silently dropping report fields. A smaller
+    # complete prefix is explicit through its continuation cursor.
+    for report in reports:
+        candidate = {**payload, "rounds": [*payload["rounds"], report]}
+        try:
+            _json(candidate, 4 * 1024 * 1024 - 1024)
+        except GameLearningError as exc:
+            if exc.code != "payload_limit" or not payload["rounds"]:
+                raise
+            break
+        payload["rounds"].append(report)
+    last = payload["rounds"][-1]["round_index"] if payload["rounds"] else after
+    payload["next_after"] = last if last < row["cursor"] else None
+    encoded = _json(payload, 4 * 1024 * 1024)
+    current = await _read(scope, identifier, historical=True)
+    if current["context"] != row["context"] or current["code_digest"] != row["code_digest"]:
+        raise GameLearningError("campaign_export_changed", "Campaign authority changed during export.", 409)
+    return {
+        "campaign_id": identifier,
+        "project_id": row["project_id"],
+        "campaign_version": row["version"],
+        "captured_head_cursor": row["cursor"],
+        "round_count": len(payload["rounds"]),
+        "next_after": payload["next_after"],
+        "filename": "studio-evidence-" + identifier + "-after-" + str(after) + ".json",
+        "media_type": "application/json",
+        "content": encoded.decode(),
+        "content_digest": hashlib.sha256(encoded).hexdigest(),
     }
 
 

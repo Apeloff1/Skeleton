@@ -40,8 +40,27 @@
   },
   "offline_trace": {
     "schema_version": "skeleton.game.trace.v1",
-    "required": ["schema_version", "environment", "episode_id", "seed", "source_lineage", "transitions", "return", "steps", "trace_digest"],
-    "transition_required": ["sequence", "observation", "action", "next_observation", "reward", "reward_components", "terminated", "truncated"],
+    "required": [
+      "schema_version",
+      "environment",
+      "episode_id",
+      "seed",
+      "source_lineage",
+      "transitions",
+      "return",
+      "steps",
+      "trace_digest"
+    ],
+    "transition_required": [
+      "sequence",
+      "observation",
+      "action",
+      "next_observation",
+      "reward",
+      "reward_components",
+      "terminated",
+      "truncated"
+    ],
     "validation": "Exact environment descriptor and source lineage, or exact original lineage in policy source_lineage.admitted_traces keyed by the complete trace digest; finite typed observations/rewards, action membership, sequential continuous observation chain, terminal/truncated last transition, exact component sum, return and canonical UTF8 JSON digest",
     "admitted_traces": "Bounded 256-entry immutable trace-digest-to-original-lineage map populated only by existing authenticated backend from current rights-scoped source bundles; it grants no independent rights authority",
     "evidence": "Imported transitions are supplied evidence; Q updates are real execution but imported rewards are not relabeled as simulator-measured returns"
@@ -57,5 +76,69 @@
   "automated_tests_authorized": false,
   "verification": "User directs no tests. Static compilation/lint only during this implementation session; future executed acceptance evidence required.",
   "production_model_promotion_authorized": false,
-  "masterplan_completion_authorized": false
+  "masterplan_completion_authorized": false,
+  "application_training_extension": {
+    "status": "implementation_candidate",
+    "authority": "Existing GameLearningWorkspace CORE_DB jobs/checkpoints/policies/episodes; no new physical store, provider, scheduler or promotion owner",
+    "owners": [
+      "backend/core/game_learning.py",
+      "backend/routes/game_learning.py",
+      "backend/routes/game_studio_learning.py"
+    ],
+    "train_fields": {
+      "alpha": "(0,1]",
+      "gamma": "[0,1]",
+      "epsilon": "[0,1]",
+      "epsilon_decay": "(0,1]",
+      "min_epsilon": "[0,epsilon]",
+      "reward_clip": "(0,1000000]",
+      "imitation_strength": "[0,16]",
+      "exploration_strategy": [
+        "uniform",
+        "least_visited"
+      ],
+      "n_step": [
+        1,
+        16
+      ],
+      "evaluation_seeds": [
+        1,
+        8
+      ],
+      "min_improvement": "finite >=0",
+      "max_worst_seed_regression": "finite >=0",
+      "execution_seconds": [
+        5,
+        300
+      ],
+      "max_states": [
+        1,
+        16384
+      ]
+    },
+    "budget": "Admit at most65536 planned online transitions plus exact selected demonstration transitions; at most256 total episodes. Paired held-out evaluation is separately bounded65536 actual transitions and1..8 disjoint seeds.",
+    "acceptance": "Digest-bound actual paired return gate compares measured mean and worst-seed difference to immutable request thresholds. A new candidate may become the project default only when the gate passes against that exact observed current default, or against seeded random when no default exists. Rejected candidates remain durable, exportable and explicitly selectable. Default selection uses exact admission-observed policy/version/input-epoch CAS; concurrent newer defaults cannot be overwritten. This is bounded application selection, never production promotion or semantic commercial-game success.",
+    "deadline_recovery": "Only after the exact executor future and all actor/native child cleanup quiesce may a current-source uncancelled train attempt with a durable checkpoint become interrupted/resumable. Reuse exact immutable request/config/pending batch; no reapplication of committed updates or synthetic progress.",
+    "policy_read_export": "Authenticated project-owned completed issuer, full snapshot/evaluation/input digest and recursive source/teacher authority rechecked before and after bounded policy/committed-episode reads and JSON export. No raw cartridge bytes, credentials or private materialization paths; export is not a portable authority grant or unsigned import permission.",
+    "api": [
+      "GET /api/game-studio-learning/projects/{project_id}/policies",
+      "GET /api/game-studio-learning/projects/{project_id}/policies/{policy_id}",
+      "GET /api/game-studio-learning/projects/{project_id}/policies/{policy_id}/export",
+      "GET /api/game-studio-learning/projects/{project_id}/policies/{policy_id}/episodes",
+      "GET /api/game-studio-learning/projects/{project_id}/policies/{policy_id}/episodes/{episode_id}/export"
+    ],
+    "bounds": {
+      "policy_page": 32,
+      "episode_page": 32,
+      "policy_export_bytes": 8388608,
+      "trace_export_bytes": 2097152
+    },
+    "automated_tests_run": false,
+    "production_promotion_authorized": false,
+    "resource_profiles": {
+      "cpu": "Preserve the existing interactive reserve.",
+      "cpu_throughput": "Explicitly borrow idle interactive physical credits using the same atomically claimed existing actor/play IDs; observed CPU/memory combined capacity and8-actor safety ceiling remain unchanged. Active live plays block their borrowed credit; no hidden extra process slot."
+    },
+    "default_selection_compatibility": "Existing completed policy/default rows are not rewritten. Legacy executing jobs without acceptance preserve prior selection eligibility with a current-pointer CAS. Explicit source/policy selection still requires all live authority checks."
+  }
 }

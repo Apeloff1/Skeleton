@@ -51,9 +51,13 @@ def first_install_report(
     live: bool = False,
     timeout: float = 3.0,
     environ: Mapping[str, str] | None = None,
+    studio: bool = False,
+    auth_token_file: Path | None = None,
 ) -> dict[str, object]:
     """Return bounded, redacted host/configuration and optional live findings."""
 
+    if type(studio) is not bool:
+        raise TypeError("studio inspection must be an explicit boolean")
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -61,6 +65,8 @@ def first_install_report(
         or not 0 < timeout <= 10
     ):
         raise ValueError("doctor timeout must be finite and greater than zero, at most 10 seconds")
+    if auth_token_file is not None and not (studio and live):
+        raise ValueError("--auth-token-file requires --studio --live")
     root = (root or find_repo_root()).resolve()
     host = inspect_host(root)
     checks = preflight(root, runtime=True, environ=environ)
@@ -140,7 +146,7 @@ def first_install_report(
         next_steps.append(
             "Configure genuine trained local weights or the engine-owned hosted provider in .env; see docs/APP_ASSEMBLY.md. Restart the engine after changes."
         )
-    return {
+    report = {
         "schema_version": "skeleton.application.first_install_report.v1",
         "platform_ready": host.ready,
         "configuration_ready": checks_ok(checks),
@@ -165,3 +171,15 @@ def first_install_report(
         },
         "next_steps": list(dict.fromkeys(next_steps)),
     }
+    if studio:
+        from skeleton.app.studio_readiness import studio_readiness_report
+
+        report["studio"] = studio_readiness_report(
+            root,
+            values=values,
+            backend_url=manifest.service("backend").public_url,
+            live=live,
+            timeout=timeout,
+            auth_token_file=auth_token_file,
+        )
+    return report

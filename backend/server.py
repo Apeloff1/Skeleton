@@ -2519,6 +2519,17 @@ async def lifespan(app: FastAPI):
             logger.warning(f"MongoDB index creation deferred: {e}")
     _kick(2, "mongo-indexes", _kick_index_creation)
 
+    # Empty schema initialization is explicitly enabled by the operator. It
+    # does not import knowledge, approve lessons, create keys, or start practice.
+    async def _kick_dragon_runtime():
+        try:
+            from core.dragon_runtime import initialize_dragon_runtime
+            await asyncio.wait_for(initialize_dragon_runtime(), timeout=10)
+        except Exception:
+            logger.warning("Dragon runtime storage unavailable; check configured persistent paths")
+    _kick(0, "dragon-runtime-storage", _kick_dragon_runtime)
+
+
     # ── Jeeves self-training: prefill game-specific logic at launch ──────────
     async def _kick_jeeves_training():
         try:

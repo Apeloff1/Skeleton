@@ -247,5 +247,18 @@
     "action_exploration": "Least numerical action-visit counts among epsilon candidates or equal-best learned scores; actor counts are isolated copied visit ledgers and never mutable shared Q.",
     "accounting": "Delayed online backups flush at episode end and verified/offline paths use the same measured reward windows; one numerical update/action visit per actual transition. Pending delayed transitions count against admitted update budget before execution.",
     "limitations": "Observed zero rewards and low binned-state coverage do not identify an unknown commercial game objective. No guaranteed improvement, isolated mechanic causal proof, all-game capability, subjective art critic or lifetime-cap override."
+  },
+  "evidence_export_extension": {
+    "status": "implementation_candidate",
+    "owner": "backend/core/game_studio_learning.py",
+    "api": "GET /api/game-studio-learning/campaigns/{campaign_id}/evidence/export?after=0&limit=16",
+    "authority": "Exact currently authorized campaign/source/policy/teacher context; committed round/report and lesson digests verified, paged export cannot claim unexecuted rounds. Source changes and revocation remain fail-closed.",
+    "bounds": {
+      "rounds": 16,
+      "bytes": 4194304
+    },
+    "scope": "Actual completed round comparison/role/acceptance and lesson evidence with current head snapshot/cursor; no bulk100000 in-memory materialization or production promotion.",
+    "automated_tests_run": false,
+    "runtime_json_boundary": "Durable campaign envelopes, round reports and lessons pass lossless finite bounded JSON encode/decode before strict pure digest/schema validation. BSON integer subclasses preserve their exact JSON value and all original hashes; dates, binary and arbitrary objects are not coerced."
   }
 }

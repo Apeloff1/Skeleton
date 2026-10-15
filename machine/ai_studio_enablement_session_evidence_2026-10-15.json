@@ -1,0 +1,112 @@
+{
+  "schema_version": "skeleton.ai.studio_enablement_session_evidence.v1",
+  "status": "implementation_candidate",
+  "continuation_start_commit": "85eaa1fecf952e26d16909c10f1dfcdad041b045",
+  "upstream_integration_target": "389ea48a78c6e420e0ad7b01df8d7844b315cfa3",
+  "canonical_owners": "Existing backend, scheduler, engine, MongoDB workspace and Dragon SQLite stores; no additional provider boundary or promotion authority",
+  "automated_tests_run": false,
+  "validation_policy": "User explicitly requested no tests; source gates, lint/compile, frontend export and actual application/compiler/emulator/model/crawl/train operations only",
+  "completed_operational_evidence": {
+    "crawler": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/crawler/20261015T152752Z-e53a08be/evidence-summary.json",
+      "sha256": "617bbef891b777526815e8ba7d20f19e855322800cd921aa5c0dc9834f5ef5ab",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "dragon": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/dragon/evidence-summary.json",
+      "sha256": "5bbebad10bbbdb7a97a8b59cb28f969e124d246dd45df5a1cd52c819d2099aa5",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "builder": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/tools-20261015-final-01/receipt.json",
+      "sha256": "db63acda84247f3bd39d3ad5f97d0f84ead5515e9da146d0a1238ee48ed87fab",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "model_attempt": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/model-goal-20261015-final-01/receipt.json",
+      "sha256": "28675ff3ec53a6923c0042eb3f99abd8485920150909a514b12f9241efb34c9b",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "parallel_training": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/receipt.json",
+      "sha256": "f365d69977a29fd3937a532c08265b741e251910e38696e1427293a04b0c7a77",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "paired_review": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/review/20261015T152936Z-6907064d/summary.json",
+      "sha256": "7d95b345f56ce8ed341db92f7f182be8f4f5e5020418e71d09469deb213fa6bd",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "installer": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/installer-workload-report.json",
+      "sha256": "7dd550b2f929c401222b66ba7a2f73a6c0deafa7c9e66ce87878dd3aa7c21eb5",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    },
+    "production_backend": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/backend-proof/final-production-runtime-qualification.json",
+      "sha256": "e7bcd3bec78b7b7b5b13c4e74c0efcc2d391052bfe578c097700a4ef8668f34c",
+      "scope": "Observed pre-upstream-integration execution; original receipt retained, never re-labelled as a later runtime"
+    }
+  },
+  "observed_results": {
+    "crawler": {
+      "accepted_sources": 3,
+      "accepted_bytes": 149221,
+      "autonomous_slices": 3,
+      "unknown_outcome_reserved_cap_retained": true,
+      "pause_reauthorize_and_active_erase_observed": true
+    },
+    "dragon": {
+      "actual_reference_steps": 91,
+      "canonical_typed_knowledge_read": true,
+      "exact_replay": true,
+      "source_withdrawal_denies_downstream_use": true,
+      "xp_awarded": 0,
+      "policy_trained": false,
+      "truth_verified": false
+    },
+    "builder": {
+      "original_game_boy_binary_bytes": 32768,
+      "native_preview_steps": 64,
+      "actual_video_callbacks": 71,
+      "source_and_binary_export_verified": true,
+      "model_authored": false
+    },
+    "parallel_training": {
+      "admitted_workers": 2,
+      "distinct_physical_actor_pids": 4,
+      "campaign_committed_rounds": 2,
+      "campaign_recovered_across_restart": true,
+      "last_candidate_return_gate": false,
+      "guaranteed_quality_improvement": false
+    },
+    "paired_review": {
+      "actual_steps_per_policy": 32,
+      "matching_execution_protocol": true,
+      "different_frozen_policies": true,
+      "subjective_quality_certified": false
+    },
+    "model_attempt": {
+      "status": "failed_before_engine_admission",
+      "cause": "Current USER prompt omitted by capacity-constrained context compiler; typed admission guard and capacity-aware planner correction require fresh qualification"
+    },
+    "production_backend": {
+      "fresh_accounts_and_auth_restart": true,
+      "private_empty_dragon_stores": true,
+      "declared_source_overlays": 6,
+      "checked_effective_python_sources": 29,
+      "engine_model_or_native_execution_in_container_proven": false
+    }
+  },
+  "final_integration_qualification": {
+    "status": "pending_combined_runtime_and_source_freeze"
+  },
+  "limitations": [
+    "Configured catalogue targets are not proof of universal emulation, full per-console editors or arbitrary ROM understanding.",
+    "Native execution requires an approved compatible core, content, firmware where applicable, toolchain and mandatory sandbox.",
+    "Q-learning returns and deterministic review findings do not establish subjective game quality or outperformance.",
+    "The observed rejected candidate did not improve held-out returns; no automatic production promotion is authorized.",
+    "The first model planning operation failed before inference and remains retained as failed evidence.",
+    "Scratch receipts and large model/toolchain/frontend assets are local operational evidence, not bundled repository deliverables."
+  ]
+}

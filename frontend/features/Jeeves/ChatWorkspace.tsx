@@ -242,7 +242,7 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
         <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
       </ScrollView>}
       <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
-      {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.small}>{dragonAcademy.error}</Text>}
+      {(width >= 1000 || showCompanion) && !!dragonAcademy.error && <Text accessibilityRole="alert" style={s.small}>{dragonAcademy.error}</Text>}
       <ScrollView ref={scroll} style={s.flex} contentContainerStyle={[s.transcript, width < 1000 && s.transcriptCompact]} keyboardShouldPersistTaps="handled" testID="jeeves-transcript">
         {!conversation.messages.length && <View style={s.welcome}>
           <View style={s.crest}><Ionicons name="sparkles-outline" size={34} color={C.purple} /></View>

@@ -28,7 +28,25 @@
     "governed_chat_route": "frontend/app/ai-chat.tsx",
     "governed_chat_export": "frontend/src/product/governedConversationClient.ts",
     "governed_chat_workspace": "frontend/features/Jeeves/GovernedChatWorkspace.tsx",
-    "governed_chat_styles": "frontend/features/Jeeves/ChatWorkspace.styles.ts"
+    "governed_chat_styles": "frontend/features/Jeeves/ChatWorkspace.styles.ts",
+    "crawler_automation_panel": "frontend/features/Jeeves/CrawlerAutomationPanel.tsx",
+    "crawler_source_library": "frontend/features/Jeeves/CrawlerSourceLibrary.tsx",
+    "dragon_knowledge_panel": "frontend/features/Jeeves/DragonKnowledgePanel.tsx",
+    "dragon_knowledge_client": "frontend/src/product/dragonKnowledgeClient.ts",
+    "build_workflow_panel": "frontend/features/Jeeves/GameBuildWorkflowPanel.tsx",
+    "compiled_build_client": "frontend/src/product/gameCompiledRomClient.ts",
+    "studio_goal_client": "frontend/src/product/gameStudioAgentClient.ts",
+    "studio_goal_panel": "frontend/features/Jeeves/GameStudioAssistantPanel.tsx",
+    "training_policy_panel": "frontend/features/Jeeves/GameTrainingPolicyPanel.tsx",
+    "training_policy_client": "frontend/src/product/gameTrainingPolicyClient.ts",
+    "dragon_companion_navigation": "frontend/features/Jeeves/companion/DragonCompanionPanel.tsx",
+    "studio_review_client": "frontend/src/product/gameConsoleStudioClient.ts",
+    "studio_review_panel": "frontend/features/Jeeves/GameStudioReviewPanel.tsx",
+    "training_workspace": "frontend/features/Jeeves/GameLearningWorkspace.tsx",
+    "campaign_panel": "frontend/features/Jeeves/GameStudioLearningPanel.tsx",
+    "native_play_panel": "frontend/features/Jeeves/GameCompiledRomPanel.tsx",
+    "training_request_client": "frontend/src/product/gameLearningClient.ts",
+    "game_learning_route": "frontend/app/game-learning.tsx"
   },
   "authority": "Existing authenticated endpoint resolver, canonical application conversations, crawler source custody and engine receipts; browser state/cache is derived, never source/consent/execution authority.",
   "interfaces": [
@@ -52,7 +70,7 @@
     "recovery": "GET exact turn and POST /resume of frozen command; bounded status polling fallback; restored canonical pending turns without original client request are resume-only",
     "cancellation": "POST server cancel is separate from local navigation detach; terminal confirmation comes from canonical result/history",
     "history": "Exact increasing pagination, maximum10000 messages/8MiB, stable thread/version/active branch before/after read and bounded retry; cache retains latest100messages while server transcript remains owner",
-    "attachments": "Explicitly unavailable in canonical chat; no raw file upload or silent data discard",
+    "attachments": "First-install /jeeves-chat is a text/explicit-crawler-context screen; retained /ai-chat supports actual bounded admitted attachments with capability filters and consent.",
     "selection": "Catalog availability never grants caller-selected provider credentials or execution authority",
     "export": "Existing governed thread export owner returns exact current active lineage JSON/Markdown under version/retention/exportability checks; client verifies UTF-8 SHA, account and 8MiB bound before device save; attachments excluded."
   },
@@ -62,7 +80,10 @@
     "controls": "Pause/resume/cancel exact server version/idempotency; up to three CAS-only conflict retries with distinct pinned per-attempt bodies",
     "progress": "Actual requests/downloaded bytes/captures/failures/reserved uncertain transport bytes, URL frontier and retained event tail; no invented percent or XP",
     "sources": "Plain-text inspection, exact source SHA export verification and explicit confirmed erasure/context withdrawal",
-    "trust": "All captured material remains unreviewed external evidence, never instructions, reviewed knowledge or a training grant"
+    "trust": "All captured material remains unreviewed external evidence, never instructions, reviewed knowledge or a training grant",
+    "automation": "Explicit server-owned finite slice/time authorization, durable worker/recovery capabilities and passive observation only; no browser scheduler.",
+    "source_inspection": "Digest-checked bounded Unicode-codepoint text pages and source-scoped search; passage offsets bind review drafts to exact owned captures.",
+    "review_handoff": "Explicit authored statement and mechanic from selected source passage; human review and bounded measured practice remain existing Academy owners, never automatic truth/XP/training grants."
   },
   "validation": "Scoped TypeScript and ESLint plus actual Expo production export only. User prohibits automated tests. Readiness or local workload success does not authorize release, deployment, completion of the AI masterplan or provider quality claims.",
   "production_hydration": "Expo SDK54 web dependency import.meta is transformed through the existing babel-preset-expo web.unstable_transformImportMeta option and canonical Expo ImportMetaRegistry runtime. No dependency-source mutation, unsafe global shim or provider boundary; actual browser hydration and API fetch must be observed before accepting artifact.",
@@ -74,5 +95,8 @@
   },
   "production_ingress": "The more-specific canonical /api/v1/conversations namespace reaches its existing backend owner; other /api/v1 routes retain engine ownership and /api application routes reach backend. API proxy buffering is disabled for actual transition streaming. No authentication, tenant, credential or provider authority moves into Nginx.",
   "integration_policy": "Retain main governed /ai-chat workspace/controller, real attachments, canonical edit/regeneration, and searchable/recoverable conversations. First-install /jeeves-chat consumes its explicit canonical transition bridge; both retain the same backend conversation authority.",
-  "responsive_verification": "Actual production Chromium review must confirm composer controls remain unobscured by the optional scrollable companion and crawler headings retain readable width on mobile."
+  "responsive_verification": "Actual production Chromium review must confirm composer controls remain unobscured by the optional scrollable companion and crawler headings retain readable width on mobile.",
+  "build_workflow_policy": "Exact saved-head compiler preflight, existing isolated compiler jobs, bounded genuine native preview, verified source and binary downloads; current-head completion receipts never imply downloaded or hardware compatibility.",
+  "training_inspection_policy": "Current source-fenced policies, measured acceptance, committed episodes and SHA-verified exports; explicit hyperparameters and bounded actual updates, no policy promotion or fabricated replay.",
+  "game_learning_entry_policy": "Canonical StudioLoginGate loads and verifies persisted account before mounting game workspace requests. Direct reloads and expired sessions keep sign-in reachable; no local cache grants execution."
 }

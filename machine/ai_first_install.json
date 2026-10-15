@@ -23,7 +23,9 @@
     "Dockerfile.dockerignore",
     "backend/Dockerfile",
     "backend/Dockerfile.dockerignore",
-    "frontend/Dockerfile"
+    "frontend/Dockerfile",
+    "skeleton/app/studio_readiness.py",
+    "scripts/install_game_desktop_toolchains.py"
   ],
   "services": [
     "mongo",
@@ -78,7 +80,10 @@
       "probe_timeout_seconds": 10,
       "maximum_checks": 256
     },
-    "semantics": "Read-only configuration and observed canonical health projection. Unprobed capability states remain unknown; configuration is not execution evidence."
+    "semantics": "Read-only configuration and observed canonical health projection. Unprobed capability states remain unknown; configuration is not execution evidence.",
+    "optional_fields": [
+      "studio"
+    ]
   },
   "qualification": {
     "automated_tests_run": false,
@@ -121,5 +126,13 @@
     "password_bounds": "at least 16 Unicode characters, at most 72 UTF-8 bytes, no embedded control characters; optional single trailing line ending",
     "serialization": "literal quoted Compose-compatible .env, dollar interpolation escaped, never return credential values",
     "preflight": "validate both inputs before creating or changing .env"
+  },
+  "studio_continuation": {
+    "contract": "machine/ai_studio_installation.json",
+    "owner": "skeleton/app",
+    "diagnostics": "python -m skeleton app doctor --studio --json",
+    "native_setup": "Existing pinned operator installers only; no browser shell, automatic firmware/content download or readiness inferred from configuration.",
+    "dragon_bootstrap": "SKL_DRAGON_RUNTIME_BOOTSTRAP=1 initializes empty existing practice/knowledge schemas on backend_data; never approves raw crawled knowledge or starts automatic training.",
+    "documentation": "docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md"
   }
 }

@@ -1,5 +1,8 @@
 # First install: AI chat and Dragon web capture
 
+For the integrated studio workflow, see
+[crawler, builder and training operations](STUDIO_CRAWLER_BUILDER_TRAINING.md).
+
 The full application uses the existing frontend, backend, canonical AI engine
 and Mongo services. This guide covers installation, optional local weights,
 durable chat and bounded web capture. It does not certify production deployment,
@@ -212,3 +215,5 @@ store remain separate from these crawler operation snapshots.
 Source validators and measured installation/model/crawl workloads are recorded
 separately from automated tests. No automated tests were authored or run in this
 continuation, following the user's instruction.
+
+For initialized Dragon practice, native SDK/core setup and per-target readiness, see [Studio installation and native readiness](STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).

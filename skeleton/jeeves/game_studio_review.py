@@ -31,6 +31,7 @@ SCHEMA = "skeleton.game.studio_review.v1"
 MAX_FRAMES = 25
 MAX_STEPS = 512
 MAX_RESULT = 2 * 1024 * 1024
+MAX_COMPARISON = 65536
 
 
 def _copy(value: Any, limit: int = MAX_RESULT) -> Any:
@@ -47,6 +48,266 @@ def _integer(value, name, low, high):
     if type(value) is not int or not low <= value <= high:
         raise GameLearningError(f"{name} must be an integer within [{low}, {high}]")
     return value
+
+
+def _observation_digest(review):
+    """Identify the actual run without creating a self-referential comparison."""
+    return _digest(
+        {
+            key: value
+            for key, value in review.items()
+            if key not in {"review_digest", "comparison", "triangle_review"}
+        }
+    )
+
+
+def _validated_review(review):
+    value = _copy(review)
+    if not isinstance(value, dict) or value.get("schema_version") != SCHEMA:
+        raise GameLearningError("paired review requires actual studio review evidence")
+    payload = {key: item for key, item in value.items() if key != "review_digest"}
+    if value.get("review_digest") != _digest(payload):
+        raise GameLearningError("paired review evidence digest differs")
+    return value
+
+
+def compare_executed_reviews(baseline, candidate):
+    """Compare two issued observations; application callers must verify authority.
+
+    A paired, bounded observation can expose a regression. It cannot establish
+    that a game, policy or renderer is generally better from a single episode.
+    """
+    baseline, candidate = _validated_review(baseline), _validated_review(candidate)
+    old, new = baseline.get("source_identity", {}), candidate.get("source_identity", {})
+    reasons = []
+    required = (
+        "project_id",
+        "project_version",
+        "input_epoch",
+        "tree_digest",
+        "environment_request_digest",
+        "environment",
+        "reviewer_implementation_digest",
+        "seed",
+        "review_protocol",
+    )
+    for key in required:
+        if key not in old or key not in new:
+            reasons.append("missing_" + key)
+        elif old[key] != new[key]:
+            reasons.append("different_" + key)
+    for review in (baseline, candidate):
+        execution = review.get("execution")
+        if not isinstance(execution, dict) or not isinstance(execution.get("trace"), list):
+            reasons.append("missing_executed_trace")
+            continue
+        trace = execution["trace"]
+        if execution.get("trace_digest") != _digest(trace) or execution.get("steps") != len(trace):
+            raise GameLearningError("paired review executed trace differs")
+    reasons = sorted(set(reasons))
+    measurements = []
+
+    def measure(name, before, after, direction, *, advisory=False):
+        if (
+            type(before) not in (int, float)
+            or type(after) not in (int, float)
+            or not math.isfinite(before)
+            or not math.isfinite(after)
+        ):
+            return
+        delta = after - before
+        status = "unchanged" if delta == 0 else "increased" if delta > 0 else "decreased"
+        regression = bool(
+            not reasons
+            and not advisory
+            and ((direction == "higher" and delta < 0) or (direction == "lower" and delta > 0))
+        )
+        measurements.append(
+            {
+                "metric": name,
+                "baseline": before,
+                "candidate": after,
+                "delta": delta,
+                "change": status,
+                "preferred_direction": direction,
+                "bounded_regression_observed": regression,
+                "advisory": advisory,
+                "classification": "paired_bounded_observation" if not reasons else "unpaired_observation",
+            }
+        )
+
+    before_execution, after_execution = (
+        baseline.get("execution", {}),
+        candidate.get("execution", {}),
+    )
+    measure(
+        "task_return",
+        before_execution.get("return"),
+        after_execution.get("return"),
+        "higher",
+    )
+    before_semantics, after_semantics = (
+        baseline.get("semantic_review", {}),
+        candidate.get("semantic_review", {}),
+    )
+    semantics_available = before_semantics.get("scope") == after_semantics.get(
+        "scope"
+    ) and before_semantics.get("scope") in {
+        "declared_reference_runtime",
+        "authored_simulation",
+        "approved_native_observation",
+    }
+    if semantics_available:
+        for name, key, direction in (
+            ("observed_goal", "observed_success_steps", "higher"),
+            ("observed_death", "observed_death_steps", "lower"),
+        ):
+            measure(
+                name,
+                int(bool(before_semantics.get(key))),
+                int(bool(after_semantics.get(key))),
+                direction,
+            )
+        controls = [item.get("control_response", {}) for item in (before_semantics, after_semantics)]
+        measure(
+            "physical_positions_available",
+            int(controls[0].get("physical_positions_available") is True),
+            int(controls[1].get("physical_positions_available") is True),
+            "higher",
+        )
+        measure(
+            "unchanged_directional_holds",
+            controls[0].get("unchanged_directional_holds"),
+            controls[1].get("unchanged_directional_holds"),
+            "inspect",
+            advisory=True,
+        )
+    for key in ("available_frames", "captured_frames", "unchanged_moving_frame_pairs"):
+        measure(
+            key,
+            baseline.get("metrics", {}).get(key),
+            candidate.get("metrics", {}).get(key),
+            "inspect",
+            advisory=True,
+        )
+    regressions = [item["metric"] for item in measurements if item["bounded_regression_observed"]]
+    result = {
+        "schema_version": "skeleton.game.studio_review_comparison.v1",
+        "status": "inconclusive" if reasons else "paired_observation",
+        "comparability_failures": reasons,
+        "baseline_review_digest": baseline["review_digest"],
+        "baseline_job_id": old.get("job_id"),
+        "baseline_observation_digest": _observation_digest(baseline),
+        "candidate_observation_digest": _observation_digest(candidate),
+        "comparison_kind": (
+            "frozen_policy_comparison"
+            if old.get("policy_digest") != new.get("policy_digest")
+            else "same_controller_repeat"
+        ),
+        "baseline_policy_digest": old.get("policy_digest"),
+        "candidate_policy_digest": new.get("policy_digest"),
+        "measurements": measurements,
+        "semantic_comparison_available": semantics_available,
+        "observed_regressions": regressions,
+        "next_action": (
+            "rerun_matched_protocol"
+            if reasons
+            else "inspect_regressions" if regressions else "expand_held_out_evidence"
+        ),
+        "quality_improvement_verified": False,
+        "automatic_acceptance": False,
+        "limitations": [
+            "One paired episode does not establish general quality, statistical significance or promotion.",
+            "Task reward has only the admitted environment meaning; it is not a subjective game quality score.",
+            "Frame counts and held controls require inspection; termination, collisions or intentional scenes can explain them.",
+            "Offline timings are excluded from regression gates because this observer does not isolate machine load.",
+        ],
+    }
+    result["comparison_digest"] = _digest(result)
+    return _copy(result, MAX_COMPARISON)
+
+
+def review_triangle(review):
+    """Build a durable, bounded work queue from actual specialist observations."""
+    identity = review.get("source_identity", {})
+    execution = review.get("execution", {})
+    semantics = review.get("semantic_review", {})
+    comparison = review.get("comparison")
+    severity_order = {"error": 0, "warning": 1, "info": 2}
+    findings = sorted(
+        review.get("findings", []),
+        key=lambda item: (
+            severity_order.get(item.get("severity"), 3),
+            item.get("finding_id", ""),
+        ),
+    )
+    priorities = []
+    for finding in findings[:16]:
+        proposals = [
+            item["proposal_digest"]
+            for item in review.get("remedial_actions", [])
+            if item.get("finding_id") == finding.get("finding_id")
+        ]
+        priorities.append(
+            {
+                "finding_id": finding["finding_id"],
+                "code": finding["code"],
+                "severity": finding["severity"],
+                "evidence_refs": finding["evidence_refs"],
+                "required_inspection": finding["candidate_constraint"]["requires"],
+                "remedial_proposal_digests": proposals,
+                "automatic_execution": False,
+            }
+        )
+    result = {
+        "schema_version": "skeleton.game.studio_review_triangle.v1",
+        "observation_digest": _observation_digest(review),
+        "source_identity": {
+            key: identity.get(key)
+            for key in (
+                "project_id",
+                "project_version",
+                "input_epoch",
+                "tree_digest",
+                "job_id",
+                "environment_request_digest",
+                "policy_digest",
+                "reviewer_implementation_digest",
+            )
+        },
+        "roles": {
+            "jeeves": {
+                "reviewer_kind": "actual_registered_runtime_execution",
+                "steps": execution.get("steps", 0),
+                "trace_digest": execution.get("trace_digest"),
+                "task_return": execution.get("return"),
+                "controller": identity.get("controller"),
+                "policy_digest": identity.get("policy_digest"),
+            },
+            "dragon": {
+                "reviewer_kind": "deterministic_source_and_raster_observer",
+                "semantic_scope": semantics.get("scope"),
+                "semantic_digest": semantics.get("semantic_digest"),
+                "available_frames": review.get("metrics", {}).get("available_frames", 0),
+                "finding_count": len(findings),
+                "model_critic_executed": False,
+            },
+            "adversarial": {
+                "reviewer_kind": "deterministic_paired_evidence_scrutiny",
+                "status": "baseline_required" if comparison is None else comparison["status"],
+                "comparison_digest": None if comparison is None else comparison["comparison_digest"],
+                "observed_regressions": [] if comparison is None else comparison["observed_regressions"],
+                "next_action": "run_matched_baseline" if comparison is None else comparison["next_action"],
+            },
+        },
+        "priority_findings": priorities,
+        "retained_by": "existing_immutable_scoped_review_job",
+        "automatic_mutation": False,
+        "learning_claim": "retrievable_observations_and_constraints_only",
+        "quality_certified": False,
+    }
+    result["triangle_digest"] = _digest(result)
+    return _copy(result, MAX_COMPARISON)
 
 
 def review_implementation_digest() -> str:
@@ -110,7 +371,9 @@ def _decode(frame):
 
 
 def analyze_frame_sequence(
-    frames: Sequence[Mapping[str, Any]], *, source_identity: Mapping[str, Any] | None = None
+    frames: Sequence[Mapping[str, Any]],
+    *,
+    source_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Observe supplied actual frames; caller supplies their scoped provenance.
 
@@ -162,7 +425,14 @@ def analyze_frame_sequence(
         ref = "frame:" + str(step)
         observation = _copy(dict(row.get("observation") or {}), 8192)
         if decoded is None:
-            records.append({"evidence_ref": ref, "step": step, "available": False, "timings": timings})
+            records.append(
+                {
+                    "evidence_ref": ref,
+                    "step": step,
+                    "available": False,
+                    "timings": timings,
+                }
+            )
             continue
         measured, samples, thumbnail = decoded
         total_bytes += measured["png_bytes"]
@@ -211,7 +481,10 @@ def analyze_frame_sequence(
                     "luminance_range": visual["luminance_range"],
                     "palette_bins": visual["occupied_quantized_palette_bins"],
                 },
-                {"requires": "inspect scene visibility and palette", "automatic_mutation": False},
+                {
+                    "requires": "inspect scene visibility and palette",
+                    "automatic_mutation": False,
+                },
             )
         if visual["opaque_fraction"] < 0.02:
             finding(
@@ -220,7 +493,10 @@ def analyze_frame_sequence(
                 "Less than two percent of sampled pixels are visible.",
                 [ref],
                 {"opaque_fraction": visual["opaque_fraction"]},
-                {"requires": "verify intended background and visible layers", "automatic_mutation": False},
+                {
+                    "requires": "verify intended background and visible layers",
+                    "automatic_mutation": False,
+                },
             )
         if prior_size is not None and prior_size != size:
             finding(
@@ -229,7 +505,10 @@ def analyze_frame_sequence(
                 "The runtime changed preview dimensions within this sequence.",
                 [records[-1]["evidence_ref"], ref],
                 {"before": list(prior_size), "after": list(size)},
-                {"requires": "confirm viewport transition is intentional", "automatic_mutation": False},
+                {
+                    "requires": "confirm viewport transition is intentional",
+                    "automatic_mutation": False,
+                },
             )
         record = {
             "evidence_ref": ref,
@@ -262,7 +541,12 @@ def analyze_frame_sequence(
         vectors.append(
             (
                 step,
-                (luminance, visual["edge_density"], visual["dominant_color_fraction"], min(1, motion or 0)),
+                (
+                    luminance,
+                    visual["edge_density"],
+                    visual["dominant_color_fraction"],
+                    min(1, motion or 0),
+                ),
                 ref,
             )
         )
@@ -533,6 +817,17 @@ def review_project_sequence(
                 if actions is not None
                 else "frozen_q_policy" if policy else "registered_action_cycle"
             ),
+            "review_protocol": {
+                "schema_version": "skeleton.game.studio_review_protocol.v1",
+                "planned_steps": steps,
+                "capture_every": interval,
+                "controller": (
+                    "explicit_actions"
+                    if actions is not None
+                    else "frozen_q_policy" if policy else "registered_action_cycle"
+                ),
+                "actions_digest": None if actions is None else _digest(list(actions)),
+            },
         }
         result = analyze_frame_sequence(rows, source_identity=identity)
         semantics = analyze_executed_semantics(
@@ -584,6 +879,7 @@ def review_project_sequence(
             },
             "elapsed_wall_ms": (time.monotonic() - started) * 1000,
         }
+        result["triangle_review"] = review_triangle(result)
         result.pop("review_digest")
         result["review_digest"] = _digest(result)
         return _copy(result)
@@ -703,7 +999,12 @@ def _editor_layout(request, guard):
                     {
                         "target_id": layer["id"] + ":" + str(x) + ":" + str(y),
                         "kind": "tile",
-                        "rect": [layer["offset"][0] + x * 8, layer["offset"][1] + y * 8, 8, 8],
+                        "rect": [
+                            layer["offset"][0] + x * 8,
+                            layer["offset"][1] + y * 8,
+                            8,
+                            8,
+                        ],
                         "source_ref": "source:game/editor/console.json#layers/"
                         + layer["id"]
                         + "/cells/"
@@ -739,7 +1040,12 @@ def _editor_layout(request, guard):
         body = [x, y, pw, ph]
         refs = []
         if x < 0 or y < 0 or x + pw > width or y + ph > height:
-            refs.append({"kind": "world_boundary", "source_ref": "source:game/editor/console.json#layers"})
+            refs.append(
+                {
+                    "kind": "world_boundary",
+                    "source_ref": "source:game/editor/console.json#layers",
+                }
+            )
         for identity, rect in platforms:
             if _overlaps(body, rect):
                 refs.append(
@@ -811,7 +1117,12 @@ def _editor_layout(request, guard):
         if visited_iterations % 64 == 0:
             guard()
         col, row = queue.popleft()
-        for adjacent in ((col - 1, row), (col + 1, row), (col, row - 1), (col, row + 1)):
+        for adjacent in (
+            (col - 1, row),
+            (col + 1, row),
+            (col, row - 1),
+            (col, row + 1),
+        ):
             if adjacent in parents or not 0 <= adjacent[0] < columns or not 0 <= adjacent[1] < rows:
                 continue
             dx, dy = adjacent[0] - col, adjacent[1] - row
@@ -869,7 +1180,13 @@ def _editor_layout(request, guard):
 
 
 def analyze_executed_semantics(
-    request, trace, *, source_identity=None, native_binding=None, geometry_snapshot=None, guard=lambda: None
+    request,
+    trace,
+    *,
+    source_identity=None,
+    native_binding=None,
+    geometry_snapshot=None,
+    guard=lambda: None,
 ):
     """Source facts plus measured responses; no opaque-ROM semantic guessing."""
     if (
@@ -887,7 +1204,10 @@ def analyze_executed_semantics(
         else "declared_reference_runtime" if request.kind == "builtin" else "authored_simulation"
     )
     layout, project, document, graph = (
-        {"available": False, "reason": "No typed authored scene geometry for this adapter."},
+        {
+            "available": False,
+            "reason": "No typed authored scene geometry for this adapter.",
+        },
         None,
         None,
         None,

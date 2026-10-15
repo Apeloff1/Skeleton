@@ -460,7 +460,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
             academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
         </ScrollView>}
         <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
-        {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.errorText}>{dragonAcademy.error}</Text>}
+        {companionOpen && !!dragonAcademy.error && <Text accessibilityRole="alert" style={s.errorText}>{dragonAcademy.error}</Text>}
         {state.error && <View style={s.alert} accessibilityRole={state.error.kind === 'cancelled' ? undefined : 'alert'}><View style={s.row}>
           <Ionicons name={state.error.kind === 'cancelled' ? 'stop-circle-outline' : 'alert-circle-outline'} size={20} color={state.error.kind === 'cancelled' ? C.textMuted : C.warning} />
           <Text style={s.alertText}>{state.error.message}</Text>

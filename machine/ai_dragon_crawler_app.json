@@ -6,7 +6,8 @@
     "public_routes": "backend/routes/dragon_academy.py",
     "crawler": "skeleton/ai/webcrawler",
     "storage": "existing CORE_DB Mongo application authority; Academy SQLite reviewed knowledge remains separate and is not crawler operation storage",
-    "crawler_facade": "skeleton/ai/webcrawler/operations.py"
+    "crawler_facade": "skeleton/ai/webcrawler/operations.py",
+    "scheduler": "backend/core/scheduler.py (existing process-wide AsyncIOScheduler only)"
   },
   "authority": {
     "principal": "verified tenant and normalized email hashed by existing Dragon Academy _principal; request data never selects another owner",
@@ -14,7 +15,8 @@
     "source_rights": "caller acknowledgement permits the requested bounded personal acquisition only; never independent source review, verified knowledge promotion, XP, model training or publication rights",
     "network": "canonical crawler transport owns public-destination/DNS/socket/redirect/robots/byte/deadline admission; no application HTTP fetcher",
     "idle": "manual foreground acquisition is explicit; remote/browser activity never claims local OS idle authority",
-    "runtime": "bounded request-driven slices under per-owner durable worker lease; no new provider, process root, store, service or scheduler"
+    "runtime": "Manual bounded request slices and explicit finite autonomous grants consumed by existing backend scheduler; same CORE_DB snapshots/account/global capacity, no new service/store/scheduler",
+    "stops": "Authenticated exact owners, including a current viewer after role demotion, may pause/cancel/erase/disable intent after source-use consent expiry. Starting/resuming/re-authorizing still requires current editor/admin authority."
   },
   "routes": {
     "base": "/api/dragon-academy/crawler",
@@ -27,7 +29,10 @@
     "source": "GET /sessions/{session_id}/sources/{source_id}",
     "export": "GET /sessions/{session_id}/sources/{source_id}/export",
     "events": "GET /sessions/{session_id}/events",
-    "erase": "DELETE /sessions/{session_id}"
+    "erase": "DELETE /sessions/{session_id}",
+    "automation": "POST /sessions/{session_id}/automation {expected_version,idempotency_key,enabled,max_slices=16,max_seconds=900}",
+    "search": "GET /sessions/{session_id}/search?query=&limit=8",
+    "source_chunk": "GET /sessions/{session_id}/sources/{source_id}/text?offset=0&max_chars=8000&expected_content_digest="
   },
   "limits": {
     "seed_urls": 16,
@@ -49,7 +54,14 @@
     "mutation_receipts_per_session": 128,
     "event_page": 64,
     "retained_runtime_events": 64,
-    "concurrent_slices": 4
+    "concurrent_slices": 4,
+    "autonomous_slices_per_grant": 64,
+    "autonomous_authorization_seconds": 3600,
+    "recovery_scan": 16,
+    "recovery_concurrency": 4,
+    "quiescence_wait_seconds": 15,
+    "source_chunk_characters": 16000,
+    "latest_safety_control_receipts": 1
   },
   "durability": {
     "writes": "existing engine storage admission precedes Mongo snapshot CAS; atomic snapshot includes exact captured sources, cursor, robots, dedupe and cumulative usage",
@@ -61,7 +73,10 @@
     "history": "bounded recent64 canonical events; replay exposes history_truncated rather than synthesizing missing events",
     "network_dispatch_budget": "Canonical core checkpoints dispatch reservation before HTTP and records unknown/discarded response allowance separately; failed, cancelled or uncertain post-fetch publication cannot erase already admitted network cost",
     "physical_bounds": "One account slice plus four app-wide live lease slots in existing command collection. New IO requires fifteen seconds of server-clock lease and consent remaining, exceeding the canonical ten-second full transport deadline. Local cancellation drains the actual thread before releasing both credits. DNS subprocess and socket deadline cleanup are canonical transport responsibilities, not a new scheduler.",
-    "command_journal": "At most128 compact idempotency receipts retain actual usage/sequence/terminal status, full-result digest and exact event digests. Current queue and recent events are stored once in the runtime snapshot, preventing repeated-queue Mongo growth."
+    "command_journal": "At most128 compact idempotency receipts retain actual usage/sequence/terminal status, full-result digest and exact event digests. Current queue and recent events are stored once in the runtime snapshot, preventing repeated-queue Mongo growth.",
+    "quiescence": "Control and erase return explicit worker active/quiescent/lease state. Local workers are cooperatively signalled and awaited up to15seconds without cancelling their executor Future; remote active leases remain occupied until actual finalization or conservative expiry. Deleted tombstones retain no source text/request/consent/grant principal.",
+    "safety_command_capacity": "Positive-authority commands retain at most128 immutable idempotency receipts. At journal capacity, pause/cancel/disable remain available via one bounded latest safety-control receipt with expected-version CAS. Replaced older safety keys cannot refresh or create a positive execution grant; stale versions fail closed. Erasure removes this slot.",
+    "physical_confirmation": "last_worker_exit_confirmed is set only after observing local executor completion. Expired remote leases are publication-fenced but report quiescent=false /lease_fenced_physical_unconfirmed. Existing conservative expired-lease recovery remains eligible under ten-second transport deadline, fifteen-second pre-IO server-clock margin and fresh epoch/consent/grant checks; lease recovery is not an attestation that a remote OS process exited."
   },
   "readiness": "Actual CORE_DB ping/index setup plus two-second canonical engine boundary read probe. Model/provider availability is independent of crawler capture. Every write still requires its own canonical storage admission; configuration never proves network reachability, reviewed knowledge or trusted local OS idle.",
   "verification": "User instruction prohibits tests; static checks and authorized actual bounded application crawl workflows are permitted. No release, complete masterplan, signed closure, verified source or policy quality claim follows this candidate.",
@@ -76,5 +91,31 @@
     "revocation": "cancelled/deleted session or expired capture/use consent prevents context reuse; source erasure retains only minimal scoped tombstone and exact deletion receipt",
     "bounds": "8 documents /32000 characters max; default4 /16000; no unbounded embedding service or tenantwide collection leak",
     "evidence": "Full normalized content hash, preserved text hash, actual returned passage hash/offsets and explicit external_evidence_only classification are distinct. Keyword retrieval never establishes verified knowledge or training permission."
+  },
+  "autonomous_intent": {
+    "schema_version": "skeleton.dragon.crawler_execution_grant.v1",
+    "explicit": "Owner editor/admin authorizes enabled,max_slices 1..64,max_seconds 15..3600 with version CAS and idempotency key. Server derives exact scope, original consent and canonical principal; no JWT is retained. Expiry is no later than original consent or requested finite duration.",
+    "current_authority": "Current canonical gameforge_users enabled editor/admin role and exact tenant/owner are rechecked before every delegated network dispatch and publication; missing or changed principal fails closed. Recovery never renews grants.",
+    "reservation": "Same session CAS reserves one grant slice before executor launch; uncertain/crashed attempts remain consumed. Existing canonical HTTP request/byte reservations remain authoritative.",
+    "recovery": "Existing scheduler runs recover_crawler_runs(limit<=16), at most four distinct owners concurrently. Due cursor and finite grant survive backend restart; active leases fence duplicates. Delays follow actual frontier readiness.",
+    "stops": "Pause/cancel/erase disable intent immediately, fence publication/new IO and signal local workers; bounded drain reports actual local/remote quiescence. Account/global physical credits are not released before observed executor completion.",
+    "limits": "At most64 slices per grant and3600seconds; request/document/byte/consent/command bounds remain supreme. Every attempted worker consumes finite credit, including interrupted/crashed work.",
+    "separation": "Captured external material is unreviewed evidence. No automatic review, XP, verified lesson, provider call or training grant."
+  },
+  "inspection": {
+    "incremental": "sources accepts after_sequence (snapshot event sequence), returns source capture sequence and exact current version; stable ID pagination retained.",
+    "search": "Canonical exact-offset lexical passage search with source provenance and instruction-risk signals under current scoped consent; no provider call.",
+    "chunks": "Bounded text offsets with optional expected preserved-text SHA fence; text SHA and source provenance accompany chunks, no source regeneration or network IO."
+  },
+  "frontend": {
+    "owners": [
+      "frontend/features/Jeeves/CrawlerWorkspace.tsx",
+      "frontend/src/product/crawlerClient.ts",
+      "frontend/features/Jeeves/CrawlerAutomationPanel.tsx",
+      "frontend/features/Jeeves/CrawlerSourceLibrary.tsx",
+      "frontend/features/Jeeves/DragonKnowledgePanel.tsx",
+      "frontend/src/product/dragonKnowledgeClient.ts"
+    ],
+    "authority": "Frontend submits explicit finite grants and observes actual persisted status; browser polling never schedules or authorizes crawl work. Knowledge review retains separate canonical admission."
   }
 }

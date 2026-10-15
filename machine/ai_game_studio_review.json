@@ -12,7 +12,7 @@
   "interfaces": {
     "pure": "analyze_frame_sequence(frames, source_identity=None) accepts actual runtime-produced frame projections and measured operation timings; returns quantitative findings with evidence references",
     "execute": "review_project_sequence(environment_request, actions, seed, capture_every, policy_snapshot, cancel, on_event) executes only canonical registered environment adapters",
-    "api": "POST /api/game-learning/projects/{project_id}/review starts existing scoped review job; GET /api/game-learning/jobs/{job_id} reads canonical completion; GET /api/game-learning/projects/{project_id}/reviews/{job_id} rechecks current source authority",
+    "api": "POST /api/game-learning/projects/{project_id}/review starts existing scoped review job; GET /api/game-learning/jobs/{job_id} reads canonical completion; GET /api/game-learning/projects/{project_id}/reviews/{job_id} rechecks current source authority; GET /api/game-learning/projects/{project_id}/reviews/{job_id}/export returns exact digest-labelled completed review JSON after the same current-source/policy/baseline checks",
     "semantic": "analyze_executed_semantics(request, trace, source_identity, native_binding, geometry_snapshot) consumes bounded actual canonical transitions and optional approved native ABI descriptor; no screenshots or callbacks confer application authority"
   },
   "bounds": {
@@ -46,6 +46,15 @@
     "Repeated frames during observed movement are candidates requiring inspection, not proven stutter",
     "Numeric evidence cannot establish original asset rights"
   ],
+  "paired_review_extension": {
+    "owner": "Existing review modules/routes and existing scoped workspace jobs; no new service, collection, authority or provider",
+    "request": "Optional baseline_review_job_id selects only an actual completed same-project current-authority original unpaired review; its exact review/input digests and original policy identity are frozen before dispatch and rechecked before publication and every review-specific read. Reference-review chains are rejected to bound transitive work.",
+    "comparison": "Compare actual task return, observed success/death, instrumented control coverage and frame availability only when exact current project/head/epoch, environment request/spec, reviewer implementation, seed, planned steps, capture interval and controller protocol match. Different frozen policies are labelled policy comparison. No unpaired source-revision or arbitrary screenshot comparison.",
+    "protocol": "Explicit action digest or registered action-cycle identity is retained, alongside actual planned/observed step counts. Legacy evidence without this protocol remains readable but comparison is inconclusive.",
+    "triangle": "Bounded digest-linked execution, Dragon numerical/source scrutiny and adversarial comparability/regression projections, with prioritized actual findings and explicit follow-up constraints. Deterministic roles are labelled; no model critic, quality certification, promotion, automatic mutation or invented learning score.",
+    "bounds": {"comparison_bytes": 65536, "priority_findings": 16, "role_count": 3},
+    "recovery": "Baseline withdrawal, changed digest, current-source failure or missing completion fails closed; no baseline result is copied into a new owner/store. Existing fenced job recovery and physical cancellation apply."
+  },
   "automated_tests_requested": false,
   "storage": "Existing workspace storage admitter reserves at most2MiB output per exact job identity before execution; receipts remain in frozen job input and completion is fenced by the existing owner.",
   "semantic_review": {

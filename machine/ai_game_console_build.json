@@ -149,5 +149,13 @@
       "durable_runtime_json": "Existing workspace._stored_evidence losslessly roundtrips finite bounded runtime JSON envelopes after Mongo BSON decoding, converting BSON integer representation back to standard JSON integer values before strict pure validators. Applies policy/checkpoint/pending actor batch/demonstration and live IPC envelopes. No default-string coercion or whole document normalization of dates/binary, no snapshot relabeling or weakened spec/runtime/hash/source/consent checks."
     },
     "baseline_cartridge_format_admission": "Canonical emulator_content_extensions includes original installed baseline cores and remaining installed known core declarations. Suffix hints never grant execution authority; exact approved target/core/issuer cartridge format remains required and actual native worker checks loaded retro_system_info.valid_extensions. Unknown core mappings remain denied; no artifact-specific bypass."
+  },
+  "builder_workflow_interface": {
+    "owner": "existing backend/core/game_console_build.py",
+    "preflight": "Exact project version, current source authority and canonical build_runner.plan without compiler dispatch; secret-free projection of tool hashes, plan/runtime/source digests and expected relative artifacts.",
+    "preview": "Exact completed binary -> existing derived source admission -> bounded canonical simulation receipt; no bypass when sandbox/core/toolchain unavailable.",
+    "export": "Current source authority and completed producer remain required for all byte reads and download references.",
+    "publication": "Goal host validates exact current project/version/head and actual completed owner receipts before declaring requested build workflow complete.",
+    "frontend": "frontend/features/Jeeves/GameBuildWorkflowPanel.tsx consumes only actual source revision, build preflight, job/artifact, bounded preview and authorized export receipts; queued/source_only and prepared download remain explicitly distinct from compiled/playback/client download evidence."
   }
 }

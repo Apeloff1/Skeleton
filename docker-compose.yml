@@ -134,6 +134,8 @@ services:
       - SKL_ENGINE_SERVICE_PRINCIPAL=${SKL_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
       - SKL_JEEVES_CANONICAL_CONVERSATIONS=${SKL_JEEVES_CANONICAL_CONVERSATIONS:-1}
       - SKL_DRAGON_PRACTICE_DB_PATH=/app/data/dragon_practice.sqlite
+      - SKL_DRAGON_KNOWLEDGE_DB_PATH=/app/data/dragon_knowledge.sqlite
+      - SKL_DRAGON_RUNTIME_BOOTSTRAP=${SKL_DRAGON_RUNTIME_BOOTSTRAP:-1}
     volumes:
       - backend_data:/app/data
     depends_on:
