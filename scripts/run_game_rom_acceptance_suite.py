@@ -238,10 +238,34 @@ def _verify_instruction_microtrace(directory: Path) -> dict[str, Any]:
         or runs[0].get("control") != "idle"
     ):
         raise AcceptanceSuiteError("controlled real ROM CPU instruction evidence is incomplete")
+    from skeleton.jeeves.game_rom_instruction_divergence import ACTIONS
+
     executed = 0
+    schedules_observed = 0
+    temporal_sequences_observed = 0
     for case in runs:
         source = case.get("first_run", {})
         observations = source.get("time_and_video_evidence")
+        schedule = source.get("source_input_schedule")
+        count = report["requested_instructions_per_branch"]
+        if (
+            not isinstance(schedule, list) or not 1 <= len(schedule) <= 8
+            or case.get("source_input_schedule") != schedule
+            or source.get("source_controller_changes") != len(schedule)
+            or any(
+                not isinstance(entry, dict)
+                or set(entry) != {"at_source_instruction", "action"}
+                or type(entry["at_source_instruction"]) is not int
+                or entry["at_source_instruction"] != index * count // len(schedule)
+                or entry["action"] not in ACTIONS
+                for index, entry in enumerate(schedule)
+            )
+            or case.get("control") != "->".join(entry["action"] for entry in schedule)
+            or source.get("control") != case.get("control")
+        ):
+            raise AcceptanceSuiteError("real source input phase ledger is missing or not aligned to CPU instructions")
+        schedules_observed += len(schedule)
+        temporal_sequences_observed += len(schedule) > 1
         if (
             case.get("source_replay_identical") is not True
             or case.get("actual_repeated_physical_cpu_runs") != 2
@@ -262,6 +286,11 @@ def _verify_instruction_microtrace(directory: Path) -> dict[str, Any]:
         executed += source["real_source_cpu_instructions"] * 2
     if executed != report.get("real_source_instruction_executions"):
         raise AcceptanceSuiteError("source instruction replay claims more or fewer CPU instructions than audited")
+    if (
+        report.get("actually_executed_temporal_sequences") != temporal_sequences_observed
+        or report.get("controlled_source_input_assignment_events") != schedules_observed
+    ):
+        raise AcceptanceSuiteError("source temporal interventions or actual controller event counts differ")
     for comparison in contrasts:
         finding = comparison.get("comparison")
         if (
@@ -276,6 +305,8 @@ def _verify_instruction_microtrace(directory: Path) -> dict[str, Any]:
         "source_instruction_executions": executed,
         "actual_replayed_branch_pairs": len(runs),
         "controlled_divergence_pairs": len(contrasts),
+        "actual_multi_action_sequences": temporal_sequences_observed,
+        "source_controller_assignment_events": schedules_observed,
         "receipt_file": reference,
         "hardware_timing_or_game_success_certified": False,
         "production_weights_updated": False,
@@ -428,6 +459,9 @@ def run_acceptance_suite(
                 "--seed", str(seed), "--instruction-count", "2048",
                 "--sample-stride", "8", "--max-cycles-per-branch", "131072",
                 "--actions", "idle", "a", "right", "a_right",
+                "--sequence", "a,idle,right",
+                "--sequence", "right,a",
+                "--sequence", "a_right,idle",
             ],
             output_directory, "original_cpu_source_instruction_replays",
             seconds=process_timeout_seconds,
