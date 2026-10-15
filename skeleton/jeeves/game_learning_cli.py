@@ -440,6 +440,7 @@ def _fit_emulator_world_model(args) -> dict[str, Any]:
             clip_gradient=args.clip_gradient,
             max_samples=args.max_samples,
             min_relative_holdout_gain=args.min_relative_holdout_gain,
+            max_compute_units=args.max_compute_units,
         ),
     )
     _write_json(args.model_file, model, replace=False)
@@ -716,6 +717,7 @@ def parser() -> argparse.ArgumentParser:
     world.add_argument("--clip-gradient", type=float, default=3.0)
     world.add_argument("--max-samples", type=int, default=2048)
     world.add_argument("--min-relative-holdout-gain", type=float, default=0.01)
+    world.add_argument("--max-compute-units", type=int, default=50000000)
     cross = commands.add_parser(
         "compare-emulator-cores",
         help="Execute the same owned ROM and exact controls on 2-4 approved libretro cores",
