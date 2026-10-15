@@ -73,6 +73,7 @@ def _candidate_worker(
     name: str, lr: float, epochs: int, source: Path, parent_sha: str,
     manifest: Path, candidate: Path, report: Path,
     expand_vocabulary: bool, capacity_growth: str, max_added_parameters: int,
+    adaptive_replay: bool, replay_examples: int, max_scored_examples: int,
     max_optimizer_steps: int, max_training_seconds: int,
 ) -> dict[str, Any]:
     """A spawned child does real candidate SGD through the existing optimizer."""
@@ -83,6 +84,8 @@ def _candidate_worker(
         expand_vocabulary=expand_vocabulary, dataset_manifest=manifest,
         training_view=name, capacity_growth=capacity_growth,
         max_added_parameters=max_added_parameters,
+        adaptive_replay=adaptive_replay, replay_examples=replay_examples,
+        max_scored_examples=max_scored_examples,
         max_optimizer_steps=max_optimizer_steps,
         max_training_seconds=max_training_seconds)
     return {
@@ -94,6 +97,7 @@ def _candidate_worker(
         "capacity_growth": result.get("capacity_growth"),
         "candidate_trainable_parameters": result.get("candidate_trainable_parameters"),
         "new_trainable_parameters": result.get("trainable_parameters_added_by_growth", 0),
+        "capability_replay": result.get("capability_replay"),
         "candidate_sha256": result.get("candidate_sha256"),
         "candidate_file": candidate.name if candidate.is_file() else None,
         "report_file": report.name,
@@ -110,6 +114,8 @@ def run_parallel_candidates(
     expand_vocabulary: bool = False,
     constructive_capacity: str = "none", adversarial_capacity: str = "none",
     max_added_parameters: int = 500000,
+    adaptive_replay: bool = False, replay_examples: int = 64,
+    max_scored_examples: int = 128,
 ) -> dict[str, Any]:
     if type(max_optimizer_steps) is not int or not 1 <= max_optimizer_steps <= 25000:
         raise ProductionCheckpointError("optimizer step budget outside 1..25000")
@@ -123,6 +129,11 @@ def run_parallel_candidates(
         raise ProductionCheckpointError("mirror growth profiles must be supported")
     if type(max_added_parameters) is not int or not 1 <= max_added_parameters <= 2000000:
         raise ProductionCheckpointError("mirror FFN new-parameter budget outside 1..2,000,000")
+    if type(adaptive_replay) is not bool or (
+            adaptive_replay and (type(replay_examples) is not int or
+            type(max_scored_examples) is not int or
+            not 6 <= replay_examples <= max_scored_examples <= 256)):
+        raise ProductionCheckpointError("mirror hard-example replay budget invalid")
     if (os.cpu_count() or 1) < 2:
         raise ProductionCheckpointError("two training arms require at least two CPU cores")
     if output_directory.is_symlink() or not output_directory.is_dir():
@@ -165,8 +176,9 @@ def run_parallel_candidates(
             (name, pool.submit(_candidate_worker, name, lr, epochs,
                                source, parent_sha, manifest_path, *names[name],
                                expand_vocabulary, capacity_by_arm[name],
-                               max_added_parameters, max_optimizer_steps,
-                               max_training_seconds))
+                               max_added_parameters, adaptive_replay,
+                               replay_examples, max_scored_examples,
+                               max_optimizer_steps, max_training_seconds))
             for name, lr, epochs in ARMS
         ]
         # Await both even on failure; do not leave unobserved live optimizers.
@@ -197,6 +209,8 @@ def run_parallel_candidates(
         "candidate_arms": results,
         "capacity_growth_profiles": capacity_by_arm,
         "new_parameter_admission_per_arm": max_added_parameters,
+        "adaptive_capability_replay": adaptive_replay,
+        "capability_replay_examples": replay_examples if adaptive_replay else 0,
         "real_model_parameter_growth_ran": any(
             item.get("new_trainable_parameters", 0) > 0
             and item.get("real_optimizer_updates", 0) > 0 for item in results
@@ -234,6 +248,10 @@ def main(argv: list[str] | None = None) -> int:
                         choices=("none", "micro", "balanced", "large", "xlarge"),
                         default="none")
     parser.add_argument("--max-added-parameters", type=int, default=500000)
+    parser.add_argument("--adaptive-replay", action="store_true",
+                        help="each mirror scores only its own approved TRAIN specialist documents")
+    parser.add_argument("--replay-examples", type=int, default=64)
+    parser.add_argument("--max-scored-examples", type=int, default=128)
     parser.add_argument("--max-optimizer-steps", type=int, default=10000)
     parser.add_argument("--max-training-seconds", type=int, default=1200)
     parser.add_argument("--workers", type=int, default=4)
@@ -257,7 +275,10 @@ def main(argv: list[str] | None = None) -> int:
             expand_vocabulary=args.expand_vocabulary,
             constructive_capacity=args.constructive_capacity,
             adversarial_capacity=args.adversarial_capacity,
-            max_added_parameters=args.max_added_parameters)
+            max_added_parameters=args.max_added_parameters,
+            adaptive_replay=args.adaptive_replay,
+            replay_examples=args.replay_examples,
+            max_scored_examples=args.max_scored_examples)
         print(json.dumps(result, sort_keys=True, indent=2))
         return 0 if result["status"] == "two_candidates_pending_independent_review" else 3
     except (OSError, RuntimeError, ValueError, TypeError, OverflowError) as exc:
