@@ -46,6 +46,7 @@ TEST_MODULES = (
     "skeleton.testing.test_game_original_mapper_bus_audit",
     "skeleton.testing.test_game_rom_virtual_rtc",
     "skeleton.testing.test_game_rom_cpu_timer",
+    "skeleton.testing.test_game_rom_dma_timing",
     "skeleton.testing.test_game_rom_instruction_divergence",
 )
 
