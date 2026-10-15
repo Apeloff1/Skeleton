@@ -1226,6 +1226,10 @@ async def _prepare(scope, row, token):
     prompt, allowed, capacity_receipt = await _fit_planner_context(
         scope, row, context, schemas, allowed, prompt
     )
+    allow_done = (
+        not row.get("completion_requirements") or context.get("completion", {}).get("verified") is True
+    )
+    response_schema = _planner_response_schema(allowed, allow_done=allow_done)
     _json({"prompt": prompt}, 256 * 1024)
     pending = {
         "index": row["cursor"],
@@ -1240,8 +1244,9 @@ async def _prepare(scope, row, token):
         "evidence_catalog": context.get("evidence_catalog", []),
         "attempt": 1,
         "prompt_digest": _digest({"prompt": prompt}),
-        "structured_output_schema": _planner_response_schema(allowed),
-        "structured_output_schema_digest": _digest(_planner_response_schema(allowed)),
+        "structured_output_schema": response_schema,
+        "structured_output_schema_digest": _digest(response_schema),
+        "planner_done_allowed": allow_done,
         "planner_context": capacity_receipt,
     }
     return await _set(
@@ -2906,7 +2911,7 @@ async def _next_workflow_action(scope, row, token):
     return await _accept_response(scope, row, token)
 
 
-def _planner_response_schema(allowed):
+def _planner_response_schema(allowed, *, allow_done=True):
     action = {
         "type": "object",
         "additionalProperties": False,
@@ -2929,7 +2934,7 @@ def _planner_response_schema(allowed):
     }
     action["properties"]["evidence_refs"] = properties["evidence_refs"]
     required = ["schema_version", "operation", "payload", "explanation", "done"]
-    return {
+    schema = {
         "oneOf": [
             {
                 "type": "object",
@@ -2955,6 +2960,9 @@ def _planner_response_schema(allowed):
             },
         ]
     }
+    if not allow_done:
+        schema["oneOf"] = schema["oneOf"][:1]
+    return schema
 
 
 def _action_scope(row, operation, payload):

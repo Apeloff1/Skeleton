@@ -1776,6 +1776,8 @@ class GameLearningWorkspace:
         return saved, issuer, learner
 
     async def _policy_projection(self, scope, saved, issuer):
+        from skeleton.jeeves.game_learning import MAX_LIFETIME_EPISODES, MAX_LIFETIME_UPDATES
+
         project = await self._project(saved["project_id"], scope)
         snapshot, result = saved["snapshot"], issuer["result"]
         return {
@@ -1799,10 +1801,13 @@ class GameLearningWorkspace:
             "imitation_observations": snapshot.get("imitation_observations", 0),
             "parent_policy_id": snapshot.get("parent_policy_id"),
             "remaining_lifetime_episodes": max(
-                0, 1024 - snapshot["committed_episodes"] - len(snapshot.get("inherited_episodes", []))
+                0,
+                MAX_LIFETIME_EPISODES
+                - snapshot["committed_episodes"]
+                - len(snapshot.get("inherited_episodes", [])),
             ),
             "remaining_lifetime_updates": max(
-                0, 1048576 - snapshot["committed_updates"] - snapshot.get("inherited_updates", 0)
+                0, MAX_LIFETIME_UPDATES - snapshot["committed_updates"] - snapshot.get("inherited_updates", 0)
             ),
             "metrics": result["metrics"],
             "acceptance": result.get("acceptance"),

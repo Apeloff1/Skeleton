@@ -121,6 +121,10 @@ workflow stage and its typed forms in a compact projection. It adds complete
 observations only when they fit and records what was omitted. A model that
 cannot fit this minimum returns an explicit capacity error. Existing frozen
 prompts keep their original identities.
+For new decisions, an incomplete required workflow permits only a real granted
+operation with `done=false`; the terminal response branch becomes available
+after the host verifies the requested facts. Model output still requires owner
+validation and can fail without executing a tool.
 
 ## Train, observe and retain lessons
 

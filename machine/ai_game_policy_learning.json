@@ -139,6 +139,16 @@
       "cpu": "Preserve the existing interactive reserve.",
       "cpu_throughput": "Explicitly borrow idle interactive physical credits using the same atomically claimed existing actor/play IDs; observed CPU/memory combined capacity and8-actor safety ceiling remain unchanged. Active live plays block their borrowed credit; no hidden extra process slot."
     },
-    "default_selection_compatibility": "Existing completed policy/default rows are not rewritten. Legacy executing jobs without acceptance preserve prior selection eligibility with a current-pointer CAS. Explicit source/policy selection still requires all live authority checks."
+    "default_selection_compatibility": "Existing completed policy/default rows are not rewritten. Legacy executing jobs without acceptance preserve prior selection eligibility with a current-pointer CAS. Explicit source/policy selection still requires all live authority checks.",
+    "lifetime_budget_authority": {
+      "owner": "skeleton/jeeves/game_learning.py",
+      "episode_constant": "MAX_LIFETIME_EPISODES",
+      "update_constant": "MAX_LIFETIME_UPDATES",
+      "merged_values": {
+        "episodes": 65536,
+        "updates": 16777216
+      },
+      "projection": "Remaining inherited-plus-current budgets read the canonical constants. Application per-job episode/update bounds remain256/65536 and do not grant a lifetime reset."
+    }
   }
 }

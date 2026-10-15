@@ -255,7 +255,8 @@
       "authority": "Existing canonical EngineClient + model_catalog/resolve_selection/context_budget_for_selection/estimate_context_tokens. No provider choice, approximate tokenizer substitution, engine budget increase or direct inference.",
       "projection": "New preparations only: when full source/tool context exceeds actual admitted model capacity, retain exact goal, current source/manifest/workflow identities and strict current-stage owner forms. Actual current completion receipts select prerequisite stage edit/build/preview/export; the model still chooses each typed action or done under existing finite grant. Optional evidence/observations are added only when they fit, with explicit whole-context digest/omission disclosure.",
       "framing": "Measure exact declared token profile plus actual LocalInferenceRequest rendered system/user framing. Respect compiler protected policy reservation and segment cap. Persist safe capacity/projection receipt in existing pending record.",
-      "compatibility": "Existing frozen pending prompts/model keys remain untouched; typed capacity errors never become fabricated model steps. Historical failed/unknown goals retain original evidence."
+      "compatibility": "Existing frozen pending prompts/model keys remain untouched; typed capacity errors never become fabricated model steps. Historical failed/unknown goals retain original evidence.",
+      "incomplete_workflow_grammar": "For NEW pending decisions only, when requested host completion facts are incomplete, the frozen canonical structured response schema permits only done=false and a non-null actually allowed operation. Model still selects its actual typed tool; no host-invented action. Completed checks allow ordinary done branch; historical frozen pending schema/keys are unchanged."
     }
   }
 }
