@@ -60,6 +60,8 @@ class MemoryGoal:
             raise EmulatorGoalError("unsupported operator memory hypothesis direction")
         cap = 2 ** (8 * self.bytes_per_value)
         _bounded(self.threshold, "objective threshold", 0, cap - 1)
+        if self.direction in ("increase", "decrease") and self.threshold == 0:
+            raise EmulatorGoalError("real increase/decrease requires at least one changed unit")
         _bounded(self.mask, "operator-selected bitmask", 0, cap - 1)
         if self.direction.startswith("bit_") and (self.mask == 0 or self.signed):
             raise EmulatorGoalError("bit predicates require a nonzero unsigned memory mask")
