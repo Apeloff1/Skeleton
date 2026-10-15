@@ -44,6 +44,21 @@ class ExecutionLedger:
         self._next_sequence = 0
 
     def begin(self, command: str, correlation: str = "") -> ExecutionRecord:
+        # Never evict an in-flight execution just to admit a new one. Prefer
+        # old terminal records; reject admission if every slot is still active.
+        if len(self._records) >= self._max_records:
+            terminal_id = next(
+                (
+                    identity
+                    for identity, record in self._records.items()
+                    if record.status is not ExecutionStatus.STARTED
+                ),
+                None,
+            )
+            if terminal_id is None:
+                raise OverflowError("execution ledger is full of active work")
+            del self._records[terminal_id]
+
         # Retention-based counts stop advancing once the ledger is full.
         # A monotonic sequence prevents fresh executions overwriting older IDs
         # when the bounded history trims its oldest completed records.
@@ -57,7 +72,6 @@ class ExecutionLedger:
             created_at=datetime.now(timezone.utc).isoformat(),
         )
         self._records[identity] = record
-        self._trim()
         return record
 
     def complete(
@@ -103,6 +117,3 @@ class ExecutionLedger:
 
         return tuple(self._records.values())
 
-    def _trim(self) -> None:
-        while len(self._records) > self._max_records:
-            self._records.pop(next(iter(self._records)))
