@@ -8,7 +8,7 @@ import pytest
 
 from skeleton.ai.training.jeeves_adaptive_sim_training import (
     SCHEMA, ATTACKS, WEATHER, SITUATIONS,
-    _scenario, _run_case, _environment,
+    _scenario, _run_case, _environment, _targeted,
     draft_scenarios, run_campaign, retraining_drafts,
     validate_scenario, verify_campaign, main,
 )
@@ -113,3 +113,37 @@ def test_cli_returns_replayable_evidence_and_quarantined_review_files(tmp_path):
     assert queued and all(not r["optimizer_eligible"] for r in queued)
     assert main(["--audit-report", str(receipt)]) == 0
     assert main(["--scene", str(source), "--budget", "0"]) == 2
+
+def test_counterfactual_repair_is_executed_against_same_original_scene():
+    source = scene()
+    difficult = _scenario("pursuit", "storm", "night", "high_wind",
+                          90, -30, 40, 1000, 30, 0)
+    repaired = _targeted(difficult, "visibility_loss", 2)
+    a = _run_case(source, difficult, 100)
+    b = _run_case(source, repaired, 100)
+    assert a["source_digest"] == b["source_digest"]
+    assert a["risk_counts"].get("visibility_loss", 0) > 0
+    assert b["risk_counts"].get("visibility_loss", 0) == 0
+    assert a["trace_digest"] != b["trace_digest"] or a["scenario"] != b["scenario"]
+    assert a["reverse_audit_passed"] and b["reverse_audit_passed"]
+
+
+def test_counterfactual_report_ledger_proves_measured_parent_child_values():
+    campaign = run_campaign(scene(), budget=12, seed=2)
+    assert campaign["paired_counterfactual_experiments"] >= 1
+    assert len(campaign["counterfactual_results"]) == campaign["paired_counterfactual_experiments"]
+    by_id = {r["scenario"]["scenario_id"]: r for r in campaign["cases"]}
+    for pair in campaign["counterfactual_results"]:
+        parent = by_id[pair["parent_scenario_id"]]
+        child = by_id[pair["child_scenario_id"]]
+        assert pair["target_failure_delta"] == (
+            child["risk_counts"].get(pair["target_family"], 0) -
+            parent["risk_counts"].get(pair["target_family"], 0))
+        assert pair["intervention"] in ("repair", "adversarial")
+        assert pair["changed_dimensions"]
+    forged = deepcopy(campaign)
+    forged["counterfactual_results"][0]["observed_reduction"] = (
+        not forged["counterfactual_results"][0]["observed_reduction"])
+    # The outer digest blocks easy tampering.
+    with pytest.raises(CinematicSimError, match="receipt SHA mismatch"):
+        verify_campaign(forged)

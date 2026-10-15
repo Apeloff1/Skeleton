@@ -470,3 +470,11 @@ unlabelled and ineligible for optimizer updates** until independent rights,
 quality, project-split and leakage review. This adds controlled evidence,
 not fictitious model learning. The installed Windows launcher exposes an
 opt-in **Adaptive Simulation** control.
+
+Adaptive campaigns also materialize a **paired counterfactual ledger**:
+each second-stage attack or repair records the parent scenario, changed
+dimensions, exact targeted failure family, measured before/after counts and
+observed reduction or regression. These are *executed* comparisons against
+the original authored source, not merely plausible improvement prose.
+The reverse audit and immutable campaign hash detect forged measurements.
+The output stays quarantined until independent evaluator/rights approval.
