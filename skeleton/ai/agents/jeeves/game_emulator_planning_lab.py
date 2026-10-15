@@ -22,7 +22,9 @@ from .game_learning_parallel import GameEnvironmentRequest
 from .game_emulator_neural_world import (
     SCHEMA as MODEL_SCHEMA,
     infer_neural_world_transition,
+    validate_neural_world_checkpoint,
 )
+from .game_emulator_neural_ensemble import predict_world_ensemble
 
 SCHEMA = "skeleton.game.emulator_planning_lab.v1"
 
@@ -99,17 +101,30 @@ def _objective_score(
 def _beam_search(
     model: Mapping[str, Any], observation: Mapping[str, float],
     actions: tuple[str, ...], config: EmulatorPlanningConfig,
-) -> tuple[list[dict[str, Any]], int]:
+    ensemble: Mapping[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], int, int]:
     """Predict only. All proposed gains remain explicitly speculative."""
     frontier = [(0.0, tuple(), dict(observation), [])]
     proposed = 0
+    refused = 0
     for depth in range(config.horizon):
         possibilities = []
         for score, sequence, predicted, per_step in frontier:
             for action in actions:
-                raw = infer_neural_world_transition(model, predicted, action)
-                next_ = raw["predicted_next_observation"]
-                reward = raw["predicted_one_step_reward"]
+                proposed += 1
+                if ensemble is None:
+                    raw = infer_neural_world_transition(model, predicted, action)
+                    next_ = raw["predicted_next_observation"]
+                    reward = raw["predicted_one_step_reward"]
+                    uncertainty = None
+                else:
+                    raw = predict_world_ensemble(ensemble, predicted, action)
+                    if not raw["confidence_gate_passed_for_physical_recheck"]:
+                        refused += 1
+                        continue
+                    next_ = raw["speculative_mean_next_observation"]
+                    reward = raw["speculative_mean_one_step_reward"]
+                    uncertainty = raw["source_measured_member_disagreement"]
                 if (
                     not math.isfinite(reward)
                     or abs(reward) > 1e8
@@ -129,12 +144,16 @@ def _beam_search(
                         "predicted_reward": reward,
                         "proposed_objective_contribution": contribution,
                         "speculative_next_observation": next_,
+                        "source_ensemble_normalized_disagreement": uncertainty,
                     }],
                 )
                 possibilities.append(proposal)
-                proposed += 1
         if proposed > config.horizon * config.beam_width * config.action_subset:
             raise EmulatorPlanningError("predicted search exceeded finite planning envelope")
+        if not possibilities:
+            raise EmulatorPlanningError(
+                "every speculative native action was refused by the ensemble uncertainty gate"
+            )
         # Ties follow the same seeded, source-independent order every time.
         frontier = sorted(
             possibilities,
@@ -149,7 +168,7 @@ def _beam_search(
             "speculative_rollout": rows,
             "source_executed": False,
         })
-    return result, proposed
+    return result, proposed, refused
 
 
 def _observed(
@@ -216,6 +235,7 @@ def run_native_confirmed_planning(
     request: GameEnvironmentRequest, *,
     model: Mapping[str, Any], training_report: Mapping[str, Any],
     rights_acknowledged: bool,
+    ensemble: Mapping[str, Any] | None = None,
     config: EmulatorPlanningConfig = EmulatorPlanningConfig(),
     cancel: Callable[[], bool] | None = None,
     authorize: Callable[[], None] | None = None,
@@ -232,20 +252,42 @@ def run_native_confirmed_planning(
         raise EmulatorPlanningError("operator rights and typed planning budget are required")
     if not isinstance(model, Mapping) or model.get("schema_version") != MODEL_SCHEMA:
         raise EmulatorPlanningError("source-bound trained emulator neural candidate required")
-    parent = dict(model)
-    model_digest = parent.pop("model_digest", None)
-    if _digest(parent) != model_digest:
-        raise EmulatorPlanningError("candidate neural parameters are not checksum-bound")
-    if (
-        not isinstance(training_report, Mapping)
-        or training_report.get("world_model_digest") != model_digest
-        or training_report.get("report_digest") != _digest({
-            key: val for key, val in training_report.items() if key != "report_digest"
-        })
-        or training_report.get("candidate_status") != "candidate_predictive_gain_measured"
-        or model.get("measured_predictive_gate") != "candidate_predictive_gain_measured"
-    ):
-        raise EmulatorPlanningError("unqualified or mismatched neural candidate cannot direct source actions")
+    model_digest = validate_neural_world_checkpoint(model)
+    if ensemble is not None:
+        if (
+            not isinstance(ensemble, Mapping)
+            or ensemble.get("qualified_for_source_confirmation") is not True
+            or model_digest not in ensemble.get("member_model_digests", [])
+        ):
+            raise EmulatorPlanningError(
+                "physical planning needs an approved predictive member of a qualified neural ensemble"
+            )
+    if not isinstance(training_report, Mapping) or training_report.get("report_digest") != _digest({
+        key: val for key, val in training_report.items() if key != "report_digest"
+    }):
+        raise EmulatorPlanningError("source-trained candidate report evidence differs")
+    if ensemble is None:
+        validated = (
+            training_report.get("world_model_digest") == model_digest
+            and training_report.get("candidate_status") == "candidate_predictive_gain_measured"
+        )
+    else:
+        receipts = training_report.get("member_seed_receipts")
+        validated = (
+            training_report.get("ensemble_digest") == ensemble.get("ensemble_digest")
+            and training_report.get("qualified_for_physical_native_confirmation") is True
+            and isinstance(receipts, list)
+            and any(
+                isinstance(item, Mapping)
+                and item.get("model_digest") == model_digest
+                and item.get("qualified_prediction") == "candidate_predictive_gain_measured"
+                for item in receipts
+            )
+        )
+    if not validated or model.get("measured_predictive_gate") != "candidate_predictive_gain_measured":
+        raise EmulatorPlanningError(
+            "unqualified or mismatched world model cannot direct real ROM experiments"
+        )
     if request.max_steps < config.anchors - 1 + config.horizon:
         raise EmulatorPlanningError("real episode cannot contain the anchor prefix and full proposed horizon")
     if config.objective == "audio_activity" and "audio_rms" not in model.get("observation_features", []):
@@ -289,11 +331,15 @@ def run_native_confirmed_planning(
                     raise EmulatorPlanningError("native source terminated before experiment anchor")
                 now = dict(real.observation)
         proven = []
+        refused_by_uncertainty = 0
         total_steps = config.anchors - 1
         predicted_nodes = 0
         for anchor in anchors:
-            candidates, count = _beam_search(model, anchor["observation"], actions, config)
+            candidates, count, refused = _beam_search(
+                model, anchor["observation"], actions, config, ensemble=ensemble
+            )
             predicted_nodes += count
+            refused_by_uncertainty += refused
             baseline_actions = [neutral] * config.horizon
             base_trials = [
                 _observed(
@@ -375,11 +421,15 @@ def run_native_confirmed_planning(
             "independent_trial_repetitions": config.repeats,
             "real_emulator_steps": total_steps,
             "speculative_search_nodes": predicted_nodes,
+            "source_ensemble_digest": None if ensemble is None else ensemble["ensemble_digest"],
+            "speculative_actions_rejected_by_neural_disagreement": refused_by_uncertainty,
             "actual_positive_plans": sum(
                 case["actual_measured_positive_gain"]
                 for anchor in proven for case in anchor["model_proposals_physically_checked"]
             ),
-            "tested_plan_count": config.anchors * config.proposal_count,
+            "tested_plan_count": sum(
+                len(anchor["model_proposals_physically_checked"]) for anchor in proven
+            ),
             "physical_evidence": proven,
             "limitations": {
                 "no_game_objective_labels": True,
