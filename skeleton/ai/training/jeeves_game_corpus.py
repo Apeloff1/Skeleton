@@ -202,6 +202,25 @@ def load_approved_corpus(manifest_path: Path) -> tuple[
         for idx in candidate_ids:
             if _split_contamination(held_prompt, train_prompts[idx]):
                 raise ProductionCheckpointError("near-duplicate prompt leaked between corpus splits")
+    # Prompt partition alone is insufficient: copied reference *answers*
+    # can make held-out loss appear to improve without transfer of skills.
+    # Apply the same high-similarity policy to the actual target sequences.
+    training_answers = [row["answer"] for row in training]
+    eval_answers = [row["answer"] for row in heldout]
+    answer_index: dict[tuple[str, ...], set[int]] = defaultdict(set)
+    for idx, answer in enumerate(training_answers):
+        for gram in _shingles(answer):
+            answer_index[gram].add(idx)
+    exact_training_answers = {_normalize(answer) for answer in training_answers}
+    for answer in eval_answers:
+        if _normalize(answer) in exact_training_answers:
+            raise ProductionCheckpointError("held-out game design answer copied from training")
+        candidates: set[int] = set()
+        for gram in _shingles(answer):
+            candidates.update(answer_index.get(gram, ()))
+        for idx in candidates:
+            if _split_contamination(answer, training_answers[idx]):
+                raise ProductionCheckpointError("held-out reference answer near-duplicates training")
     # Preserve authored training order and family-key order, not sorted
     # vocabulary occurrences. Model fit and optimizer progress stay replayable.
     train_texts = tuple(
