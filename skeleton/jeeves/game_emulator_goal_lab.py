@@ -61,8 +61,8 @@ class MemoryGoal:
         cap = 2 ** (8 * self.bytes_per_value)
         _bounded(self.threshold, "objective threshold", 0, cap - 1)
         _bounded(self.mask, "operator-selected bitmask", 0, cap - 1)
-        if self.direction.startswith("bit_") and self.mask == 0:
-            raise EmulatorGoalError("a bit predicate requires a nonzero declared bitmask")
+        if self.direction.startswith("bit_") and (self.mask == 0 or self.signed):
+            raise EmulatorGoalError("bit predicates require a nonzero unsigned memory mask")
 
 
 @dataclass(frozen=True)
@@ -225,7 +225,7 @@ def evaluate_operator_native_goals(
     if request.max_steps < config.anchors - 1 + config.horizon:
         raise EmulatorGoalError("native episode cannot contain all state anchors and full trial horizons")
     num_steps = config.anchors - 1 + config.anchors * config.repeats * (
-        config.horizon + sum(len(controls) for controls in interventions.values())
+        config.horizon * (1 + len(interventions))
     )
     if num_steps > config.max_actual_steps:
         raise EmulatorGoalError("native goal experiment exceeds declared source-step budget")
@@ -259,8 +259,9 @@ def evaluate_operator_native_goals(
             measured_steps += sum(item["real_steps"] for item in neutral)
             outcomes = []
             for label, controls in interventions.items():
+                active_controls = list(controls) + ["idle"] * (config.horizon - len(controls))
                 matched = [
-                    _run(env, anchor, initial, controls, goals, cancel=cancel, authorize=authorize)
+                    _run(env, anchor, initial, active_controls, goals, cancel=cancel, authorize=authorize)
                     for _ in range(config.repeats)
                 ]
                 measured_steps += sum(item["real_steps"] for item in matched)
@@ -303,7 +304,8 @@ def evaluate_operator_native_goals(
                     })
                 outcomes.append({
                     "operator_intervention": label,
-                    "actions": list(controls),
+                    "requested_actions": list(controls),
+                    "executed_horizon_actions": active_controls,
                     "source_active_repetitions": matched,
                     "operator_goal_contrasts": proofs,
                 })
