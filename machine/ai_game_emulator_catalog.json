@@ -135,7 +135,15 @@
     "vice_x64": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
     "px68k": "0ad84d7058a12b7db4f7f7a906e87fad4e2f26f6",
     "quasi88": "7884be5277776a5d8c4fdc4e574e9b5b589945c9",
-    "mednafen_saturn": "faef2779a7568c1734addc4fe63cc76e9fa2566b"
+    "mednafen_saturn": "faef2779a7568c1734addc4fe63cc76e9fa2566b",
+    "sameboy": "aa158a889a48b538a0302873704a34577c8eb67d",
+    "vba_next": "788192f215ad0a1413f1625b40ebba3423fa0ade",
+    "a5200": "40c6f2f1ad4a3145b328d5baaf010fae6c7e752b",
+    "vice_x64sc": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_x128": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_xvic": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_xplus4": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_xpet": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -294,9 +302,9 @@
   },
   "recipe_expansion_2026_10_15": {
     "status": "source_recipe_added_unbuilt_unexecuted",
-    "additional_recipes": 8,
-    "current_pinned_recipe_count": 43,
-    "default_profile": "starter preserves six original recipes; broad includes nondeferred software recipes; all explicitly includes candidate-only",
+    "additional_recipes": 16,
+    "current_pinned_recipe_count": 51,
+    "default_profile": "starter keeps original six; broad selects all non-deferred recipes; all includes candidates requiring operator firmware and runtime qualification",
     "upstream_pins": {
       "nestopia": {
         "repository": "https://github.com/libretro/nestopia.git",
@@ -329,6 +337,38 @@
       "mednafen_saturn": {
         "repository": "https://github.com/libretro/beetle-saturn-libretro.git",
         "revision": "faef2779a7568c1734addc4fe63cc76e9fa2566b"
+      },
+      "sameboy": {
+        "repository": "https://github.com/libretro/SameBoy.git",
+        "revision": "aa158a889a48b538a0302873704a34577c8eb67d"
+      },
+      "vba_next": {
+        "repository": "https://github.com/libretro/vba-next.git",
+        "revision": "788192f215ad0a1413f1625b40ebba3423fa0ade"
+      },
+      "a5200": {
+        "repository": "https://github.com/libretro/a5200.git",
+        "revision": "40c6f2f1ad4a3145b328d5baaf010fae6c7e752b"
+      },
+      "vice_x64sc": {
+        "repository": "https://github.com/libretro/vice-libretro.git",
+        "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
+      },
+      "vice_x128": {
+        "repository": "https://github.com/libretro/vice-libretro.git",
+        "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
+      },
+      "vice_xvic": {
+        "repository": "https://github.com/libretro/vice-libretro.git",
+        "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
+      },
+      "vice_xplus4": {
+        "repository": "https://github.com/libretro/vice-libretro.git",
+        "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
+      },
+      "vice_xpet": {
+        "repository": "https://github.com/libretro/vice-libretro.git",
+        "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
       }
     },
     "assets": "blueMSX copies only pinned C-BIOS machine profiles and databases into /system; no proprietary firmware bundled",
