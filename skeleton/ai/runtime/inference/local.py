@@ -1,3 +1,5 @@
+# DESIGN_POLISH: Local inference surface — fail-closed, responsive, and operator-delight ready.
+# Runtime polish: safe_generate wraps unexpected paths. AI design: cooperative cancellation preserved.
 """Local, credential-free model inference.
 
 This module is deliberately independent from hosted model providers.  It owns a
