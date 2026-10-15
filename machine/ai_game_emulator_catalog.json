@@ -137,7 +137,11 @@
     "bluemsx": "e3086eb5d36d77fa11704cf53dc176686e70127d",
     "px68k": "0ad84d7058a12b7db4f7f7a906e87fad4e2f26f6",
     "vice_x64": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
-    "vice_x64sc": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
+    "vice_x64sc": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_x128": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_xvic": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_xplus4": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_xpet": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -273,7 +277,7 @@
     "system_assets": "Only public artifacts already in the exact pinned source tree may be copied under an explicit recipe, bounded1024 files/64MiB and immutable exact SHA256. Retained upstream licenses do not grant ROM or commercial-use rights.",
     "operator_dependencies": "Build-only header paths and OpenGL library paths may be supplied explicitly through the local CLI. Installed dependency bytes are observed and recorded; the command does not fetch/install dependencies or enable hardware rendering. Actual isolated runtime admission remains separate.",
     "inactive_gpu_scope": "Flycast can be compiled/inspected under an exact pinned recipe but is registered approved:false because the isolated host has no approved hardware rendering context. Compilation does not imply Dreamcast gameplay availability.",
-    "core_recipe_count": 45,
+    "core_recipe_count": 49,
     "default_bootstrap_cores": [
       "gambatte",
       "fceumm",
@@ -291,10 +295,10 @@
       "license_bytes": 8388608
     },
     "license_aliases": "An upstream license symlink may be resolved only to a nonsymlink regular file inside the exact pinned source root. Copy its actual text under an immutable regular destination and record the source alias/target; external targets and unsafe installed-library paths remain rejected.",
-    "bootstrap_pins_count": 45,
+    "bootstrap_pins_count": 49,
     "static_compilation_scope": "34 ELF libretro core libraries built locally at this wave end, including28 additional.29 operator-approved mappings cover46 canonical hardware targets; 4 firmware-missing candidates and1 hardware-rendering candidate remain inactive. No automated tests or actual game compatibility verification. Local artifact evidence is separate from portable checked-in source. This is historical local evidence only. The newer additional pinned recipes are source instructions, not proof that additional binaries were compiled.",
     "follow_up_2026_10_15": {
-      "scope": "Add 10 source-pinned operator build recipes (including the two identified-but-unimplemented upstream pins); no automatic download or BIOS/game distribution.",
+      "scope": "Add 14 source-pinned operator build recipes, including two earlier identified-but-unimplemented upstream pins and four additional VICE 8-bit families; no automatic download or BIOS/game distribution.",
       "added_core_ids": [
         "a5200",
         "mupen64plus_next",
@@ -305,14 +309,22 @@
         "bluemsx",
         "px68k",
         "vice_x64",
-        "vice_x64sc"
+        "vice_x64sc",
+        "vice_x128",
+        "vice_xvic",
+        "vice_xplus4",
+        "vice_xpet"
       ],
       "candidate_only": [
         "mupen64plus_next",
         "fmsx",
         "bluemsx",
         "vice_x64",
-        "vice_x64sc"
+        "vice_x64sc",
+        "vice_x128",
+        "vice_xvic",
+        "vice_xplus4",
+        "vice_xpet"
       ],
       "requires_external_firmware": [
         "a5200",

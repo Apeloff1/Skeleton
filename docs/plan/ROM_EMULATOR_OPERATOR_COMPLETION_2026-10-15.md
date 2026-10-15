@@ -4,7 +4,7 @@ The canonical emulator system is `skeleton/jeeves/game_emulator_catalog.py`, the
 
 ## Exact build scope
 
-The six default bootstrap recipes remain unchanged. The source-pinned recipe catalog now has **45** core entries. Ten newly scripted cores: `a5200`, `mupen64plus_next`, `nestopia`, `mesen`, `vba_next`, `fmsx`, `bluemsx`, `px68k`, `vice_x64`, `vice_x64sc`. Two were previously identified in the expansion contract but missing from the installer; eight add previously unbuilt recipe families or variants. All source revisions are exact SHA-1 commit pins; licenses are retained with installed source identities. Added ROM suffix hints do **not** bypass existing structural parsing, content hash checks, archive extraction bounds or worker-level libretro extension validation.
+The six default bootstrap recipes remain unchanged. The source-pinned recipe catalog now has **49** core entries. Fourteen newly scripted cores: `a5200`, `mupen64plus_next`, `nestopia`, `mesen`, `vba_next`, `fmsx`, `bluemsx`, `px68k`, `vice_x64`, `vice_x64sc`, `vice_x128`, `vice_xvic`, `vice_xplus4`, `vice_xpet`. Two were previously identified in the expansion contract but missing from the installer; twelve add previously unbuilt recipe families or variants. All source revisions are exact SHA-1 commit pins; licenses are retained with installed source identities. Added ROM suffix hints do **not** bypass existing structural parsing, content hash checks, archive extraction bounds or worker-level libretro extension validation.
 
 ## Local operator commands
 
@@ -45,7 +45,7 @@ The all-core command is **not** invoked by the application or CI. It returns exi
 | PX68k | Sharp X68000 | Requires operator-owned `iplrom.dat` and `cgrom.dat` |
 | fMSX | MSX1/MSX2 | Candidate until firmware requirements are inspected and qualified |
 | blueMSX | MSX family | Candidate until copied upstream C-BIOS assets and system-directory resolution are qualified |
-| VICE x64/x64sc | Commodore 64 | Candidates until original system ROMs have been legitimately installed and qualified |
+| VICE x64/x64sc/x128/xvic/xplus4/xpet | Commodore 64/128, VIC-20, Plus/4, PET | Candidates until original system ROMs have been legitimately installed and qualified |
 | Mupen64Plus-Next | Nintendo 64 | Candidate: host software-renderer/headless compatibility is not qualified |
 
 An `approved:false` registry record is intentionally *not* a working emulator. No installation or execution was performed by this source-only commit. Existing bubblewrap and native byte/hash checks remain required. ROM rights and upstream core licensing remain the operator's responsibility. Do not classify compatibility as verified until a separate runtime evidence receipt has been obtained.

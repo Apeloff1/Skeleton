@@ -410,6 +410,10 @@ _CORE_CONTENT_EXTENSIONS = {
     "px68k": "dim|xdf|hdf|d88|m3u",
     "vice_x64": "d64|g64|d71|prg|p00|tap|t64|crt|m3u",
     "vice_x64sc": "d64|g64|d71|prg|p00|tap|t64|crt|m3u",
+    "vice_x128": "d64|g64|d71|prg|p00|tap|t64|crt|m3u",
+    "vice_xvic": "d64|g64|d71|prg|p00|tap|t64|crt|m3u",
+    "vice_xplus4": "d64|g64|d71|prg|p00|tap|t64|crt|m3u",
+    "vice_xpet": "d64|g64|d71|prg|p00|tap|t64|crt|m3u",
 }
 
 
