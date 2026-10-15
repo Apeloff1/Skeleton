@@ -537,6 +537,9 @@ class GameBoyMachine:
                 return 20
             if opcode == 0x10:
                 self._fetch()
+                # DMG STOP resets the divider and freezes its oscillator
+                # until joypad activity. No CGB speed-switch emulation.
+                self.write(0xFF04, 0)
                 self.stopped = True
                 return 4
             if opcode == 0x18 or opcode in (0x20, 0x28, 0x30, 0x38):
@@ -768,7 +771,13 @@ class GameBoyMachine:
                 self.pc = 0x40 + bit * 8
                 self._advance(20)
                 return 20
-        if self.halted or self.stopped:
+        if self.stopped:
+            # Advance a bounded scheduler budget so run() cannot spin
+            # indefinitely, while leaving actual divider/TIMA/PPU/RTC
+            # counters frozen. Actual oscillator resume is joypad-gated.
+            self.cycles += 4
+            return 4
+        if self.halted:
             self._advance(4)
             return 4
         cycles = self._execute()
