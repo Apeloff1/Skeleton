@@ -18,6 +18,7 @@ from typing import Any
 MAX_ROM_BYTES = 8_388_608
 FRAME_CYCLES = 70_224
 RTC_CYCLES_PER_SECOND = 4_194_304
+SERIAL_INTERNAL_BIT_CYCLES = 512
 WIDTH, HEIGHT = 160, 144
 Z, N, H, C = 0x80, 0x40, 0x20, 0x10
 BUTTONS = ("right", "left", "up", "down", "a", "b", "select", "start")
@@ -136,6 +137,9 @@ class GameBoyMachine:
         self.dma_tcycles = 0
         self.dma_startup = 0
         self._cpu_bus_active = False
+        self.serial_active = False
+        self.serial_bits = 0
+        self.serial_phase = 0
         # Battery-backed wall time is intentionally unavailable. RTC grows
         # only through executed CPU cycles and is sealed in source snapshots.
         self.rtc_regs = [0, 0, 0, 0, 0]
@@ -194,6 +198,24 @@ class GameBoyMachine:
         self.dma_index += 1
         if self.dma_index == 160:
             self.dma_active = False
+
+    def _serial_tick(self) -> None:
+        # DMG internal clock is 8192 Hz: one bit per 512 CPU T-cycles.
+        # No external link peer is attached. The input line therefore
+        # idles high. External clock mode intentionally cannot advance.
+        if not self.serial_active or not self.memory[0xFF02] & 0x01:
+            return
+        self.serial_phase += 1
+        if self.serial_phase != SERIAL_INTERNAL_BIT_CYCLES:
+            return
+        self.serial_phase = 0
+        self.memory[0xFF01] = ((self.memory[0xFF01] << 1) | 1) & 0xFF
+        self.serial_bits += 1
+        if self.serial_bits == 8:
+            self.serial_active = False
+            self.serial_bits = 0
+            self.memory[0xFF02] &= ~0x80
+            self.memory[0xFF0F] |= 0x08
 
     def _rtc_advance(self, cycles: int) -> None:
         """Advance the virtual clock in O(1), never using host wall time."""
@@ -282,6 +304,8 @@ class GameBoyMachine:
             if not select & 0x20:
                 low &= ~((self.buttons >> 4) & 15)
             return 0xC0 | select | low
+        if address == 0xFF02:
+            return 0x7E | (self.memory[address] & 0x81)
         if address == 0xFF04:
             return self.divider >> 8
         if address == 0xFF07:
@@ -369,6 +393,16 @@ class GameBoyMachine:
         if 0xE000 <= address < 0xFE00:
             address -= 0x2000
         if 0xFEA0 <= address < 0xFF00 or address == 0xFF44:
+            return
+        if address == 0xFF01:
+            if self.serial_active:
+                raise GameRomRuntimeError('serial SB rewrite during active transfer unsupported')
+            self.memory[address] = value
+            return
+        if address == 0xFF02:
+            self.memory[address] = value & 0x81
+            self.serial_active = bool(value & 0x80)
+            self.serial_bits = self.serial_phase = 0
             return
         if address == 0xFF04:
             old_signal = self._timer_signal()
@@ -828,6 +862,7 @@ class GameBoyMachine:
             self.divider = (self.divider + 1) & 65535
             self._timer_apply_edge(old_signal)
             self._dma_tick()
+            self._serial_tick()
             self._ppu_tick()
         self.cycles += cycles
         self._rtc_advance(cycles)
@@ -915,6 +950,9 @@ class GameBoyMachine:
             "dma_index",
             "dma_tcycles",
             "dma_startup",
+            "serial_active",
+            "serial_bits",
+            "serial_phase",
         )
         result = {
             "schema_version": 1,
@@ -974,6 +1012,8 @@ class GameBoyMachine:
             "dma_index": 160,
             "dma_tcycles": 3,
             "dma_startup": 4,
+            "serial_bits": 7,
+            "serial_phase": SERIAL_INTERNAL_BIT_CYCLES - 1,
             "rom_bank": (
                 511 if self.metadata["mapper"] == "mbc5"
                 else 127 if self.metadata["mapper"] == "mbc3"
@@ -1037,6 +1077,16 @@ class GameBoyMachine:
             if len(data) != length:
                 raise GameRomRuntimeError("ROM snapshot memory length is invalid")
             decoded[name] = bytearray(data)
+        if (
+            bool(decoded["memory"][0xFF02] & 0x80) != registers["serial_active"]
+            or decoded["memory"][0xFF02] & ~0x81
+            or (not registers["serial_active"] and (
+                registers["serial_bits"] or registers["serial_phase"]
+            ))
+            or (registers["serial_active"] and not decoded["memory"][0xFF02] & 1
+                and registers["serial_phase"])
+        ):
+            raise GameRomRuntimeError("source serial clock state or SB/SC session is invalid")
         if registers["dma_active"] and decoded["memory"][0xFF46] != registers["dma_source"] >> 8:
             raise GameRomRuntimeError("OAM DMA source and programmed bus register differ")
         if decoded["memory"][0xFF44] > 153 or any(
