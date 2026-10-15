@@ -1,0 +1,58 @@
+name: Focused Lawful Game Decompilation Qualification
+
+# Manual ONLY: do not multiply the repository's pull-request CI congestion.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: focused-game-decompilation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bounded-static-game-decompilation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+    steps:
+      - name: Checkout selected immutable branch head, without token persistence
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Compile source parsers, authorizers, CLI and synthetic original tests
+        run: |
+          python -m compileall -q \
+            skeleton/jeeves/game_decompilation.py \
+            skeleton/jeeves/game_decompilation_code.py \
+            skeleton/jeeves/game_decompilation_arm.py \
+            skeleton/jeeves/game_decompilation_assets.py \
+            skeleton/jeeves/game_decompilation_formats.py \
+            skeleton/jeeves/game_decompilation_archives.py \
+            skeleton/jeeves/game_decompilation_runtime.py \
+            skeleton/jeeves/game_decompilation_quality.py \
+            skeleton/jeeves/game_decompilation_learning.py \
+            scripts/decompile_game_assets.py \
+            scripts/train_game_asset_quality_shadow.py \
+            tests/test_game_decompilation.py
+      - name: Run real byte-level self-contained source and learning contracts
+        run: |
+          python -m unittest -v tests.test_game_decompilation
+      - name: Assert this check performed no commercial decompilation or production training
+        if: success()
+        run: |
+          python - <<'PY'
+          from skeleton.jeeves.game_decompilation import REPORT_SCHEMA
+          from skeleton.jeeves.game_decompilation_learning import SHADOW_SCHEMA
+          assert REPORT_SCHEMA == "skeleton.game.authorized_decompilation.v1"
+          assert SHADOW_SCHEMA == "skeleton.game.asset_quality_shadow_model.v1"
+          print("Original fixtures only; no games, production model or commercial assets touched.")
+          PY
