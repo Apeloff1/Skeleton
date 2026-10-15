@@ -268,6 +268,9 @@ def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
         or report.get("actual_cb_prefix_expansions_executed") != 256
         or report.get("expected_illegal_base_opcodes_rejected") != 11
         or report.get("actual_total_single_step_source_replays") != 1000
+        or report.get("source_reference_opcodes_compared_to_actual_timing") != 500
+        or report.get("external_sm83_reference_commit")
+        != "376f61c86fdac2048f7ce5fe838ae756b306017e"
         or report.get("native_libretro_corpus_tested") is not False
         or report.get("hardware_instruction_cycle_accuracy_independently_proven") is not False
         or report.get("production_jeeves_weights_modified") is not False
@@ -302,6 +305,10 @@ def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
                 or type(before) is not str or len(before) != 64 or before != after
                 or type(case.get("emulated_t_cycles")) is not int
                 or case["emulated_t_cycles"] not in (4, 8, 12, 16, 20, 24)
+                or case.get("reference_documented_t_cycles") != case["emulated_t_cycles"]
+                or case.get("source_reference_cycles_verified") is not True
+                or type(case.get("reference_documented_instruction_bytes")) is not int
+                or not 1 <= case["reference_documented_instruction_bytes"] <= 3
             ):
                 raise AcceptanceSuiteError("legal opcode lacks exact real CPU/memory/raster replay proof")
     return {
@@ -309,6 +316,7 @@ def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
         "legal_base_opcode_variants": 245,
         "actual_cb_prefixed_opcode_variants": 256,
         "source_cpu_instruction_steps_replayed": 1000,
+        "independent_cc0_opcode_cycle_reference_matches": 500,
         "invalid_opcodes_denied": 11,
         "receipt_file": reference,
         "hardware_accuracy_certified": False,
