@@ -544,3 +544,22 @@ def test_runtime_probes_use_configured_ports_including_ready_route(monkeypatch):
     assert ("backend", "http://localhost:8101/api/health") in seen
     assert ("skeleton", "http://localhost:8110/api/v1/health/live") in seen
     assert ("application", "http://localhost:8101/api/app/ready") in seen
+
+@pytest.mark.parametrize(
+    ("key", "invalid"),
+    [
+        ("GAMEFORGE_JWT_SECRET", "weak"),
+        ("GF_SEAL_SECRET", "too-short"),
+        ("GF_KEYHOLDER_SEED", "not-hex"),
+        ("GF_KEYHOLDER_SEED", "f" * 63),
+    ],
+)
+def test_runtime_preflight_rejects_invalid_forge_security_configuration(
+    tmp_path, monkeypatch, key, invalid,
+):
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    (tmp_path / ".env").write_text(f"{key}={invalid}\n", encoding="utf-8")
+    checks = preflight(tmp_path, runtime=True, environ={})
+    check = next(item for item in checks if item.code == f"env:{key}")
+    assert check.ok is False
+    assert invalid not in check.message
