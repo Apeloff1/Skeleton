@@ -1,55 +1,26 @@
-# ROM and libretro core expansion (2026-10-15)
+# ROM and libretro core operator admission — reconciled 2026-10-15
 
-The canonical emulator system is `skeleton/jeeves/game_emulator_catalog.py`, the isolated host/worker and the explicit Linux operator installer. This pass expands **build recipes, not installed binaries**. No ROMs, commercial system firmware, emulator binaries or proprietary keys are fetched, bundled or offered by an API.
+This reconciles PR #3933 with the later canonical mainline. The early PR described 49 pinned recipes; the current canonical source manifests already enumerate **83 exact source-pinned recipes**, including all fourteen proposed IDs, so the older 49-item catalog must not overwrite main. These are source recipes, **not installed, booted or verified emulators**.
 
-## Exact build scope
+## Explicit Linux operator actions
 
-The six default bootstrap recipes remain unchanged. The source-pinned recipe catalog now has **49** core entries. Fourteen newly scripted cores: `a5200`, `mupen64plus_next`, `nestopia`, `mesen`, `vba_next`, `fmsx`, `bluemsx`, `px68k`, `vice_x64`, `vice_x64sc`, `vice_x128`, `vice_xvic`, `vice_xplus4`, `vice_xpet`. Two were previously identified in the expansion contract but missing from the installer; twelve add previously unbuilt recipe families or variants. All source revisions are exact SHA-1 commit pins; licenses are retained with installed source identities. Added ROM suffix hints do **not** bypass existing structural parsing, content hash checks, archive extraction bounds or worker-level libretro extension validation.
-
-## Local operator commands
-
-Inspect recipes without side effects:
+Read-only source inventory:
 
 ```sh
-python scripts/install_game_emulator_cores.py --list-recipes
-python scripts/install_game_emulator_cores.py --list-recipes --core nestopia --core mesen
+python scripts/install_game_emulator_cores.py --list-cores
+python scripts/install_game_emulator_cores.py --coverage-matrix
+python scripts/install_game_emulator_cores.py --validate-recipes
 ```
 
-Build and register specific cores from pinned public source on a suitably equipped **Linux** host:
+Operator-pinned bulk attempt with per-core failure receipts:
 
 ```sh
 python scripts/install_game_emulator_cores.py \
-  --source-root /absolute/private/core-sources \
-  --install-root /absolute/private/emulators \
-  --fetch-sources --core nestopia --core mesen --core vba_next
+  --source-root /absolute/private/sources \
+  --install-root /absolute/private/cores \
+  --profile all --fetch-sources --continue-on-error --jobs 2
 ```
 
-To attempt every recipe explicitly, with bounded jobs and per-core failure receipts:
+The installer continues to the next selected core only when `--continue-on-error` is explicit. It records `selected_count`, `installed_count`, `failed_count`, per-core error type/message and the resolved registry if present; any failure exits **2**, including an entirely failed batch. Without that flag, the first failure retains the former fail-fast behavior. No automatic install, ROM, firmware acquisition, secret inclusion, runtime approval or model training occurs. Runtime approval remains controlled by validated core/firmware identity and sandbox policy. Operator must independently test actual video, audio, controller, disc/save behaviors and lawful homebrew content before declaring compatibility.
 
-```sh
-python scripts/install_game_emulator_cores.py \
-  --source-root /absolute/private/core-sources \
-  --install-root /absolute/private/emulators \
-  --fetch-sources --all-cores --continue-on-error --jobs 2
-```
-
-The all-core command is **not** invoked by the application or CI. It returns exit code 2 if any core fails, even if other cores build successfully. The installer does not fetch operating-system packages, redistributable BIOS/ROM content, third-party keys or extra dependencies beyond the explicit pinned source. Larger cores may require operator-installed build prerequisites. Runtime enabling uses `SKL_GAME_EMULATOR_REGISTRY=/absolute/private/emulators/cores.json` in the **server** process, not the frontend.
-
-## Readiness and authority
-
-| Core(s) | Target scope | Admission constraint |
-| --- | --- | --- |
-| Nestopia, Mesen | NES cartridges | No Famicom Disk System firmware or disk support enabled by these recipes |
-| VBA-Next | GBA-family cartridges | No physical-console/accessory or accuracy guarantee |
-| a5200 | Atari 5200 | Requires operator-owned `5200.rom`, missing file defers approval |
-| PX68k | Sharp X68000 | Requires operator-owned `iplrom.dat` and `cgrom.dat` |
-| fMSX | MSX1/MSX2 | Candidate until firmware requirements are inspected and qualified |
-| blueMSX | MSX family | Candidate until copied upstream C-BIOS assets and system-directory resolution are qualified |
-| VICE x64/x64sc/x128/xvic/xplus4/xpet | Commodore 64/128, VIC-20, Plus/4, PET | Candidates until original system ROMs have been legitimately installed and qualified |
-| Mupen64Plus-Next | Nintendo 64 | Candidate: host software-renderer/headless compatibility is not qualified |
-
-An `approved:false` registry record is intentionally *not* a working emulator. No installation or execution was performed by this source-only commit. Existing bubblewrap and native byte/hash checks remain required. ROM rights and upstream core licensing remain the operator's responsibility. Do not classify compatibility as verified until a separate runtime evidence receipt has been obtained.
-
-## Remaining closure obligations
-
-Validate the pinned sources, compiler/toolchain requirements, output names and retained licenses on the target architecture; inspect copied firmware identities; prove native ABI, sandboxed software framebuffer, reset/run/snapshot/restore/audio/input and correct controller behavior per core; confirm exact ROM/disc source admission with rights-audited homebrew; record test and environment receipts. Migrate any core from candidate to approved **only** following that review. Platform families with no public-compatible libretro implementation remain explicitly unavailable and must not fall back to reference simulation.
+The earlier `--list-recipes` request is fulfilled by the existing `--list-cores`, and `--all-cores` by existing `--profile all`; introducing duplicate, divergent switches is avoided. The exact external native build jobs and full game playthroughs remain unverified by this source reconciliation.
