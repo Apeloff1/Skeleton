@@ -192,3 +192,32 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in source
     assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
+
+
+def test_windows_payload_covers_manifest_and_docker_copy_inputs():
+    """Installed copies must have every file required by their own preflight."""
+    import json
+    import re
+
+    source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    paths_section = source.split("$RuntimePaths = @(", 1)[1].split("\n)\n$ArchiveArgs", 1)[0]
+    staged = set(re.findall(r'^\s*"([^"]+)"', paths_section, flags=re.MULTILINE))
+
+    def included(path: str) -> bool:
+        return any(path == entry or path.startswith(entry + "/") for entry in staged
+                   if not entry.startswith(":("))
+
+    manifest = json.loads(Path("skeleton/app/manifest.json").read_text(encoding="utf-8"))
+    sources = set(manifest["required_paths"])
+    for dockerfile in ("Dockerfile", "backend/Dockerfile"):
+        docker_text = Path(dockerfile).read_text(encoding="utf-8")
+        sources.update(re.findall(
+            r"^\s*COPY\s+(?:--\S+\s+)*((?:machine|docs)/\S+)\s",
+            docker_text,
+            flags=re.MULTILINE,
+        ))
+
+    missing = sorted(path for path in sources if not included(path))
+    assert not missing, f"first-install payload excludes required files: {missing}"
+    assert "$MissingPayloadPaths.Count -gt 0" in source
+    assert "Windows payload lacks required app/Docker inputs" in source
