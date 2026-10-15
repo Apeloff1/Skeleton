@@ -42,6 +42,7 @@ TEST_MODULES = (
     "skeleton.testing.test_game_emulator_first_boot_audit",
     "skeleton.testing.test_game_original_rom_ai_acceptance",
     "skeleton.testing.test_game_original_rom_goal_training",
+    "skeleton.testing.test_game_rom_acceptance_suite",
 )
 
 
@@ -196,6 +197,32 @@ def _verify_game_goal(directory: Path) -> dict[str, Any]:
     }
 
 
+def _publish_phase(directory: Path, receipt: dict[str, Any]) -> dict[str, Any]:
+    """Write a create-only *failure or success* phase result, never acceptance."""
+    label = receipt.get("label")
+    if (
+        type(label) is not str or not label
+        or len(label) > 80
+        or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789_" for char in label)
+    ):
+        raise AcceptanceSuiteError("unbounded phase label rejected")
+    result = dict(receipt)
+    result["receipt_digest"] = _sha(_canonical(result))
+    payload = _canonical(result) + b"\n"
+    if len(payload) > 2 * MAX_STDOUT + 4096:
+        raise AcceptanceSuiteError("phase diagnostic exceeds bounded output capacity")
+    name = "phase_" + label + ".json"
+    fd = os.open(
+        directory / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        | getattr(os, "O_NOFOLLOW", 0), 0o600,
+    )
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(payload)
+        stream.flush()
+        os.fsync(stream.fileno())
+    return result
+
+
 def _run(
     command: list[str], output_root: Path, label: str, *,
     seconds: int,
@@ -205,6 +232,13 @@ def _run(
         or not isinstance(command, list) or not command
     ):
         raise AcceptanceSuiteError("bounded acceptance process command required")
+    base = {
+        "label": label,
+        "command": command,
+        "actual_process_invoked": True,
+        "production_jeeves_weights_modified": False,
+        "not_an_acceptance_receipt": True,
+    }
     try:
         finished = subprocess.run(
             command, cwd=ROOT, capture_output=True, text=True,
@@ -212,22 +246,30 @@ def _run(
             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
         )
     except subprocess.TimeoutExpired as exc:
+        decoded = lambda text: (
+            text.decode("utf-8", errors="replace") if isinstance(text, bytes)
+            else (text or "")
+        )
+        _publish_phase(output_root, {
+            **base, "status": "bounded_child_timed_out",
+            "exit_code": None,
+            "timeout_seconds": seconds,
+            "stdout_tail": decoded(exc.stdout)[-MAX_STDOUT:],
+            "stderr_tail": decoded(exc.stderr)[-MAX_STDOUT:],
+        })
         raise AcceptanceSuiteError(f"{label}: bounded real executable process timed out") from exc
-    receipt = {
-        "label": label,
-        "command": command,
+    receipt = _publish_phase(output_root, {
+        **base,
+        "status": "child_passed" if finished.returncode == 0 else "child_failed",
         "exit_code": finished.returncode,
         "stdout_tail": finished.stdout[-MAX_STDOUT:],
         "stderr_tail": finished.stderr[-MAX_STDOUT:],
-        "actual_process_executed": True,
-    }
-    receipt["receipt_digest"] = _sha(_canonical(receipt))
+    })
     if finished.returncode != 0:
         raise AcceptanceSuiteError(
             f"{label} returned {finished.returncode}: {finished.stderr[-1400:]}"
         )
     return receipt
-
 
 def run_acceptance_suite(
     output_directory: Path, *, seed: int = 42,
