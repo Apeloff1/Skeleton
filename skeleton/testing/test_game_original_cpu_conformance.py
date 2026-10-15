@@ -36,6 +36,9 @@ class SourceCPUOpcodeConformanceCases(unittest.TestCase):
         self.assertEqual(result["actual_total_single_step_source_replays"], 1000)
         self.assertEqual(result["expected_illegal_base_opcodes_rejected"], 11)
         self.assertEqual(len(result["prefixed_instruction_receipts"]), 256)
+        self.assertEqual(result["source_reference_opcodes_compared_to_actual_timing"], 500)
+        self.assertEqual(result["external_sm83_reference_commit"],
+                         "376f61c86fdac2048f7ce5fe838ae756b306017e")
         with tempfile.TemporaryDirectory() as folder:
             target = Path(folder) / "original-cpu-opcodes.json"
             target.write_bytes(_canonical(result) + b"\n")
@@ -49,6 +52,23 @@ class SourceCPUOpcodeConformanceCases(unittest.TestCase):
                 k: v for k, v in modified.items() if k != "report_digest"
             })).hexdigest()
             target.write_bytes(_canonical(modified) + b"\n")
+            with self.assertRaises(AcceptanceSuiteError):
+                _verify_cpu_opcode_matrix(Path(folder))
+
+    def test_sourced_cycle_timing_and_rehashed_reference_mismatch_fail_closed(self):
+        from hashlib import sha256
+        report = audit_cpu_opcode_matrix()
+        with tempfile.TemporaryDirectory() as folder:
+            p = Path(folder) / "original-cpu-opcodes.json"
+            case = report["prefixed_instruction_receipts"][0x46]  # BIT 0,(HL)
+            self.assertEqual(case["emulated_t_cycles"], 12)
+            self.assertEqual(case["reference_documented_t_cycles"], 12)
+            self.assertEqual(case["reference_documented_instruction_bytes"], 2)
+            report["prefixed_instruction_receipts"][0x46]["reference_documented_t_cycles"] = 16
+            report["report_digest"] = sha256(_canonical({
+                key: value for key, value in report.items() if key != "report_digest"
+            })).hexdigest()
+            p.write_bytes(_canonical(report) + b"\n")
             with self.assertRaises(AcceptanceSuiteError):
                 _verify_cpu_opcode_matrix(Path(folder))
 
