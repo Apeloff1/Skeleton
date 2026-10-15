@@ -172,23 +172,24 @@ def _context_signatures(rows: list[dict]) -> set[str]:
 
 
 def _due_work(queue: dict, now: int) -> list[int]:
-    """Deterministic seeded queue reshuffle, fairness through earliest due."""
+    """Seeded due-work shuffle, combining queued new and overdue past simulations."""
     policy = queue["reshuffle_policy"]
     ready = []
     for i, entry in enumerate(queue["entries"]):
         if entry["status"] in ("awaiting_second_pass", "awaiting_third_pass"):
-            ready.append((0, i))
+            ready.append((queue["last_tick_epoch"], i))
         elif entry["status"] == "scheduled_return" and entry["next_due_epoch"] <= now:
             ready.append((entry["next_due_epoch"], i))
-    # Stable pseudo-random tie breaks reshuffle equal-due work, but earliest
-    # overdue tickets outrank fresh tickets; a low budget does not starve old work.
+    # Aging promotes long-waiting tickets; a deterministic randomized tie-break
+    # mixes new and returned work in the same age bucket. No random starvation.
     def order(item):
         due, index = item
+        wait_hours = max(0, now - due) // 3600
         salt = _hash({"source": queue["entries"][index]["queue_id"],
                       "generation": queue["generation"],
                       "seed": policy["shuffle_seed"],
-                      "clock_day": now // 86400})
-        return (due, salt)
+                      "clock_hour": now // 3600})
+        return (-wait_hours, salt)
     return [index for _due_at, index in sorted(ready, key=order)]
 
 

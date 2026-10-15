@@ -497,10 +497,10 @@ class WindowsLauncher:
 
         def execute() -> str:
             from skeleton.ai.training.jeeves_boomerang_queue import (
-                create_queue, advance_queue, verify_queue)
+                create_queue, enable_reshuffle, advance_queue, verify_queue)
             from skeleton.ai.training.jeeves_cinematic_simulation import _read_json, _write_new
             if make_new:
-                result = create_queue(Path(original), Path(archive))
+                result = enable_reshuffle(create_queue(Path(original), Path(archive)))
             else:
                 existing = _read_json(Path(queue_file), 16 * 1024 * 1024)
                 result = advance_queue(existing, max_entries=1, probes=8,
@@ -511,7 +511,9 @@ class WindowsLauncher:
                 f"Archive sources: {summary['queued_sources']}\n"
                 f"Pending second pass: {summary['pending_second_pass']}\n"
                 f"Pending third pass: {summary['pending_third_pass']}\n"
-                f"Completed: {summary['complete_sources']}\n"
+                f"Scheduled randomized returns: {summary['scheduled_returns']}\n"
+                f"Next return UTC epoch: {summary['next_return_epoch']}\n"
+                f"Retired sources: {summary['complete_sources']}\n"
                 f"Queue generation: {summary['generation']}\n"
                 "Prior runs were reused; new probes are candidate evidence only.\n"
                 f"Immutable queue: {destination}"
