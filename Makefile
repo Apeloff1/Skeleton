@@ -31,6 +31,9 @@ precompile:
 	python scripts/check_ai_app_construction.py
 	python scripts/check_capability_interfaces.py
 	python scripts/check_provider_bootstrap.py
+	python scripts/check_state_topology.py
+	python scripts/check_enterprise_ai_superiority.py --json
+	python scripts/check_enterprise_ai_implementation_notes.py --json
 	python scripts/check_app_assembly.py
 	python scripts/check_toolchain_contract.py
 	python -m skeleton app check
