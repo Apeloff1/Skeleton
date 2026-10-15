@@ -1013,3 +1013,116 @@ independently unverified.
 sources are committed to PR #3935 but none has been executed in this
 turn's environment. No operational console, learned policy improvement,
 native libretro boot or hardware accuracy is claimed from source alone.
+
+
+## T. Actual ROM comparison corpus: up to 30 games, ten-game study waves
+
+`skeleton.jeeves.game_emulator_cross_game_lab` is now a strict,
+real-source comparative replay engine shared with its identical governed
+AI mirror under `skeleton/ai/agents/jeeves/`. It uses the established
+`GameEnvironmentRequest` build path, not a dummy simulator or a
+fabricated game-result generator. A request must execute either:
+
+1. A source-original local Game Boy ROM through the **actual experimental
+   LR35902 interpreter**, with its declared limitations; or
+2. A duly approved real libretro core loading a lawful locally supplied
+   ROM through the existing isolated native host.
+
+Input is 2–30 **distinct content/environment request identities**, with
+two to six common controller programs of at most eight actions each and
+at most 32 actions per game's study. The first program is passive idle.
+The currently supported cross-platform input vocabulary is idle, four
+directions, A/B, start/select and A+left/right, and all tested cores
+must expose every requested input. No controller mappings are silently
+substituted across systems.
+
+Every selected game restores its **own exact source machine snapshot**
+before each controller program, executes it, records actual source
+frame SHA256, observation/reward-component digests and end-state digests,
+then independently restores and repeats the same program. Missing
+native savestates, unsupported controller inputs, absent screenshots,
+different source results, termination before the program finishes, or
+non-finite rewards fail the entire study. Original DMG results that do
+not provide an engine-native transition receipt use an explicitly
+labeled **measured source projection** instead, never a forged engine
+transition digest.
+
+The result includes raw evidence digests per step, video event rates,
+selected source identities, controller interventions, game-specific
+state lineage, ten-game wave indexes, and up to **435 independent
+pairwise comparison projections** for a 30-game study. A separate
+`verify_cross_game_comparison_receipt` reconstructs each step's
+projection, full action-program commitment and pairwise deltas, rejecting
+altered controller order, fake frame changes, rehashed weights and
+inflated coverage.
+
+Comparing frame-change rates across different resolutions, frame rates,
+game genres or objectives **does not establish equal task rewards or
+visual/gameplay identity**. The report explicitly flags
+`cross_game_rewards_equivalent=false`,
+`gameplay_skill_or_causation_established=false`, and
+`ai_training_gradient_updates=0`. It produces reliable candidate
+research evidence; using it to train a neural game-design model
+requires a separately verified, explicit optimizer and held-out
+evaluation with provenance.
+
+### Private local ROM operator command
+
+`scripts/audit_rom_cross_game_comparison.py` supports a finite JSON
+source manifest with the following exact layout (shown with placeholders
+that **must** be replaced with actual SHA256 and locally authorized
+source paths):
+
+```json
+{
+  "schema_version": "skeleton.game.operator_cross_emulator_source_manifest.v1",
+  "games": [
+    {
+      "source_kind": "original_dmg",
+      "core_id": null,
+      "target_id": "game_boy",
+      "filename": "original-one.gb",
+      "rom_path": "/private/original-one.gb",
+      "rom_sha256": "ACTUAL_64_CHARACTER_SHA256_REPLACE"
+    },
+    {
+      "source_kind": "approved_native",
+      "core_id": "sameboy",
+      "target_id": "game_boy",
+      "filename": "original-two.gb",
+      "rom_path": "/private/original-two.gb",
+      "rom_sha256": "ACTUAL_64_CHARACTER_SHA256_REPLACE"
+    }
+  ]
+}
+```
+
+```bash
+export SKL_GAME_EMULATOR_REGISTRY=/private/emulators/cores.json
+python scripts/audit_rom_cross_game_comparison.py \
+  --manifest-file /private/owned-rom-comparison.json \
+  --evidence-file /private/evidence/rom-comparisons.json \
+  --rights-acknowledged --seed 42 \
+  --program idle --program a --program right,idle,a
+```
+
+For this source operator, **single-file inline ROM bytes remain limited
+to 2 MiB**, matching `GameEnvironmentRequest`. Larger cartridges, optical
+media, playlists or CHD/M3U content must continue through the separately
+approved streamed-media host and disc/first-boot gates. The CLI refuses
+symlinked source trees, invalid or changed source hashes, repeated game
+identities and unexpected fields. Content is not copied into GitHub,
+downloaded, or embedded in the report.
+
+**Execution model:** Ten games is a wave/selection bound, not a claim of
+ten simultaneous native workers; real native emulators are deliberately
+run one after another to preserve isolation and predictable RAM cost.
+Neither 30-game comparison capability nor 435 possible pairwise results
+means that 30 independent games were actually played during this source
+authoring pass.
+
+**Regression/proof status:** The synthetic original-ROM comparison
+regressions are in `skeleton/testing/test_game_emulator_cross_game_lab.py`
+and `skeleton/testing/test_game_emulator_cross_game_operator.py`; both
+are selected by the existing manual-only source acceptance runner. They
+and real approved native games remain **unexecuted in this environment**.
