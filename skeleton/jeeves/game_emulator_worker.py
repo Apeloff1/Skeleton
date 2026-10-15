@@ -387,7 +387,9 @@ class NativeCore:
                         self.error = "operator core option is outside the actual core's choices"
                         return False
                     self.options.setdefault(key, values[0])
-                return False
+                # RETRO_ENVIRONMENT_SET_VARIABLES succeeded: core options are
+                # now available to subsequent RETRO_ENVIRONMENT_GET_VARIABLE.
+                return True
             if command == 24:
                 C.cast(data, C.POINTER(C.c_uint64))[0] = sum(1 << device for device in (1, 2, 3, 5, 6))
                 return True
@@ -491,8 +493,18 @@ class NativeCore:
     def _input(self, port: int, device: int, index: int, identity: int) -> int:
         if port < 0 or index < 0 or identity < 0 or port >= len(self.controls):
             return 0
-        control = self.controls[port]
         device &= 255
+        selected = self.controller_port_devices[port]
+        requested = {1: "joypad", 2: "mouse", 3: "keyboard", 5: "analog", 6: "pointer"}.get(device)
+        if requested is None or selected == "none":
+            return 0
+        # Retro keyboard events are global, not bound to a joypad port.
+        # Preserve the legacy keyboard callback path for port zero.
+        if requested != selected and not (requested == "keyboard" and port == 0 and self.keyboard):
+            # Analog devices may expose digital joypad buttons as well.
+            if not (selected == "analog" and requested == "joypad"):
+                return 0
+        control = self.controls[port]
         if device == 1:
             if identity == 256:
                 return C.c_int16(control["buttons"]).value
