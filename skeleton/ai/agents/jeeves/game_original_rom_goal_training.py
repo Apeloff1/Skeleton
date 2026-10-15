@@ -178,7 +178,11 @@ def train_original_rom_goal_policy(
         raise OriginalGameGoalError("booted ROM game state differs from its authored starting state")
     grid = _actual_map(env)
     route = _route(grid, (1, 1))
-    if len(route) > 160 or 1 + len(route) * max_frames_per_tile > max_steps:
+    # A per-tile retry budget is a maximum, not the frame cost of every
+    # traversed cell; rejecting their product would incorrectly refuse valid
+    # mazes that move immediately. Check the true lower bound up front, then
+    # enforce the remaining real frame budget at each source-executed step.
+    if len(route) > 160 or 1 + len(route) > max_steps:
         raise OriginalGameGoalError("generated maze route exceeds source-controlled maximum step budget")
     original_state = env.snapshot()
     actions = []
@@ -188,6 +192,8 @@ def train_original_rom_goal_policy(
         origin = (state["player_x"], state["player_y"])
         succeeded = False
         for _ in range(max_frames_per_tile):
+            if env.steps >= max_steps:
+                raise OriginalGameGoalError("actual source-emulated goal route exhausted its frame budget")
             row, state = _step_receipt(env, direction, state, len(rows) + 1)
             actions.append(direction)
             rows.append(row)
