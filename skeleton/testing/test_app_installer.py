@@ -318,3 +318,23 @@ def test_secret_with_word_example_is_not_rotated(tmp_path):
     assert values["JWT_SECRET"] == "a-production-secret-with-example-inside"
     assert "MONGO_INITDB_ROOT_PASSWORD" in result.preserved_keys
     assert "JWT_SECRET" in result.preserved_keys
+
+
+def test_setup_reconciles_local_mongo_uri_with_preserved_root_credentials(tmp_path):
+    root_password = "already-managed-root-secret"
+    (tmp_path / ".env").write_text(
+        "MONGO_INITDB_ROOT_USERNAME=admin\n"
+        f"MONGO_INITDB_ROOT_PASSWORD={root_password}\n"
+        "MONGO_URL=mongodb://admin:stale@mongo:27017/tutolage?authSource=admin\n"
+        "SKL_MONGO_URI=mongodb://admin:stale@mongo:27017/skeleton?authSource=admin\n"
+        "JWT_SECRET=valid-nonplaceholder-jwt-secret\n",
+        encoding="utf-8",
+    )
+
+    result = ensure_runtime_environment(tmp_path)
+    values = _read_values(tmp_path / ".env")
+    assert values["MONGO_INITDB_ROOT_PASSWORD"] == root_password
+    assert f"admin:{root_password}@mongo:27017" in values["MONGO_URL"]
+    assert f"admin:{root_password}@mongo:27017" in values["SKL_MONGO_URI"]
+    assert {"MONGO_URL", "SKL_MONGO_URI"} <= set(result.configured_keys)
+    assert not ensure_runtime_environment(tmp_path).changed
