@@ -500,3 +500,50 @@ manual-only workflow are committed on PR #3935, but the suite, source
 mapper matrix, native emulator builds and neural optimizer have not been
 executed here. A source-authored receipt must precede any statement that
 these gates pass.
+
+
+## J. Virtual-clock MBC3 cartridge extension and source audit
+
+The experimental DMG interpreter now admits **RTC-enabled MBC3 cartridge
+types 0x0F and 0x10** in addition to the RTC-free types. This is a genuine
+source CPU memory-bus feature: writes to 0x4000–0x5FFF select either cartridge
+RAM or one of five virtual RTC registers (0x08–0x0C), and writes to
+0x6000–0x7FFF explicitly latch the clock on a 0x00→0x01 sequence.
+
+The virtual seconds, minutes, hours, 9-bit day counter, halt flag, and
+sticky day-overflow carry are advanced in constant time from **4,194,304
+emulated CPU cycles per virtual second**. No wall-clock timestamp, RTC
+battery hardware, host clock catch-up after process shutdown, or accelerated
+standby time is inferred. A halt keeps counters still; an operator clock
+write can intentionally clear the carry bit. Values outside supported
+clock register ranges fail closed instead of becoming fabricated evidence.
+
+Savestates for timer-equipped cartridges use **machine snapshot schema v2**
+with live registers, latched registers, previous latch bit, and fractional
+cycle remainder. The ordinary RTC-free cartridges retain schema v1.
+Snapshots are checked for valid elapsed-cycle remainder and clock bounds;
+replaying from the same state reconstructs the same virtual time. It does
+not prove real-cartridge RTC oscillator precision.
+
+The original cartridge audit now verifies **eight configurations across
+five mapper families**:
+
+- ROM-only; standard MBC1 extended-ROM and four-SRAM-bank variants;
+  internal four-bit MBC2; RTC-free MBC3; MBC3 timer-only and timer-plus-RAM;
+  and 512-bank MBC5.
+- Standard MBC1 four-bank SRAM configurations are rejected when declared
+  ROM sizes exceed 512 KiB: the high selector is needed for ROM extension
+  in those physical layouts (excluding unsupported MBC1M rewiring).
+- RTC-equipped audit profiles independently check live CPU-clock increments,
+  stable latch readings, explicit latch renewal, halt/resume behavior, actual
+  external SRAM availability, and snapshot round trips.
+
+Synthetic tests in
+`skeleton/testing/test_game_rom_virtual_rtc.py` exercise the timer-only
+header, latch protocol, fractional cycle replay, halt, 512-day rollover,
+sticky carry and corrupt-state rejection. This testing source and its
+manual acceptance integration are **committed, not executed in this chat**.
+
+The manually dispatched suite still requires real execution and reports
+only the supported interpreter experiments, never certified Game Boy
+hardware timing, game-title compatibility or production AI weight promotion.
