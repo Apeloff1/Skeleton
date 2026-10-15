@@ -166,8 +166,10 @@ async function autoAdvance(id){
   if(!playing.has(id))return;
   if(!response.all_succeeded){playing.delete(id);render();return}
   const after=current.lanes[id];
-  const ms=after.timing_mode==="slow"?Math.ceil(1000/60*after.timing_factor):
-   after.timing_mode==="normal"?Math.ceil(1000/60*after.native_frames_per_step*repeat):0;
+  const nominalHz=Number(after.native_preview?.native_fps);
+  const hz=Number.isFinite(nominalHz)&&nominalHz>=10&&nominalHz<=240?nominalHz:60;
+  const ms=after.timing_mode==="slow"?Math.ceil(1000/hz*after.timing_factor):
+   after.timing_mode==="normal"?Math.ceil(1000/hz*after.native_frames_per_step*repeat):0;
   setTimeout(()=>autoAdvance(id),ms)
  }catch(e){playing.delete(id);msg("Autoplay stopped: "+e.message);await load()}
 }
