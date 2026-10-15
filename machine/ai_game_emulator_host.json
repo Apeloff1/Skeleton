@@ -46,7 +46,7 @@
   "production_model_promotion_authorized": false,
   "masterplan_completion_authorized": false,
   "learning_telemetry": {
-    "schema_version": "skeleton.libretro_measured_signal_channels.v1",
+    "schema_version": "skeleton.libretro_measured_signal_channels.v2",
     "actual_source": "unmodified approved native libretro RGB24 framebuffer and stereo S16LE output",
     "features": [
       "screen_mean",
@@ -60,7 +60,19 @@
       "color_bias",
       "audio_peak",
       "audio_zero_crossing",
-      "stereo_difference"
+      "stereo_difference",
+      "motion_energy",
+      "motion_fraction",
+      "motion_centroid_x",
+      "motion_centroid_y",
+      "motion_quadrant_tl",
+      "motion_quadrant_tr",
+      "motion_quadrant_bl",
+      "motion_quadrant_br",
+      "frame_luma_drift",
+      "audio_energy_change",
+      "audio_positive_onset",
+      "audio_zero_crossing_shift"
     ],
     "sampling": {
       "spatial_samples_max": 4096,
@@ -69,13 +81,21 @@
     "guarantees": [
       "No fabricated game score, health, win or semantic object recognition",
       "Finite normalized frame and audio features are measured from real native callbacks",
-      "Checkpoint restore and independent replay required before candidate Q updates in deep training laboratory"
+      "Checkpoint restore and independent replay required before candidate Q updates in deep training laboratory",
+      "Twenty-four finite native signal dimensions per actual worker-emitted observation including 12 paired-frame/audio changes"
     ],
     "limitations": [
       "Missing output is reported as zero signal, not proof of silence in the game",
       "Spatial edge and entropy probes sample pixels and are not render-quality certificates",
-      "Hardware compatibility remains unverified until actual native sessions"
+      "Hardware compatibility remains unverified until actual native sessions",
+      "Cross-video-frame geometry change produces zero motion channels instead of fabricating vector correspondence"
     ],
-    "neural_weights_updated": 0
+    "neural_weights_updated": 0,
+    "time_correlations": {
+      "channels": 12,
+      "measurements": "prev real framebuffer versus actual current frame; prev native S16LE chunk versus actual current chunk",
+      "coordinate_basis": "normalized native pixel coordinates, 4 quadrant movement energy",
+      "semantics": "numerical frame-and-audio transition probes, not segmentation, optical flow vectors, scene understanding, music transcription or gameplay outcomes"
+    }
   }
 }
