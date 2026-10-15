@@ -157,34 +157,6 @@ def _step_receipt(env: GameBoyROMEnvironment, action: str,
     return row, actual
 
 
-def _physical_actions(
-    env: GameBoyROMEnvironment, route: list[tuple[str, tuple[int, int]]],
-    *, max_frames_per_tile: int,
-) -> tuple[list[str], list[dict[str, Any]], dict[str, int]]:
-    actions = []
-    rows = []
-    state = _actual_game_registers(env)
-    for action, expected in route:
-        reached = False
-        for _ in range(max_frames_per_tile):
-            if env.steps >= env.max_steps:
-                raise OriginalGameGoalError("actual native interpreter step budget exhausted")
-            row, state = _step_receipt(env, action, state, len(rows) + 1)
-            rows.append(row)
-            actions.append(action)
-            position = (state["player_x"], state["player_y"])
-            if position == expected:
-                reached = True
-                break
-            if position != route[0][1] and position != expected:
-                # Intermediate position is valid only if equal to the origin
-                # of this movement attempt, checked below.
-                pass
-        if not reached:
-            raise OriginalGameGoalError("actual cartridge never committed the declared maze move")
-    return actions, rows, state
-
-
 def train_original_rom_goal_policy(
     *, seed: int = 42, max_steps: int = 1024,
     max_frames_per_tile: int = 12,
