@@ -30,6 +30,7 @@ def main(argv=None)->int:
     parser.add_argument("--scenarios",type=int,default=8)
     parser.add_argument("--steps",type=int,default=4)
     parser.add_argument("--seed",type=int,default=11)
+    parser.add_argument("--scrutiny-seeds",type=int,choices=(2,3),default=3)
     parser.add_argument("--output",type=Path,required=True)
     parser.add_argument("--plan-only",action="store_true")
     parser.add_argument("--neural-corpus-output",type=Path,
@@ -64,6 +65,7 @@ def main(argv=None)->int:
             source,interaction_order=args.interaction_order,
             max_scenarios=args.scenarios,axis_offset=args.axis_offset,
             steps=args.steps,seed=args.seed,
+            scrutiny_seeds=args.scrutiny_seeds,
             train=args.train_local_q,authorized=args.authorized,
             rights_cleared=args.rights_cleared,
         )

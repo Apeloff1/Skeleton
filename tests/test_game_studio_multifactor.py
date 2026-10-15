@@ -9,7 +9,7 @@ import unittest
 from skeleton.jeeves.game_studio_environment import make_studio_source
 from skeleton.jeeves.game_studio_multifactor import (
     CATEGORIES, MultiFactorError, multifactor_capabilities,
-    plan_multifactor_scenarios, execute_multifactor_scenarios,
+    plan_multifactor_scenarios, execute_multifactor_scenarios, _gain,
 )
 
 
@@ -66,6 +66,10 @@ class MultifactorExperimentTests(unittest.TestCase):
         )
         self.assertEqual(self.source,prior)
         self.assertEqual(result["actual_q_weight_updates"],0)
+        self.assertEqual(result["factorial_scrutiny_seed_count"],2)
+        self.assertEqual(result["factorial_scrutiny_checks_passed"],
+                         sum((row["factorial_scrutiny"] or {}).get("audited_checks_count",0)
+                             for row in result["experiments"]))
         self.assertTrue(all(
             set(entry["selected_registered_actions"][:2]).issubset(
                 set(result["experiments"][entry["index"]]["scripted_actions"])
@@ -77,6 +81,15 @@ class MultifactorExperimentTests(unittest.TestCase):
         self.assertGreaterEqual(result["scenarios_executed"],2)
         for row in result["experiments"]:
             self.assertTrue(row["variant_source_verified"])
+            self.assertEqual(
+                row["factorial_evidence_complete"],
+                row["factorial_scrutiny"] is not None and
+                row["factorial_scrutiny"]["source_factorial_design_complete"],
+            )
+            if row["factorial_scrutiny"] is not None:
+                self.assertTrue(row["factorial_scrutiny"]["sample_scope_only"])
+                self.assertFalse(row["factorial_scrutiny"]["causal_identification_generalized"])
+                self.assertEqual(len(row["factorial_scrutiny"]["digest"]),64)
             self.assertEqual(row["all_selected_actions_accepted"],all(
                 action["accepted"] for action in row["selected_action_receipts"]
             ))
@@ -122,6 +135,17 @@ class MultifactorExperimentTests(unittest.TestCase):
             self.assertGreaterEqual(efficiency["accepted_game_actions"],0)
             self.assertEqual(efficiency["neural_parameter_updates_observed"],0)
             self.assertFalse(efficiency["claimed_converged_or_SOTA"])
+            self.assertIn("factorial_interaction_weight_attribution_authorized",efficiency)
+            self.assertEqual(gain["positive_weight_changes"]+
+                             gain["negative_weight_changes"],
+                             gain["changed_q_parameters"])
+            self.assertEqual(set(gain["absolute_weight_delta_quantiles"]),
+                             {"median","p90","p99"})
+            self.assertGreaterEqual(
+                gain["absolute_weight_delta_quantiles"]["p99"],
+                gain["absolute_weight_delta_quantiles"]["median"],
+            )
+            self.assertFalse(efficiency["claimed_converged_or_SOTA"])
             self.assertEqual(len(training["training_episode_actions"]),3)
             self.assertTrue(all(
                 1<=len(e["actions"])<=2 and len(e["trace_digest"])==64
@@ -132,6 +156,38 @@ class MultifactorExperimentTests(unittest.TestCase):
             self.assertEqual(gain["production_neural_parameters_updated"],0)
             self.assertFalse(training["promoted_to_production"])
             self.assertEqual(len(gain["complete_q_diff_digest"]),64)
+
+    def test_exact_parameter_delta_statistics_and_source_action_coverage(self):
+        before={
+            "snapshot_digest":"0"*64,
+            "q_table":[{
+                "state":[0],"values":[0.0,0.0],"visits":[0,0],
+            }],
+        }
+        after={
+            "snapshot_digest":"1"*64,
+            "q_table":[
+                {"state":[0],"values":[0.5,-0.25],"visits":[1,1]},
+                {"state":[1],"values":[0.0,0.75],"visits":[0,1]},
+            ],
+        }
+        gain=_gain(before,after)
+        self.assertEqual(gain["newly_visited_state_action_parameters"],3)
+        self.assertEqual(gain["changed_q_parameters"],3)
+        self.assertEqual(gain["signed_q_weight_movement"],1.0)
+        self.assertEqual(gain["sum_absolute_q_weight_change"],1.5)
+        self.assertEqual(gain["max_absolute_q_weight_change"],0.75)
+        self.assertEqual(gain["positive_weight_changes"],2)
+        self.assertEqual(gain["negative_weight_changes"],1)
+        self.assertEqual(gain["absolute_weight_delta_quantiles"],{
+            "median":0.5,"p90":0.75,"p99":0.75,
+        })
+        self.assertEqual(
+            sum(item["newly_visited_parameters"]
+                for item in gain["per_registered_action_weight_movement"]),3,
+        )
+        self.assertEqual(len(gain["complete_q_diff_digest"]),64)
+        self.assertFalse(gain["sample_truncated"])
 
     def test_invalid_limits_do_not_build_unbounded_worlds(self):
         with self.assertRaises(MultiFactorError):

@@ -340,6 +340,43 @@ export default function GameStudioScenarioLabPanel({
                 {' · measured difference-of-differences '}
                 {row.pairwise_interaction_witness.difference_of_differences.toFixed(3)}
               </Text>}
+            {row.factorial_scrutiny && <View style={{ gap: 3 }}>
+              <Text style={heading}>
+                Exhaustive source-intervention lattice · {row.factorial_scrutiny.source_replayed_corner_count}
+                {' corner runs · '}{row.factorial_scrutiny.audited_checks_count} checked controls
+              </Text>
+              <Text style={muted}>
+                {row.factorial_scrutiny.complete_seed_cubes}/{row.factorial_scrutiny.seed_count_requested}
+                {' complete matched-seed cubes · '}
+                {row.factorial_scrutiny.whole_joint_variant_examined
+                  ? 'all factors of this joint variant tested'
+                  : 'only selected factors of this variant examined'}
+              </Text>
+              {!!row.factorial_scrutiny.other_active_axes_not_examined.length &&
+                <Text style={{ color: '#f6c6a5' }}>
+                  Remaining active factors: {row.factorial_scrutiny.other_active_axes_not_examined.join(', ')}
+                </Text>}
+              {row.factorial_scrutiny.worst_seed_joint_return_delta!==null &&
+                <Text style={muted}>Worst matched-seed return change:
+                  {' '}{row.factorial_scrutiny.worst_seed_joint_return_delta.toFixed(3)}
+                </Text>}
+              {row.factorial_scrutiny.sensitivity.map((effect,index) => (
+                <Text key={index} style={muted}>
+                  {effect.order}-way {effect.factors.join(' × ')}:
+                  {' '}{effect.mean.toFixed(4)} mean interaction effect
+                  {' ('}{effect.min.toFixed(4)} to {effect.max.toFixed(4)}{')'}
+                  {effect.sign_reversal_between_seeds ? ' · direction reverses across seeds' : ''}
+                </Text>
+              ))}
+              {!!row.factorial_scrutiny.constraint_violations.length &&
+                <Text style={{ color: '#f6c6a5' }}>
+                  {row.factorial_scrutiny.constraint_violations.length}
+                  {' illegal intermediate states; source-causal proof is incomplete.'}
+                </Text>}
+              <Text selectable style={muted}>
+                Independent lattice digest: {row.factorial_scrutiny.digest.slice(0,24)}
+              </Text>
+            </View>}
           </View>)}
         </View>}
       </View>

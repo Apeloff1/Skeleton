@@ -40,7 +40,10 @@ class FactorialScrutinyTests(unittest.TestCase):
         )
         self.assertEqual(observed["exact_cells_per_seed"],8)
         self.assertEqual(observed["source_replayed_corner_count"],16)
-        self.assertEqual(observed["audited_checks_count"],160)
+        self.assertEqual(observed["audited_checks_count"],200)
+        self.assertEqual(observed["reversed_order_independent_replays"],4)
+        self.assertTrue(observed["source_simulation_order_invariance_tested"])
+        self.assertTrue(observed["source_unmodified_by_interventions"])
         self.assertEqual(observed["complete_seed_cubes"],2)
         self.assertTrue(observed["source_factorial_design_complete"])
         self.assertTrue(observed["whole_joint_variant_examined"])
@@ -53,9 +56,19 @@ class FactorialScrutinyTests(unittest.TestCase):
                 self.assertEqual(cell["checks_passed"],10)
                 self.assertEqual(len(cell["trace_digest"]),64)
                 self.assertEqual(len(cell["multispectral_audit_digest"]),64)
+                self.assertEqual(
+                    len(cell["complete_step_receipts"]),cell["executed_steps"]
+                )
             self.assertEqual(cube["corners"][0]["interventions"][0]["active"],False)
             self.assertEqual(cube["corners"][-1]["interventions"][0]["active"],True)
         self.assertEqual(len(observed["sensitivity"]),7)
+        self.assertTrue(all(
+            statistic["statistical_significance_established"] is False
+            and statistic["negative_seed_count"]+
+                statistic["positive_seed_count"]+
+                statistic["zero_seed_count"]==2
+            for statistic in observed["sensitivity"]
+        ))
         self.assertTrue(verify_factorial_receipt(
             self.original,self.axes,[1,1,1],observed,steps=3,
         ))
@@ -66,7 +79,7 @@ class FactorialScrutinyTests(unittest.TestCase):
             selected_indices=[0,2],seed=19,steps=3,seed_count=2,
         )
         self.assertEqual(output["exact_cells_per_seed"],4)
-        self.assertEqual(output["audited_checks_count"],80)
+        self.assertEqual(output["audited_checks_count"],120)
         self.assertTrue(output["source_factorial_design_complete"])
         self.assertFalse(output["whole_joint_variant_examined"])
         self.assertEqual(output["other_active_axes_not_examined"],

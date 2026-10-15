@@ -317,6 +317,11 @@ def _gain(before:dict,after:dict)->dict:
     left={tuple(item["state"]):item for item in before["q_table"]}
     right={tuple(item["state"]):item for item in after["q_table"]}
     added=0;changed=0;maximum=0.0;total=0.0;details=[]
+    signed_total=0.0
+    positive_count=0
+    negative_count=0
+    weights=[]
+    action_movements={}
     for state,row in sorted(right.items()):
         previous=left.get(state)
         old_q=previous["values"] if previous else [0.0]*len(row["values"])
@@ -325,9 +330,20 @@ def _gain(before:dict,after:dict)->dict:
             old_q,row["values"],old_n,row["visits"]
         )):
             delta=round(float(new)-float(old),9)
+            record=action_movements.setdefault(str(i),{
+                "action_index":i,"changed_parameters":0,
+                "absolute_value_movement":0.0,
+                "newly_visited_parameters":0,
+            })
             if abs(delta)>1e-10:
                 changed+=1;total+=abs(delta);maximum=max(maximum,abs(delta))
-                if len(details)<96:
+                signed_total+=delta
+                positive_count+=int(delta>0)
+                negative_count+=int(delta<0)
+                weights.append(abs(delta))
+                record["changed_parameters"]+=1
+                record["absolute_value_movement"]+=abs(delta)
+                if len(details)<4096:
                     details.append({
                         "state":list(state),"action_index":i,
                         "before":round(float(old),9),
@@ -335,13 +351,43 @@ def _gain(before:dict,after:dict)->dict:
                         "delta":delta,
                         "visits_before":prior,"visits_after":visits,
                     })
-            added+=int(prior==0 and visits>0)
+            is_new=int(prior==0 and visits>0)
+            added+=is_new
+            record["newly_visited_parameters"]+=is_new
+    weights.sort()
+    for item in action_movements.values():
+        item["absolute_value_movement"]=round(item["absolute_value_movement"],9)
+    # A sampled audit must never pretend it contains the whole delta tensor.
+    details.sort(key=lambda row:(
+        -abs(row["delta"]),row["state"],row["action_index"],
+    ))
+    def empirical_quantile(fraction):
+        if not weights:return 0.0
+        return round(weights[math.ceil(fraction*len(weights))-1],9)
     return {
         "newly_visited_state_action_parameters":added,
         "changed_q_parameters":changed,
         "sum_absolute_q_weight_change":round(total,9),
+        "signed_q_weight_movement":round(signed_total,9),
+        "positive_weight_changes":positive_count,
+        "negative_weight_changes":negative_count,
+        "unchanged_or_never_visited_parameters":max(
+            0,sum(len(row["values"]) for row in right.values())-changed,
+        ),
+        "number_of_source_observation_states_before":len(left),
+        "number_of_source_observation_states_after":len(right),
         "max_absolute_q_weight_change":round(maximum,9),
-        "sample_parameter_updates":details,
+        "absolute_weight_delta_quantiles":{
+            "median":empirical_quantile(0.5),
+            "p90":empirical_quantile(0.9),
+            "p99":empirical_quantile(0.99),
+        },
+        "per_registered_action_weight_movement":sorted(
+            action_movements.values(),key=lambda row:row["action_index"],
+        ),
+        "sample_parameter_updates":details[:96],
+        "sample_truncated":len(details)>96 or changed>4096,
+        "complete_parameter_proof_digest_required":True,
         "complete_q_diff_digest":_sha({
             "before":before["snapshot_digest"],"after":after["snapshot_digest"],
             "q_table":after["q_table"],
@@ -355,13 +401,16 @@ def execute_multifactor_scenarios(
     source:Mapping[str,object], *,
     interaction_order:int=3,
     max_scenarios:int=8,steps:int=4,seed:int=1,axis_offset:int=0,
+    scrutiny_seeds:int=2,
     train:bool=False,authorized:bool=False,rights_cleared:bool=False,
 )->dict:
     original=parse_studio_source(dict(source))
     if (type(max_scenarios) is not int or not 2<=max_scenarios<=MAX_EXECUTED
             or type(steps) is not int or not 1<=steps<=12
             or type(seed) is not int or not 0<=seed<=2**31-20000
-            or type(train) is not bool):
+            or type(train) is not bool
+            or type(scrutiny_seeds) is not int
+            or not 2<=scrutiny_seeds<=3):
         raise MultiFactorError("real game and candidate training resource ceiling exceeded")
     if train and (authorized is not True or rights_cleared is not True):
         raise PermissionError("local weight gains require explicit operator and source rights")
@@ -412,7 +461,8 @@ def execute_multifactor_scenarios(
         factorial=(
             scrutinize_interactions(
                 original,plan["axes"],row["levels"],
-                seed=trial_seed,steps=min(steps,8),seed_count=2,
+                seed=trial_seed,steps=min(steps,8),
+                seed_count=scrutiny_seeds,
                 selected_indices=all_changed_indices[:3],
             )
             if len(all_changed_indices)>=2 else None
@@ -615,6 +665,7 @@ def execute_multifactor_scenarios(
         "plan":plan,
         "editor":original["editor"],
         "scenarios_executed":len(experiments),
+        "factorial_scrutiny_seed_count":scrutiny_seeds,
         "measured_interactions_not_causal_proof":True,
         "actual_q_weight_updates":sum(
             (x["actual_weight_training"] or {}).get("actual_training_updates",0)

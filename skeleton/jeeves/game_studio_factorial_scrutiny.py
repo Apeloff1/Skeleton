@@ -151,6 +151,8 @@ def scrutinize_interactions(
     cube=[]
     violations=[]
     responses=[]
+    original_digest=_digest(base)
+    reversed_execution_checks=0
     for offset in range(seed_count):
         # Independent stress seeds avoid both local optimizer seeds (+9000)
         # and heldout seeds (+14000). All corners within one cube get
@@ -200,6 +202,7 @@ def scrutinize_interactions(
                 "reward":run["total_reward"],
                 "terminal_observation":run["last_observation"],
                 "transition_digests":run["transition_digests"],
+                "complete_step_receipts":run["step_receipts"],
                 "trace_digest":run["digest"],
                 "multispectral_audit_digest":run["multispectral"]["digest"],
                 "checks_passed":run["multispectral"]["passed_count"],
@@ -209,6 +212,29 @@ def scrutinize_interactions(
             scores[mask]=float(run["total_reward"])
         if len(corners)!=(1<<len(indexes)):
             continue
+        # Independently re-execute the two extreme worlds in REVERSE
+        # execution order after all intermediate factor combinations.
+        # This catches hidden mutable-global/cross-sim contamination.
+        for mask in ((1<<len(indexes))-1,0):
+            active=[indexes[i] for i in range(len(indexes)) if mask&(1<<i)]
+            rebuilt=_state_for_corner(base,axes,levels,active)
+            replay_commands,_=_script_for_corner(
+                base,axes,levels,indexes,active,steps,trial_seed,
+            )
+            replay=_lane(
+                rebuilt,"causal",trial_seed,steps,
+                scripted_actions=replay_commands,
+            )
+            if replay["digest"]!=corners[mask]["trace_digest"] or (
+                replay["multispectral"]["digest"]!=
+                corners[mask]["multispectral_audit_digest"]
+            ):
+                raise FactorialScrutinyError(
+                    "game execution order contaminated independently repeated source"
+                )
+            reversed_execution_checks+=1
+        if _digest(base)!=original_digest:
+            raise FactorialScrutinyError("factor interventions changed original source")
         # Fully observed cube, not just a joint-world minus baseline score.
         main_effects=[]
         interaction_effects=[]
@@ -262,6 +288,19 @@ def scrutinize_interactions(
                 any(x>0 for x in values) and any(x<0 for x in values)
             ),
             "range":round(max(values)-min(values),7),
+            "population_standard_deviation":round(
+                math.sqrt(math.fsum(
+                    (v-math.fsum(values)/len(values))**2 for v in values
+                )/len(values)),7,
+            ),
+            "negative_seed_count":sum(x<0 for x in values),
+            "positive_seed_count":sum(x>0 for x in values),
+            "zero_seed_count":sum(x==0 for x in values),
+            "sign_consistency_across_tested_seeds":(
+                all(x>0 for x in values) or all(x<0 for x in values)
+                or all(x==0 for x in values)
+            ),
+            "statistical_significance_established":False,
         })
     report={
         "schema_version":SCHEMA,
@@ -279,6 +318,12 @@ def scrutinize_interactions(
         "source_replayed_corner_count":sum(len(row["corners"]) for row in cube),
         "audited_checks_count":sum(
             entry["checks_passed"] for row in cube for entry in row["corners"]
+        )+10*reversed_execution_checks,
+        "reversed_order_independent_replays":reversed_execution_checks,
+        "reversed_order_scrutiny_checks":10*reversed_execution_checks,
+        "total_audited_source_episode_checks":10*(
+            sum(len(row["corners"]) for row in cube)
+            +reversed_execution_checks
         ),
         "seed_cubes":cube,
         "constraint_violations":violations,
@@ -298,6 +343,8 @@ def scrutinize_interactions(
                              for row in cube)
             and all(v>0 for v in responses)
         ),
+        "source_unmodified_by_interventions":_digest(base)==original_digest,
+        "source_simulation_order_invariance_tested":reversed_execution_checks>0,
         "sample_scope_only":True,
         "causal_identification_generalized":False,
         "training_weight_updates":0,

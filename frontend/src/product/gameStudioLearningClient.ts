@@ -318,9 +318,32 @@ export type MultifactorExperimentPlan = {
   }[];
   campaign_id: string; campaign_cursor: number; training_performed: false;
 };
+export type FactorialScrutinySummary = {
+  schema_version: string; axes: string[]; source_axis_positions: number[];
+  seed_count_requested: number; complete_seed_cubes: number;
+  source_replayed_corner_count: number; audited_checks_count: number;
+  source_factorial_design_complete: boolean;
+  whole_joint_variant_examined: boolean;
+  other_active_axes_not_examined: string[];
+  constraint_violations: { seed: number; mask: number; reason: string }[];
+  matched_seed_joint_return_differences: number[];
+  mean_matched_seed_delta: number | null;
+  worst_seed_joint_return_delta: number | null;
+  observed_joint_gain_proven: boolean;
+  sensitivity: {
+    order: number; factors: string[]; per_seed_contrasts: number[];
+    mean: number; min: number; max: number;
+    range: number; sign_reversal_between_seeds: boolean;
+  }[];
+  digest: string;
+};
 export type MultifactorVerifiedExperiments = {
   schema_version: string; editor: string; campaign_id: string;
   scenarios_executed: number; spectator_only: true;
+  exact_source_replayed_factorial_corners: number;
+  factorial_scrutiny_checks_passed: number;
+  complete_factorial_scenarios: number;
+  incomplete_factorial_scenarios: number;
   actual_q_weight_updates: 0; newly_visited_q_parameters: 0;
   production_neural_weights_modified: false; digest: string;
   experiments: {
@@ -330,6 +353,9 @@ export type MultifactorVerifiedExperiments = {
     variant_accepted: number; control_accepted: number;
     variant_productive_changes: number; control_productive_changes: number;
     variant_source_verified: true;
+    factorial_scrutiny: FactorialScrutinySummary | null;
+    factorial_evidence_complete: boolean;
+    whole_joint_variant_factorially_explained: boolean;
     selected_action_receipts: { action: string; attempted: boolean; accepted: boolean }[];
     all_selected_actions_accepted: boolean;
     unexecuted_action_categories: string[];
@@ -388,7 +414,15 @@ export async function getMultifactorExperiments(
       || value.experiments.some(x=>
         x.variant_source_verified!==true || x.actual_weight_training!==null
         || !Array.isArray(x.factor_ablation_receipts)
-        || x.factor_ablation_receipts.length>4)
-      || JSON.stringify(value).length>262144) invalid('Source-bound multi-factor probe receipt differs.');
+        || x.factor_ablation_receipts.length>4
+        || (x.factorial_scrutiny!==null && (
+          x.factorial_scrutiny.seed_count_requested!==2
+          || x.factorial_scrutiny.source_replayed_corner_count>16
+          || x.factorial_scrutiny.audited_checks_count!==
+             x.factorial_scrutiny.source_replayed_corner_count*10
+          || x.factorial_scrutiny.sensitivity.length>7
+          || !/^[a-f0-9]{64}$/.test(x.factorial_scrutiny.digest)
+        )))
+      || JSON.stringify(value).length>524288) invalid('Source-bound multi-factor probe receipt differs.');
   return value;
 }
