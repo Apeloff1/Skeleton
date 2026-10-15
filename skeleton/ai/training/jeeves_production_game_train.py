@@ -220,6 +220,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     curriculum_and_eval = dataset + tuple(
         case for rows in heldout.values() for case in rows
     )
+    # Capture *actual parent* outputs before even the optional vocabulary
+    # growth. The post-growth but pre-SGD loss is a different tokenizer
+    # baseline, so never mislabel it as production-model improvement.
+    parent_heldout, parent_generations = _heldout(model, heldout)
     vocab_coverage_before = _token_coverage(model, curriculum_and_eval)
     expansion: dict[str, Any] | None = None
     if expand_vocabulary and vocab_coverage_before < min_coverage:
@@ -278,6 +282,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "vocabulary_coverage": vocab_coverage,
         "vocabulary_expansion": expansion,
         "vocabulary_growth_opted_in": expand_vocabulary,
+        "parent_heldout_losses_before_vocabulary_growth": parent_heldout,
+        "parent_generated_before_vocabulary_growth": parent_generations,
+        "losses_across_changed_vocabulary_not_directly_comparable": bool(expansion and expansion["new_tokens"]),
         "heldout_losses_before": before,
         "heldout_losses_after": after,
         "mean_heldout_loss_before": mean_before,
