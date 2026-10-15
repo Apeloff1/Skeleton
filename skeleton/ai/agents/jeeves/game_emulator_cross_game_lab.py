@@ -198,6 +198,144 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
     return result
 
 
+def verify_cross_game_comparison_receipt(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Recheck finite source, per-step and pairwise lineage after publication.
+
+    This detects post-publication corruption; it is NOT a substitute for
+    trusted actual emulator execution or a digital signature from hardware.
+    """
+    if not isinstance(document, Mapping):
+        raise CrossGameComparisonError("cross-emulator report must be an exact source record")
+    report = dict(document)
+    signed = report.pop("report_digest", None)
+    if signed != _digest(report):
+        raise CrossGameComparisonError("cross-game report no longer matches its source evidence digest")
+    n, wave_size = report.get("selected_games"), report.get("games_per_sequential_wave")
+    library = report.get("game_receipts")
+    programs = report.get("controlled_programs")
+    pairs = report.get("pairwise_measured_evidence")
+    if (
+        report.get("schema_version") != SCHEMA
+        or report.get("status") != "measured_source_emulator_controller_comparison"
+        or report.get("explicit_source_rights_acknowledged") is not True
+        or type(n) is not int or not 2 <= n <= MAX_GAME_LIBRARY
+        or type(wave_size) is not int or not 2 <= wave_size <= MAX_ACTIVE_WAVE
+        or report.get("max_selected_game_capacity") != MAX_GAME_LIBRARY
+        or report.get("actual_native_executions_concurrent") != 1
+        or report.get("completed_sequential_waves") != (n + wave_size - 1) // wave_size
+        or not isinstance(programs, list) or not 2 <= len(programs) <= MAX_PROGRAMS
+        or programs[0] != ["idle"]
+        or any(not isinstance(p, list) or not 1 <= len(p) <= MAX_PROGRAM_ACTIONS
+               or any(type(a) is not str or a not in ALLOWED_ACTIONS for a in p)
+               for p in programs)
+        or len(set(tuple(p) for p in programs)) != len(programs)
+        or sum(map(len, programs)) > MAX_TOTAL_ACTIONS
+        or not isinstance(library, list) or len(library) != n
+        or not isinstance(pairs, list) or len(pairs) != n * (n - 1) // 2
+        or report.get("actual_replayed_game_programs") != n * len(programs) * 2
+        or report.get("actual_source_action_steps") != n * sum(map(len, programs)) * 2
+        or report.get("cross_game_rewards_equivalent") is not False
+        or report.get("ai_training_gradient_updates") != 0
+        or report.get("neural_model_promotion_authorized") is not False
+        or report.get("trained_game_design_synthesis_proven") is not False
+    ):
+        raise CrossGameComparisonError("comparison source library, action budget or learning claims are unverified")
+    seen = set()
+    for i, row in enumerate(library):
+        if (
+            not isinstance(row, dict)
+            or row.get("game_index") != i
+            or row.get("wave") != i // wave_size
+            or row.get("source_kind") not in ("builtin", "libretro")
+            or row.get("request_digest") in seen
+            or not isinstance(row.get("controller_programs"), list)
+            or len(row["controller_programs"]) != len(programs)
+        ):
+            raise CrossGameComparisonError("unique source ROM/candidate and wave custody changed")
+        seen.add(_sha(row["request_digest"]))
+        _sha(row["environment_digest"])
+        _sha(row["actual_start_snapshot_sha256"])
+        for actions, phase in zip(programs, row["controller_programs"], strict=True):
+            if (
+                not isinstance(phase, dict)
+                or phase.get("controller_program") != actions
+                or phase.get("actual_replayed_source_passes") != 2
+                or phase.get("exact_source_replay_verified") is not True
+                or phase.get("real_steps_executed") != 2 * len(actions)
+                or phase.get("source_before_sha256") != row["actual_start_snapshot_sha256"]
+                or not isinstance(phase.get("controlled_source_step_receipts"), list)
+                or len(phase["controlled_source_step_receipts"]) != len(actions)
+            ):
+                raise CrossGameComparisonError("source controller replay evidence is incomplete")
+            prior = _sha(phase["initial_frame_sha256"])
+            changes = 0
+            for j, (action, step) in enumerate(zip(
+                actions, phase["controlled_source_step_receipts"], strict=True
+            )):
+                if (
+                    not isinstance(step, dict)
+                    or step.get("ordinal") != j or step.get("action") != action
+                    or "measured_source_projection_sha256" not in step
+                ):
+                    raise CrossGameComparisonError("real source controller order changed")
+                actual = _sha(step["measured_source_projection_sha256"])
+                source_projection = {key: value for key, value in step.items()
+                                     if key != "measured_source_projection_sha256"}
+                if _digest(source_projection) != actual:
+                    raise CrossGameComparisonError("source observation/action/frame projection is corrupted")
+                _sha(step["actual_frame_sha256"])
+                _sha(step["source_observation_sha256"])
+                _sha(step["source_reward_components_sha256"])
+                _sha(step["actual_machine_state_sha256"])
+                changes += step["actual_frame_sha256"] != prior
+                prior = step["actual_frame_sha256"]
+            program = {
+                "source_start_snapshot_sha256": phase["source_before_sha256"],
+                "source_end_snapshot_sha256": phase["source_after_sha256"],
+                "initial_frame_sha256": phase["initial_frame_sha256"],
+                "final_frame_sha256": phase["final_frame_sha256"],
+                "actual_frame_change_events": phase["actual_frame_change_events"],
+                "actual_executed_steps": len(actions),
+                "source_step_receipts": phase["controlled_source_step_receipts"],
+            }
+            if (
+                changes != phase.get("actual_frame_change_events")
+                or prior != phase["final_frame_sha256"]
+                or phase.get("source_program_digest") != _digest(program)
+                or phase.get("observed_visual_change_rate") != changes / len(actions)
+            ):
+                raise CrossGameComparisonError("source frame chronology or exact CPU replay commitment differs")
+    position = 0
+    for i in range(n):
+        for j in range(i + 1, n):
+            pair = pairs[position]
+            position += 1
+            left, right = library[i], library[j]
+            expected_rates = [
+                round(a["observed_visual_change_rate"] - b["observed_visual_change_rate"], 6)
+                for a, b in zip(left["controller_programs"], right["controller_programs"], strict=True)
+            ]
+            if (
+                not isinstance(pair, dict)
+                or pair.get("left_game_index") != i
+                or pair.get("right_game_index") != j
+                or pair.get("same_target_platform") != (left["target_id"] == right["target_id"])
+                or pair.get("same_source_environment") != (left["environment_digest"] == right["environment_digest"])
+                or pair.get("controlled_programs_matched") != len(programs)
+                or pair.get("visual_event_rate_differences") != expected_rates
+                or pair.get("pixel_content_directly_comparable") is not False
+                or pair.get("gameplay_skill_or_causation_established") is not False
+            ):
+                raise CrossGameComparisonError("cross-console visual difference evidence was fabricated or altered")
+    return {
+        "accepted": True,
+        "source_game_count": n,
+        "real_replayed_source_programs": n * len(programs) * 2,
+        "controlled_pairwise_comparisons": position,
+        "production_model_gradient_steps": 0,
+    }
+
+
 def compare_real_emulator_games(
     requests: Sequence[GameEnvironmentRequest],
     programs: Sequence[Sequence[str]],
@@ -242,6 +380,8 @@ def compare_real_emulator_games(
                     "source_program_digest": first["source_program_digest"],
                     "source_before_sha256": source_sha,
                     "source_after_sha256": first["source_end_snapshot_sha256"],
+                    "initial_frame_sha256": first["initial_frame_sha256"],
+                    "final_frame_sha256": first["final_frame_sha256"],
                     "controlled_source_step_receipts": first["source_step_receipts"],
                     "observed_visual_change_rate": first["actual_frame_change_events"] / len(program),
                 })
@@ -299,4 +439,5 @@ def compare_real_emulator_games(
         "trained_game_design_synthesis_proven": False,
     }
     result["report_digest"] = _digest(result)
+    verify_cross_game_comparison_receipt(result)
     return result
