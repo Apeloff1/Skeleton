@@ -130,12 +130,23 @@ def _load_split(root: Path, *, filename: Any, digest: Any, split: str) -> list[d
 
 def _shingles(text: str, n: int = 6) -> set[tuple[str, ...]]:
     words = _normalize(text).split()
-    return {tuple(words[i:i+n]) for i in range(max(0, len(words)-n+1))}
+    if not words:
+        return set()
+    # Short prompts (<six words) still need exact-content shingles. An
+    # empty gram set would silently disable the near-copy evaluation check.
+    n = min(n, len(words))
+    return {tuple(words[i:i+n]) for i in range(len(words) - n + 1)}
 
 
 def _split_contamination(a: str, b: str) -> bool:
     """Catch copied long prompt passages without punishing shared game terms."""
-    if _normalize(a) == _normalize(b):
+    left, right = _normalize(a), _normalize(b)
+    if left == right:
+        return True
+    # Prevent embedding a short held-out prompt verbatim inside a longer
+    # training question (or vice versa), even if token-gram widths differ.
+    small, large = sorted((left, right), key=len)
+    if len(small.split()) >= 3 and (" " + small + " ") in (" " + large + " "):
         return True
     aa, bb = _shingles(a), _shingles(b)
     return bool(aa and bb and len(aa & bb) / min(len(aa), len(bb)) >= .85)
