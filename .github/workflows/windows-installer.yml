@@ -67,6 +67,13 @@ jobs:
             /skeleton/
             /scripts/
             /packaging/
+            /machine/
+            /docs/
+            /.cursor/rules/architecture.mdc
+            /.github/copilot-instructions.md
+            /AGENTS.md
+            /CLAUDE.md
+            /GEMINI.md
 
       - name: Verify exact head provenance for Windows installer
         shell: pwsh
@@ -162,6 +169,22 @@ jobs:
 
           # The command below performs actual bounded native transformer
           # inference inside the frozen executable. No Docker/credentials/GUI.
+          # Exercise actual installed frozen executable against all mandatory
+          # shipped application files, without relying on Docker Desktop on CI.
+          $payloadSmoke = Start-Process -FilePath $launcher -ArgumentList @("--verify-payload") -Wait -PassThru
+          if ($payloadSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe runtime payload preflight exited $($payloadSmoke.ExitCode)"
+          }
+
+          $offlineConsole = Join-Path $installDir "SkeletonOffline.exe"
+          if (-not (Test-Path -LiteralPath $offlineConsole)) {
+            throw "installed SkeletonOffline.exe missing"
+          }
+          $offlineHelp = Start-Process -FilePath $offlineConsole -ArgumentList @("--help") -Wait -PassThru
+          if ($offlineHelp.ExitCode -ne 0) {
+            throw "installed SkeletonOffline.exe help smoke exited $($offlineHelp.ExitCode)"
+          }
+
           $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru
           if ($nativeSmoke.ExitCode -ne 0) {
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"

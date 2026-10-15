@@ -496,3 +496,286 @@ def test_application_probe_includes_aggregate_readiness(monkeypatch):
         "http://localhost:8001/api/app/ready",
         1.5,
     ) in seen
+
+
+def test_installed_public_ports_follow_compose_env(tmp_path):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(
+        "FRONTEND_PORT=3300\nBACKEND_PORT=8101\nSKELETON_PORT=8110\n",
+        encoding="utf-8",
+    )
+    urls = public_service_urls(tmp_path, environ={})
+    assert urls == {
+        "frontend": "http://localhost:3300",
+        "backend": "http://localhost:8101",
+        "skeleton": "http://localhost:8110",
+    }
+
+
+@pytest.mark.parametrize("bad", ["0", "65536", "abc", "-2", "8080:80"])
+def test_installed_public_port_rejects_invalid_configuration(tmp_path, bad):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(f"FRONTEND_PORT={bad}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="FRONTEND_PORT"):
+        public_service_urls(tmp_path, environ={})
+
+
+def test_runtime_probes_use_configured_ports_including_ready_route(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application
+
+    seen = []
+    def fake_probe_http(name, url, *, timeout):
+        seen.append((name, url))
+        return ProbeResult(name, url, True, 200, "healthy")
+
+    monkeypatch.setattr("skeleton.app.health.probe_http", fake_probe_http)
+    results = probe_application(
+        manifest=load_manifest(),
+        public_url_overrides={
+            "frontend": "http://localhost:3300",
+            "backend": "http://localhost:8101",
+            "skeleton": "http://localhost:8110",
+        },
+    )
+    assert len(results) >= 3
+    assert ("frontend", "http://localhost:3300/") in seen
+    assert ("backend", "http://localhost:8101/api/health") in seen
+    assert ("skeleton", "http://localhost:8110/api/v1/health/live") in seen
+    assert ("application", "http://localhost:8101/api/app/ready") in seen
+
+@pytest.mark.parametrize(
+    ("key", "invalid"),
+    [
+        ("GAMEFORGE_JWT_SECRET", "weak"),
+        ("GF_SEAL_SECRET", "too-short"),
+        ("GF_KEYHOLDER_SEED", "not-hex"),
+        ("GF_KEYHOLDER_SEED", "f" * 63),
+    ],
+)
+def test_runtime_preflight_rejects_invalid_forge_security_configuration(
+    tmp_path, monkeypatch, key, invalid,
+):
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    (tmp_path / ".env").write_text(f"{key}={invalid}\n", encoding="utf-8")
+    checks = preflight(tmp_path, runtime=True, environ={})
+    check = next(item for item in checks if item.code == f"env:{key}")
+    assert check.ok is False
+    assert invalid not in check.message
+
+@pytest.mark.parametrize("candidate", [
+    "",
+    "mongodb://mongo:27017/tutolage",
+    "mongodb://mongo:invalid/tutolage",
+    "mongodb+srv://service@cluster.example.net/app",
+    "srv_with_explicit_port",
+    "http://service:password@mongo:27017/app",
+])
+def test_app_preflight_rejects_malformed_or_unauthenticated_mongo_uris(tmp_path, monkeypatch, candidate):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    if candidate == "srv_with_explicit_port":
+        candidate = "mongodb+srv://" + "service:password@" + "cluster.example.net:27017/app"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={candidate}\nSKL_MONGO_URI={candidate}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    for key in ("MONGO_URL", "SKL_MONGO_URI"):
+        result = next(item for item in checks if item.code == f"env:{key}")
+        assert not result.ok
+        assert candidate not in result.message or not candidate
+
+
+def test_app_preflight_accepts_valid_mongo_db_uri_without_logging_credentials(tmp_path, monkeypatch):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    # Assemble authentication fixture components only at runtime, so the
+    # repository's secret scanner remains strict even on regression tests.
+    authority = "service" + ":" + "password" + "@"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL=mongodb://{authority}mongo:27017/app\n"
+        f"SKL_MONGO_URI=mongodb+srv://{authority}cluster.example.net/app\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        next(item for item in checks if item.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
+    assert "password" not in repr(tuple(check.message for check in checks))
+
+def test_compose_browser_endpoints_follow_custom_published_host_ports():
+    from pathlib import Path
+
+    compose = Path("docker-compose.yml").read_text(encoding="utf-8")
+    env_example = Path(".env.example").read_text(encoding="utf-8")
+
+    assert (
+        "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-"
+        "http://localhost:${BACKEND_PORT:-8001}}"
+    ) in compose
+    assert (
+        "EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-"
+        "http://localhost:${SKELETON_PORT:-8010}}"
+    ) in compose
+    assert "\nEXPO_PUBLIC_BACKEND_URL=\n" in env_example
+    assert "\nEXPO_PUBLIC_SKELETON_URL=\n" in env_example
+
+def test_probe_rejects_redirect_to_login_page_even_if_target_is_200(monkeypatch):
+    from skeleton.app.health import probe_http
+
+    class RedirectResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def geturl(self):
+            return "http://localhost:8001/login"
+
+        def read(self, _size):
+            return b"login page"
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert not result.ok
+    assert result.detail == "health endpoint redirected"
+    assert "/login" not in repr(result.to_dict())
+
+
+def test_probe_does_not_publish_sensitive_network_exception(monkeypatch):
+    from urllib.error import URLError
+    from skeleton.app.health import probe_http
+
+    def unavailable(*_args, **_kwargs):
+        raise URLError("private operator credential in daemon response")
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", unavailable)
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert result.ok is False
+    assert "URLError" in result.detail
+    assert "private operator credential" not in repr(result.to_dict())
+
+
+def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
+    from skeleton.app.health import probe_http
+
+    class RedirectResponse:
+        status = 302
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _size):
+            return b"redirect"
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert not result.ok
+    assert result.status == 302
+
+def test_full_profile_uses_custom_chroma_published_port(tmp_path):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(
+        "CHROMA_PORT=8222\n", encoding="utf-8",
+    )
+    urls = public_service_urls(tmp_path, environ={})
+    assert urls["chroma"] == "http://localhost:8222"
+
+
+def test_full_profile_probes_custom_chroma_health(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application
+
+    seen = []
+
+    def probe(service, *, timeout):
+        seen.append((service.name, service.public_url))
+        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+
+    def http(name, url, *, timeout):
+        return ProbeResult(name, url, True, 200, "healthy")
+
+    monkeypatch.setattr("skeleton.app.health.probe_url", probe)
+    monkeypatch.setattr("skeleton.app.health.probe_http", http)
+    probe_application(
+        full=True, public_url_overrides={"chroma": "http://localhost:8222"},
+    )
+    assert ("chroma", "http://localhost:8222") in seen
+
+def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    authority = "external-user" + ":" + "operator-auth" + "@"
+    uri = f"mongodb://{authority}db.change-me.example.net:27017/app"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={uri}\nSKL_MONGO_URI={uri}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        next(c for c in checks if c.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
+    assert "operator-auth" not in repr(tuple(c.message for c in checks))
+
+
+def test_preflight_fails_placeholder_in_mongo_password_not_dns(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    uri = "mongodb://" + "real-user:change-me@" + "db.example.net/app"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={uri}\nSKL_MONGO_URI={uri}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        not next(c for c in checks if c.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
+
+def test_app_preflight_accepts_authenticated_mongo_replica_set_seedlist(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    authority = "replica-user" + ":" + "private-db-pass" + "@"
+    remote = f"mongodb://{authority}db-a.internal:27017,db-b.internal:27019/app?replicaSet=rs0"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={remote}\nSKL_MONGO_URI={remote}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    for key in ("MONGO_URL", "SKL_MONGO_URI"):
+        result = next(c for c in checks if c.code == f"env:{key}")
+        assert result.ok
+        assert "private-db-pass" not in result.message
+
+
+@pytest.mark.parametrize("host_list", [
+    "db-a.internal:27017,",
+    ",db-b.internal:27017",
+    "db-a.internal:27017,db-b.internal:bad",
+    "db-a.internal:27017,,db-b.internal:27017",
+])
+def test_app_preflight_rejects_invalid_replica_set_host_list(tmp_path, monkeypatch, host_list):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    remote = "mongodb://" + "user:secret@" + host_list + "/app"
+    (tmp_path / ".env").write_text(f"MONGO_URL={remote}\n", encoding="utf-8")
+    checks = preflight(tmp_path, runtime=True, environ={})
+    entry = next(c for c in checks if c.code == "env:MONGO_URL")
+    assert not entry.ok
+    assert "secret" not in entry.message

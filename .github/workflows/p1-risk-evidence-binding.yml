@@ -1,6 +1,15 @@
 name: P1 Risk Evidence Binding Gate
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/p1-risk-evidence-binding.yml"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
   push:
     branches:
       - main

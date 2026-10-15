@@ -17,6 +17,7 @@ from skeleton.app.assembly import (
     find_repo_root,
     load_manifest,
     preflight,
+    public_service_urls,
     runtime_manifest,
 )
 from skeleton.app.preloader import PreloadReport, inspect_host
@@ -65,8 +66,11 @@ def _run(
     runner: Runner,
     label: str,
     timeout: float | None = None,
+    env: dict[str, str] | None = None,
 ) -> InstallPhase:
     try:
+        # Compose output can contain credentials and unbounded build logs.
+        # Discard it instead of retaining it in GUI memory or installer receipts.
         completed = runner(
             list(command),
             cwd=root,
@@ -75,6 +79,7 @@ def _run(
             stderr=subprocess.DEVNULL,
             text=True,
             timeout=timeout,
+            **({"env": env} if env is not None else {}),
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return InstallPhase(label, False, f"{label} failed: {type(exc).__name__}")
@@ -107,6 +112,11 @@ def _setup_phase(result: SetupResult) -> InstallPhase:
         detail = f"runtime environment already configured at {result.env_path}"
     if result.configured_keys:
         detail += "; configured " + ", ".join(result.configured_keys)
+    if result.warnings:
+        # Setup warnings contain only bounded configuration-key diagnostics,
+        # not secret material. Never silently report a fully configured AI
+        # runtime when the optional provider key or signing seed is missing.
+        detail += "; advisories: " + "; ".join(result.warnings)
     return InstallPhase("setup-runtime", True, detail)
 
 
@@ -209,18 +219,28 @@ def install_application(
         return InstallReceipt(root=root, phases=tuple(phases))
     manifest = runtime_manifest(manifest, root=root)
 
+    # Validate precisely the configuration used for startup. The production
+    # frontend uses port 8080, unlike the default development Compose model.
+    mode = "production" if production else "development"
+    compose_env = {**os.environ, **manifest.mode_env(mode)}
     compose_validate = _run(
-        compose_command("config", manifest=manifest),
+        compose_command("config", manifest=manifest, full=full, hot=hot),
         root=root,
         runner=runner,
         label="compose-config",
         timeout=60.0,
+        env=compose_env,
     )
     phases.append(compose_validate)
     if not compose_validate.ok or not start:
         return InstallReceipt(root=root, phases=tuple(phases))
 
-    mode = "production" if production else "development"
+    try:
+        host_urls = public_service_urls(root, manifest=manifest)
+    except ValueError as exc:
+        phases.append(InstallPhase("public-endpoints", False, str(exc)))
+        return InstallReceipt(root=root, phases=tuple(phases))
+
     command = compose_command(
         "up",
         manifest=manifest,
@@ -236,7 +256,7 @@ def install_application(
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             text=True,
-            env={**os.environ, **manifest.mode_env(mode)},
+            env=compose_env,
             timeout=1800.0,
         )
         ok = completed.returncode == 0
@@ -256,6 +276,7 @@ def install_application(
             timeout=3.0,
             attempts=12,
             delay=1.0,
+            public_url_overrides=host_urls,
         )
         healthy = probes_ok(results)
         failed = [result.service for result in results if not result.ok]
@@ -263,9 +284,11 @@ def install_application(
             InstallPhase(
                 "readiness",
                 healthy,
-                "application runtime is healthy"
-                if healthy
-                else "readiness probes failed: " + ", ".join(failed),
+                (
+                    "application runtime is healthy"
+                    if healthy
+                    else "readiness probes failed: " + ", ".join(failed)
+                ),
             )
         )
 
@@ -289,10 +312,14 @@ def configure_setup_parsers(subparsers: argparse._SubParsersAction) -> None:
     setup.add_argument("--json", action="store_true", dest="as_json")
 
     install = subparsers.add_parser("install", help="run preloader, setup runtime and installer validation")
-    install.add_argument("--skip-python", action="store_true", help="skip editable Python package installation")
+    install.add_argument(
+        "--skip-python", action="store_true", help="skip editable Python package installation"
+    )
     install.add_argument("--start", action="store_true", help="start the assembled app after installation")
     install.add_argument("--full", action="store_true", help="include optional full-profile services")
-    install.add_argument("--production", action="store_true", help="install/start using production image stages")
+    install.add_argument(
+        "--production", action="store_true", help="install/start using production image stages"
+    )
     install.add_argument("--hot", action="store_true", help="start with the hot-reload Compose overlay")
     install.add_argument("--rotate-secrets", action="store_true")
     install.add_argument("--admin-email", help="explicit optional operator bootstrap email")

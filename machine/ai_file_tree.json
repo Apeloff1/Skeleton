@@ -502,33 +502,11 @@
         "VOL-072",
         "VOL-074"
       ],
-      "source_exclusions": [
-        "game_comparison_pairwise.py",
-        "game_comparison_portfolio.py",
-        "game_decompilation.py",
-        "game_decompilation_archives.py",
-        "game_decompilation_arm.py",
-        "game_decompilation_assets.py",
-        "game_decompilation_capabilities.py",
-        "game_decompilation_code.py",
-        "game_decompilation_evidence.py",
-        "game_decompilation_formats.py",
-        "game_decompilation_learning.py",
-        "game_decompilation_quality.py",
-        "game_decompilation_runtime.py",
-        "game_emulator_host.py",
-        "game_emulator_timing.py",
-        "game_emulator_worker.py"
-      ],
-      "overlay_children": [
-        "game_emulator_host.py",
-        "game_emulator_worker.py"
-      ],
       "native_emulator_compatibility": {
         "authority_contract": "machine/ai_game_emulator_host.json",
-        "integration_parent": "389ea48a78c6e420e0ad7b01df8d7844b315cfa3",
-        "canonical_execution": "skeleton/jeeves/game_emulator_host.py and game_emulator_worker.py remain the approved native runtime. New canonical comparison/decompilation/timing modules retain incoming placement.",
-        "historical_overlays": "AI host/worker copies retain historical executable compatibility only; AIFT-NATIVE-AGENTS-ROOT provides residual file custody, not native execution or promotion authority. No byte parity claimed for those two modules."
+        "integration_parent": "2458395ca074ef7ee3e153020967ffce8efd42a7",
+        "canonical_execution": "Approved native execution remains canonical skeleton/jeeves; compatibility-copy parity grants no ownership cutover or promotion.",
+        "parity": "Incoming245 adds canonical-only comparison/decompilation/timing mirrors. Host/worker copies synchronize to the already-qualified current canonical implementation, preserving RAM observations, disc/save-RAM/controller APIs and the31-action policy fix."
       }
     },
     {
@@ -965,7 +943,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "0b3b07eaeb8f67e02597d5e2147ceacdf7fc1d4b",
+      "source_git_object_sha": "e81bed1065ad6f5ac8cec82aa24613a56570c1a1",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -1616,7 +1594,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "176230ede76b365bd76195ee1f737a44550ed7da",
+      "source_git_object_sha": "eec40a4d78faa58090e550ec48b5ce49a763afad",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -6529,7 +6507,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_33_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_45_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7249,86 +7227,6 @@
       "path": "skeleton/volumes",
       "owner": "masterplan volume organs",
       "reason": "per-volume construction organs referenced by masterplan implementation_paths; retained outside the AI tree pending explicit per-volume cutover."
-    },
-    {
-      "path": "skeleton/jeeves/game_comparison_pairwise.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_comparison_portfolio.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_archives.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_arm.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_assets.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_capabilities.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_code.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_evidence.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_formats.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_learning.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_quality.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_decompilation_runtime.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_emulator_host.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_emulator_timing.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
-    },
-    {
-      "path": "skeleton/jeeves/game_emulator_worker.py",
-      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
-      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
     }
   ],
   "classification_coverage": {
@@ -7575,7 +7473,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 33
+    "native_ai_owner_count": 45
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8150,7 +8048,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual AI-native multi-agent engineering surfaces outside mirrored Jeeves/core/swarm subtrees, and custody of explicitly excluded historical emulator host/worker compatibility overlays. Approved native execution remains canonical skeleton/jeeves under machine/ai_game_emulator_host.json.",
+      "role": "Residual AI-native multi-agent engineering surfaces outside mirrored Jeeves/core/swarm subtrees.",
       "volume_refs": [
         "VOL-100",
         "VOL-201",
@@ -8638,6 +8536,138 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Sparse-model capability qualification and accounting.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-CORPUS",
+      "path": "skeleton/ai/training/jeeves_game_corpus.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-CORPUS-BUILDER",
+      "path": "skeleton/ai/training/jeeves_game_corpus_builder.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-DESIGN-BENCHMARK",
+      "path": "skeleton/ai/training/jeeves_game_design_benchmark.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-DESIGN-REVIEW-CLI",
+      "path": "skeleton/ai/training/jeeves_game_design_review_cli.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-DESIGN-REVIEW-GATE",
+      "path": "skeleton/ai/training/jeeves_game_design_review_gate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-VOCABULARY",
+      "path": "skeleton/ai/training/jeeves_game_vocabulary.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-PRODUCTION-GAME-RECOVERY",
+      "path": "skeleton/ai/training/jeeves_production_game_recovery.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-PRODUCTION-GAME-SESSION",
+      "path": "skeleton/ai/training/jeeves_production_game_session.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-PRODUCTION-GAME-TRAIN",
+      "path": "skeleton/ai/training/jeeves_production_game_train.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-PRODUCTION-READINESS",
+      "path": "skeleton/ai/training/jeeves_production_readiness.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-TORCH-GAME-VOCABULARY",
+      "path": "skeleton/ai/training/jeeves_torch_game_vocabulary.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native game-specific model learning and training progress tracking, owned outside the staged legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-TRAINING-PROGRESS",
+      "path": "skeleton/ai/training/jeeves_training_progress.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native game-specific model learning and training progress tracking, owned outside the staged legacy training mirror.",
       "volume_refs": [
         "VOL-006"
       ]

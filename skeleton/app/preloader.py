@@ -83,17 +83,17 @@ def _command_check(
             remediation=remediation,
         )
 
-    # Failure diagnostics from Docker contexts or package indexes can include
-    # authenticated URLs. Keep only successful version output in the receipt.
-    output = (completed.stdout or "").strip().splitlines() if completed.returncode == 0 else []
-    suffix = f": {output[0][:160]}" if output else ""
+    # Docker/pip diagnostic output is untrusted and may include credentialed
+    # daemon URLs or command environment values. A host readiness receipt
+    # records only the operation and its exit status; full diagnostics stay
+    # with the operator's local CLI.
     return PreloadCheck(
         code=code,
         ok=completed.returncode == 0,
         detail=(
-            f"{label} available{suffix}"
+            f"{label} available"
             if completed.returncode == 0
-            else f"{label} check failed with exit {completed.returncode}{suffix}"
+            else f"{label} check failed with exit {completed.returncode}"
         ),
         remediation=remediation if completed.returncode else "",
     )
@@ -177,6 +177,9 @@ def inspect_host(
                 runner=runner,
             )
         )
+        # Compose can render configuration while Docker Desktop is stopped.
+        # Confirm that the daemon is accepting connections before claiming the
+        # first-install host is ready. This step does not mutate Docker state.
         checks.append(
             _command_check(
                 [docker, "info", "--format", "{{.ServerVersion}}"],
@@ -184,33 +187,52 @@ def inspect_host(
                 label="Docker daemon",
                 remediation=(
                     "Start Docker Desktop or Docker Engine and allow the current user access "
-                    "to its socket. Check the selected Docker context; no service was started."
+                    "to its socket. Wait for startup and check the selected Docker context; no service was started."
                 ),
                 runner=runner,
-                timeout=10.0,
+                timeout=15.0,
             )
         )
 
-    usage = shutil.disk_usage(root)
+    try:
+        free_bytes = shutil.disk_usage(root).free
+    except OSError as exc:
+        # A deleted, inaccessible or unplugged installation filesystem must
+        # produce a normal actionable report, not crash the Windows launcher.
+        free_bytes = None
+        disk_error = type(exc).__name__
+    else:
+        disk_error = ""
+
+    disk_ready = free_bytes is not None and free_bytes >= min_free_bytes
+    recommended_ready = free_bytes is not None and free_bytes >= recommended_free_bytes
     checks.append(
         PreloadCheck(
             code="host:disk",
-            ok=usage.free >= min_free_bytes,
-            detail=f"{usage.free / 1024**3:.1f} GiB free on application filesystem",
-            remediation=f"Free at least {min_free_bytes / 1024**3:.0f} GiB before installing.",
+            ok=disk_ready,
+            detail=(
+                f"{free_bytes / 1024**3:.1f} GiB free on application filesystem"
+                if free_bytes is not None
+                else f"cannot inspect installation filesystem: {disk_error}"
+            ),
+            remediation=f"Make the destination accessible and free at least {min_free_bytes / 1024**3:.0f} GiB.",
         )
     )
     checks.append(
         PreloadCheck(
             code="host:disk-recommended",
-            ok=usage.free >= recommended_free_bytes,
+            ok=recommended_ready,
             required=False,
             detail=(
-                f"recommended Docker build headroom available ({usage.free / 1024**3:.1f} GiB)"
-                if usage.free >= recommended_free_bytes
-                else f"less than recommended {recommended_free_bytes / 1024**3:.0f} GiB Docker build headroom"
+                f"recommended Docker build headroom available ({free_bytes / 1024**3:.1f} GiB)"
+                if recommended_ready
+                else (
+                    f"less than recommended {recommended_free_bytes / 1024**3:.0f} GiB Docker build headroom"
+                    if free_bytes is not None
+                    else f"cannot inspect installation filesystem: {disk_error}"
+                )
             ),
-            remediation="Free additional disk space for faster, safer image builds.",
+            remediation="Free additional disk space for safer image builds.",
         )
     )
 

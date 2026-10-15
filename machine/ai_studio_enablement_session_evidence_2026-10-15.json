@@ -392,5 +392,29 @@
     "Arbitrary commercial ROM semantic understanding and game mastery remain unverified.",
     "The small model did not complete the full autonomous export checklist, although real edit/build/preview/binary-export actions executed.",
     "100,000-iteration quality improvement, AAA fidelity and guaranteed outperformance are unverified."
-  ]
+  ],
+  "late_main_integration": {
+    "incoming_main": "2458395ca074ef7ee3e153020967ffce8efd42a7",
+    "status": "source_union_resolved_final_requalification_pending",
+    "reason": "Main advanced during publication with Windows first-install/runtime recovery and governed compatibility parity repairs. Preserve both parents before final handoff.",
+    "canonical_native_host_worker_learner_parallel_changed": false,
+    "existing_native_training_and_play_fingerprints_retained": true,
+    "compatibility_host_worker_now_exact_current_canonical_copies": true,
+    "native_api_union_receipt": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/integration/native-mirror-union-2458395.json",
+      "sha256": "3a67c6c3c1a94e7e79ea19c8c562c3d1df36044ac2914f05e52366b0a0a7967d"
+    },
+    "new_frontend_artifact": {
+      "archive": "/workspace/scratch/jeeves-app-oct15-studio-main245-final.zip",
+      "archive_bytes": 10120281,
+      "archive_sha256": "f19fa2fc305fb458442cdd01aad46d5f782b2f1b3a35fb7d7e9a1ed4cf062791",
+      "source_files": 822,
+      "source_manifest_sha256": "226e52399b90309f728c327cc0a7bab03036a8e3045392394353741073342dc8",
+      "all_javascript_identical_to_browser_qualified_bundle": true,
+      "only_html_delta": "Nondeterministic decorative particle styles on welcome.html; normalized page identical",
+      "requalification_path": "/workspace/scratch/jeeves-app-oct15-studio-main245-final-requalification.json"
+    },
+    "prior_image_qualification": "97c3 remains historical exact captured snapshot; new combined image/health qualification pending.",
+    "test_suites_run": false
+  }
 }

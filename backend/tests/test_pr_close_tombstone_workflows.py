@@ -55,10 +55,19 @@ def _job_block(text: str, job: str) -> str:
 def test_pr_validation_workflows_use_zero_work_close_tombstones() -> None:
     for name, jobs in WORKFLOWS.items():
         text = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+        # Manual-only and opened/synchronize-only workflows must not be
+        # reactivated on PR closure just to schedule a skipped no-op run.
+        if "  pull_request:\n" not in text:
+            assert "  workflow_dispatch:" in text, name
+            continue
         first_pr_child = text.split("  pull_request:\n", 1)[1].splitlines()[0]
         assert first_pr_child.strip().startswith("types:"), name
-        assert "closed" in first_pr_child, name
         assert "cancel-in-progress: true" in text, name
+        if "closed" not in first_pr_child:
+            assert any(token in first_pr_child for token in ("opened", "synchronize", "reopened")), name
+            continue
+        # A workflow that does subscribe to closures must implement a
+        # zero-work tombstone in every expensive validation job.
         for job in jobs:
             assert "github.event.action != 'closed'" in _job_block(text, job), f"{name}: {job}"
 

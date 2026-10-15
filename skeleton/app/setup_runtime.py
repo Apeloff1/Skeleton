@@ -13,7 +13,7 @@ import stat
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from skeleton.app.assembly import _dotenv_value, find_repo_root
 
@@ -56,6 +56,8 @@ def _is_placeholder(value: str) -> bool:
     if not stripped:
         return True
     lowered = stripped.lower()
+    # Do not treat the word "example" inside a real Mongo hostname or
+    # operator-provided secret as a placeholder (e.g. db.example.net).
     return any(
         token in lowered
         for token in (
@@ -64,9 +66,25 @@ def _is_placeholder(value: str) -> bool:
             "your-key-here",
             "your-secret",
             "replace-me",
-            "example",
         )
-    )
+    ) or lowered in {"example", "example-value", "example-secret"}
+
+
+def _bundled_mongo_endpoint(value: str) -> bool:
+    """Recognize only the bundled Mongo host, including legacy no-auth URIs.
+
+    Remote database URLs must never be rewritten during setup. URL parsing
+    prevents substring matches in external hostnames or credential text.
+    """
+    try:
+        parsed = urlsplit(value)
+        return (
+            parsed.scheme == "mongodb"
+            and parsed.hostname == "mongo"
+            and parsed.port in {None, 27017}
+        )
+    except ValueError:
+        return False
 
 
 def _replace_env_value(text: str, key: str, value: str) -> str:
@@ -92,26 +110,31 @@ def _replace_env_value(text: str, key: str, value: str) -> str:
 
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        delete=False,
-    ) as handle:
-        handle.write(text)
-        handle.flush()
-        os.fsync(handle.fileno())
-        temporary = Path(handle.name)
+    temporary: Path | None = None
     try:
+        # Include temp-file creation, write, flush and fsync in the cleanup
+        # boundary. The previous implementation entered try only *after*
+        # successful fsync, leaving secret-bearing .env.*.tmp files behind
+        # when disks filled or storage synchronization failed.
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary, path)
         try:
             path.chmod(0o600)
         except OSError:
             pass
     finally:
-        if temporary.exists():
+        if temporary is not None:
             temporary.unlink(missing_ok=True)
 
 
@@ -251,7 +274,11 @@ def ensure_runtime_environment(
         configured.append("MONGO_INITDB_ROOT_USERNAME")
 
     password = values.get("MONGO_INITDB_ROOT_PASSWORD", "")
-    if rotate_secrets or _is_placeholder(password):
+    # MongoDB's root user is initialized only when its persistent data volume
+    # is empty. Changing .env alone does NOT rotate the database user password.
+    # Generic --rotate-secrets must preserve existing credentials; database
+    # password rotation needs a separate authenticated DB operation.
+    if _is_placeholder(password):
         password = secrets.token_urlsafe(24)
         text = _replace_env_value(text, "MONGO_INITDB_ROOT_PASSWORD", password)
         values["MONGO_INITDB_ROOT_PASSWORD"] = password
@@ -296,6 +323,30 @@ def ensure_runtime_environment(
     else:
         preserved.append("SKL_ENGINE_SERVICE_TOKEN")
 
+    # The installed game-production stack needs stable secret protection,
+    # Forge HMAC identity and process signing across restarts. An empty seed
+    # makes the signing identity ephemeral and can invalidate earlier evidence.
+    # These are generated once; ordinary secret rotation must NEVER replace
+    # keys protecting stored ciphertext or signed historical artifacts.
+    for key in (
+        "SKELETON_MASTER_SECRET",
+        "GF_SEAL_SECRET",
+        "GF_KEYHOLDER_SEED",
+        "GAMEFORGE_JWT_SECRET",
+    ):
+        current = values.get(key, "")
+        if _is_placeholder(current):
+            generated = secrets.token_hex(32)
+            text = _replace_env_value(text, key, generated)
+            values[key] = generated
+            configured.append(key)
+        else:
+            preserved.append(key)
+
+    signing_seed = values["GF_KEYHOLDER_SEED"]
+    if len(signing_seed) != 64 or any(c not in "0123456789abcdefABCDEF" for c in signing_seed):
+        warnings.append("GF_KEYHOLDER_SEED must be exactly 32 bytes of hexadecimal data")
+
     user_uri = quote(username, safe="")
     password_uri = quote(password, safe="")
 
@@ -306,8 +357,19 @@ def ensure_runtime_environment(
     }
     for key, generated in generated_uris.items():
         current = values.get(key, "")
-        local_generated_uri = "@mongo:27017/" in current
-        if _is_placeholder(current) or (rotate_secrets and local_generated_uri):
+        local_generated_uri = _bundled_mongo_endpoint(current)
+        # A remote URI may legitimately contain "change-me" in its hostname
+        # or credential. Never redirect any operator-supplied remote Mongo
+        # endpoint to the bundled database, even if a placeholder token
+        # appears within that URI. Malformed/weak remote config fails the
+        # separate runtime preflight rather than silently changing ownership.
+        current_is_mongo_uri = current.lower().startswith(
+            ("mongodb://", "mongodb+srv://")
+        )
+        if (
+            (not current_is_mongo_uri and _is_placeholder(current))
+            or (local_generated_uri and current != generated)
+        ):
             text = _replace_env_value(text, key, generated)
             values[key] = generated
             configured.append(key)

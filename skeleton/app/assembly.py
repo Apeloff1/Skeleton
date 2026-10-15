@@ -224,9 +224,7 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     for service in services:
         missing = set(service.depends_on) - set(names)
         if missing:
-            raise ValueError(
-                f"service {service.name!r} depends on unknown services: {sorted(missing)}"
-            )
+            raise ValueError(f"service {service.name!r} depends on unknown services: {sorted(missing)}")
 
         if service.name in service.depends_on:
             raise ValueError(f"service {service.name!r} cannot depend on itself")
@@ -241,9 +239,7 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
                 raise ValueError(f"service {service.name!r} ingress_prefix must not end with '/'")
             owner = ingress_prefixes.get(prefix)
             if owner is not None:
-                raise ValueError(
-                    f"ingress_prefix {prefix!r} is shared by {owner!r} and {service.name!r}"
-                )
+                raise ValueError(f"ingress_prefix {prefix!r} is shared by {owner!r} and {service.name!r}")
             ingress_prefixes[prefix] = service.name
             if service.health_path and prefix != "/" and not service.health_path.startswith(prefix + "/"):
                 raise ValueError(
@@ -256,12 +252,9 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     contract_prefix = public_contract["prefix"]
     backend_prefix = backend.ingress_prefix
     if not backend_prefix or (
-        contract_prefix != backend_prefix
-        and not contract_prefix.startswith(backend_prefix.rstrip("/") + "/")
+        contract_prefix != backend_prefix and not contract_prefix.startswith(backend_prefix.rstrip("/") + "/")
     ):
-        raise ValueError(
-            "public application contract must live inside backend ingress prefix"
-        )
+        raise ValueError("public application contract must live inside backend ingress prefix")
 
     required_paths = payload.get("required_paths", ())
     if not isinstance(required_paths, list):
@@ -299,6 +292,7 @@ def load_manifest() -> AssemblyManifest:
         raise ValueError("application assembly manifest root must be an object")
     return parse_manifest(payload)
 
+
 def find_repo_root(start: Path | None = None) -> Path:
     """Find the checkout root without depending on the current working directory."""
 
@@ -306,9 +300,7 @@ def find_repo_root(start: Path | None = None) -> Path:
     if cursor.is_file():
         cursor = cursor.parent
     for candidate in (cursor, *cursor.parents):
-        if (candidate / "pyproject.toml").is_file() and (
-            candidate / "docker-compose.yml"
-        ).is_file():
+        if (candidate / "pyproject.toml").is_file() and (candidate / "docker-compose.yml").is_file():
             return candidate
     raise FileNotFoundError("could not locate Skeleton repository root")
 
@@ -393,7 +385,9 @@ def runtime_manifest(
             if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
                 raise ValueError(f"{key} must be an integer from 1 to 65535")
             url = urlsplit(service.public_url)
-            host = url.hostname or "localhost"
+            if url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}:
+                raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
+            host = url.hostname
             if ":" in host:
                 host = "[" + host + "]"
             service = replace(
@@ -401,6 +395,31 @@ def runtime_manifest(
             )
         services.append(service)
     return replace(manifest, services=tuple(services))
+
+
+def public_service_urls(
+    root: Path,
+    *,
+    manifest: AssemblyManifest | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Resolve host-facing service addresses from the same Compose port inputs.
+
+    The application manifest documents default public URLs, while Compose
+    permits changing published host ports to avoid conflicts. The launcher
+    and installed readiness checks must probe the actual configured ports.
+    Invalid port overrides fail closed rather than probing the wrong service.
+    """
+    manifest = manifest or load_manifest()
+    values = _runtime_env(root, environ)
+    resolved = runtime_manifest(manifest, root=root, environ=values)
+    ports = {
+        "frontend": "FRONTEND_PORT",
+        "backend": "BACKEND_PORT",
+        "skeleton": "SKELETON_PORT",
+        "chroma": "CHROMA_PORT",
+    }
+    return {name: resolved.service(name).public_url for name, key in ports.items() if values.get(key, "")}
 
 
 def _usable_secret(value: str) -> bool:
@@ -414,9 +433,58 @@ def _usable_secret(value: str) -> bool:
         "your-key-here",
         "your-secret",
         "replace-me",
-        "example",
     )
-    return not any(token in lowered for token in placeholders)
+    # Operator secrets and database URLs may legitimately contain "example"
+    # (for instance db.example.net). Match a literal placeholder, not a
+    # substring of an otherwise real credential.
+    return lowered not in {"example", "example-value", "example-secret"} and not any(
+        token in lowered for token in placeholders
+    )
+
+
+def _authenticated_mongo_uri(value: str) -> bool:
+    """Require authenticated MongoDB connection syntax without logging a URI."""
+    try:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"mongodb", "mongodb+srv"}:
+            return False
+        if not parsed.hostname or not parsed.username or not parsed.password:
+            return False
+        # Apply placeholder scrutiny to credentials only, not an external DNS
+        # label such as db.change-me.example.net. Earlier generic substring
+        # scrutiny mistakenly rejected valid operator-owned Mongo endpoints.
+        if any(
+            value.strip().lower()
+            in {
+                "change-me",
+                "changeme",
+                "replace-me",
+                "your-secret",
+                "your-key-here",
+                "example",
+                "placeholder",
+            }
+            for value in (parsed.username, parsed.password)
+        ):
+            return False
+        # MongoDB permits comma-separated seed lists for replica sets.
+        # urllib.parse only understands a single host, so checking parsed.port
+        # rejects otherwise valid multi-host URIs. Validate each authority
+        # endpoint independently; SRV mode must declare exactly one hostname
+        # and must not carry a port.
+        endpoints = parsed.netloc.rsplit("@", 1)[-1].split(",")
+        if parsed.scheme == "mongodb+srv" and len(endpoints) != 1:
+            return False
+        for endpoint in endpoints:
+            host = urlsplit("//" + endpoint)
+            if not host.hostname:
+                return False
+            port = host.port  # Reject malformed ports, also in replica sets.
+            if parsed.scheme == "mongodb+srv" and port is not None:
+                return False
+    except ValueError:
+        return False
+    return True
 
 
 def preflight(
@@ -491,9 +559,7 @@ def preflight(
             AssemblyCheck(
                 code="runtime:docker",
                 ok=docker is not None,
-                message=(
-                    f"docker available at {docker}" if docker else "docker executable not found"
-                ),
+                message=(f"docker available at {docker}" if docker else "docker executable not found"),
             )
         )
         values = _runtime_env(root, environ)
@@ -504,8 +570,14 @@ def preflight(
         for key in manifest.required_env:
             value = values.get(key, "")
             ok = _usable_secret(value)
+            if key in {"MONGO_URL", "SKL_MONGO_URI"}:
+                ok = _authenticated_mongo_uri(value)
             if key in {"SKL_ENGINE_SERVICE_TOKEN", "JWT_SECRET", "GAMEFORGE_JWT_SECRET"}:
                 ok = ok and 32 <= len(value) <= 4096 and value == value.strip()
+            if key in {"GAMEFORGE_JWT_SECRET", "GF_SEAL_SECRET"}:
+                ok = ok and len(value) >= 32 and value == value.strip()
+            if key == "GF_KEYHOLDER_SEED":
+                ok = ok and len(value) == 64 and all(char in "0123456789abcdefABCDEF" for char in value)
             checks.append(
                 AssemblyCheck(
                     code=f"env:{key}",

@@ -218,7 +218,7 @@ class MongoConversationAuthority:
 
     async def dragon_context_segments(self, thread: ConversationThread, query: str) -> tuple:
         """Return only currently consented, untrusted Dragon context evidence."""
-        projection = self.dragon_projection
+        projection = getattr(self, "dragon_projection", None)
         if projection is None:
             return ()
         try:
@@ -232,7 +232,7 @@ class MongoConversationAuthority:
 
     async def _delete_dragon_projection(self, *, tenant_id: str, owner_id: str, thread_id: str) -> None:
         """Erase the optional derived store before canonical deletion advances."""
-        projection = self.dragon_projection
+        projection = getattr(self, "dragon_projection", None)
         if projection is None:
             return
         try:
@@ -244,7 +244,10 @@ class MongoConversationAuthority:
 
     async def _after_dragon_commit(self, thread: ConversationThread) -> None:
         """Checkpoint only exact ten-step committed windows, when configured."""
-        projection = self.dragon_projection
+        # Optional derived state is installed by the full application lifespan.
+        # Minimal authority adapters (replay/recovery/migration) can omit it;
+        # canonical Mongo commits must never fail from an absent extension.
+        projection = getattr(self, "dragon_projection", None)
         if projection is None or thread.message_sequence < 10 or thread.message_sequence % 10:
             return
         try:
@@ -535,7 +538,7 @@ class MongoConversationAuthority:
 
         # Expire Dragon's tenant-scoped derived summaries even when the
         # canonical governance plan has no parent records due in this sweep.
-        projection = self.dragon_projection
+        projection = getattr(self, "dragon_projection", None)
         if projection is not None:
             try:
                 await projection.expire_tenant(str(tenant_id))
@@ -686,7 +689,7 @@ class MongoConversationAuthority:
         # Any governed deletion of a conversation message invalidates the
         # derived ten-step checkpoint too. Fence the entire affected thread
         # before the first physical delete, not after a partial retry.
-        if self.dragon_projection is not None and actions:
+        if getattr(self, "dragon_projection", None) is not None and actions:
             affected_threads = {
                 str(query["_id"] if kind == "thread" else query["thread_id"])
                 for _order, kind, query, _raw in actions

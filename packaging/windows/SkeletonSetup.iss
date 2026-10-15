@@ -65,5 +65,8 @@ Filename: "{app}\{#AppExeName}"; Description: "Launch Skeleton setup and runtime
 [UninstallRun]
 Filename: "{app}\{#AppExeName}"; Parameters: "--stop --quiet"; WorkingDir: "{app}"; RunOnceId: "StopSkeleton"; Flags: runhidden skipifdoesntexist
 
-[UninstallDelete]
-Type: files; Name: "{app}\.env"
+ ; User-generated .env intentionally remains after uninstall. Compose "down"
+; preserves named database volumes, which retain the old Mongo root account.
+; Deleting .env but retaining volumes breaks reinstall and data recovery.
+; Erasing installation credentials and Docker volumes requires an explicit
+; user-requested data wipe; do not perform it by default.
