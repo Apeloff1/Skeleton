@@ -154,3 +154,121 @@ def test_parallel_workers_reproduce_the_same_source_bound_return(tmp_path):
         two["entries"][0]["passes"][0]["source_digest"])
     assert [r["trace_digest"] for r in one["entries"][0]["passes"][0]["results"]] == [
         r["trace_digest"] for r in two["entries"][0]["passes"][0]["results"]]
+
+
+def test_finished_three_pass_archive_can_be_randomly_requeued(tmp_path):
+    from skeleton.ai.training.jeeves_boomerang_queue import enable_reshuffle
+    source, campaign, _ = archived(tmp_path)
+    old = create_queue(source, campaign)
+    old = advance_queue(old, probes=2)
+    old = advance_queue(old, probes=2)
+    assert old["entries"][0]["status"] == "complete"
+    scheduled = enable_reshuffle(old, seed=23, min_delay_seconds=120,
+                                 max_delay_seconds=600, now_epoch=1_800_000_000)
+    assert scheduled["schema_version"].endswith("v2")
+    assert scheduled["parent_queue_sha256"] == old["queue_sha256"]
+    assert old["entries"][0]["status"] == "complete"
+    entry = scheduled["entries"][0]
+    assert entry["status"] == "scheduled_return"
+    assert 1_800_000_120 <= entry["next_due_epoch"] <= 1_800_000_600
+    assert entry["next_due_epoch"] == enable_reshuffle(
+        old, seed=23, min_delay_seconds=120, max_delay_seconds=600,
+        now_epoch=1_800_000_000)["entries"][0]["next_due_epoch"]
+    assert verify_queue(scheduled, verify_sources=True)["scheduled_returns"] == 1
+    with pytest.raises(CinematicSimError, match="no boomerang source is due"):
+        advance_queue(scheduled, probes=2, now_epoch=entry["next_due_epoch"] - 1)
+    first = advance_queue(scheduled, probes=2, now_epoch=entry["next_due_epoch"])
+    verify_queue(first, verify_sources=True)
+    retried = first["entries"][0]
+    assert retried["status"] == "scheduled_return"
+    assert retried["passes"][-1]["pass_number"] == 4
+    assert retried["return_visits"] == 1
+    assert retried["passes"][-1]["original_simulation_reexecutions"] == 0
+    assert retried["next_due_epoch"] >= entry["next_due_epoch"] + 120
+    all_ids = retried["initial_scenario_ids"] + [
+        row["scenario"]["scenario_id"] for part in retried["passes"]
+        for row in part["results"]]
+    assert len(all_ids) == len(set(all_ids))
+
+
+def test_return_budget_retires_finished_queue(tmp_path):
+    from skeleton.ai.training.jeeves_boomerang_queue import enable_reshuffle
+    source, archive, _ = archived(tmp_path)
+    q = enable_reshuffle(create_queue(source, archive), seed=6,
+                         min_delay_seconds=1, max_delay_seconds=4,
+                         max_return_visits=1, plateau_limit=10,
+                         now_epoch=1_800_000_000)
+    q = advance_queue(q, probes=2, now_epoch=1_800_000_000)
+    q = advance_queue(q, probes=2, now_epoch=1_800_000_000)
+    due = q["entries"][0]["next_due_epoch"]
+    q = advance_queue(q, probes=2, now_epoch=due)
+    entry = q["entries"][0]
+    assert entry["revisits_completed"] == 3
+    assert entry["return_visits"] == 1
+    assert entry["next_due_epoch"] is None
+    assert entry["status"] == "retired"
+    assert verify_queue(q, verify_sources=True)["complete_sources"] == 1
+    with pytest.raises(CinematicSimError, match="no boomerang source is due"):
+        advance_queue(q, probes=2, now_epoch=due + 100)
+
+
+def test_seed_or_due_time_forgery_rejected_even_with_new_receipt_hash(tmp_path):
+    from skeleton.ai.training.jeeves_boomerang_queue import enable_reshuffle, _receipt
+    source, archive, _ = archived(tmp_path)
+    complete = advance_queue(advance_queue(create_queue(source, archive),
+                                           probes=2), probes=2)
+    scheduled = enable_reshuffle(complete, seed=4, min_delay_seconds=100,
+                                 max_delay_seconds=900, now_epoch=1_800_000_000)
+    forged = deepcopy(scheduled)
+    forged["entries"][0]["next_due_epoch"] += 2
+    forged = _receipt({k: v for k, v in forged.items() if k != "queue_sha256"})
+    with pytest.raises(CinematicSimError, match="random interval differs"):
+        verify_queue(forged)
+    invalid = deepcopy(scheduled)
+    invalid["reshuffle_policy"]["shuffle_seed"] = 2**32
+    invalid = _receipt({k: v for k, v in invalid.items() if k != "queue_sha256"})
+    with pytest.raises(CinematicSimError):
+        verify_queue(invalid)
+
+
+def test_old_sources_are_reshuffled_with_new_work_without_early_returns(tmp_path):
+    from skeleton.ai.training.jeeves_boomerang_queue import (
+        enable_reshuffle, _due_work)
+    a, b, _ = archived(tmp_path, source_id="old_covered")
+    c, d, _ = archived(tmp_path, source_id="fresh_uncovered")
+    first = advance_queue(advance_queue(create_queue(a, b), probes=2), probes=2)
+    scheduled = enable_reshuffle(first, seed=13, min_delay_seconds=3,
+                                 max_delay_seconds=9, now_epoch=1_800_000_000)
+    queued = enqueue(scheduled, c, d)
+    assert queued["entries"][0]["status"] == "scheduled_return"
+    assert queued["entries"][1]["status"] == "awaiting_second_pass"
+    ahead = advance_queue(queued, max_entries=1, probes=2,
+                          now_epoch=1_800_000_000)
+    assert ahead["entries"][0]["return_visits"] == 0
+    assert ahead["entries"][1]["revisits_completed"] == 1
+    when = ahead["entries"][0]["next_due_epoch"]
+    order_a = _due_work(ahead, when)
+    order_b = _due_work(ahead, when)
+    assert order_a == order_b and set(order_a) == {0, 1}
+    after = advance_queue(ahead, max_entries=2, probes=2, now_epoch=when)
+    assert after["entries"][0]["return_visits"] == 1
+    assert after["entries"][1]["revisits_completed"] == 2
+
+
+def test_cli_reshuffle_existing_completed_snapshot_and_inspect_due(tmp_path):
+    original, archive, _ = archived(tmp_path)
+    old = advance_queue(advance_queue(create_queue(original, archive),
+                                      probes=2), probes=2)
+    old_file = tmp_path / "legacy.json"
+    new_file = tmp_path / "scheduled.json"
+    old_file.write_text(json.dumps(old), encoding="utf-8")
+    assert main(["--reshuffle", "--queue", str(old_file), "--output", str(new_file),
+                 "--now-epoch", "1800000000", "--min-return-seconds", "60",
+                 "--max-return-seconds", "300", "--shuffle-seed", "44"]) == 0
+    assert main(["--inspect", "--queue", str(new_file)]) == 0
+    scheduled = json.loads(new_file.read_text(encoding="utf-8"))
+    assert scheduled["entries"][0]["status"] == "scheduled_return"
+    assert scheduled["last_tick_epoch"] == 1_800_000_000
+    assert main(["--advance", "--queue", str(new_file),
+                 "--output", str(tmp_path / "blocked.json"),
+                 "--now-epoch", "1800000001"]) == 2
