@@ -551,16 +551,95 @@ def train_neural_world_from_evidence(
     return model, report
 
 
+
+def validate_neural_world_checkpoint(snapshot: Mapping[str, Any]) -> str:
+    """Fail closed on adversarial model shapes, not just self-declared SHA256.
+
+    A recomputed digest is not cryptographic authorization. This structural
+    check constrains independently imported local candidate files before any
+    expensive prediction or source-bound experiment.
+    """
+    if not isinstance(snapshot, Mapping) or snapshot.get("schema_version") != SCHEMA:
+        raise EmulatorNeuralError("typed emulator candidate model is required")
+    claimed = snapshot.get("model_digest")
+    if not isinstance(claimed, str) or len(claimed) != 64:
+        raise EmulatorNeuralError("candidate model has no finite digest identity")
+    payload = {name: item for name, item in snapshot.items() if name != "model_digest"}
+    if _digest(payload) != claimed:
+        raise EmulatorNeuralError("candidate model exact parameter checksum differs")
+    features = snapshot.get("observation_features")
+    actions = snapshot.get("actions")
+    width = snapshot.get("hidden_width")
+    if (
+        not isinstance(features, list) or not 1 <= len(features) <= 32
+        or not isinstance(actions, list) or not 2 <= len(actions) <= 32
+        or len(set(features)) != len(features)
+        or len(set(actions)) != len(actions)
+        or any(type(item) is not str or not 1 <= len(item) <= 64 for item in features + actions)
+        or type(width) is not int or not 4 <= width <= 64
+    ):
+        raise EmulatorNeuralError("candidate model sensor, action or hidden basis exceeds physical bounds")
+    n_input = len(features) + len(actions)
+    n_output = len(features) + 1
+    if (
+        snapshot.get("input_dimensions") != n_input
+        or snapshot.get("output_dimensions") != n_output
+        or snapshot.get("network") != "two_hidden_layer_tanh_dense_reward_and_observation_delta"
+    ):
+        raise EmulatorNeuralError("candidate network topology differs from admitted optimizer")
+    normalizer = (
+        snapshot.get("normalization_means_train_only"),
+        snapshot.get("normalization_std_train_only"),
+    )
+    if any(not isinstance(values, list) or len(values) != len(features) for values in normalizer):
+        raise EmulatorNeuralError("world-model source normalization dimensions differ")
+    for values in normalizer:
+        if any(type(v) not in (float, int) or not math.isfinite(v) or abs(v) > 1e9 for v in values):
+            raise EmulatorNeuralError("world-model source normalization is nonfinite")
+    if any(v <= 0 for v in normalizer[1]):
+        raise EmulatorNeuralError("world-model normalization has a zero or negative divisor")
+    reward_scale = snapshot.get("reward_scale_train_only")
+    if type(reward_scale) not in (float, int) or not math.isfinite(reward_scale) or not 0 < reward_scale <= 1e9:
+        raise EmulatorNeuralError("world-model reward scale is invalid")
+    params = snapshot.get("parameters")
+    layout = _layout(n_input, width, n_output)
+    if not isinstance(params, Mapping) or set(params) != {name for name, count in layout}:
+        raise EmulatorNeuralError("world model has missing or foreign weight tensors")
+    sizes = []
+    for name, expected in layout:
+        values = params[name]
+        if not isinstance(values, list) or len(values) != expected:
+            raise EmulatorNeuralError("world model tensor dimensions differ from signed architecture")
+        if any(type(v) not in (float, int) or not math.isfinite(v) or abs(v) > 1e9 for v in values):
+            raise EmulatorNeuralError("world model has nonfinite/oversized numeric parameters")
+        sizes.append(expected)
+    if (
+        snapshot.get("parameter_count") != sum(sizes)
+        or type(snapshot.get("real_optimizer_steps")) is not int
+        or snapshot["real_optimizer_steps"] < 1
+        or type(snapshot.get("gradient_evaluations")) is not int
+        or snapshot["gradient_evaluations"] < snapshot["real_optimizer_steps"]
+        or snapshot.get("actual_neural_parameter_training_executed") is not True
+        or snapshot.get("production_model_promotion_authorized") is not False
+        or snapshot.get("not_a_jeeves_transformer_update") is not True
+        or snapshot.get("heldout_results_not_used_for_optimization") is not True
+        or snapshot.get("measured_predictive_gate") not in (
+            "candidate_predictive_gain_measured", "candidate_failed_heldout_benchmark"
+        )
+    ):
+        raise EmulatorNeuralError("candidate optimizer provenance or production safety fields differ")
+    for key in ("source_evidence_digest", "source_policy_snapshot_digest", "source_environment_digest"):
+        value = snapshot.get(key)
+        if type(value) is not str or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+            raise EmulatorNeuralError("world model source-chain digest is invalid")
+    return claimed
+
+
 def infer_neural_world_transition(
     snapshot: Mapping[str, Any], observation: Mapping[str, float], action: str,
 ) -> dict[str, Any]:
     """Explicitly speculative numerical prediction: NOT a live game step."""
-    if not isinstance(snapshot, Mapping) or snapshot.get("schema_version") != SCHEMA:
-        raise EmulatorNeuralError("typed candidate world-model snapshot required")
-    payload = dict(snapshot)
-    claimed = payload.pop("model_digest", None)
-    if _digest(payload) != claimed:
-        raise EmulatorNeuralError("neural parameters lack canonical checkpoint integrity")
+    claimed = validate_neural_world_checkpoint(snapshot)
     features, actions = snapshot["observation_features"], snapshot["actions"]
     if not isinstance(observation, Mapping) or set(observation) != set(features) or action not in actions:
         raise EmulatorNeuralError("predictive input differs from admitted emulator features/actions")
