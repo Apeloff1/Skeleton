@@ -322,6 +322,50 @@ def _evaluate(args) -> dict[str, Any]:
     }
 
 
+def _probe_goals(args) -> dict[str, Any]:
+    from .game_emulator_goal_lab import (
+        GoalExperimentConfig, MemoryGoal, evaluate_operator_native_goals,
+    )
+
+    if not args.rights_acknowledged or args.rom is None or args.project is not None:
+        raise ValueError("Actual native ROM and operator source rights are required")
+    if not args.target.startswith("emulator:"):
+        raise ValueError("Native memory-goal probes require an approved libretro core")
+    if args.evidence_file.exists():
+        raise FileExistsError("Memory-goal experiment output already exists")
+    if args.goal_file.resolve(strict=False) == args.evidence_file.resolve(strict=False):
+        raise ValueError("Goal definition and output destinations must be separate")
+    definition = _json_read(args.goal_file)
+    if set(definition) != {"source_authority", "goals", "interventions"}:
+        raise ValueError("Operator objective schema must include only source_authority/goals/interventions")
+    goals_raw = definition["goals"]
+    if not isinstance(goals_raw, list) or not 1 <= len(goals_raw) <= 8:
+        raise ValueError("The input must declare one to eight explicit bounded memory goals")
+    goals = tuple(MemoryGoal(**item) for item in goals_raw)
+    _, _, request = _factory(args)
+    result = evaluate_operator_native_goals(
+        request,
+        goals=goals,
+        interventions=definition["interventions"],
+        source_authority=definition["source_authority"],
+        rights_acknowledged=True,
+        config=GoalExperimentConfig(
+            seed=args.seed, anchors=args.anchors, repeats=args.repeats,
+            horizon=args.horizon, max_actual_steps=args.max_actual_steps,
+        ),
+    )
+    _write_json(args.evidence_file, result, replace=False)
+    return {
+        "status": "operator_goals_physically_measured",
+        "report_digest": result["report_digest"],
+        "observed_active_only_goal_contrasts": result["measured_active_only_goal_contrasts"],
+        "native_source_steps": result["actual_source_steps"],
+        "evidence_file": str(args.evidence_file),
+        "semantic_game_success_certified": False,
+        "production_weight_updates": 0,
+    }
+
+
 def _plan_emulator(args) -> dict[str, Any]:
     from .game_emulator_planning_lab import (
         EmulatorPlanningConfig,
@@ -607,6 +651,26 @@ def parser() -> argparse.ArgumentParser:
 
 
 
+
+    goal = commands.add_parser(
+        "probe-emulator-goals",
+        help="Measure operator-defined native memory objectives vs same-timeline neutral controls",
+    )
+    goal.add_argument("--target", required=True)
+    goal.add_argument("--rom", type=Path, required=True)
+    goal.add_argument("--project", type=Path)
+    goal.add_argument("--core", required=True)
+    goal.add_argument("--episode-steps", type=int, default=32)
+    goal.add_argument("--frames-per-step", type=int, default=1)
+    goal.add_argument("--cycles-per-step", type=int, default=1824)
+    goal.add_argument("--goal-file", type=Path, required=True)
+    goal.add_argument("--evidence-file", type=Path, required=True)
+    goal.add_argument("--seed", type=int, default=0)
+    goal.add_argument("--anchors", type=int, default=2)
+    goal.add_argument("--repeats", type=int, default=2)
+    goal.add_argument("--horizon", type=int, default=6)
+    goal.add_argument("--max-actual-steps", type=int, default=2048)
+    goal.add_argument("--rights-acknowledged", action="store_true")
     plan = commands.add_parser(
         "plan-emulator",
         help="Physically compare candidate neural action plans vs identical-state neutral baselines",
@@ -767,6 +831,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _fit_emulator_world_model(args)
         elif args.command == "plan-emulator":
             result = _plan_emulator(args)
+        elif args.command == "probe-emulator-goals":
+            result = _probe_goals(args)
         else:
             result = _native(args)
         print(json.dumps(result, sort_keys=True, allow_nan=False))
