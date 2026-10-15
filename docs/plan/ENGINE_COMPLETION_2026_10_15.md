@@ -55,3 +55,11 @@ The remaining editor-only set is now: `narrative`, `cinematics`, `audio`,
 `save_system`, `platform_profile`. These features need real product or
 presentation integration; they should not be labeled gameplay engines solely
 because typed editor forms exist.
+
+## Batch 3 — original narrative choices and proof
+The prior `narrative` editor had only authored settings. New
+`advanced_narrative_runtime.py` executes source-validated story beats,
+player-branch effects, canon custody, capped persistent flags, progression,
+earned endings, and optional postgame. It is now in the shared scene,
+playable-session, snapshot, and emulator-compatible policy-training pipeline.
+It does not claim generated dialogue, model prose or movie rendering.
