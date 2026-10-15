@@ -40,6 +40,8 @@ static uint32_t ticks=0;
 static uint8_t save_ram[256];
 static uint16_t pixels[32*24];
 static int16_t samples[64*2];
+/* Test-only observer; production libretro cores never need this symbol. */
+uint32_t skl_fixture_ticks(void){return ticks;}
 
 static bool set_eject(bool value){ejected=value;return true;}
 static bool get_eject(void){return ejected;}
