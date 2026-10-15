@@ -221,3 +221,27 @@ def test_windows_payload_covers_manifest_and_docker_copy_inputs():
     assert not missing, f"first-install payload excludes required files: {missing}"
     assert "$MissingPayloadPaths.Count -gt 0" in source
     assert "Windows payload lacks required app/Docker inputs" in source
+
+
+def test_host_preload_rejects_stopped_docker_daemon(monkeypatch, tmp_path):
+    from skeleton.app.preloader import inspect_host
+    from subprocess import CompletedProcess
+
+    monkeypatch.setattr("skeleton.app.preloader.preflight", lambda *args, **kwargs: ())
+    monkeypatch.setattr("skeleton.app.preloader.checks_ok", lambda checks: True)
+    monkeypatch.setattr("skeleton.app.preloader.shutil.which", lambda name: "docker")
+    monkeypatch.setattr(
+        "skeleton.app.preloader.shutil.disk_usage",
+        lambda path: type("Usage", (), {"free": 20 * 1024**3})(),
+    )
+    def runner(command, **kwargs):
+        if command[1] == "info":
+            return CompletedProcess(command, 1, stdout="", stderr="Docker daemon unavailable")
+        return CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    report = inspect_host(tmp_path, runner=runner, require_python=False, require_pip=False)
+    daemon = next(check for check in report.checks if check.code == "host:docker-daemon")
+    assert report.ready is False
+    assert daemon.required is True
+    assert "Start Docker Desktop" in daemon.remediation
+
