@@ -282,6 +282,7 @@ _CORE_TARGET_GROUPS = {
     "nestopia": ("nes", "famicom_disk_system"),
     "mesen": ("nes", "famicom_disk_system"),
     "snes9x": ("snes",),
+    "snes9x2010": ("snes",),
     "bsnes": ("snes",),
     "genesis_plus_gx": ("genesis", "master_system", "sega_mark_iii", "sega_sg1000", "game_gear", "sega_cd"),
     "picodrive": ("genesis", "master_system", "sega_cd", "sega_32x"),
@@ -375,6 +376,10 @@ _CORE_TARGET_GROUPS = {
 # Unsafe archive containers and DSi-specific content are intentionally excluded.
 _CORE_CONTENT_EXTENSIONS = {
     "stella2014": "a26|bin|mvc",
+    "snes9x2010": "smc|fig|sfc|gd3|gd7|dx2|bsx|swc",
+    "sameboy": "gb|gbc",
+    "nestopia": "nes",
+    "mesen": "nes",
     "prosystem": "a78|bin|cdf",
     "handy": "lnx|lyx|o",
     "mednafen_ngp": "ngp|ngc|ngpc|npc",
@@ -382,6 +387,7 @@ _CORE_CONTENT_EXTENSIONS = {
     "mednafen_vb": "vb|vboy|bin",
     "mednafen_pce_fast": "pce|cue|chd|m3u",
     "mednafen_supergrafx": "pce|sgx|cue|chd|m3u",
+    "mednafen_saturn": "cue|toc|m3u|ccd|chd",
     "vecx": "bin|vec",
     "pokemini": "min",
     "freeintv": "int|bin|rom",
