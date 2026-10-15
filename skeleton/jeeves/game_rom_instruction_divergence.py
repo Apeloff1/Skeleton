@@ -81,6 +81,18 @@ def _capture(machine: GameBoyMachine, index: int, pc_before: int, opcode: int) -
         "pending_overflow_cycles": machine.timer_reload_delay,
         "if": machine.read(0xFF0F), "ie": machine.read(0xFFFF),
     }
+    sprite_dma = {
+        "active": machine.dma_active,
+        "programmed_source_page": machine.read(0xFF46),
+        "source_address": machine.dma_source,
+        "actual_copied_oam_bytes": machine.dma_index,
+        "inflight_4t_byte_phase": machine.dma_tcycles,
+        "startup_remaining_t_cycles": machine.dma_startup,
+        "sprite_attribute_bytes_sha256": hashlib.sha256(
+            machine.memory[0xFE00:0xFEA0]
+        ).hexdigest(),
+        "source_bus_conflicts_modeled": False,
+    }
     cartridge = {
         "mapper": machine.metadata["mapper"],
         "rom_bank": machine.rom_bank,
@@ -113,6 +125,7 @@ def _capture(machine: GameBoyMachine, index: int, pc_before: int, opcode: int) -
         "real_cpu_registers": registers,
         "real_div_timer_interrupts": timer,
         "real_mapper_control": cartridge,
+        "real_sprite_dma_transfer": sprite_dma,
         "native_source_memory_sha256": parts,
         "authored_goal_memory": {
             "player_x": machine.read(0xC000),
@@ -171,7 +184,7 @@ def _first_difference(
         raise InstructionDivergenceError("controlled instruction sampling dimension differs")
     domains = (
         "real_cpu_registers", "real_div_timer_interrupts", "real_mapper_control",
-        "native_source_memory_sha256", "authored_goal_memory",
+        "real_sprite_dma_transfer", "native_source_memory_sha256", "authored_goal_memory",
         "actual_cpu_schedule_cycles", "actual_frame_count",
     )
     for left, right in zip(baseline, treatment, strict=True):
