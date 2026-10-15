@@ -63,13 +63,14 @@ class InstructionDivergenceConfig:
             or any(action not in ACTIONS for action in self.action_subset)
             or not isinstance(self.temporal_sequences, tuple)
             or len(self.action_subset) + len(self.temporal_sequences) > 8
-            or len(set(self.temporal_sequences)) != len(self.temporal_sequences)
             or any(
                 not isinstance(sequence, tuple)
                 or not 2 <= len(sequence) <= 8
-                or any(action not in ACTIONS for action in sequence)
+                or any(type(action) is not str or action not in ACTIONS for action in sequence)
+                or any(left == right for left, right in zip(sequence, sequence[1:]))
                 for sequence in self.temporal_sequences
             )
+            or len(set(self.temporal_sequences)) != len(self.temporal_sequences)
         ):
             raise InstructionDivergenceError("bounded unique controls with idle baseline and finite sampling required")
 
@@ -299,7 +300,7 @@ def compare_original_rom_instruction_branches(
         ),
         "actual_passive_and_controller_interventions": results,
         "actually_executed_temporal_sequences": len(config.temporal_sequences),
-        "controlled_source_input_change_events": sum(
+        "controlled_source_input_assignment_events": sum(
             len(record["source_input_schedule"]) for record in results
         ),
         "paired_replay_verified_differences": contrasts,
