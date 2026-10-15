@@ -112,6 +112,25 @@ class GameParetoInputTests(unittest.TestCase):
                 subject.train(options)
             self.assertEqual(path.read_text(encoding="utf-8"), "{}")
 
+    def test_exclusive_candidate_publish(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            protected = directory / "protected.json"
+            protected.write_text("existing", encoding="utf-8")
+
+            def writer(_model, destination):
+                destination.write_text("new candidate", encoding="utf-8")
+                return "receipt"
+
+            with self.assertRaises(FileExistsError):
+                subject._publish_new_candidate(object(), protected, writer)
+            self.assertEqual(protected.read_text(encoding="utf-8"), "existing")
+
+            fresh = directory / "fresh.json"
+            receipt = subject._publish_new_candidate(object(), fresh, writer)
+            self.assertEqual(receipt, "receipt")
+            self.assertEqual(fresh.read_text(encoding="utf-8"), "new candidate")
+
     def test_reject_retention_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             data = Path(temp) / "source.txt"
