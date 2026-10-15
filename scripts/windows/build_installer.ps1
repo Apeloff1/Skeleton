@@ -50,6 +50,12 @@ if (Test-Path $ShortDrive) {
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ShortDrive)) {
     throw "Unable to create short Windows build drive $ShortDrive"
 }
+# Every terminating error after SUBST must unmap the temporary build drive.
+# Otherwise a failed local build makes the next attempt fail before staging.
+trap {
+    & subst $ShortDrive /D | Out-Null
+    break
+}
 New-Item -ItemType Directory -Force -Path $PayloadDir, $LauncherDist, $LauncherWork, $LauncherSpec | Out-Null
 
 Write-Host "==> Staging curated application payload from $SourceRef via $ShortDrive"
