@@ -188,7 +188,7 @@ def _train(args) -> dict[str, Any]:
     if args.resume and args.fork_parent:
         raise ValueError("Choose exact resume or an explicit parent-policy fork")
     config = GameLearningConfig(
-        seed=args.seed, max_updates=args.max_updates, max_episodes=256
+        seed=args.seed, max_updates=args.max_updates, max_episodes=args.max_episodes
     )
     pending_batch = None
     if args.resume:
@@ -369,6 +369,7 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--policy-file", type=Path, required=True)
         if name == "train":
             command.add_argument("--episodes", type=int, default=16)
+            command.add_argument("--max-episodes", type=int, default=1024, help="Policy horizon, 1–8192 episodes; larger work uses explicit checkpoints")
             command.add_argument("--seed", type=int, default=0)
             command.add_argument("--max-updates", type=int, default=65536)
             command.add_argument("--policy-id", default="local-game-policy")
