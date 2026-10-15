@@ -80,6 +80,8 @@ def _arm(
     chain=digest(["comparative-controlled-native-run",
                   registry.registry_digest,content_sha256,
                   game["id"],arm,repeated_index,game["seed"]])
+    from .game_comparison_multispectral import native_step_multispectral_receipt
+
     with create_emulator_environment(
         game["target_id"],core_id=game["core_id"],
         expected_registry_digest=registry.registry_digest,
@@ -89,6 +91,8 @@ def _arm(
     ) as env:
         env.reset(game["seed"])
         for index, action in enumerate(actions,1):
+            prior_frame=dict(env._frame) if isinstance(env._frame,dict) else None
+            prior_pixels=env._pixels
             result=env.step(action)
             frame=env._frame
             if not isinstance(frame,dict):
@@ -99,6 +103,9 @@ def _arm(
             }
             if any(not math.isfinite(value) for value in observations.values()):
                 raise ComparativeExperimentError("Nonfinite measured native objective evidence")
+            multispectral=native_step_multispectral_receipt(
+                prior_frame,prior_pixels,frame,env._pixels,env._audio,
+            )
             receipt={
                 "step":index,"action":action,
                 "source":"actual_isolated_libretro",
@@ -108,6 +115,7 @@ def _arm(
                 "native_pcm_sha256":frame["audio_sha256"],
                 "native_transition_sha256":result.transition_digest,
                 "observations":observations,
+                "native_multispectral":multispectral,
                 "native_gameplay_goal_verified":False,
             }
             chain=digest([chain,receipt])
@@ -234,8 +242,35 @@ def _analyze_counterfactual(
         status="controlled_observable_signal_response_candidate"
     else:
         status="no_repeatable_audiovisual_difference"
+    # Abstract physics/audio texture descriptors are logged, not raw source
+    # frames, sound buffers, melodies or copied expressive material.
+    from .game_comparison_multispectral import summarize_multispectral_change
+
+    a_multi=a_runs[0][perturbation_step-1].get("native_multispectral")
+    b_multi=b_runs[0][perturbation_step-1].get("native_multispectral")
+    if (isinstance(a_multi,dict) and isinstance(b_multi,dict)
+        and a_multi.get("spatial") is not None
+        and b_multi.get("spatial") is not None):
+        multi_comparison={
+            "available":True,
+            "abstract_differences":summarize_multispectral_change(a_multi,b_multi),
+            "source_frame_sha256_pair":[
+                a_multi["source_frame_sha256"],b_multi["source_frame_sha256"]
+            ],
+            "source_pcm_sha256_pair":[
+                a_multi["source_pcm_sha256"],b_multi["source_pcm_sha256"]
+            ],
+            "no_game_semantics_inferred":True,
+        }
+    else:
+        multi_comparison={
+            "available":False,
+            "reason":"Native spatial motion unavailable or geometry changed",
+            "no_game_semantics_inferred":True,
+        }
     return {
         "measured_objective_changes":measured_delta,
+        "multispectral_abstract_comparison":multi_comparison,
         "paired_numeric_observation_deltas":per_pair_deltas,
         "signal_comparison":outcomes,
         "repeat_consistent_in_both_arms":stable_arms,

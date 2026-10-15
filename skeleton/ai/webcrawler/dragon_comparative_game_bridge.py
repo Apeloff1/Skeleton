@@ -134,6 +134,7 @@ def export_dragon_counterfactual_review(report: Mapping[str, object]) -> dict[st
             "within_arm_repeat_consistency":analysis["repeat_consistent_in_both_arms"],
             "pre_intervention_observations_matched":analysis["pre_intervention_controls_matched"],
             "scientific_evidence_status":analysis["scientific_evidence_status"],
+            "nonreconstructive_multispectral_observation":analysis.get("multispectral_abstract_comparison"),
             "post_intervention_signal_candidate":analysis["post_intervention_observable_response_candidate"],
             "causal_mechanic_or_transfer_knowledge_approved":False,
             "signal_divergences":analysis["signal_comparison"],
