@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check "$DIFF_BASE" "$HEAD_SHA" -- . ':!skeleton/ai/research/legacy/**'
+          # Consume all diagnostics without dumping huge whitespace diffs into\n          # Actions logs; a nonzero git status still fails this gate.\n          python scripts/bounded_git_diff_check.py --base "$DIFF_BASE" --head "$HEAD_SHA"
 
       - name: Reject generated junk and accidental local state
         shell: bash
