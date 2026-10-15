@@ -90,6 +90,20 @@ class PairwiseNativeObservationContracts(unittest.TestCase):
         with self.assertRaises(PairwiseObservationError):
             analyze_live_comparison_evidence(export)
 
+    def test_huge_integer_signal_fails_cleanly_even_with_rechained_receipt(self):
+        export = evidence()
+        lane = export["lanes"]["game_0"]
+        event = lane["native_events"][-1]
+        event["receipt"]["objective_observations"]["audio_rms"] = 10 ** 500
+        receipt = dict(event["receipt"])
+        receipt.pop("receipt_sha256")
+        new_hash = digest(receipt)
+        event["receipt"]["receipt_sha256"] = new_hash
+        event["receipt_sha256"] = new_hash
+        lane["final_chain_sha256"] = new_hash
+        with self.assertRaises(PairwiseObservationError):
+            analyze_live_comparison_evidence(export)
+
     def test_reset_is_new_ordinal_generation(self):
         export = evidence()
         for lane in export["lanes"].values():
