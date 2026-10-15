@@ -114,9 +114,33 @@ Assistant goals can require `edit`, `build`, `preview` and `export`. Completion
 checks use current original-owner receipts at the current project head. A model
 stop statement cannot satisfy missing requirements. Historical goals without a
 checklist retain their existing unverified-stop semantics.
-This checklist is for canonical console editor projects. Successor and other
-project types use ordinary scoped goals; attempting the native checklist there
-returns an explicit admission error before creating a goal or calling a model.
+The native checklist is for canonical console editor projects. Attempting it
+on another project type returns an explicit admission error before creating a
+goal or calling a model.
+
+For an original successor, select `completion_mode: original` and the
+`edit`, `simulate`, `review`, `package` and `export` requirements. Start from
+an ordinary base project or an existing saved successor. Console editor and
+studio-session projects need a separate original project; this workflow does
+not convert those source roots. Creation and adoption require the explicit edit
+grant. Omitting the mode retains the native and historical behavior.
+
+The planner can synthesize from one or three registered authored profiles,
+adopt its completed candidate, inspect and edit the saved world, simulate it,
+request a numerical review, build an available desktop target and prepare both
+source and package exports. Stage guidance uses actual current-source receipts
+and toolchain readiness. Adoption counts as creation; a review does not force
+an arbitrary edit. Further refinement uses the same finite goal budget or a
+separately authorized goal. A source edit invalidates downstream evidence.
+
+Original completion requires positive committed simulation steps and a real
+frame, a current digest-checked review and a current `binary_ready` desktop
+package. The simulation measures the source runtime. The desktop package is a
+compiled browser-rendered launcher; these checks do not prove that it ran on
+the target OS or certify subjective game quality. Both export preparation facts
+remain separate from a client download. The limits remain eight model calls,
+sixteen actions and four jobs; an unavailable toolchain or exhausted grant can
+leave an honestly incomplete goal.
 
 New checklist decisions expose the next prerequisite stage from those receipts,
 regardless of model capacity. Export progress reports source and binary

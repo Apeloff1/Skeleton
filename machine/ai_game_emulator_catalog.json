@@ -26,6 +26,26 @@
   },
   "inspection": "Bounded nonsymlink regular library files, stable inode/size/time identity, exact SHA256, ELF shared-object architecture matching the host and actual exported libretro ABI symbols. Inspection never dlopens a library or runs constructors. Required firmware is presence and exact-byte identity only; no external proprietary firmware/keys are fetched, disclosed or bundled. Actual ABI version/system-info/content loading occurs only in the separately declared isolated emulator host. Complete bounded system directory inventory is hashed, including optional assets and missing optional rows; the host copies every present file and compares the copied inventory digest before native activation.",
   "revalidation": "Issued immutable core descriptors bind canonical registry digest, exact library and firmware bytes, target scope and options. The host must revalidate against the current operator registry before commands; changed/withdrawn files or approvals fail closed. A descriptor is not a hardware/game compatibility certificate.",
+  "coverage_and_disc_admission_continuation": {
+    "status": "implementation_candidate",
+    "owners": [
+      "skeleton/jeeves/game_emulator_catalog.py",
+      "skeleton/jeeves/game_emulator_target_gap_matrix.py",
+      "scripts/qualify_game_emulator.py"
+    ],
+    "public_projection": "emulator_content_admission(core_id) distinguishes upstream suffix hints, structurally admitted entrypoints, unsupported TOC/MDS descriptors, bounded CloneCD CCD plus IMG/optional SUB closure, and the isolated worker's final actual content admission. Per-target core_installations disclose only safe core identities/readiness/content prerequisites; library paths, option values and firmware bytes remain private.",
+    "inventory_failures": "Expected filesystem races and permissions errors become per-core unavailable diagnostics. An unreadable core never aborts unrelated target inventory or grants execution. Whole malformed registry metadata remains a rejected registry.",
+    "operator_multifile_qualification": "Explicit --content-root and relative --entrypoint permit local lawful multi-file/disc qualification through existing GameContentBundle references, SHA256 streaming, bounded source inventory, immutable request identity and existing isolated workers. No implicit scanning outside that root, network acquisition, execution outside the worker, application rights grant, or automatic core approval. The operator-only reader reopens exact nonsymlink regular files and verifies their complete identity during existing private materialization.",
+    "coverage_actions": "All canonical targets retain distinct installed, firmware/approval/ABI blocked, recipe-only and unmapped states with specific bounded operator commands. Recipe presence and installed metadata never become real ROM boot, hardware fidelity, controller or learning qualification. Existing measured receipts and historical counts are not rewritten.",
+    "limits": {
+      "clonecd_descriptor_bytes": 65536,
+      "clonecd_tracks": 99,
+      "clonecd_toc_entries": 256,
+      "operator_files": 96,
+      "operator_file_bytes": 2147483648,
+      "operator_bundle_bytes": 4294967296
+    }
+  },
   "content": {
     "schema_version": "skeleton.game.emulator_content.v1",
     "inline_source_bytes": 16777216,
@@ -45,6 +65,7 @@
       "CUE plus exact relative track files",
       "GDI plus exact relative track files",
       "M3U relative disc playlists",
+      "CloneCD version 2/3 CCD plus exact same-stem IMG and optional SUB sector closure",
       "CHD structural container",
       "ISO data images",
       "bounded classic ZIP multi-file packages"
@@ -52,8 +73,9 @@
     "rules": [
       "Reject traversal, absolute/drive paths, symlinks, encryption, casefold/NFC aliases, nested archives, unknown ZIP expansion and missing referenced tracks",
       "Preserve actual filenames and each content SHA256; bind ordered dependency graph, entrypoint and complete bundle digest",
-      "Descriptor references include bounded actual prefix bytes; small CUE/GDI/M3U descriptors carry their entire digest-validated text. Materialization verifies every prefix and the complete streamed byte hash before admission",
-      "CUE/GDI/M3U descriptor syntax and ISO/CHD structure are bounded metadata checks, not compatibility/playability proof"
+      "Descriptor references include bounded actual prefix bytes; small CUE/GDI/M3U/CCD descriptors carry their entire digest-validated text. Materialization verifies every prefix and the complete streamed byte hash before admission",
+      "CUE/GDI/M3U/CCD descriptor syntax and ISO/CHD structure are bounded metadata checks, not compatibility/playability proof",
+      "TOC/MDS descriptor closure, CloneCD embedded CD-text, and parent-dependent CHD images are unsupported and rejected explicitly"
     ],
     "aggregate_prefix_bytes": 262144,
     "directory_depth": 8,
@@ -81,7 +103,8 @@
     "GameEmulatorRegistry.system_inventory",
     "ApprovedEmulatorCore.from_dict",
     "load_game_content_for_core",
-    "emulator_content_extensions"
+    "emulator_content_extensions",
+    "emulator_content_admission"
   ],
   "failure": "Unknown target, unmapped/absent/unapproved core, malformed manifest, changed SHA/scope, wrong architecture, missing ABI/firmware, unsafe filename/descriptor, exhausted bounds and missing disc dependency fail explicitly. Modern/closed systems remain unavailable unless a declared adapter exists; the target count never implies emulator availability.",
   "qualification": "NO TESTS user instruction persists. Static compile/lint/source review only. Actual core compilation/installation and later gameplay are separate operator/product work; no universal commercial-ROM or production-model qualification claim.",

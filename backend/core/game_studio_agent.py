@@ -32,6 +32,9 @@ READ = frozenset(
     {
         "catalog",
         "successor.inspect",
+        "successor.export",
+        "world.inspect",
+        "desktop.inspect",
         "play.inspect",
         "campaign.attempts",
         "campaign.champion.handoff",
@@ -70,7 +73,7 @@ WORK = frozenset(
         "artifact.preview",
     }
 )
-EDIT = frozenset({"console.edit", "world.edit", "campaign.champion.adopt"})
+EDIT = frozenset({"console.edit", "world.edit", "successor.adopt", "campaign.champion.adopt"})
 CONTROL = frozenset(
     {
         "job.resume",
@@ -152,6 +155,8 @@ def _public(row):
         "workflow_requirements_verified": bool(row.get("completion_receipt", {}).get("verified")),
     }
     result["completion_requirements"] = row.get("completion_requirements", [])
+    if "completion_mode" in row:
+        result["completion_mode"] = row["completion_mode"]
     result["completion"] = row.get("completion_receipt")
     result["workflow"] = {
         "remaining_actions": len(row.get("workflow", [])),
@@ -289,7 +294,11 @@ async def _recover_own_edit(scope, row, token, *, metadata_only=False):
             )
         save_body = operation["evidence"]["editor"]
     else:
-        kind = "console-edit" if raw["operation"] == "console.edit" else "successor-world"
+        kind = {
+            "console.edit": "console-edit",
+            "world.edit": "successor-world",
+            "successor.adopt": "successor-adopt",
+        }[raw["operation"]]
         operation = await _rows.find_one(
             {"_id": _key(row["project_id"], kind, raw["payload"]["idempotency_key"]), **scope}
         )
@@ -387,11 +396,18 @@ async def create(scope, project_id, body):
         return _public(prior)
     body = {"max_output_tokens": 1024, **body}
     requirements = body.get("completion_requirements") or []
+    mode = body.get("completion_mode", "native")
+    supported = (
+        {"edit", "simulate", "review", "package", "export"}
+        if mode == "original"
+        else {"edit", "build", "preview", "export"}
+    )
     if (
-        not isinstance(requirements, list)
-        or len(requirements) > 4
+        mode not in {"native", "original"}
+        or not isinstance(requirements, list)
+        or len(requirements) > len(supported)
         or len(set(requirements)) != len(requirements)
-        or any(item not in {"edit", "build", "preview", "export"} for item in requirements)
+        or any(item not in supported for item in requirements)
         or (requirements and body["execution_mode"] != "run")
         or ("edit" in requirements and not body["allow_edits"])
     ):
@@ -404,7 +420,7 @@ async def create(scope, project_id, body):
         )
     digest = _digest(body)
     project = await workspace._project(project_id, scope, body["expected_version"])
-    if requirements:
+    if requirements and mode == "native":
         from skeleton.jeeves.game_console_editor import ConsoleEditorError, ConsoleProject
 
         files = {item["path"]: item["content"] for item in project["files"]}
@@ -422,6 +438,32 @@ async def create(scope, project_id, body):
                 "The native build checklist requires a valid console editor document matching the project's selected console.",
                 422,
             ) from exc
+    elif mode == "original":
+        files = {item["path"]: item["content"] for item in project["files"]}
+        authored = workspace.authored_environment_kind(files)
+        if authored in {"console_editor", "studio", "studio_rules"}:
+            raise GameLearningError(
+                "studio_goal_original_project",
+                "Create an original project separately; this workflow cannot implicitly convert a console editor or studio-session project.",
+                422,
+            )
+        if authored != "successor" and body["execution_mode"] == "run" and not body["allow_edits"]:
+            raise GameLearningError(
+                "studio_goal_original_edit_grant",
+                "Original creation and adoption require explicit edit authorization.",
+                422,
+            )
+        if authored == "successor":
+            from skeleton.jeeves.game_successor_runtime import validate_successor_spec
+
+            try:
+                validate_successor_spec(json.loads(files["game/successor/spec.json"]))
+            except (ValueError, TypeError) as exc:
+                raise GameLearningError(
+                    "studio_goal_original_project",
+                    "The saved original successor specification is invalid.",
+                    422,
+                ) from exc
     binding = await workspace._input(scope, project, require_execution=False)
     await workspace._authority(scope, binding)
     # Existing revision capacity is shared; these journals do not extend it.
@@ -472,6 +514,8 @@ async def create(scope, project_id, body):
     }
     if "completion_requirements" in body:
         row["completion_requirements"] = requirements
+    if "completion_mode" in body:
+        row["completion_mode"] = mode
     row["state_digest"] = _state_digest(row)
     row["storage_receipt"] = await workspace._admit(
         scope, "game-learning-revision", goal_id, len(_json(jsonable_encoder(row)))
@@ -789,6 +833,9 @@ def _feedback(value, maximum=8192):
         "project_version",
         "head_digest",
         "artifact_id",
+        "candidate_id",
+        "recipe_digest",
+        "spec_digest",
         "artifact_digest",
         "producer_job_id",
         "producer_input_digest",
@@ -837,6 +884,8 @@ def _feedback(value, maximum=8192):
 
 async def _completion_progress(scope, row, project=None):
     """Verify requested workflow facts from current original owner receipts."""
+    if row.get("completion_mode") == "original":
+        return await _original_completion_progress(scope, row, project)
     from core import game_console_build as builds
 
     await _authorize_history(scope, row)
@@ -983,11 +1032,227 @@ async def _completion_progress(scope, row, project=None):
     return result
 
 
+async def _original_completion_progress(scope, row, project=None):
+    """Verify original source execution and packaging without implying binary play."""
+    from core import game_console_build as builds
+    from core import game_studio_review as reviews
+    from core.game_learning import _public as workspace_public
+    from core.game_studio_tools import _model, _mutation_receipt
+    from routes.game_learning import SimulationRequest
+
+    await _authorize_history(scope, row)
+    project = project or await workspace._project(row["project_id"], scope, row["head_version"])
+    head = _digest(project["files"])
+    checks = {name: {"verified": False} for name in ("edit", "simulate", "review", "package", "export")}
+    current_steps = [
+        step for step in row["steps"] if step.get("executed") and step.get("output_digest") == head
+    ]
+    issued_artifacts = {}
+    for step in current_steps:
+        operation = step["decision"]["operation"]
+        if operation in {"successor.adopt", "world.edit"} and step.get("input_digest") != head:
+            checks["edit"] = {
+                "verified": True,
+                "operation": operation,
+                "step_digest": step["step_digest"],
+                "output_digest": head,
+            }
+        if operation == "simulate":
+            body = _model(SimulationRequest, step["command"]["payload"])
+            operation_id = _key(project["project_id"], "simulation", body["idempotency_key"])
+            proof = await workspace.receipts.find_one(
+                {"_id": operation_id, **scope, "project_id": project["project_id"]}
+            )
+            value = step.get("result", {}).get("result")
+            if proof is None or proof.get("state") != "committed" or not isinstance(value, dict):
+                continue
+            original = proof.get("result")
+            prepared = proof.get("prepared_session")
+            if not isinstance(original, dict) or not isinstance(prepared, dict):
+                continue
+            session = await workspace.sessions.find_one(
+                {
+                    "_id": proof.get("session_id"),
+                    **scope,
+                    "project_id": project["project_id"],
+                    "operation_ids": operation_id,
+                }
+            )
+            if session is None:
+                continue
+            await workspace._authority(scope, prepared["input"])
+            await workspace._authority(scope, session["input"])
+            frame = original.get("last_frame")
+            actual_steps = original.get("steps")
+            if (
+                proof.get("request_digest") != _digest(body)
+                or proof.get("input_digest") != _digest(prepared["input"])
+                or prepared["input"]["project_version"] != project["version"]
+                or _digest(prepared["input"]["files"]) != head
+                or prepared["snapshot_digest"] != _digest(prepared["snapshot"])
+                or proof.get("prepared_digest")
+                != _digest(
+                    {
+                        "session": workspace_public(prepared),
+                        "snapshot": prepared["snapshot"],
+                        "input": prepared["input"],
+                        "result": original,
+                    }
+                )
+                or _digest(_mutation_receipt(original)) != _digest(value)
+                or original.get("session_id") != session["session_id"]
+                or original.get("snapshot_digest") != prepared["snapshot_digest"]
+                or session.get("_input_fenced")
+                or session["session_id"] not in project["session_ids"]
+                or session["input"]["project_version"] != project["version"]
+                or _digest(session["input"]["files"]) != head
+                or session["snapshot_digest"] != _digest(session["snapshot"])
+                or type(actual_steps) is not int
+                or not 1 <= actual_steps <= 4096
+                or not isinstance(original.get("transitions"), list)
+                or not 1 <= len(original["transitions"]) <= actual_steps
+                or not isinstance(frame, dict)
+                or frame.get("runtime_kind") != "original_successor_game"
+                or not frame.get("pixel_digest")
+                or not frame.get("png_digest")
+            ):
+                continue
+            checks["simulate"] = {
+                "verified": True,
+                "simulation_receipt_id": operation_id,
+                "session_id": session["session_id"],
+                "steps": actual_steps,
+                "result_digest": _digest(original),
+                "frame_digest": frame["pixel_digest"],
+                "scope": "Executed original source runtime and its frame; desktop executable was not run.",
+            }
+        if operation not in {"project.review", "desktop.build"} or not step.get("job_id"):
+            continue
+        kind = "review" if operation == "project.review" else "desktop"
+        job = await workspace.jobs.find_one(
+            {
+                "_id": step["job_id"],
+                **scope,
+                "project_id": project["project_id"],
+                "kind": kind,
+                "status": "completed",
+            }
+        )
+        if job is None:
+            continue
+        await workspace._authority(scope, job["input"])
+        if (
+            job["job_id"] not in project["job_ids"]
+            or job["input"]["project_version"] != project["version"]
+            or _digest(job["input"]["files"]) != head
+        ):
+            continue
+        if kind == "review":
+            checked = await reviews._load_review(scope, project["project_id"], job["job_id"])
+            await reviews._baseline(scope, checked)
+            report = reviews._checked_result(checked)
+            execution, metrics = report.get("execution", {}), report.get("metrics", {})
+            if (
+                type(execution.get("steps")) is not int
+                or execution["steps"] < 1
+                or type(metrics.get("available_frames")) is not int
+                or metrics["available_frames"] < 1
+            ):
+                continue
+            findings = []
+            for finding in report.get("findings", [])[:4]:
+                item = {key: finding[key] for key in ("finding_id", "code", "severity") if key in finding}
+                item["message"] = str(finding.get("message", finding.get("title", "")))[:400]
+                item["evidence_refs"] = [str(ref)[:256] for ref in finding.get("evidence_refs", [])[:4]]
+                findings.append(item)
+            checks["review"] = {
+                "verified": True,
+                "job_id": job["job_id"],
+                "review_digest": report["review_digest"],
+                "steps": execution["steps"],
+                "available_frames": metrics["available_frames"],
+                "findings": findings,
+                "findings_total": len(report.get("findings", [])),
+                "quality_certified": False,
+            }
+        elif job.get("result", {}).get("state") == "binary_ready":
+            for artifact in job["result"].get("artifacts", [])[:4]:
+                record, issuer = await builds._completed_artifact(
+                    scope, project["project_id"], artifact["artifact_id"]
+                )
+                if issuer["job_id"] == job["job_id"]:
+                    issued_artifacts[record["artifact_id"]] = (record, issuer)
+            if any(
+                record["format"] in {"elf64", "pe32_plus", "mach_o_64"}
+                for record, _issuer in issued_artifacts.values()
+            ):
+                checks["package"] = {
+                    "verified": True,
+                    "job_id": job["job_id"],
+                    "target_id": job["request"]["target_id"],
+                    "result_digest": _digest(job["result"]),
+                    "renderer": "browser",
+                    "target_execution_verified": False,
+                    "artifacts": [
+                        {
+                            "artifact_id": record["artifact_id"],
+                            "digest": record["digest"],
+                            "format": record["format"],
+                        }
+                        for record, _issuer in issued_artifacts.values()
+                    ],
+                }
+    source_export = None
+    package_exports = set()
+    for step in current_steps:
+        value = step.get("result")
+        if not isinstance(value, dict) or value.get("head_digest") != head:
+            continue
+        operation = step["decision"]["operation"]
+        if operation == "project.export":
+            actual = await builds.prepare_project_export(scope, project["project_id"], project["version"])
+            if value.get("content_digest") == actual["content_digest"]:
+                source_export = actual
+        elif operation == "artifact.export" and value.get("artifact_id") in issued_artifacts:
+            actual = await builds.prepare_artifact_export(scope, project["project_id"], value["artifact_id"])
+            if (
+                value.get("artifact_digest") == actual["artifact_digest"]
+                and value.get("producer_input_digest") == actual["producer_input_digest"]
+            ):
+                package_exports.add(value["artifact_id"])
+    checks["export"] = {
+        "verified": bool(source_export and package_exports),
+        "source_prepared": source_export is not None,
+        "binary_prepared": bool(package_exports),
+        "artifact_ids": sorted(package_exports),
+        "client_download_verified": False,
+        **({"source_export_digest": source_export["content_digest"]} if source_export else {}),
+    }
+    await workspace._authority(scope, await workspace._input(scope, project, require_execution=False))
+    requirements = row.get("completion_requirements", [])
+    result = {
+        "schema_version": "skeleton.game.studio_original_completion.v1",
+        "completion_mode": "original",
+        "project_id": project["project_id"],
+        "project_version": project["version"],
+        "head_digest": head,
+        "requirements": requirements,
+        "checks": checks,
+        "missing": [name for name in requirements if not checks[name]["verified"]],
+        "verified": bool(requirements) and all(checks[name]["verified"] for name in requirements),
+        "scope": "Original source edit, measured simulation/review and compiled browser-rendered desktop packaging/export facts only; no subjective quality, desktop execution or console hardware certification.",
+    }
+    result["receipt_digest"] = _digest(result)
+    return result
+
+
 def _workflow_stage(row, context, allowed):
     """Guide new checklist decisions using verified current owner receipts only."""
     requirements = row.get("completion_requirements", [])
     if not requirements:
         return allowed, None
+    if row.get("completion_mode") == "original":
+        return _original_workflow_stage(row, context, allowed)
     checks = context.get("completion", {}).get("checks", {})
     exports = checks.get("export", {})
     if "edit" in requirements and not checks.get("edit", {}).get("verified"):
@@ -1027,6 +1292,142 @@ def _workflow_stage(row, context, allowed):
         build = checks.get("build", {})
         guidance["build_receipt"] = {key: build[key] for key in ("job_id", "artifacts") if key in build}
     return allowed, guidance
+
+
+def _original_workflow_stage(row, context, allowed):
+    requirements = row.get("completion_requirements", [])
+    checks = context.get("completion", {}).get("checks", {})
+    original = context.get("original_project", {})
+    exports = checks.get("export", {})
+    if not original.get("adopted_world"):
+        if original.get("candidate"):
+            stage, operations = "original_adopt", {"successor.inspect", "successor.adopt"}
+        else:
+            stage, operations = "original_create", {"successor.synthesize"}
+    elif "edit" in requirements and not checks.get("edit", {}).get("verified"):
+        stage, operations = "original_edit", {"world.inspect", "world.edit"}
+    elif any(name in requirements for name in ("simulate", "review")) and not checks.get("simulate", {}).get(
+        "verified"
+    ):
+        stage, operations = "original_simulate", {"simulate", "world.inspect"}
+    elif "review" in requirements and not checks.get("review", {}).get("verified"):
+        stage, operations = "original_review", {"project.review"}
+    elif any(name in requirements for name in ("package", "export")) and not checks.get("package", {}).get(
+        "verified"
+    ):
+        stage, operations = "original_package", {
+            "desktop.inspect",
+            "desktop.build",
+            "world.inspect",
+            "world.edit",
+        }
+    elif "export" in requirements and not exports.get("verified"):
+        if exports.get("binary_prepared"):
+            stage, operations = "original_export_source", {"project.export"}
+        elif exports.get("source_prepared"):
+            stage, operations = "original_export_binary", {"artifact.export"}
+        else:
+            stage, operations = "original_export", {"project.export", "artifact.export"}
+    else:
+        stage, operations = "original_complete", {"project.inspect"}
+    allowed = allowed & operations
+    guidance = {
+        "stage": stage,
+        "completion_mode": "original",
+        "required": requirements,
+        "verified": {name: value.get("verified", False) for name, value in checks.items()},
+        "remaining_operations": sorted(allowed),
+    }
+    if stage == "original_create":
+        guidance["authored_profiles"] = original.get("authored_profiles", [])
+        guidance["source_cardinality"] = [1, 3]
+    if stage == "original_adopt":
+        guidance["candidate"] = original["candidate"]
+    if stage in {"original_edit", "original_simulate", "original_review", "original_package"}:
+        guidance["actions"] = original.get("actions", [])
+    if stage == "original_package":
+        guidance["desktop_targets"] = original.get("desktop_targets", [])
+        if checks.get("review", {}).get("verified"):
+            review = checks["review"]
+            guidance["review"] = {
+                key: review[key]
+                for key in (
+                    "job_id",
+                    "review_digest",
+                    "steps",
+                    "available_frames",
+                    "findings_total",
+                    "quality_certified",
+                )
+            }
+            if review["findings"]:
+                priority = review["findings"][0]
+                guidance["review"]["priority_finding"] = {
+                    **priority,
+                    "message": priority["message"][:160],
+                    "evidence_refs": priority["evidence_refs"][:1],
+                }
+                guidance["review"]["findings_projection_partial"] = True
+        guidance["refinement"] = (
+            "world.edit invalidates downstream facts. Budget fresh simulation/review/package or use another finite goal; review is not subjective quality certification."
+        )
+    if stage.startswith("original_export"):
+        guidance["package_receipt"] = checks.get("package", {})
+        guidance["exports"] = exports
+    return allowed, guidance
+
+
+async def _original_project_context(scope, row, project):
+    from core import game_successor as successor
+
+    ready = any(item["path"] == "game/successor/spec.json" for item in project["files"])
+    result = {"adopted_world": ready}
+    if not ready:
+        result["authored_profiles"] = [
+            {
+                key: value
+                for key, value in profile.as_dict().items()
+                if key in {"profile_id", "title", "family"}
+            }
+            for profile in successor._default_profiles().values()
+        ]
+        for step in reversed(row["steps"]):
+            if (
+                step["decision"]["operation"] not in {"successor.synthesize", "successor.compare"}
+                or not step.get("executed")
+                or not step.get("job_id")
+            ):
+                continue
+            job = await workspace.jobs.find_one(
+                {"_id": step["job_id"], **scope, "project_id": project["project_id"], "status": "completed"}
+            )
+            if (
+                job is None
+                or job["input"]["project_version"] != project["version"]
+                or _digest(job["input"]["files"]) != _digest(project["files"])
+            ):
+                continue
+            issuer, recipe = await successor._candidate_job(scope, job["job_id"])
+            result["candidate"] = {
+                "candidate_id": issuer["job_id"],
+                "recipe_digest": recipe.digest,
+                "issuer_input_digest": _digest(issuer["input"]),
+            }
+            break
+    else:
+        current = await successor.world(scope, project["project_id"])
+        result["actions"] = current["environment"]["actions"]
+    catalog = await successor.desktop_catalog()
+    result["desktop_targets"] = [
+        {
+            "target_id": target["target_id"],
+            "binary_build_available": target["binary_build_available"],
+            "renderer": target["renderer"],
+            "readiness_code": target["readiness"]["code"],
+        }
+        for target in catalog["targets"]
+    ]
+    return result
 
 
 async def _context(scope, row, project, binding):
@@ -1203,6 +1604,8 @@ async def _context(scope, row, project, binding):
         result["successor_editable"] = {
             key: authored["spec"].get(key) for key in ("title", "mechanics", "palette", "camera", "fidelity")
         }
+    if row.get("completion_mode") == "original":
+        result["original_project"] = await _original_project_context(scope, row, project)
     while len(_json(result)) > 192 * 1024 and result.get("authoring_documents"):
         result["authoring_documents"].pop()
     _json(result, 192 * 1024)
@@ -1243,7 +1646,7 @@ async def _prepare(scope, row, token):
     project, binding = await _current(scope, row)
     allowed = READ | WORK | CONTROL | (EDIT if row["allow_edits"] else frozenset())
     if row.get("completion_requirements"):
-        allowed &= {
+        checklist_operations = {
             "catalog",
             "project.inspect",
             "console.inspect",
@@ -1263,6 +1666,28 @@ async def _prepare(scope, row, token):
             "lessons.search",
             "project.review",
         }
+        if row.get("completion_mode") == "original":
+            checklist_operations = {
+                "project.inspect",
+                "world.inspect",
+                "world.edit",
+                "successor.synthesize",
+                "successor.adopt",
+                "successor.inspect",
+                "successor.export",
+                "simulate",
+                "project.review",
+                "desktop.inspect",
+                "desktop.build",
+                "project.export",
+                "artifact.export",
+                "job.inspect",
+                "job.resume",
+                "job.cancel",
+                "knowledge.search",
+                "knowledge.practice",
+            }
+        allowed &= checklist_operations
     if row["jobs_started"] >= row["max_jobs"]:
         allowed -= JOB
     schemas = studio_application_schemas()
@@ -1274,6 +1699,8 @@ async def _prepare(scope, row, token):
             "goal": row["goal"],
             "execution_mode": row["execution_mode"],
             "remaining_steps": row["max_steps"] - row["cursor"],
+            "remaining_model_calls": row["max_model_calls"] - row["model_calls"],
+            "remaining_jobs": row["max_jobs"] - row["jobs_started"],
             "context": context,
             "operations": {key: schemas[key] for key in sorted(allowed) if key in schemas},
             "required_response": {
@@ -1287,7 +1714,11 @@ async def _prepare(scope, row, token):
             "receipt_reference_tokens": sorted(_RECEIPT_REFS),
             "completion_requirements": row.get("completion_requirements", []),
             "workflow": workflow,
-            "workflow_guidance": "Inspect exact records and build preflight; make authorized edits; build and wait for actual binary; preview exact artifact with bounded inputs; prepare project.export and artifact.export. Queued/source_only is not successful compilation. Cite only evidence_catalog refs. A requested export requires both current source JSON and the same previewed binary.",
+            "workflow_guidance": (
+                "Create through the registered original profiles or inspect the current saved world; explicitly adopt the actual completed candidate; run positive source simulation and numerical review; package with a ready registered desktop target; prepare project.export and matching artifact.export. Authoring/adoption is not compilation, numerical review is not subjective quality certification, and source simulation is not desktop binary execution. Budget extra refinement explicitly: a world.edit requires new current-source simulation/review/package facts. Use actual current observations rather than repeating completed reads. Cite only evidence_catalog refs."
+                if row.get("completion_mode") == "original"
+                else "Inspect exact records and build preflight; make authorized edits; build and wait for actual binary; preview exact artifact with bounded inputs; prepare project.export and artifact.export. Queued/source_only is not successful compilation. Cite only evidence_catalog refs. A requested export requires both current source JSON and the same previewed binary."
+            ),
         },
         ensure_ascii=False,
         allow_nan=False,
@@ -1441,13 +1872,29 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
                     )
                     if op in edits
                 }
-            if shape.get("$defs"):
+            if name == "world.edit":
+                operations[name]["fields"] = {
+                    "expected_spec_digest": {"type": "string"},
+                    "changes": {"type": "object"},
+                    "edits": {"type": "array", "minItems": 1, "maxItems": 64},
+                }
+                operations[name][
+                    "choose"
+                ] = "Exactly one of changes or edits; inspect current fields/entities first."
+                operations[name]["edit_fields"] = {
+                    value["properties"]["op"]["const"]: value.get("required", [])
+                    for value in shape.get("$defs", {}).values()
+                    if isinstance(value.get("properties", {}).get("op", {}).get("const"), str)
+                }
+            if shape.get("$defs") and name != "world.edit":
                 operations[name]["$defs"] = {key: field_shape(value) for key, value in shape["$defs"].items()}
         source_project = context["project"]
         data = {
             "goal": row["goal"],
             "mode": row["execution_mode"],
             "remaining_steps": row["max_steps"] - row["cursor"],
+            "remaining_model_calls": row["max_model_calls"] - row["model_calls"],
+            "remaining_jobs": row["max_jobs"] - row["jobs_started"],
             "current": {
                 "project_id": row["project_id"],
                 "version": row["head_version"],
@@ -2384,7 +2831,7 @@ def _state_digest(row):
     payload = {key: row.get(key) for key in _STATE_FIELDS}
     if "max_output_tokens" in row:
         payload["max_output_tokens"] = row["max_output_tokens"]
-    for name in ("completion_requirements", "completion_receipt"):
+    for name in ("completion_requirements", "completion_receipt", "completion_mode"):
         if name in row:
             payload[name] = row[name]
     return _digest(jsonable_encoder(_bson_canonical(payload)))
@@ -2423,6 +2870,11 @@ def _validate_journal(row):
             raise GameLearningError(
                 "studio_goal_journal_corrupt", "Original workflow requirements differ.", 503
             )
+    if "completion_mode" in row or "completion_mode" in intent:
+        if row.get("completion_mode") not in {"native", "original"} or row.get(
+            "completion_mode"
+        ) != intent.get("completion_mode"):
+            raise GameLearningError("studio_goal_journal_corrupt", "Original workflow mode differs.", 503)
     if "max_output_tokens" in row or "max_output_tokens" in intent:
         if (
             type(row.get("max_output_tokens")) is not int
@@ -2872,6 +3324,31 @@ async def catalog(scope):
             "planner_poll_seconds": PLANNER_POLL_SECONDS,
         },
         "completion_requirements": ["edit", "build", "preview", "export"],
+        "completion_modes": {
+            "native": {
+                "requirements": ["edit", "build", "preview", "export"],
+                "project_owner": "console_editor",
+                "scope": "Actual compiled console artifact and approved-core preview; no hardware certification.",
+            },
+            "original": {
+                "requirements": ["edit", "simulate", "review", "package", "export"],
+                "project_owner": "successor_or_nonconsole_base",
+                "operations": [
+                    "successor.synthesize",
+                    "successor.adopt",
+                    "world.inspect",
+                    "world.edit",
+                    "simulate",
+                    "project.review",
+                    "desktop.inspect",
+                    "desktop.build",
+                    "project.export",
+                    "artifact.export",
+                ],
+                "scope": "Actual original source runtime and numerical review, compiled browser-rendered desktop package and exports; no subjective-quality or desktop-execution certification.",
+                "source_change_invalidates_downstream_receipts": True,
+            },
+        },
         "builder_workflow": {
             "operations": [
                 "console.inspect",
@@ -2893,6 +3370,7 @@ async def catalog(scope):
 _RECEIPT_REFS = {
     "last_job.job_id": ("last_job_receipt", "job_id"),
     "last_job.result.policy_id": ("last_job_receipt", "result", "policy_id"),
+    "last_job.result.candidate_id": ("last_job_receipt", "result", "candidate_id"),
     "last_job.result.artifacts.0.artifact_id": ("last_job_receipt", "result", "artifacts", 0, "artifact_id"),
     "last_job.result.artifacts.0.sha256": ("last_job_receipt", "result", "artifacts", 0, "digest"),
     "last_job.result.artifacts.0.digest": ("last_job_receipt", "result", "artifacts", 0, "digest"),
@@ -2905,6 +3383,7 @@ _RECEIPT_REFS = {
 }
 _REF_FIELDS = {
     "job_id",
+    "candidate_id",
     "artifact_id",
     "expected_artifact_digest",
     "campaign_id",
@@ -3080,6 +3559,43 @@ def _planner_payload_schemas(schemas, allowed, context):
                 and all(c in "0123456789abcdef" for c in manifest)
             ):
                 properties["expected_manifest_digest"]["enum"] = [manifest]
+        elif operation == "world.edit":
+            spec_digest = context.get("successor_spec_digest")
+            if (
+                isinstance(spec_digest, str)
+                and len(spec_digest) == 64
+                and all(c in "0123456789abcdef" for c in spec_digest)
+            ):
+                properties["expected_spec_digest"]["enum"] = [spec_digest]
+            if "changes" in properties and "edits" in properties:
+                branches = []
+                for selected, omitted in (("changes", "edits"), ("edits", "changes")):
+                    selected_schema = properties[selected]
+                    if "anyOf" in selected_schema:
+                        non_null = [item for item in selected_schema["anyOf"] if item.get("type") != "null"]
+                        selected_schema = non_null[0] if len(non_null) == 1 else {"anyOf": non_null}
+                    branch_properties = {key: value for key, value in properties.items() if key != omitted}
+                    branch_properties[selected] = selected_schema
+                    branches.append(
+                        {
+                            **payload,
+                            "properties": branch_properties,
+                            "required": [*payload.get("required", []), selected],
+                        }
+                    )
+                payload = {"oneOf": branches}
+        elif operation == "successor.synthesize":
+            sources = properties["sources"]
+            profiles = context.get("original_project", {}).get("authored_profiles", [])
+            profile_ids = [profile["profile_id"] for profile in profiles]
+            if profile_ids:
+                for branch in sources.get("items", {}).get("oneOf", []):
+                    fields = branch.get("properties", {})
+                    if fields.get("kind", {}).get("const") == "authored_profile":
+                        fields["profile_id"]["enum"] = profile_ids
+            properties["sources"] = {
+                "oneOf": [{**sources, "minItems": count, "maxItems": count} for count in (1, 3)]
+            }
         result[operation] = payload
     _json(result, 48 * 1024)
     return result
@@ -3189,12 +3705,90 @@ def _planner_response_schema(allowed, *, allow_done=True, payload_schemas=None):
             done = schema["oneOf"][-1]
             done["properties"]["follow_up"] = {"type": "array", "maxItems": 0}
             decisions.append(done)
+        _share_payload_definitions(definitions, ["p" + str(index) for index in range(len(payload_schemas))])
         schema = {"$defs": definitions, "oneOf": decisions}
         _json(schema, 65536)
     return schema
 
 
+def _share_payload_definitions(definitions, payload_names):
+    """Intern identical owner subforms, retaining all validation semantics."""
+    counts, sizes = {}, {}
+
+    def map_children(value, visit):
+        output = dict(value)
+        for key in ("properties", "patternProperties"):
+            if isinstance(value.get(key), dict):
+                output[key] = {name: visit(child) for name, child in value[key].items()}
+        for key in (
+            "items",
+            "additionalProperties",
+            "not",
+            "if",
+            "then",
+            "else",
+            "contains",
+            "propertyNames",
+        ):
+            if isinstance(value.get(key), dict):
+                output[key] = visit(value[key])
+        for key in ("anyOf", "oneOf", "allOf", "prefixItems"):
+            if isinstance(value.get(key), list):
+                output[key] = [visit(child) for child in value[key]]
+        return output
+
+    nodes = 0
+
+    def count(value):
+        nonlocal nodes
+        nodes += 1
+        if nodes > 32768 or not isinstance(value, dict):
+            raise GameLearningError(
+                "studio_planner_schema_bounds", "Owner forms exceed bounded shared structure.", 409
+            )
+        key = _json(value)
+        counts[key] = counts.get(key, 0) + 1
+        sizes[key] = len(json.dumps(value).encode())
+        map_children(value, count)
+        return value
+
+    for name in payload_names:
+        count(definitions[name])
+    shared, additions = {}, {}
+
+    def replace(value, *, root=False):
+        key = _json(value)
+        output = map_children(value, replace)
+        occurrences, size = counts[key], sizes[key]
+        # The definition and all references must actually reduce the wire size.
+        if root or (occurrences - 1) * size <= occurrences * 30 + 16:
+            return output
+        name = shared.get(key)
+        if name is None:
+            name = "t" + str(len(shared))
+            shared[key] = name
+            additions[name] = output
+        return {"$ref": "#/$defs/" + name}
+
+    for name in payload_names:
+        definitions[name] = replace(definitions[name], root=True)
+    definitions.update(additions)
+
+
 def _action_scope(row, operation, payload):
+    if operation == "successor.adopt":
+        issued = {
+            step.get("job_id")
+            for step in row["steps"]
+            if step["decision"]["operation"] in {"successor.synthesize", "successor.compare"}
+            and step.get("executed")
+        }
+        if not payload.get("candidate_id") or payload["candidate_id"] not in issued:
+            raise GameLearningError(
+                "studio_goal_candidate_scope",
+                "A goal may adopt only its exact issued successor candidate.",
+                403,
+            )
     if operation in {"job.resume", "job.cancel"}:
         issued = {step.get("job_id") for step in row["steps"]} | {row.get("pending_job_id")}
         if not payload.get("job_id") or payload["job_id"] not in issued:

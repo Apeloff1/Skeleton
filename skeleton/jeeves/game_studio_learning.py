@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from concurrent.futures import ThreadPoolExecutor
 import json
 import math
 import random
@@ -18,6 +17,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, fields
 from pathlib import Path
 from types import MappingProxyType
@@ -68,6 +68,8 @@ def campaign_catalog() -> dict[str, Any]:
             "exploration_strategies": ["uniform", "least_visited"],
             "n_step": {"minimum": 1, "maximum": 16, "default": 4},
             "search_memory_limit": 64,
+            "proposal_preview_limit": 8,
+            "proposal_preview_claim": "Data-only source validation and rejection-memory checks; only the selected executed round counts as measured work.",
             "evaluation_seeds": {"minimum": 1, "maximum": 8, "default": 3},
             "objective_weight_bounds": [0, 10],
             "objective_normalization": "Return delta/max(1,abs baseline mean return); other deltas use their measured fractions.",
@@ -115,6 +117,8 @@ def _copy(value: Any, limit: int = 8 * 1024 * 1024) -> Any:
 
 
 def _implementation() -> str:
+    from skeleton.ai.game_builder import system_editors
+
     names = (
         "game_studio_learning.py",
         "game_learning.py",
@@ -133,8 +137,17 @@ def _implementation() -> str:
         "game_emulator_host.py",
         "game_studio_review.py",
         "game_studio_environment.py",
+        "game_studio_frame.py",
         "game_studio_rule_curriculum.py",
+        "game_studio_scenario_lab.py",
     )
+    game_builder = Path(system_editors.__file__).parent
+    dependencies = sorted(game_builder.glob("advanced_*_runtime.py")) + [
+        game_builder / "advanced_level_scenes.py",
+        game_builder / "system_editors.py",
+    ]
+    if len(dependencies) > 64:
+        raise GameLearningError("studio implementation dependency inventory exceeds64")
     return digest(
         {
             "python": list(sys.version_info[:3]),
@@ -142,6 +155,10 @@ def _implementation() -> str:
                 name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
                 for name in names
                 if Path(__file__).with_name(name).is_file()
+            }
+            | {
+                "game_builder/" + path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in dependencies
             },
         }
     )
@@ -265,6 +282,32 @@ def validate_lesson(value: Mapping[str, Any], *, context_digest: str) -> dict[st
         or len(raw["recommendation"]) > 1024
     ):
         raise GameLearningError("lesson facts/recommendation exceed bounds")
+    previews = raw["facts"].get("discarded_previews", [])
+    if not isinstance(previews, list) or len(previews) > 8:
+        raise GameLearningError("lesson source-preview memory exceeds8")
+    for preview in previews:
+        if (
+            not isinstance(preview, dict)
+            or not {"arm_id", "source_digest", "reason"} <= preview.keys()
+            or preview.keys() - {"arm_id", "source_digest", "reason", "detail", "proposal_signature"}
+            or not isinstance(preview["arm_id"], str)
+            or not 1 <= len(preview["arm_id"]) <= 128
+            or not isinstance(preview["reason"], str)
+            or not 1 <= len(preview["reason"]) <= 128
+            or "detail" in preview
+            and (not isinstance(preview["detail"], str) or len(preview["detail"]) > 256)
+        ):
+            raise GameLearningError("lesson source-preview schema differs")
+        for name in ("source_digest", "proposal_signature"):
+            value = preview.get(name)
+            if value is None and name == "proposal_signature":
+                continue
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(c not in "0123456789abcdef" for c in value)
+            ):
+                raise GameLearningError("lesson source-preview identity differs")
     return raw
 
 
@@ -372,6 +415,16 @@ class StudioLearningCampaign:
             raise GameLearningError("explicit admitted source lineage required")
         self.implementation_digest = _implementation()
         initial_policy = None if policy_snapshot is None else _copy(policy_snapshot)
+        if len(lessons) > 128:
+            raise GameLearningError("imported lesson count exceeds128")
+        initial_lessons, seen = [], set()
+        for value in lessons:
+            lesson = validate_lesson(value, context_digest=self.context_digest)
+            if lesson["lesson_digest"] in seen:
+                raise GameLearningError("duplicate imported lesson")
+            seen.add(lesson["lesson_digest"])
+            initial_lessons.append(lesson)
+        initial_lessons = self._remember_lessons(initial_lessons)
         self.binding = {
             "request_digest": request.digest,
             "config": config.as_dict(),
@@ -379,6 +432,7 @@ class StudioLearningCampaign:
             "lineage_digest": digest(self.lineage),
             "implementation_digest": self.implementation_digest,
             "proposal_priors_digest": digest(self.proposal_priors),
+            "initial_lessons_digest": digest(initial_lessons),
             "initial_policy_digest": (
                 None if initial_policy is None else initial_policy.get("snapshot_digest")
             ),
@@ -394,17 +448,7 @@ class StudioLearningCampaign:
         self.history_digest = digest({"campaign_id": self.campaign_id, "genesis": self.binding})
         self.last_round_digest = None
         self.lesson_count = 0
-        self.recent_lessons = []
-        if len(lessons) > 128:
-            raise GameLearningError("imported lesson count exceeds128")
-        seen = set()
-        for value in lessons:
-            lesson = validate_lesson(value, context_digest=self.context_digest)
-            if lesson["lesson_digest"] in seen:
-                raise GameLearningError("duplicate imported lesson")
-            seen.add(lesson["lesson_digest"])
-            self.recent_lessons.append(lesson)
-        self.recent_lessons = self.recent_lessons[-64:]
+        self.recent_lessons = initial_lessons
         if snapshot is not None:
             self._restore(snapshot)
         self._validate_policy(self.champion, self.champion_policy)
@@ -424,6 +468,16 @@ class StudioLearningCampaign:
     def _validate_policy(self, request, policy):
         if policy is not None:
             GamePolicyLearner.from_snapshot(policy, expected_spec=self._spec(request))
+
+    @staticmethod
+    def _remember_lessons(lessons):
+        # Specialist reports remain in the durable round journal. The small
+        # proposal cache favors distinct decision receipts over their three
+        # duplicate role fact sets, while retaining the latest role evidence.
+        decisions = [i for i, lesson in enumerate(lessons) if lesson["role"] == "decision"][-61:]
+        other = [i for i, lesson in enumerate(lessons) if lesson["role"] != "decision"]
+        keep = sorted(decisions + other[-(64 - len(decisions)) :])
+        return [lessons[i] for i in keep]
 
     def snapshot(self) -> dict[str, Any]:
         raw = {
@@ -489,11 +543,12 @@ class StudioLearningCampaign:
         if raw["round_limit"] != self.config.round_limit:
             raise GameLearningError("campaign round admission differs")
         episodes = self.config.episodes_per_round + 4 * self.config.evaluation_seeds
+        mirror_steps = 20 * min(6, self.config.episode_steps) if self.request.kind == "studio" else 0
         self.cumulative_steps = _int(
             raw["cumulative_steps"],
             "campaign actual steps",
             self.cursor * episodes,
-            self.cursor * episodes * self.config.episode_steps,
+            self.cursor * (episodes * self.config.episode_steps + mirror_steps),
         )
         self.lesson_count = _int(raw["lesson_count"], "campaign lessons", 0, 400000)
         if self.lesson_count != self.cursor * 4:
@@ -589,7 +644,7 @@ class StudioLearningCampaign:
         ):
             raise GameLearningError("champion target/request identity differs")
         if (
-            self.request.kind not in ("successor", "console_editor")
+            self.request.kind not in ("successor", "console_editor", "studio")
             and champion.digest != self.request.digest
         ):
             raise GameLearningError(
@@ -819,6 +874,9 @@ class StudioLearningCampaign:
                 "adventure.dungeon_count",
                 "fishing.fish_variants",
                 "farming.crop_variants",
+                "farming.growth_days",
+                "farming.harvest_value",
+                "farming.seed_cost",
             }
             for path in sorted(MECHANIC_CATALOG):
                 group, key = path.split(".")
@@ -840,8 +898,15 @@ class StudioLearningCampaign:
                         }
                     )
             if world.get("crop_variants"):
-                arms.append(
-                    {"id": "economy.crop_variants.seed_cost", "family": "economy", "kind": "seed_cost"}
+                arms.extend(
+                    [
+                        {"id": "economy.crop_variants.seed_cost", "family": "economy", "kind": "seed_cost"},
+                        {
+                            "id": "economy.crop_variants.growth_days",
+                            "family": "economy",
+                            "kind": "variant_growth",
+                        },
+                    ]
                 )
             if world.get("enemies"):
                 arms.extend(
@@ -861,8 +926,9 @@ class StudioLearningCampaign:
             if spec.get("fidelity", {"profile": "pixel"})["profile"] != "cinematic":
                 arms.append({"id": "fidelity.profile", "family": "fidelity", "kind": "fidelity"})
         elif request.kind == "studio":
-            from .game_studio_environment import parse_studio_source
             from skeleton.ai.game_builder.system_editors import editor_spec
+
+            from .game_studio_environment import parse_studio_source
 
             source = parse_studio_source(json.loads(request.tree["game/studio/session.json"]))
             for field in editor_spec(source["editor"])["fields"]:
@@ -873,16 +939,18 @@ class StudioLearningCampaign:
                     continue
                 if field["kind"] == "enum" and len(field["options"]) < 2:
                     continue
-                arms.append({
-                    "id": "studio." + key,
-                    "family": "mechanics",
-                    "kind": "studio_rule_setting",
-                    "key": key,
-                    "field_kind": field["kind"],
-                    "minimum": field["minimum"],
-                    "maximum": field["maximum"],
-                    "options": field["options"],
-                })
+                arms.append(
+                    {
+                        "id": "studio." + key,
+                        "family": "mechanics",
+                        "kind": "studio_rule_setting",
+                        "key": key,
+                        "field_kind": field["kind"],
+                        "minimum": field["minimum"],
+                        "maximum": field["maximum"],
+                        "options": field["options"],
+                    }
+                )
         elif request.kind == "console_editor":
             from .game_console_editor import ConsoleProject
 
@@ -973,6 +1041,36 @@ class StudioLearningCampaign:
                     ("fishing.reel_speed", 1),
                     ("policy.curriculum", 1),
                 ],
+                "adventure": [
+                    ("adventure.interact_radius", 1),
+                    ("adventure.melee_cooldown", -1),
+                    ("layout.checkpoint_shift", 1),
+                    ("policy.exploration", 1),
+                ],
+                "fishing": [
+                    ("fishing.cast_range", 1),
+                    ("fishing.reel_speed", 1),
+                    ("fishing.tension_release", 1),
+                    ("fishing.catch_window_seconds", 1),
+                ],
+                "farming": [
+                    ("economy.crop_variants.growth_days", -1),
+                    ("farming.water_decay", -1),
+                    ("economy.crop_variants.seed_cost", -1),
+                    ("economy.crop_variants.value", 1),
+                ],
+                "studio_cultivation": [
+                    ("studio.growth_days", -1),
+                    ("studio.field_tiles", 1),
+                    ("studio.crop_types", 1),
+                    ("policy.curriculum", 1),
+                ],
+                "studio_adventure": [
+                    ("studio.quest_depth", -1),
+                    ("studio.party_size", 1),
+                    ("policy.reward_horizon", 1),
+                    ("policy.exploration", 1),
+                ],
                 "scene": [
                     ("config.speed", 1),
                     ("config.attack_range", 1),
@@ -986,9 +1084,15 @@ class StudioLearningCampaign:
                 ],
             }
             for name, components in plans.items():
+                if name.startswith("studio_") and request.kind != "studio":
+                    continue
                 selected = [
                     {"id": identity, "sign": sign} for identity, sign in components if identity in known
                 ][: self.config.proposal_width]
+                if name != "exploration" and not any(
+                    not part["id"].startswith("policy.") for part in selected
+                ):
+                    continue
                 if len(selected) >= 2:
                     arms.append(
                         {
@@ -1000,7 +1104,7 @@ class StudioLearningCampaign:
                     )
         return arms
 
-    def _search_priority(self, arm):
+    def _search_priority(self, arm, *, source_digest=None):
         records = self.search_memory[-8:]
         if not records:
             return 0.0, [], {}
@@ -1047,11 +1151,30 @@ class StudioLearningCampaign:
             bonus += 0.15 * no_events
         recent_rejections = sum(r["arm_id"] == identity and r["outcome"] == "rejected" for r in records)
         bonus -= 0.05 * recent_rejections
+        source_digest = self.champion.digest if source_digest is None else source_digest
+        preview_rejections = sum(
+            preview.get("arm_id") == identity and preview.get("source_digest") == source_digest
+            for lesson in self.recent_lessons
+            if lesson["role"] == "decision"
+            for preview in lesson["facts"].get("discarded_previews", [])
+            if isinstance(preview, dict)
+        )
+        # This is remembered source-validation evidence, not a fabricated
+        # measured bandit trial. Otherwise eight permanently invalid untried
+        # arms could monopolize every later bounded preview page.
+        bonus -= min(4.0, 0.5 * preview_rejections)
+        urgency["unmeasured_source_preview_rejections"] = preview_rejections
         return bonus, [r["receipt_digest"] for r in records], urgency
 
-    def _select_proposal(self, index):
-        arms = self.proposal_catalog()
-        if self.champion_policy is not None and "policy.continue" not in self.bandit_state:
+    def _select_proposal(self, index, *, excluded=()):
+        arms = [arm for arm in self.proposal_catalog() if arm["id"] not in excluded]
+        if not arms:
+            raise GameLearningError("no remaining admitted proposal arms")
+        if (
+            self.champion_policy is not None
+            and "policy.continue" not in self.bandit_state
+            and "policy.continue" not in excluded
+        ):
             arm = next(a for a in arms if a["id"] == "policy.continue")
             return arm, {
                 "algorithm": "deterministic_ucb1",
@@ -1064,6 +1187,7 @@ class StudioLearningCampaign:
                 "selection_reason": "first_actual_admitted_parent_continuation",
             }
         total = max(1, self.cursor)
+        source_digest = self.champion.digest
         scored = []
         for arm in arms:
             row = self.bandit_state.get(arm["id"], {"trials": 0, "accepted": 0, "reward_sum": 0.0})
@@ -1072,11 +1196,11 @@ class StudioLearningCampaign:
                 if row["trials"] == 0
                 else row["reward_sum"] / row["trials"] + math.sqrt(2 * math.log(total + 1) / row["trials"])
             )
-            priority, refs, urgency = self._search_priority(arm)
+            priority, refs, urgency = self._search_priority(arm, source_digest=source_digest)
             tie = self._seed(index, "bandit:" + arm["id"])
             scored.append((row["trials"] == 0, (score or 0.0) + priority, -tie, arm, row))
         _, score, _, arm, row = max(scored, key=lambda item: item[:3])
-        priority, refs, urgency = self._search_priority(arm)
+        priority, refs, urgency = self._search_priority(arm, source_digest=source_digest)
         return arm, {
             "algorithm": "deterministic_ucb1",
             "arm_id": arm["id"],
@@ -1116,12 +1240,60 @@ class StudioLearningCampaign:
             )
         return facts
 
-    def _mutate(self, index, *, arm_override=None, request_override=None, direction_override=None):
+    def _propose(self, index):
+        """Skip bounded unmeasured dead ends before spending an episode budget."""
+        discarded, excluded = [], set()
+        for _ in range(min(8, len(self.proposal_catalog()))):
+            arm, selection = self._select_proposal(index, excluded=excluded)
+            excluded.add(arm["id"])
+            try:
+                request, facts = self._mutate(index, arm_override=arm, selection_override=selection)
+            except (ValueError, KeyError) as exc:
+                discarded.append(
+                    {
+                        "arm_id": arm["id"],
+                        "source_digest": self.champion.digest,
+                        "reason": "typed_source_validation",
+                        "detail": str(exc)[:256],
+                    }
+                )
+                continue
+            if not facts.get("proposal_rejected"):
+                facts["proposal_selection"]["discarded_previews"] = discarded
+                return request, facts
+            discarded.append(
+                {
+                    "arm_id": arm["id"],
+                    "source_digest": self.champion.digest,
+                    "reason": (
+                        "known_rejected_trial" if facts.get("duplicate_rejected_trial") else facts["strategy"]
+                    ),
+                    "proposal_signature": facts.get("proposal_signature"),
+                }
+            )
+        fallback = next(arm for arm in self.proposal_catalog() if arm["id"] == "policy.continue")
+        request, facts = self._mutate(index, arm_override=fallback)
+        facts["proposal_selection"].update(
+            algorithm="bounded_validated_proposal_search",
+            selection_reason="source_previews_exhausted_use_actual_policy_trial",
+            discarded_previews=discarded,
+        )
+        return request, facts
+
+    def _mutate(
+        self,
+        index,
+        *,
+        arm_override=None,
+        request_override=None,
+        direction_override=None,
+        selection_override=None,
+    ):
         if arm_override is None:
             arm, selection = self._select_proposal(index)
         else:
             arm = arm_override
-            selection = {
+            selection = selection_override or {
                 "algorithm": "bounded_composition_component",
                 "arm_id": arm["id"],
                 "family": arm["family"],
@@ -1152,6 +1324,7 @@ class StudioLearningCampaign:
             facts.update(
                 strategy="bounded_typed_composition",
                 direction=overall,
+                decision_lesson_digest=None if decision is None else decision["lesson_digest"],
                 composition=[],
                 learning_parameters={},
                 **self._proposal_facts(prior),
@@ -1195,6 +1368,7 @@ class StudioLearningCampaign:
             supported=True,
             strategy="bandit_selected_typed_mutation",
             direction=direction,
+            decision_lesson_digest=None if decision is None else decision["lesson_digest"],
             **self._proposal_facts(prior),
         )
         changes = facts["changes"]
@@ -1244,11 +1418,14 @@ class StudioLearningCampaign:
                 group, key = arm["path"].split(".")
                 low, high, _, _, integer = MECHANIC_CATALOG[arm["path"]]
                 change(spec["mechanics"][group], key, arm["path"], low, high, integer)
-            elif kind in ("variant_value", "seed_cost"):
+            elif kind in ("variant_value", "seed_cost", "variant_growth"):
                 section = arm.get("section", "crop_variants")
-                key = "seed_cost" if kind == "seed_cost" else "value"
+                key = {"seed_cost": "seed_cost", "variant_value": "value", "variant_growth": "growth_days"}[
+                    kind
+                ]
+                low, high, integer = (0.1, 30, False) if kind == "variant_growth" else (1, 100, True)
                 for row in world[section]:
-                    change(row, key, "world." + section + "." + row["id"] + "." + key, 1, 100, True)
+                    change(row, key, "world." + section + "." + row["id"] + "." + key, low, high, integer)
             elif kind in ("enemy_speed", "enemy_health"):
                 key = "hp" if kind == "enemy_health" else "speed"
                 for row in world["enemies"]:
@@ -1319,10 +1496,14 @@ class StudioLearningCampaign:
             tree = ConsoleProject(document, tree).export_files()
         elif request.kind == "studio":
             from .game_studio_environment import (
-                parse_studio_source, studio_request_tree,
+                parse_studio_source,
+                studio_request_tree,
             )
             from .game_studio_rule_curriculum import (
-                PROPOSAL_SCHEMA, RuleCurriculumError, apply_rule_proposal, _sha,
+                PROPOSAL_SCHEMA,
+                RuleCurriculumError,
+                _sha,
+                apply_rule_proposal,
             )
 
             source = parse_studio_source(json.loads(tree["game/studio/session.json"]))
@@ -1334,14 +1515,14 @@ class StudioLearningCampaign:
                 new = max(minimum, min(maximum, old + direction * increment))
                 if new == old:
                     new = max(minimum, min(maximum, old - direction * increment))
-                operation = {"scope":"settings", "path":key, "op":"set", "value":new}
+                operation = {"scope": "settings", "path": key, "op": "set", "value": new}
             elif arm["field_kind"] == "bool":
                 new = not old
-                operation = {"scope":"settings", "path":key, "op":"toggle", "value":None}
+                operation = {"scope": "settings", "path": key, "op": "toggle", "value": None}
             else:
                 choices = arm["options"]
                 new = choices[(choices.index(old) + direction) % len(choices)]
-                operation = {"scope":"settings", "path":key, "op":"set", "value":new}
+                operation = {"scope": "settings", "path": key, "op": "set", "value": new}
             proposal = {
                 "schema_version": PROPOSAL_SCHEMA,
                 "proposal_id": "campaign-" + str(index).zfill(6),
@@ -1361,17 +1542,20 @@ class StudioLearningCampaign:
                 )
                 return request, facts
             tree = studio_request_tree(changed)
-            changes.append({
-                "path":"game/studio/session.json/settings/" + key,
-                "before":old,"after":new,
-                "source_before_digest":_sha(source),
-                "source_after_digest":_sha(changed),
-                "rule_proposal_digest":_sha(proposal),
-                "source_rule_validated":True,
-            })
-            facts["strategy"]="bandit_selected_source_verified_game_rule"
-            facts["model_weights_modified"]=False
-            facts["runtime_engine_changed"]=False
+            changes.append(
+                {
+                    "path": "game/studio/session.json/settings/" + key,
+                    "before": old,
+                    "after": new,
+                    "source_before_digest": _sha(source),
+                    "source_after_digest": _sha(changed),
+                    "rule_proposal_digest": _sha(proposal),
+                    "source_rule_validated": True,
+                }
+            )
+            facts["strategy"] = "bandit_selected_source_verified_game_rule"
+            facts["model_weights_modified"] = False
+            facts["runtime_engine_changed"] = False
         raw = request.as_dict()
         raw["tree"] = tree
         request = GameEnvironmentRequest.from_dict(raw)
@@ -1738,7 +1922,7 @@ class StudioLearningCampaign:
         if _implementation() != self.implementation_digest:
             raise GameLearningError("studio implementation changed during campaign")
         try:
-            candidate, mutation = self._mutate(index)
+            candidate, mutation = self._propose(index)
         except (ValueError, KeyError) as exc:
             arm, selection = self._select_proposal(index)
             candidate = self.champion
@@ -1841,25 +2025,22 @@ class StudioLearningCampaign:
         # All scenario comparisons are read-only, seed-paired and independent.
         # Studio reference engines support concurrently isolated instances;
         # native emulator providers keep their existing sequential evaluation.
-        evaluations = [
-            (self.champion, seed, self.champion_policy, False, "baseline")
-            for seed in ordinary_seeds
-        ] + [
-            (candidate, seed, policy, False, "measured")
-            for seed in ordinary_seeds
-        ] + [
-            (self.champion, seed, self.champion_policy, True, "baseline_adv")
-            for seed in jitter_seeds
-        ] + [
-            (candidate, seed, policy, True, "measured_adv")
-            for seed in jitter_seeds
-        ]
+        evaluations = (
+            [(self.champion, seed, self.champion_policy, False, "baseline") for seed in ordinary_seeds]
+            + [(candidate, seed, policy, False, "measured") for seed in ordinary_seeds]
+            + [(self.champion, seed, self.champion_policy, True, "baseline_adv") for seed in jitter_seeds]
+            + [(candidate, seed, policy, True, "measured_adv") for seed in jitter_seeds]
+        )
 
         def evaluate_one(item):
             req, sample_seed, evaluator, perturbed, role = item
             return role, self._play(
-                req, sample_seed, evaluator, jitter=perturbed,
-                cancel=cancel, authorize=authorize,
+                req,
+                sample_seed,
+                evaluator,
+                jitter=perturbed,
+                cancel=cancel,
+                authorize=authorize,
             )
 
         if self.champion.kind == "studio" and candidate.kind == "studio":
@@ -1870,9 +2051,7 @@ class StudioLearningCampaign:
                 results = list(workers.map(evaluate_one, evaluations))
         else:
             results = [evaluate_one(item) for item in evaluations]
-        grouped = {role: [] for role in (
-            "baseline", "measured", "baseline_adv", "measured_adv"
-        )}
+        grouped = {role: [] for role in ("baseline", "measured", "baseline_adv", "measured_adv")}
         for role, execution in results:
             grouped[role].append(execution)
         baseline, measured = grouped["baseline"], grouped["measured"]
@@ -1913,31 +2092,31 @@ class StudioLearningCampaign:
         # they never automatically certify subjective game quality or cause
         # changes in production weights. Full training-seed holds remain
         # disjoint from this measured evaluation.
-        if (self.champion.kind == "studio" and candidate.kind == "studio"
-                and mutation.get("supported") and candidate.digest != self.champion.digest):
+        if (
+            self.champion.kind == "studio"
+            and candidate.kind == "studio"
+            and mutation.get("supported")
+            and candidate.digest != self.champion.digest
+        ):
             from .game_studio_environment import parse_studio_source
             from .game_studio_scenario_lab import ANGLES, mirrored_rule_comparison
 
-            original = parse_studio_source(
-                json.loads(self.champion.tree["game/studio/session.json"])
-            )
-            variant = parse_studio_source(
-                json.loads(candidate.tree["game/studio/session.json"])
-            )
+            original = parse_studio_source(json.loads(self.champion.tree["game/studio/session.json"]))
+            variant = parse_studio_source(json.loads(candidate.tree["game/studio/session.json"]))
             scenario_mirror = mirrored_rule_comparison(
-                original, variant,
+                original,
+                variant,
                 seed=self._seed(index, "mirrored-angles") % (2**31 - 16),
-                steps=min(6, self.config.episode_steps), angles=ANGLES,
+                steps=min(6, self.config.episode_steps),
+                angles=ANGLES,
             )
         constraints = {
             "mirrored_rule_has_observed_mechanics_effect": (
-                scenario_mirror is None or
-                scenario_mirror["informative_for_rule_selection"]
+                scenario_mirror is None or scenario_mirror["informative_for_rule_selection"]
             ),
             "mirrored_original_rule_nonregression": (
                 scenario_mirror is None
-                or scenario_mirror["worst_return_difference"]
-                >= -self.config.max_worst_seed_regression - 1e-9
+                or scenario_mirror["worst_return_difference"] >= -self.config.max_worst_seed_regression - 1e-9
             ),
             "visual_source_resource_floor": dragon["passed"],
             "typed_proposal_valid": not mutation.get("proposal_rejected", False),
@@ -1950,6 +2129,9 @@ class StudioLearningCampaign:
             or mean_step_ms <= self.config.max_mean_step_ms,
         }
         accepted = all(constraints.values()) and weighted > max(1e-9, self.config.min_improvement)
+        rejection_reasons = [name for name, passed in constraints.items() if not passed]
+        if weighted <= max(1e-9, self.config.min_improvement):
+            rejection_reasons.append("minimum_measured_weighted_gain")
         comparisons = list(zip(baseline + baseline_adv, measured + measured_adv, strict=True))
         new_counterexamples = []
         for baseline_play, play in sorted(
@@ -2061,14 +2243,20 @@ class StudioLearningCampaign:
                 "limit_ms": self.config.max_mean_step_ms,
                 "render_time_included": False,
                 "mirrored_effectiveness": (
-                    None if scenario_mirror is None else {
+                    None
+                    if scenario_mirror is None
+                    else {
                         "informative": scenario_mirror["informative_for_rule_selection"],
                         "classification": scenario_mirror["effectiveness_classification"],
                         "measured_behavior_differences": scenario_mirror["measured_behavior_differences"],
                         "productive_state_changes": scenario_mirror["productive_state_changes"],
                         "total_executed_steps": scenario_mirror["total_executed_steps"],
-                        "actual_replayed_action_applications": scenario_mirror["total_replayed_action_applications"],
-                        "novelty_per_100_replayed_actions": scenario_mirror["novelty_per_100_replayed_actions"],
+                        "actual_replayed_action_applications": scenario_mirror[
+                            "total_replayed_action_applications"
+                        ],
+                        "novelty_per_100_replayed_actions": scenario_mirror[
+                            "novelty_per_100_replayed_actions"
+                        ],
                         "worst_return_difference": scenario_mirror["worst_return_difference"],
                     }
                 ),
@@ -2087,8 +2275,7 @@ class StudioLearningCampaign:
                 "adversarial_return_delta": adversarial_delta,
                 "worst_seed_return_delta": min(ordinary_pairs + adv_pairs),
                 "mirrored_worst_return_delta": (
-                    None if scenario_mirror is None
-                    else scenario_mirror["worst_return_difference"]
+                    None if scenario_mirror is None else scenario_mirror["worst_return_difference"]
                 ),
                 "death_rate_regression": death_regression,
                 "minimum_improvement": self.config.min_improvement,
@@ -2100,6 +2287,7 @@ class StudioLearningCampaign:
                     if accepted
                     else "candidate_failed_one_or_more_declared_gates"
                 ),
+                "rejection_reasons": rejection_reasons,
             },
             "proposals": [],
             "lessons": [],
@@ -2112,13 +2300,20 @@ class StudioLearningCampaign:
                 "ordinary_return_delta": improvement,
                 "adversarial_return_delta": adversarial_delta,
                 "objective_gain": weighted,
+                "normalized_objective_delta": normalized,
                 "constraints": constraints,
+                "failed_constraints": [name for name, passed in constraints.items() if not passed],
+                "rejection_reasons": rejection_reasons,
                 "mechanic": mutation.get("mechanic"),
                 "direction": mutation.get("direction"),
                 "candidate_changes": mutation["changes"],
                 "proposal_arm": mutation["proposal_selection"]["arm_id"],
+                "discarded_previews": mutation["proposal_selection"].get("discarded_previews", []),
                 "evaluation_seed_count": self.config.evaluation_seeds,
                 "counterexamples": [r["record_digest"] for r in new_counterexamples],
+                "role_evidence_digest": (
+                    digest(raw["decision"]) if role == "decision" else roles[role]["report_digest"]
+                ),
             }
             lesson = {
                 "schema_version": LESSON_SCHEMA,
@@ -2131,7 +2326,11 @@ class StudioLearningCampaign:
                 "recommendation": (
                     "Retain this measured candidate within the exact admitted context."
                     if accepted
-                    else "Retain champion; use measured counterexamples and avoid this unsupported or regressing proposal without new evidence."
+                    else (
+                        "Retain champion; measured or source-validation gates rejected this trial: "
+                        + ", ".join(rejection_reasons)
+                        + ". Use the pinned counterexamples before retrying this source change."
+                    )[:1024]
                 ),
                 "evidence_digest": evidence_digest,
             }
@@ -2175,14 +2374,11 @@ class StudioLearningCampaign:
         # Their real steps must be admitted
         # *before* a campaign slice starts, not only after checkpointing.
         studio_mirror_allowance = (
-            20 * min(6, self.config.episode_steps)
-            if self.champion.kind == "studio" else 0
+            20 * min(6, self.config.episode_steps) if self.champion.kind == "studio" else 0
         )
-        planned = (
-            count * (
-                (self.config.episodes_per_round + 4 * self.config.evaluation_seeds)
-                * self.config.episode_steps + studio_mirror_allowance
-            )
+        planned = count * (
+            (self.config.episodes_per_round + 4 * self.config.evaluation_seeds) * self.config.episode_steps
+            + studio_mirror_allowance
         )
         if planned > self.config.max_slice_steps:
             raise GameLearningError("campaign planned slice exceeds cumulative step budget")
@@ -2233,7 +2429,7 @@ class StudioLearningCampaign:
                     self.counterexamples = retained
                     self.search_memory = (self.search_memory + [self._search_receipt(report)])[-64:]
                     self.lesson_count += len(report["lessons"])
-                    self.recent_lessons = (self.recent_lessons + report["lessons"])[-64:]
+                    self.recent_lessons = self._remember_lessons(self.recent_lessons + report["lessons"])
                     self.history_digest = digest(
                         {"previous": self.history_digest, "round_digest": report["round_digest"]}
                     )

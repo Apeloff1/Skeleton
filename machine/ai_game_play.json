@@ -17,7 +17,8 @@
     "source_withdrawal": "Project input epoch and play publication fence precede authority changes; current source rights are checked before read, replay, demonstration training and publication.",
     "parallel_training": "One to eight bounded native process actors with frozen batch assignments, acknowledged checkpoint prefix, live actual actor observations and existing job checkpoint authority. Interactive play has reserved capacity.",
     "media": "Operator-approved emulator IDs and registry digest are pinned in immutable input. Large source bundles and legacy cartridges above2MiB use private server materialization with exact hashes; HTTP inputs cannot select filesystem paths.",
-    "frames_storage": "Existing Mongo holds bounded latest-frame TTL projections for cross-process polling; the local broker retains bounded actual events. These caches confer no execution, checkpoint or completion authority."
+    "frames_storage": "Existing Mongo holds bounded latest-frame TTL projections for cross-process polling; the local broker retains bounded actual events. These caches confer no execution, checkpoint or completion authority.",
+    "studio_human_turns": "For studio/studio_rules requests only, an authenticated held=true human input executes one bounded environment action. Idle and held=false release events never select actions[0] or consume game turns. A completed turn checkpoints the actual snapshot and input acknowledgement before removing its durable pending input; controls, AI/replay, native held inputs, resource credits and physical drain remain unchanged. Existing queue remains bounded32; no future-turn planner or unbounded local action backlog. Already-committed input sequence retries acknowledge the durable checkpoint prefix without repeating a turn. Public capabilities expose input_mode one_turn_per_press, held_buttons false and idle_advances_environment false."
   },
   "bounds": {
     "live_plays_per_project": 32,

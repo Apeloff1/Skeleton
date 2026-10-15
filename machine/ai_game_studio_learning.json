@@ -260,5 +260,28 @@
     "scope": "Actual completed round comparison/role/acceptance and lesson evidence with current head snapshot/cursor; no bulk100000 in-memory materialization or production promotion.",
     "automated_tests_run": false,
     "runtime_json_boundary": "Durable campaign envelopes, round reports and lessons pass lossless finite bounded JSON encode/decode before strict pure digest/schema validation. BSON integer subclasses preserve their exact JSON value and all original hashes; dates, binary and arbitrary objects are not coerced."
+  },
+  "original_revision_learning": {
+    "status": "implementation_candidate",
+    "owners": [
+      "backend/core/game_studio_learning.py",
+      "skeleton/jeeves/game_studio_learning.py"
+    ],
+    "scope": "Existing campaign, Mongo round/lesson projections, typed original-game source and expected-version editor adoption only; no new service/store/provider or numerical promotion authority.",
+    "restoration": "Accepted validated studio source revisions may reopen under the same pinned editor/target/config/code identity; actual cumulative bounds include the already-admitted twenty studio mirror trajectories per round. No old-code snapshot migration.",
+    "selection": "At most eight data-only proposal previews per round skip previously rejected identical source edits and invalid/no-op mutations, then fall back to a genuine bounded policy trial. Bounded source-bound discarded-preview memory deprioritizes repeated invalid arms without inventing measured bandit trials. Previews never increment trials/rounds/steps; existing paired held-out and hard gates alone decide admission.",
+    "memory": "Existing bounded64 recent lesson slots retain at most61 decision receipts plus recent specialist evidence rather than duplicate role facts; all four issued lessons remain in durable paged evidence. At creation, bounded64 same-source and64 different-source decision rows are selected before transfer limits, validated against exact committed rounds and current source/teacher ancestry, and frozen as at most32 existing proposal_priors. Workers never refresh unbound lesson pools. Direct pure lessons inputs bind their initial digest; all same-code restores reuse exact inputs. Empty/invalid/over-capacity prior candidates cannot leak partial lineage into binding.",
+    "original_edits": "Only existing canonical successor mechanics and typed studio editor rules are combined; explicit adventure, fishing and farming proposal bundles are available when their actual consumed fields exist. No subjective design score or arbitrary source execution.",
+    "adoption": "An accepted current studio champion may hand off game/studio/session.json through existing source-preserving expected-version editor save, carrying all source/teacher ancestry. Eligibility requires actual champion tree bytes different from admitted source, exposed as source_changed_from_admission; policy-only gains remain inspectable and source/evidence-exportable without pretending a design edit. Existing paused/drained/exact-round gates remain mandatory; historical receipts are never rewritten.",
+    "bounds": {
+      "proposal_previews": 8,
+      "retained_lesson_slots": 64,
+      "proposal_decision_query": 128,
+      "proposal_transfers": 32,
+      "canonical_editor_runtime_files": 64
+    },
+    "validation": "Static syntax/format/lint and independent source review. No automated tests or workloads are run by this extension without the parent coordinated runtime go-ahead.",
+    "source_identity": "Campaign and proposal transfer identity includes canonical studio environment/frame/rule/scenario helpers and at most64 actual advanced editor/runtime dependency files, alongside prior successor/console/learning source pins. Source changes require fresh campaigns; no old-code state or quality evidence is silently migrated.",
+    "step_admission": "Creation rejects a slice whose configured episode and already-declared studio mirror allowance exceeds131072 actual-step budget before durable job admission; restore uses the same per-round upper bound."
   }
 }
