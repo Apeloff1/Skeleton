@@ -29,7 +29,6 @@ from skeleton.config.settings import EngineSettings
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 
-
 _SERVICE_TOKEN = "test-engine-service-token-" + ("x" * 32)
 
 
@@ -73,10 +72,7 @@ def _service_and_command(tmp_path):
             "context_digest": handoff.context_digest,
             "compiler_version": handoff.compiler_version,
             "handoff_digest": handoff.handoff_digest,
-            "source_snapshot": [
-                [segment_id, digest]
-                for segment_id, digest in handoff.source_snapshot
-            ],
+            "source_snapshot": [[segment_id, digest] for segment_id, digest in handoff.source_snapshot],
         },
         tool_policy={
             "tenant_id": "tenant-a",
@@ -225,20 +221,14 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
     assert replay.json() == submitted.json()
 
     status = client.get(
-        (
-            "/api/v1/engine/executions/route-exec"
-            "?actor_id=actor-a&tenant_id=tenant-a"
-        ),
+        ("/api/v1/engine/executions/route-exec" "?actor_id=actor-a&tenant_id=tenant-a"),
         headers=headers,
     )
     assert status.status_code == 200
     assert status.json()["execution_state"] == "created"
 
     events = client.get(
-        (
-            "/api/v1/engine/executions/route-exec/events"
-            "?actor_id=actor-a&tenant_id=tenant-a"
-        ),
+        ("/api/v1/engine/executions/route-exec/events" "?actor_id=actor-a&tenant_id=tenant-a"),
         headers=headers,
     )
     assert events.status_code == 200
@@ -255,7 +245,6 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
     )
     assert cancelled.status_code == 200
     assert cancelled.json()["cancellation_requested"] is True
-
 
 
 def test_engine_routes_reject_cross_actor_execution_access(tmp_path) -> None:
@@ -277,19 +266,13 @@ def test_engine_routes_reject_cross_actor_execution_access(tmp_path) -> None:
     assert submitted.status_code == 202
 
     wrong_status = client.get(
-        (
-            "/api/v1/engine/executions/route-exec"
-            "?actor_id=actor-b&tenant_id=tenant-a"
-        ),
+        ("/api/v1/engine/executions/route-exec" "?actor_id=actor-b&tenant_id=tenant-a"),
         headers=headers,
     )
     assert wrong_status.status_code == 403
 
     wrong_events = client.get(
-        (
-            "/api/v1/engine/executions/route-exec/events"
-            "?actor_id=actor-b&tenant_id=tenant-a"
-        ),
+        ("/api/v1/engine/executions/route-exec/events" "?actor_id=actor-b&tenant_id=tenant-a"),
         headers=headers,
     )
     assert wrong_events.status_code == 403
@@ -304,3 +287,8 @@ def test_engine_routes_reject_cross_actor_execution_access(tmp_path) -> None:
         headers=headers,
     )
     assert wrong_cancel.status_code == 403
+
+
+def _inventory_headers() -> dict:
+    """Minimal inventory headers for handoff recovery tests."""
+    return {"x-zaibatsu-principal": "test-principal", "x-zaibatsu-attester": "test-attester"}

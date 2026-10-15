@@ -18,6 +18,15 @@ class ModelProgramError(RuntimeError):
 
 
 def _json(value: object) -> str:
+    def _thaw(v):
+        if isinstance(v, MappingProxyType):
+            return {k: _thaw(i) for k, i in v.items()}
+        if isinstance(v, dict):
+            return {k: _thaw(i) for k, i in v.items()}
+        if isinstance(v, (list, tuple)):
+            return [_thaw(i) for i in v]
+        return v
+    value = _thaw(value)
     try:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     except (TypeError, ValueError) as exc:
@@ -905,3 +914,9 @@ __all__ = [
     "TrainingSpec",
     "corpus_digest",
 ]
+
+# Pickle/deepcopy support for MappingProxyType
+import copyreg
+def _proxy_reduce(proxy):
+    return (MappingProxyType, (dict(proxy),))
+copyreg.pickle(MappingProxyType, _proxy_reduce)

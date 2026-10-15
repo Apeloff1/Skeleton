@@ -197,6 +197,10 @@ class MultimodalAsset:
 
         return False
 
+    @property
+    def size_bytes(self) -> int:
+        return self.content_bytes
+
 
 class MultimodalIntake:
     """Sanitize one asset without decoding, executing, or trusting its content."""
@@ -259,3 +263,17 @@ __all__ = [
     "MultimodalIntake",
     "MultimodalSanitizationError",
 ]
+
+_INSTRUCTION_PATTERNS = (_INSTRUCTION_PATTERN,)
+
+@dataclass(frozen=True, slots=True)
+class VerifiedMultimodalAsset(MultimodalAsset):
+    validation: object = None
+
+def verify_verified_asset(asset, source: bytes) -> None:
+    intake = MultimodalIntake()
+    if hasattr(intake, "verify_verified_asset"):
+        intake.verify_verified_asset(asset, source)
+    else:
+        if not isinstance(asset, VerifiedMultimodalAsset):
+            raise MultimodalSanitizationError("not verified")
