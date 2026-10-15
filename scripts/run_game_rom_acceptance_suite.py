@@ -43,6 +43,7 @@ TEST_MODULES = (
     "skeleton.testing.test_game_original_rom_ai_acceptance",
     "skeleton.testing.test_game_original_rom_goal_training",
     "skeleton.testing.test_game_rom_acceptance_suite",
+    "skeleton.testing.test_game_original_mapper_bus_audit",
 )
 
 
@@ -110,7 +111,10 @@ def _verify_original_pipeline(directory: Path) -> dict[str, Any]:
         "neural-world-candidate.json", "neural-world-measurements.json",
     }
     records = acceptance.get("private_output_sha256_receipts")
-    if not isinstance(records, list) or {row.get("name") for row in records if isinstance(row, dict)} != expected:
+    if (
+        not isinstance(records, list) or len(records) != len(expected)
+        or {row.get("name") for row in records if isinstance(row, dict)} != expected
+    ):
         raise AcceptanceSuiteError("original ROM acceptance did not declare all expected files")
     published = [acceptance_ref]
     for row in records:
