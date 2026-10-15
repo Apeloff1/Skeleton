@@ -91,11 +91,13 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                     or payload.get("source_content_sha256")!=source
                     or payload.get("core_sha256")!=core_sha):
                     raise LiveEvidenceError("Actual native episode step index or source was modified")
-                frames = payload.get("requested_native_frames", configured_frames)
+                if not {"requested_native_frames", "timing_mode", "timing_factor"} <= set(payload):
+                    raise LiveEvidenceError("Actual native frame pacing fields were removed")
+                frames = payload["requested_native_frames"]
                 expected_frames, _ = native_execution_budget(timing_mode, timing_factor, configured_frames)
                 if (type(frames) is not int or frames != expected_frames
-                    or payload.get("timing_mode", "normal") != timing_mode
-                    or payload.get("timing_factor", 1) != timing_factor
+                    or payload["timing_mode"] != timing_mode
+                    or payload["timing_factor"] != timing_factor
                     or type(payload.get("native_frame_calls")) is not int
                     or payload["native_frame_calls"] < frames
                     or (last_run_cursor is not None
@@ -298,6 +300,8 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         "total_real_reported_native_steps":sum(x["native_input_steps_verified"] for x in rows),
         "total_native_reset_events":sum(x["native_resets_verified"] for x in rows),
         "total_native_disc_swaps_verified":sum(x["native_disc_swaps_verified"] for x in rows),
+        "total_native_timing_changes_verified":sum(x["native_timing_changes_verified"] for x in rows),
+        "total_frozen_frame_inspections_verified":sum(x["native_frozen_inspections_verified"] for x in rows),
         "games":rows,
         "correctness_claim":"Checks a self-contained hash chain and exact raw controller records, not independently signed hardware execution",
         "model_weights_changed":False,
