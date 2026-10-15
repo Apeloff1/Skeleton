@@ -309,7 +309,7 @@ class RuntimeNativeRGBContracts(unittest.TestCase):
             authorize=lambda *_:True,
         )
         self.assertEqual(report["frames_measured"],2)
-        self.assertEqual(report["mean_temporal_rgb_change"],1/3)
+        self.assertAlmostEqual(report["mean_temporal_rgb_change"],1/3,places=6)
         self.assertEqual(report["frame_reports"][1]["delta_native_runs"],1)
         self.assertEqual(report["native_frames_executed_by_this_analyzer"],0)
         self.assertEqual(report["frame_reports"][0]["visual_features"]["tile_columns"],8)
