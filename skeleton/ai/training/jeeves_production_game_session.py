@@ -58,11 +58,12 @@ def run(
     expand_vocabulary: bool = False,
     max_optimizer_steps: int = 25000,
     max_training_seconds: int = 1200,
+    resume: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(run_id, str) or not _RUN_ID.fullmatch(run_id):
         raise ProductionCheckpointError("run id must be 3-48 safe lowercase characters")
-    if type(dry_run) is not bool or type(expand_vocabulary) is not bool:
-        raise ProductionCheckpointError("dry_run and expand_vocabulary must be boolean")
+    if any(type(flag) is not bool for flag in (dry_run, expand_vocabulary, resume)):
+        raise ProductionCheckpointError("dry_run, expand_vocabulary and resume must be boolean")
     if type(epochs) is not int or not 1 <= epochs <= 3:
         raise ProductionCheckpointError("epochs must be between 1 and 3")
     for label, value, upper in (
@@ -102,20 +103,27 @@ def run(
     }
     if len({x.resolve() for x in names.values()}) != len(names):
         raise ProductionCheckpointError("training output path identity collision")
-    for path in names.values():
-        if path.is_symlink() or path.exists():
+    for label, path in names.items():
+        if path.is_symlink() or (path.exists() and not (resume and label == "backup")):
             raise ProductionCheckpointError("training output already exists: " + path.name)
+    if resume and not names["backup"].is_file():
+        raise ProductionCheckpointError("resume requires the previous exact parent backup")
     start_sha = report["checkpoint_sha256"]
     if _sha(baseline) != start_sha:
         raise ProductionCheckpointError("active production state changed since preflight")
 
     # Write an independently verified, immutable parent copy before any SGD.
-    backup = prepare_training_copy(
-        attestation=attestation,
-        candidate_directory=out,
-        copy_destination=names["backup"],
-        allow_vocabulary_expansion=expand_vocabulary,
-    )
+    if resume:
+        if _sha(names["backup"]) != start_sha:
+            raise ProductionCheckpointError("resumed parent backup differs from verified production state")
+        backup = {"parent_sha256": start_sha}
+    else:
+        backup = prepare_training_copy(
+            attestation=attestation,
+            candidate_directory=out,
+            copy_destination=names["backup"],
+            allow_vocabulary_expansion=expand_vocabulary,
+        )
     if _sha(baseline) != _sha(names["backup"]):
         raise ProductionCheckpointError("serving weights differ from prepared backup")
 
@@ -131,6 +139,9 @@ def run(
         expand_vocabulary=expand_vocabulary,
         max_optimizer_steps=max_optimizer_steps,
         max_training_seconds=max_training_seconds,
+        progress_directory=out,
+        progress_run_id=run_id,
+        resume=resume,
     )
     if _sha(baseline) != start_sha:
         raise ProductionCheckpointError("live serving weights changed during training")
@@ -173,6 +184,8 @@ def run(
         "vocabulary_expansion_opted_in": expand_vocabulary,
         "max_optimizer_steps": max_optimizer_steps,
         "max_training_seconds": max_training_seconds,
+        "resumed_from_existing_progress": resume,
+        "resumable_optimizer_cursors": True,
         "human_review_complete": False,
         "game_design_improvement_established": False,
         "production_weights_modified": False,
@@ -188,6 +201,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--attestation", required=True, type=Path)
     parser.add_argument("--output-directory", required=True, type=Path)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--resume", action="store_true",
+                        help="resume an interrupted run from its immutable optimizer stages")
     parser.add_argument("--expand-vocabulary", action="store_true",
                         help="opt in to native BPE token growth on cloned candidate")
     parser.add_argument("--epochs", default=1, type=int)
@@ -210,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
             expand_vocabulary=args.expand_vocabulary,
             max_optimizer_steps=args.max_optimizer_steps,
             max_training_seconds=args.max_training_seconds,
+            resume=args.resume,
         )
         print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
         return 0 if result["status"] in (
