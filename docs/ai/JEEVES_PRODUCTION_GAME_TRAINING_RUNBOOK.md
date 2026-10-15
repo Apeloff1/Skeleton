@@ -75,6 +75,30 @@ Training protects the original parent checkpoint, writes an immutable verified b
 
 ## 6. Review files and gate promotion
 
+Every normal session also commits content-addressed, production-parent-bound
+optimizer snapshots and ordered progress receipts **after each eight-document
+batch**. An interrupted attempt can resume using the SAME run ID, the same
+policy and dataset, the same active model weights, and a fresh valid live
+attestation. The run checks stage-zero weights against freshly restored
+production weights, then verifies each cursor and immutable snapshot before
+continuing. An unverified or missing stage is rejected, not skipped.
+
+    skeleton-jeeves-game-session \
+      --run-id game-001 \
+      --attestation /PRIVATE_PATH/operator/jeeves-training-attestation.json \
+      --output-directory /PRIVATE_PATH/operator/candidates \
+      --epochs 1 \
+      --learning-rate 0.005 \
+      --max-optimizer-steps 25000 \
+      --max-training-seconds 1200 \
+      --resume
+
+A completed/rejected run with a manifest cannot be resumed as though unfinished;
+start a distinct run ID instead. Resume does not modify the live parent file
+or authorize deployment. The progress folder must be privately writable by
+the operator; its SHA-256 digests provide tamper detection, not an independent
+signature against someone able to rewrite all local files.
+
 A completed candidate run writes the following separate output files:
 
 - game-001-parent-backup.json — byte-identical, verified production baseline copy
@@ -133,7 +157,8 @@ Run:
       skeleton.testing.test_jeeves_production_game_train \
       skeleton.testing.test_jeeves_production_training_operator \
       skeleton.testing.test_jeeves_cortex_persisted_bpe \
-      skeleton.testing.test_jeeves_game_design_review_gate
+      skeleton.testing.test_jeeves_game_design_review_gate \
+      skeleton.testing.test_jeeves_training_progress
 
 Separately run the app installer, native runtime, game builder, security, model serving and end-to-end validation after compiling. Source commits alone do not prove those gates passed. No new noisy Actions workflows have been added.
 
@@ -142,5 +167,5 @@ Separately run the app installer, native runtime, game builder, security, model 
 - A real compiled serving process, real SKELETON_OWN checkpoint and in-process attestations are not accessible in this authoring environment.
 - An independent evaluation and controlled game playtesting process must establish whether candidate generations materially improve design; lexical/loss metrics are insufficient.
 - Torch-stack BPE vocabulary growth is not implemented; low-coverage runs fail closed.
-- Interrupted candidate training does not yet resume from an optimizer cursor; use fresh run IDs and preserve the original backup.
+- Interrupted candidate training can resume from immutable per-batch optimizer cursors, but the actual compiled-app restart path still requires end-to-end qualification.
 - End-to-end installer/compiled runtime proof and signed model promotion remain open until execution and separate authorization.
