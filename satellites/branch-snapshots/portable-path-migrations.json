@@ -1,0 +1,52 @@
+{
+  "schema_version": "skeleton.portable_renames.v1",
+  "reason": "Archive path portability on case-insensitive filesystems; file data are unchanged",
+  "baseline_commit": "af2c8ce53a0a92147d5b830d4a076e14d195ec7e",
+  "migrations": [
+    {
+      "old_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/frontend/components/UI/ErrorBanner.tsx",
+      "new_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/frontend/components/ui-legacy/ErrorBanner.tsx",
+      "blob_sha": "f3b04f165fabf989a570fd017186b7e01c4312b8"
+    },
+    {
+      "old_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/frontend/components/UI/LoadingScreen.tsx",
+      "new_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/frontend/components/ui-legacy/LoadingScreen.tsx",
+      "blob_sha": "96aabc81fcd11e96f11fe680ac8e5f2dbc2bb11c"
+    },
+    {
+      "old_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/frontend/components/UI/Toast.tsx",
+      "new_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/frontend/components/ui-legacy/Toast.tsx",
+      "blob_sha": "b7da7cf99f893516fc4fe489a5cdb58c44edf225"
+    },
+    {
+      "old_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/frontend/components/UI/ErrorBanner.tsx",
+      "new_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/frontend/components/ui-legacy/ErrorBanner.tsx",
+      "blob_sha": "f3b04f165fabf989a570fd017186b7e01c4312b8"
+    },
+    {
+      "old_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/frontend/components/UI/LoadingScreen.tsx",
+      "new_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/frontend/components/ui-legacy/LoadingScreen.tsx",
+      "blob_sha": "96aabc81fcd11e96f11fe680ac8e5f2dbc2bb11c"
+    },
+    {
+      "old_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/frontend/components/UI/Toast.tsx",
+      "new_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/frontend/components/ui-legacy/Toast.tsx",
+      "blob_sha": "b7da7cf99f893516fc4fe489a5cdb58c44edf225"
+    },
+    {
+      "old_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/frontend/components/UI/ErrorBanner.tsx",
+      "new_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/frontend/components/ui-legacy/ErrorBanner.tsx",
+      "blob_sha": "f3b04f165fabf989a570fd017186b7e01c4312b8"
+    },
+    {
+      "old_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/frontend/components/UI/LoadingScreen.tsx",
+      "new_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/frontend/components/ui-legacy/LoadingScreen.tsx",
+      "blob_sha": "96aabc81fcd11e96f11fe680ac8e5f2dbc2bb11c"
+    },
+    {
+      "old_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/frontend/components/UI/Toast.tsx",
+      "new_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/frontend/components/ui-legacy/Toast.tsx",
+      "blob_sha": "b7da7cf99f893516fc4fe489a5cdb58c44edf225"
+    }
+  ]
+}
