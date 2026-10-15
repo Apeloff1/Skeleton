@@ -27,7 +27,7 @@ class RecoveryWorker:
         self._queue = queue
 
     def process_next(self) -> RecoveryResult | None:
-        item = self._queue.pop()
+        item = self._queue.dequeue()
         if item is None:
             return None
 
