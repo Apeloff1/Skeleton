@@ -11,7 +11,8 @@ from .story_canon_fabric import (
 
 CAMERAS = frozenset((
     "establishing","wide","medium","closeup","extreme_closeup",
-    "tracking","over_shoulder","first_person","interactive","fixed"))
+    "tracking","over_shoulder","first_person","interactive","fixed",
+    "pan_to","tilt","dolly","crane","orbit","rack_focus","handheld"))
 CUTS = frozenset(("straight","match_cut","cross_cut","dissolve",
                   "continuous","player_control","fade"))
 AXES = frozenset(("axis_a","axis_b","neutral"))

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed if any of 384 Jeeves competency contracts drift before compilation."""
+"""Fail closed if any of 480 Jeeves competency contracts drift before compilation."""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -18,7 +18,7 @@ def main() -> int:
     except (OSError, ValueError) as exc:
         print(json.dumps({"valid": False, "error": str(exc)[:300]}), file=sys.stderr)
         return 1
-    if value["modules"] != 384 or value["domains"] != ["ai", "coding", "gaming"]:
+    if value["modules"] != 480 or value["domains"] != ["ai", "coding", "gaming"]:
         print("Jeeves specialization coverage drift", file=sys.stderr)
         return 1
     print(json.dumps({"valid": True, **value}, sort_keys=True))
