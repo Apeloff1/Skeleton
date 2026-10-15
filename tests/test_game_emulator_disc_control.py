@@ -26,10 +26,11 @@ GET_COUNT = C.CFUNCTYPE(C.c_uint)
 
 
 class FakeDisc:
-    def __init__(self, *, count=3, refuse_eject=False, refuse_select=False):
+    def __init__(self, *, count=3, refuse_eject=False, refuse_select=False, sentinel_during_eject=False):
         self.count, self.index, self.ejected = count, 0, False
         self.calls = []
         self.refuse_eject, self.refuse_select = refuse_eject, refuse_select
+        self.sentinel_during_eject = sentinel_during_eject
         def eject(value):
             self.calls.append(("eject", bool(value)))
             if value and self.refuse_eject:
@@ -39,7 +40,7 @@ class FakeDisc:
         def get_eject():
             return self.ejected
         def get_index():
-            return self.index
+            return 0xFFFFFFFF if self.ejected and self.sentinel_during_eject else self.index
         def select(index):
             self.calls.append(("select", index))
             if not self.ejected or self.refuse_select or index >= self.count:
@@ -81,6 +82,15 @@ class NativeDiskControlAbiContracts(unittest.TestCase):
         self.assertFalse(result["ejected"])
         self.assertTrue(result["changed"])
         self.assertEqual(core.calls, [("eject", True), ("select", 2), ("eject", False)])
+
+    def test_ejected_tray_can_report_uint_max_without_losing_actual_selection(self):
+        fixture = FakeDisc(sentinel_during_eject=True)
+        fixture.register()
+        self.assertEqual(fixture.core.swap_disc(2)["image_index"], 2)
+        self.assertFalse(fixture.ejected)
+        self.assertEqual(fixture.calls, [
+            ("eject", True), ("select", 2), ("eject", False),
+        ])
 
     def test_legacy_v0_callback_is_supported(self):
         fixture = FakeDisc(count=2)
