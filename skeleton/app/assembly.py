@@ -409,6 +409,17 @@ def _authenticated_mongo_uri(value: str) -> bool:
             return False
         if not parsed.hostname or not parsed.username or not parsed.password:
             return False
+        # Apply placeholder scrutiny to credentials only, not an external DNS
+        # label such as db.change-me.example.net. Earlier generic substring
+        # scrutiny mistakenly rejected valid operator-owned Mongo endpoints.
+        if any(
+            value.strip().lower() in {
+                "change-me", "changeme", "replace-me", "your-secret",
+                "your-key-here", "example", "placeholder",
+            }
+            for value in (parsed.username, parsed.password)
+        ):
+            return False
         # SRV records contain their own discovered port.
         if parsed.scheme == "mongodb+srv" and parsed.port is not None:
             return False
@@ -500,7 +511,7 @@ def preflight(
             value = values.get(key, "")
             ok = _usable_secret(value)
             if key in {"MONGO_URL", "SKL_MONGO_URI"}:
-                ok = ok and _authenticated_mongo_uri(value)
+                ok = _authenticated_mongo_uri(value)
             if key == "SKL_ENGINE_SERVICE_TOKEN":
                 ok = ok and 32 <= len(value) <= 4096 and value == value.strip()
             if key in {"GAMEFORGE_JWT_SECRET", "GF_SEAL_SECRET"}:

@@ -712,3 +712,36 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
         full=True, public_url_overrides={"chroma": "http://localhost:8222"},
     )
     assert ("chroma", "http://localhost:8222") in seen
+
+def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    authority = "external-user" + ":" + "operator-auth" + "@"
+    uri = f"mongodb://{authority}db.change-me.example.net:27017/app"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={uri}\nSKL_MONGO_URI={uri}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        next(c for c in checks if c.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
+    assert "operator-auth" not in repr(tuple(c.message for c in checks))
+
+
+def test_preflight_fails_placeholder_in_mongo_password_not_dns(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    uri = "mongodb://" + "real-user:change-me@" + "db.example.net/app"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={uri}\nSKL_MONGO_URI={uri}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        not next(c for c in checks if c.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
