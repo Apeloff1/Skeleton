@@ -185,11 +185,20 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           expand_vocabulary: bool = False,
           max_optimizer_steps: int = 25000,
           max_training_seconds: int = 1200,
+          progress_directory: Path | None = None,
+          progress_run_id: str | None = None,
+          resume: bool = False,
           studio_corpus: Path | None = None,
           studio_corpus_expected_sha256: str | None = None) -> dict[str, Any]:
     from skeleton.cortex.transformer import TinyTransformer
     from skeleton.cortex.bpe import BytePairEncoder
 
+    if type(resume) is not bool:
+        raise ValueError("resume must be boolean")
+    if (progress_directory is None) != (progress_run_id is None):
+        raise ValueError("progress_directory and progress_run_id must be supplied together")
+    if resume and progress_directory is None:
+        raise ProductionCheckpointError("resume requires a pinned progress directory and run ID")
     if type(max_optimizer_steps) is not int or not 1 <= max_optimizer_steps <= 1000000:
         raise ValueError("max_optimizer_steps must be an integer in [1, 1000000]")
     if type(max_training_seconds) is not int or not 1 <= max_training_seconds <= 86400:
@@ -208,10 +217,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         if path.exists() or path.is_symlink() or not path.parent.is_dir():
             raise ProductionCheckpointError("outputs must be new paths in existing directories")
 
-    # Admit only independently pinned, replay-verified original engine
-    # experience. Never treat a user-supplied training label as proof.
+    # Import only rights-cleared original gameplay from independently verified
+    # source and runtime replays, before touching the production checkpoint.
     if (studio_corpus is None) != (studio_corpus_expected_sha256 is None):
-        raise ProductionCheckpointError("gameplay corpus needs an independently pinned SHA256")
+        raise ProductionCheckpointError("studio corpus requires an independently pinned SHA256")
     measured_examples: tuple[str, ...] = ()
     pinned_corpus_sha256: str | None = None
     if studio_corpus is not None:
@@ -220,15 +229,15 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             studio_corpus, expected_sha256=studio_corpus_expected_sha256,
         )
         if not measured_examples:
-            raise ProductionCheckpointError("replay-verified gameplay corpus is empty")
+            raise ProductionCheckpointError("replayed original game curriculum is empty")
     parent_path, original, parent_sha = _production_source(source, expected)
     if parent_path.resolve() in (candidate.resolve(), report.resolve()):
         raise ProductionCheckpointError("outputs cannot overwrite active production checkpoint")
     dataset, heldout = _texts()
     if measured_examples:
-        holdout_rows = {text for cases in heldout.values() for text in cases}
-        if holdout_rows.intersection(measured_examples):
-            raise ProductionCheckpointError("measured gameplay corpus overlaps heldout evaluation")
+        independent_holdout = {line for group in heldout.values() for line in group}
+        if independent_holdout.intersection(measured_examples):
+            raise ProductionCheckpointError("replayed game experiences overlap independent holdout")
         dataset = dataset + measured_examples
     selected_key, original_snapshot, mouth = _active_snapshot(original)
     torch_stack = original_snapshot.get("kind") == "torch-stack"
@@ -254,19 +263,22 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     vocab_coverage_before = _token_coverage(model, curriculum_and_eval)
     expansion: dict[str, Any] | None = None
     if expand_vocabulary and vocab_coverage_before < min_coverage:
+        original_snapshot_sha256 = sha256(json.dumps(
+            original_snapshot, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
         if torch_stack:
-            raise ProductionCheckpointError(
-                "torch-stack production vocabulary expansion is not implemented; "
-                "never substitute a native transformer"
+            from .jeeves_torch_game_vocabulary import expand_torch_game_words
+            expansion = expand_torch_game_words(
+                model, curriculum_and_eval,
+                expected_snapshot_digest=original_snapshot_sha256,
             )
-        from .jeeves_game_vocabulary import expand_native_game_pieces
-        expansion = expand_native_game_pieces(
-            model, curriculum_and_eval,
-            expected_snapshot_digest=sha256(json.dumps(
-                original_snapshot, sort_keys=True, separators=(",", ":"),
-                ensure_ascii=False, allow_nan=False,
-            ).encode("utf-8")).hexdigest(),
-        )
+        else:
+            from .jeeves_game_vocabulary import expand_native_game_pieces
+            expansion = expand_native_game_pieces(
+                model, curriculum_and_eval,
+                expected_snapshot_digest=original_snapshot_sha256,
+            )
     vocab_coverage = _token_coverage(model, curriculum_and_eval)
     # The tiny default cortex vocabulary typically cannot represent arbitrary
     # game-design language. Fail closed rather than training mostly <UNK> ids.
@@ -292,21 +304,90 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "real game curriculum optimizer updates exceed operator budget: "
             + str(expected_steps) + " > " + str(max_optimizer_steps)
         )
-    # Bound work by small batches, checking a monotonic deadline between them.
-    # A single in-progress document is not preemptible by this mechanism.
-    deadline = time.monotonic() + max_training_seconds
+    # Stage a full clone after each small batch. Every persisted cursor binds
+    # to the same parent, curriculum bytes, model selection and optimizer plan.
+    batches = [
+        dataset[offset:offset + 8]
+        for _ in range(epochs)
+        for offset in range(0, len(dataset), 8)
+    ]
+    progress = None
+    start_batch = 0
     observed_steps = 0
-    for _ in range(epochs):
-        for offset in range(0, len(dataset), 8):
-            if time.monotonic() >= deadline:
-                raise ProductionCheckpointError("training time budget expired")
-            batch = dataset[offset:offset + 8]
+    if progress_directory is not None:
+        from .jeeves_training_progress import CandidateProgress
+        config_digest = sha256(json.dumps({
+            "dataset": list(dataset),
+            "heldout": heldout,
+            "epochs": epochs,
+            "learning_rate": lr,
+            "max_optimizer_steps": max_optimizer_steps,
+            "min_coverage": min_coverage,
+            "max_domain_regression": max_domain_regression,
+            "native_vocabulary_expansion": expand_vocabulary,
+            "active_model_key": selected_key,
+            "architecture": "torch-stack" if torch_stack else "TinyTransformer",
+            "expected_optimizer_updates": expected_steps,
+            "batch_size": 8,
+            "trainer_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
+            "native_or_torch_kernel_sha256": sha256((
+                Path(__file__).parents[2] / "cortex" /
+                ("torch_lm.py" if torch_stack else "transformer.py")
+            ).read_bytes()).hexdigest(),
+        }, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            allow_nan=False).encode("utf-8")).hexdigest()
+        progress = CandidateProgress(
+            directory=progress_directory, run_id=progress_run_id,
+            parent_sha256=parent_sha, config_digest=config_digest,
+            total_batches=len(batches), parent_steps=steps_before,
+            selected_model_key=selected_key,
+        )
+        restored = progress.latest(resume=resume)
+        if restored is None:
+            progress.write(0, model.snapshot())
+        else:
+            # A stage with a valid local digest can still have been assembled
+            # from unrelated tensors. Stage zero must equal the same
+            # production-derived, optionally BPE-grown baseline re-created
+            # from the attested parent, before loading any resumed weights.
+            expected_initial = model.snapshot()
+            if progress.initial_snapshot() != expected_initial:
+                raise ProductionCheckpointError(
+                    "optimizer stage zero differs from reconstructed production-derived baseline"
+                )
+            start_batch, state = restored
+            resumed_snapshot = state["snapshot"]
+            # The resumable architecture and token IDs must match the exact
+            # parent-derived candidate we would have trained from scratch.
+            if resumed_snapshot.get("itos") != model.itos:
+                raise ProductionCheckpointError("resumed tokenizer vocabulary differs from the pinned corpus")
             if torch_stack:
-                observed_steps += model.fit(batch, lr=lr)
+                model = TorchTransformer.from_snapshot(resumed_snapshot)
+                if model.snapshot().get("state") != resumed_snapshot.get("state"):
+                    raise ProductionCheckpointError("resumed Torch weights differ from committed optimizer stage")
             else:
-                observed_steps += model.fit(batch, lr=lr, schedule="cosine")
-            if time.monotonic() >= deadline:
-                raise ProductionCheckpointError("training time budget expired after batch")
+                model = TinyTransformer.from_snapshot(resumed_snapshot)
+                model.bpe = BytePairEncoder.from_snapshot(original["bpe"])
+                if model.snapshot().get("E") != resumed_snapshot.get("E"):
+                    raise ProductionCheckpointError("resumed native weights differ from committed optimizer stage")
+            observed_steps = state["receipt"]["completed_updates"]
+            if model.steps - steps_before != observed_steps:
+                raise ProductionCheckpointError("resumed weight cursor differs from recorded SGD steps")
+    deadline = time.monotonic() + max_training_seconds
+    for batch_index in range(start_batch, len(batches)):
+        if time.monotonic() >= deadline:
+            raise ProductionCheckpointError("training time budget expired; committed cursor is resumable")
+        batch = batches[batch_index]
+        if torch_stack:
+            observed_steps += model.fit(batch, lr=lr)
+        else:
+            observed_steps += model.fit(batch, lr=lr, schedule="cosine")
+        # Commit progress BEFORE checking the deadline after each batch.
+        # An elapsed-time rejection must preserve the last completed work.
+        if progress is not None:
+            progress.write(batch_index + 1, model.snapshot())
+        if time.monotonic() >= deadline:
+            raise ProductionCheckpointError("training time budget expired; committed cursor is resumable")
     if observed_steps != expected_steps or model.steps - steps_before != expected_steps:
         raise ProductionCheckpointError("actual optimizer steps differ from admitted budget")
     trained_snapshot = model.snapshot()
@@ -339,6 +420,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "observed_optimizer_updates": observed_steps,
         "max_optimizer_steps": max_optimizer_steps,
         "max_training_seconds": max_training_seconds,
+        "resumed_from_committed_batch": start_batch,
+        "committed_training_batches": len(batches) if progress is not None else 0,
+        "progress_run_id": progress_run_id,
+        "training_resume_supported": progress is not None,
         "vocabulary_coverage_before": vocab_coverage_before,
         "vocabulary_coverage": vocab_coverage,
         "vocabulary_expansion": expansion,
@@ -359,7 +444,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     if sha256(parent_path.read_bytes()).hexdigest() != parent_sha:
         raise ProductionCheckpointError("live checkpoint changed during training; refusing stale candidate")
     if studio_corpus is not None and sha256(studio_corpus.read_bytes()).hexdigest() != pinned_corpus_sha256:
-        raise ProductionCheckpointError("gameplay training corpus changed during optimization")
+        raise ProductionCheckpointError("gameplay curriculum changed during optimizer training")
     if result["status"] != "rejected_evaluation_gate":
         output = dict(original)
         output[selected_key] = trained_snapshot
@@ -382,10 +467,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--max-optimizer-steps", type=int, default=25000)
     parser.add_argument("--max-training-seconds", type=int, default=1200)
+    parser.add_argument("--progress-directory", type=Path)
+    parser.add_argument("--run-id")
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--learning-rate", type=float, default=0.005)
     parser.add_argument("--min-coverage", type=float, default=0.80)
     parser.add_argument("--expand-vocabulary", action="store_true",
-                        help="explicitly add missing original BPE pieces to a cloned native LM only")
+                        help="explicitly add missing BPE pieces or Torch tokens to the cloned active production LM only")
     parser.add_argument("--max-domain-regression", type=float, default=0.0)
     args = parser.parse_args(argv)
     try:
@@ -395,7 +483,10 @@ def main(argv: list[str] | None = None) -> int:
                        max_domain_regression=args.max_domain_regression,
                        expand_vocabulary=args.expand_vocabulary,
                        max_optimizer_steps=args.max_optimizer_steps,
-                       max_training_seconds=args.max_training_seconds)
+                       max_training_seconds=args.max_training_seconds,
+                       progress_directory=args.progress_directory,
+                       progress_run_id=args.run_id,
+                       resume=args.resume)
         print(json.dumps({k: v for k, v in result.items() if not k.startswith("generated_")},
                          sort_keys=True, allow_nan=False))
         return 0 if result["status"] != "rejected_evaluation_gate" else 3
