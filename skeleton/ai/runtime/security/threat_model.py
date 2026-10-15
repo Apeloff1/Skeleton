@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
-import json
 from typing import Iterable
+from skeleton.contracts.canonical import canonical_json_bytes
 
 from .contracts import SecurityContractError
 
@@ -108,7 +108,7 @@ class ThreatModel:
                 for item in self.impact_triggers
             ],
         }
-        return sha256(json.dumps(payload,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+        return sha256(canonical_json_bytes(payload)).hexdigest()
 
     def review_required(self, changed_domains: Iterable[str]) -> bool:
         if isinstance(changed_domains,(str,bytes)):

@@ -8,6 +8,8 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "repo-attention.yml"
 
+# Metadata-only assignment, milestone, lock and auto-merge changes are
+# reconciled by the existing daily sweep. Do not wake Actions on these.
 REQUIRED_PR_TYPES = {
     "synchronize",
     "edited",
@@ -15,16 +17,8 @@ REQUIRED_PR_TYPES = {
     "closed",
     "ready_for_review",
     "converted_to_draft",
-    "assigned",
-    "unassigned",
-    "milestoned",
-    "demilestoned",
     "review_requested",
     "review_request_removed",
-    "locked",
-    "unlocked",
-    "auto_merge_enabled",
-    "auto_merge_disabled",
 }
 FORBIDDEN_PR_TYPES = {"enqueued", "dequeued"}
 
@@ -32,12 +26,6 @@ REQUIRED_ISSUE_TYPES = {
     "edited",
     "reopened",
     "closed",
-    "assigned",
-    "unassigned",
-    "milestoned",
-    "demilestoned",
-    "locked",
-    "unlocked",
 }
 TRUSTED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 WRITE_SCOPE_RE = re.compile(r"^\s+([A-Za-z0-9_-]+):\s*write\s*(?:#.*)?$", re.MULTILINE)

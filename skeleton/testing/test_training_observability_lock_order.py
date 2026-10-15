@@ -10,7 +10,34 @@ from datetime import timedelta
 import pytest
 
 from skeleton.ai.runtime.training.observability import TrainingObserver
-from skeleton.testing.test_training_observability import NOW, _fixture, _train
+from skeleton.ai.runtime.training.control import TrainingRepository
+from skeleton.ai.runtime.training.data import DatasetRegistry
+from skeleton.ai.runtime.training.trainer import ReferenceLocalTrainer
+from skeleton.testing.test_governed_training_data import (
+    NOW, _ingest, _run_manifest,
+)
+
+
+def _fixture(tmp_path, engine: str):
+    """Create real governed, byte-materialized reference-training fixtures."""
+    if engine != "reference":
+        raise ValueError("lock-order fixture only qualifies reference trainer")
+    datasets=DatasetRegistry(tmp_path/"governed_input.sqlite3")
+    receipt=_ingest(datasets)
+    runs=TrainingRepository(tmp_path/"checkpoint_runs.sqlite3")
+    manifest=_run_manifest(receipt.manifest,run_id="observability-lock-order")
+    return datasets,runs,manifest,receipt
+
+
+def _train(datasets, runs, manifest, engine: str):
+    if engine != "reference":
+        raise ValueError("unsupported native training worker")
+    return ReferenceLocalTrainer(datasets,runs).train(
+        manifest,
+        datasets.training_corpus(manifest.dataset_digest),
+        checkpoint_every_documents=1,
+        now=NOW,
+    )
 
 
 class _AcquisitionProbe:

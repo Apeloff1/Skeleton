@@ -95,7 +95,9 @@ def test_inno_setup_contract_is_per_user_and_uninstallable():
     assert "Uninstallable=yes" in source
     assert 'Filename: "{app}\\{#AppExeName}"' in source
     assert 'Parameters: "--stop --quiet"' in source
-    assert 'Type: files; Name: "{app}\\.env"' in source
+    # Uninstall retains database volumes: credentials must survive for reinstall.
+    assert 'Type: files; Name: "{app}\\.env"' not in source
+    assert "User-generated .env intentionally remains" in source
     assert "{userdesktop}\\Skeleton" in source
     assert "{commondesktop}" not in source
 
@@ -135,6 +137,7 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert '"backend"' in source
     assert '"frontend"' in source
     assert '"skeleton"' in source
+    assert '"machine"' in source
     assert '":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json"' in source
     assert "$MaxRuntimeRelativePathChars = 190" in source
     assert "$PathBudgetViolations" in source
@@ -163,6 +166,7 @@ def test_windows_runtime_payload_respects_portable_path_budget():
             "skeleton",
             "scripts",
             "packaging",
+            "machine",
         ],
         check=True,
         capture_output=True,
@@ -280,3 +284,244 @@ def test_installed_boomerang_sim_queue_is_source_pinned_and_review_only():
     assert '"Boomerang Sim Queue", self.run_boomerang_queue' in launcher
     assert '"skeleton.ai.training.jeeves_boomerang_queue"' in packager
     assert "candidate evidence only" in launcher
+
+
+def test_windows_payload_covers_manifest_and_docker_copy_inputs():
+    """Installed copies must have every file required by their own preflight."""
+    import json
+    import re
+
+    source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    paths_section = source.split("$RuntimePaths = @(", 1)[1].split("\n)\n$ArchiveArgs", 1)[0]
+    staged = set(re.findall(r'^\s*"([^"]+)"', paths_section, flags=re.MULTILINE))
+
+    def included(path: str) -> bool:
+        return any(path == entry or path.startswith(entry + "/") for entry in staged
+                   if not entry.startswith(":("))
+
+    manifest = json.loads(Path("skeleton/app/manifest.json").read_text(encoding="utf-8"))
+    sources = set(manifest["required_paths"])
+    for dockerfile in ("Dockerfile", "backend/Dockerfile"):
+        docker_text = Path(dockerfile).read_text(encoding="utf-8")
+        sources.update(re.findall(
+            r"^\s*COPY\s+(?:--\S+\s+)*((?:machine|docs)/\S+)\s",
+            docker_text,
+            flags=re.MULTILINE,
+        ))
+
+    missing = sorted(path for path in sources if not included(path))
+    assert not missing, f"first-install payload excludes required files: {missing}"
+    assert "$MissingPayloadPaths.Count -gt 0" in source
+    assert "Windows payload lacks required app/Docker inputs" in source
+
+
+def test_host_preload_rejects_stopped_docker_daemon(monkeypatch, tmp_path):
+    from skeleton.app.preloader import inspect_host
+    from subprocess import CompletedProcess
+
+    monkeypatch.setattr("skeleton.app.preloader.preflight", lambda *args, **kwargs: ())
+    monkeypatch.setattr("skeleton.app.preloader.checks_ok", lambda checks: True)
+    monkeypatch.setattr("skeleton.app.preloader.shutil.which", lambda name: "docker")
+    monkeypatch.setattr(
+        "skeleton.app.preloader.shutil.disk_usage",
+        lambda path: type("Usage", (), {"free": 20 * 1024**3})(),
+    )
+    def runner(command, **kwargs):
+        if command[1] == "info":
+            return CompletedProcess(command, 1, stdout="", stderr="Docker daemon unavailable")
+        return CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    report = inspect_host(tmp_path, runner=runner, require_python=False, require_pip=False)
+    daemon = next(check for check in report.checks if check.code == "host:docker-daemon")
+    assert report.ready is False
+    assert daemon.required is True
+    assert "Start Docker Desktop" in daemon.remediation
+
+def test_windows_launcher_failure_receipts_do_not_show_ready_status(tmp_path):
+    from skeleton.app.installer import InstallPhase, InstallReceipt
+    from skeleton.app.preloader import PreloadCheck, PreloadReport
+    from skeleton.app.windows_launcher import _action_succeeded
+
+    failure = InstallReceipt(tmp_path, (InstallPhase("runtime-preflight", False, "Docker missing"),))
+    passed = InstallReceipt(tmp_path, (InstallPhase("runtime-preflight", True, "ok"),))
+    blocked = PreloadReport(
+        tmp_path, "Windows AMD64", "3.14",
+        (PreloadCheck("host:docker-daemon", False, "Docker stopped"),),
+    )
+    assert not _action_succeeded(failure)
+    assert _action_succeeded(passed)
+    assert not _action_succeeded(blocked)
+    assert not _action_succeeded((False, "cannot stop services"))
+    assert _action_succeeded((True, "stopped"))
+
+def test_default_uninstall_retains_credentials_needed_by_existing_mongo_volume():
+    source = Path("packaging/windows/SkeletonSetup.iss").read_text(encoding="utf-8")
+    assert "[UninstallRun]" in source
+    assert 'Parameters: "--stop --quiet"' in source
+    assert "[UninstallDelete]" not in source
+    assert "preserves named database volumes" in source
+
+def test_windows_installer_runs_actual_frozen_payload_preflight():
+    launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    assert 'mode.add_argument("--verify-payload"' in launcher
+    assert "preflight(root, runtime=False, manifest=load_manifest())" in launcher
+    assert "return 0 if checks_ok(checks) else 1" in launcher
+    assert 'ArgumentList @("--verify-payload")' in workflow
+    assert "SkeletonOffline.exe" in workflow
+    assert 'ArgumentList @("--help") -Wait -PassThru' in workflow
+
+def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    calls = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
+    ok, detail = launcher.open_running_application()
+    assert not ok
+    assert "backend offline" in detail
+    assert calls == []
+
+
+def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "all services healthy"))
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: False)
+    ok, detail = launcher.open_running_application()
+    assert not ok
+    assert "no browser accepted" in detail
+
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: True)
+    ok, detail = launcher.open_running_application()
+    assert ok
+    assert "all services healthy" in detail
+
+def test_windows_ci_sparse_checkout_contains_every_installer_root():
+    source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    for required in (
+        "/machine/", "/docs/", "/AGENTS.md", "/CLAUDE.md",
+        "/GEMINI.md", "/.cursor/rules/architecture.mdc",
+        "/.github/copilot-instructions.md",
+    ):
+        assert required in source
+
+
+def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    (tmp_path / ".env").write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "healthy"))
+    opened = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
+
+    success, detail = launcher.open_running_application(tmp_path)
+    assert success
+    assert opened == ["http://localhost:3300"]
+    assert "http://localhost:3300" in detail
+
+
+def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    secret = "sensitive-compose-secret"
+    def runner(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command, 5, stdout=f"MONGO_URL={secret}", stderr=f"JWT_SECRET={secret}",
+        )
+
+    monkeypatch.setattr(launcher, "_hidden_runner", runner)
+    success, detail = launcher.stop_runtime(tmp_path)
+    assert not success
+    assert "exit 5" in detail
+    assert secret not in detail
+
+def test_disk_preflight_fails_closed_when_installation_drive_disappears(tmp_path, monkeypatch):
+    monkeypatch.setattr("skeleton.app.preloader.preflight", lambda *args, **kwargs: ())
+    monkeypatch.setattr("skeleton.app.preloader.checks_ok", lambda checks: True)
+    monkeypatch.setattr("skeleton.app.preloader.shutil.which", lambda name: None)
+    def disk_missing(root):
+        raise OSError("drive missing")
+    monkeypatch.setattr("skeleton.app.preloader.shutil.disk_usage", disk_missing)
+
+    report = inspect_host(tmp_path, require_python=False, require_pip=False)
+    disk = next(item for item in report.checks if item.code == "host:disk")
+    assert not disk.ok
+    assert report.ready is False
+    assert "cannot inspect installation filesystem" in disk.detail
+    assert "drive missing" not in disk.detail
+
+
+def test_windows_hidden_runner_forwards_streaming_compose_output(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher
+
+    observed = {}
+    def fake_run(command, **kwargs):
+        observed.update(kwargs)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(windows_launcher.subprocess, "run", fake_run)
+    log_path = tmp_path / "build.log"
+    with log_path.open("w", encoding="utf-8") as output:
+        result = windows_launcher._hidden_runner(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=tmp_path, check=False,
+            stdout=output, stderr=subprocess.STDOUT, text=True,
+            env={"APP_MODE": "production"},
+        )
+    assert result.returncode == 0
+    assert observed["stdout"].closed
+    assert observed["stderr"] is subprocess.STDOUT
+    assert observed["capture_output"] is False
+    assert observed["cwd"] == tmp_path
+    assert observed["env"]["APP_MODE"] == "production"
+    assert observed["shell"] is False
+
+
+def test_host_preloader_never_echoes_docker_daemon_credentials(monkeypatch, tmp_path):
+    from skeleton.app.preloader import _command_check
+
+    credential = "private-token-present-only-in-child-output"
+    for status in (0, 17):
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command, status,
+                stdout=f"DOCKER_HOST=https://user:{credential}@daemon.internal",
+                stderr=f"DOCKER_HOST=https://user:{credential}@daemon.internal",
+            )
+
+        probe = _command_check(
+            ["docker", "info"], code="host:docker-daemon",
+            label="Docker daemon", remediation="Start Docker Desktop",
+            runner=runner,
+        )
+        assert probe.ok is (status == 0)
+        assert credential not in probe.detail
+        assert "DOCKER_HOST" not in probe.detail
+
+
+def test_windows_stop_command_raised_error_does_not_show_sensitive_text(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    def runner(command, **kwargs):
+        raise OSError("Secret environment variable JWT_SECRET=internal-test-secret")
+
+    monkeypatch.setattr(launcher, "_hidden_runner", runner)
+    ok, detail = launcher.stop_runtime(tmp_path)
+    assert not ok
+    assert "OSError" in detail
+    assert "internal-test-secret" not in detail
+    assert "JWT_SECRET" not in detail
+
+
+def test_windows_runtime_probe_exception_uses_type_only(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    def raise_probe(*args, **kwargs):
+        raise RuntimeError("private service token leaked from diagnostic")
+
+    monkeypatch.setattr(launcher, "public_service_urls", raise_probe)
+    ok, detail = launcher.runtime_status(tmp_path)
+    assert not ok
+    assert "RuntimeError" in detail
+    assert "private service token" not in detail

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, Mapping
+from urllib.parse import urlsplit
 
 
 @dataclass(frozen=True)
@@ -337,6 +338,49 @@ def _runtime_env(root: Path, environ: Mapping[str, str] | None) -> dict[str, str
     return values
 
 
+def public_service_urls(
+    root: Path,
+    *,
+    manifest: AssemblyManifest | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Resolve host-facing service addresses from the same Compose port inputs.
+
+    The application manifest documents default public URLs, while Compose
+    permits changing published host ports to avoid conflicts. The launcher
+    and installed readiness checks must probe the actual configured ports.
+    Invalid port overrides fail closed rather than probing the wrong service.
+    """
+    from urllib.parse import urlsplit, urlunsplit
+
+    manifest = manifest or load_manifest()
+    values = _runtime_env(root, environ)
+    ports = {
+        "frontend": "FRONTEND_PORT",
+        "backend": "BACKEND_PORT",
+        "skeleton": "SKELETON_PORT",
+        # The full-profile vector store is published on CHROMA_PORT.
+        # Omitting this made a healthy custom-port full install fail
+        # readiness by probing the stale default localhost:8000.
+        "chroma": "CHROMA_PORT",
+    }
+    result: dict[str, str] = {}
+    for service_name, key in ports.items():
+        port_text = values.get(key, "").strip()
+        if not port_text:
+            continue
+        if not port_text.isascii() or not port_text.isdecimal() or not 1 <= int(port_text) <= 65535:
+            raise ValueError(f"{key} must be an integer between 1 and 65535")
+        original = manifest.service(service_name).public_url
+        parsed = urlsplit(original)
+        if parsed.scheme not in {"http", "https"} or parsed.hostname not in {"localhost", "127.0.0.1"}:
+            raise ValueError(f"{service_name} has a non-local public URL; port override rejected")
+        result[service_name] = urlunsplit(
+            (parsed.scheme, f"{parsed.hostname}:{int(port_text)}", parsed.path, "", "")
+        )
+    return result
+
+
 def _usable_secret(value: str) -> bool:
     stripped = value.strip()
     if not stripped:
@@ -348,9 +392,52 @@ def _usable_secret(value: str) -> bool:
         "your-key-here",
         "your-secret",
         "replace-me",
-        "example",
     )
-    return not any(token in lowered for token in placeholders)
+    # Operator secrets and database URLs may legitimately contain "example"
+    # (for instance db.example.net). Match a literal placeholder, not a
+    # substring of an otherwise real credential.
+    return lowered not in {"example", "example-value", "example-secret"} and not any(
+        token in lowered for token in placeholders
+    )
+
+
+def _authenticated_mongo_uri(value: str) -> bool:
+    """Require authenticated MongoDB connection syntax without logging a URI."""
+    try:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"mongodb", "mongodb+srv"}:
+            return False
+        if not parsed.hostname or not parsed.username or not parsed.password:
+            return False
+        # Apply placeholder scrutiny to credentials only, not an external DNS
+        # label such as db.change-me.example.net. Earlier generic substring
+        # scrutiny mistakenly rejected valid operator-owned Mongo endpoints.
+        if any(
+            value.strip().lower() in {
+                "change-me", "changeme", "replace-me", "your-secret",
+                "your-key-here", "example", "placeholder",
+            }
+            for value in (parsed.username, parsed.password)
+        ):
+            return False
+        # MongoDB permits comma-separated seed lists for replica sets.
+        # urllib.parse only understands a single host, so checking parsed.port
+        # rejects otherwise valid multi-host URIs. Validate each authority
+        # endpoint independently; SRV mode must declare exactly one hostname
+        # and must not carry a port.
+        endpoints = parsed.netloc.rsplit("@", 1)[-1].split(",")
+        if parsed.scheme == "mongodb+srv" and len(endpoints) != 1:
+            return False
+        for endpoint in endpoints:
+            host = urlsplit("//" + endpoint)
+            if not host.hostname:
+                return False
+            port = host.port  # Reject malformed ports, also in replica sets.
+            if parsed.scheme == "mongodb+srv" and port is not None:
+                return False
+    except ValueError:
+        return False
+    return True
 
 
 def preflight(
@@ -434,8 +521,16 @@ def preflight(
         for key in manifest.required_env:
             value = values.get(key, "")
             ok = _usable_secret(value)
+            if key in {"MONGO_URL", "SKL_MONGO_URI"}:
+                ok = _authenticated_mongo_uri(value)
             if key == "SKL_ENGINE_SERVICE_TOKEN":
                 ok = ok and 32 <= len(value) <= 4096 and value == value.strip()
+            if key in {"GAMEFORGE_JWT_SECRET", "GF_SEAL_SECRET"}:
+                ok = ok and len(value) >= 32 and value == value.strip()
+            if key == "GF_KEYHOLDER_SEED":
+                ok = ok and len(value) == 64 and all(
+                    char in "0123456789abcdefABCDEF" for char in value
+                )
             checks.append(
                 AssemblyCheck(
                     code=f"env:{key}",

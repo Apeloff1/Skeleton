@@ -1,0 +1,182 @@
+"""Loopback and same-origin security contracts, no real emulator workers."""
+from __future__ import annotations
+
+import json
+import threading
+import unittest
+import urllib.error
+import urllib.request
+
+from skeleton.jeeves.game_comparison_live_http import LocalComparisonServer
+
+
+class FakeStudy:
+    def __init__(self):
+        self.steps=0
+        self.swaps=0
+        self.timings=0
+        self.inspections=0
+        self.closed=False
+    def state(self):
+        return {"schema_version":"synthetic-test-view","lanes":{}}
+    def step(self,packet):
+        self.steps+=1
+        return {"status":"fake-test-only","accepted":packet}
+    def reset(self,game_id):
+        return {"status":"synthetic-reset","game_id":game_id}
+    def swap_disc(self, packet):
+        self.swaps+=1
+        return {"status":"synthetic_disc_transaction","request":packet}
+    def set_timing(self, packet):
+        self.timings+=1
+        return {"status":"synthetic_timing","request":packet}
+    def inspect(self, packet):
+        self.inspections+=1
+        return {"status":"synthetic_inspection","request":packet}
+    def checkpoint(self,game_id):
+        return {"status":"synthetic-private-checkpoint","game_id":game_id}
+    def rewind(self,game_id):
+        return {"status":"synthetic-private-rewind","game_id":game_id}
+    def export_evidence(self):
+        return {"schema_version":"synthetic-no-native-evidence"}
+    def close(self):
+        self.closed=True
+
+
+class LocalOriginContracts(unittest.TestCase):
+    def setUp(self):
+        self.study=FakeStudy()
+        self.server=LocalComparisonServer(self.study,0,60)
+        self.base="http://127.0.0.1:"+str(self.server.server_port)
+        self.thread=threading.Thread(target=self.server.serve_forever,daemon=True)
+        self.thread.start()
+
+    def tearDown(self):
+        self.server.stop()
+        self.server.server_close()
+        self.thread.join(timeout=3)
+
+    def _call(self,path,*,method="GET",body=None,token=None,origin=None):
+        headers={}
+        if token is not None:headers["X-Study-Token"]=token
+        if origin is not None:headers["Origin"]=origin
+        if body is not None:headers["Content-Type"]="application/json"
+        request=urllib.request.Request(
+            self.base+path,data=json.dumps(body).encode() if body is not None else None,
+            headers=headers,method=method,
+        )
+        try:
+            with urllib.request.urlopen(request,timeout=3) as response:
+                return response.status,json.loads(response.read()) if path!="/" else response.read().decode()
+        except urllib.error.HTTPError as error:
+            return error.code,json.loads(error.read())
+
+    def test_get_state_requires_random_token(self):
+        status,_=self._call("/api/state")
+        self.assertEqual(status,403)
+        status,_=self._call("/api/state",token=self.server.secret)
+        self.assertEqual(status,200)
+
+    def test_post_rejects_cross_origin_even_with_token(self):
+        status,_=self._call(
+            "/api/step",method="POST",body={"steps":[]},
+            token=self.server.secret,origin="https://example.org",
+        )
+        self.assertEqual(status,403)
+        self.assertEqual(self.study.steps,0)
+        status,_=self._call(
+            "/api/step",method="POST",body={"steps":[]},
+            token=self.server.secret,origin=self.base,
+        )
+        self.assertEqual(status,200)
+        self.assertEqual(self.study.steps,1)
+
+    def test_disc_swap_requires_origin_token_and_cannot_accept_unauthorized_calls(self):
+        packet={"game_id":"synthetic","image_index":1}
+        status,_=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            origin=self.base,
+        )
+        self.assertEqual(status,403)
+        status,_=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            token=self.server.secret,origin="https://other.example",
+        )
+        self.assertEqual(status,403)
+        self.assertEqual(self.study.swaps,0)
+        status,result=self._call(
+            "/api/disc_swap",method="POST",body=packet,
+            token=self.server.secret,origin=self.base,
+        )
+        self.assertEqual(status,200)
+        self.assertEqual(result["status"],"synthetic_disc_transaction")
+        self.assertEqual(self.study.swaps,1)
+
+    def test_timing_and_inspection_enforce_same_origin_authentication(self):
+        speed={"game_id":"synthetic","mode":"slow","factor":4}
+        freeze={"game_id":"synthetic"}
+        for path,packet in (("/api/timing",speed),("/api/inspect",freeze)):
+            unauthenticated,_=self._call(path,method="POST",body=packet,origin=self.base)
+            self.assertEqual(unauthenticated,403)
+            foreign,_=self._call(path,method="POST",body=packet,
+                token=self.server.secret,origin="https://cross-origin.example")
+            self.assertEqual(foreign,403)
+            success,payload=self._call(path,method="POST",body=packet,
+                token=self.server.secret,origin=self.base)
+            self.assertEqual(success,200)
+            self.assertEqual(payload["request"],packet)
+        self.assertEqual(self.study.timings,1)
+        self.assertEqual(self.study.inspections,1)
+
+    def test_checkpoint_and_rewind_are_authenticated_same_origin_only(self):
+        for endpoint in ("/api/checkpoint","/api/rewind"):
+            status,_=self._call(
+                endpoint,method="POST",body={"game_id":"first"},
+                token=self.server.secret,origin="https://untrusted.invalid",
+            )
+            self.assertEqual(status,403)
+            status,receipt=self._call(
+                endpoint,method="POST",body={"game_id":"first"},
+                token=self.server.secret,origin=self.base,
+            )
+            self.assertEqual(status,200)
+            self.assertEqual(receipt["game_id"],"first")
+            self.assertEqual(set(receipt),{"status","game_id"})
+            status,_=self._call(
+                endpoint,method="POST",body={"game_id":"first","path":"/etc"},
+                token=self.server.secret,origin=self.base,
+            )
+            self.assertEqual(status,400)
+
+    def test_branch_difference_export_is_read_only_and_token_protected(self):
+        from unittest.mock import patch
+        status,_=self._call("/api/branches")
+        self.assertEqual(status,403)
+        response={
+            "schema_version":"skeleton.game.live_branch_difference.v1",
+            "game_count":2,"games":[],
+            "native_snapshot_game_memory_or_pcm_exported":False,
+        }
+        with patch(
+            "skeleton.jeeves.game_comparison_branch_analysis.build_live_branch_difference_report",
+            return_value=response,
+        ) as build:
+            status,result=self._call("/api/branches",token=self.server.secret)
+        self.assertEqual(status,200)
+        self.assertEqual(result,response)
+        build.assert_called_once()
+        self.assertEqual(self.study.steps,0)
+
+    def test_home_page_restrictive_security_policy(self):
+        request=urllib.request.Request(self.base+"/")
+        with urllib.request.urlopen(request,timeout=3) as response:
+            html=response.read().decode()
+            csp=response.headers["Content-Security-Policy"]
+        self.assertIn("connect-src 'self'",csp)
+        self.assertIn("frame-ancestors 'none'",csp)
+        self.assertIn('nonce="'+self.server.nonce+'"',html)
+        self.assertIn("root.append(deckFor(id));",html)
+
+
+if __name__=="__main__":
+    unittest.main()

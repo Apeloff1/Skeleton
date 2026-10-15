@@ -72,7 +72,7 @@ def _behavior() -> dict[str, object]:
                 "T-AUTH-001",
             ],
             "validation_paths": validations,
-            "model_version": "vol026-v1",
+            "model_version": "vol026-v2",
         },
     }
 

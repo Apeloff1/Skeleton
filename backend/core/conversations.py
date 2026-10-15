@@ -251,6 +251,9 @@ class MongoConversationAuthority:
 
     async def _after_dragon_commit(self, thread: ConversationThread) -> None:
         """Checkpoint only exact ten-step committed windows, when configured."""
+        # Optional derived state is installed by the full application lifespan.
+        # Minimal authority adapters (replay/recovery/migration) can omit it;
+        # canonical Mongo commits must never fail from an absent extension.
         projection = getattr(self, "dragon_projection", None)
         if projection is None or thread.message_sequence < 10 or thread.message_sequence % 10:
             return
