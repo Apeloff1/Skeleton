@@ -767,3 +767,11 @@ generalization. Every action selected as an item, ability, tool or
 weapon factor is scheduled early enough to actually be exercised
 within the requested bounded episode depth; seed jitter cannot
 silently omit it from the tested source path.
+
+The experiment receipts also explicitly distinguish action factors
+*scheduled for the test* from actions genuinely **attempted and
+accepted** by the original runtime. A multi-weapon, tool, item,
+ability or music action that is unavailable or rejected at that
+actual world state is flagged as unexecuted; it must not be treated
+as effective factor-training evidence merely because its command
+name appears in a planned schedule.

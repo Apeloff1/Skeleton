@@ -380,6 +380,21 @@ def execute_multifactor_scenarios(
         changed=_lane(modified,"causal",trial_seed,steps,scripted_actions=script)
         if not control["audit_passed"] or not changed["audit_passed"]:
             raise MultiFactorError("unverified combined world cannot supply weight data")
+        selected_actions=row["selected_registered_actions"]
+        action_receipts=[
+            {
+                "action":name,
+                "attempted":any(event["action"]==name for event in changed["step_receipts"]),
+                "accepted":any(
+                    event["action"]==name and event["accepted"] is True
+                    for event in changed["step_receipts"]
+                ),
+            }
+            for name in selected_actions
+        ]
+        # An attempted but rejected action is never proof an item, ability,
+        # weapon, tool, animation or media behavior was actually exercised.
+        all_selected_exercised=all(item["accepted"] for item in action_receipts)
         if (control["source_digest"]!=_sha(original)
                 or changed["source_digest"]!=row["source_digest"]):
             raise MultiFactorError("game source custody differs from original design")
@@ -550,6 +565,11 @@ def execute_multifactor_scenarios(
                 or changed["total_reward"]!=control["total_reward"]
             ),
             "variant_source_verified":True,
+            "selected_action_receipts":action_receipts,
+            "all_selected_actions_accepted":all_selected_exercised,
+            "unexecuted_action_categories":[
+                item["action"] for item in action_receipts if not item["accepted"]
+            ],
             "factor_ablation_receipts":counterfactuals,
             "pairwise_interaction_witness":pair_interaction,
             "actual_weight_training":learned,
@@ -573,6 +593,12 @@ def execute_multifactor_scenarios(
             for x in experiments
         ),
         "different_gameplay_observed_count":sum(x["source_behavior_differs"] for x in experiments),
+        "scenarios_with_all_selected_actions_actually_accepted":sum(
+            x["all_selected_actions_accepted"] for x in experiments
+        ),
+        "scenarios_with_rejected_or_unexecuted_factor_actions":sum(
+            not x["all_selected_actions_accepted"] for x in experiments
+        ),
         "experiments":experiments,
         "independently_heldout_from_training":True,
         "production_neural_weights_modified":False,

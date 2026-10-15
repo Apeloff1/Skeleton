@@ -330,6 +330,9 @@ export type MultifactorVerifiedExperiments = {
     variant_accepted: number; control_accepted: number;
     variant_productive_changes: number; control_productive_changes: number;
     variant_source_verified: true;
+    selected_action_receipts: { action: string; attempted: boolean; accepted: boolean }[];
+    all_selected_actions_accepted: boolean;
+    unexecuted_action_categories: string[];
     factor_ablation_receipts: {
       removed_axes: string[]; reward_difference_to_joint: number;
       source_verified: true; audit_digest: string;

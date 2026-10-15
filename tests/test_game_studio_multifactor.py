@@ -77,6 +77,14 @@ class MultifactorExperimentTests(unittest.TestCase):
         self.assertGreaterEqual(result["scenarios_executed"],2)
         for row in result["experiments"]:
             self.assertTrue(row["variant_source_verified"])
+            self.assertEqual(row["all_selected_actions_accepted"],all(
+                action["accepted"] for action in row["selected_action_receipts"]
+            ))
+            self.assertEqual(
+                row["unexecuted_action_categories"],
+                [entry["action"] for entry in row["selected_action_receipts"]
+                 if not entry["accepted"]],
+            )
             self.assertEqual(len(row["control_audit_digest"]),64)
             self.assertEqual(len(row["variant_audit_digest"]),64)
             self.assertIsNone(row["actual_weight_training"])

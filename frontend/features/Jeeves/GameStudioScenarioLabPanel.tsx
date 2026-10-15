@@ -321,6 +321,13 @@ export default function GameStudioScenarioLabPanel({
             padding: 7,borderColor:'#526173',borderWidth:1,borderRadius:7,gap:3,
           }}>
             <Text style={muted}>Combined: {row.axes.join(' + ')}</Text>
+            <Text style={muted}>Selected engine actions: {row.all_selected_actions_accepted
+              ? 'all accepted by the game' : 'some unavailable or rejected in this initial state'}
+            </Text>
+            {!!row.unexecuted_action_categories.length &&
+              <Text style={{ color: '#f6c6a5' }}>Unexecuted modality controls:
+                {' '}{row.unexecuted_action_categories.join(', ')}
+              </Text>}
             <Text style={muted}>Observed reward difference {row.reward_delta.toFixed(3)} ·
               baseline {row.control_productive_changes} vs modified {row.variant_productive_changes} state changes
             </Text>
