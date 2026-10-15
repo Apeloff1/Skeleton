@@ -912,9 +912,17 @@ class TorchTransformer:
 
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any]) -> "TorchTransformer":
+        if not isinstance(data, dict):
+            raise ValueError("torch checkpoint must be a mapping")
+        itos = data.get("itos")
+        if (not isinstance(itos, list) or len(itos) < 2 or
+                itos[0] != UNK or
+                any(not isinstance(token, str) or not token for token in itos) or
+                len(set(itos)) != len(itos)):
+            raise ValueError("torch checkpoint must declare unique ordered token identities")
         want = str(data.get("device") or "cpu")
         lm = cls(
-            vocab=[t for t in (data.get("itos") or []) if t != UNK],
+            vocab=[t for t in itos if t != UNK],
             dim=int(data.get("dim") or 8),
             ctx=int(data.get("ctx") or 8),
             n_heads=int(data.get("n_heads") or 2),
@@ -922,12 +930,18 @@ class TorchTransformer:
             d_ff=int(data.get("d_ff") or 32),
             device=want,
         )
-        state = data.get("state") or {}
-        if state:
-            torch = lm.torch
-            sd = {k: torch.tensor(v) for k, v in state.items()}
-            lm.net.load_state_dict(sd, strict=False)
-            lm.net.to(lm.device_obj)
+        # Constructor sorts a fresh vocabulary. A trained checkpoint MUST
+        # restore its original token IDs unchanged, including appended BPE
+        # vocabulary growth, or learned embedding rows lose their meaning.
+        lm.itos = list(itos)
+        lm.stoi = {token: index for index, token in enumerate(itos)}
+        state = data.get("state")
+        if not isinstance(state, dict) or not state:
+            raise ValueError("torch checkpoint is missing trained tensor state")
+        torch = lm.torch
+        sd = {k: torch.tensor(v) for k, v in state.items()}
+        lm.net.load_state_dict(sd, strict=True)
+        lm.net.to(lm.device_obj)
         lm.fitted = int(data.get("fitted") or 0)
         lm.steps = int(data.get("steps") or 0)
         return lm
