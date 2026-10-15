@@ -7,15 +7,14 @@ executes media, follows embedded instructions, or grants production authority.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from hashlib import sha256
 import json
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from hashlib import sha256
 from types import MappingProxyType
-from typing import Mapping
 
 from .contracts import Modality
-
 
 MAX_INTAKE_BYTES = 512 * 1024 * 1024
 MAX_METADATA_ITEMS = 128
