@@ -885,6 +885,23 @@
         "tests/test_game_comparison_readiness.py"
       ],
       "executed_on_user_machine": false
+    },
+    "full_169_target_gap_matrix": {
+      "owner": "skeleton/jeeves/game_emulator_target_gap_matrix.py",
+      "operator_cli": "python3 scripts/audit_game_emulator_169_targets.py --registry /srv/approved/cores.json --output-dir /srv/reports",
+      "canonical_targets": 169,
+      "currently_declared_libretro_target_mappings": 99,
+      "currently_unmapped": 70,
+      "controller_generic_fallbacks": 137,
+      "behavior": "Compute actual approved installations from the current operator registry catalog, preserve the distinction from mapped metadata, attached source pins and real boot qualification, classify each hardware target and next repair step",
+      "outputs": [
+        "emulator_169_target_gaps.json",
+        "emulator_169_target_gaps.html"
+      ],
+      "display": "Standalone offline searchable/filterable hardware/core/controller coverage matrix",
+      "safety": "No ROM download, no core execution, no production model training, no unsupported physical hardware accuracy claim",
+      "qualification_tests": "tests/test_game_emulator_169_gap_matrix.py added; not executed during source editing",
+      "executed_against_users_local_core_registry": false
     }
   }
 }
