@@ -251,7 +251,10 @@ class MongoConversationAuthority:
 
     async def _after_dragon_commit(self, thread: ConversationThread) -> None:
         """Checkpoint only exact ten-step committed windows, when configured."""
-        projection = self.dragon_projection
+        # A minimal authority restored for idempotent replay may not have an
+        # optional Dragon projection attached. Canonical Mongo message
+        # persistence cannot depend on that optional derived subsystem.
+        projection = getattr(self, "dragon_projection", None)
         if projection is None or thread.message_sequence < 10 or thread.message_sequence % 10:
             return
         try:
