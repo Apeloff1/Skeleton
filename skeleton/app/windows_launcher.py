@@ -43,6 +43,8 @@ def _hidden_runner(
     text: bool = False,
     timeout: float | None = None,
     env=None,
+    stdout=None,
+    stderr=None,
 ):
     """Run an argument-vector child process without a Windows console flash."""
 
@@ -55,6 +57,8 @@ def _hidden_runner(
         text=text,
         timeout=timeout,
         env=env,
+        stdout=stdout,
+        stderr=stderr,
         shell=False,
         creationflags=creationflags,
     )
