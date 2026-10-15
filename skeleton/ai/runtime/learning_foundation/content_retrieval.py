@@ -1150,9 +1150,11 @@ class ContentSignalIndex:
 class ContentScrutinyError(MultimodalFoundationError):
     """Raised when labyrinthine scrutiny of content retrieval fails closed."""
 
+
 @dataclass(frozen=True, slots=True)
 class ScrutinyEvidence:
     """Multi-layer evidence produced by beyond-human scrutiny of a retrieval path."""
+
     layers: tuple[str, ...]
     digests: tuple[str, ...]
     bounds_ok: bool
@@ -1165,11 +1167,13 @@ class ScrutinyEvidence:
         if self.recursion_depth > 8:
             raise ContentScrutinyError("scrutiny recursion bound exceeded")
 
+
 class ContentScrutinyEngine:
     """Labyrinthine, fail-closed scrutiny layer over content retrieval.
 
     Applies nested bounds, digest chains, and cross-checks without stored prose.
     """
+
     def __init__(self, max_depth: int = 8) -> None:
         self.max_depth = max_depth
         self._evidence: list[ScrutinyEvidence] = []
@@ -1185,7 +1189,11 @@ class ContentScrutinyEngine:
             if len(getattr(corpus, "records", getattr(corpus, "_records", []))) > _CEILINGS["max_records"]:
                 bounds_ok = False
             # Layer 2: digest chain
-            digests.append(_digest({"n": len(getattr(corpus, "records", getattr(corpus, "_records", []))), "depth": depth}))
+            digests.append(
+                _digest(
+                    {"n": len(getattr(corpus, "records", getattr(corpus, "_records", []))), "depth": depth}
+                )
+            )
             # Layer 3: authority
             digests.append(_digest({"authority": "verified-only"}))
             # Layer 4: temporal
@@ -1193,11 +1201,11 @@ class ContentScrutinyEngine:
             # Nested
             if depth < 2:
                 nested = self.scrutinize(corpus, depth=depth + 1)
-                digests.append(nested.digests[-1] if nested.digests else "0"*64)
+                digests.append(nested.digests[-1] if nested.digests else "0" * 64)
         except Exception as exc:
             raise ContentScrutinyError(f"scrutiny layer failed: {type(exc).__name__}") from exc
         evidence = ScrutinyEvidence(
-            layers=layers[:len(digests)],
+            layers=layers[: len(digests)],
             digests=tuple(digests),
             bounds_ok=bounds_ok,
             recursion_depth=depth,
