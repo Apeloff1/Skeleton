@@ -309,6 +309,12 @@ export type MultifactorControlManifest = {
 export type MultifactorExperimentPlan = {
   schema_version: string; editor: string; axis_offset: number;
   interaction_order: number; digest: string; covered_interactions: number;
+  coverage_by_interaction_order: {
+    interaction_order: number; source_legal_offered_witnesses: number;
+    selected_plan_witnesses: number; all_factors_active_witnesses: number;
+    coverage_of_considered_source_legal_witnesses: number;
+    cross_engine_global_exhaustiveness_claimed: false;
+  }[];
   valid_interaction_opportunities: number; coverage_fraction: number;
   axes: MultifactorControlManifest['available_axes'];
   scenarios: {
@@ -418,12 +424,13 @@ export async function getMultifactorPlan(
   return value;
 }
 export async function getMultifactorExperiments(
-  campaignId:string, axisOffset=0, input: LearningRequest = {},
+  campaignId:string, axisOffset=0, steps=4, input: LearningRequest = {},
 ): Promise<MultifactorVerifiedExperiments> {
-  if (!Number.isSafeInteger(axisOffset) || axisOffset<0 || axisOffset>63) invalid('Engine factor bank is outside bounds.');
+  if (!Number.isSafeInteger(axisOffset) || axisOffset<0 || axisOffset>63
+      || !Number.isSafeInteger(steps) || steps<1 || steps>4) invalid('Engine factor bank or scrutiny steps are outside bounds.');
   const value=await request<MultifactorVerifiedExperiments>(
     'get','/campaigns/'+id(campaignId)+'/multifactor-experiments?axis_offset='+
-    axisOffset+'&count=2&steps=2',null,input,
+    axisOffset+'&count=2&steps='+steps,null,input,
   );
   if (value.campaign_id!==campaignId || value.spectator_only!==true
       || value.scenarios_executed!==value.experiments?.length

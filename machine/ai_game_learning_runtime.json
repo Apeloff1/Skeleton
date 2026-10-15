@@ -334,7 +334,20 @@
         "production neural weight improvements",
         "automatic policy or world promotion"
       ],
-      "verification": "tests added; exact-head CI and integration not yet complete"
+      "verification": "tests added; exact-head CI and integration not yet complete",
+      "coverage_ledger": {
+        "offered_valid_candidate_pool_scope_only": true,
+        "per_order_witness_counts": [
+          1,
+          2,
+          3
+        ],
+        "records_all_enabled_factor_witnesses": true,
+        "default_spectator_steps": 4,
+        "quick_spectator_steps": 2,
+        "source_governance_fields_immutable": true,
+        "production_model_changed": false
+      }
     }
   }
 }

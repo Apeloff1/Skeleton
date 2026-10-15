@@ -22,6 +22,7 @@ from .game_studio_scenario_lab import _lane
 from .game_learning import GameLearningConfig, GamePolicyLearner
 from .game_learning_parallel import GameEnvironmentRequest
 from .game_studio_factorial_scrutiny import scrutinize_interactions
+from .game_studio_rule_curriculum import _LOCKED as _UNMODIFIABLE_SOURCE_KEYS
 
 SCHEMA="skeleton.game_builder.multifactor_training.v1"
 MAX_AXES=8
@@ -119,6 +120,10 @@ def multifactor_capabilities(raw_source:Mapping[str,object])->dict:
     catalog=editor_spec(source["editor"])
     groups={name:[] for name in CATEGORIES}
     for field in catalog["fields"]:
+        # Reuse the AI rule author's protected source-key policy so adding
+        # new factor categories can never open provenance/rights mutations.
+        if field["key"] in _UNMODIFIABLE_SOURCE_KEYS:
+            continue
         category=_category(field["key"])
         if category is None:continue
         variants=_field_variants(source,field)
@@ -277,6 +282,22 @@ def plan_multifactor_scenarios(
     total=set()
     for levels,_,_ in pairs+[(tuple(row["levels"]),row["source"],()) for row in selected]:
         total.update(_coverage(levels,interaction_order))
+    by_degree=[]
+    for degree in range(1,min(interaction_order,len(axes))+1):
+        eligible=[witness for witness in total if len(witness)==degree]
+        verified=[witness for witness in seen if len(witness)==degree]
+        actual_joint=[witness for witness in verified
+                      if all(value!=0 for _,value in witness)]
+        by_degree.append({
+            "interaction_order":degree,
+            "source_legal_offered_witnesses":len(eligible),
+            "selected_plan_witnesses":len(verified),
+            "all_factors_active_witnesses":len(actual_joint),
+            "coverage_of_considered_source_legal_witnesses":round(
+                len(verified)/max(1,len(eligible)),6,
+            ),
+            "cross_engine_global_exhaustiveness_claimed":False,
+        })
     out={
         "schema_version":"skeleton.game_builder.multifactor_plan.v1",
         "editor":source["editor"],"base_source_digest":_sha(source),
@@ -287,6 +308,8 @@ def plan_multifactor_scenarios(
         "scenarios":selected,
         "covered_interactions":len(seen),
         "valid_interaction_opportunities":len(total),
+        "coverage_by_interaction_order":by_degree,
+        "baseline_only_and_mixed_null_interactions_included":True,
         "bounded_candidate_worlds_considered":len(candidates),
         "full_cross_product_enumerated":False,
         "coverage_fraction":round(len(seen)/max(1,len(total)),6),

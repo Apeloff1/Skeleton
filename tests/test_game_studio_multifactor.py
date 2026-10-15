@@ -50,6 +50,16 @@ class MultifactorExperimentTests(unittest.TestCase):
         self.assertFalse(plan["full_cross_product_enumerated"])
         self.assertEqual(plan["editor"],"economy")
         self.assertGreater(plan["covered_interactions"],0)
+        self.assertEqual(
+            sum(item["selected_plan_witnesses"]
+                for item in plan["coverage_by_interaction_order"]),
+            plan["covered_interactions"],
+        )
+        self.assertTrue(all(
+            item["all_factors_active_witnesses"]<=item["selected_plan_witnesses"]
+            and item["cross_engine_global_exhaustiveness_claimed"] is False
+            for item in plan["coverage_by_interaction_order"]
+        ))
         for experiment in plan["scenarios"]:
             self.assertEqual(experiment["source"]["editor"],"economy")
             self.assertEqual(experiment["source"]["actions"],self.source["actions"])

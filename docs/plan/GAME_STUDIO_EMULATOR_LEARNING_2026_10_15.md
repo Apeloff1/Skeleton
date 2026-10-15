@@ -850,3 +850,29 @@ lattices, tampered receipts, source-rights protection, invalid
 source combinations, quantitative Q deltas, reverse order
 re-execution and descriptive risk flags. Their exact-head
 execution and production behavior have **not yet been verified**.
+
+### Factor coverage accounting and actual action admission
+
+The multi-factor planner now publishes separate coverage counts by
+1-, 2-, and 3-way interaction order, including how many selected
+witnesses actually enable *every* participating factor. Counts
+include the number of offered legal candidate witness combinations
+and an explicit note that the bounded candidate pool is **not**
+the complete global game-state or configuration Cartesian product.
+
+The live viewer can request either two or four source-game steps
+per tested factor scenario. The deeper option helps distinguish
+an action that was registered for the scenario from one that
+actually executed and was accepted before the episode ended.
+Factorial evidence still gives full four-/eight-corner matched-seed
+source receipts and signals any illegal, truncated or unexercised
+interventions. Rights/provenance field names protected by the
+AI rule-authoring contract are excluded from the multi-factor
+mutator; merely adding a new keyword category cannot open a
+rights or source-ownership bypass.
+
+All resulting gains are measurements of the **local Q-policy
+candidate**, not an increase to the live Jeeves transformer
+parameter count. A bounded corpus may separately be admitted
+to candidate neural checkpoint training by a signed source and
+independent heldout evaluation.

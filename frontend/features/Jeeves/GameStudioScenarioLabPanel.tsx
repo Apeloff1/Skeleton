@@ -37,6 +37,7 @@ export default function GameStudioScenarioLabPanel({
   const [factorPlan, setFactorPlan] = useState<MultifactorExperimentPlan | null>(null);
   const [factorEvidence, setFactorEvidence] = useState<MultifactorVerifiedExperiments | null>(null);
   const [factorOffset, setFactorOffset] = useState(0);
+  const [factorSteps, setFactorSteps] = useState(4);
   const [factorPending, setFactorPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -164,7 +165,9 @@ export default function GameStudioScenarioLabPanel({
         const result=await getMultifactorPlan(campaign.campaign_id,factorOffset);
         if (owner.current === campaign.campaign_id && tenantToken.current===getAuthToken()) setFactorPlan(result);
       } else {
-        const result=await getMultifactorExperiments(campaign.campaign_id,factorOffset);
+        const result=await getMultifactorExperiments(
+          campaign.campaign_id,factorOffset,factorSteps,
+        );
         if (owner.current === campaign.campaign_id && tenantToken.current===getAuthToken()) setFactorEvidence(result);
       }
     } catch (issue) {
@@ -280,6 +283,11 @@ export default function GameStudioScenarioLabPanel({
         <View style={group}>
           {button('Inspect executable factors', () => { void inspectFactors('catalog'); })}
           {button('Design triple interactions', () => { void inspectFactors('plan'); })}
+          {[2,4].map(value => <React.Fragment key={value}>
+            {button(value+' source steps', () => {
+              setFactorSteps(value);setFactorEvidence(null);
+            },factorSteps===value)}
+          </React.Fragment>)}
           {button(factorPending ? 'Replaying factor worlds…' : 'Run two audited factor worlds',
             () => { void inspectFactors('execute'); })}
           {button('Next factor bank', () => {
@@ -306,6 +314,14 @@ export default function GameStudioScenarioLabPanel({
             interaction witnesses covered ({(factorPlan.coverage_fraction*100).toFixed(1)}%);
             this is sampled covering design, not a full Cartesian proof.
           </Text>
+          {factorPlan.coverage_by_interaction_order.map(order => (
+            <Text key={order.interaction_order} style={muted}>
+              {order.interaction_order}-way coverage:
+              {' '}{order.selected_plan_witnesses}/{order.source_legal_offered_witnesses}
+              {' offered interaction witnesses; '}{order.all_factors_active_witnesses}
+              {' with every involved factor active'}
+            </Text>
+          ))}
           {factorPlan.scenarios.map(entry => <Text key={entry.index} style={muted}>
             #{entry.index+1} {entry.changed_axes.join(' + ')} ·
             {entry.new_coverage_witnesses} newly covered interactions
