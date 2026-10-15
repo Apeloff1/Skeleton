@@ -154,7 +154,8 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
     for sequence, action in enumerate(program):
         step = environment.step(action)
         frame = _frame(environment)
-        visual_changes += frame != previous_frame
+        observed_change = frame != previous_frame
+        visual_changes += observed_change
         previous_frame = frame
         if not isinstance(step.observation, Mapping) or not isinstance(step.reward_components, Mapping):
             raise CrossGameComparisonError("source step has no actual reward/observation contract")
@@ -185,7 +186,7 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
             "source_observation": previous_observation,
             "source_next_observation": next_observation,
             "source_reward_components": reward,
-            "source_visual_change_observed": frame != previous_frame,
+            "source_visual_change_observed": observed_change,
             "actual_frame_sha256": frame,
             "source_observation_sha256": _digest(next_observation),
             "source_reward_components_sha256": _digest(reward),
