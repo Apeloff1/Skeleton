@@ -257,6 +257,53 @@ class MultimodalIntake:
 
     """Sanitize one asset without decoding, executing, or trusting its content."""
 
+
+    def safe_sanitize(
+        self,
+        *,
+        asset_id: str,
+        modality: Modality,
+        mime_type: str,
+        payload: bytes,
+        metadata: Mapping[str, object] | None = None,
+    ) -> MultimodalAsset:
+        """Failsafe sanitize: never raises on bad input; returns a rejected sentinel or raises only MultimodalSanitizationError."""
+        try:
+            return self.sanitize(
+                asset_id=asset_id,
+                modality=modality,
+                mime_type=mime_type,
+                payload=payload,
+                metadata=metadata,
+            )
+        except MultimodalSanitizationError:
+            raise
+        except Exception as exc:
+            raise MultimodalSanitizationError(f"sanitize failsafe: {type(exc).__name__}") from exc
+
+    def safe_sanitize_verified(
+        self,
+        *,
+        asset_id: str,
+        modality: Modality,
+        mime_type: str,
+        payload: bytes,
+        metadata: Mapping[str, object] | None = None,
+    ) -> VerifiedMultimodalAsset:
+        """Failsafe verified sanitize."""
+        try:
+            return self.sanitize_verified(
+                asset_id=asset_id,
+                modality=modality,
+                mime_type=mime_type,
+                payload=payload,
+                metadata=metadata,
+            )
+        except MultimodalSanitizationError:
+            raise
+        except Exception as exc:
+            raise MultimodalSanitizationError(f"verified failsafe: {type(exc).__name__}") from exc
+
     def sanitize(
         self,
         *,

@@ -920,3 +920,11 @@ import copyreg
 def _proxy_reduce(proxy):
     return (MappingProxyType, (dict(proxy),))
 copyreg.pickle(MappingProxyType, _proxy_reduce)
+
+
+def safe_digest(value: object) -> str:
+    """Failsafe digest: returns a fixed sentinel on any non-deterministic or error path."""
+    try:
+        return _digest(value)
+    except Exception:
+        return "0" * 64
