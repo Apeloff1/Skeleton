@@ -43,5 +43,30 @@
   ],
   "failure": "Invalid source/tree/seed/action, unsupported mapper/instruction, foreign snapshot or code identity, exhausted resources and cancelled work fail explicitly without granting promotion authority",
   "production_model_promotion_authorized": false,
-  "masterplan_completion_authorized": false
+  "masterplan_completion_authorized": false,
+  "studio_game_environment": {
+    "status": "implementation_candidate_pending_exact_head_verification",
+    "canonical_owner": "skeleton/jeeves/game_studio_environment.py",
+    "studio_source": "skeleton/ai/game_builder/advanced_gameplay_runtime.py",
+    "request_kind": "studio",
+    "target_format": "studio:<registered_advanced_engine>",
+    "scope": "All registered original-game reference engine sessions execute through existing advanced-session action replay and verified hashed receipts; no added model-provider, renderer or native emulator.",
+    "learning": "Emulator-compatible GameEnvironmentSpec/EpisodeStep reset/step/preview/snapshot/restore; local Q policy uses actual runtime state deltas; original scene, settings, seed and implementation hash bound; invalid inputs terminate with negative reward instead of inventing state.",
+    "training_cli": "python -m skeleton.jeeves.game_studio_policy_cli --engine economy --output /private/new-candidate.json --authorized --rights-cleared",
+    "guarantees": [
+      "bounded actions and episodes",
+      "no executable external sources",
+      "deterministic strict scene and action replay",
+      "rejected commands do not grant game progress",
+      "snapshot restored via independent re-execution",
+      "candidate policy cannot auto-promote"
+    ],
+    "limitations": [
+      "reference preview contains state only; no fabricated pixels/audio",
+      "reward shaping measures declared engine state, not general game design quality",
+      "no live production neural weight update",
+      "requires operator rights and training admission",
+      "CI and independent validation pending"
+    ]
+  }
 }
