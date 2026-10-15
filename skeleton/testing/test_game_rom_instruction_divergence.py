@@ -47,6 +47,7 @@ class InstructionSourceReplayCases(unittest.TestCase):
                  "real_cpu_registers": {"pc": 1},
                  "real_div_timer_interrupts": {"tima": 1},
                  "real_mapper_control": {"rom_bank": 1},
+                 "real_sprite_dma_transfer": {"active": False, "actual_copied_oam_bytes": 0},
                  "native_source_memory_sha256": {"wram_full_sha256": "a" * 64},
                  "authored_goal_memory": {"score": 0},
                  "actual_cpu_schedule_cycles": 4,
@@ -61,6 +62,30 @@ class InstructionSourceReplayCases(unittest.TestCase):
         self.assertEqual(result["first_sample_ordinal"], 0)
         self.assertIn("real_div_timer_interrupts", result["changed_measured_domains"])
         self.assertFalse(result["game_objective_success_proven"])
+
+    def test_first_divergence_isolated_to_real_sprite_dma_phase(self):
+        baseline = {
+            "time_and_video_evidence": [{
+                "after_instruction_ordinal": 4,
+                "sample_digest": "a" * 64,
+                "real_cpu_registers": {"pc": 256},
+                "real_div_timer_interrupts": {"tima": 1},
+                "real_mapper_control": {"rom_bank": 1},
+                "real_sprite_dma_transfer": {"active": True, "actual_copied_oam_bytes": 5},
+                "native_source_memory_sha256": {"oam_full_sha256": "c" * 64},
+                "authored_goal_memory": {"score": 0},
+                "actual_cpu_schedule_cycles": 200,
+                "actual_frame_count": 0,
+            }],
+        }
+        active = copy.deepcopy(baseline)
+        active["time_and_video_evidence"][0]["real_sprite_dma_transfer"][
+            "actual_copied_oam_bytes"
+        ] = 6
+        active["time_and_video_evidence"][0]["sample_digest"] = "b" * 64
+        result = _first_difference(baseline, active)
+        self.assertTrue(result["actual_source_control_difference_observed"])
+        self.assertEqual(result["changed_measured_domains"], ["real_sprite_dma_transfer"])
 
     def test_sample_budget_fails_before_any_source_cpu_execution(self):
         for invalid in [
