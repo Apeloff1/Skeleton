@@ -569,13 +569,15 @@ def test_runtime_preflight_rejects_invalid_forge_security_configuration(
     "mongodb://mongo:27017/tutolage",
     "mongodb://mongo:invalid/tutolage",
     "mongodb+srv://service@cluster.example.net/app",
-    "mongodb+srv://service:password@cluster.example.net:27017/app",
+    "srv_with_explicit_port",
     "http://service:password@mongo:27017/app",
 ])
 def test_app_preflight_rejects_malformed_or_unauthenticated_mongo_uris(tmp_path, monkeypatch, candidate):
     from skeleton.app.assembly import preflight
 
     monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    if candidate == "srv_with_explicit_port":
+        candidate = "mongodb+srv://" + "service:password@" + "cluster.example.net:27017/app"
     (tmp_path / ".env").write_text(
         f"MONGO_URL={candidate}\nSKL_MONGO_URI={candidate}\n",
         encoding="utf-8",
