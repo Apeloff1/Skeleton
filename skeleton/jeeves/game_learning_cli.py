@@ -322,6 +322,49 @@ def _evaluate(args) -> dict[str, Any]:
     }
 
 
+def _cross_core_comparison(args) -> dict[str, Any]:
+    from .game_emulator_cross_core_lab import CrossCoreConfig, compare_real_emulator_cores
+
+    if not args.rights_acknowledged:
+        raise ValueError("Exact rights-cleared ROM input acknowledgment is required")
+    if args.project is not None or args.rom is None or not args.target.startswith("emulator:"):
+        raise ValueError("Only installed, approved libretro cores sharing one ROM are comparable")
+    if args.evidence_file.exists():
+        raise FileExistsError("Cross-core comparison output already exists")
+    cores = tuple(args.core)
+    if len(cores) != len(set(cores)):
+        raise ValueError("Comparison requires distinct core IDs")
+    from argparse import Namespace
+
+    requests = []
+    for core in cores:
+        options = vars(args).copy()
+        options["core"] = core
+        _, _, request = _factory(Namespace(**options))
+        if request.kind != "libretro":
+            raise ValueError("Expected actual approved native libretro runtime")
+        requests.append(request)
+    report = compare_real_emulator_cores(
+        requests,
+        rights_acknowledged=True,
+        config=CrossCoreConfig(
+            seed=args.seed, steps=args.comparison_steps,
+            repetitions=args.repetitions, max_native_steps=args.max_native_steps,
+        ),
+    )
+    _write_json(args.evidence_file, report, replace=False)
+    return {
+        "status": "measured_native_core_comparison",
+        "report_digest": report["report_digest"],
+        "compared_cores": report["compared_approved_native_cores"],
+        "actual_native_steps": report["actual_native_steps"],
+        "all_repetitions_reproducible": report["all_repeats_stable"],
+        "evidence_file": str(args.evidence_file),
+        "production_neural_weight_updates": 0,
+        "hardware_certification": False,
+    }
+
+
 def _emulator_experiment(args) -> dict[str, Any]:
     from .game_emulator_experiment_lab import (
         EmulatorExperimentConfig,
@@ -466,6 +509,24 @@ def parser() -> argparse.ArgumentParser:
     native.add_argument("--force", action="store_true")
 
 
+
+    cross = commands.add_parser(
+        "compare-emulator-cores",
+        help="Execute the same owned ROM and exact controls on 2-4 approved libretro cores",
+    )
+    cross.add_argument("--target", required=True)
+    cross.add_argument("--rom", required=True, type=Path)
+    cross.add_argument("--project", type=Path)
+    cross.add_argument("--core", action="append", required=True)
+    cross.add_argument("--episode-steps", type=int, default=32)
+    cross.add_argument("--comparison-steps", type=int, default=16)
+    cross.add_argument("--repetitions", type=int, default=2)
+    cross.add_argument("--max-native-steps", type=int, default=256)
+    cross.add_argument("--seed", type=int, default=0)
+    cross.add_argument("--frames-per-step", type=int, default=1)
+    cross.add_argument("--cycles-per-step", type=int, default=1824)
+    cross.add_argument("--rights-acknowledged", action="store_true")
+    cross.add_argument("--evidence-file", required=True, type=Path)
     experiment = commands.add_parser(
         "experiment-emulator",
         help="Run actual checkpointed ROM counterfactuals; never update model weights",
@@ -558,6 +619,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _deep_emulator(args)
         elif args.command == "experiment-emulator":
             result = _emulator_experiment(args)
+        elif args.command == "compare-emulator-cores":
+            result = _cross_core_comparison(args)
         else:
             result = _native(args)
         print(json.dumps(result, sort_keys=True, allow_nan=False))
