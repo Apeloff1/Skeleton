@@ -1667,6 +1667,133 @@ def install(args):
 
 
 
+
+def _validate_recipe_contract():
+    """Source-only fail-closed pin, target and build metadata audit; no native execution."""
+    import re
+    from skeleton.jeeves.game_emulator_catalog import _CORE_TARGET_GROUPS, canonical_targets
+
+    contract_path = REPOSITORY_ROOT / "machine" / "ai_game_emulator_catalog.json"
+    raw = json.loads(contract_path.read_text(encoding="utf-8"))
+    recorded = raw.get("bootstrap_pins")
+    if not isinstance(recorded, dict) or set(recorded) != set(PINNED_CORES):
+        raise ValueError("Machine core-pin contract differs from the operator installer")
+    canonical = canonical_targets()
+    permitted = re.compile(r"^[a-zA-Z0-9_./-]{1,160}$")
+    def safe_relative(path: object) -> bool:
+        return (
+            type(path) is str and bool(path)
+            and bool(permitted.fullmatch(path))
+            and not path.startswith("/")
+            and all(part not in ("", ".", "..") for part in path.split("/"))
+        )
+    by_target = {}
+    for core_id, pin in sorted(PINNED_CORES.items()):
+        if (not re.fullmatch(r"[a-z0-9_]{1,80}", core_id)
+            or not isinstance(pin, dict)
+            or not re.fullmatch(r"[0-9a-f]{40}", pin.get("revision", ""))
+            or recorded.get(core_id) != pin["revision"]):
+            raise ValueError("Pinned core SHA or identity differs: " + core_id)
+        repository = pin.get("repository")
+        if (not isinstance(repository, str)
+            or not re.fullmatch(r"https://github[.]com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+[.]git", repository)):
+            raise ValueError("Source repository is not a fixed GitHub HTTPS git URL: " + core_id)
+        for key in ("artifact", "license", "makefile"):
+            path = pin.get(key, "Makefile.libretro" if key == "makefile" else None)
+            if not safe_relative(path):
+                raise ValueError("Unsafe build/asset path for " + core_id + "/" + key)
+        folder = pin.get("build_directory", "")
+        if folder and not safe_relative(folder):
+            raise ValueError("Unsafe build directory for " + core_id)
+        if pin.get("build_kind", "make") not in {"make", "cmake"}:
+            raise ValueError("Unexpected source build kind for " + core_id)
+        if pin.get("build_target") not in (None, "core"):
+            raise ValueError("Unexpected explicit make target for " + core_id)
+        if type(pin.get("candidate_only", False)) is not bool:
+            raise ValueError("Core candidate status is not a boolean")
+        variables = pin.get("make_variables", {})
+        if (not isinstance(variables, dict) or len(variables) > 32
+            or any(
+                not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", key)
+                or not isinstance(value, str)
+                or not re.fullmatch(r"[A-Za-z0-9_./+:-]{1,128}", value)
+                for key, value in variables.items()
+            )):
+            raise ValueError("Pinned make variables exceed safe literal bounds: " + core_id)
+        targets = pin.get("targets")
+        known = set(_CORE_TARGET_GROUPS.get(core_id, ()))
+        if (not isinstance(targets, list) or not targets or len(targets) > 32
+            or len(targets) != len(set(targets))
+            or any(target not in canonical or target not in known for target in targets)):
+            raise ValueError("Pinned core hardware scope is incompatible: " + core_id)
+        for target in targets:
+            by_target.setdefault(target, []).append(core_id)
+    return {
+        "status": "pinned_source_recipe_contract_consistent",
+        "recipe_count": len(PINNED_CORES),
+        "canonical_hardware_target_count": len(canonical),
+        "targets_with_declared_build_recipes": len(by_target),
+        "targets_without_build_recipes": len(canonical) - len(by_target),
+        "native_binaries_checked": 0,
+        "roms_executed": 0,
+        "gameplay_qualifications": None,
+    }
+
+
+def _installed_core_audit(root: Path):
+    """Inspect exact local operator approval, ELF and firmware with no core execution."""
+    from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry, EmulatorCatalogError
+    registry_file = root / "cores.json"
+    if not registry_file.is_file():
+        raise ValueError("Operator registry absent at the explicit install root")
+    registry = GameEmulatorRegistry(registry_file)
+    rows = []
+    for raw in registry._raw["cores"]:
+        identity = raw["core_id"]
+        if identity not in PINNED_CORES:
+            raise ValueError("Installed registry has a core not declared by pinned build recipes")
+        if raw["approved"] is False:
+            rows.append({
+                "core_id": identity,
+                "status": "deferred_candidate_not_operator_approved",
+                "abi_inspected_in_this_audit": False,
+                "runtime_execution_verified": False,
+            })
+            continue
+        try:
+            core = registry.resolve_core(identity)
+        except EmulatorCatalogError as exc:
+            rows.append({
+                "core_id": identity,
+                "status": "approved_but_invalid",
+                "reason_code": exc.code,
+                "abi_inspected_in_this_audit": False,
+                "runtime_execution_verified": False,
+            })
+            continue
+        rows.append({
+            "core_id": identity,
+            "status": "approved_elf_and_firmware_inspected_not_playability_verified",
+            "library_sha256": core.library_sha256,
+            "firmware_digest": core.firmware_digest,
+            "architecture": core.architecture,
+            "hardware_target_ids": list(core.target_ids),
+            "abi_inspected_in_this_audit": True,
+            "runtime_execution_verified": False,
+        })
+    return {
+        "status": "operator_registry_audit",
+        "registry_digest": registry.registry_digest,
+        "declared_installation_records": len(rows),
+        "approved_abi_checked": sum(row["abi_inspected_in_this_audit"] for row in rows),
+        "deferred_candidates": sum(row["status"] == "deferred_candidate_not_operator_approved" for row in rows),
+        "failed_approved_records": sum(row["status"] == "approved_but_invalid" for row in rows),
+        "gameplay_qualified_count": None,
+        "training_weights_promoted": False,
+        "records": rows,
+    }
+
+
 def _recipe_coverage_matrix():
     """Report source-recipe opportunities across canonical hardware; never infer gameplay."""
     from skeleton.jeeves.game_emulator_catalog import _CORE_TARGET_GROUPS, canonical_targets
@@ -1718,6 +1845,8 @@ def main(argv=None):
         "--profile", choices=("starter", "broad", "all"), default="starter",
         help="starter=original six, broad=all non-deferred recipes, all=include explicitly deferred candidates",
     )
+    parser.add_argument("--validate-recipes", action="store_true", help="Verify static pinned source and canonical machine contract without compilation")
+    parser.add_argument("--installed-audit", action="store_true", help="Verify explicit local approved ELF/firmware inventory, never execute a game")
     parser.add_argument("--coverage-matrix", action="store_true", help="Read-only canonical hardware versus source-recipe audit; never claims execution")
     parser.add_argument(
         "--list-cores", action="store_true",
@@ -1745,6 +1874,22 @@ def main(argv=None):
         help="Explicit canonical installed OpenGL library for software-fallback recipes; no runtime rendering permission is granted",
     )
     args = parser.parse_args(argv)
+    if args.validate_recipes:
+        try:
+            print(json.dumps(_validate_recipe_contract(), indent=2))
+            return 0
+        except (ValueError, OSError, json.JSONDecodeError) as exc:
+            print(json.dumps({"status": "recipe_contract_rejected", "message": str(exc)}), file=sys.stderr)
+            return 2
+    if args.installed_audit:
+        if args.install_root is None:
+            parser.error("--installed-audit requires an explicit --install-root")
+        try:
+            print(json.dumps(_installed_core_audit(args.install_root), indent=2))
+            return 0
+        except (ValueError, OSError, RuntimeError) as exc:
+            print(json.dumps({"status": "installed_audit_rejected", "message": str(exc)}), file=sys.stderr)
+            return 2
     if args.coverage_matrix:
         try:
             print(json.dumps(_recipe_coverage_matrix(), indent=2))

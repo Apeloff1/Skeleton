@@ -51,3 +51,12 @@ python3 scripts/install_game_emulator_cores.py --source-root /srv/skeleton-emula
 ```
 
 **83 source recipes ≠ 83 verified emulators ≠ 169 target machines supported.**
+
+## Additional pre-install and installed-instance audits
+
+```bash
+python3 scripts/install_game_emulator_cores.py --validate-recipes
+python3 scripts/install_game_emulator_cores.py --installed-audit --install-root /srv/skeleton-emulators
+```
+
+The first command fail-closes on a mismatch between **all 83** pinned source revisions in the installer and the machine contract, invalid source URLs/Makefile/artifact/license paths, duplicate/unknown hardware IDs or unsafe Make variables. The second is strictly local, read-only, and checks actual currently operator-approved ELF SHA-256/ABI and bounded declared firmware inventory. Deferred candidates remain marked deferred; mismatching approved artifacts are separately marked invalid. Neither command executes ROMs, compiles source, promotes weights, accesses licensed SDKs nor certifies gameplay.
