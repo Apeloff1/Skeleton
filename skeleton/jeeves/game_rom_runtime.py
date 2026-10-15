@@ -135,6 +135,7 @@ class GameBoyMachine:
         self.dma_index = 0
         self.dma_tcycles = 0
         self.dma_startup = 0
+        self._cpu_bus_active = False
         # Battery-backed wall time is intentionally unavailable. RTC grows
         # only through executed CPU cycles and is sealed in source snapshots.
         self.rtc_regs = [0, 0, 0, 0, 0]
