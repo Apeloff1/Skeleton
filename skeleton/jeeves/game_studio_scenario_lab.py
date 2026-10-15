@@ -163,6 +163,8 @@ def test_manifest(editor: str) -> dict:
         {"id":"training_data_separation","required":True},
         {"id":"concurrent_replay_isolation","required":True},
         {"id":"mirrored_angle_coverage","required":True},
+        {"id":"ten_source_verified_multispectral_channels","required":True},
+        {"id":"ten_pass_reverse_checkpoint_scrutiny","required":True},
         {"id":"telemetry_source_identity","required":True},
         {"id":"native_hardware_limitations_explicit","required":True},
     ]

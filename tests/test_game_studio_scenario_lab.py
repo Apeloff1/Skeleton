@@ -48,10 +48,10 @@ class StudioEngineScenarioLabTests(unittest.TestCase):
                     self.assertGreater(len(field["cases"]),0)
                     self.assertIn("invalid_value_rejection",field["checks"])
 
-    def test_six_actual_mirrors_execute_different_perspectives_concurrently(self):
+    def test_ten_actual_mirrors_execute_different_perspectives_concurrently(self):
         source=make_studio_source("economy", {"market_nodes":3,"goods":10})
         report=mirrored_simulations(source,seed=6,steps=6,workers=4)
-        self.assertEqual(report["concurrent_reference_simulations_executed"],6)
+        self.assertEqual(report["concurrent_reference_simulations_executed"],10)
         self.assertEqual(report["workers_used"],4)
         self.assertEqual(report["angles"],list(ANGLES))
         self.assertFalse(report["training_candidate_mutated"])
@@ -87,7 +87,7 @@ class StudioEngineScenarioLabTests(unittest.TestCase):
                                           "trade_tax":15})
         comparison=mirrored_rule_comparison(source,other,seed=10,steps=3,
                                            angles=ANGLES)
-        self.assertEqual(len(comparison["mirrors"]),6)
+        self.assertEqual(len(comparison["mirrors"]),10)
         self.assertEqual(comparison["total_executed_steps"],sum(
             row["baseline_executed_steps"]+row["candidate_executed_steps"]
             for row in comparison["mirrors"]
