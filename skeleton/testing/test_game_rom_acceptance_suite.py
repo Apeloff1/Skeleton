@@ -79,6 +79,35 @@ class AcceptanceSuiteCustodyTests(unittest.TestCase):
             self.assertTrue(private.exists())
             self.assertFalse((private / "suite-acceptance.json").exists())
 
+    def test_instruction_microtrace_receipts_reject_rehashed_tampered_samples(self):
+        from skeleton.jeeves.game_rom_instruction_divergence import (
+            InstructionDivergenceConfig, compare_original_rom_instruction_branches,
+        )
+        from scripts.run_game_rom_acceptance_suite import _verify_instruction_microtrace
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            result = compare_original_rom_instruction_branches(
+                InstructionDivergenceConfig(
+                    seed=9, instruction_count=64, sample_stride=4,
+                    max_cycles_per_branch=4096,
+                    action_subset=("idle", "a"),
+                ),
+            )
+            path = base / "original-cpu-instruction-divergence.json"
+            path.write_bytes(_canonical(result) + b"\n")
+            self.assertTrue(_verify_instruction_microtrace(base)["accepted"])
+            result["actual_passive_and_controller_interventions"][1][
+                "first_run"]["time_and_video_evidence"][0][
+                    "real_div_timer_interrupts"]["tima"] = 17
+            # Even if the caller rehashes the outer report, each original
+            # hardware sample must independently match its source digest.
+            result["report_digest"] = _sha(_canonical({
+                key: value for key, value in result.items() if key != "report_digest"
+            }))
+            path.write_bytes(_canonical(result) + b"\n")
+            with self.assertRaises(AcceptanceSuiteError):
+                _verify_instruction_microtrace(base)
+
     def test_existing_destination_rejected_without_overwriting(self):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaises(AcceptanceSuiteError):
