@@ -39,3 +39,21 @@ def test_recovery_queue_rejects_overflow_without_discarding_pending_work():
 def test_reconciliation_capacity_must_be_positive():
     with pytest.raises(ValueError, match="max_items must be positive"):
         ReconciliationQueue(max_items=0)
+
+def test_concurrent_queue_producers_cannot_discard_accepted_recovery_items():
+    from concurrent.futures import ThreadPoolExecutor
+
+    queue = ReconciliationQueue(max_items=4)
+    def submit(index):
+        try:
+            queue.enqueue(ReconciliationItem(str(index), "retry", 1))
+        except OverflowError:
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=16) as workers:
+        admitted = list(workers.map(submit, range(64)))
+    assert sum(admitted) == 4
+    drained = [queue.dequeue() for _ in range(4)]
+    assert len({item.execution_id for item in drained if item is not None}) == 4
+    assert queue.dequeue() is None

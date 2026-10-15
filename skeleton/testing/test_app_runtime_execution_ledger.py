@@ -52,3 +52,37 @@ def test_ledger_refuses_new_work_instead_of_eviction_of_active_execution():
     assert finished.status is ExecutionStatus.SUCCEEDED
     later = ledger.begin("another-command")
     assert later.execution_id != active.execution_id
+
+def test_concurrent_execution_tracking_preserves_unique_identifiers():
+    from concurrent.futures import ThreadPoolExecutor
+
+    ledger = ExecutionLedger(max_records=128)
+    def work(index):
+        record = ledger.begin("app-start", correlation=str(index % 5))
+        ledger.complete(record.execution_id, success=True)
+        return record.execution_id
+
+    with ThreadPoolExecutor(max_workers=32) as workers:
+        identities = list(workers.map(work, range(128)))
+    assert len(set(identities)) == 128
+    assert len(ledger.snapshot()) == 128
+    assert all(record.status is ExecutionStatus.SUCCEEDED for record in ledger.snapshot())
+
+
+def test_unexpected_command_exceptions_finalize_active_execution_without_secret_leak():
+    import pytest
+    from skeleton.app.runtime.instrumented_command_service import InstrumentedCommandService
+
+    class ExplodingCommand:
+        def execute(self, command, payload):
+            raise RuntimeError("secret-token-should-never-enter-ledger")
+
+    service = InstrumentedCommandService(ExplodingCommand())
+    with pytest.raises(RuntimeError, match="secret-token"):
+        service.execute("repair", {"auth": "another-secret"})
+
+    records = service.lifecycle.ledger.snapshot()
+    assert len(records) == 1
+    assert records[0].status is ExecutionStatus.FAILED
+    assert records[0].evidence["error"] == "unexpected RuntimeError"
+    assert "secret-token" not in repr(records)
