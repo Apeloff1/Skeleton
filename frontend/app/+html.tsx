@@ -7,11 +7,6 @@ export default function Root({ children }: PropsWithChildren) {
     <html lang="en" style={{ height: "100%" }}>
       <head>
         <meta charSet="utf-8" />
-        <title>Skeleton — Jeeves AI Game Studio</title>
-        <meta
-          name="description"
-          content="A local-first game studio with Jeeves AI chat, Dragon source review, world editing, human and AI play, and bounded training."
-        />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta
           name="viewport"
