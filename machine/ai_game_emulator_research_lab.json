@@ -8,7 +8,8 @@
     "skeleton/jeeves/game_emulator_cross_core_lab.py",
     "skeleton/jeeves/game_emulator_neural_world.py",
     "skeleton/jeeves/game_emulator_planning_lab.py",
-    "skeleton/jeeves/game_emulator_goal_lab.py"
+    "skeleton/jeeves/game_emulator_goal_lab.py",
+    "skeleton/jeeves/game_original_rom_goal_training.py"
   ],
   "governed_mirrors": [
     "skeleton/ai/agents/jeeves/game_emulator_experiment_lab.py",
@@ -16,7 +17,8 @@
     "skeleton/ai/agents/jeeves/game_emulator_cross_core_lab.py",
     "skeleton/ai/agents/jeeves/game_emulator_neural_world.py",
     "skeleton/ai/agents/jeeves/game_emulator_planning_lab.py",
-    "skeleton/ai/agents/jeeves/game_emulator_goal_lab.py"
+    "skeleton/ai/agents/jeeves/game_emulator_goal_lab.py",
+    "skeleton/ai/agents/jeeves/game_original_rom_goal_training.py"
   ],
   "entrypoints": [
     "python -m skeleton.jeeves.game_learning_cli train-emulator-deep",
@@ -25,7 +27,9 @@
     "python -m skeleton.jeeves.game_learning_cli fit-emulator-world-model",
     "python -m skeleton.jeeves.game_learning_cli plan-emulator",
     "python -m skeleton.jeeves.game_learning_cli probe-emulator-goals",
-    "python scripts/audit_game_emulator_first_boot.py"
+    "python scripts/audit_game_emulator_first_boot.py",
+    "python scripts/accept_original_rom_ai_pipeline.py",
+    "python -m skeleton.jeeves.game_original_rom_goal_training"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -117,7 +121,9 @@
     "skeleton/testing/test_game_emulator_neural_world.py",
     "skeleton/testing/test_game_emulator_physical_planning.py",
     "skeleton/testing/test_game_emulator_operator_goals.py",
-    "skeleton/testing/test_game_emulator_first_boot_audit.py"
+    "skeleton/testing/test_game_emulator_first_boot_audit.py",
+    "skeleton/testing/test_game_original_rom_ai_acceptance.py",
+    "skeleton/testing/test_game_original_rom_goal_training.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -193,5 +199,62 @@
     "failure_policy": "all cores must independently pass; any failed case yields exit status 2 and failed receipt",
     "hardware_accuracy_certified": false,
     "first_boot_sessions_executed_in_this_pr": 0
+  },
+  "original_rom_end_to_end_acceptance": {
+    "operator_entrypoint": "python scripts/accept_original_rom_ai_pipeline.py",
+    "scope": "original locally generated Game Boy ROM CPU emulator only, no external native core",
+    "source": "build_original_dmg_game exact original bytes and SHA256",
+    "stages": [
+      "source-authored ROM generator",
+      "experimental LR35902 interpreter boot and true steps",
+      "reverse source snapshot replay proofs",
+      "real source Q updates",
+      "original transition-specific dataset digests",
+      "disjoint episode holdout",
+      "bounded real AdamW numeric gradient updates",
+      "heldout baseline gain acceptance verdict"
+    ],
+    "private_outputs": [
+      "original-training.gb",
+      "rom-policy.json",
+      "rom-source-evidence.json",
+      "neural-world-candidate.json",
+      "neural-world-measurements.json",
+      "acceptance.json"
+    ],
+    "boundaries": {
+      "max_source_runs": 32,
+      "max_episode_steps": 32,
+      "max_neural_epochs": 16,
+      "max_neural_width": 32,
+      "create_only_private_directory": true,
+      "real_libretro_cores_proven": 0,
+      "production_transformer_weights_changed": false
+    },
+    "proof": "Only after source Q and neural measurements validate; nonzero exit when heldout gain not shown",
+    "execution_verified_during_this_pr": false
+  },
+  "original_source_grounded_game_goal": {
+    "source_module": "skeleton/jeeves/game_original_rom_goal_training.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_original_rom_goal_training.py",
+    "operator_entrypoint": "python -m skeleton.jeeves.game_original_rom_goal_training",
+    "game": "generated original deterministic Game Boy maze only",
+    "author_declared_registers": {
+      "player_x": "0xC000",
+      "player_y": "0xC001",
+      "score": "0xC002",
+      "completion": "0xC004"
+    },
+    "source_grounding": "CPU writes VRAM maze, actual CPU-read positions/score/completion under controller actions, exact independent rewind/replay",
+    "baseline": "Same starting savestate and equal number of idle emulated frames",
+    "learning": "separate tabular Q-policy offline trained on actually measured tile movement/one-time completion gain",
+    "forbidden_claims": [
+      "unrelated ROM gameplay semantics",
+      "independent commercial license verification",
+      "generalization to unknown games",
+      "physical Game Boy compatibility",
+      "automatic Jeeves production promotion"
+    ],
+    "real_executable_proof_established": false
   }
 }
