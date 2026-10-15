@@ -116,4 +116,3 @@ class ExecutionLedger:
         """Return the bounded ledger in deterministic insertion order."""
 
         return tuple(self._records.values())
-
