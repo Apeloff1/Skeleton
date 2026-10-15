@@ -364,16 +364,16 @@ def test_first_install_bootstraps_stable_forge_and_signing_secrets(tmp_path):
     (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
     first = ensure_runtime_environment(tmp_path)
     before = _read_values(tmp_path / ".env")
-    for key in ("SKELETON_MASTER_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED"):
+    for key in ("SKELETON_MASTER_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED", "GAMEFORGE_JWT_SECRET"):
         assert len(before[key]) == 64
         assert set(before[key]) <= set("0123456789abcdef")
         assert key in first.configured_keys
         assert before[key] not in repr(first.to_dict())
-    assert len({before[key] for key in ("SKELETON_MASTER_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED")}) == 3
+    assert len({before[key] for key in ("SKELETON_MASTER_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED", "GAMEFORGE_JWT_SECRET")}) == 4
 
     repeat = ensure_runtime_environment(tmp_path, rotate_secrets=True)
     after = _read_values(tmp_path / ".env")
-    for key in ("SKELETON_MASTER_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED"):
+    for key in ("SKELETON_MASTER_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED", "GAMEFORGE_JWT_SECRET"):
         assert after[key] == before[key], f"{key} must survive generic secret rotation"
         assert key in repeat.preserved_keys
 
