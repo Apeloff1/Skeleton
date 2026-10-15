@@ -8,7 +8,7 @@
     "cpu": "Official LR35902 base and CB instructions; invalid instructions fail explicitly",
     "cartridges": [
       "ROM-only (including header-declared SRAM)",
-      "MBC1 banking, up to 2 MiB ROM / 32 KiB SRAM",
+      "MBC1 ROM/RAM-bank mode: up to 2 MiB with at most 8 KiB RAM, or up to 512 KiB with 32 KiB SRAM (standard wiring, MBC1M not implemented)",
       "MBC2 0x05/0x06 with up to 256 KiB ROM, built-in 512 × 4-bit battery/nonbattery RAM, A8-qualified register writes and high-nibble readback",
       "MBC3 without RTC (types 0x11–0x13)",
       "MBC5 without rumble (types 0x19–0x1B), up to 8 MiB ROM / 128 KiB SRAM"
@@ -35,6 +35,6 @@
     "framebuffer_pixels": 23040,
     "state_bytes": 400000
   },
-  "failure": "Unsupported mapper/RTC/rumble or invalid MBC2 built-in RAM geometry, invalid RAM/ROM geometry, malformed header/checksum, illegal opcode, cycle/resource overrun and modified state/ROM identity fail explicitly. No proprietary BIOS, keys or game ROMs are bundled.",
+  "failure": "Unsupported mapper/RTC/rumble or invalid MBC2 built-in RAM geometry, invalid RAM/ROM geometry, malformed header/checksum, illegal opcode, cycle/resource overrun and modified state/ROM identity fail explicitly. No proprietary BIOS, keys or game ROMs are bundled. Standard MBC1 high-ROM and four-RAM-bank wiring cannot coexist.",
   "verification": "Source-level interpreter candidate including MBC2; native binaries, original generated ROM e2e training, exact LR35902 hardware timing and focused Python regressions must pass independent execution gates before operational acceptance. Boot ROM, CGB-only, RTC, rumble, audio and cycle-perfect PPU/APU behavior remain unavailable."
 }
