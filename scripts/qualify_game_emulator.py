@@ -89,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     from skeleton.jeeves.game_emulator_qualification import run_emulator_qualification
     from skeleton.jeeves.game_emulator_exploration import run_emulator_exploration
     from skeleton.jeeves.game_emulator_cross_core import compare_native_emulator_cores
+    from skeleton.jeeves.game_emulator_savestate_audit import run_native_savestate_roundtrip
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--registry", type=Path, required=True, help="Approved local cores.json (no download)")
@@ -102,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     advanced_group = parser.add_mutually_exclusive_group()
     advanced_group.add_argument("--explore-scenarios", type=int, help="Explicit bounded boomerang exploration, 2–80 scenarios")
     advanced_group.add_argument("--compare-core", action="append", help="Additional approved core to compare against --core; 1–7 other cores")
+    advanced_group.add_argument("--checkpoint-at", type=int, help="Save native state after this input step, then replay the suffix without restarting the core")
     parser.add_argument("--stagnation-window", type=int, default=10, help="Stop exploration after 3–20 scenarios with no new audiovisual outcome (default 10)")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--frames-per-step", type=int, default=1)
@@ -155,6 +157,24 @@ def main(argv: list[str] | None = None) -> int:
                 actions=args.action,
                 controller_tape=tape,
                 runs_per_core=args.runs,
+                seed=args.seed,
+                frames_per_step=args.frames_per_step,
+                controller_devices=args.controller_device,
+                timeout_seconds=args.timeout_seconds,
+                rights_evidence_digest=args.rights_evidence_digest,
+            )
+        elif args.checkpoint_at is not None:
+            if args.include_traces:
+                raise ValueError("Checkpoint audit returns exact bounded comparison receipts, not a raw trace export")
+            result = run_native_savestate_roundtrip(
+                args.target,
+                core_id=args.core,
+                expected_registry_digest=registry.registry_digest,
+                rom_source=source,
+                filename=name,
+                actions=args.action,
+                controller_tape=tape,
+                checkpoint_at=args.checkpoint_at,
                 seed=args.seed,
                 frames_per_step=args.frames_per_step,
                 controller_devices=args.controller_device,

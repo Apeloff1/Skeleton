@@ -624,5 +624,28 @@
     "caveat": "Same frame/audio hashes do not prove either core is accurate; different output formats/resolutions and frame timing may be legitimate. No objective winner or model gains are asserted.",
     "core_binary_compilations_performed": 0,
     "training_weights_promoted": false
+  },
+  "native_savestate_roundtrip_2026_10_15": {
+    "state": "Implemented source only; not executed against licensed/homebrew ROMs on an actual host in this change",
+    "owner": "skeleton/jeeves/game_emulator_savestate_audit.py",
+    "operator_cli": "scripts/qualify_game_emulator.py --core fceumm --target nes --registry /path/cores.json --source /path/homebrew.nes --action idle --action right --action a --checkpoint-at 1",
+    "method": "Actual retro_serialize snapshot after selected prefix, run actual suffix, retro_unserialize restore, rerun suffix in same sandboxed worker process",
+    "comparisons": [
+      "native RGB SHA-256",
+      "s16le PCM SHA-256",
+      "audio frame callback count",
+      "native frame calls",
+      "pixel callback count",
+      "observation and reward components",
+      "hashed transition chain"
+    ],
+    "bounds": {
+      "max_tape": 64,
+      "checkpoint_index": "strictly between 0 and length",
+      "max_step_and_reset_frames": 2048,
+      "native_workers": 1
+    },
+    "negative_claims": "No backward CPU cycle execution, emulator accuracy proof, legal rights certificate or production model training/promotion",
+    "bios_and_rom_fetched": false
   }
 }
