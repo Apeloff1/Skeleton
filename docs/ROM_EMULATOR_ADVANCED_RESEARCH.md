@@ -198,3 +198,111 @@ hardware-comparable cores, repeatable actual native multiport experiments,
 source-identity and licensing review, focused regression/test execution,
 CI signoff, real optimization-run receipt, held-out accuracy improvement,
 and independent proof of increased game skill.
+
+
+## E. Physically verified multi-step world-model planning
+
+After fitting a neural candidate and obtaining a **measured** held-out
+predictive gain, the proposed planner may search a bounded tree of speculative
+action sequences. Those proposals never update a policy or count as a real
+game success. Each candidate plan must be executed repeatedly on the **actual
+source ROM** from an identical restored native state, paired with a neutral
+input sequence of the same length. Mismatched source/model identities and
+early-terminated/shortened runs cannot be counted as positive evidence.
+
+```bash
+python -m skeleton.jeeves.game_learning_cli plan-emulator \
+  --target game_boy --rom /private/roms/original-training-world.gb \
+  --model-file /private/research/rom-world-model-candidate.json \
+  --training-report-file /private/research/rom-world-training.json \
+  --evidence-file /private/research/physical-plan-validation.json \
+  --rights-acknowledged --episode-steps 32 \
+  --anchors 2 --horizon 4 --beam-width 8 --proposal-count 3 \
+  --repeats 2 --max-actual-steps 512
+```
+
+Search width is bounded to 16, horizon to 8 steps, and proposals to 6 per
+actual initial state. Objectives are measured reward, visual activity, audio
+activity (only if the original environment measures it), or low visual
+activity. A positive source comparison is evidence only for the selected
+**numeric objective**, never actual gameplay success or general AI capability.
+A source-trained model that did not beat its held-out baseline is rejected
+before it is permitted to propose a source-executed plan.
+
+Physical planning also depends on a correct rewind of the host's *last raw
+native audio chunk*, not only its framebuffer. The native host now binds
+`audio_base64`, `audio_size` and `audio_sha256` into the checked savestate
+and restores that previous audio telemetry before executing the next frame.
+This closes an observation-history gap for temporal audio-onset features.
+Host observations are cleared when a new episode is reset.
+
+## F. Operator-authored game-objective experiments
+
+Visual-change reward can be optimized by flashing screens, so it is not
+adequate evidence of story progression, ability use, quest completion or
+game mastery. The native-only operator-goal laboratory permits **explicit,
+bounded actual libretro memory measurements**. Operators must provide the
+source-rights assertion, hypothesis provenance, memory region/offset/width,
+threshold/bitmask and an action sequence to test. No memory addresses,
+score meanings or victory flags are guessed.
+
+Example private `/private/research/operator-goals.json` file:
+
+```json
+{
+  "source_authority": "Owned original ROM; operator mapped this game register",
+  "goals": [
+    {
+      "label": "operator-claimed-objective-counter",
+      "region": 0,
+      "offset": 8192,
+      "bytes_per_value": 2,
+      "direction": "increase",
+      "threshold": 1,
+      "mask": 0,
+      "signed": false
+    }
+  ],
+  "interventions": {
+    "press-a": ["a"],
+    "press-a-right": ["a_right"],
+    "press-a-twice": ["a", "a"]
+  }
+}
+```
+
+Use an actual approved core with lawful private media, for example:
+
+```bash
+python -m skeleton.jeeves.game_learning_cli probe-emulator-goals \
+  --target emulator:game_boy --core gambatte \
+  --rom /private/roms/original-training-world.gb \
+  --goal-file /private/research/operator-goals.json \
+  --evidence-file /private/research/operator-goal-measurements.json \
+  --rights-acknowledged --episode-steps 32 \
+  --anchors 2 --repeats 2 --horizon 6 --max-actual-steps 2048
+```
+
+Each active input sequence is padded with neutral controls to the same
+length as the neutral baseline. Trials repeatedly restore the *same real
+emulator state*. The collector returns the measured native memory bytes'
+SHA-256, operator-selected bounded decoded values, controlled predicate
+changes, actual frame/step identities and run-level repeatability. A source
+state at which both active and neutral controls reach the threshold is not
+reported as an active-only result.
+
+**Critical qualification:** Even reproducible register changes do not by
+themselves establish that the register represents score, health, inventory,
+abilities, quests, NPC behavior, camera angle, cinematic state or a win. A
+human-provided hypothesis must be corroborated by separate game-specific
+evidence; no gameplay semantics are automatically certified. No commercial
+ROMs/BIOS are included and no production weights are trained by this probe.
+
+## Execution and proof status
+
+The new `plan-emulator` and `probe-emulator-goals` paths, their governed
+Jeeves mirrors, and synthetic regression cases are committed as source.
+Actual local native ROM execution, Python regression runs, release CI,
+per-core accuracy, learned gameplay improvement and production model
+promotion are **not yet verified**. Operator-run source evidence must precede
+any claim that the corresponding hardware features work.
