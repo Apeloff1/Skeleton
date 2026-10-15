@@ -227,6 +227,9 @@ class WindowsLauncher:
         self._add_button(
             offline_buttons, "Cutscene Multi-Sim", self.run_cutscene_sim
         )
+        self._add_button(
+            offline_buttons, "Adaptive Simulation", self.run_adaptive_sim
+        )
 
         helper = ttk.Frame(outer)
         helper.pack(fill="x", pady=(0, 10))
@@ -413,6 +416,44 @@ class WindowsLauncher:
 
         self._run_worker("Simulating camera and cutscene variants...", simulate,
                          lambda value: value)
+
+    def run_adaptive_sim(self) -> None:
+        """Opt-in coverage-guided situation and edge-case stress rehearsal."""
+        from tkinter import filedialog
+        scene_file = filedialog.askopenfilename(
+            parent=self.window, title="Select original, rights-reviewed scenario",
+            filetypes=[("Scene JSON", "*.json"), ("All files", "*.*")])
+        if not scene_file:
+            return
+        output_file = filedialog.asksaveasfilename(
+            parent=self.window, title="Save new adaptive scenario evidence",
+            defaultextension=".json", filetypes=[("Evidence JSON", "*.json")])
+        if not output_file:
+            return
+        evidence = Path(output_file)
+        if evidence.exists() or evidence.is_symlink():
+            self._set_log("Adaptive evidence must use an unused filename.")
+            return
+
+        def simulate() -> str:
+            from skeleton.ai.training.jeeves_adaptive_sim_training import run_campaign
+            from skeleton.ai.training.jeeves_cinematic_simulation import _read_json, _write_new
+            original = _read_json(Path(scene_file), 128*1024)
+            result = run_campaign(original, budget=24, workers=2)
+            _write_new(evidence, result)
+            return (
+                f"Source-bound rehearsals: {result['simulations_executed']}\n"
+                f"Feedback-selected cases: {result['feedback_guided_runs']}\n"
+                f"Coverage features: {result['coverage_feature_count']}\n"
+                f"Recorded failure families: {len(result['risk_families_observed'])}\n"
+                f"Forward observations: {result['forward_observations']}\n"
+                f"Reverse observations: {result['reverse_observations']}\n"
+                "Candidate training remains quarantined pending independent review.\n"
+                f"Evidence file: {evidence}"
+            )
+
+        self._run_worker("Running adaptive environment and adversarial sims...",
+                         simulate, lambda result: result)
 
     def _start_browser_service(self, selected: Path, *, gguf: bool) -> str:
         """Start one authenticated loopback service owned by this launcher.
@@ -689,6 +730,9 @@ def main(argv: list[str] | None = None) -> int:
     if arguments and arguments[0] == "--cinematic-sim":
         from skeleton.ai.training.jeeves_cinematic_simulation import main as cinema_main
         return cinema_main(arguments[1:])
+    if arguments and arguments[0] == "--adaptive-sim":
+        from skeleton.ai.training.jeeves_adaptive_sim_training import main as adaptive_main
+        return adaptive_main(arguments[1:])
     if "--offline-command" in arguments:
         # The frozen executable shares the canonical offline CLI. This path
         # is usable on a headless host and never initializes Tk or Compose.

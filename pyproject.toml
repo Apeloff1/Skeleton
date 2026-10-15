@@ -68,3 +68,4 @@ skeleton-jeeves-session-recover = "skeleton.ai.training.jeeves_production_game_r
 skeleton-jeeves-production-train = "skeleton.ai.training.jeeves_production_game_train:main"
 skeleton-jeeves-training-modules = "skeleton.ai.training.jeeves_parallel_mirrors:main"
 skeleton-jeeves-cinematic-sim = "skeleton.ai.training.jeeves_cinematic_simulation:main"
+skeleton-jeeves-adaptive-sim = "skeleton.ai.training.jeeves_adaptive_sim_training:main"

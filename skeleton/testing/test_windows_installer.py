@@ -241,3 +241,13 @@ def test_windows_bundle_includes_cutscene_multi_sim_and_review_runtime():
     assert '"Cutscene Multi-Sim", self.run_cutscene_sim' in launcher
     assert "args.cinematic_sim" not in launcher
     assert '"skeleton.ai.training.jeeves_cinematic_simulation"' in builder
+
+def test_installed_adaptive_scenario_training_is_packaged_without_auto_training():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    app = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    builder = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    assert "test_jeeves_adaptive_sim_training.py" in workflow
+    assert '"--adaptive-sim", "--help"' in workflow
+    assert '"Adaptive Simulation", self.run_adaptive_sim' in app
+    assert '"skeleton.ai.training.jeeves_adaptive_sim_training"' in builder
+    assert '"source-bound rehearsals"' not in app.lower()

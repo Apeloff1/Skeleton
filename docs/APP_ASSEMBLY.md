@@ -445,3 +445,28 @@ The cursor stores already observed frames with a chained checksum. Restoration
 rejects tampered observations and changed source identities, then computes only
 remaining frames. It does not repeat earlier simulation steps or alter any
 model weights. Paused artifacts are private and require an unused output path.
+
+### Adaptive scenario, environment and adversarial simulator
+
+Jeeves also includes a coverage-guided stress-rehearsal controller:
+```bash
+python -m skeleton app adaptive-sim --scene approved-original-scene.json \
+  --output adaptive-campaign.json --draft-output review-drafts.jsonl \
+  --budget 48 --workers 4 --seed 7 --frame-ms 100
+```
+
+The scheduler maximizes coverage across pursuit, rescue, combat, stealth,
+dialogue and exploration; clear/fog/rain/snow/storm conditions, light, crowd,
+noise, friction and approved camera/item/apparel stresses. It runs a *real*
+deterministic camera/prop simulator per scenario and applies documented,
+bounded **proxy** risk formulas to each observed frame. It does not render
+rain, NPC crowds, acoustics or fluid physics. It compares each scenario to a
+shared immutable baseline, prioritizes measured failures in a feedback stage,
+and performs source-derived reverse audits without restarting a scene.
+
+The `--draft-output` pairs situational diagnosis, one-factor repair requests
+and adversarial edge-case review prompts. Every generated draft is **quarantined,
+unlabelled and ineligible for optimizer updates** until independent rights,
+quality, project-split and leakage review. This adds controlled evidence,
+not fictitious model learning. The installed Windows launcher exposes an
+opt-in **Adaptive Simulation** control.

@@ -5745,7 +5745,8 @@
         "jeeves_training_progress.py",
         "jeeves_multidomain.py",
         "jeeves_parallel_mirrors.py",
-        "jeeves_cinematic_simulation.py"
+        "jeeves_cinematic_simulation.py",
+        "jeeves_adaptive_sim_training.py"
       ]
     },
     {
@@ -6503,7 +6504,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_48_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_49_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7469,7 +7470,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 48
+    "native_ai_owner_count": 49
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8711,6 +8712,18 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Real deterministic cutscene camera, props, apparel, reversible audit and bounded multisim specialist with quarantined training candidates.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-ADAPTIVE-SIM-TRAINING",
+      "path": "skeleton/ai/training/jeeves_adaptive_sim_training.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Bounded feedback-guided cinematic situation and environment simulation, counterfactual repair experiment, and quarantined retraining evidence.",
       "volume_refs": [
         "VOL-006",
         "VOL-072"
