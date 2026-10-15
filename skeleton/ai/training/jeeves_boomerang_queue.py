@@ -1,8 +1,11 @@
-"""Persistent three-pass Jeeves boomerang simulation queue.
+"""Persistent Jeeves boomerang simulation queue with bounded randomized returns.
 
 Pass 1 is a previously completed, audited adaptive campaign.
 Pass 2 revisits it with bounded, controlled counterfactual probes.
 Pass 3 analyzes the newly collected failures and revisits again.
+An explicitly enabled randomized scheduler resurfaces completed old sources
+for bounded later return visits, shuffled alongside new queue entries. Each
+visit performs novel effective-control probes and retires on plateau or budget.
 
 The original simulation is NOT restarted. Completed queue snapshots are
 immutable, chained, and source-pinned; each advancement executes only new
@@ -18,6 +21,8 @@ from pathlib import Path
 import json
 import os
 import sys
+import time
+from random import Random
 from typing import Any
 
 from .jeeves_cinematic_simulation import (
@@ -34,6 +39,18 @@ MAX_ENTRIES = 32
 MAX_REVISITS = 2
 MAX_PROBES = 24
 MAX_QUEUE_BYTES = 16 * 1024 * 1024
+RESHUFFLE_SCHEMA = "skeleton.jeeves.boomerang_queue.v2"
+MAX_RETURN_VISITS = 16
+MAX_PLATEAU = 10
+MAX_RETURN_INTERVAL = 30 * 86400
+BASE_KEYS = {"schema_version", "generation", "parent_queue_sha256", "entries",
+             "source_projects", "serving_weights_modified", "optimizer_updates",
+             "automatic_model_promotion", "queue_sha256"}
+ENTRY_KEYS = {"queue_id", "source", "revisits_completed", "max_revisits",
+              "status", "initial_case_count", "initial_risk_families",
+              "initial_scenario_ids", "initial_trace_count", "passes"}
+RETURN_KEYS = {"next_due_epoch", "last_scheduled_epoch", "return_visits",
+               "plateau_streak", "last_discovery_context_count"}
 
 
 def _require(ok: bool, message: str) -> None:
@@ -59,6 +76,120 @@ def _effective_identity(case: dict) -> str:
     controls = {key: value for key, value in _controls(case).items() if key != "seed"}
     return _hash({"situation": case["situation"],
                   "environment": _environment(case), "controls": controls})
+
+
+def _policy(seed: int, min_delay: int, max_delay: int,
+            max_visits: int, plateau_limit: int) -> dict:
+    _bounded_int(seed, 0, 2**31-1, "randomized-return seed")
+    _bounded_int(min_delay, 1, MAX_RETURN_INTERVAL, "minimum return delay")
+    _bounded_int(max_delay, min_delay, MAX_RETURN_INTERVAL, "maximum return delay")
+    _bounded_int(max_visits, 1, MAX_RETURN_VISITS, "maximum later visits")
+    _bounded_int(plateau_limit, 1, MAX_PLATEAU, "consecutive zero-discovery ceiling")
+    return {"shuffle_seed": seed, "min_delay_seconds": min_delay,
+            "max_delay_seconds": max_delay,
+            "max_return_visits": max_visits,
+            "plateau_limit": plateau_limit}
+
+
+def _clock(now_epoch: int | None) -> int:
+    timestamp = int(time.time()) if now_epoch is None else now_epoch
+    return _bounded_int(timestamp, 0, 4102444800, "UTC queue epoch")
+
+
+def _due(policy: dict, identity: str, last_receipt: str,
+         next_visit: int, from_epoch: int) -> int:
+    """Deterministic PRNG for auditability, with a real interval in seconds."""
+    entropy = _hash({"source": identity, "prior_pass": last_receipt,
+                     "return_number": next_visit,
+                     "seed": policy["shuffle_seed"]})
+    rng = Random(int(entropy, 16))
+    return from_epoch + rng.randint(policy["min_delay_seconds"],
+                                    policy["max_delay_seconds"])
+
+
+def _status(entry: dict, policy: dict | None) -> str:
+    if entry["revisits_completed"] == 0:
+        return "awaiting_second_pass"
+    if entry["revisits_completed"] == 1:
+        return "awaiting_third_pass"
+    if policy is None:
+        return "complete"
+    if (entry["return_visits"] >= policy["max_return_visits"] or
+            entry["plateau_streak"] >= policy["plateau_limit"]):
+        return "retired"
+    return "scheduled_return"
+
+
+def _return_entry(entry: dict, policy: dict, now: int) -> dict:
+    result = deepcopy(entry)
+    result.update({"next_due_epoch": None, "last_scheduled_epoch": None,
+                   "return_visits": 0, "plateau_streak": 0,
+                   "last_discovery_context_count": 0})
+    if result["revisits_completed"] >= MAX_REVISITS:
+        result["last_scheduled_epoch"] = now
+        result["next_due_epoch"] = _due(
+            policy, result["queue_id"], result["passes"][-1]["pass_sha256"], 1, now)
+    result["status"] = _status(result, policy)
+    return result
+
+
+def enable_reshuffle(queue: dict, *, seed: int = 19,
+                     min_delay_seconds: int = 3600,
+                     max_delay_seconds: int = 86400,
+                     max_return_visits: int = 16, plateau_limit: int = 10,
+                     now_epoch: int | None = None) -> dict:
+    """Migrate existing v1 queue, including completed 3-pass simulations."""
+    verify_queue(queue, verify_sources=True)
+    _require(queue["schema_version"] == SCHEMA,
+             "randomized returns already configured for this queue")
+    now = _clock(now_epoch)
+    policy = _policy(seed, min_delay_seconds, max_delay_seconds,
+                     max_return_visits, plateau_limit)
+    upgraded = {**queue, "schema_version": RESHUFFLE_SCHEMA,
+                "reshuffle_policy": policy, "last_tick_epoch": now,
+                "generation": queue["generation"]+1,
+                "parent_queue_sha256": queue["queue_sha256"],
+                "entries": [_return_entry(e, policy, now) for e in queue["entries"]]}
+    updated = _receipt(upgraded)
+    verify_queue(updated, verify_sources=True)
+    return updated
+
+
+def _context_signatures(rows: list[dict]) -> set[str]:
+    """Novel risk contexts, not seed changes or arbitrary raw frame hashes."""
+    found = set()
+    for row in rows:
+        case = row["scenario"]
+        # Weather/lighting/situation/attack are distinct controlled settings.
+        # Changing only camera micro-parameters cannot make the same discovery.
+        for family in row["risk_counts"]:
+            found.add(_hash({
+                "family": family, "situation": case["situation"],
+                "weather": case["weather"], "lighting": case["lighting"],
+                "attack": case["attack"],
+            }))
+    return found
+
+
+def _due_work(queue: dict, now: int) -> list[int]:
+    """Deterministic seeded queue reshuffle, fairness through earliest due."""
+    policy = queue["reshuffle_policy"]
+    ready = []
+    for i, entry in enumerate(queue["entries"]):
+        if entry["status"] in ("awaiting_second_pass", "awaiting_third_pass"):
+            ready.append((0, i))
+        elif entry["status"] == "scheduled_return" and entry["next_due_epoch"] <= now:
+            ready.append((entry["next_due_epoch"], i))
+    # Stable pseudo-random tie breaks reshuffle equal-due work, but earliest
+    # overdue tickets outrank fresh tickets; a low budget does not starve old work.
+    def order(item):
+        due, index = item
+        salt = _hash({"source": queue["entries"][index]["queue_id"],
+                      "generation": queue["generation"],
+                      "seed": policy["shuffle_seed"],
+                      "clock_day": now // 86400})
+        return (due, salt)
+    return [index for _due_at, index in sorted(ready, key=order)]
 
 
 def _source_record(scene_file: Path, campaign_file: Path) -> dict:
@@ -119,7 +250,12 @@ def enqueue(queue: dict, scene_file: Path, campaign_file: Path) -> dict:
         "entries": [*deepcopy(queue["entries"]), entry],
     }
     new["source_projects"] = sorted({e["source"]["project_id"] for e in new["entries"]})
-    return _receipt(new)
+    if queue["schema_version"] == RESHUFFLE_SCHEMA:
+        new["entries"][-1] = _return_entry(
+            entry, queue["reshuffle_policy"], queue["last_tick_epoch"])
+    updated = _receipt(new)
+    verify_queue(updated)
+    return updated
 
 
 def _load_source(entry: dict) -> tuple[dict, dict]:
@@ -141,11 +277,20 @@ def _load_source(entry: dict) -> tuple[dict, dict]:
 
 def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
     """Validate structural chain and per-pass integrity without replaying frames."""
-    _require(type(queue) is dict and set(queue) == {
-        "schema_version", "generation", "parent_queue_sha256", "entries",
-        "source_projects", "serving_weights_modified", "optimizer_updates",
-        "automatic_model_promotion", "queue_sha256",
-    } and queue["schema_version"] == SCHEMA, "queue schema changed")
+    _require(type(queue) is dict and queue.get("schema_version") in
+             (SCHEMA, RESHUFFLE_SCHEMA), "queue schema changed")
+    policy = None
+    if queue["schema_version"] == RESHUFFLE_SCHEMA:
+        _require(set(queue) == BASE_KEYS | {"reshuffle_policy", "last_tick_epoch"},
+                 "unknown randomized queue fields")
+        policy = queue["reshuffle_policy"]
+        _require(type(policy) is dict and policy == _policy(
+            policy["shuffle_seed"], policy["min_delay_seconds"],
+            policy["max_delay_seconds"], policy["max_return_visits"],
+            policy["plateau_limit"]), "reshuffle policy mutated")
+        _clock(queue["last_tick_epoch"])
+    else:
+        _require(set(queue) == BASE_KEYS, "unknown original queue fields")
     _require(queue["queue_sha256"] == _hash({
         key: value for key, value in queue.items() if key != "queue_sha256"}),
         "queue content digest mismatch")
@@ -159,21 +304,43 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
              "simulation report falsely claims model training")
     ids = set()
     for entry in queue["entries"]:
-        _require(type(entry) is dict and set(entry) == {
-            "queue_id", "source", "revisits_completed", "max_revisits",
-            "status", "initial_case_count", "initial_risk_families",
-            "initial_scenario_ids", "initial_trace_count", "passes",
-        }, "unrecognized queue entry fields")
+        _require(type(entry) is dict and
+                 set(entry) == (ENTRY_KEYS | (RETURN_KEYS if policy else set())),
+                 "unrecognized queue entry fields")
         _require(entry["queue_id"] not in ids, "duplicate queue source")
         ids.add(entry["queue_id"])
         _require(entry["max_revisits"] == MAX_REVISITS and
                  type(entry["passes"]) is list and
                  len(entry["passes"]) == entry["revisits_completed"] and
-                 0 <= entry["revisits_completed"] <= MAX_REVISITS,
+                 0 <= entry["revisits_completed"] <=
+                 MAX_REVISITS + (policy["max_return_visits"] if policy else 0),
                  "pass counters or cap drifted")
-        status = ("awaiting_second_pass", "awaiting_third_pass", "complete")[
-            entry["revisits_completed"]]
-        _require(entry["status"] == status, "queue completion status drift")
+        _require(entry["status"] == _status(entry, policy),
+                 "queue completion status drift")
+        if policy:
+            returns = _bounded_int(entry["return_visits"], 0,
+                                   policy["max_return_visits"], "return count")
+            _require(returns == max(0, entry["revisits_completed"] - MAX_REVISITS),
+                     "return counter differs from actual passes")
+            _bounded_int(entry["plateau_streak"], 0, MAX_PLATEAU,
+                         "consecutive empty discovery returns")
+            _bounded_int(entry["last_discovery_context_count"], 0, 100000,
+                         "last unique discovery contexts")
+            if entry["revisits_completed"] < MAX_REVISITS:
+                _require(entry["next_due_epoch"] is None and
+                         entry["last_scheduled_epoch"] is None,
+                         "initial three passes must run without randomized delay")
+            elif entry["status"] == "scheduled_return":
+                _clock(entry["last_scheduled_epoch"])
+                _clock(entry["next_due_epoch"])
+                _require(entry["next_due_epoch"] == _due(
+                    policy, entry["queue_id"], entry["passes"][-1]["pass_sha256"],
+                    returns+1, entry["last_scheduled_epoch"]) and
+                    entry["next_due_epoch"] > entry["last_scheduled_epoch"],
+                    "random interval differs from attested schedule")
+            else:
+                _require(entry["next_due_epoch"] is None,
+                         "retired queue source must not own a due ticket")
         seen = set(entry["initial_scenario_ids"])
         effective_seen = set()
         _require(len(seen) == len(entry["initial_scenario_ids"]),
@@ -269,7 +436,17 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
                                    for e in queue["entries"]),
         "pending_third_pass": sum(e["status"] == "awaiting_third_pass"
                                   for e in queue["entries"]),
-        "complete_sources": sum(e["status"] == "complete" for e in queue["entries"]),
+        "complete_sources": sum(e["status"] in ("complete", "retired")
+                                for e in queue["entries"]),
+        "scheduled_returns": sum(e["status"] == "scheduled_return"
+                                  for e in queue["entries"]),
+        "overdue_returns": sum(e["status"] == "scheduled_return" and
+                               e["next_due_epoch"] <= queue["last_tick_epoch"]
+                               for e in queue["entries"]) if policy else 0,
+        "next_return_epoch": min(
+            (e["next_due_epoch"] for e in queue["entries"]
+             if e["status"] == "scheduled_return"), default=None),
+        "randomized_returns_enabled": policy is not None,
         "real_optimizer_updates": 0,
         "source_bytes_verified": verify_sources,
     }
@@ -302,7 +479,8 @@ def _coverage_fill(scene: dict, used: set[str], effective: set[str],
 def _advance_entry(entry: dict, scene: dict, archive: dict, *,
                    budget: int, workers: int, frame_ms: int) -> dict:
     pass_number = entry["revisits_completed"] + 2
-    _require(2 <= pass_number <= 3, "boomerang can only run second and third passes")
+    _require(2 <= pass_number <= MAX_REVISITS + MAX_RETURN_VISITS + 1,
+             "boomerang visit budget exhausted")
     latest = (archive["cases"] if pass_number == 2 else entry["passes"][-1]["results"])
     previous = _previous_rows(entry, archive)
     old_ids = {row["scenario"]["scenario_id"] for row in previous}
@@ -399,7 +577,8 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
         "novel_failure_families": sorted(new_families),
         "novel_family_count": len(new_families),
         "control_parse_policy": (
-            "third_pass_new_failure_priority" if pass_number == 3
+            "randomized_return_coverage_and_failure_priority" if pass_number > 3
+            else "third_pass_new_failure_priority" if pass_number == 3
             else "second_pass_archived_failure_priority"),
         "novel_control_context_risk_signatures": len(new_signatures),
         "risk_signatures_not_independent_training_proof": True,
@@ -416,7 +595,7 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
         "independent_game_design_quality_proven": False,
     }
     # Keep historic pass receipts within bounded queue storage.
-    _require(len(_json(batch)) <= MAX_QUEUE_BYTES // MAX_REVISITS,
+    _require(len(_json(batch)) <= MAX_QUEUE_BYTES // 2,
              "boomerang pass artifact exceeds durable queue quota")
     batch["pass_sha256"] = _hash(batch)
     return batch
