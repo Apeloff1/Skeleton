@@ -6,6 +6,7 @@ no claim of rendering, cloth dynamics, or model weight improvements.
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 import pytest
 
 from skeleton.ai.training.jeeves_cinematic_simulation import (
@@ -194,3 +195,26 @@ def test_unapproved_apparel_and_item_variants_rejected():
         simulate_once(scene(), controls(item_variant_id="copyrighted_sword"))
     with pytest.raises(CinematicSimError, match="unapproved outfit"):
         simulate_once(scene(), controls(apparel_variant_id="foreign_outfit"))
+
+def test_checkpoint_resume_without_restarting_scene_and_tamper_rejection():
+    controller = SimulationController(scene(), controls(yaw_offset_deg=15))
+    for _ in range(7):
+        controller.step()
+    controller.pause()
+    checkpoint = json.loads(json.dumps(controller.checkpoint()))
+    restored = SimulationController.from_checkpoint(scene(), checkpoint)
+    assert restored.cursor == 7 and restored.paused is True
+    assert restored.step() is None
+    resumed_trace = restored.run()
+    uninterrupted = SimulationController(scene(), controls(yaw_offset_deg=15)).run()
+    assert [x["digest"] for x in resumed_trace] == [x["digest"] for x in uninterrupted]
+    assert restored.reverse_audit()["passed"] is True
+
+    compromised = deepcopy(checkpoint)
+    compromised["observations"][3]["yaw_deg"] += 10
+    with pytest.raises(CinematicSimError, match="checkpoint integrity"):
+        SimulationController.from_checkpoint(scene(), compromised)
+    other = deepcopy(scene())
+    other["shots"][0]["lighting_id"] = "unauthorized_edit"
+    with pytest.raises(CinematicSimError, match="source changed"):
+        SimulationController.from_checkpoint(other, checkpoint)
