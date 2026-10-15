@@ -84,15 +84,17 @@ def _command_check(
             remediation=remediation,
         )
 
-    output = (completed.stdout or completed.stderr or "").strip().splitlines()
-    suffix = f": {output[0][:160]}" if output else ""
+    # Docker/pip diagnostic output is untrusted and may include credentialed
+    # daemon URLs or command environment values. A host readiness receipt
+    # records only the operation and its exit status; full diagnostics stay
+    # with the operator's local CLI.
     return PreloadCheck(
         code=code,
         ok=completed.returncode == 0,
         detail=(
-            f"{label} available{suffix}"
+            f"{label} available"
             if completed.returncode == 0
-            else f"{label} check failed with exit {completed.returncode}{suffix}"
+            else f"{label} check failed with exit {completed.returncode}"
         ),
         remediation=remediation if completed.returncode else "",
     )

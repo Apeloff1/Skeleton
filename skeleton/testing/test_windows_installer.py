@@ -388,3 +388,52 @@ def test_windows_hidden_runner_forwards_streaming_compose_output(monkeypatch, tm
     assert observed["cwd"] == tmp_path
     assert observed["env"]["APP_MODE"] == "production"
     assert observed["shell"] is False
+
+
+def test_host_preloader_never_echoes_docker_daemon_credentials(monkeypatch, tmp_path):
+    from skeleton.app.preloader import _command_check
+
+    credential = "private-token-present-only-in-child-output"
+    for status in (0, 17):
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command, status,
+                stdout=f"DOCKER_HOST=https://user:{credential}@daemon.internal",
+                stderr=f"DOCKER_HOST=https://user:{credential}@daemon.internal",
+            )
+
+        probe = _command_check(
+            ["docker", "info"], code="host:docker-daemon",
+            label="Docker daemon", remediation="Start Docker Desktop",
+            runner=runner,
+        )
+        assert probe.ok is (status == 0)
+        assert credential not in probe.detail
+        assert "DOCKER_HOST" not in probe.detail
+
+
+def test_windows_stop_command_raised_error_does_not_show_sensitive_text(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    def runner(command, **kwargs):
+        raise OSError("Secret environment variable JWT_SECRET=internal-test-secret")
+
+    monkeypatch.setattr(launcher, "_hidden_runner", runner)
+    ok, detail = launcher.stop_runtime(tmp_path)
+    assert not ok
+    assert "OSError" in detail
+    assert "internal-test-secret" not in detail
+    assert "JWT_SECRET" not in detail
+
+
+def test_windows_runtime_probe_exception_uses_type_only(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher as launcher
+
+    def raise_probe(*args, **kwargs):
+        raise RuntimeError("private service token leaked from diagnostic")
+
+    monkeypatch.setattr(launcher, "public_service_urls", raise_probe)
+    ok, detail = launcher.runtime_status(tmp_path)
+    assert not ok
+    assert "RuntimeError" in detail
+    assert "private service token" not in detail

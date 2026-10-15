@@ -151,7 +151,7 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
             timeout=90,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        return False, f"Unable to stop services: {type(exc).__name__}: {exc}"
+        return False, f"Unable to stop services: {type(exc).__name__}; check Docker Desktop"
     if completed.returncode == 0:
         return True, "Skeleton services stopped."
     # Docker may echo environment values in diagnostics. Do not surface
@@ -168,7 +168,7 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
             manifest=manifest, timeout=2.0, public_url_overrides=urls,
         )
     except Exception as exc:
-        return False, f"Runtime probe failed: {type(exc).__name__}: {exc}"
+        return False, f"Runtime probe failed: {type(exc).__name__}; check local port configuration"
     if not results:
         return False, "No public health probes are configured."
     lines = []
@@ -320,7 +320,7 @@ class WindowsLauncher:
                 rendered = render(result)
                 error = None if _action_succeeded(result) else RuntimeError("operation returned unsuccessful result")
             except Exception as exc:
-                rendered = f"{type(exc).__name__}: {exc}"
+                rendered = f"{type(exc).__name__}: operation failed; see local runtime diagnostics"
                 error = exc
 
             def finish() -> None:
@@ -577,7 +577,7 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
             return 0 if ready else 1
         except Exception as exc:
             if not args.quiet:
-                print("GGUF local acceptance failed: " + str(exc))
+                print("GGUF local acceptance failed: " + type(exc).__name__)
             return 1
     if args.verify_payload:
         # Docker-free verification of the real installed, frozen payload.
