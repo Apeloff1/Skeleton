@@ -1,0 +1,9 @@
+# Core-reported native libretro input descriptions beneath game viewport
+
+The previous comparison controller deck used hardware-family labels or a visible generic RetroPad fallback. The real native core may expose a more accurate, game-specific button name via `RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS` (libretro environment command 11). The isolated worker now reads that C ABI structure **inside the sandbox** and emits a bounded, copied JSON description list in the existing libretro system-info handshake. It rejects malformed/duplicate descriptions, unsupported input devices, out-of-range port/index/key IDs, control characters, and overlong descriptions; it does not retain source pointers.
+
+The canonical `controller_layout_for_target()` optionally consumes that native metadata and changes matching RetroPad button labels (e.g., A can display 'Jump') without changing the actual `mask`, controller input vectors, device topology, or physical layout. All missing or unrecognized inputs retain familiar generic labels. Core-reported labels are **observations of the approved core ABI, not proof of authentic hardware controllers**. The overlay is bolted below the game image and does not occlude video.
+
+The existing offline 169-target matrix still reports unqualified generic fallbacks when no native core has actually provided descriptions. The live panel only receives descriptors from the exact installed core that launched the lane.
+
+The new unit tests use in-memory `ctypes` descriptors to prove exact libretro input-descriptor field layout, dual button mapping, duplicate rejection, and no false physical-fidelity claim. They are added to the explicit/manual focused qualification workflow. An actual native libretro boot with unusual input peripherals is still needed before marking hardware controller compatibility verified.

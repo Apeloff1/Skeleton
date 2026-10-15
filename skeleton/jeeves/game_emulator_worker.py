@@ -31,6 +31,7 @@ MAX_AUDIO_FRAMES = 131072
 MAX_STATE = 64 * 1024 * 1024
 MAX_ROM = 32 * 1024 * 1024
 MAX_MEMORY_READ = 1024 * 1024
+MAX_SAVE_RAM = 8 * 1024 * 1024
 REQUIRED_SYMBOLS = (
     "retro_api_version",
     "retro_set_environment",
@@ -75,6 +76,40 @@ class SystemInfo(C.Structure):
 
 class GameInfo(C.Structure):
     _fields_ = [("path", C.c_void_p), ("data", C.c_void_p), ("size", C.c_size_t), ("meta", C.c_void_p)]
+
+
+class ControllerDescription(C.Structure):
+    _fields_ = [("desc", C.c_void_p), ("id", C.c_uint)]
+
+
+class ControllerInfo(C.Structure):
+    _fields_ = [("types", C.POINTER(ControllerDescription)), ("num_types", C.c_uint)]
+
+
+class InputDescriptor(C.Structure):
+    """Upstream libretro retro_input_descriptor ABI, no pointer retained."""
+    _fields_ = [
+        ("port", C.c_uint), ("device", C.c_uint),
+        ("index", C.c_uint), ("id", C.c_uint),
+        ("description", C.c_void_p),
+    ]
+
+
+class DiskControlCallbacks(C.Structure):
+    """Stable first seven pointers in libretro v0 and v1 disk control ABI.
+
+    The v1 struct appends three fields. We intentionally read only the
+    compatible subset: no dynamic paths, replacing discs, or adding content.
+    """
+    _fields_ = [
+        ("set_eject_state", C.c_void_p),
+        ("get_eject_state", C.c_void_p),
+        ("get_image_index", C.c_void_p),
+        ("set_image_index", C.c_void_p),
+        ("get_num_images", C.c_void_p),
+        ("replace_image_index", C.c_void_p),
+        ("add_image_index", C.c_void_p),
+    ]
 
 
 class Geometry(C.Structure):
@@ -195,6 +230,16 @@ class NativeCore:
         self.error: str | None = None
         self.shutdown = False
         self.options = dict(config["options"])
+        declared_ports = config.get("controller_port_devices", ["joypad"] * 4)
+        allowed_ports = {"none": 0, "joypad": 1, "mouse": 2, "keyboard": 3, "analog": 5, "pointer": 6}
+        if (not isinstance(declared_ports, list) or len(declared_ports) != 4
+            or any(type(item) is not str or item not in allowed_ports for item in declared_ports)):
+            raise ValueError("Native controller port topology is not a supported bounded declaration")
+        self.controller_port_devices = tuple(declared_ports)
+        self.controller_capabilities: list[list[dict[str, object]]] | None = None
+        self.input_descriptors: list[dict[str, object]] = []
+        self.disk_callbacks: dict[str, int] | None = None
+        self.disk_interface_version: int | None = None
         self.buffers: dict[str, object] = {}
         self.keys_previous: set[int] = set()
         self.keyboard = None
@@ -269,6 +314,7 @@ class NativeCore:
             "valid_extensions": _text(self.system.valid_extensions),
             "need_fullpath": bool(self.system.need_fullpath),
             "block_extract": bool(self.system.block_extract),
+            "controller_port_devices": list(self.controller_port_devices),
         }
         self.core.retro_init()
         self._initialized = True
@@ -291,11 +337,40 @@ class NativeCore:
         if not self.core.retro_load_game(C.byref(game)):
             raise ValueError("native core rejected the supplied content")
         self._loaded = True
-        for port in range(4):
-            self.core.retro_set_controller_port_device(port, 1)
+        for port, device in enumerate(self.controller_port_devices):
+            if (device not in ("none", "joypad")
+                and self.controller_capabilities is not None
+                and port < len(self.controller_capabilities)
+                and allowed_ports[device] not in {
+                    row["device_id"] for row in self.controller_capabilities[port]
+                }):
+                raise ValueError("requested native controller is absent from core port capabilities")
+            self.core.retro_set_controller_port_device(port, allowed_ports[device])
         self.av = AvInfo()
         self.core.retro_get_system_av_info(C.byref(self.av))
         self._check_av()
+        # libretro cores may send descriptions before and after load_game;
+        # snapshot them into wire-safe metadata only after both phases.
+        self.info["core_input_descriptors"] = list(self.input_descriptors)
+        self.info["core_input_descriptors_are_user_defined"] = True
+        self.info["disk_control_interface_version"] = self.disk_interface_version
+        self.info["controller_capabilities"] = self.controller_capabilities
+        self.info["input_descriptors"] = [
+            {"port": row["port"], "device": row["device"],
+             "index": row["index"], "id": row["id"],
+             "label": row["description"]}
+            for row in self.input_descriptors
+        ]
+        self.info["controller_routing_evidence"] = [
+            "disconnected" if device == "none" else (
+                "not_advertised" if self.controller_capabilities is None
+                or port >= len(self.controller_capabilities) else (
+                    "core_advertised" if allowed_ports[device] in {
+                        row["device_id"] for row in self.controller_capabilities[port]
+                    } else "core_unlisted"
+                )
+            ) for port, device in enumerate(self.controller_port_devices)
+        ]
         self._check()
 
     def _buffer(self, key: str, value: str) -> int:
@@ -328,8 +403,25 @@ class NativeCore:
             if command == 7:
                 self.shutdown = True
                 return True
+            if command in (13, 58):
+                # libretro allows deregistration with NULL, e.g. on unload.
+                if not data:
+                    self.disk_callbacks = None
+                    self.disk_interface_version = None
+                    return True
+                table = C.cast(data, C.POINTER(DiskControlCallbacks)).contents
+                mandatory = ("set_eject_state", "get_eject_state", "get_image_index",
+                             "set_image_index", "get_num_images")
+                if any(not getattr(table, name) for name in mandatory):
+                    return False
+                self.disk_callbacks = {name: int(getattr(table, name)) for name in mandatory}
+                self.disk_interface_version = 1 if command == 58 else 0
+                return True
             if not data:
                 return False
+            if command == 57:
+                C.cast(data, C.POINTER(C.c_uint))[0] = 1
+                return True
             if command == 1:
                 rotation = C.cast(data, C.POINTER(C.c_uint))[0]
                 if rotation > 3:
@@ -342,6 +434,37 @@ class NativeCore:
             if command in (9, 19, 30, 31):
                 directory = {9: "/system", 19: "/core/core.so", 30: "/core", 31: "/tmp/saves"}[command]
                 C.cast(data, C.POINTER(C.c_void_p))[0] = self._buffer("directory_" + str(command), directory)
+                return True
+            if command == 11:
+                # RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. Observe labels,
+                # never interpret them as proof of controller compatibility.
+                values=C.cast(data,C.POINTER(InputDescriptor))
+                descriptions=[]
+                seen=set()
+                for index in range(129):
+                    row=values[index]
+                    if not row.description:
+                        break
+                    if index==128:
+                        return False
+                    if not (row.port<4 and row.device in (1,2,3,5,6)
+                            and row.index<=3 and row.id<=511):
+                        return False
+                    label=_text(row.description,96)
+                    if not label or any(ord(c)<32 for c in label):
+                        return False
+                    key=(int(row.port),int(row.device),int(row.index),int(row.id))
+                    if key in seen:
+                        return False
+                    seen.add(key)
+                    descriptions.append({
+                        "port":int(row.port),"device":int(row.device),
+                        "index":int(row.index),"id":int(row.id),
+                        "description":label,
+                    })
+                else:
+                    return False
+                self.input_descriptors=descriptions
                 return True
             if command == 10:
                 pixel_format = C.cast(data, C.POINTER(C.c_int))[0]
@@ -380,6 +503,35 @@ class NativeCore:
                         self.error = "operator core option is outside the actual core's choices"
                         return False
                     self.options.setdefault(key, values[0])
+                # RETRO_ENVIRONMENT_SET_VARIABLES succeeded: core options are
+                # now available to subsequent RETRO_ENVIRONMENT_GET_VARIABLE.
+                return True
+            if command == 35:
+                # RETRO_ENVIRONMENT_SET_CONTROLLER_INFO: per-port native device
+                # announcements; never extrapolate to ports the core omitted.
+                ports = C.cast(data, C.POINTER(ControllerInfo))
+                announced = []
+                for port in range(17):
+                    entry = ports[port]
+                    if not entry.types or not entry.num_types:
+                        self.controller_capabilities = announced
+                        return True
+                    if port == 16 or entry.num_types > 32:
+                        raise ValueError("native controller announcement exceeds bounds")
+                    if port >= 4:
+                        continue
+                    ids = set()
+                    descriptions = []
+                    for index in range(entry.num_types):
+                        item = entry.types[index]
+                        if item.id > 65535 or item.id in ids:
+                            raise ValueError("native controller device ID is invalid or repeated")
+                        ids.add(item.id)
+                        descriptions.append({
+                            "device_id": int(item.id),
+                            "description": _text(item.desc, 128),
+                        })
+                    announced.append(descriptions)
                 return False
             if command == 24:
                 C.cast(data, C.POINTER(C.c_uint64))[0] = sum(1 << device for device in (1, 2, 3, 5, 6))
@@ -405,6 +557,73 @@ class NativeCore:
         ) as exc:
             self.error = str(exc)[:512]
             return False
+
+    def _disk_call(self, name: str, restype, *arguments):
+        if self.disk_callbacks is None or name not in self.disk_callbacks:
+            raise ValueError("native_disk_control_unavailable")
+        return C.CFUNCTYPE(restype, *arguments)(self.disk_callbacks[name])
+
+    def disk_status(self) -> dict[str, object]:
+        if self.disk_callbacks is None:
+            return {
+                "supported": False, "interface_version": None,
+                "image_count": 0, "image_index": None, "ejected": None,
+            }
+        # Do not trust an arbitrary native library's declared capacity.
+        count = int(self._disk_call("get_num_images", C.c_uint)())
+        if count == 0:
+            # Some cores register the ABI before discovering whether the
+            # loaded image contains a multidisc set. Do not break regular
+            # boot/step paths merely because there are no registered disks.
+            return {
+                "supported": False, "interface_version": None,
+                "image_count": 0, "image_index": None, "ejected": None,
+            }
+        if not 1 <= count <= 32:
+            raise ValueError("native_disk_count_outside_bound")
+        index = int(self._disk_call("get_image_index", C.c_uint)())
+        ejected = bool(self._disk_call("get_eject_state", C.c_bool)())
+        # The libretro sentinel UINT_MAX may represent no inserted disc.
+        # Accept it only with the tray ejected, never as a selected image.
+        if index == 0xFFFFFFFF and ejected:
+            index = None
+        elif not 0 <= index < count:
+            raise ValueError("native_disk_index_outside_bound")
+        return {
+            "supported": True, "interface_version": self.disk_interface_version,
+            "image_count": count, "image_index": index, "ejected": ejected,
+        }
+
+    def swap_disc(self, index: int) -> dict[str, object]:
+        """Eject -> select a core-preloaded image -> insert; abort on any error.
+
+        There is deliberately no replace_image_index/add_image_index facility:
+        all media was pinned readonly when the sandbox started. On a partial
+        callback failure the worker returns an error and is torn down by host.
+        """
+        previous = self.disk_status()
+        if not previous["supported"] or previous["image_count"] < 2:
+            raise ValueError("native_multiple_discs_unavailable")
+        wanted = _integer(index, 0, previous["image_count"] - 1, "selected disc index")
+        if previous["ejected"]:
+            raise ValueError("native_disc_tray_unexpectedly_open")
+        if wanted == previous["image_index"]:
+            return {**previous, "previous_image_index": wanted, "changed": False}
+        eject = self._disk_call("set_eject_state", C.c_bool, C.c_bool)
+        select = self._disk_call("set_image_index", C.c_bool, C.c_uint)
+        if not eject(True):
+            raise ValueError("native_disc_eject_rejected")
+        if not self.disk_status()["ejected"]:
+            raise ValueError("native_disc_eject_not_confirmed")
+        if not select(wanted):
+            raise ValueError("native_disc_select_rejected")
+        if not eject(False):
+            raise ValueError("native_disc_insert_rejected")
+        current = self.disk_status()
+        if current["ejected"] or current["image_index"] != wanted or current["image_count"] != previous["image_count"]:
+            raise ValueError("native_disc_switch_unverified")
+        self._check()
+        return {**current, "previous_image_index": previous["image_index"], "changed": True}
 
     def _video(self, pointer: int, width: int, height: int, pitch: int) -> None:
         try:
@@ -482,10 +701,20 @@ class NativeCore:
             return 0
 
     def _input(self, port: int, device: int, index: int, identity: int) -> int:
-        if port >= len(self.controls):
+        if port < 0 or index < 0 or identity < 0 or port >= len(self.controls):
             return 0
-        control = self.controls[port]
         device &= 255
+        selected = self.controller_port_devices[port]
+        requested = {1: "joypad", 2: "mouse", 3: "keyboard", 5: "analog", 6: "pointer"}.get(device)
+        if requested is None or selected == "none":
+            return 0
+        # Retro keyboard events are global, not bound to a joypad port.
+        # Preserve the legacy keyboard callback path for port zero.
+        if requested != selected and not (requested == "keyboard" and port == 0 and self.keyboard):
+            # Analog devices may expose digital joypad buttons as well.
+            if not (selected == "analog" and requested == "joypad"):
+                return 0
+        control = self.controls[port]
         if device == 1:
             if identity == 256:
                 return C.c_int16(control["buttons"]).value
@@ -539,12 +768,27 @@ class NativeCore:
             "video_callbacks": self.video_calls,
             "runs": self.runs,
             "audio_frames": self.audio_frames,
+            "audio_sha256": hashlib.sha256(self.audio).hexdigest(),
             "sample_rate": self.av.timing.sample_rate or None,
             "fps": self.av.timing.fps or None,
             "audio_available": self.audio_frames > 0,
             "shutdown": self.shutdown,
         }
-        return metadata, {"pixels": pixels, "audio": bytes(self.audio)}
+        audio = bytes(self.audio)
+        if len(audio) != self.audio_frames * 4:
+            raise ValueError("native PCM bytes differ from libretro callback frame count")
+        return metadata, {"pixels": pixels, "audio": audio}
+
+    def _save_ram_access(self) -> tuple[int, int]:
+        """Libretro RETRO_MEMORY_SAVE_RAM=0; fail without a valid live region."""
+        size = int(self.core.retro_get_memory_size(0))
+        if not 1 <= size <= MAX_SAVE_RAM:
+            raise ValueError("native_save_ram_unavailable_or_oversized")
+        pointer = int(self.core.retro_get_memory_data(0) or 0)
+        if not pointer:
+            raise ValueError("native_save_ram_pointer_unavailable")
+        self._check()
+        return pointer, size
 
     def command(
         self, operation: str, payload: dict[str, object], blocks: dict[str, bytes]
@@ -576,6 +820,48 @@ class NativeCore:
                 if operation == "reset" and self.raw_video is not None:
                     break
             return self.frame()
+        if operation == "disc_status":
+            if payload or blocks:
+                raise ValueError("native_disc_status_request_requires_no_arguments")
+            return self.disk_status(), {}
+        if operation == "disc_swap":
+            if set(payload) != {"image_index"} or blocks:
+                raise ValueError("native_disc_swap_request_invalid")
+            return self.swap_disc(payload["image_index"]), {}
+        if operation == "save_ram_export":
+            if payload or blocks:
+                raise ValueError("native_save_ram_export_requires_empty_request")
+            pointer, size = self._save_ram_access()
+            raw = C.string_at(pointer, size)
+            return {
+                "memory_region": 0,
+                "size": size, "sha256": hashlib.sha256(raw).hexdigest(),
+                "format": "raw_libretro_save_ram",
+            }, {"save_ram": raw}
+        if operation == "save_ram_import":
+            if set(payload) != {"memory_region", "size", "sha256"} or set(blocks) != {"save_ram"}:
+                raise ValueError("native_save_ram_import_schema_invalid")
+            if type(payload["memory_region"]) is not int or payload["memory_region"] != 0:
+                raise ValueError("native_save_ram_region_forbidden")
+            expected_size = _integer(payload["size"], 1, MAX_SAVE_RAM, "native save RAM size")
+            raw = blocks["save_ram"]
+            if (not isinstance(raw, bytes) or len(raw) != expected_size
+                or type(payload["sha256"]) is not str
+                or hashlib.sha256(raw).hexdigest() != payload["sha256"]):
+                raise ValueError("native_save_ram_source_corrupt")
+            pointer, actual_size = self._save_ram_access()
+            if actual_size != expected_size:
+                raise ValueError("native_save_ram_exact_size_mismatch")
+            C.memmove(pointer, raw, expected_size)
+            if hashlib.sha256(C.string_at(pointer, expected_size)).hexdigest() != payload["sha256"]:
+                raise ValueError("native_save_ram_writeback_changed")
+            self._check()
+            return {
+                "memory_region": 0,
+                "size": actual_size,
+                "sha256": payload["sha256"],
+                "readback_verified": True,
+            }, {}
         if operation == "state_info":
             size = self.core.retro_serialize_size()
             return {"state_size": size}, {}
