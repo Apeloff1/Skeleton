@@ -81,12 +81,12 @@ def _run(
     except (OSError, subprocess.SubprocessError) as exc:
         return InstallPhase(label, False, f"{label} failed: {type(exc).__name__}")
 
-    stdout = (completed.stdout or "").strip().splitlines()
-    stderr = (completed.stderr or "").strip().splitlines()
-    tail = stdout[-1] if stdout else (stderr[-1] if stderr else "")
+    # Docker Compose configuration and build output can contain resolved
+    # credentials, database URIs and registry tokens. Never attach raw child
+    # process stdout/stderr to an installer receipt or GUI status text.
     detail = f"{label} completed" if completed.returncode == 0 else f"{label} exited {completed.returncode}"
-    if tail:
-        detail += f": {tail[:240]}"
+    if completed.returncode != 0:
+        detail += "; inspect Docker Desktop diagnostics for further details"
     return InstallPhase(label, completed.returncode == 0, detail)
 
 
@@ -224,10 +224,11 @@ def install_application(
             env=compose_env,
         )
         ok = completed.returncode == 0
-        tail_lines = ((completed.stdout or "") + "\n" + (completed.stderr or "")).strip().splitlines()
-        detail = "application services started" if ok else f"application start exited {completed.returncode}"
-        if tail_lines:
-            detail += f": {tail_lines[-1][:240]}"
+        detail = (
+            "application services started"
+            if ok
+            else f"application start exited {completed.returncode}; inspect Docker Desktop diagnostics"
+        )
         phases.append(InstallPhase("start", ok, detail))
     except (OSError, subprocess.SubprocessError) as exc:
         phases.append(InstallPhase("start", False, f"application start failed: {type(exc).__name__}"))
