@@ -61,10 +61,10 @@ def validate_catalog(path: Path = CATALOG) -> dict[str, Any]:
     value = _strict_object(raw)
     rows = value.get("modules")
     if (value.get("schema_version") != CATALOG_SCHEMA or
-            value.get("module_count") != 480 or
+            value.get("module_count") != 576 or
             value.get("model_execution") != "only through attested candidate optimizer" or
             value.get("independent_model_promotion") != "required" or
-            not isinstance(rows, list) or len(rows) != 480):
+            not isinstance(rows, list) or len(rows) != 576):
         raise _error("invalid catalogue structure or model boundary")
     seen: set[str] = set()
     coverage: dict[str, dict[str, set[str]]] = {domain: {} for domain in DOMAINS}
@@ -83,11 +83,11 @@ def validate_catalog(path: Path = CATALOG) -> dict[str, Any]:
             raise _error("specialist lacks executable competency contract")
         seen.add(identity)
         coverage[domain].setdefault(topic, set()).add(lens)
-    expected_domains = {"gaming": 28, "ai": 16, "coding": 16}
+    expected_domains = {"gaming": 40, "ai": 16, "coding": 16}
     if any(len(coverage[d]) != expected_domains[d] or
            any(lenses != set(LENSES) for lenses in coverage[d].values()) for d in DOMAINS):
         raise _error("incomplete gaming/AI/coding specialty x lens coverage")
-    return {"catalog_sha256": sha256(raw).hexdigest(), "modules": 480,
+    return {"catalog_sha256": sha256(raw).hexdigest(), "modules": 576,
             "domains": sorted(DOMAINS), "catalogue_valid": True,
             "model_training_executed": False}
 

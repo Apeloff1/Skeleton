@@ -63,10 +63,10 @@ def _fixture(folder: Path, *, dual_views: bool = False) -> Path:
     return manifest
 
 
-def test_480_unique_executable_specialization_routes():
+def test_576_unique_executable_specialization_routes():
     rows = generate_modules()
-    assert len(rows) == 480
-    assert len({m["module_id"] for m in rows}) == 480
+    assert len(rows) == 576
+    assert len({m["module_id"] for m in rows}) == 576
     assert {m["domain"] for m in rows} == {"gaming", "ai", "coding"}
     assert validate_catalog()["catalogue_valid"] is True
 
