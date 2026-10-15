@@ -1126,3 +1126,33 @@ regressions are in `skeleton/testing/test_game_emulator_cross_game_lab.py`
 and `skeleton/testing/test_game_emulator_cross_game_operator.py`; both
 are selected by the existing manual-only source acceptance runner. They
 and real approved native games remain **unexecuted in this environment**.
+
+
+### Source-grounded comparative learning candidates
+
+A plain screenshot digest proves that something was seen, but cannot
+train a numeric world-state predictor. Each controlled source action in
+the comparison lab now retains the **bounded numeric actual observation
+before the action, observation after the action and original per-game
+reward components**, alongside the unchanged physical frame SHA256,
+actual source-machine savestate SHA256 and the original requested action.
+
+The real step is committed under
+`measured_source_projection_sha256`, and the combined candidate corpus
+under `candidate_numeric_dataset_sha256`. The report verifier rebuilds
+both commitments; tampering with an action, source feature, reward or
+frame-change boolean is rejected even if the attacker rehashes the
+outer report. The source records are suitable as *candidate data* for
+a separately authorized optimizer, but no parameter updates occur in
+this pass and all rewards remain strictly game-local.
+
+A native savestate can be larger than the small research report. Private
+source-state custody now hashes deterministic snapshots up to **64 MiB**
+without embedding them in the report, which retains a separate
+**2 MiB maximum**. This avoids falsely disqualifying approved native
+cores simply because a genuine savestate contains more than 2 MiB of
+private machine state, while still enforcing a finite source limit.
+
+The manual source suite includes adversarially altered numeric-reward
+and dataset digests; this source code is committed but not locally
+executed or hardware certified.
