@@ -700,6 +700,157 @@ PINNED_CORES.update(
     }
 )
 
+
+# Batch 3: exact upstream pins and inspected Linux libretro build entry points.
+# All are candidate-only. Recipes do not imply installed, qualified or playable cores.
+PINNED_CORES.update(
+    {
+        "gearboy": {
+            "repository": "https://github.com/drhelius/Gearboy.git",
+            "revision": "4f2da20b339071dbb4c7b5020c8b0eae46b094fb",
+            "artifact": "platforms/libretro/gearboy_libretro.so",
+            "license": "LICENSE",
+            "targets": [
+                "game_boy",
+                "game_boy_color",
+                "game_boy_pocket",
+                "game_boy_light"
+            ],
+            "build_directory": "platforms/libretro",
+            "makefile": "Makefile",
+            "feature_limits": "GB/GBC modes only; SGB peripherals, link-cable and color palettes need independent runtime qualification",
+            "unavailable_requirements": [
+                "Qualify software video, boot ROM modes and controls with licensed/homebrew cartridges"
+            ],
+            "candidate_only": True
+        },
+        "gearsystem": {
+            "repository": "https://github.com/drhelius/Gearsystem.git",
+            "revision": "63468c474d432a2b1ac230c43adf481f04e4d958",
+            "artifact": "platforms/libretro/gearsystem_libretro.so",
+            "license": "LICENSE",
+            "targets": [
+                "master_system",
+                "sega_mark_iii",
+                "sega_sg1000",
+                "game_gear"
+            ],
+            "build_directory": "platforms/libretro",
+            "makefile": "Makefile",
+            "feature_limits": "Master System, SG-1000, Mark III and Game Gear modes; region and mapper behavior not automatically qualified",
+            "unavailable_requirements": [
+                "Qualify model selection, BIOS fallback, cartridge mappers and region timing"
+            ],
+            "candidate_only": True
+        },
+        "gpsp": {
+            "repository": "https://github.com/libretro/gpsp.git",
+            "revision": "5819380c2ffb0900219d700a382ee68c464ebb99",
+            "artifact": "gpsp_libretro.so",
+            "license": "COPYING",
+            "targets": [
+                "game_boy_advance",
+                "game_boy_micro",
+                "game_boy_player"
+            ],
+            "makefile": "Makefile",
+            "make_variables": {
+                "HAVE_DYNAREC": "0"
+            },
+            "feature_limits": "Interpreter-only GBA candidate; no JIT/dynamic recompilation in isolated worker",
+            "unavailable_requirements": [
+                "Rights-cleared GBA boot firmware or independently verified HLE mode",
+                "Qualify interpreter-only memory/saves and timing"
+            ],
+            "candidate_only": True
+        },
+        "mednafen_psx": {
+            "repository": "https://github.com/libretro/beetle-psx-libretro.git",
+            "revision": "e57860d82faa953dc0fc10f201fd583739bc2f7d",
+            "artifact": "mednafen_psx_libretro.so",
+            "license": "COPYING",
+            "targets": [
+                "ps1"
+            ],
+            "makefile": "Makefile",
+            "make_variables": {
+                "HAVE_OPENGL": "0",
+                "HAVE_VULKAN": "0",
+                "HAVE_LIGHTREC": "0",
+                "THREADED_RECOMPILER": "0"
+            },
+            "feature_limits": "Beetle PSX software core only; no hardware-frame callbacks or dynarec permitted",
+            "unavailable_requirements": [
+                "Operator rights-cleared PlayStation BIOS",
+                "Software graphics, XA/CD audio, multi-disc and controller/region qualification"
+            ],
+            "candidate_only": True
+        },
+        "snes9x2005": {
+            "repository": "https://github.com/libretro/snes9x2005.git",
+            "revision": "a79dfe9047e7fec58808aefe48ad2bf499c7af11",
+            "artifact": "snes9x2005_libretro.so",
+            "license": "copyright",
+            "targets": [
+                "snes"
+            ],
+            "makefile": "Makefile",
+            "feature_limits": "Older performance-oriented SNES core; separate enhancement-chip/accuracy qualification",
+            "unavailable_requirements": [
+                "Verify core CPU/timing regressions and special cartridges"
+            ],
+            "candidate_only": True
+        },
+        "snes9x2010": {
+            "repository": "https://github.com/libretro/snes9x2010.git",
+            "revision": "fe690dd321fa5a46b5234a2bde089d2518c62b0e",
+            "artifact": "snes9x2010_libretro.so",
+            "license": "LICENSE.txt",
+            "targets": [
+                "snes"
+            ],
+            "makefile": "Makefile.libretro",
+            "feature_limits": "Legacy SNES core; separate mapper, audio, save and accessory verification",
+            "unavailable_requirements": [
+                "Qualify special-chip cartridges and deterministic frame/audio traces"
+            ],
+            "candidate_only": True
+        },
+        "mednafen_supafaust": {
+            "repository": "https://github.com/libretro/supafaust.git",
+            "revision": "642d1d1b6684aa7e306a02a89885f3f5456a5157",
+            "artifact": "mednafen_supafaust_libretro.so",
+            "license": "COPYING",
+            "targets": [
+                "snes"
+            ],
+            "makefile": "Makefile",
+            "feature_limits": "Alternative software SNES implementation, not a replacement for complete special-cartridge compatibility",
+            "unavailable_requirements": [
+                "Qualify video/audio timing and expansion co-processors"
+            ],
+            "candidate_only": True
+        },
+        "blastem": {
+            "repository": "https://github.com/libretro/blastem.git",
+            "revision": "ab743653ed110eeb7b1fe64d00cc5f9279c2bfec",
+            "artifact": "blastem_libretro.so",
+            "license": "COPYING",
+            "targets": [
+                "genesis"
+            ],
+            "makefile": "Makefile.libretro",
+            "build_target": "core",
+            "feature_limits": "Genesis/Mega Drive only in this recipe; no Sega CD/32X qualification",
+            "unavailable_requirements": [
+                "Qualify 68K/Z80, mapper/region timing and input/audio traces"
+            ],
+            "candidate_only": True
+        }
+    }
+)
+
+
 def _environment(*, network: bool = False):
     # No inherited provider/Mongo credentials, user git configuration, dynamic
     # loader overrides, compiler injection flags or credential helpers.
@@ -1001,6 +1152,10 @@ def install(args):
             "-j" + str(args.jobs),
         ]
         build_command.extend(key + "=" + value for key, value in pin.get("make_variables", {}).items())
+        if pin.get("build_target"):
+            if pin["build_target"] not in ("core",):
+                raise ValueError("Unsupported pinned build target")
+            build_command.append(pin["build_target"])
         if args.build_include:
             _safe_path(str(args.build_include))
             if not args.build_include.is_dir():

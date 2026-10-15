@@ -353,6 +353,14 @@ _CORE_TARGET_GROUPS = {
         "windows_me",
     ),
     "dosbox_svn": ("dos_8086", "dos_vga", "dos_cga", "dos_ega", "dos_vesa", "windows_31"),
+    "gearboy": ("game_boy", "game_boy_color", "game_boy_pocket", "game_boy_light"),
+    "gearsystem": ("master_system", "sega_mark_iii", "sega_sg1000", "game_gear"),
+    "gpsp": ("game_boy_advance", "game_boy_micro", "game_boy_player"),
+    "mednafen_psx": ("ps1",),
+    "snes9x2005": ("snes",),
+    "snes9x2010": ("snes",),
+    "mednafen_supafaust": ("snes",),
+    "blastem": ("genesis",),
     "mame": (
         "fairchild_channel_f",
         "rca_studio_ii",
@@ -426,6 +434,14 @@ _CORE_CONTENT_EXTENSIONS = {
     "hatari": "st|msa|stx|dim|ipf|m3u",
     "swanstation": "cue|bin|img|chd|pbp|m3u|iso",
     "mupen64plus_next": "n64|v64|z64|bin",
+    "gearboy": "gb|gbc|dmg|sgb",
+    "gearsystem": "sms|gg|sg|bin|rom",
+    "gpsp": "gba|bin",
+    "mednafen_psx": "cue|ccd|chd|toc|m3u",
+    "snes9x2005": "sfc|smc|fig|swc",
+    "snes9x2010": "sfc|smc|fig|swc",
+    "mednafen_supafaust": "sfc|smc|fig|swc",
+    "blastem": "md|bin|gen|smd",
 }
 
 

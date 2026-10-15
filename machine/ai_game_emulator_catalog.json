@@ -151,7 +151,15 @@
     "yabause": "8926b0c6c347f8c5c755911ddb0ac695420ffbf8",
     "hatari": "a82e014ce2b05fc7724add284febba3816e4112a",
     "swanstation": "e436e9b85374def58d211df7f78880f0f4a917b4",
-    "mupen64plus_next": "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5"
+    "mupen64plus_next": "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5",
+    "gearboy": "4f2da20b339071dbb4c7b5020c8b0eae46b094fb",
+    "gearsystem": "63468c474d432a2b1ac230c43adf481f04e4d958",
+    "gpsp": "5819380c2ffb0900219d700a382ee68c464ebb99",
+    "mednafen_psx": "e57860d82faa953dc0fc10f201fd583739bc2f7d",
+    "snes9x2005": "a79dfe9047e7fec58808aefe48ad2bf499c7af11",
+    "snes9x2010": "fe690dd321fa5a46b5234a2bde089d2518c62b0e",
+    "mednafen_supafaust": "642d1d1b6684aa7e306a02a89885f3f5456a5157",
+    "blastem": "ab743653ed110eeb7b1fe64d00cc5f9279c2bfec"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -404,5 +412,28 @@
     "firmware_policy": "operator-supplied rights-cleared firmware only; none distributed",
     "legal_policy": "no game ROMs, encryption keys or platform firmware included",
     "caveat": "The canonical 169-target inventory is hardware identities, not a claim of 169 runnable emulators."
+  },
+  "third_expansion": {
+    "date": "2026-10-15",
+    "type": "operator_source_build_recipes_only",
+    "baseline_recipe_count": 59,
+    "added_recipe_count": 8,
+    "declared_recipe_count": 67,
+    "new_cores": [
+      "gearboy",
+      "gearsystem",
+      "gpsp",
+      "mednafen_psx",
+      "snes9x2005",
+      "snes9x2010",
+      "mednafen_supafaust",
+      "blastem"
+    ],
+    "upstream_provenance": "Full commit revisions checked from repository branch refs, makefile locations and license paths inspected; upstream versions remain frozen in each recipe",
+    "admission": "all eight deferred candidates; build and inspection never prove runtime, firmware rights or gameplay; approvals require qualified sandbox",
+    "hardware_catalog_rows_not_emulators": 169,
+    "compiled_or_executed_in_this_change": false,
+    "tests_executed_in_this_change": false,
+    "no_copyrighted_rom_or_bios_bundled": true
   }
 }
