@@ -27,7 +27,8 @@ from skeleton.jeeves.game_rom_runtime import GameBoyMachine, GameRomRuntimeError
 SCHEMA = "skeleton.game.original_mapper_bus_matrix.v1"
 _CASES = (
     ("rom_only", 0x00, 0, 0),
-    ("mbc1", 0x03, 5, 3),  # 1 MiB, 64 banks, 32 KiB SRAM
+    ("mbc1_large", 0x03, 5, 2),  # 1 MiB, ROM extension, 8 KiB SRAM
+    ("mbc1_ram", 0x03, 4, 3),    # 512 KiB, 32 banks, 32 KiB SRAM
     ("mbc2", 0x06, 3, 0),  # 256 KiB, 16 banks, 512 internal nibbles
     ("mbc3", 0x13, 6, 3), # 2 MiB, 128 banks, 32 KiB SRAM; no RTC
     ("mbc5", 0x1B, 8, 4), # 8 MiB, 512 banks, 128 KiB SRAM
@@ -85,7 +86,8 @@ def _probe(label: str, kind: int, size: int, ram: int) -> dict[str, Any]:
     source_hash = hashlib.sha256(raw).hexdigest()
     machine = GameBoyMachine(raw)
     _assert(machine.metadata["rom_digest"] == source_hash, "source cartridge SHA256 identity changed")
-    _assert(machine.metadata["mapper"] == label, "source emulator mapper type resolution differs")
+    expected_type = "mbc1" if label.startswith("mbc1_") else label
+    _assert(machine.metadata["mapper"] == expected_type, "source emulator mapper type resolution differs")
     checkpoints = []
 
     def check(name: str, condition: bool) -> None:
@@ -98,21 +100,33 @@ def _probe(label: str, kind: int, size: int, ram: int) -> dict[str, Any]:
         check("ram_not_declared", machine.metadata["ram_bytes"] == 0)
         check("ignored_mapper_write", (machine.write(0x2100, 3) is None
                                        and machine.read(0x4000) == 1))
-    elif label == "mbc1":
+    elif label in ("mbc1_large", "mbc1_ram"):
         machine.write(0x2000, 4)
         _read_bank(machine, 4)
         check("rom_bank_four", True)
         machine.write(0x4000, 1)
-        _read_bank(machine, 36)
-        check("upper_rom_bank_bits", True)
-        machine.write(0x6000, 1)
-        check("bank_mode_changes_rom0", machine.read(0x0000) == 32)
-        machine.write(0x0000, 0x0A)
-        machine.write(0xA023, 0x79)
-        machine.write(0x4000, 0)
-        check("ram_switch_avoids_overwrite", machine.read(0xA023) == 0)
-        machine.write(0x4000, 1)
-        check("ram_bank_restored", machine.read(0xA023) == 0x79)
+        if label == "mbc1_large":
+            _read_bank(machine, 36)
+            check("upper_rom_bank_bits", True)
+            machine.write(0x6000, 1)
+            check("bank_mode_changes_rom0", machine.read(0x0000) == 32)
+            machine.write(0x0000, 0x0A)
+            machine.write(0xA023, 0x79)
+            machine.write(0x4000, 0)
+            check("single_ram_bank_without_fake_32K_SRAM", machine.read(0xA023) == 0x79)
+        else:
+            # 512 KiB cart ignores upper ROM selector bits after physical
+            # address masking, but can wire them to four SRAM banks.
+            _read_bank(machine, 4)
+            check("rom_bank_high_masked_by_512K_cart", True)
+            machine.write(0x6000, 1)
+            check("ram_mode_uses_rom_bank_zero", machine.read(0x0000) == 0)
+            machine.write(0x0000, 0x0A)
+            machine.write(0xA023, 0x79)
+            machine.write(0x4000, 0)
+            check("ram_switch_avoids_overwrite", machine.read(0xA023) == 0)
+            machine.write(0x4000, 1)
+            check("ram_bank_restored", machine.read(0xA023) == 0x79)
     elif label == "mbc2":
         check("512_internal_half_bytes", machine.metadata["ram_bytes"] == 512)
         machine.write(0x2000, 7)
@@ -189,6 +203,7 @@ def _probe(label: str, kind: int, size: int, ram: int) -> dict[str, Any]:
     check("RAM_after_restore", machine.read(0xA123) == saved_ram)
     receipt = {
         "mapper": label,
+        "actual_mapper_type": expected_type,
         "cartridge_type": kind,
         "original_rom_sha256": source_hash,
         "actual_source_rom_banks": machine.metadata["rom_banks"],
@@ -206,14 +221,15 @@ def _probe(label: str, kind: int, size: int, ram: int) -> dict[str, Any]:
 
 def audit_mapper_matrix() -> dict[str, Any]:
     items = [_probe(label, code, size, ram) for label, code, size, ram in _CASES]
-    if len(items) != 5 or any(not item["actual_memory_cpu_savestate_roundtrip"] for item in items):
-        raise MapperAuditError("not all built-in source mappers completed full bus checks")
+    if len(items) != 6 or any(not item["actual_memory_cpu_savestate_roundtrip"] for item in items):
+        raise MapperAuditError("not all six original cartridge geometry profiles completed source bus checks")
     result = {
         "schema_version": SCHEMA,
         "status": "original_cartridge_mapper_bus_checks_passed",
         "source_original_cartridge_only": True,
-        "mapped_cartridge_categories": [x["mapper"] for x in items],
-        "tested_actual_mapper_categories": len(items),
+        "mapped_cartridge_categories": ["rom_only", "mbc1", "mbc2", "mbc3", "mbc5"],
+        "tested_actual_mapper_categories": 5,
+        "tested_bank_geometry_profiles": len(items),
         "verified_source_bus_checks": sum(x["real_source_bus_checks"] for x in items),
         "mapper_results": items,
         "original_game_ROMs_downloaded": 0,
@@ -246,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({
             "status": report["status"],
             "mapped_categories": report["tested_actual_mapper_categories"],
+            "verified_bank_geometry_profiles": report["tested_bank_geometry_profiles"],
             "real_source_bus_checks": report["verified_source_bus_checks"],
             "report_file": str(args.evidence_file),
             "hardware_accuracy_certified": False,
