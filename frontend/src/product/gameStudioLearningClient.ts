@@ -216,3 +216,73 @@ export async function runStudioEngineProbePage(
       || JSON.stringify(value).length > 65536) invalid('Executable engine probe evidence differs.');
   return value;
 }
+
+export type StudioShadowCycleReceipt = {
+  schema_version: string; angle: string; cycle: number; seed: number;
+  digest: string; previous_receipt_digest: string;
+  new_semantic_evidence_count: number;
+  cumulative_semantic_evidence_count: number;
+  zero_novelty_streak: number;
+  escalated_scrutiny_level: number;
+  base_audits_passed: number; additional_checks_passed: number;
+  scrutiny_checks: { name: string; passed: true }[];
+  primary_digest: string; shadow_digest: string;
+  fork: { fork_at_step: number; parent_snapshot_digest: string;
+    parent_next_action: string; shadow_alternative_action: string;
+    distinct_available_action: boolean; digest: string };
+  primary_step_receipts: { index: number; action: string; accepted: boolean;
+    semantic_behavior_digest: string; transition_digest: string }[];
+  shadow_step_receipts: { index: number; action: string; accepted: boolean;
+    semantic_behavior_digest: string; transition_digest: string }[];
+  completed_cycle_game_steps: number; cumulative_game_steps: number;
+};
+export type StudioShadowAuditResult = {
+  schema_version: string; campaign_id: string; campaign_cursor: number;
+  spectator_only: true; training_weight_changes: false;
+  parent_sim_count: number; actual_game_steps: number; digest: string;
+  simulations: {
+    angle: string; cycles_executed: number; stop_reason: string;
+    saturation_within_tested_bounds: boolean;
+    universal_learning_exhaustion_proven: false;
+    observed_zero_novelty_streak: number;
+    required_consecutive_zero_novelty_cycles: number;
+    observed_unique_semantic_behaviors: number;
+    peak_additional_scrutiny_checks: number;
+    receipts: StudioShadowCycleReceipt[]; digest: string;
+  }[];
+};
+const SHADOW_ANGLES = [
+  'explore','progress','safety','economy','adversary',
+  'boundary','temporal','causal','perturbation','recovery',
+] as const;
+export async function getStudioShadowAudit(
+  campaignId: string, angle: string, cycles = 12,
+  input: LearningRequest = {},
+): Promise<StudioShadowAuditResult> {
+  if (!SHADOW_ANGLES.some(item => item === angle)
+      || !Number.isSafeInteger(cycles) || cycles < 10 || cycles > 16) {
+    invalid('Shadow saturation selection exceeds read-only source bounds.');
+  }
+  const value = await request<StudioShadowAuditResult>(
+    'get','/campaigns/' + id(campaignId) + '/shadow-audit?angle=' +
+    angle + '&steps=2&max_cycles=' + cycles + '&replay_budget=600',
+    null,input,
+  );
+  const sim=value.simulations?.[0];
+  if (value.campaign_id !== campaignId || value.spectator_only !== true
+      || value.training_weight_changes !== false
+      || value.parent_sim_count !== 1
+      || !sim || sim.angle !== angle
+      || sim.universal_learning_exhaustion_proven !== false
+      || sim.required_consecutive_zero_novelty_cycles !== 10
+      || sim.cycles_executed > cycles || sim.receipts.length !== sim.cycles_executed
+      || sim.receipts.some((record, index) =>
+          record.cycle !== index + 1 || record.base_audits_passed !== 20
+          || record.additional_checks_passed !== record.scrutiny_checks.length
+          || record.scrutiny_checks.some(check => check.passed !== true)
+          || !/^[a-f0-9]{64}$/.test(record.digest))
+      || JSON.stringify(value).length > 4 * 1024 * 1024) {
+    invalid('Shadow audit lacks authoritative source and ten-cycle proof.');
+  }
+  return value;
+}

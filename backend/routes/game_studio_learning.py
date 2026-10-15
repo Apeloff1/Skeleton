@@ -229,3 +229,18 @@ async def executable_engine_test_page(
     return await _call(learning.engine_probe_page(
         _scope(user),editor,offset=offset,limit=limit,
     ))
+
+
+@router.get("/campaigns/{campaign_id}/shadow-audit")
+async def shadow_audit(
+    campaign_id:str,
+    angle:str=Query(default="explore",min_length=3,max_length=24),
+    steps:int=Query(default=2,ge=1,le=4),
+    max_cycles:int=Query(default=12,ge=10,le=16),
+    replay_budget:int=Query(default=600,ge=100,le=1000),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.scenario_shadow_audit(
+        _scope(user),campaign_id,angle=angle,steps=steps,
+        max_cycles=max_cycles,replay_budget=replay_budget,
+    ))

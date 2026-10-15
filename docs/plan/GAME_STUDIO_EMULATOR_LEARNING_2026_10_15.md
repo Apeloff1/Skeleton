@@ -512,3 +512,105 @@ native 3D/graphics/audio simulation, proprietary game content,
 trained live model checkpoints or automatically verified increases
 in game-model accuracy. Training tests and all 43 real engine
 integration gates must run on the exact PR head before release.
+
+## Adaptive shadow-clone saturation and escalating per-sim scrutiny
+
+**Critical semantics change**: `10` is a *consecutive unproductive
+cycle requirement after evidence stops improving*, NOT the total
+simulation count. Every original studio simulation gets its own
+independently maintained source-verified history and counters. The
+new `skeleton/jeeves/game_studio_shadow_saturation.py` executes a
+fresh source-bound simulation at every iteration, then forks one
+actual **saved intermediate game checkpoint** into an isolated shadow
+environment and takes an alternate allowed action. The fork state,
+next command, transition digest, parent source and independent full
+replay must agree. Each primary and shadow path passes the existing
+ten-check multispectral audit, including reverse checkpoint prefix
+verification. A cycle has at least **20 independent baseline checks**
+plus escalating extra checks up to **8 additional gates at peak**
+(when source and actions support the check).
+
+A newly seen semantic witness is keyed to the authoritative action
+name, accepted/rejected outcome, directions of real gameplay-state
+changes (excluding time), signs of source-computed reward components
+and terminal/failure state. New source seeds and raw digest changes
+alone cannot inflate learned novelty. An optional, rights-authorized
+*actual local Q-policy candidate* receives one newly executed episode
+per cycle. Its measured newly visited state-action combinations and
+maximum observed Q-value change (default significance threshold 0.0001)
+also reset the inactivity counter. This means a policy that is still
+changing measurably **cannot be declared saturated** even if its
+spectator-visible state signatures have repeated.
+
+**Stop rule**: only after **10 consecutive independently audited
+primary-plus-shadow cycles** with neither new semantic evidence nor
+material Q-policy gains is
+`saturation_within_tested_bounds=true` issued. This is at least
+20 further executions after the last novel event, with their real
+source receipts. The more restrictive bound of at most 64 cycles
+per original simulation, max 12 game actions per episode, limited
+simulation replay-work budget, and at most four independent thread
+workers prevents runaway resource consumption. Exhausting a bound,
+being cancelled, or exhausting source seeds yields an explicit
+`*_unproven` status. **No finite test can prove that there is
+literally nothing more to learn about a game.**
+
+Each cycle records a SHA-256-linked receipt carrying the parent
+checkpoint and fork identity, a complete accepted/rejected and reward
+observation chain for *both* paths, both source-verifiable transition
+digests, their multispectral audit hashes, reverse checkpoints,
+new semantic evidence digests, candidate Q update counts, Q coverage
+gain, measured Q-value delta, cumulative novelty, dry streak, peak
+scrutiny level, actual gameplay steps and the replay-work estimate.
+The receipts form a strict chained log, not a spreadsheet with
+fabricated scores.
+
+`skeleton/jeeves/game_studio_shadow_cli.py` runs the **whole ten-parent
+mirror room** by default with a single user-admitted rights and
+training command. Its append-only, exclusive, fsynced NDJSON ledger
+captures each cycle before processing continues. Only after comparing
+the persisted ledger to the real receipt chain does it publish a new
+separate final private certificate. If interrupted or capped it
+preserves incomplete forensic evidence and **does not** claim
+completion or merge/promote any live neural weights.
+
+Example:
+
+```bash
+python -m skeleton.jeeves.game_studio_shadow_cli \
+  --engine economy --seed 13 --steps 3 \
+  --max-cycles-per-sim 24 --max-replay-work-per-sim 10000 \
+  --workers 2 --authorized --rights-cleared \
+  --ledger /private/receipts/game-shadow.ndjson \
+  --output /private/receipts/game-shadow-certificate.json
+```
+
+The default runs ten independent parent perspectives and their
+shadow clones, extending each individually until its ten-dry-cycle
+threshold or an explicitly reported resource limit. Use
+`--spectator-only` to disable Q policy updates; otherwise it
+actually performs local candidate Q training. The output includes
+candidate policies and replay custody, never live production
+neural-weight changes. Use `--angles explore` for a smaller,
+explicitly scoped investigation. Evidence from one angle cannot
+certify the other nine.
+
+The authenticated Jeeves spectator panel has an explicit **Shadow
+scrutiny** control for 12- or 16-cycle read-only investigation of
+one selected perspective at a time. The API uses a tenant/owner
+campaign scope, one global admission semaphore, an explicit replay
+budget and no live training mutation. It reports the full chain's
+cycle-by-cycle knowledge gains and visible fork/checkpoint evidence
+along with precise inconclusive/within-bound saturation labels.
+These short interactive investigations are **not substitutes** for
+the full ten-parent operator-run marathon.
+
+Security boundaries: original-only source rights, bounded
+validator-approved engine commands, no user-provided executable
+callbacks in authenticated API, exclusive candidate/ledger paths,
+no external ROM or proprietary game cloning, source and transport
+digests, no automatic policy promotion. Native rendering/thermal,
+real GPU optics, all physically possible world outcomes and the
+production Jeeves transformer remain separate unsatisfied release
+requirements. Regression tests exist but exact-head execution,
+perf soak and E2E still require verification.

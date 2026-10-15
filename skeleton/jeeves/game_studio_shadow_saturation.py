@@ -22,6 +22,9 @@ import json
 from .game_studio_environment import StudioGameEnvironment, parse_studio_source
 from .game_studio_scenario_lab import ANGLES, _lane
 from .game_studio_multispectral import audit_simulation, MultispectralAuditError
+from .game_learning import GameLearningConfig, GamePolicyLearner
+from .game_learning_parallel import GameEnvironmentRequest
+from .game_studio_environment import studio_request_tree
 
 SCHEMA="skeleton.game_builder.shadow_saturation.v1"
 DRY_CYCLES_REQUIRED=10
@@ -168,11 +171,58 @@ def _lane_signals(lane: dict) -> set[str]:
     return set(result)
 
 
+def _policy_change(before: dict, after: dict) -> tuple[int,float]:
+    """Actual sparse Q-state-action coverage plus max source-trained Q delta."""
+    first={tuple(row["state"]):row for row in before["q_table"]}
+    last={tuple(row["state"]):row for row in after["q_table"]}
+    added=0
+    delta=0.0
+    for key,current in last.items():
+        previous=first.get(key)
+        original_values=(previous["values"] if previous is not None
+                         else [0.0]*len(current["values"]))
+        original_visits=(previous["visits"] if previous is not None
+                         else [0]*len(current["visits"]))
+        for old,new,old_visits,new_visits in zip(
+            original_values,current["values"],original_visits,current["visits"]
+        ):
+            delta=max(delta,abs(float(new)-float(old)))
+            added+=int(old_visits==0 and new_visits>0)
+    return added,round(delta,9)
+
+
 def _one(source:dict,angle:str,base_seed:int,steps:int,
          max_cycles:int, dry_cycles:int,
          max_work:int,
          *,on_receipt:Callable[[dict],None]|None=None,
-         cancel:Callable[[],bool]|None=None) -> dict:
+         cancel:Callable[[],bool]|None=None,
+         train_policy:bool=False,
+         q_change_tolerance:float=0.0001) -> dict:
+    learner=None
+    request=None
+    if train_policy:
+        request=GameEnvironmentRequest(
+            "studio:"+source["editor"],kind="studio",
+            tree=studio_request_tree(source),max_steps=steps,
+        )
+        probe=request.build()
+        try:
+            spec=probe.spec
+        finally:
+            probe.close()
+        learner=GamePolicyLearner(
+            spec,GameLearningConfig(
+                seed=base_seed,max_episodes=max_cycles,
+                max_updates=max_cycles*steps,
+            ),
+            policy_id="shadow:"+source["editor"]+":"+angle+":"+str(base_seed),
+            source_lineage={
+                "origin":"independent_shadow_saturation_candidate_only",
+                "rights_acknowledged":True,
+                "source_request_digest":request.digest,
+                "active_production_weights_modified":False,
+            },
+        )
     seen:set[str]=set()
     records=[]
     receipts=[]
@@ -205,10 +255,23 @@ def _one(source:dict,angle:str,base_seed:int,steps:int,
         peak=max(peak,level)
         fresh=(_lane_signals(primary)|_lane_signals(shadow))-seen
         seen.update(_lane_signals(primary)|_lane_signals(shadow))
-        if fresh:
-            dry=0
-        else:
-            dry+=1
+        # In candidate-training mode real updates are part of convergence:
+        # each original episode consumes one admitted, independently
+        # evidenced game seed. A plateau cannot be declared while measured
+        # Q coverage/value changes continue beyond the specified tolerance.
+        q_new=0
+        q_delta=0.0
+        q_updates=0
+        q_digest=None
+        if learner is not None and request is not None:
+            q_before=learner.snapshot()
+            actual=learner.train(request.build,episodes=1,seeds=[seed])
+            q_after=learner.snapshot()
+            q_new,q_delta=_policy_change(q_before,q_after)
+            q_updates=actual.updates
+            q_digest=q_after["snapshot_digest"]
+        learning_gain=bool(fresh or q_new>0 or q_delta>q_change_tolerance)
+        dry=0 if learning_gain else dry+1
         # Audited replay consumes more than a single visible environment
         # step. Report estimated replayed action applications separately
         # from genuinely executed primary/shadow game actions.
@@ -236,6 +299,12 @@ def _one(source:dict,angle:str,base_seed:int,steps:int,
             "new_semantic_evidence_count":len(fresh),
             "new_semantic_digests":sorted(fresh),
             "cumulative_semantic_evidence_count":len(seen),
+            "new_policy_state_action_pairs":q_new,
+            "maximum_measured_q_value_change":q_delta,
+            "q_change_tolerance":q_change_tolerance,
+            "actual_game_q_updates":q_updates,
+            "policy_snapshot_digest":q_digest,
+            "real_learning_gain_detected":learning_gain,
             "zero_novelty_streak":dry,
             "completed_cycle_game_steps":steps_actual,
             "cumulative_game_steps":total_actions,
@@ -260,7 +329,7 @@ def _one(source:dict,angle:str,base_seed:int,steps:int,
             on_receipt(deepcopy(receipt))
         if dry>=dry_cycles:
             saturation=True
-            stop_reason="ten_consecutive_zero_novelty_audited_cycles"
+            stop_reason="ten_consecutive_zero_gain_audited_cycles"
             break
     out={
         "schema_version":"skeleton.game_builder.shadow_sim_result.v1",
@@ -280,6 +349,11 @@ def _one(source:dict,angle:str,base_seed:int,steps:int,
         "estimated_replayed_action_applications":work,
         "receipts":receipts,
         "receipt_chain_head":chain,
+        "candidate_q_training_enabled":train_policy,
+        "candidate_q_policy_snapshot":(
+            None if learner is None else learner.snapshot()
+        ),
+        "q_gain_tolerance":q_change_tolerance,
         "production_neural_weights_modified":False,
     }
     if len(json.dumps(out,sort_keys=True,allow_nan=False))>2000000:
@@ -295,8 +369,17 @@ def run_shadow_saturation(source:Mapping[str,object], *, seed:int=0,
                           max_replay_work_per_sim:int=10000,
                           workers:int=2,
                           cancel:Callable[[],bool]|None=None,
-                          on_receipt:Callable[[dict],None]|None=None) -> dict:
+                          on_receipt:Callable[[dict],None]|None=None,
+                          train_policy:bool=False,
+                          authorized:bool=False,
+                          rights_cleared:bool=False,
+                          q_change_tolerance:float=0.0001) -> dict:
+    if train_policy and (authorized is not True or rights_cleared is not True):
+        raise PermissionError("shadow Q-learning requires actual operator and original-source rights")
     original=parse_studio_source(source)
+    if (type(train_policy) is not bool or type(q_change_tolerance) is not float
+            or not 1e-9<=q_change_tolerance<=0.1):
+        raise ShadowSaturationError("model training switch and Q convergence tolerance must be bounded")
     if (type(seed) is not int or not 0<=seed<=2**31-10000
             or type(steps) is not int or not 1<=steps<=12
             or type(max_cycles_per_sim) is not int
@@ -314,7 +397,8 @@ def run_shadow_saturation(source:Mapping[str,object], *, seed:int=0,
         index,angle=pair
         return _one(original,angle,seed+index,steps,max_cycles_per_sim,
                     dry_cycles,max_replay_work_per_sim,on_receipt=on_receipt,
-                    cancel=cancel)
+                    cancel=cancel,train_policy=train_policy,
+                    q_change_tolerance=q_change_tolerance)
     with ThreadPoolExecutor(max_workers=min(workers,len(angles)),
                             thread_name_prefix="jeeves-shadow-saturation") as pool:
         results=list(pool.map(execute,enumerate(angles)))
@@ -337,6 +421,10 @@ def run_shadow_saturation(source:Mapping[str,object], *, seed:int=0,
         "ten_consecutive_nonproductive_cycles_required":dry_cycles,
         "per_sim_cycle_hard_limit":max_cycles_per_sim,
         "audit_source":"independent_game_replays_and_reverse_checkpoint_proof",
+        "candidate_q_training_enabled":train_policy,
+        "candidate_q_policy_count":sum(
+            x["candidate_q_policy_snapshot"] is not None for x in results
+        ),
         "automatic_promotion":False,
         "production_neural_weights_modified":False,
     }
@@ -374,7 +462,13 @@ def verify_shadow_receipts(document:dict) -> bool:
             if len(fresh)!=row["new_semantic_evidence_count"] or len(fresh)!=len(row["new_semantic_digests"]):
                 raise ShadowSaturationError("false or duplicate knowledge claim")
             seen.update(fresh)
-            dry=0 if fresh else dry+1
+            gain=bool(
+                fresh or row["new_policy_state_action_pairs"]>0
+                or row["maximum_measured_q_value_change"]>row["q_change_tolerance"]
+            )
+            if row["real_learning_gain_detected"] is not gain:
+                raise ShadowSaturationError("reported knowledge gain disagrees with real evidence")
+            dry=0 if gain else dry+1
             if row["zero_novelty_streak"]!=dry:
                 raise ShadowSaturationError("stalled-cycle count inconsistent with receipts")
             previous=row["digest"]

@@ -2247,3 +2247,47 @@ async def engine_probe_page(scope, editor, *, offset=0, limit=8):
         ) from exc
     return {"engine":editor, "contract":contract, "actions":actions,
             "release_certified":False,"full_engine_state_exhausted":False}
+
+
+_shadow_audit_slots = asyncio.Semaphore(1)
+
+
+async def scenario_shadow_audit(
+    scope, identifier, *, angle="explore", steps=2,
+    max_cycles=12, replay_budget=600,
+):
+    """Owner-scoped, read-only, bounded one-sim shadow convergence probe."""
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+    from skeleton.jeeves.game_studio_environment import parse_studio_source
+    from skeleton.jeeves.game_studio_scenario_lab import ANGLES
+    from skeleton.jeeves.game_studio_shadow_saturation import (
+        run_shadow_saturation, verify_shadow_receipts,
+    )
+
+    if (type(angle) is not str or angle not in ANGLES
+        or type(steps) is not int or not 1<=steps<=4
+        or type(max_cycles) is not int or not 10<=max_cycles<=16
+        or type(replay_budget) is not int or not 100<=replay_budget<=1000):
+        raise GameLearningError("shadow_limits","Source-bound shadow audit budget exceeded.",422)
+    row=await _read(scope,identifier)
+    candidate=(row.get("snapshot") or {}).get("champion_request")
+    request=GameEnvironmentRequest.from_dict(candidate or row["environment_request"])
+    if (request.kind!="studio" or
+        request.target_id!=row["environment_request"]["target_id"]):
+        raise GameLearningError("shadow_source","Only owner-registered original studios admit shadow reviews.",409)
+    source=parse_studio_source(__import__("json").loads(request.tree["game/studio/session.json"]))
+    seed=(row["config"]["seed"]+row["cursor"]*101)%(2**31-12000)
+    async with _shadow_audit_slots:
+        result=await asyncio.to_thread(
+            run_shadow_saturation,source,seed=seed,steps=steps,
+            angles=(angle,),workers=1,max_cycles_per_sim=max_cycles,
+            max_replay_work_per_sim=replay_budget,train_policy=False,
+        )
+    if not verify_shadow_receipts(result):
+        raise GameLearningError("shadow_evidence","Shadow receipt chain verification failed.",409)
+    return {
+        **result,"campaign_id":identifier,"campaign_cursor":row["cursor"],
+        "spectator_only":True,"training_weight_changes":False,
+        "complete_run_proof_scope":"ten_consecutive_zero_gain_cycles_only_if_reached",
+        "native_spectral_camera_claim":False,
+    }

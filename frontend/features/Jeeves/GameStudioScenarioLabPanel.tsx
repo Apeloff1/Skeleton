@@ -3,9 +3,10 @@ import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-na
 import {
   getStudioMirrorViews, getStudioScenarioDrafts,
   getStudioEngineTestManifest, getStudioSalesReferences, runStudioEngineProbePage,
+  getStudioShadowAudit,
   type StudioMirrorViews, type StudioScenarioDiscovery,
   type StudioEngineTestManifest, type StudioSalesCatalog, type StudioEngineProbePage,
-  type StudioCampaign,
+  type StudioCampaign, type StudioShadowAuditResult,
 } from '../../src/product/gameStudioLearningClient';
 import { getAuthToken } from '../../src/auth/gameforgeAuth';
 
@@ -26,6 +27,9 @@ export default function GameStudioScenarioLabPanel({
   const [sales, setSales] = useState<StudioSalesCatalog | null>(null);
   const [probePages, setProbePages] = useState<StudioEngineProbePage[]>([]);
   const [probePending, setProbePending] = useState(false);
+  const [shadowAngle, setShadowAngle] = useState('explore');
+  const [shadow, setShadow] = useState<StudioShadowAuditResult | null>(null);
+  const [shadowPending, setShadowPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sample = useRef(0);
@@ -39,6 +43,7 @@ export default function GameStudioScenarioLabPanel({
     setDrafts(null);
     setTests(null);
     setProbePages([]);
+    setShadow(null);
     owner.current = campaign.campaign_id;
     tenantToken.current = getAuthToken();
   }, [campaign.campaign_id]);
@@ -115,6 +120,24 @@ export default function GameStudioScenarioLabPanel({
       setError(issue instanceof Error ? issue.message : 'The engine action probe failed.');
     } finally {
       setProbePending(false);
+    }
+  };
+  const loadShadow = async (maxCycles: number) => {
+    if (shadowPending) return;
+    setShadowPending(true);
+    setShadow(null);
+    setError(null);
+    try {
+      const result = await getStudioShadowAudit(
+        campaign.campaign_id, shadowAngle, maxCycles,
+      );
+      if (owner.current !== campaign.campaign_id ||
+          tenantToken.current !== getAuthToken()) return;
+      setShadow(result);
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : 'Shadow scrutiny was not verified.');
+    } finally {
+      setShadowPending(false);
     }
   };
   const loadSales = async () => {
@@ -213,6 +236,54 @@ export default function GameStudioScenarioLabPanel({
           </View>
         </View>
       )}
+      <View style={{ gap: 8 }}>
+        <Text style={heading}>Shadow-clone convergence room</Text>
+        <Text style={muted}>Choose a parent perspective. Each cycle forks a real checkpoint into an isolated shadow, independently replays both branches, increases scrutiny, and records hash-chained step evidence. Ten consecutive cycles without new verified knowledge are required; a resource stop is inconclusive.</Text>
+        <View style={group}>
+          {['explore','progress','safety','economy','adversary','boundary',
+            'temporal','causal','perturbation','recovery'].map(value =>
+            <React.Fragment key={value}>
+              {button(value, () => { setShadowAngle(value); setShadow(null); }, shadowAngle === value)}
+            </React.Fragment>)}
+        </View>
+        <View style={group}>
+          {button(shadowPending ? 'Scrutinizing shadow clones…' : 'Audit 12 cycles', () => { void loadShadow(12); })}
+          {button('Audit up to 16 cycles', () => { void loadShadow(16); })}
+        </View>
+        {shadow && shadow.simulations.map(sim => (
+          <View key={sim.angle} style={{ padding: 9, borderWidth: 1, borderColor: '#526173', borderRadius: 8, gap: 7 }}>
+            <Text style={heading}>Shadow {sim.angle} · {sim.cycles_executed} audited cycles</Text>
+            <Text style={muted} accessibilityLiveRegion="polite">
+              {sim.observed_unique_semantic_behaviors} distinct verified behaviors ·
+              {sim.observed_zero_novelty_streak}/10 consecutive dry cycles ·
+              peak scrutiny +{sim.peak_additional_scrutiny_checks} gates
+            </Text>
+            <Text style={{ color: sim.saturation_within_tested_bounds ? '#b4e7cb' : '#f6c6a5' }}>
+              {sim.saturation_within_tested_bounds
+                ? 'No new behavior or policy gain detected for ten audited cycles within the tested bounds.'
+                : 'Inconclusive: ' + sim.stop_reason.replace(/_/g, ' ')}
+            </Text>
+            <Text style={muted}>This viewer performs read-only source replay. It does not update live Q or neural weights. Separate operator-authorized training can audit policy-value convergence.</Text>
+            {sim.receipts.map(receipt => (
+              <View key={receipt.digest} style={{ paddingVertical: 5, gap: 2 }}>
+                <Text style={muted}>
+                  Cycle {receipt.cycle} · +{receipt.new_semantic_evidence_count} learned behaviors ·
+                  dry streak {receipt.zero_novelty_streak} · {receipt.base_audits_passed}+{receipt.additional_checks_passed} passed audits
+                </Text>
+                <Text selectable style={muted}>
+                  Fork {receipt.fork.fork_at_step} · parent {receipt.fork.parent_next_action}
+                  {' → shadow '}{receipt.fork.shadow_alternative_action} ·
+                  evidence {receipt.digest.slice(0,16)}
+                </Text>
+                <Text style={muted}>
+                  Source-replayed steps {receipt.completed_cycle_game_steps} ·
+                  scrutiny {receipt.scrutiny_checks.map(item => item.name).join(', ')}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
       <View style={group}>
         {button('Draft from committed evidence', () => { void loadDrafts(); })}
         {button('Per-engine exhaustive checklist', () => { void loadTests(); })}

@@ -45,6 +45,28 @@ class TestStudioScenarioSpectators(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(lane["steps"]>0 for lane in report["lanes"]))
         self.assertEqual(self.row["cursor"],7)
 
+    async def test_shadow_scrutiny_is_scoped_readonly_and_never_fabricates_saturation(self):
+        with patch.object(game_studio_learning,"_read",new_callable=AsyncMock) as reader:
+            reader.return_value=self.row
+            outcome=await game_studio_learning.scenario_shadow_audit(
+                self.scope,"campaign-fixture",angle="temporal",
+                steps=1,max_cycles=10,replay_budget=300,
+            )
+            reader.assert_awaited_once_with(self.scope,"campaign-fixture")
+        self.assertEqual(outcome["campaign_id"],"campaign-fixture")
+        self.assertEqual(outcome["parent_sim_count"],1)
+        self.assertTrue(outcome["spectator_only"])
+        self.assertFalse(outcome["training_weight_changes"])
+        sim=outcome["simulations"][0]
+        self.assertEqual(sim["angle"],"temporal")
+        self.assertLessEqual(sim["cycles_executed"],10)
+        self.assertFalse(sim["universal_learning_exhaustion_proven"])
+        self.assertEqual(self.row["cursor"],7)
+        with self.assertRaises(GameLearningError):
+            await game_studio_learning.scenario_shadow_audit(
+                self.scope,"campaign-fixture",angle="foreign_python",
+            )
+
     async def test_malformed_parallel_and_campaign_source_rejected(self):
         with self.assertRaises(GameLearningError):
             await game_studio_learning.scenario_mirror_views(

@@ -240,6 +240,25 @@
       "native_renderer_camera_training_claimed": false,
       "production_neural_checkpoint_modified": false,
       "independent_test_verification": "not verified; new tests committed but not executed"
+    },
+    "shadow_saturation": {
+      "status": "committed_candidate_pending_exact_head_execution",
+      "core": "skeleton/jeeves/game_studio_shadow_saturation.py",
+      "operator_cli": "skeleton/jeeves/game_studio_shadow_cli.py",
+      "backend": "GET /api/game-studio-learning/campaigns/{id}/shadow-audit (read-only, one angle)",
+      "ui": "frontend/features/Jeeves/GameStudioScenarioLabPanel.tsx",
+      "ten_rule": "Ten consecutive independently audited zero-learning cycles *after* the most recent novel original-game behavior or significant Q-policy gain, per parent simulation",
+      "shadow_clones": "Exact parent intermediate snapshot is restored in an isolated engine and branched using an alternate registered action, then independently replayed and verified",
+      "novelty": "new action/acceptance/state-delta-direction/reward-sign/terminal witnesses, excluding source-seed/timestamp-only novelty",
+      "policy_training": "optional local real GamePolicyLearner Q episodes per cycle with new visited state-action pairs and source-measured maximum Q delta (default tolerance 1e-4) governing convergence",
+      "peak_scrutiny": "20 multispectral baseline checks per parent-plus-clone cycle, escalating by one independent extra check each successive cycle to a peak of 28; repeated at peak",
+      "evidence": "SHA256 receipt chain with full per-step evidence for both branches, original and shadow checkpoint digests, reverse replay, spectral proofs, exact source/Q update counts, measured novelty and budget usage",
+      "persistence": "exclusive append-only fsync-per-cycle JSONL ledger with independent final certificate only on completed verified run",
+      "resources": "max 64 cycles per parent, max 12 steps per simulation, 4 concurrent threads, finite replay-work budget; an exhausted budget MUST report unproven",
+      "native_sensors_claimed": false,
+      "universal_exhaustion_claimed": false,
+      "production_neural_weights_changed": false,
+      "verification": "focused tests committed; not run at exact head"
     }
   }
 }
