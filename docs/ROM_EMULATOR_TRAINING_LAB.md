@@ -54,10 +54,10 @@ license receipt.
    learned policy, adversarial/minimum-Q, temporal, boundary, recovery,
    randomized perturbation, causal/greedy, reversed controls and boomerang.
 3. Capture real frame/audio data. The native libretro host now exposes
-   twelve normalized measured channels: brightness, visual frame difference,
-   audio RMS, time fraction, frame entropy, luminance contrast, spatial edge
-   strength, color saturation, color bias, audio peak, zero crossings and
-   left/right stereo difference. These **do not identify objects, music,
+   twenty-four bounded measured channels: brightness, visual frame difference,
+   audio RMS, time fraction, image entropy, luminance contrast, spatial edges,
+   color saturation/bias, audio peak, zero crossings, stereo separation, plus
+   12 consecutive-frame motion/quadrant/audio-change signals. These **do not identify objects, music,
    abilities, score, win/loss or gameplay quality**.
 4. At selected points, fork actual native states into alternative inputs and,
    for libretro, one- through four-controller combinations. Replay restores
@@ -75,9 +75,9 @@ license receipt.
    inside a newly built approved runtime. Re-evaluations are not falsely
    counted as extra successful learning episodes.
 8. Stop only when ten consecutive executed runs add no new coarse
-   frame-plus-observation signatures, or when the explicit resource/run budget
-   is exhausted. Those signals measure *visual exploration saturation*,
-   not mathematical impossibility of further learning or game mastery.
+   frame-plus-observation signatures **and** no new learned Q state or Q-value
+   change above 1e-6, or when the explicit resource/run budget is exhausted.
+   This is a local measured training plateau, not a proof of global convergence.
 9. Evaluate the candidate on disjoint held-out episodes against the
    existing seeded random policy. Libretro cores do **not** share a universal
    reproducible RNG; measured held-out returns must therefore be interpreted
@@ -88,7 +88,7 @@ license receipt.
     network transfer, online self-modification or weight promotion runs.
 
 The returned report separates a saturation exit from a bounded exit:
-`visual_novelty_saturated` versus
+`observed_q_and_visual_learning_plateau` versus
 `budget_exhausted_before_saturation`. Native runtime failure, missing
 snapshot support, replay mismatch, wrong target, missing rights assertion,
 inconsistent firmware or interrupted worker are errors and **do not
