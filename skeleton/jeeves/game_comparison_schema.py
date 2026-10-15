@@ -104,6 +104,49 @@ def _questions(value: object) -> list[str]:
     return [_text(x, "comparison question", limit=240) for x in value]
 
 
+def _content_bundle_manifest(value: object, *, entry_source_path: str, entry_source_sha: str) -> dict[str, Any]:
+    """Validate explicit local multi-file media; defer actual file access to operator execution."""
+    from .game_emulator_catalog import (
+        _content_name, MAX_CONTENT_FILES, MAX_REFERENCED_FILE_BYTES, MAX_REFERENCED_BUNDLE_BYTES,
+    )
+
+    if not isinstance(value, dict) or set(value) != {"entrypoint", "files"}:
+        _fail("Disc bundle requires an exact entrypoint and finite local file list")
+    entrypoint = _content_name(value["entrypoint"])
+    rows = value["files"]
+    if not isinstance(rows, list) or not 1 <= len(rows) <= MAX_CONTENT_FILES:
+        _fail("Disc bundle file count is outside the bounded emulator content domain")
+    clean = []
+    seen = set()
+    total = 0
+    entry_found = False
+    for item in rows:
+        if not isinstance(item, dict) or set(item) != {"name", "path", "sha256", "size_bytes"}:
+            _fail("Disc file metadata requires exact name/path/SHA/size")
+        name = _content_name(item["name"])
+        path = _text(item["path"], "local disc media path", limit=2048)
+        if (not path.startswith("/") or "\x00" in path or "/../" in path
+            or name.casefold() in seen):
+            _fail("Disc media file paths must be absolute and contents must have distinct canonical names")
+        sha = _sha(item["sha256"], "disc file content")
+        size = item["size_bytes"]
+        if type(size) is not int or not 1 <= size <= MAX_REFERENCED_FILE_BYTES:
+            _fail("Each disc media file must have a bounded declared size")
+        seen.add(name.casefold())
+        total += size
+        if total > MAX_REFERENCED_BUNDLE_BYTES:
+            _fail("Total disc media bytes exceed the native four-GiB content limit")
+        if name == entrypoint:
+            if path != entry_source_path or sha != entry_source_sha:
+                _fail("Disc entrypoint differs from the pinned game source path/SHA")
+            entry_found = True
+        clean.append({"name": name, "path": path, "sha256": sha, "size_bytes": size})
+    if not entry_found:
+        _fail("Disc bundle must contain its pinned entrypoint")
+    clean.sort(key=lambda row: row["name"])
+    return {"entrypoint": entrypoint, "files": clean}
+
+
 def validate_study(raw: object) -> dict[str, Any]:
     """Fail closed before any emulator is loaded; return normalized JSON metadata."""
     if not isinstance(raw, dict):
@@ -133,8 +176,9 @@ def validate_study(raw: object) -> dict[str, Any]:
             "source_sha256", "rights_evidence_digest", "actions",
             "seed", "frames_per_step", "controller_devices",
         }
-        if not isinstance(game, dict) or set(game) != fields:
-            _fail("Game row must contain the exact pinned manifest fields")
+        if (not isinstance(game, dict)
+            or set(game) not in (fields, fields | {"content_bundle"})):
+            _fail("Game row requires exact pinned metadata and optional governed content_bundle")
         identity = _id(game["id"], "game id")
         if identity in seen:
             _fail("Game IDs must be distinct")
@@ -156,6 +200,11 @@ def validate_study(raw: object) -> dict[str, Any]:
         if not path.startswith("/") or "\x00" in path:
             _fail("Operator ROM source must use an absolute local file path")
         sha = _sha(game["source_sha256"], "expected original ROM content")
+        bundle = (None if game.get("content_bundle") is None else _content_bundle_manifest(
+            game["content_bundle"], entry_source_path=path, entry_source_sha=sha
+        ))
+        if "content_bundle" in game and game["content_bundle"] is None:
+            bundle = None
         rights = game["rights_evidence_digest"]
         if rights is not None:
             _sha(rights, "operator rights record")
@@ -176,6 +225,7 @@ def validate_study(raw: object) -> dict[str, Any]:
             "series_id": series_id, "release_order": order, "release_year": year,
             "series_phase": game["series_phase"], "target_id": target, "core_id": core,
             "source_path": path, "source_sha256": sha,
+            "content_bundle": bundle,
             "rights_evidence_digest": rights, "actions": list(actions),
             "seed": seed, "frames_per_step": frames,
             "controller_devices": list(devices),

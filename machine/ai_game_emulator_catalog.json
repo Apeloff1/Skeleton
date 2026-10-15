@@ -724,6 +724,19 @@
       "runnable_native_roms_compiled": false,
       "tests": "tests/test_game_comparison_variant_forge.py source tests added but not executed against native ROMs in this edit",
       "rights": "No source game ROM bytes appear in variant output, only SHA-256 stage and original ROM digests"
+    },
+    "multifile_media_admission": {
+      "status": "Source implemented, native disc execution not tested",
+      "module": "skeleton/jeeves/game_comparison_media.py",
+      "schema": "Optional game.content_bundle {entrypoint, files:[{name,path,sha256,size_bytes}]} alongside pinned entrypoint source_path/source_sha256",
+      "input_authority": "Per-file absolute local operator paths, no symlink path components, exact bounded length and SHA; read-only streamed open file handles, no URI fetching",
+      "actual_emulator_integration": "Existing GameContentReference/GameContentBundle with host-owned reader, SHA-256 and CUE/GDI/M3U/ISO/CHD header/dependency admission",
+      "bounds": "<=96 file references, <=2 GiB per file, <=4 GiB per game content bundle; 1 MiB chunks, streamed instead of preloading",
+      "source_binding": "Both entrypoint ROM SHA and full game bundle SHA appear in native comparison stage evidence and cross-study series ledger",
+      "no_bios_or_game_downloads": true,
+      "large_content_requires_native_core_approval": true,
+      "runtime_verified_on_actual_disc": false,
+      "tests": "tests/test_game_comparison_media.py added; actual native emulator tests pending"
     }
   }
 }

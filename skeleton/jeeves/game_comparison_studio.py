@@ -77,7 +77,9 @@ def _observe_one(
 
     if cancelled is not None and cancelled():
         raise ComparativeStudyError("Operator cancelled the comparative study")
-    source, filename = _source_file(game)
+    from .game_comparison_media import prepare_comparison_media
+
+    content_kwargs, content_sha256 = prepare_comparison_media(game)
     tape = game["actions"]
     checkpoints = _stage_checkpoints(len(tape))
     observed: dict[str, Any] = {}
@@ -87,8 +89,7 @@ def _observe_one(
         game["target_id"],
         core_id=game["core_id"],
         expected_registry_digest=expected_registry_digest,
-        rom_source=source,
-        filename=filename,
+        **content_kwargs,
         max_steps=len(tape),
         frames_per_step=game["frames_per_step"],
         controller_devices=game["controller_devices"],
@@ -114,7 +115,7 @@ def _observe_one(
                     "source": "actual_isolated_libretro",
                     "evidence_ref": game["id"] + ":" + phase,
                     "evidence_sha256": digest([
-                        env.spec.environment_digest, game["source_sha256"],
+                        env.spec.environment_digest, content_sha256,
                         env.core.library_sha256, phase, index,
                         step.transition_digest, pixel_sha, frame["audio_sha256"],
                     ]),
@@ -178,6 +179,8 @@ def _observe_one(
         "release_year": game["release_year"], "series_phase": game["series_phase"],
         "target_id": game["target_id"], "core_id": game["core_id"],
         "source_sha256": game["source_sha256"],
+        "source_bundle_sha256": content_sha256,
+        "content_kind": "governed_local_multifile_bundle" if game.get("content_bundle") else "small_inline_rom",
         "core_sha256": actual_core_sha,
         "environment_sha256": environment_sha,
         "status": "actual_native_observations_captured",

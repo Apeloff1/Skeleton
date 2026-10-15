@@ -73,7 +73,11 @@ def merge_comparative_series(reports: Sequence[Mapping[str, Any]]) -> dict[str, 
             if game.get("status") != "actual_native_observations_captured":
                 continue
             unique_version = (study_id, game_id)
-            current_bytes = (game.get("source_sha256"), game.get("core_sha256"))
+            current_bytes = (
+                game.get("source_sha256"),
+                game.get("source_bundle_sha256", game.get("source_sha256")),
+                game.get("core_sha256"),
+            )
             if unique_version in seen_game_versions:
                 if seen_game_versions[unique_version] != current_bytes:
                     raise SeriesLedgerError("The same study game identity changed ROM/core bytes across batches")
@@ -99,6 +103,8 @@ def merge_comparative_series(reports: Sequence[Mapping[str, Any]]) -> dict[str, 
                 "core_id": game["core_id"], "core_sha256": game["core_sha256"],
                 "target_id": game["target_id"],
                 "rom_sha256": game["source_sha256"],
+                "full_game_media_bundle_sha256": game.get("source_bundle_sha256", game["source_sha256"]),
+                "content_kind": game.get("content_kind", "small_inline_rom"),
                 "native_checkpoint_receipts": receipts,
                 "mean_visual_change": game["metrics"]["mean_visual_change"],
                 "mean_audio_rms": game["metrics"]["mean_audio_rms"],
