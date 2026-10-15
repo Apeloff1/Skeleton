@@ -234,7 +234,8 @@ def decompile_authorized_game(
         "full_original_source_recovered": False,
         "native_executable_or_game_rom_executed": False,
         "gameplay_quality_or_decompilation_accuracy_independently_verified": False,
-        "raw_source_bytes_in_report": False,
+        "bounded_machine_instruction_hex_present": bool(code and code.get("supported") is True),
+        "complete_source_or_asset_binary_embedded": False,
         "production_model_training_performed": False,
         "model_weights_updated": False,
     }
