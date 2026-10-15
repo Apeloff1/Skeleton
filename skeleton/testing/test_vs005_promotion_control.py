@@ -518,13 +518,7 @@ def test_rollback_must_bind_exact_promotion_decision_digest() -> None:
 
 def test_rollback_requires_fourth_independent_verifier() -> None:
     selected = candidate()
-    evaluation_value, canary_value, decision = verified_promotion(selected)
-    ledger.record_decision(
-        selected,
-        decision,
-        evaluation=evaluation_value,
-        canary=canary_value,
-    )
+    _evaluation, _canary, decision = verified_promotion(selected)
     for verifier in (
         selected.builder_id,
         decision.verifier_id,
@@ -645,7 +639,7 @@ def test_promotion_ledger_decision_is_idempotent_but_not_rebindable() -> None:
     )
     with pytest.raises(
         ImprovementError,
-        match="already bound to another decision",
+        match="does not match supplied evaluation/canary evidence",
     ):
         ledger.record_decision(
             selected,
@@ -735,7 +729,13 @@ def test_promotion_ledger_rollback_rebinding_fails_closed() -> None:
 def test_promotion_ledger_rejects_nonindependent_rollback_verifier() -> None:
     ledger = PromotionLedger()
     selected = candidate()
-    decision = promoted_decision(selected)
+    evaluation_value, canary_value, decision = verified_promotion(selected)
+    ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    )
     for verifier in (
         selected.builder_id,
         decision.verifier_id,
