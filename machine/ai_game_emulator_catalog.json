@@ -159,7 +159,15 @@
     "snes9x2005": "a79dfe9047e7fec58808aefe48ad2bf499c7af11",
     "snes9x2010": "fe690dd321fa5a46b5234a2bde089d2518c62b0e",
     "mednafen_supafaust": "642d1d1b6684aa7e306a02a89885f3f5456a5157",
-    "blastem": "ab743653ed110eeb7b1fe64d00cc5f9279c2bfec"
+    "blastem": "ab743653ed110eeb7b1fe64d00cc5f9279c2bfec",
+    "snes9x2002": "6ffbf9ef4f0063e1f1b78a40d10c50fc52f2524c",
+    "smsplus_gx": "3844b46caa926b6494987b97da63092818c4ddef",
+    "tgbdual": "0392c9c469e653205e471114c7949c07c83bfce9",
+    "mednafen_lynx": "fcdefcfb3c11d6d2e71be076a5d3df2e88ab73ed",
+    "meteor": "9ea6c358eae6acd1a346647d96b832ccaffad0aa",
+    "mame2003_plus": "c5233bcb5897e5abd7a7edbd1de6b88af3489350",
+    "genesis_plus_gx_wide": "b7ad005431f5f0b55e559f6d598d1ed2479bf13b",
+    "mesen_s": "9e4fdeb9b336470bc96beb8765b2e79c86a2da1e"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -441,5 +449,28 @@
       "prerequisites": "canonical hardware and core mappings must agree; fail closed on invalid target",
       "confidence": "source declarations only"
     }
+  },
+  "fourth_expansion": {
+    "date": "2026-10-15",
+    "previous_declarations": 67,
+    "added_declarations": 8,
+    "current_declarations": 75,
+    "scope": "new exact upstream source recipe candidates for existing canonical hardware identities",
+    "new_cores": [
+      "snes9x2002",
+      "smsplus_gx",
+      "tgbdual",
+      "mednafen_lynx",
+      "meteor",
+      "mame2003_plus",
+      "genesis_plus_gx_wide",
+      "mesen_s"
+    ],
+    "archive_policy": "After exact approved core identity and bounded ZIP preflight, MAME 2003 Plus can preserve opaque ZIP content only when actual isolated worker live libretro retro_system_info.block_extract approves; no global ZIP bypass",
+    "legal_limitations": "Classic MAME and legacy Snes9x have noncommercial use restrictions. GPL/mixed licenses must be individually reviewed; no ROM/BIOS/keys provided",
+    "software_install_or_rom_execution_performed": false,
+    "verified_gameplay_targets_new": 0,
+    "core_build_command_fix": "Special upstream make target is removed from clean-only invocation, preserving explicit build target on compile",
+    "operator_use": "python3 scripts/install_game_emulator_cores.py --list-cores; python3 scripts/install_game_emulator_cores.py --coverage-matrix"
   }
 }

@@ -851,6 +851,155 @@ PINNED_CORES.update(
 )
 
 
+
+# Batch 4: source pinned Linux libretro candidates. No auto-approval or gameplay claim.
+PINNED_CORES.update(
+    {
+        "snes9x2002": {
+            "repository": "https://github.com/libretro/snes9x2002.git",
+            "revision": "6ffbf9ef4f0063e1f1b78a40d10c50fc52f2524c",
+            "artifact": "snes9x2002_libretro.so",
+            "license": "src/copyright.h",
+            "makefile": "Makefile",
+            "targets": [
+                "snes"
+            ],
+            "candidate_only": True,
+            "license_review": "Upstream legacy Snes9x license has noncommercial permission limits; operator must clear redistribution and deployment rights",
+            "feature_limits": "Older SNES core; accuracy, enhancement chips and audio need separate trace comparison",
+            "unavailable_requirements": [
+                "Qualified game timing/CoProcessor, ROM mappings, firmware region and audio traces",
+                "Separate legal acceptance for the restrictive legacy license"
+            ]
+        },
+        "smsplus_gx": {
+            "repository": "https://github.com/libretro/smsplus-gx.git",
+            "revision": "3844b46caa926b6494987b97da63092818c4ddef",
+            "artifact": "smsplus_libretro.so",
+            "license": "docs/license",
+            "makefile": "Makefile.libretro",
+            "targets": [
+                "master_system",
+                "sega_mark_iii",
+                "sega_sg1000",
+                "game_gear"
+            ],
+            "candidate_only": True,
+            "license_review": "Operator must review upstream mixed components and PSG licensing before commercial distribution",
+            "feature_limits": "SMS/GG/SG family candidate; console-region selection and mappers are not qualified",
+            "unavailable_requirements": [
+                "Firmware/machine mode and region switch qualification",
+                "Mapper/SRAM, palette and audio core option evidence"
+            ]
+        },
+        "tgbdual": {
+            "repository": "https://github.com/libretro/tgbdual-libretro.git",
+            "revision": "0392c9c469e653205e471114c7949c07c83bfce9",
+            "artifact": "tgbdual_libretro.so",
+            "license": "docs/COPYING-2.0.txt",
+            "makefile": "Makefile",
+            "targets": [
+                "game_boy",
+                "game_boy_color",
+                "game_boy_pocket",
+                "game_boy_light"
+            ],
+            "candidate_only": True,
+            "feature_limits": "Dual-Game Boy/link-capable core, but link pair, cheat, input and serial timing remain unqualified",
+            "unavailable_requirements": [
+                "Validate paired-game link state, serial timing, save consistency and core isolation"
+            ]
+        },
+        "mednafen_lynx": {
+            "repository": "https://github.com/libretro/beetle-lynx-libretro.git",
+            "revision": "fcdefcfb3c11d6d2e71be076a5d3df2e88ab73ed",
+            "artifact": "mednafen_lynx_libretro.so",
+            "license": "COPYING",
+            "makefile": "Makefile",
+            "targets": [
+                "lynx"
+            ],
+            "candidate_only": True,
+            "feature_limits": "Atari Lynx alternate interpreter; rotation, audio, optional EEPROM and special controllers unqualified",
+            "unavailable_requirements": [
+                "BIOS/HLE approach and Lynx rotation/input/persistence qualification"
+            ]
+        },
+        "meteor": {
+            "repository": "https://github.com/libretro/meteor-libretro.git",
+            "revision": "9ea6c358eae6acd1a346647d96b832ccaffad0aa",
+            "artifact": "libretro/meteor_libretro.so",
+            "license": "COPYING",
+            "build_directory": "libretro",
+            "makefile": "Makefile",
+            "targets": [
+                "game_boy_advance",
+                "game_boy_micro",
+                "game_boy_player"
+            ],
+            "candidate_only": True,
+            "feature_limits": "GBA emulator candidate; Micro/Player hardware accessory semantics are not automatically emulated",
+            "unavailable_requirements": [
+                "Operator review of any required boot firmware",
+                "Validate software renderer, cartridge SRAM/FLASH/EEPROM and ARM timing"
+            ]
+        },
+        "mame2003_plus": {
+            "repository": "https://github.com/libretro/mame2003-plus-libretro.git",
+            "revision": "c5233bcb5897e5abd7a7edbd1de6b88af3489350",
+            "artifact": "mame2003_plus_libretro.so",
+            "license": "LICENSE.md",
+            "makefile": "Makefile",
+            "targets": [
+                "neo_geo"
+            ],
+            "candidate_only": True,
+            "license_review": "Classic MAME noncommercial restrictions; deployment and ROM rights require independent legal review",
+            "firmware": [
+                "neogeo.zip"
+            ],
+            "feature_limits": "Limited to legacy Neo Geo arcade candidate. Other arcade hardware and game sets are NOT automatically supported.",
+            "unavailable_requirements": [
+                "Operator rights-cleared Neo Geo BIOS and legally acquired compatible cartridge images",
+                "ROM-set version checks, controller mappings and MAME save/RTC determinism",
+                "Commercial redistribution is not automatically permitted"
+            ]
+        },
+        "genesis_plus_gx_wide": {
+            "repository": "https://github.com/libretro/genesis-plus-gx-wide.git",
+            "revision": "b7ad005431f5f0b55e559f6d598d1ed2479bf13b",
+            "artifact": "genesis_plus_gx_wide_libretro.so",
+            "license": "LICENSE.txt",
+            "makefile": "Makefile.libretro",
+            "targets": [
+                "genesis"
+            ],
+            "candidate_only": True,
+            "feature_limits": "Experimental widescreen derivative for Genesis only; special renderer margins can diverge from original hardware",
+            "unavailable_requirements": [
+                "Confirm no offscreen gameplay or crop changes cause training-label corruption",
+                "Frame/sprite timing audit versus standard Genesis Plus GX"
+            ]
+        },
+        "mesen_s": {
+            "repository": "https://github.com/libretro/mesen-s.git",
+            "revision": "9e4fdeb9b336470bc96beb8765b2e79c86a2da1e",
+            "artifact": "Libretro/mesen-s_libretro.so",
+            "license": "LICENSE",
+            "build_directory": "Libretro",
+            "makefile": "Makefile",
+            "targets": [
+                "snes"
+            ],
+            "candidate_only": True,
+            "feature_limits": "SNES enhancement hardware and Super Game Boy modes require separate core validation",
+            "unavailable_requirements": [
+                "Accurate SPC700 audio, co-processors and controller expansion coverage"
+            ]
+        }
+    }
+)
+
 def _environment(*, network: bool = False):
     # No inherited provider/Mongo credentials, user git configuration, dynamic
     # loader overrides, compiler injection flags or credential helpers.
@@ -1222,7 +1371,7 @@ def install(args):
                 _run(configuration_command, cwd=directory, log=log, timeout=args.timeout)
             else:
                 _run(
-                    [*build_command, "clean"],
+                    ([*build_command[:-1], "clean"] if pin.get("build_target") else [*build_command, "clean"]),
                     cwd=build_directory,
                     log=log,
                     timeout=60,

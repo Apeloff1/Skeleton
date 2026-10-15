@@ -361,6 +361,14 @@ _CORE_TARGET_GROUPS = {
     "snes9x2010": ("snes",),
     "mednafen_supafaust": ("snes",),
     "blastem": ("genesis",),
+    "snes9x2002": ("snes",),
+    "smsplus_gx": ("master_system", "sega_mark_iii", "sega_sg1000", "game_gear"),
+    "tgbdual": ("game_boy", "game_boy_color", "game_boy_pocket", "game_boy_light"),
+    "mednafen_lynx": ("lynx",),
+    "meteor": ("game_boy_advance", "game_boy_micro", "game_boy_player"),
+    "mame2003_plus": ("neo_geo",),
+    "genesis_plus_gx_wide": ("genesis",),
+    "mesen_s": ("snes",),
     "mame": (
         "fairchild_channel_f",
         "rca_studio_ii",
@@ -434,6 +442,14 @@ _CORE_CONTENT_EXTENSIONS = {
     "hatari": "st|msa|stx|dim|ipf|m3u",
     "swanstation": "cue|bin|img|chd|pbp|m3u|iso",
     "mupen64plus_next": "n64|v64|z64|bin",
+    "snes9x2002": "sfc|smc|fig|swc",
+    "smsplus_gx": "sms|gg|sg|bin|rom",
+    "tgbdual": "gb|gbc",
+    "mednafen_lynx": "lnx|lyx|o",
+    "meteor": "gba",
+    "mame2003_plus": "zip",
+    "genesis_plus_gx_wide": "bin|gen|md|smd",
+    "mesen_s": "sfc|smc|fig|swc",
     "gearboy": "gb|gbc|dmg|sgb",
     "gearsystem": "sms|gg|sg|bin|rom",
     "gpsp": "gba|bin",
@@ -1374,13 +1390,13 @@ def load_game_content_for_core(
     expected_source_digest: str | None = None,
     registry: GameEmulatorRegistry | None = None,
 ) -> GameContentBundle:
-    """Keep native DOS/arcade ZIPs intact after bounded actual archive inspection.
+    """Keep explicitly authorized native DOS/arcade ZIPs intact after bounded archive inspection.
 
     The worker must also verify its actual ``block_extract`` declaration. This
     source admission does not infer game compatibility or execute archived code.
     """
     (registry or GameEmulatorRegistry.from_environment()).revalidate(core)
-    if core.core_id not in {"dosbox_pure", "fbneo"}:
+    if core.core_id not in {"dosbox_pure", "fbneo", "mame2003_plus"}:
         return load_game_content(
             data, filename, entrypoint=entrypoint, expected_source_digest=expected_source_digest
         )
