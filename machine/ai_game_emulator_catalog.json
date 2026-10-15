@@ -60,7 +60,7 @@
     "directories": 96,
     "stream_chunks_per_file": 131072,
     "stream_chunks_per_bundle": 262144,
-    "opaque_core_archives": "load_game_content_for_core revalidates the exact operator-approved core binding. Only the declared DOSBox Pure, FBNeo and MAME 2003 Plus core profiles preserve an actual ZIP (plus DOSBox Pure .dosz) as opaque native content; all directory/path/member/count/ratio/expanded-byte/CRC bounds still apply before admission. Worker actual retro_system_info.block_extract must agree before loading; no caller boolean grants this behavior. Large streamed archive descriptors remain exact owned files under the isolated worker resource budget.",
+    "opaque_core_archives": "load_game_content_for_core revalidates the exact operator-approved core binding. Only the declared DOSBox Pure, FBNeo, MAME 2003 Plus, MAME 2003, MAME 2016 and FBA 2012 Neo Geo core profiles preserve an actual ZIP (plus DOSBox Pure .dosz) as opaque native content; all directory/path/member/count/ratio/expanded-byte/CRC bounds still apply before admission. Worker actual retro_system_info.block_extract must agree before loading; no caller boolean grants this behavior. Large streamed archive descriptors remain exact owned files under the isolated worker resource budget.",
     "extension_profiles": "Fixed native-content suffix hints are copied from the exact pinned upstream core valid_extensions declarations. They permit data-only metadata admission outside known cartridge parsers only after the existing owner resolves current approved core/target authority. Missing or malformed known cartridge formats do not become opaque. These hints are not native load approval: the isolated worker checks actual loaded core valid_extensions, exact content, and applicable block_extract before admission."
   },
   "interfaces": [
@@ -167,7 +167,15 @@
     "meteor": "9ea6c358eae6acd1a346647d96b832ccaffad0aa",
     "mame2003_plus": "c5233bcb5897e5abd7a7edbd1de6b88af3489350",
     "genesis_plus_gx_wide": "b7ad005431f5f0b55e559f6d598d1ed2479bf13b",
-    "mesen_s": "9e4fdeb9b336470bc96beb8765b2e79c86a2da1e"
+    "mesen_s": "9e4fdeb9b336470bc96beb8765b2e79c86a2da1e",
+    "bnes": "8e26e89a93bef8eb8992d1921b539dce1792660a",
+    "bsnes_mercury_accuracy": "79d7f9de218b6ffa65a80bbdc5828532bc239232",
+    "bsnes_mercury_balanced": "79d7f9de218b6ffa65a80bbdc5828532bc239232",
+    "bsnes_mercury_performance": "79d7f9de218b6ffa65a80bbdc5828532bc239232",
+    "mame2003": "b9ac708f922386a0ae1f2379dbb31b60d7ec7b25",
+    "mame2016": "ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a",
+    "fbalpha2012_neogeo": "e092097037d494c50d17c5144a2758d68538061b",
+    "dosbox_core": "d38fcb5013e4dca8d119a9786279cf41465757f2"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -480,5 +488,31 @@
       "nonemulator_targets_note": "Many of the unmapped rows are contemporary host OSes, handheld PCs, proprietary consoles or SDK destinations; not all correspond to a distinct ROM emulator core."
     },
     "recipe_list_information": "--list-cores now exposes exact artifact path, build kind/directory/file/target, licensing, feature limits and deployment dependencies for all 75 source recipes"
+  },
+  "fifth_expansion": {
+    "date": "2026-10-15",
+    "new_recipes": [
+      "bnes",
+      "bsnes_mercury_accuracy",
+      "bsnes_mercury_balanced",
+      "bsnes_mercury_performance",
+      "mame2003",
+      "mame2016",
+      "fbalpha2012_neogeo",
+      "dosbox_core"
+    ],
+    "baseline_recipe_count": 75,
+    "declared_recipe_count": 83,
+    "code_owner": "skeleton/jeeves/game_emulator_catalog.py",
+    "true_status": "8 new source-pinned operator-build candidates; zero new native binaries compiled or qualified",
+    "source_sha_method": "Exact 40-character upstream GitHub branch commits, Makefile target paths and mandatory licenses inspected via repository API",
+    "developer_runtime_execution": false,
+    "firmware_bundled": false,
+    "roms_distributed": false,
+    "admission": "candidate_only for all eight; exact libretro symbol/ELF/firmware/registry checks remain",
+    "archive_policy": "Only exact approved arcade core and live block_extract permits bounded opaque zip; general nested ZIPs forbidden",
+    "training_trace": "EmulatorEnvironment.capture_training_trace uses actual native frame evidence and canonical offline _validate_trace; no production weights promotion or game-success claim",
+    "hardware_identity_count": 169,
+    "modern_sdk_target_note": "Modern licensed SDKs and host OS variations are not equivalent to libretro emulators"
   }
 }

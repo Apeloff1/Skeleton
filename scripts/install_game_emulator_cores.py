@@ -1000,6 +1000,178 @@ PINNED_CORES.update(
     }
 )
 
+
+# Batch 5: independently pinned upstream compile candidates, not approved binaries.
+PINNED_CORES.update(
+    {
+        "bnes": {
+            "repository": "https://github.com/libretro/bnes-libretro.git",
+            "revision": "8e26e89a93bef8eb8992d1921b539dce1792660a",
+            "artifact": "bnes_libretro.so",
+            "license": "license",
+            "makefile": "Makefile",
+            "targets": [
+                "nes"
+            ],
+            "candidate_only": True,
+            "feature_limits": "Alternative NES interpreter; input/PPU/APU mapper accuracy unqualified",
+            "unavailable_requirements": [
+                "Validate mapper implementations, expansion audio, controller adapters and deterministic SRAM"
+            ]
+        },
+        "bsnes_mercury_accuracy": {
+            "repository": "https://github.com/libretro/bsnes-mercury.git",
+            "revision": "79d7f9de218b6ffa65a80bbdc5828532bc239232",
+            "artifact": "bsnes_mercury_accuracy_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile",
+            "make_variables": {
+                "PROFILE": "accuracy"
+            },
+            "targets": [
+                "snes"
+            ],
+            "candidate_only": True,
+            "feature_limits": "Accuracy profile; coprocessors, DSP variants, timing and MSU are not verified",
+            "unavailable_requirements": [
+                "Validate snes chip coprocessors, deterministic save/replay and actual native video/audio"
+            ]
+        },
+        "bsnes_mercury_balanced": {
+            "repository": "https://github.com/libretro/bsnes-mercury.git",
+            "revision": "79d7f9de218b6ffa65a80bbdc5828532bc239232",
+            "artifact": "bsnes_mercury_balanced_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile",
+            "make_variables": {
+                "PROFILE": "balanced"
+            },
+            "targets": [
+                "snes"
+            ],
+            "candidate_only": True,
+            "feature_limits": "Balanced compile profile is an independent core ABI candidate, not a qualified mode",
+            "unavailable_requirements": [
+                "Verify sample timing, enhancement chips and relative stability to accuracy profile"
+            ]
+        },
+        "bsnes_mercury_performance": {
+            "repository": "https://github.com/libretro/bsnes-mercury.git",
+            "revision": "79d7f9de218b6ffa65a80bbdc5828532bc239232",
+            "artifact": "bsnes_mercury_performance_libretro.so",
+            "license": "LICENSE",
+            "makefile": "Makefile",
+            "make_variables": {
+                "PROFILE": "performance"
+            },
+            "targets": [
+                "snes"
+            ],
+            "candidate_only": True,
+            "feature_limits": "Performance profile differs from accuracy and balanced; replay determinism is not assumed",
+            "unavailable_requirements": [
+                "Validate accepted speed/accuracy envelope and optimization determinism"
+            ]
+        },
+        "mame2003": {
+            "repository": "https://github.com/libretro/mame2003-libretro.git",
+            "revision": "b9ac708f922386a0ae1f2379dbb31b60d7ec7b25",
+            "artifact": "mame2003_libretro.so",
+            "license": "LICENSE.md",
+            "makefile": "Makefile",
+            "targets": [
+                "neo_geo"
+            ],
+            "candidate_only": True,
+            "firmware": [
+                "neogeo.zip"
+            ],
+            "license_review": "Classic MAME 0.78 noncommercial source restrictions; not approved for commercial distribution",
+            "feature_limits": "Neo Geo ROM-set profile only; generic 2003 arcade hardware is not automatically asserted",
+            "unavailable_requirements": [
+                "Rights-cleared matching Neo Geo BIOS and user ROM set",
+                "Match exact MAME 2003 ROM revisions and validate frames/input/driver flags"
+            ]
+        },
+        "mame2016": {
+            "repository": "https://github.com/libretro/mame2016-libretro.git",
+            "revision": "ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a",
+            "artifact": "mame_libretro.so",
+            "license": "LICENSE.md",
+            "makefile": "Makefile.libretro",
+            "targets": [
+                "neo_geo",
+                "fairchild_channel_f",
+                "rca_studio_ii",
+                "bally_astrocade",
+                "apple_ii",
+                "apple_iigs",
+                "bbc_micro",
+                "acorn_electron",
+                "trs80_model_i",
+                "ti_99_4a",
+                "oric_atmos",
+                "fm_towns",
+                "philips_cdi"
+            ],
+            "candidate_only": True,
+            "license_review": "MAME 0.172+ GPLv2-or-later aggregate; check per-driver licenses, redistribution and MAME source requirements",
+            "feature_limits": "Provisional all-machine source build; each driver/BIOS/region/software-list requires independent capability proof",
+            "unavailable_requirements": [
+                "Large upstream MAME build and potentially hundreds of host build dependencies",
+                "Qualify every mapped system independently; no auto platform support",
+                "Rights-cleared per-machine firmware, software list and device controllers"
+            ]
+        },
+        "fbalpha2012_neogeo": {
+            "repository": "https://github.com/libretro/fbalpha2012_neogeo.git",
+            "revision": "e092097037d494c50d17c5144a2758d68538061b",
+            "artifact": "fbalpha2012_neogeo_libretro.so",
+            "license": "src/license.txt",
+            "makefile": "makefile.libretro",
+            "targets": [
+                "neo_geo"
+            ],
+            "candidate_only": True,
+            "firmware": [
+                "neogeo.zip"
+            ],
+            "license_review": "FB Alpha legacy license restricts selling or profit; source and game ROM rights must be independently reviewed",
+            "feature_limits": "Neo Geo dedicated historical FBA core, not all arcade boards",
+            "unavailable_requirements": [
+                "Operator lawful BIOS and exact ROM-set revision",
+                "Classic FBA noncommercial licensing policy and controller compatibility"
+            ]
+        },
+        "dosbox_core": {
+            "repository": "https://github.com/libretro/dosbox-core.git",
+            "revision": "d38fcb5013e4dca8d119a9786279cf41465757f2",
+            "artifact": "libretro/dosbox_core_libretro.so",
+            "license": "COPYING",
+            "build_directory": "libretro",
+            "makefile": "Makefile.libretro",
+            "make_variables": {
+                "WITH_ALSA_MIDI": "0",
+                "WITH_VOODOO": "0"
+            },
+            "targets": [
+                "dos_8086",
+                "dos_vga",
+                "dos_cga",
+                "dos_ega",
+                "dos_vesa",
+                "windows_31"
+            ],
+            "candidate_only": True,
+            "feature_limits": "DOS machine profiles only; neither Windows 95 nor Win98 compatibility claimed; native file/run semantics require specialized controlled admission",
+            "unavailable_requirements": [
+                "Build-time SDL, codec and graphics dependencies must be locally supplied or explicitly qualified",
+                "Virtual DOS drive and keyboard/mouse controller qualification required"
+            ]
+        }
+    }
+)
+
 def _environment(*, network: bool = False):
     # No inherited provider/Mongo credentials, user git configuration, dynamic
     # loader overrides, compiler injection flags or credential helpers.

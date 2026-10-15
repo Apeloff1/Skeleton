@@ -369,6 +369,14 @@ _CORE_TARGET_GROUPS = {
     "mame2003_plus": ("neo_geo",),
     "genesis_plus_gx_wide": ("genesis",),
     "mesen_s": ("snes",),
+    "bnes": ("nes",),
+    "bsnes_mercury_accuracy": ("snes",),
+    "bsnes_mercury_balanced": ("snes",),
+    "bsnes_mercury_performance": ("snes",),
+    "mame2003": ("neo_geo",),
+    "mame2016": ("neo_geo", "fairchild_channel_f", "rca_studio_ii", "bally_astrocade", "apple_ii", "apple_iigs", "bbc_micro", "acorn_electron", "trs80_model_i", "ti_99_4a", "oric_atmos", "fm_towns", "philips_cdi"),
+    "fbalpha2012_neogeo": ("neo_geo",),
+    "dosbox_core": ("dos_8086", "dos_vga", "dos_cga", "dos_ega", "dos_vesa", "windows_31"),
     "mame": (
         "fairchild_channel_f",
         "rca_studio_ii",
@@ -442,6 +450,14 @@ _CORE_CONTENT_EXTENSIONS = {
     "hatari": "st|msa|stx|dim|ipf|m3u",
     "swanstation": "cue|bin|img|chd|pbp|m3u|iso",
     "mupen64plus_next": "n64|v64|z64|bin",
+    "bnes": "nes|unf|unif",
+    "bsnes_mercury_accuracy": "sfc|smc|fig|swc",
+    "bsnes_mercury_balanced": "sfc|smc|fig|swc",
+    "bsnes_mercury_performance": "sfc|smc|fig|swc",
+    "mame2003": "zip",
+    "mame2016": "zip",
+    "fbalpha2012_neogeo": "zip",
+    "dosbox_core": "exe|com|bat|conf|img|iso|cue|ima",
     "snes9x2002": "sfc|smc|fig|swc",
     "smsplus_gx": "sms|gg|sg|bin|rom",
     "tgbdual": "gb|gbc",
@@ -1396,7 +1412,7 @@ def load_game_content_for_core(
     source admission does not infer game compatibility or execute archived code.
     """
     (registry or GameEmulatorRegistry.from_environment()).revalidate(core)
-    if core.core_id not in {"dosbox_pure", "fbneo", "mame2003_plus"}:
+    if core.core_id not in {"dosbox_pure", "fbneo", "mame2003_plus", "mame2003", "mame2016", "fbalpha2012_neogeo"}:
         return load_game_content(
             data, filename, entrypoint=entrypoint, expected_source_digest=expected_source_digest
         )
