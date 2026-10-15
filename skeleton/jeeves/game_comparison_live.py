@@ -46,9 +46,29 @@ def _preview(env: Any) -> dict[str, Any]:
     uri = preview.get("data_uri") if isinstance(preview, dict) else None
     if not isinstance(uri, str) or not uri.startswith("data:image/png;base64,") or len(uri) > MAX_IMAGE_URI:
         uri = None
+    audio=preview.get("audio") if isinstance(preview,dict) else None
+    pcm=None
+    if isinstance(audio,dict):
+        sample=audio.get("samples_base64")
+        frames=audio.get("sample_frames")
+        rate=audio.get("sample_rate")
+        channels=audio.get("channels")
+        if (type(sample) is str and len(sample)<=100000
+            and type(frames) is int and 0<=frames<=16384
+            and type(rate) in (int,float) and 8000<=rate<=384000
+            and channels==2):
+            pcm={
+                "format":"s16le_stereo","sample_frames":frames,
+                "sample_rate":rate,"samples_base64":sample,
+                "sample_sha256":audio.get("sample_digest"),
+                "source_native_pcm_sha256":audio.get("source_digest"),
+                "sample_duration_seconds":round(frames/rate,4),
+                "actual_native_audio_not_original_music":True,
+            }
     return {
         "image_data_uri": uri,
         "image_unavailable": uri is None,
+        "recent_native_pcm_preview":pcm,
         "frame_sha256": frame["pixel_sha256"],
         "audio_sha256": frame["audio_sha256"],
         "audio_frames": frame["audio_frames"],

@@ -223,6 +223,32 @@ class NativeLiveComparisonContracts(unittest.TestCase):
         with self.assertRaises(LiveComparisonError):
             LiveComparison(fixture(),batch_index=0,game_ids=["first","first"])
 
+    def test_native_pcm_excerpt_bounded_and_visible_below_controller(self):
+        import base64
+        from skeleton.jeeves.game_comparison_live import _preview
+        session=self._session()
+        lane=session._lanes["first"]
+        pcm=bytes([0,1,2,3])*32
+        def generated_native_audio():
+            return {
+                "data_uri":"data:image/png;base64,iVBORw0KGgo=",
+                "audio":{
+                    "samples_base64":base64.b64encode(pcm).decode(),
+                    "sample_frames":32,"sample_rate":16000,"channels":2,
+                    "sample_digest":"a"*64,"source_digest":"b"*64,
+                },
+            }
+        lane.env.preview=generated_native_audio
+        data=_preview(lane.env)
+        excerpt=data["recent_native_pcm_preview"]
+        self.assertEqual(excerpt["sample_frames"],32)
+        self.assertEqual(excerpt["sample_rate"],16000)
+        self.assertTrue(excerpt["actual_native_audio_not_original_music"])
+        page=render_live_comparison_page("a"*64,"b"*32)
+        self.assertIn("Listen to bounded native PCM",page)
+        self.assertLess(page.index("root.append(deckFor(id));"),
+                        page.index("root.append(nativeAudioMonitor(frame));"))
+
     def test_browser_uses_below_screen_controllers(self):
         page=render_live_comparison_page("a"*64,"b"*32)
         self.assertIn("root.append(stage);",page)

@@ -902,6 +902,15 @@
       "safety": "No ROM download, no core execution, no production model training, no unsupported physical hardware accuracy claim",
       "qualification_tests": "tests/test_game_emulator_169_gap_matrix.py added; not executed during source editing",
       "executed_against_users_local_core_registry": false
+    },
+    "live_pcm_audition": {
+      "owner": "skeleton/jeeves/game_comparison_live.py and game_comparison_live_viewer.py",
+      "feature": "User clicks a manual Listen to bounded native PCM control to hear the most recent <=16384 actual emulator stereo s16le frames as a temporary WAV Blob, with controllers still bolted immediately under game screen",
+      "transport": "Native host actual preview audio PCM is returned with sample rate, frame length, SHA receipts and explicit no-original-music-generation indicator; 100KB base64 cap and 5MB response cap",
+      "browser_safety": "No autoplay, no external URL, local blob audio only, restrictive media-src blob: CSP, temporary blob URLs revoked on view refresh",
+      "no_transcription_or_neural_music_learning_claim": true,
+      "tests_added": "tests/test_game_comparison_live.py bounded synthetic native PCM excerpt and under-screen ordering fixture",
+      "native_real_game_audio_tested": false
     }
   }
 }

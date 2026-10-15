@@ -199,6 +199,45 @@ function graphFor(lane){
   " · chain "+r.receipt_sha256?.slice(0,15)))
  });details.append(table);container.append(details);return container
 }
+const activeAudioUrls=[];
+function nativeAudioMonitor(frame){
+ const audio=frame?.recent_native_pcm_preview;
+ const region=txt("div","","inline");
+ if(!audio||!audio.samples_base64||!audio.sample_frames){
+  region.append(txt("small","Native PCM excerpt unavailable for this frame."));
+  return region
+ }
+ const button=txt("button","Listen to bounded native PCM");
+ button.type="button";
+ const description=txt("small",audio.sample_frames+" frames @ "+audio.sample_rate+
+   " Hz · "+audio.sample_duration_seconds+" s · captured native game audio");
+ const player=document.createElement("audio");player.controls=true;player.preload="none";
+ player.setAttribute("aria-label","Actual native audio excerpt, manual playback only");
+ button.onclick=()=>{
+  try{
+   const binary=atob(audio.samples_base64),length=binary.length;
+   if(length!==audio.sample_frames*4||length>65536)throw Error("PCM length mismatch");
+   const data=new ArrayBuffer(length+44),view=new DataView(data);
+   function tag(offset,str){for(let i=0;i<str.length;i++)view.setUint8(offset+i,str.charCodeAt(i))}
+   const rate=Number(audio.sample_rate);
+   if(!Number.isFinite(rate)||rate<8000||rate>384000)throw Error("Invalid PCM sample rate");
+   tag(0,"RIFF");view.setUint32(4,length+36,true);
+   tag(8,"WAVE");tag(12,"fmt ");view.setUint32(16,16,true);
+   view.setUint16(20,1,true);view.setUint16(22,2,true);
+   view.setUint32(24,rate,true);view.setUint32(28,rate*4,true);
+   view.setUint16(32,4,true);view.setUint16(34,16,true);
+   tag(36,"data");view.setUint32(40,length,true);
+   const output=new Uint8Array(data,44);
+   for(let i=0;i<length;i++)output[i]=binary.charCodeAt(i);
+   const url=URL.createObjectURL(new Blob([data],{type:"audio/wav"}));
+   activeAudioUrls.push(url);
+   player.src=url;player.load();
+   button.disabled=true;description.textContent+=" · sample loaded locally"
+  }catch(error){description.textContent="Native PCM playback rejected: "+error.message}
+ };
+ region.append(button,player,description);
+ return region
+}
 function panel(side){
  const root=$(side),id=selected[side],lane=current.lanes[id];
  root.replaceChildren();
@@ -216,6 +255,7 @@ function panel(side){
  }else stage.append(txt("p",lane.status==="running"?"Actual frame exceeds bounded preview limit":lane.status,"subtle"));
  root.append(stage);
  root.append(deckFor(id));
+ root.append(nativeAudioMonitor(frame));
  const actions=txt("div","","inline"),doStep=txt("button","Advance native frame"),doReset=txt("button","Reset this emulator");
  doStep.disabled=lane.status!=="running"||lane.lifetime_steps>=lane.max_lifetime_steps;doReset.disabled=lane.status==="native_execution_failed"||lane.reset_count>=4;
  doStep.onclick=()=>step([id]);doReset.onclick=()=>resetGame(id);
@@ -226,7 +266,11 @@ function panel(side){
     " · native evidence root "+lane.latest_event_chain_sha256,"stats"));
  root.append(graphFor(lane))
 }
-function render(){if(!current)return;panel("left");panel("right")}
+function render(){
+ if(!current)return;
+ activeAudioUrls.splice(0).forEach(url=>URL.revokeObjectURL(url));
+ panel("left");panel("right")
+}
 $("all").onclick=()=>{if(!current)return;
  const repeat=Number($("repeat").value)||1;
  const ids=current.native_game_ids.filter(id=>current.lanes[id].status==="running"
