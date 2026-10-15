@@ -60,7 +60,7 @@ class ActualInterpreterMapperMatrixTests(unittest.TestCase):
             verified = _verify_mapper_bus(Path(temp))
             self.assertTrue(verified["accepted"])
             self.assertEqual(verified["real_interpreter_mapper_types"][-1], "mbc5")
-        self.assertEqual(verified["verified_cartridge_geometry_profiles"], 8)
+            self.assertEqual(verified["verified_cartridge_geometry_profiles"], 8)
             report["mapper_results"][1]["verified_register_and_memory_cases"].pop()
             report["mapper_results"][1]["real_source_bus_checks"] -= 1
             report["mapper_results"][1]["receipt_digest"] = _sha(_canonical({
