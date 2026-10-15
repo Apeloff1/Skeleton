@@ -461,6 +461,12 @@ async def artifact_playback(scope, project_id, artifact_id):
         "execution_verified": False,
         "learning_reward_scope": "Measured visual exploration; game score, health, mastery and success are unavailable",
         "source_id": None,
+        "native_instrumentation": {
+            "available": False,
+            "fields": [],
+            "measurement_scope": "Opaque ROM visual exploration; game state semantics are unavailable",
+            "reason": "No exact authored native observation binding is available",
+        },
     }
     try:
         target, registry, core = _core_for_artifact(project, record, job)
@@ -496,6 +502,7 @@ async def artifact_playback(scope, project_id, artifact_id):
         }
     return {
         **base,
+        "native_instrumentation": _instrumentation_projection(_native_observation(record, job, core.core_id)),
         "target_id": target,
         "available": True,
         "readiness": {
@@ -505,6 +512,71 @@ async def artifact_playback(scope, project_id, artifact_id):
         "core": core.public_dict(),
         "source_id": source_id if source and source_id in project["source_ids"] else None,
     }
+
+
+def _native_observation(record, job, core_id):
+    """Derive RAM authority from issuer-frozen sources, never HTTP metadata."""
+    from skeleton.jeeves.game_console_editor import ConsoleEditorError, ConsoleProject
+
+    files = {}
+    for item in job["input"]["files"]:
+        if _digest(item["content"].encode()) != item["digest"] or item["path"] in files:
+            raise GameLearningError("build_source_corrupt", "Producer source identity differs.", 503)
+        files[item["path"]] = item["content"]
+    if "game/editor/console.json" not in files:
+        return None
+    try:
+        project = ConsoleProject.from_files(files, target_id=job["request"]["target_id"])
+        layout = project.native_observation_layout()
+    except ConsoleEditorError as exc:
+        if exc.code == "editor_native_observation_unbound":
+            return None
+        raise GameLearningError(
+            "native_layout_invalid", "Producer authoring layout is invalid.", 503
+        ) from exc
+    if core_id not in layout["core_ids"]:
+        return None
+    payload = {
+        "schema_version": "skeleton.console_build.native_observation.v1",
+        "layout": layout,
+        "artifact_digest": record["digest"],
+        "producer_job_id": job["job_id"],
+        "producer_input_digest": json_digest(job["input"]),
+    }
+    return {**payload, "descriptor_digest": json_digest(payload)}
+
+
+def _instrumentation_projection(descriptor):
+    if descriptor is None:
+        return {
+            "available": False,
+            "fields": [],
+            "measurement_scope": "Opaque ROM visual exploration; game state semantics are unavailable",
+            "reason": "The exact authored kernel/data binding or compatible core is unavailable",
+        }
+    layout = descriptor["layout"]
+    return {
+        "available": True,
+        "schema_version": descriptor["schema_version"],
+        "layout_digest": layout["layout_digest"],
+        "descriptor_digest": descriptor["descriptor_digest"],
+        "fields": list(layout["fields"]),
+        "core_ids": layout["core_ids"],
+        "measurement_scope": layout["measurement_scope"],
+        "reward_components": ["visual_change", "movement", "health_delta", "goal_reached"],
+        "game_success_available": True,
+    }
+
+
+async def artifact_native_observation(scope, source, *, dragon_guarded=False):
+    artifact_source_projection(scope, source)
+    record, job = await _completed_artifact(
+        scope,
+        source["project_id"],
+        source["artifact_manifest"]["artifact_id"],
+        dragon_guarded=dragon_guarded,
+    )
+    return _native_observation(record, job, source["artifact_manifest"]["core_id"])
 
 
 async def assert_artifact_source(scope, source, *, dragon_guarded=False):
@@ -760,3 +832,20 @@ async def start_artifact_training(scope, project_id, artifact_id, body):
         scope, project_id, "train", {**body, "source_id": admitted["source"]["source_id"]}
     )
     return {"job": job, "source": admitted["source"], "playback": admitted["playback"]}
+
+
+async def start_artifact_campaign(scope, project_id, artifact_id, body):
+    """Bind a campaign to one exact owned compiler output, through its source authority."""
+    admitted = await admit_artifact_source(
+        scope,
+        project_id,
+        artifact_id,
+        {
+            "expected_version": body["expected_version"],
+            "idempotency_key": "campaign:" + json_digest(body["idempotency_key"]),
+        },
+    )
+    from core.game_studio_learning import create
+
+    campaign = await create(scope, project_id, {**body, "source_id": admitted["source"]["source_id"]})
+    return {"campaign": campaign, "source": admitted["source"], "playback": admitted["playback"]}

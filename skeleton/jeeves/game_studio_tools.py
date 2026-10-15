@@ -30,6 +30,8 @@ READ_OPERATIONS = (
     "campaign.rounds",
     "lessons.search",
     "artifact.inspect",
+    "campaign.champion.handoff",
+    "campaign.attempts",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -44,6 +46,13 @@ WRITE_OPERATIONS = (
     "artifact.admit",
     "artifact.train",
     "artifact.play",
+    "artifact.campaign",
+    "job.resume",
+    "job.cancel",
+    "play.resume",
+    "play.stop",
+    "campaign.champion.adopt",
+    "campaign.authorization",
     "play.start",
     "play.input",
     "play.control",

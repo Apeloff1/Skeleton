@@ -37,13 +37,13 @@
   "production_promotion_authorized": false,
   "masterplan_completion_authorized": false,
   "runtime_api": {
-    "config": "CampaignConfig(...,evaluation_seeds=3,curriculum=\"mixed\",objective_weights=None,max_mean_step_ms=None,max_death_regression=0,max_worst_seed_regression=0)",
+    "config": "CampaignConfig(...,proposal_width=2,exploration_strategy=\"least_visited\",n_step=4); prior evaluation/constraint fields preserved",
     "campaign": "StudioLearningCampaign(request,config,context,lineage,policy_snapshot=None,snapshot=None,lessons=(),proposal_priors=())",
     "execution": "run_slice(rounds,on_checkpoint(snapshot,round_report),authorize,cancel)",
-    "snapshot": "Strict skeleton.game.studio_campaign.v2; persistent bandit_state, bounded counterexamples, champion+policy and exact existing binding. No implicit v1 migration.",
+    "snapshot": "Strict skeleton.game.studio_campaign.v3; all prior bound state plus contiguous64-trial search_memory with actual measurements and receipt digests. No implicit v1/v2 migration.",
     "round": "Existing digest-bound roles plus objective_vector, constraints, measured performance, per-seed evaluations, bandit_observation and counterexample_summaries.",
     "proposal_prior": "make_proposal_prior(lesson,origin_context=...,destination_context=...); validate_proposal_prior(prior,destination_context=...)",
-    "catalog": "campaign_catalog(); StudioLearningCampaign.proposal_catalog() exposes only typed fields consumed by current request."
+    "catalog": "campaign_catalog() -> v3 objective/constraint/curriculum, composition width and measured-reward backup bounds; proposal_catalog exposes supported atoms/compositions only."
   },
   "round_semantics": [
     "Actual bounded tabular Q updates; exact-environment champion continuation forks measured parent state, while changed descriptors receive fresh tables. Frozen-policy evaluation transfers check exact action/bin/reward semantics.",
@@ -72,7 +72,11 @@
     "evaluation_seeds": 8,
     "counterexamples": 16,
     "counterexample_bytes": 524288,
-    "bandit_arms": 128
+    "bandit_arms": 128,
+    "search_memory": 64,
+    "search_memory_bytes": 524288,
+    "proposal_components": 4,
+    "n_step": 16
   },
   "dragon_visual_review": {
     "decoder": "existing bounded console_assets.decode_png",
@@ -193,6 +197,55 @@
       "Ruff",
       "Python syntax compilation"
     ],
-    "automated_tests_run": false
+    "automated_tests_run": false,
+    "durable_runtime_json": "At strict pure-runtime admission only, canonical workspace._stored_evidence losslessly roundtrips finite bounded JSON envelopes (8MiB) so BSON Int64 values retain integer values and exact JSON digests as plain Python ints. Normalize runtime request/config/context/lineage/policy/snapshot/lessons/proposal priors; never coerce Mongo dates, binary or unsupported values, and retain all current owner/source/teacher/code checks."
+  },
+  "next_runtime_extension": {
+    "snapshot_schema": "skeleton.game.studio_campaign.v3",
+    "authority": "Samepurecampaign+policyowners; no new store/runtime/provider",
+    "search_memory": "Atmost64digest-bound actual measured trials, deterministiccounterexample/constraint-aware proposalranking",
+    "compositional_proposals": "2..4supportedtyped componentmutations withvalidation andheldoutpairedchampiongate; no unmeasuredcreativequality",
+    "learner_extension": {
+      "exploration_strategy": [
+        "uniform",
+        "least_visited"
+      ],
+      "n_step": [
+        1,
+        16
+      ],
+      "update_accounting": "Observedactualrewards only; one committed numerical update peractualtransition, preservingepisode-atomic checkpoint counts"
+    },
+    "legacy": "No implicitsnapshotv2-to-v3 evidence migration; policy source/code/config identities explicit",
+    "automated_tests_run": false,
+    "config_fields": {
+      "proposal_width": {
+        "minimum": 1,
+        "maximum": 4,
+        "default": 2
+      },
+      "exploration_strategy": {
+        "values": [
+          "uniform",
+          "least_visited"
+        ],
+        "default": "least_visited"
+      },
+      "n_step": {
+        "minimum": 1,
+        "maximum": 16,
+        "default": 4
+      }
+    },
+    "search_receipts": "At most64 exact-context digest-bound measured trial receipts, bounded524288 bytes, committed and rolled back with the actual round.",
+    "learning_semantics": "Bounded delayed n-step targets from actual observed clipped rewards and measured bootstrap states; exactly one Q/action-visit update per actual transition. Uniform or least-visited action exploration never changes recorded environment rewards.",
+    "scope": "Existing campaign and GamePolicyLearner owners; no provider/service/genre/hardware authority or silent old-code numerical migration.",
+    "search_receipt_schema": "skeleton.game.studio_search_trial.v1",
+    "search_semantics": "Contiguous current-context measured receipt window binds round/candidate/parent-policy/change signatures, outcomes, actual diagnostics/failed constraints and actual learning recipe. Duplicate rejected source proposals are denied without relabelling old evidence.",
+    "ranking": "Deterministic UCB plus bounded priorities from observed deaths, binned-state coverage, zero rewards and eventless episodes, with explicit receipt refs. These are proposal heuristics, not measured causal effects or subjective quality.",
+    "compositions": "Two to four available typed atomic changes from navigation/survival/economy/interaction/editor-scene/exploration plans. Each constituent validates through current source owners; complete candidate runs ordinary/adversarial paired gates. Opaque native content only receives learning-configuration compositions.",
+    "action_exploration": "Least numerical action-visit counts among epsilon candidates or equal-best learned scores; actor counts are isolated copied visit ledgers and never mutable shared Q.",
+    "accounting": "Delayed online backups flush at episode end and verified/offline paths use the same measured reward windows; one numerical update/action visit per actual transition. Pending delayed transitions count against admitted update budget before execution.",
+    "limitations": "Observed zero rewards and low binned-state coverage do not identify an unknown commercial game objective. No guaranteed improvement, isolated mechanic causal proof, all-game capability, subjective art critic or lifetime-cap override."
   }
 }

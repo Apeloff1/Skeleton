@@ -6,16 +6,15 @@ installer mutation occurs: can this checkout support the assembled app?
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import platform
-from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
 
 from skeleton.app.assembly import checks_ok, find_repo_root, preflight
-
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -84,7 +83,9 @@ def _command_check(
             remediation=remediation,
         )
 
-    output = (completed.stdout or completed.stderr or "").strip().splitlines()
+    # Failure diagnostics from Docker contexts or package indexes can include
+    # authenticated URLs. Keep only successful version output in the receipt.
+    output = (completed.stdout or "").strip().splitlines() if completed.returncode == 0 else []
     suffix = f": {output[0][:160]}" if output else ""
     return PreloadCheck(
         code=code,
@@ -174,6 +175,19 @@ def inspect_host(
                 label="Docker Compose",
                 remediation="Install or enable the Docker Compose v2 plugin.",
                 runner=runner,
+            )
+        )
+        checks.append(
+            _command_check(
+                [docker, "info", "--format", "{{.ServerVersion}}"],
+                code="host:docker-daemon",
+                label="Docker daemon",
+                remediation=(
+                    "Start Docker Desktop or Docker Engine and allow the current user access "
+                    "to its socket. Check the selected Docker context; no service was started."
+                ),
+                runner=runner,
+                timeout=10.0,
             )
         )
 

@@ -112,9 +112,50 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
         raise TypeError("A typed studio command is required")
     scope = workspace._scope(scope["tenant_id"], scope["owner_id"])
     project = await workspace._project(command.project_id, scope)
-    binding = await workspace._input(scope, project, require_execution=False)
-    await workspace._authority(scope, binding)
     operation, payload = command.operation, dict(command.payload)
+    # Stopping owned issued work remains possible after its source is withdrawn.
+    if operation not in {"job.cancel", "play.stop", "campaign.pause", "campaign.cancel"}:
+        binding = await workspace._input(scope, project, require_execution=False)
+        await workspace._authority(scope, binding)
+    if operation in {"job.resume", "job.cancel"}:
+        identifier = _id(payload, "job_id")
+        _only(payload, ("job_id",), required=("job_id",))
+        issued = await workspace.jobs.find_one({"_id": identifier, **scope, "project_id": command.project_id})
+        if issued is None or identifier not in project["job_ids"]:
+            raise GameLearningError(
+                "studio_job_absent", "This issued job does not belong to this project.", 404
+            )
+        return await (
+            workspace.resume_job(scope, identifier)
+            if operation == "job.resume"
+            else workspace.cancel_job(scope, identifier)
+        )
+    if operation in {"play.resume", "play.stop"}:
+        from routes.game_learning import PlayControl, _plays
+
+        identifier = _id(payload, "play_id")
+        _only(
+            payload, ("play_id", "expected_control_version"), required=("play_id", "expected_control_version")
+        )
+        owner = _plays()
+        issued = await owner.plays.find_one({"_id": identifier, **scope, "project_id": command.project_id})
+        if issued is None or identifier not in project.get("play_ids", []):
+            raise GameLearningError(
+                "studio_play_absent", "This issued play does not belong to this project.", 404
+            )
+        return _mutation_receipt(
+            await owner.control(
+                scope,
+                identifier,
+                _model(
+                    PlayControl,
+                    {
+                        "expected_control_version": payload["expected_control_version"],
+                        "action": "resume" if operation == "play.resume" else "stop",
+                    },
+                ),
+            )
+        )
     if operation == "catalog":
         offset, limit = _page(payload)
         from core.game_console_studio import profiles
@@ -326,7 +367,7 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
         )
     if operation.startswith("artifact."):
         from core import game_console_build as builds
-        from routes.game_console_build import ArtifactAdmission, ArtifactPlay, ArtifactTrain
+        from routes.game_console_build import ArtifactAdmission, ArtifactPlay, ArtifactTrain, ArtifactCampaign
 
         artifact_id = _id(payload, "artifact_id")
         body = {key: value for key, value in payload.items() if key != "artifact_id"}
@@ -337,6 +378,7 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
             "artifact.admit": (ArtifactAdmission, builds.admit_artifact_source),
             "artifact.train": (ArtifactTrain, builds.start_artifact_training),
             "artifact.play": (ArtifactPlay, builds.start_artifact_play),
+            "artifact.campaign": (ArtifactCampaign, builds.start_artifact_campaign),
         }[operation]
         result = await handler(scope, command.project_id, artifact_id, _model(model, body))
         if isinstance(result, dict) and "play" in result:
@@ -384,6 +426,50 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
         return await workspace.start_job(
             scope, command.project_id, "successor_compare", {**body, "candidate_id": identifier}
         )
+    if operation in {
+        "campaign.champion.handoff",
+        "campaign.champion.adopt",
+        "campaign.attempts",
+        "campaign.authorization",
+    }:
+        from core import game_studio_learning as learning
+        from routes.game_studio_learning import CampaignAuthorization, ChampionAdopt
+
+        identifier = _id(payload, "campaign_id")
+        issued = await learning.campaigns.find_one(
+            {"_id": identifier, **scope, "project_id": command.project_id}
+        )
+        if issued is None:
+            raise GameLearningError(
+                "studio_campaign_absent", "This campaign does not belong to this project.", 404
+            )
+        body = {key: value for key, value in payload.items() if key != "campaign_id"}
+        if operation == "campaign.champion.handoff":
+            _only(body, ())
+            return await learning.champion(scope, identifier)
+        if operation == "campaign.attempts":
+            _only(body, ("after_epoch", "limit"))
+            after, limit = body.get("after_epoch", 0), body.get("limit", 16)
+            if (
+                type(after) is not int
+                or not 0 <= after <= 100000
+                or type(limit) is not int
+                or not 1 <= limit <= 32
+            ):
+                raise GameLearningError(
+                    "studio_attempt_page_invalid", "Attempt pages are bounded to32 actual records.", 422
+                )
+            return await learning.attempts(scope, identifier, after, limit)
+        if operation == "campaign.champion.adopt":
+            result = await learning.adopt_champion(scope, identifier, _model(ChampionAdopt, body))
+            return (
+                {**result, "project": _project_summary(result["project"])} if "project" in result else result
+            )
+        return {
+            "campaign": await learning.authorize_campaign(
+                scope, identifier, _model(CampaignAuthorization, body)
+            )
+        }
     if operation.startswith("campaign.") or operation == "lessons.search":
         from core import game_studio_learning as learning
 
@@ -401,10 +487,21 @@ def studio_agent_user_id(scope: Mapping[str, str]) -> str:
 
 def studio_application_schemas() -> dict[str, Any]:
     """Discover exact application request shapes without delegating authority."""
-    from routes.game_console_build import ConsoleBuildBody, ArtifactAdmission, ArtifactPlay, ArtifactTrain
+    from routes.game_console_build import (
+        ConsoleBuildBody,
+        ArtifactAdmission,
+        ArtifactPlay,
+        ArtifactTrain,
+        ArtifactCampaign,
+    )
     from routes.game_console_studio import EditConsoleProject
     from routes.game_learning import SimulationRequest, TrainRequest
-    from routes.game_studio_learning import CampaignCreate, CampaignControl
+    from routes.game_studio_learning import (
+        CampaignCreate,
+        CampaignControl,
+        CampaignAuthorization,
+        ChampionAdopt,
+    )
     from routes.game_studio_review import StudioReviewBody
     from routes.game_successor import CompareRequest, DesktopRequest, SynthesisRequest, WorldRequest
 
@@ -422,15 +519,46 @@ def studio_application_schemas() -> dict[str, Any]:
         "artifact.admit": ArtifactAdmission,
         "artifact.play": ArtifactPlay,
         "artifact.train": ArtifactTrain,
+        "artifact.campaign": ArtifactCampaign,
+        "campaign.champion.adopt": ChampionAdopt,
+        "campaign.authorization": CampaignAuthorization,
     }
     shapes = {name: model.model_json_schema() for name, model in models.items()}
-    for name in ("artifact.admit", "artifact.play", "artifact.train"):
+    for name in ("artifact.admit", "artifact.play", "artifact.train", "artifact.campaign"):
         shapes[name]["properties"]["artifact_id"] = {"type": "string", "maxLength": 128}
         shapes[name].setdefault("required", []).append("artifact_id")
     shapes["artifact.inspect"] = {
         "required": ["artifact_id"],
         "properties": {"artifact_id": {"type": "string", "maxLength": 128}},
     }
+    for name in ("campaign.champion.adopt", "campaign.authorization"):
+        shapes[name]["properties"]["campaign_id"] = {"type": "string", "maxLength": 128}
+        shapes[name].setdefault("required", []).append("campaign_id")
+    shapes["campaign.champion.handoff"] = {
+        "required": ["campaign_id"],
+        "properties": {"campaign_id": {"type": "string", "maxLength": 128}},
+    }
+    shapes["campaign.attempts"] = {
+        "required": ["campaign_id"],
+        "properties": {
+            "campaign_id": {"type": "string", "maxLength": 128},
+            "after_epoch": {"type": "integer", "minimum": 0, "maximum": 100000},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 32},
+        },
+    }
+    for name in ("job.resume", "job.cancel"):
+        shapes[name] = {
+            "required": ["job_id"],
+            "properties": {"job_id": {"type": "string", "maxLength": 128}},
+        }
+    for name in ("play.resume", "play.stop"):
+        shapes[name] = {
+            "required": ["play_id", "expected_control_version"],
+            "properties": {
+                "play_id": {"type": "string", "maxLength": 128},
+                "expected_control_version": {"type": "integer", "minimum": 1},
+            },
+        }
     # This discovery projection describes real owner operations; the editor
     # still validates all nested hardware/scene invariants before committing.
     fields = {

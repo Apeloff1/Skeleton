@@ -151,6 +151,10 @@ export default function ProductShellRoute() {
           </View>
         </TouchableOpacity>
 
+        <View style={styles.metricsRow}>
+          {[['Setup & readiness', '/setup'], ['AI chat', '/jeeves-chat'], ['Web capture', '/crawler']].map(([title, href]) => <TouchableOpacity key={href} accessibilityRole="button" onPress={() => router.push(href as never)} style={styles.healthRefresh}><Text style={styles.healthRefreshText}>{title} →</Text></TouchableOpacity>)}
+        </View>
+
         <View style={styles.healthPanel}>
           <View style={styles.healthHeader}>
             <View style={styles.healthCopy}>

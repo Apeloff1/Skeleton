@@ -80,7 +80,19 @@
         "backend/core/ai_provider.py",
         "skeleton/jeeves/providers.py"
       ],
-      "engine_docker_materialization": "Dockerfile"
+      "engine_docker_materialization": "Dockerfile",
+      "docker_materialization_bundles": {
+        "Dockerfile": {
+          "context_ignore": "Dockerfile.dockerignore",
+          "layout": "engine_context_copy",
+          "rule": "Deny-all Docker context with explicit mandatory file and parent exceptions; one owned root source COPY preserves canonical contract paths."
+        },
+        "backend/Dockerfile": {
+          "context_ignore": "backend/Dockerfile.dockerignore",
+          "layout": "backend_runtime_source",
+          "rule": "Same deny-all context; named runtime-source stage flattens backend and moves the canonical skeleton, machine and docs directories into /runtime before owned final runtime COPY."
+        }
+      }
     }
   },
   "quality_attributes": {
@@ -637,7 +649,9 @@
       "evidence": [
         "skeleton/retrieval",
         "backend/services/rag_service.py",
-        "backend/services/agent_knowledge_rag.py"
+        "backend/services/agent_knowledge_rag.py",
+        "skeleton/ai/webcrawler",
+        "machine/ai_dragon_crawler_operations.json"
       ],
       "required_interfaces": [
         "document",
@@ -839,7 +853,10 @@
         "backend/server.py",
         "backend/routes",
         "backend/core/product_control_runtime.py",
-        "machine/ai_game_learning.json"
+        "machine/ai_game_learning.json",
+        "machine/ai_dragon_crawler_app.json",
+        "backend/routes/dragon_academy.py",
+        "backend/core/dragon_crawler.py"
       ],
       "required_interfaces": [
         "versioned API",
@@ -940,7 +957,8 @@
         "frontend/app/product.tsx",
         "frontend/src/product",
         "frontend/utils/apiBase.ts",
-        "machine/ai_game_learning.json"
+        "machine/ai_game_learning.json",
+        "machine/ai_first_install_product.json"
       ],
       "required_interfaces": [
         "canonical endpoint resolver",
@@ -1383,7 +1401,9 @@
         "docker-compose.yml",
         "Dockerfile",
         "backend/Dockerfile",
-        "frontend/Dockerfile"
+        "frontend/Dockerfile",
+        "skeleton/app",
+        "machine/ai_first_install.json"
       ],
       "required_interfaces": [
         "build artifact",
@@ -9786,5 +9806,39 @@
       "scope": "Console editing/emulation/build augmentation and one/three-source original successor desktop export",
       "new_service_or_provider": false
     }
+  },
+  "first_install_continuation_2026_10_15": {
+    "status": "implementation_candidate",
+    "scope": "Finish first-install platform launch, canonical AI chat/tool/model handoff and scoped bounded Dragon crawler operation within existing owners; no new runtime root, model boundary or physical database.",
+    "contracts": [
+      "machine/ai_first_install.json",
+      "machine/ai_first_install_product.json",
+      "machine/ai_dragon_crawler_operations.json",
+      "machine/ai_dragon_crawler_app.json"
+    ],
+    "owners": {
+      "installer": "skeleton/app",
+      "crawler": "skeleton/ai/webcrawler",
+      "crawler_application": "backend/core/dragon_crawler.py",
+      "crawler_api": "backend/routes/dragon_academy.py",
+      "chat_application": "backend/routes/ai.py",
+      "chat_lifecycle": "backend/core/chat_turn_lifecycle.py",
+      "model_execution": "skeleton/api/engine_runtime.py",
+      "model_credentials": "skeleton/provider_runtime.py",
+      "product": "frontend"
+    },
+    "authority": "Existing application-api/retrieval/orchestration/tool-runtime/model-provider/product-experience/deployment-release planes retain authority; source provenance and exact user/tenant scope precede execution/knowledge publication.",
+    "data": "Existing CORE_DB Mongo owns scoped crawl requests, commands, leases and bounded core snapshots; legacy reviewed Dragon Academy SQLite practice remains separate and cannot mint reviewed knowledge from raw crawling.",
+    "validation": "Source validators, compilation/lint, actual installs/services/model/crawl workflows. User explicitly forbids automated tests; no closure/promotion/enterprise grade is inferred.",
+    "automated_tests_authorized": false,
+    "production_promotion_authorized": false,
+    "masterplan_completion_authorized": false,
+    "runtime_selection_contract": "machine/ai_chat_runtime_selection.json",
+    "local_model_provisioning_contract": "machine/ai_local_model_provisioning.json",
+    "session_evidence": "machine/ai_first_install_session_evidence_2026-10-15.json",
+    "operator_guide": "docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md",
+    "provider_materialization_validation": "scripts/check_provider_bootstrap.py accepts existing literal-file COPY or only the two explicitly declared source-bundle layouts; checks deny-all context, explicit required paths/parents and subsequent exclusions before accepting bundled materialization. Required documents and provider isolation unchanged.",
+    "existing_curiosity_state": "Existing backend/core/curiosity_service.py filesystem protocol is explicitly configured via existing CURIOSITY_DATA_ROOT under backend_data; declared in state_topology before Compose startup fix. No new service/store/owner or restore qualification.",
+    "current_main_integration": "Integrate the first-install continuation against current main 020fa731fd3a295aa0fbc98f219a00503c788742, preserving existing main capabilities and historical request identities. Exact context-key/scoped-inventory compatibility is declared in machine/ai_chat_runtime_selection.json; no new service/store/provider owner."
   }
 }

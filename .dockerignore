@@ -48,6 +48,7 @@ backend/data/builds_vault
 backend/data/galaxy_vault
 backend/data/**/zips
 artifacts
+data/local-ai
 
 # Local editor/agent state
 .vscode

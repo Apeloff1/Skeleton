@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import json
-from pathlib import Path
+import os
 import subprocess
 import sys
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
 
 from skeleton.app.assembly import (
     checks_ok,
@@ -16,10 +17,10 @@ from skeleton.app.assembly import (
     find_repo_root,
     load_manifest,
     preflight,
+    runtime_manifest,
 )
 from skeleton.app.preloader import PreloadReport, inspect_host
 from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment
-
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -70,19 +71,19 @@ def _run(
             list(command),
             cwd=root,
             check=False,
-            capture_output=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             text=True,
             timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return InstallPhase(label, False, f"{label} failed: {type(exc).__name__}")
 
-    stdout = (completed.stdout or "").strip().splitlines()
-    stderr = (completed.stderr or "").strip().splitlines()
-    tail = stdout[-1] if stdout else (stderr[-1] if stderr else "")
     detail = f"{label} completed" if completed.returncode == 0 else f"{label} exited {completed.returncode}"
-    if tail:
-        detail += f": {tail[:240]}"
+    if completed.returncode and label == "python-install":
+        detail += "; use an activated Python 3.11+ virtual environment and install requirements.txt; inspect package-index access"
+    elif completed.returncode:
+        detail += "; run app doctor and inspect the named service with app logs; credentials are omitted from this receipt"
     return InstallPhase(label, completed.returncode == 0, detail)
 
 
@@ -118,6 +119,8 @@ def install_application(
     production: bool = False,
     hot: bool = False,
     rotate_secrets: bool = False,
+    admin_email: str | None = None,
+    admin_password_file: Path | None = None,
     bundled_runtime: bool = False,
     runner: Runner = subprocess.run,
 ) -> InstallReceipt:
@@ -142,8 +145,25 @@ def install_application(
     if not phases[-1].ok:
         return InstallReceipt(root=root, phases=tuple(phases))
 
-    setup = ensure_runtime_environment(root, rotate_secrets=rotate_secrets)
+    try:
+        setup = ensure_runtime_environment(
+            root,
+            rotate_secrets=rotate_secrets,
+            admin_email=admin_email,
+            admin_password_file=admin_password_file,
+        )
+    except (OSError, ValueError) as exc:
+        phases.append(
+            InstallPhase(
+                "setup-runtime",
+                False,
+                f"private runtime configuration could not be written: {type(exc).__name__}",
+            )
+        )
+        return InstallReceipt(root=root, phases=tuple(phases))
     phases.append(_setup_phase(setup))
+    for warning in setup.warnings:
+        phases.append(InstallPhase("configuration-note", True, warning, required=False))
 
     if install_python:
         python_phase = _run(
@@ -151,6 +171,7 @@ def install_application(
             root=root,
             runner=runner,
             label="python-install",
+            timeout=1200.0,
         )
         phases.append(python_phase)
         if not python_phase.ok:
@@ -186,6 +207,7 @@ def install_application(
     )
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
+    manifest = runtime_manifest(manifest, root=root)
 
     compose_validate = _run(
         compose_command("config", manifest=manifest),
@@ -211,15 +233,16 @@ def install_application(
             list(command),
             cwd=root,
             check=False,
-            capture_output=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             text=True,
-            env={**__import__("os").environ, **manifest.mode_env(mode)},
+            env={**os.environ, **manifest.mode_env(mode)},
+            timeout=1800.0,
         )
         ok = completed.returncode == 0
-        tail_lines = ((completed.stdout or "") + "\n" + (completed.stderr or "")).strip().splitlines()
         detail = "application services started" if ok else f"application start exited {completed.returncode}"
-        if tail_lines:
-            detail += f": {tail_lines[-1][:240]}"
+        if not ok:
+            detail += "; inspect app doctor and app logs <service>; no credentials are included"
         phases.append(InstallPhase("start", ok, detail))
     except (OSError, subprocess.SubprocessError) as exc:
         phases.append(InstallPhase("start", False, f"application start failed: {type(exc).__name__}"))
@@ -257,6 +280,12 @@ def configure_setup_parsers(subparsers: argparse._SubParsersAction) -> None:
 
     setup = subparsers.add_parser("setup", help="create or repair local runtime configuration")
     setup.add_argument("--rotate-secrets", action="store_true")
+    setup.add_argument("--admin-email", help="explicit optional operator bootstrap email")
+    setup.add_argument(
+        "--admin-password-file",
+        type=Path,
+        help="private file containing the chosen bootstrap password; no password in argv",
+    )
     setup.add_argument("--json", action="store_true", dest="as_json")
 
     install = subparsers.add_parser("install", help="run preloader, setup runtime and installer validation")
@@ -266,6 +295,12 @@ def configure_setup_parsers(subparsers: argparse._SubParsersAction) -> None:
     install.add_argument("--production", action="store_true", help="install/start using production image stages")
     install.add_argument("--hot", action="store_true", help="start with the hot-reload Compose overlay")
     install.add_argument("--rotate-secrets", action="store_true")
+    install.add_argument("--admin-email", help="explicit optional operator bootstrap email")
+    install.add_argument(
+        "--admin-password-file",
+        type=Path,
+        help="private file containing a strong operator bootstrap password",
+    )
     install.add_argument("--json", action="store_true", dest="as_json")
 
 
@@ -315,7 +350,25 @@ def run_setup_command(command: str, args: argparse.Namespace, root: Path | None 
     if command == "preload":
         return _print_preload(inspect_host(root), as_json=bool(args.as_json))
     if command == "setup":
-        result = ensure_runtime_environment(root, rotate_secrets=bool(args.rotate_secrets))
+        try:
+            result = ensure_runtime_environment(
+                root,
+                rotate_secrets=bool(args.rotate_secrets),
+                admin_email=getattr(args, "admin_email", None),
+                admin_password_file=getattr(args, "admin_password_file", None),
+            )
+        except (OSError, ValueError) as exc:
+            # Policy errors contain fixed remediation text, never file content.
+            message = (
+                str(exc)
+                if isinstance(exc, ValueError)
+                else "private configuration or password file could not be read/written; check paths and permissions"
+            )
+            if args.as_json:
+                print(json.dumps({"ok": False, "error": message}))
+            else:
+                print("setup blocked: " + message)
+            return 1
         return _print_setup(result, as_json=bool(args.as_json))
     if command == "install":
         receipt = install_application(
@@ -326,6 +379,8 @@ def run_setup_command(command: str, args: argparse.Namespace, root: Path | None 
             production=bool(args.production),
             hot=bool(args.hot),
             rotate_secrets=bool(args.rotate_secrets),
+            admin_email=getattr(args, "admin_email", None),
+            admin_password_file=getattr(args, "admin_password_file", None),
         )
         return _print_install(receipt, as_json=bool(args.as_json))
     raise ValueError(f"unsupported setup command: {command}")

@@ -85,7 +85,10 @@
     "studio_agent_product": "frontend/features/Jeeves/GameStudioAssistantPanel.tsx",
     "studio_agent_client": "frontend/src/product/gameStudioAgentClient.ts",
     "studio_recovery_scheduler": "backend/core/scheduler.py",
-    "studio_review_product": "frontend/features/Jeeves/GameStudioReviewPanel.tsx"
+    "studio_review_product": "frontend/features/Jeeves/GameStudioReviewPanel.tsx",
+    "studio_readiness_application": "backend/core/game_studio_health.py",
+    "studio_readiness_api": "backend/routes/game_studio_health.py",
+    "studio_readiness_product": "frontend/features/Jeeves/GameStudioReadinessPanel.tsx"
   },
   "dependencies": {
     "simulation": "Existing Jeeves legacy/3D/modern runtime families and explicitly registered existing ROM execution implementations only",
@@ -203,5 +206,14 @@
     "integration_target_utc": "2026-10-14T07:55:00Z",
     "automated_tests_authorized": false
   },
-  "advanced_work_report": "docs/plan/JEEVES_STUDIO_ADVANCED_2026-10-14.md"
+  "advanced_work_report": "docs/plan/JEEVES_STUDIO_ADVANCED_2026-10-14.md",
+  "continued_studio_pass_2": {
+    "started_utc": "2026-10-14T07:52:51Z",
+    "scope": "Actualstudioactivation, nativegraphport/nativeobservations, compositionallearner andscoped appassistant recovery",
+    "automated_tests_run": false,
+    "production_promotion": false,
+    "masterplan_closure": false,
+    "report": "docs/plan/JEEVES_STUDIO_RUNTIME_2026-10-14.md",
+    "evidence": "machine/ai_game_studio_session_evidence_2026-10-14.json#runtime_continuation"
+  }
 }

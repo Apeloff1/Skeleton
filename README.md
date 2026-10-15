@@ -9,21 +9,28 @@ combined namespace migrations and how to validate changes to them.
 
 ## Quick Start
 
-```bash
-# First-time host/runtime setup
-python -m skeleton app preload
-python -m skeleton app setup
-python -m skeleton app install
-# or, before installing the Python package: python scripts/install_app.py
+Install Python 3.11+ and Docker Desktop (or Docker Engine with Compose v2),
+then start Docker. Host Node and Yarn are only needed for host Expo development;
+the Compose frontend image supplies them.
 
-# Inspect canonical topology, then optionally probe live runtime health
+```bash
+# From a fresh clone, create an isolated Python environment:
+python3 -m venv .venv
+.venv/bin/python scripts/install_app.py --start
+# Windows PowerShell: .\.venv\Scripts\python.exe scripts/install_app.py --start
+
+# Open http://localhost:3000/product after service readiness succeeds.
+# Activate that Python environment for subsequent operator commands:
+# Linux/macOS: source .venv/bin/activate
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+python -m skeleton app doctor --live
 python -m skeleton app status
 python -m skeleton app status --live
 
 # Validate the repository-wide application assembly
 python -m skeleton app check
 
-# Build and start frontend + backend + Skeleton API + Mongo
+# Later launches retain the existing private .env and durable Docker volumes:
 python -m skeleton app up
 
 # Verify the assembled public surfaces
@@ -44,6 +51,17 @@ python -m skeleton dev health
 # Run tests
 python -m skeleton test
 ```
+
+The installer generates a private `.env` with stable Mongo, JWT and
+backend-to-engine credentials. Retain it across restarts. A fresh install starts
+in **local AI mode without weights**: service health does not imply AI
+availability. Configure a trained artifact or a real hosted-provider key using
+the [AI setup instructions](docs/APP_ASSEMBLY.md#configure-real-ai), then rerun
+`app doctor --live`. No model, crawl workload, emulator core or firmware is
+silently downloaded or approved.
+
+For the explicit model provisioning, activation and authenticated crawler
+workflow, see [first-install AI and crawler setup](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md).
 
 The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
 Canonical ownership, topology, change lanes, and migration boundaries are mapped in [`docs/ARCHITECTURE_MAP.md`](docs/ARCHITECTURE_MAP.md).

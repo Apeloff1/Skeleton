@@ -32,7 +32,7 @@ from .game_learning import (
 from .game_learning_parallel import GameEnvironmentRequest
 from .game_style_analysis import MECHANIC_CATALOG, canonical, digest
 
-CAMPAIGN_SCHEMA = "skeleton.game.studio_campaign.v2"
+CAMPAIGN_SCHEMA = "skeleton.game.studio_campaign.v3"
 ROUND_SCHEMA = "skeleton.game.studio_round.v1"
 LESSON_SCHEMA = "skeleton.game.studio_lesson.v1"
 CONTEXT_FIELDS = ("target_id", "genre", "engine", "source_digest", "code_digest")
@@ -51,10 +51,22 @@ CURRICULA = ("fresh", "mixed", "counterexample")
 def campaign_catalog() -> dict[str, Any]:
     return _copy(
         {
-            "schema_version": "skeleton.game.studio_catalog.v2",
+            "schema_version": "skeleton.game.studio_catalog.v3",
             "objectives": OBJECTIVE_CATALOG,
             "curricula": list(CURRICULA),
-            "proposal_families": ["policy", "mechanics", "economy", "entities", "layout", "fidelity"],
+            "proposal_families": [
+                "policy",
+                "mechanics",
+                "economy",
+                "entities",
+                "layout",
+                "fidelity",
+                "composition",
+            ],
+            "proposal_width": {"minimum": 1, "maximum": 4, "default": 2},
+            "exploration_strategies": ["uniform", "least_visited"],
+            "n_step": {"minimum": 1, "maximum": 16, "default": 4},
+            "search_memory_limit": 64,
             "evaluation_seeds": {"minimum": 1, "maximum": 8, "default": 3},
             "objective_weight_bounds": [0, 10],
             "objective_normalization": "Return delta/max(1,abs baseline mean return); other deltas use their measured fractions.",
@@ -156,6 +168,9 @@ class CampaignConfig:
     max_mean_step_ms: float | None = None
     max_death_regression: float = 0.0
     max_worst_seed_regression: float = 0.0
+    proposal_width: int = 2
+    exploration_strategy: str = "least_visited"
+    n_step: int = 4
 
     def __post_init__(self) -> None:
         _int(self.round_limit, "campaign rounds", 1, 100000)
@@ -165,6 +180,10 @@ class CampaignConfig:
         _int(self.seed, "campaign seed", 0, 2**63 - 1)
         _int(self.max_slice_steps, "slice step budget", 1, 131072)
         _int(self.evaluation_seeds, "paired evaluation seeds", 1, 8)
+        _int(self.proposal_width, "typed composition width", 1, 4)
+        _int(self.n_step, "actual reward backup horizon", 1, 16)
+        if self.exploration_strategy not in ("uniform", "least_visited"):
+            raise GameLearningError("unsupported grounded action exploration strategy")
         if self.curriculum not in CURRICULA:
             raise GameLearningError("unsupported campaign curriculum")
         weights = {k: v["default_weight"] for k, v in OBJECTIVE_CATALOG.items()}
@@ -368,6 +387,7 @@ class StudioLearningCampaign:
         self.champion_policy = initial_policy
         self.bandit_state = {}
         self.counterexamples = []
+        self.search_memory = []
         self.history_digest = digest({"campaign_id": self.campaign_id, "genesis": self.binding})
         self.last_round_digest = None
         self.lesson_count = 0
@@ -423,6 +443,7 @@ class StudioLearningCampaign:
             "proposal_priors": self.proposal_priors,
             "bandit_state": self.bandit_state,
             "counterexamples": self.counterexamples,
+            "search_memory": self.search_memory,
         }
         raw["snapshot_digest"] = digest(raw)
         return _copy(raw)
@@ -447,6 +468,7 @@ class StudioLearningCampaign:
             "proposal_priors",
             "bandit_state",
             "counterexamples",
+            "search_memory",
             "snapshot_digest",
         }
         if (
@@ -496,6 +518,9 @@ class StudioLearningCampaign:
         if total != self.cursor:
             raise GameLearningError("bandit trials differ from committed round cursor")
         self.bandit_state = state
+        self.search_memory = self._restore_search(
+            raw["search_memory"], self.cursor, raw["last_round_digest"], admitted_arms
+        )
         if not isinstance(raw["counterexamples"], list) or len(raw["counterexamples"]) > 16:
             raise GameLearningError("counterexample capacity differs")
         self.counterexamples = _copy(raw["counterexamples"], 524288)
@@ -591,6 +616,146 @@ class StudioLearningCampaign:
             ):
                 raise GameLearningError("campaign history identity differs")
         self.history_digest, self.last_round_digest = raw["history_digest"], raw["last_round_digest"]
+
+    def _search_receipt(self, report):
+        plays = report["roles"]["jeeves"]["evaluations"] + report["roles"]["adversary"]["evaluations"]
+        count = len(plays)
+        mutation = report["mutation"]
+        components = [p["id"] for p in mutation.get("composition", [])]
+        if not components and mutation.get("mechanic"):
+            components = [mutation["mechanic"]]
+        raw = {
+            "schema_version": "skeleton.game.studio_search_trial.v1",
+            "context_digest": self.context_digest,
+            "round_index": report["round_index"],
+            "round_digest": report["round_digest"],
+            "arm_id": report["bandit_observation"]["arm_id"],
+            "component_ids": components,
+            "champion_before_digest": report["champion_before_digest"],
+            "candidate_digest": report["candidate_digest"],
+            "proposal_signature": mutation.get(
+                "proposal_signature",
+                digest(
+                    {
+                        "arm": report["bandit_observation"]["arm_id"],
+                        "invalid": True,
+                        "champion": report["champion_before_digest"],
+                    }
+                ),
+            ),
+            "changes_digest": digest(mutation["changes"]),
+            "outcome": report["status"],
+            "objective_gain": report["objective_vector"]["weighted_gain"],
+            "failed_constraints": [k for k, v in report["constraints"].items() if not v],
+            "diagnostics": {
+                "death_rate": sum(p["dead"] for p in plays) / count,
+                "state_coverage": math.fsum(p["state_coverage"] for p in plays) / count,
+                "zero_reward_fraction": math.fsum(p["zero_reward_fraction"] for p in plays) / count,
+                "eventless_fraction": sum(not p["events"] for p in plays) / count,
+            },
+            "learning_parameters": report["roles"]["jeeves"]["curriculum"]["learning_parameters"],
+            "parent_policy_digest": report["roles"]["jeeves"]["curriculum"]["training_parent_digest"],
+            "policy_digest": report["roles"]["jeeves"]["policy_digest"],
+        }
+        raw["receipt_digest"] = digest(raw)
+        return _copy(raw, 8192)
+
+    def _restore_search(self, records, cursor, last_round_digest, admitted_arms):
+        if not isinstance(records, list) or len(records) != min(64, cursor):
+            raise GameLearningError("committed search-memory cursor window differs")
+        records = _copy(records, 524288)
+        previous = max(0, cursor - len(records))
+        for record in records:
+            expected = {
+                "schema_version",
+                "context_digest",
+                "round_index",
+                "round_digest",
+                "arm_id",
+                "component_ids",
+                "champion_before_digest",
+                "candidate_digest",
+                "proposal_signature",
+                "changes_digest",
+                "outcome",
+                "objective_gain",
+                "failed_constraints",
+                "diagnostics",
+                "learning_parameters",
+                "parent_policy_digest",
+                "policy_digest",
+                "receipt_digest",
+            }
+            if (
+                not isinstance(record, dict)
+                or set(record) != expected
+                or record["schema_version"] != "skeleton.game.studio_search_trial.v1"
+                or record["context_digest"] != self.context_digest
+                or record["arm_id"] not in admitted_arms
+            ):
+                raise GameLearningError("search-memory scope/schema differs")
+            previous = _int(record["round_index"], "search trial cursor", previous + 1, previous + 1)
+            if record["receipt_digest"] != digest(
+                {k: v for k, v in record.items() if k != "receipt_digest"}
+            ) or record["outcome"] not in ("accepted", "rejected"):
+                raise GameLearningError("search-memory empirical receipt differs")
+            for name in (
+                "round_digest",
+                "champion_before_digest",
+                "candidate_digest",
+                "proposal_signature",
+                "changes_digest",
+                "policy_digest",
+                "receipt_digest",
+                "parent_policy_digest",
+            ):
+                value = record[name]
+                if name == "parent_policy_digest" and value is None:
+                    continue
+                if (
+                    not isinstance(value, str)
+                    or len(value) != 64
+                    or any(c not in "0123456789abcdef" for c in value)
+                ):
+                    raise GameLearningError("search-memory evidence identity differs")
+            if (
+                not isinstance(record["component_ids"], list)
+                or not 1 <= len(record["component_ids"]) <= self.config.proposal_width
+                or any(identity not in admitted_arms for identity in record["component_ids"])
+            ):
+                raise GameLearningError("search-memory component capacity differs")
+            diagnostics = record["diagnostics"]
+            if (
+                not isinstance(diagnostics, dict)
+                or set(diagnostics)
+                != {"death_rate", "state_coverage", "zero_reward_fraction", "eventless_fraction"}
+                or any(
+                    type(v) not in (int, float) or not math.isfinite(v) or not 0 <= v <= 1
+                    for v in diagnostics.values()
+                )
+            ):
+                raise GameLearningError("search-memory measured diagnostics differ")
+            gain = record["objective_gain"]
+            if type(gain) not in (int, float) or not math.isfinite(gain) or abs(gain) > 1e15:
+                raise GameLearningError("search-memory objective measurement differs")
+            params = record["learning_parameters"]
+            if (
+                not isinstance(params, dict)
+                or set(params) != {"exploration_strategy", "n_step", "curriculum"}
+                or params["exploration_strategy"] not in ("uniform", "least_visited")
+                or params["curriculum"] not in CURRICULA
+            ):
+                raise GameLearningError("search-memory learning recipe differs")
+            _int(params["n_step"], "search reward horizon", 1, 16)
+            if (
+                not isinstance(record["failed_constraints"], list)
+                or len(record["failed_constraints"]) > 16
+                or any(not isinstance(v, str) or len(v) > 128 for v in record["failed_constraints"])
+            ):
+                raise GameLearningError("search-memory constraint receipts differ")
+        if records and records[-1]["round_digest"] != last_round_digest:
+            raise GameLearningError("search-memory latest round receipt differs")
+        return records
 
     def _seed(self, index, role):
         return int.from_bytes(
@@ -733,7 +898,130 @@ class StudioLearningCampaign:
                 arms.append(
                     {"id": "entities.enemy_health", "family": "entities", "kind": "editor_enemy_health"}
                 )
+        arms.extend(
+            [
+                {
+                    "id": "policy.exploration",
+                    "family": "policy",
+                    "kind": "learning",
+                    "parameter": "exploration_strategy",
+                },
+                {
+                    "id": "policy.reward_horizon",
+                    "family": "policy",
+                    "kind": "learning",
+                    "parameter": "n_step",
+                },
+                {
+                    "id": "policy.curriculum",
+                    "family": "policy",
+                    "kind": "learning",
+                    "parameter": "curriculum",
+                },
+            ]
+        )
+        if self.config.proposal_width > 1:
+            known = {a["id"] for a in arms}
+            plans = {
+                "navigation": [
+                    ("movement.max_speed", 1),
+                    ("movement.acceleration", 1),
+                    ("layout.checkpoint_shift", 1),
+                    ("policy.exploration", 1),
+                ],
+                "survival": [
+                    ("resources.max_health", 1),
+                    ("combat.invulnerability_seconds", 1),
+                    ("entities.enemy_speed", -1),
+                    ("policy.reward_horizon", 1),
+                ],
+                "economy": [
+                    ("economy.crop_variants.value", 1),
+                    ("economy.crop_variants.seed_cost", -1),
+                    ("farming.day_seconds", -1),
+                    ("fishing.reel_speed", 1),
+                ],
+                "interaction": [
+                    ("adventure.interact_radius", 1),
+                    ("fishing.cast_range", 1),
+                    ("fishing.reel_speed", 1),
+                    ("policy.curriculum", 1),
+                ],
+                "scene": [
+                    ("config.speed", 1),
+                    ("config.attack_range", 1),
+                    ("entities.enemy_health", -1),
+                    ("policy.reward_horizon", 1),
+                ],
+                "exploration": [
+                    ("policy.exploration", 1),
+                    ("policy.reward_horizon", 1),
+                    ("policy.curriculum", 1),
+                ],
+            }
+            for name, components in plans.items():
+                selected = [
+                    {"id": identity, "sign": sign} for identity, sign in components if identity in known
+                ][: self.config.proposal_width]
+                if len(selected) >= 2:
+                    arms.append(
+                        {
+                            "id": "compose." + name,
+                            "family": "composition",
+                            "kind": "composition",
+                            "components": selected,
+                        }
+                    )
         return arms
+
+    def _search_priority(self, arm):
+        records = self.search_memory[-8:]
+        if not records:
+            return 0.0, [], {}
+        count = len(records)
+        death = math.fsum(r["diagnostics"]["death_rate"] for r in records) / count
+        coverage = math.fsum(r["diagnostics"]["state_coverage"] for r in records) / count
+        sparse = math.fsum(r["diagnostics"]["zero_reward_fraction"] for r in records) / count
+        no_events = math.fsum(r["diagnostics"]["eventless_fraction"] for r in records) / count
+        urgency = {
+            "observed_death_rate": death,
+            "observed_low_state_coverage": max(0, (0.05 - coverage) / 0.05),
+            "observed_zero_reward_fraction": sparse,
+            "observed_eventless_fraction": no_events,
+            "observed_death_constraint_failure": sum(
+                "death_rate_nonregression" in r["failed_constraints"] for r in records
+            )
+            / count,
+            "observed_return_constraint_failure": sum(
+                any(
+                    k in r["failed_constraints"]
+                    for k in (
+                        "ordinary_mean_return_nonregression",
+                        "perturbed_mean_return_nonregression",
+                        "worst_seed_return_nonregression",
+                    )
+                )
+                for r in records
+            )
+            / count,
+        }
+        identity = arm["id"]
+        bonus = 0.0
+        if any(k in identity for k in ("survival", "health", "invulnerability", "enemy")):
+            bonus += 0.3 * death + 0.15 * urgency["observed_death_constraint_failure"]
+        if any(k in identity for k in ("navigation", "movement", "config.speed")):
+            bonus += 0.2 * urgency["observed_low_state_coverage"]
+        if arm["family"] == "policy" or identity == "compose.exploration":
+            bonus += (
+                0.3 * sparse
+                + 0.15 * urgency["observed_low_state_coverage"]
+                + 0.1 * urgency["observed_return_constraint_failure"]
+            )
+        if any(k in identity for k in ("interaction", "interact_radius", "cast_range")):
+            bonus += 0.15 * no_events
+        recent_rejections = sum(r["arm_id"] == identity and r["outcome"] == "rejected" for r in records)
+        bonus -= 0.05 * recent_rejections
+        return bonus, [r["receipt_digest"] for r in records], urgency
 
     def _select_proposal(self, index):
         arms = self.proposal_catalog()
@@ -758,9 +1046,11 @@ class StudioLearningCampaign:
                 if row["trials"] == 0
                 else row["reward_sum"] / row["trials"] + math.sqrt(2 * math.log(total + 1) / row["trials"])
             )
+            priority, refs, urgency = self._search_priority(arm)
             tie = self._seed(index, "bandit:" + arm["id"])
-            scored.append((row["trials"] == 0, score or 0.0, -tie, arm, row))
+            scored.append((row["trials"] == 0, (score or 0.0) + priority, -tie, arm, row))
         _, score, _, arm, row = max(scored, key=lambda item: item[:3])
+        priority, refs, urgency = self._search_priority(arm)
         return arm, {
             "algorithm": "deterministic_ucb1",
             "arm_id": arm["id"],
@@ -769,12 +1059,52 @@ class StudioLearningCampaign:
             "prior_accepted": row["accepted"],
             "selection_score": None if not row["trials"] else score,
             "eligible_arm_count": len(arms),
+            "counterexample_priority": priority,
+            "search_evidence_refs": refs,
+            "observed_diagnostics": urgency,
         }
 
-    def _mutate(self, index):
-        arm, selection = self._select_proposal(index)
+    def _proposal_identity(self, facts, before_digest):
+        signature = digest(
+            {
+                "champion_before_digest": before_digest,
+                "parent_policy_digest": (
+                    None if self.champion_policy is None else self.champion_policy["snapshot_digest"]
+                ),
+                "arm_id": facts["proposal_selection"]["arm_id"],
+                "changes": facts["changes"],
+                "learning_parameters": facts.get("learning_parameters", {}),
+            }
+        )
+        facts["proposal_signature"] = signature
+        repeats = [
+            r
+            for r in self.search_memory
+            if r["proposal_signature"] == signature and r["outcome"] == "rejected"
+        ]
+        if repeats and facts["proposal_selection"]["family"] != "policy":
+            facts.update(
+                proposal_rejected=True,
+                duplicate_rejected_trial=True,
+                search_evidence_refs=[r["receipt_digest"] for r in repeats[-4:]],
+            )
+        return facts
+
+    def _mutate(self, index, *, arm_override=None, request_override=None, direction_override=None):
+        if arm_override is None:
+            arm, selection = self._select_proposal(index)
+        else:
+            arm = arm_override
+            selection = {
+                "algorithm": "bounded_composition_component",
+                "arm_id": arm["id"],
+                "family": arm["family"],
+                "prior_trials": 0,
+                "eligible_arm_count": 1,
+            }
         rng = random.Random(self._seed(index, "mutation:" + arm["id"]))
-        request = self.champion
+        request = self.champion if request_override is None else request_override
+        before_digest = request.digest
         tree = dict(request.tree or {})
         facts = {
             "supported": False,
@@ -783,8 +1113,47 @@ class StudioLearningCampaign:
             "changes": [],
             "proposal_selection": selection,
         }
+        if arm["kind"] == "composition":
+            atoms = {a["id"]: a for a in self.proposal_catalog(request) if a["kind"] != "composition"}
+            overall = 1 if rng.random() >= 0.5 else -1
+            decision, prior = self._decision(arm["id"])
+            if (
+                decision is not None
+                and type(decision["facts"].get("direction")) is int
+                and decision["facts"]["direction"] in (-1, 1)
+            ):
+                overall = decision["facts"]["direction"] * (-1 if decision["outcome"] == "rejected" else 1)
+            facts.update(
+                strategy="bounded_typed_composition",
+                direction=overall,
+                composition=[],
+                learning_parameters={},
+                **self._proposal_facts(prior),
+            )
+            for component in arm["components"]:
+                request, part = self._mutate(
+                    index,
+                    arm_override=atoms[component["id"]],
+                    request_override=request,
+                    direction_override=overall * component["sign"],
+                )
+                facts["changes"].extend(part["changes"])
+                facts["learning_parameters"].update(part.get("learning_parameters", {}))
+                facts["composition"].append(
+                    {
+                        "id": component["id"],
+                        "direction": part.get("direction"),
+                        "changes": part["changes"],
+                        "proposal_rejected": part.get("proposal_rejected", False),
+                    }
+                )
+                facts["supported"] = facts["supported"] or part["supported"]
+            facts["proposal_rejected"] = not facts["changes"] or any(
+                c["proposal_rejected"] for c in facts["composition"]
+            )
+            return request, self._proposal_identity(facts, before_digest)
         if arm["kind"] == "policy":
-            return request, facts
+            return request, self._proposal_identity(facts, before_digest)
         decision, prior = self._decision(arm["id"])
         direction = 1 if rng.random() >= 0.5 else -1
         if (
@@ -794,6 +1163,8 @@ class StudioLearningCampaign:
         ):
             known = decision["facts"]["direction"]
             direction = -known if decision["outcome"] == "rejected" else known
+        if direction_override is not None:
+            direction = direction_override
         facts.update(
             supported=True,
             strategy="bandit_selected_typed_mutation",
@@ -801,6 +1172,29 @@ class StudioLearningCampaign:
             **self._proposal_facts(prior),
         )
         changes = facts["changes"]
+        if arm["kind"] == "learning":
+            parameter = arm["parameter"]
+            old = getattr(self.config, parameter)
+            if parameter == "n_step":
+                choices = (1, 4, 8, 16)
+                new = (
+                    next((v for v in choices if v > old), 16)
+                    if direction > 0
+                    else next((v for v in reversed(choices) if v < old), 1)
+                )
+            elif parameter == "exploration_strategy":
+                new = "uniform" if old == "least_visited" else "least_visited"
+            else:
+                choices = CURRICULA
+                new = choices[(choices.index(old) + direction) % len(choices)]
+            facts.update(
+                supported=False,
+                strategy="actual_learning_configuration_trial",
+                learning_parameters={parameter: new},
+            )
+            changes.append({"path": "training." + parameter, "before": old, "after": new})
+            facts["proposal_rejected"] = old == new
+            return request, self._proposal_identity(facts, before_digest)
 
         def change(container, key, path, low, high, integer=False):
             old = container[key]
@@ -879,7 +1273,7 @@ class StudioLearningCampaign:
                         strategy="remembered_fidelity_rejection",
                         **self._proposal_facts(prior),
                     )
-                    return request, facts
+                    return request, self._proposal_identity(facts, before_digest)
                 spec["fidelity"] = {"profile": new}
                 changes.append({"path": "fidelity.profile", "before": old, "after": new})
                 facts["subjective_quality_improvement_claim"] = False
@@ -900,8 +1294,8 @@ class StudioLearningCampaign:
         raw = request.as_dict()
         raw["tree"] = tree
         request = GameEnvironmentRequest.from_dict(raw)
-        facts["proposal_rejected"] = not changes or request.digest == self.champion.digest
-        return request, facts
+        facts["proposal_rejected"] = not changes or request.digest == before_digest
+        return request, self._proposal_identity(facts, before_digest)
 
     def _play(self, request, seed, policy, *, jitter, cancel, authorize):
         _guard(cancel, authorize)
@@ -915,6 +1309,7 @@ class StudioLearningCampaign:
                     raise GameLearningError("frozen policy transfer changed action/bin/reward semantics")
             rng = random.Random(seed ^ 0xA0761D6478BD642F)
             total, steps, step_seconds = 0.0, 0, 0.0
+            zero_rewards = 0
             actions, events, states = {}, {}, set()
             components = {key: 0.0 for key in env.spec.reward_components}
             trace_steps, trace_bytes = [], 0
@@ -947,6 +1342,7 @@ class StudioLearningCampaign:
                 ):
                     raise GameLearningError("actual evaluation reward components differ")
                 reward = math.fsum(values.values())
+                zero_rewards += abs(reward) <= 1e-12
                 data = {
                     "sequence": sequence,
                     "observation": observation,
@@ -1052,6 +1448,7 @@ class StudioLearningCampaign:
                 "observed_states": len(states),
                 "state_coverage": len(states) / steps,
                 "action_entropy": entropy,
+                "zero_reward_fraction": zero_rewards / steps,
                 "mean_step_ms": step_seconds * 1000 / steps,
                 "mean_render_ms": (first_render_ms + last_render_ms) / 2,
                 "sequence_review": {
@@ -1277,12 +1674,23 @@ class StudioLearningCampaign:
         champion_spec = (
             candidate_spec if candidate.digest == self.champion.digest else self._spec(self.champion)
         )
+        learning_parameters = {
+            "exploration_strategy": self.config.exploration_strategy,
+            "n_step": self.config.n_step,
+            "curriculum": self.config.curriculum,
+        }
+        learning_parameters.update(mutation.get("learning_parameters", {}))
+        epsilon = max(0.05, 0.3 * (0.995 ** min(self.cursor, 10000)))
+        if self.search_memory and self.search_memory[-1]["diagnostics"]["state_coverage"] < 0.02:
+            epsilon = max(epsilon, 0.5)
         learning_config = GameLearningConfig(
             seed=self._seed(index, "q"),
             max_updates=max(1, self.config.episodes_per_round * self.config.episode_steps),
             max_episodes=self.config.episodes_per_round,
             max_states=4096,
-            epsilon=max(0.05, 0.3 * (0.995 ** min(self.cursor, 10000))),
+            epsilon=epsilon,
+            exploration_strategy=learning_parameters["exploration_strategy"],
+            n_step=learning_parameters["n_step"],
         )
         parent = self.champion_policy if candidate.digest == self.champion.digest else None
         if parent is not None:
@@ -1309,10 +1717,14 @@ class StudioLearningCampaign:
         ]
         replay_count = (
             0
-            if self.config.curriculum == "fresh"
+            if learning_parameters["curriculum"] == "fresh"
             else min(
                 len(counterexamples),
-                self.config.episodes_per_round if self.config.curriculum == "counterexample" else 1,
+                (
+                    self.config.episodes_per_round
+                    if learning_parameters["curriculum"] == "counterexample"
+                    else 1
+                ),
             )
         )
         chosen = []
@@ -1442,7 +1854,7 @@ class StudioLearningCampaign:
             play.pop("_trace", None)
         steps = trained.updates + sum(p["steps"] for p in baseline + measured + baseline_adv + measured_adv)
         curriculum = {
-            "kind": self.config.curriculum,
+            "kind": learning_parameters["curriculum"],
             "training_seeds": training_seeds,
             "reexecuted_counterexamples": [
                 {
@@ -1455,6 +1867,7 @@ class StudioLearningCampaign:
             ],
             "fresh_training_episodes": len(training_seeds) - len(chosen),
             "exploration_epsilon": learning_config.epsilon,
+            "learning_parameters": learning_parameters,
             "training_parent_digest": None if parent is None else parent["snapshot_digest"],
             "changed_environment_table_reset": parent is None and self.champion_policy is not None,
         }
@@ -1462,6 +1875,7 @@ class StudioLearningCampaign:
             "jeeves": {
                 "actual_training_episodes": self.config.episodes_per_round,
                 "actual_updates": trained.updates,
+                "learning_config": learning_config.as_dict(),
                 "policy_digest": policy["snapshot_digest"],
                 "training_seeds": training_seeds,
                 "play": measured[0],
@@ -1659,6 +2073,7 @@ class StudioLearningCampaign:
                         else:
                             retained.pop(0)
                     self.counterexamples = retained
+                    self.search_memory = (self.search_memory + [self._search_receipt(report)])[-64:]
                     self.lesson_count += len(report["lessons"])
                     self.recent_lessons = (self.recent_lessons + report["lessons"])[-64:]
                     self.history_digest = digest(

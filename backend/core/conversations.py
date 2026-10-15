@@ -26,6 +26,7 @@ import re
 from typing import Any, Awaitable, Callable, Mapping
 from uuid import uuid4
 
+from bson.codec_options import CodecOptions
 from pymongo import ASCENDING, DESCENDING, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
@@ -119,9 +120,7 @@ def _storage_bytes(payload: object) -> int:
             allow_nan=False,
             default=(
                 lambda value: (
-                    value.astimezone(timezone.utc).isoformat()
-                    if isinstance(value, datetime)
-                    else str(value)
+                    value.astimezone(timezone.utc).isoformat() if isinstance(value, datetime) else str(value)
                 )
             ),
         ).encode("utf-8")
@@ -174,9 +173,7 @@ def _message_from_doc(doc: dict[str, Any]) -> ConversationMessage:
         ai_result_id=doc.get("ai_result_id"),
         context_id=doc.get("context_id"),
         context_digest=doc.get("context_digest"),
-        context_source_snapshot=tuple(
-            tuple(item) for item in (doc.get("context_source_snapshot") or ())
-        ),
+        context_source_snapshot=tuple(tuple(item) for item in (doc.get("context_source_snapshot") or ())),
         context_compiler_version=doc.get("context_compiler_version"),
         attachment_refs=tuple(doc.get("attachment_refs") or ()),
         tool_receipt_refs=tuple(doc.get("tool_receipt_refs") or ()),
@@ -205,6 +202,8 @@ class MongoConversationAuthority:
         governance_retention_planner: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
     ) -> None:
         self.database = database
+        if callable(getattr(database, "with_options", None)):
+            database = database.with_options(codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc))
         self.threads = database["conversation_threads"]
         self.messages = database["conversation_messages"]
         self.storage_admitter = storage_admitter
@@ -212,16 +211,12 @@ class MongoConversationAuthority:
         self.governance_deletion_planner = governance_deletion_planner
         self.governance_deletion_acker = governance_deletion_acker
         self.governance_inventory_reader = governance_inventory_reader
-        self.governance_engine_target_executor = (
-            governance_engine_target_executor
-        )
+        self.governance_engine_target_executor = governance_engine_target_executor
         self.governance_retention_planner = governance_retention_planner
         # Installed only through the trusted application lifespan.
         self.dragon_projection = None
 
-    async def dragon_context_segments(
-        self, thread: ConversationThread, query: str
-    ) -> tuple:
+    async def dragon_context_segments(self, thread: ConversationThread, query: str) -> tuple:
         """Return only currently consented, untrusted Dragon context evidence."""
         projection = self.dragon_projection
         if projection is None:
@@ -235,9 +230,7 @@ class MongoConversationAuthority:
             )
             return ()
 
-    async def _delete_dragon_projection(
-        self, *, tenant_id: str, owner_id: str, thread_id: str
-    ) -> None:
+    async def _delete_dragon_projection(self, *, tenant_id: str, owner_id: str, thread_id: str) -> None:
         """Erase the optional derived store before canonical deletion advances."""
         projection = self.dragon_projection
         if projection is None:
@@ -262,10 +255,7 @@ class MongoConversationAuthority:
                 after_sequence=thread.message_sequence - 10,
                 limit=10,
             )
-            if (
-                len(window) == 10
-                and all(message.branch_id == thread.active_branch_id for message in window)
-            ):
+            if len(window) == 10 and all(message.branch_id == thread.active_branch_id for message in window):
                 await projection.after_commit(thread, window)
         except Exception:
             # This is derived, optional state. The canonical Mongo commit is final.
@@ -285,14 +275,12 @@ class MongoConversationAuthority:
         thread_prefix = "conversation-thread://"
         message_prefix = "conversation-message://"
         if source.startswith(thread_prefix):
-            thread_id = source[len(thread_prefix):]
+            thread_id = source[len(thread_prefix) :]
             if not thread_id or thread_id != record_key or "/" in thread_id:
-                raise ConversationStorageUnavailable(
-                    "conversation thread governance source_ref is invalid"
-                )
+                raise ConversationStorageUnavailable("conversation thread governance source_ref is invalid")
             return "thread", {"_id": record_key}, 1
         if source.startswith(message_prefix):
-            tail = source[len(message_prefix):]
+            tail = source[len(message_prefix) :]
             thread_id, separator, message_id = tail.partition("/")
             if (
                 not separator
@@ -301,17 +289,13 @@ class MongoConversationAuthority:
                 or "/" in message_id
                 or message_id != record_key
             ):
-                raise ConversationStorageUnavailable(
-                    "conversation message governance source_ref is invalid"
-                )
+                raise ConversationStorageUnavailable("conversation message governance source_ref is invalid")
             return (
                 "message",
                 {"_id": record_key, "thread_id": thread_id},
                 0,
             )
-        raise ConversationStorageUnavailable(
-            "unsupported conversation governance source_ref"
-        )
+        raise ConversationStorageUnavailable("unsupported conversation governance source_ref")
 
     @staticmethod
     def _governed_reference_tokens(
@@ -342,18 +326,14 @@ class MongoConversationAuthority:
 
         reader = self.governance_inventory_reader
         if reader is None:
-            raise ConversationStorageUnavailable(
-                "conversation governance inventory is unavailable"
-            )
+            raise ConversationStorageUnavailable("conversation governance inventory is unavailable")
         thread = await self.get_thread(
             thread_id,
             tenant_id=tenant_id,
             owner_id=owner_id,
         )
         if thread.message_sequence > 9_999:
-            raise ConversationStorageUnavailable(
-                "conversation exceeds governed deletion record bound"
-            )
+            raise ConversationStorageUnavailable("conversation exceeds governed deletion record bound")
 
         messages: list[ConversationMessage] = []
         after = 0
@@ -366,9 +346,7 @@ class MongoConversationAuthority:
                 limit=500,
             )
             if not page:
-                raise ConversationStorageUnavailable(
-                    "conversation governance lineage is incomplete"
-                )
+                raise ConversationStorageUnavailable("conversation governance lineage is incomplete")
             messages.extend(page)
             after = page[-1].sequence
 
@@ -379,12 +357,7 @@ class MongoConversationAuthority:
         }
         expected_sources.update(
             {
-                message.message_id: (
-                    "conversation-message://"
-                    + thread.thread_id
-                    + "/"
-                    + message.message_id
-                )
+                message.message_id: ("conversation-message://" + thread.thread_id + "/" + message.message_id)
                 for message in messages
             }
         )
@@ -395,40 +368,30 @@ class MongoConversationAuthority:
         try:
             inventory = await reader(tenant_id=str(tenant_id))
         except Exception as exc:
-            raise ConversationStorageUnavailable(
-                "conversation governance inventory is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation governance inventory is unavailable") from exc
         if (
             not isinstance(inventory, Mapping)
             or inventory.get("tenant_id") != str(tenant_id)
             or not isinstance(inventory.get("records"), list)
         ):
-            raise ConversationStorageUnavailable(
-                "conversation governance inventory is malformed"
-            )
+            raise ConversationStorageUnavailable("conversation governance inventory is malformed")
 
         selected: set[str] = set()
         found_conversation: set[str] = set()
         for raw in inventory["records"]:
             if not isinstance(raw, Mapping):
-                raise ConversationStorageUnavailable(
-                    "conversation governance inventory record is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation governance inventory record is malformed")
             if raw.get("tenant_id") != str(tenant_id):
                 continue
             record_id = str(raw.get("record_id") or "").strip()
             owner_plane = str(raw.get("owner_plane") or "").strip().lower()
             source_ref = str(raw.get("source_ref") or "").strip()
             if not record_id or not owner_plane or not source_ref:
-                raise ConversationStorageUnavailable(
-                    "conversation governance inventory record is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation governance inventory record is malformed")
 
             if owner_plane == "conversation" and record_id in conversation_ids:
                 if source_ref != expected_sources[record_id]:
-                    raise ConversationStorageUnavailable(
-                        "conversation governance record source mismatch"
-                    )
+                    raise ConversationStorageUnavailable("conversation governance record source mismatch")
                 selected.add(record_id)
                 found_conversation.add(record_id)
                 continue
@@ -443,13 +406,9 @@ class MongoConversationAuthority:
 
         missing = conversation_ids - found_conversation
         if missing:
-            raise ConversationStorageUnavailable(
-                "conversation governance records are incomplete"
-            )
+            raise ConversationStorageUnavailable("conversation governance records are incomplete")
         if len(selected) > 10_000:
-            raise ConversationStorageUnavailable(
-                "conversation governed deletion exceeds record bound"
-            )
+            raise ConversationStorageUnavailable("conversation governed deletion exceeds record bound")
         return tuple(sorted(selected))
 
     async def delete_thread_with_governance(
@@ -470,9 +429,7 @@ class MongoConversationAuthority:
         )
         if initial.version != expected_thread_version:
             raise ConversationConflict("thread version conflict")
-        await self._delete_dragon_projection(
-            tenant_id=tenant_id, owner_id=owner_id, thread_id=thread_id
-        )
+        await self._delete_dragon_projection(tenant_id=tenant_id, owner_id=owner_id, thread_id=thread_id)
         record_ids = await self.governed_record_ids_for_thread(
             thread_id,
             tenant_id=tenant_id,
@@ -492,9 +449,7 @@ class MongoConversationAuthority:
 
         planner = self.governance_deletion_planner
         if planner is None:
-            raise ConversationStorageUnavailable(
-                "conversation governance deletion protocol is unavailable"
-            )
+            raise ConversationStorageUnavailable("conversation governance deletion protocol is unavailable")
         try:
             plan = await planner(
                 tenant_id=str(tenant_id),
@@ -511,27 +466,19 @@ class MongoConversationAuthority:
             or plan.get("tenant_id") != str(tenant_id)
             or not isinstance(plan.get("actions"), list)
         ):
-            raise ConversationStorageUnavailable(
-                "conversation governance deletion plan is malformed"
-            )
+            raise ConversationStorageUnavailable("conversation governance deletion plan is malformed")
 
         external_actions: list[Mapping[str, Any]] = []
         for raw in plan["actions"]:
             if not isinstance(raw, Mapping):
-                raise ConversationStorageUnavailable(
-                    "conversation governance deletion action is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation governance deletion action is malformed")
             if raw.get("tenant_id") != str(tenant_id):
-                raise ConversationStorageUnavailable(
-                    "conversation governance deletion tenant mismatch"
-                )
+                raise ConversationStorageUnavailable("conversation governance deletion tenant mismatch")
             record_id = str(raw.get("record_id") or "").strip()
             target = str(raw.get("target") or "").strip().lower()
             source_ref = str(raw.get("source_ref") or "").strip()
             if not record_id or not target or not source_ref:
-                raise ConversationStorageUnavailable(
-                    "conversation governance deletion action is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation governance deletion action is malformed")
             if record_id not in record_ids:
                 raise ConversationStorageUnavailable(
                     "conversation governance plan contains unselected record"
@@ -548,9 +495,7 @@ class MongoConversationAuthority:
         if external_actions:
             executor = self.governance_engine_target_executor
             if executor is None:
-                raise ConversationStorageUnavailable(
-                    "conversation linked lifecycle executor is unavailable"
-                )
+                raise ConversationStorageUnavailable("conversation linked lifecycle executor is unavailable")
             try:
                 engine_result = await executor(
                     tenant_id=str(tenant_id),
@@ -565,9 +510,7 @@ class MongoConversationAuthority:
                 or engine_result.get("plan_id") != str(plan["plan_id"])
                 or engine_result.get("tenant_id") != str(tenant_id)
             ):
-                raise ConversationStorageUnavailable(
-                    "conversation linked lifecycle receipt is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation linked lifecycle receipt is malformed")
 
         conversation_result = await self.execute_governed_deletion(
             tenant_id=str(tenant_id),
@@ -578,9 +521,7 @@ class MongoConversationAuthority:
             "thread": deleting.as_dict(),
             "record_ids": list(record_ids),
             "plan_id": conversation_result["plan_id"],
-            "linked_execution": (
-                None if engine_result is None else dict(engine_result)
-            ),
+            "linked_execution": (None if engine_result is None else dict(engine_result)),
             "conversation": dict(conversation_result),
             "complete": True,
         }
@@ -604,30 +545,22 @@ class MongoConversationAuthority:
                 ) from exc
         planner = self.governance_retention_planner
         if planner is None:
-            raise ConversationStorageUnavailable(
-                "conversation retention planning is unavailable"
-            )
+            raise ConversationStorageUnavailable("conversation retention planning is unavailable")
         try:
             plan = await planner(tenant_id=str(tenant_id))
         except Exception as exc:
-            raise ConversationStorageUnavailable(
-                "conversation retention plan is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation retention plan is unavailable") from exc
         if (
             not isinstance(plan, Mapping)
             or plan.get("tenant_id") != str(tenant_id)
             or not isinstance(plan.get("actions"), list)
         ):
-            raise ConversationStorageUnavailable(
-                "conversation retention plan is malformed"
-            )
+            raise ConversationStorageUnavailable("conversation retention plan is malformed")
 
         plan_id = str(plan.get("plan_id") or "").strip()
         if not plan_id:
             if plan["actions"]:
-                raise ConversationStorageUnavailable(
-                    "conversation retention plan is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation retention plan is malformed")
             return {
                 "tenant_id": str(tenant_id),
                 "plan_id": None,
@@ -642,20 +575,14 @@ class MongoConversationAuthority:
         seen_records: set[str] = set()
         for raw in plan["actions"]:
             if not isinstance(raw, Mapping):
-                raise ConversationStorageUnavailable(
-                    "conversation retention action is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation retention action is malformed")
             if raw.get("tenant_id") != str(tenant_id):
-                raise ConversationStorageUnavailable(
-                    "conversation retention tenant mismatch"
-                )
+                raise ConversationStorageUnavailable("conversation retention tenant mismatch")
             record_id = str(raw.get("record_id") or "").strip()
             target = str(raw.get("target") or "").strip().lower()
             source_ref = str(raw.get("source_ref") or "").strip()
             if not record_id or not target or not source_ref:
-                raise ConversationStorageUnavailable(
-                    "conversation retention action is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation retention action is malformed")
             seen_records.add(record_id)
             if target == "conversation":
                 self._governed_conversation_location(
@@ -671,9 +598,7 @@ class MongoConversationAuthority:
         if external_actions:
             executor = self.governance_engine_target_executor
             if executor is None:
-                raise ConversationStorageUnavailable(
-                    "conversation retention engine executor is unavailable"
-                )
+                raise ConversationStorageUnavailable("conversation retention engine executor is unavailable")
             try:
                 engine_result = await executor(
                     tenant_id=str(tenant_id),
@@ -688,9 +613,7 @@ class MongoConversationAuthority:
                 or engine_result.get("plan_id") != plan_id
                 or engine_result.get("tenant_id") != str(tenant_id)
             ):
-                raise ConversationStorageUnavailable(
-                    "conversation retention linked receipt is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation retention linked receipt is malformed")
 
         conversation_result: Mapping[str, Any] | None = None
         if conversation_ids:
@@ -700,22 +623,14 @@ class MongoConversationAuthority:
                 reason="retention-expired",
             )
             if conversation_result.get("plan_id") != plan_id:
-                raise ConversationStorageUnavailable(
-                    "conversation retention plan identity changed"
-                )
+                raise ConversationStorageUnavailable("conversation retention plan identity changed")
 
         return {
             "tenant_id": str(tenant_id),
             "plan_id": plan_id,
             "record_ids": sorted(seen_records),
-            "linked_execution": (
-                None if engine_result is None else dict(engine_result)
-            ),
-            "conversation": (
-                None
-                if conversation_result is None
-                else dict(conversation_result)
-            ),
+            "linked_execution": (None if engine_result is None else dict(engine_result)),
+            "conversation": (None if conversation_result is None else dict(conversation_result)),
             "complete": True,
         }
 
@@ -729,9 +644,7 @@ class MongoConversationAuthority:
         planner = self.governance_deletion_planner
         acker = self.governance_deletion_acker
         if planner is None or acker is None:
-            raise ConversationStorageUnavailable(
-                "conversation governance deletion protocol is unavailable"
-            )
+            raise ConversationStorageUnavailable("conversation governance deletion protocol is unavailable")
         try:
             plan = await planner(
                 tenant_id=str(tenant_id),
@@ -743,31 +656,23 @@ class MongoConversationAuthority:
                 "conversation governance deletion plan is unavailable"
             ) from exc
         if not isinstance(plan, Mapping):
-            raise ConversationStorageUnavailable(
-                "conversation governance deletion plan is malformed"
-            )
+            raise ConversationStorageUnavailable("conversation governance deletion plan is malformed")
         plan_id = str(plan.get("plan_id") or "").strip()
         if (
             not plan_id
             or plan.get("tenant_id") != str(tenant_id)
             or not isinstance(plan.get("actions"), list)
         ):
-            raise ConversationStorageUnavailable(
-                "conversation governance deletion plan identity mismatch"
-            )
+            raise ConversationStorageUnavailable("conversation governance deletion plan identity mismatch")
 
         actions = []
         for raw in plan["actions"]:
             if not isinstance(raw, Mapping):
-                raise ConversationStorageUnavailable(
-                    "conversation governance deletion action is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation governance deletion action is malformed")
             if str(raw.get("target") or "").lower() != "conversation":
                 continue
             if raw.get("tenant_id") != str(tenant_id):
-                raise ConversationStorageUnavailable(
-                    "conversation governance deletion tenant mismatch"
-                )
+                raise ConversationStorageUnavailable("conversation governance deletion tenant mismatch")
             record_id = str(raw.get("record_id") or "").strip()
             source_ref = str(raw.get("source_ref") or "").strip()
             kind, query, order = self._governed_conversation_location(
@@ -793,15 +698,11 @@ class MongoConversationAuthority:
                         {"owner_id": 1},
                     )
                 except PyMongoError as exc:
-                    raise ConversationStorageUnavailable(
-                        "Dragon deletion owner lookup unavailable"
-                    ) from exc
+                    raise ConversationStorageUnavailable("Dragon deletion owner lookup unavailable") from exc
                 if owner_doc is not None:
                     affected_owner = str(owner_doc.get("owner_id") or "")
                     if not affected_owner:
-                        raise ConversationStorageUnavailable(
-                            "Dragon deletion owner identity unavailable"
-                        )
+                        raise ConversationStorageUnavailable("Dragon deletion owner identity unavailable")
                     await self._delete_dragon_projection(
                         tenant_id=str(tenant_id),
                         owner_id=affected_owner,
@@ -816,9 +717,7 @@ class MongoConversationAuthority:
             try:
                 await collection.delete_one(query)
             except Exception as exc:
-                raise ConversationStorageUnavailable(
-                    "conversation physical deletion failed"
-                ) from exc
+                raise ConversationStorageUnavailable("conversation physical deletion failed") from exc
             try:
                 receipt = await acker(
                     tenant_id=str(tenant_id),
@@ -827,9 +726,7 @@ class MongoConversationAuthority:
                     target="conversation",
                 )
             except Exception as exc:
-                raise ConversationStorageUnavailable(
-                    "conversation deletion acknowledgement failed"
-                ) from exc
+                raise ConversationStorageUnavailable("conversation deletion acknowledgement failed") from exc
             if (
                 not isinstance(receipt, Mapping)
                 or receipt.get("plan_id") != plan_id
@@ -837,9 +734,7 @@ class MongoConversationAuthority:
                 or receipt.get("target") != "conversation"
                 or receipt.get("state") != "deleted"
             ):
-                raise ConversationStorageUnavailable(
-                    "conversation deletion acknowledgement is malformed"
-                )
+                raise ConversationStorageUnavailable("conversation deletion acknowledgement is malformed")
             deleted.append(str(raw["record_id"]))
             acknowledgements.append(dict(receipt))
 
@@ -857,23 +752,17 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         reader = self.governance_inventory_reader
         if reader is None:
-            raise ConversationStorageUnavailable(
-                "conversation governance inventory is unavailable"
-            )
+            raise ConversationStorageUnavailable("conversation governance inventory is unavailable")
         try:
             inventory = await reader(tenant_id=str(tenant_id))
         except Exception as exc:
-            raise ConversationStorageUnavailable(
-                "conversation governance inventory is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation governance inventory is unavailable") from exc
         if (
             not isinstance(inventory, Mapping)
             or inventory.get("tenant_id") != str(tenant_id)
             or not isinstance(inventory.get("records"), list)
         ):
-            raise ConversationStorageUnavailable(
-                "conversation governance inventory is malformed"
-            )
+            raise ConversationStorageUnavailable("conversation governance inventory is malformed")
 
         exported = []
         for raw in inventory["records"]:
@@ -895,9 +784,7 @@ class MongoConversationAuthority:
             try:
                 payload = await collection.find_one(query)
             except Exception as exc:
-                raise ConversationStorageUnavailable(
-                    "conversation governed export read failed"
-                ) from exc
+                raise ConversationStorageUnavailable("conversation governed export read failed") from exc
             if payload is not None:
                 payload = dict(payload)
                 payload.pop("_id", None)
@@ -949,18 +836,14 @@ class MongoConversationAuthority:
             )
         record = receipt.get("record")
         if not isinstance(record, Mapping):
-            raise ConversationStorageUnavailable(
-                "conversation governance registration receipt is malformed"
-            )
+            raise ConversationStorageUnavailable("conversation governance registration receipt is malformed")
         if (
             record.get("record_id") != str(record_id)
             or record.get("tenant_id") != str(tenant_id)
             or record.get("owner_plane") != "conversation"
             or record.get("state") != "active"
         ):
-            raise ConversationStorageUnavailable(
-                "conversation governance registration identity mismatch"
-            )
+            raise ConversationStorageUnavailable("conversation governance registration identity mismatch")
         return receipt
 
     async def _admit_storage(
@@ -983,18 +866,12 @@ class MongoConversationAuthority:
                 storage_bytes=max(1, _storage_bytes(payload)),
             )
         except Exception as exc:
-            raise ConversationStorageUnavailable(
-                "conversation storage admission is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation storage admission is unavailable") from exc
         if not isinstance(receipt, Mapping):
-            raise ConversationStorageUnavailable(
-                "conversation storage admission returned invalid receipt"
-            )
+            raise ConversationStorageUnavailable("conversation storage admission returned invalid receipt")
         admitted = int(receipt.get("storage_bytes") or 0)
         if admitted < _storage_bytes(payload):
-            raise ConversationStorageUnavailable(
-                "conversation storage admission under-accounted payload"
-            )
+            raise ConversationStorageUnavailable("conversation storage admission under-accounted payload")
         return receipt
 
     async def ensure_indexes(self) -> None:
@@ -1027,9 +904,7 @@ class MongoConversationAuthority:
                 sparse=True,
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation indexes are unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation indexes are unavailable") from exc
 
     @staticmethod
     def _authorized_filter(
@@ -1086,9 +961,7 @@ class MongoConversationAuthority:
         except DuplicateKeyError as exc:
             raise ConversationConflict("thread identity already exists") from exc
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation storage is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         return thread
 
     async def get_thread(
@@ -1107,9 +980,7 @@ class MongoConversationAuthority:
                 )
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation storage is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         if doc is None:
             raise ConversationNotFound(thread_id)
         return _thread_from_doc(doc)
@@ -1265,9 +1136,7 @@ class MongoConversationAuthority:
                 sort=[("sequence", ASCENDING)],
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation recovery state is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation recovery state is unavailable") from exc
         if prepared is None:
             return thread
 
@@ -1285,9 +1154,7 @@ class MongoConversationAuthority:
 
         if sequence != thread.message_sequence + 1 or expected != thread.version:
             try:
-                await self.messages.delete_one(
-                    {"_id": prepared["_id"], "_commit_state": "prepared"}
-                )
+                await self.messages.delete_one({"_id": prepared["_id"], "_commit_state": "prepared"})
             except PyMongoError as exc:
                 raise ConversationStorageUnavailable(
                     "stale conversation append could not be recovered"
@@ -1295,9 +1162,7 @@ class MongoConversationAuthority:
             return thread
 
         branch_id = (
-            str(prepared["branch_id"])
-            if prepared.get("_activate_branch", True)
-            else thread.active_branch_id
+            str(prepared["branch_id"]) if prepared.get("_activate_branch", True) else thread.active_branch_id
         )
         try:
             updated = await self.threads.find_one_and_update(
@@ -1362,6 +1227,7 @@ class MongoConversationAuthority:
         owner_id: str,
         expected_thread_version: int,
         activate_branch: bool = True,
+        execution_metadata: Mapping[str, Any] | None = None,
     ) -> tuple[ConversationThread, ConversationMessage]:
         """Append with a recoverable write-ahead intent and atomic thread commit."""
 
@@ -1376,14 +1242,10 @@ class MongoConversationAuthority:
                 message.idempotency_key,
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation idempotency state is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation idempotency state is unavailable") from exc
         if existing is not None:
             if not self._same_identity(existing, message):
-                raise ConversationConflict(
-                    "idempotency_key was reused with different content"
-                )
+                raise ConversationConflict("idempotency_key was reused with different content")
             if existing.sequence <= thread.message_sequence:
                 return thread, existing
 
@@ -1392,9 +1254,7 @@ class MongoConversationAuthority:
         if thread.version != expected_thread_version:
             raise ConversationConflict("thread version conflict")
         if message.sequence != thread.message_sequence + 1:
-            raise ConversationConflict(
-                f"message sequence must be exact-next ({thread.message_sequence + 1})"
-            )
+            raise ConversationConflict(f"message sequence must be exact-next ({thread.message_sequence + 1})")
 
         try:
             if message.parent_message_id is not None:
@@ -1406,22 +1266,15 @@ class MongoConversationAuthority:
                     }
                 )
                 if parent is None or int(parent["sequence"]) >= message.sequence:
-                    raise ConversationConflict(
-                        "parent message is missing or invalid"
-                    )
+                    raise ConversationConflict("parent message is missing or invalid")
                 if message.author_type is ConversationAuthorType.ASSISTANT:
                     parent_message = _message_from_doc(parent)
                     if (
-                        message.causal_user_message_id
-                        != message.parent_message_id
-                        or parent_message.author_type
-                        is not ConversationAuthorType.USER
-                        or parent_message.message_id
-                        != message.causal_user_message_id
+                        message.causal_user_message_id != message.parent_message_id
+                        or parent_message.author_type is not ConversationAuthorType.USER
+                        or parent_message.message_id != message.causal_user_message_id
                     ):
-                        raise ConversationConflict(
-                            "assistant result must bind its causal user message"
-                        )
+                        raise ConversationConflict("assistant result must bind its causal user message")
 
             if message.supersedes_message_id is not None:
                 prior_doc = await self.messages.find_one(
@@ -1432,38 +1285,38 @@ class MongoConversationAuthority:
                     }
                 )
                 if prior_doc is None:
-                    raise ConversationConflict(
-                        "superseded message does not exist"
-                    )
+                    raise ConversationConflict("superseded message does not exist")
                 prior = _message_from_doc(prior_doc)
                 if prior.author_type != message.author_type:
-                    raise ConversationConflict(
-                        "superseding message must preserve author type"
-                    )
+                    raise ConversationConflict("superseding message must preserve author type")
                 if (
                     prior.author_type is ConversationAuthorType.ASSISTANT
-                    and prior.causal_user_message_id
-                    != message.causal_user_message_id
+                    and prior.causal_user_message_id != message.causal_user_message_id
                 ):
-                    raise ConversationConflict(
-                        "assistant regeneration must preserve causal user lineage"
-                    )
+                    raise ConversationConflict("assistant regeneration must preserve causal user lineage")
 
             prepared = _message_doc(message)
             prepared["_commit_state"] = "prepared"
             prepared["_expected_thread_version"] = expected_thread_version
             prepared["_activate_branch"] = bool(activate_branch)
+            if execution_metadata is not None:
+                if message.author_type is not ConversationAuthorType.USER:
+                    raise ConversationConflict("only a canonical user message can prepare chat execution")
+                prepared["_chat_execution"] = dict(execution_metadata)
+                prepared["_chat_dispatch"] = {"state": "ready", "cancel_requested": False}
+                if _storage_bytes(prepared["_chat_execution"]) > 2 * 1024 * 1024:
+                    raise ConversationConflict("prepared chat command exceeds its byte bound")
             await self._admit_storage(
                 tenant_id=tenant_id,
                 resource_id="conversation-message",
-                write_id=(
-                    "message:"
-                    + message.thread_id
-                    + ":"
-                    + message.idempotency_key
-                ),
+                write_id=("message:" + message.thread_id + ":" + message.idempotency_key),
                 payload={
                     "message": message.as_dict(),
+                    **(
+                        {"prepared_chat_execution": prepared["_chat_execution"]}
+                        if execution_metadata is not None
+                        else {}
+                    ),
                     "thread_commit": {
                         "thread_id": message.thread_id,
                         "expected_version": expected_thread_version,
@@ -1475,12 +1328,7 @@ class MongoConversationAuthority:
             await self._register_governance(
                 record_id=message.message_id,
                 tenant_id=tenant_id,
-                source_ref=(
-                    "conversation-message://"
-                    + message.thread_id
-                    + "/"
-                    + message.message_id
-                ),
+                source_ref=("conversation-message://" + message.thread_id + "/" + message.message_id),
                 data_class=message.data_class,
                 created_at=message.created_at,
             )
@@ -1504,13 +1352,9 @@ class MongoConversationAuthority:
                     )
                     if existing.sequence <= recovered.message_sequence:
                         return recovered, existing
-            raise ConversationConflict(
-                "conversation message identity or ordering conflict"
-            ) from exc
+            raise ConversationConflict("conversation message identity or ordering conflict") from exc
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation append intent could not be prepared"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation append intent could not be prepared") from exc
 
         committed = await self._recover_prepared(
             message.thread_id,
@@ -1521,6 +1365,219 @@ class MongoConversationAuthority:
             raise ConversationConflict("conversation append did not reach commit point")
         await self._after_dragon_commit(committed)
         return committed, message
+
+    async def chat_execution(self, thread_id: str, message_id: str, *, tenant_id: str, owner_id: str):
+        """Read private execution metadata only under canonical message ownership."""
+        thread = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        try:
+            doc = await self.messages.find_one(
+                {"_id": message_id, "thread_id": thread_id, "sequence": {"$lte": thread.message_sequence}}
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable("prepared chat execution is unavailable") from exc
+        if doc is None or _message_from_doc(doc).author_type is not ConversationAuthorType.USER:
+            raise ConversationNotFound(message_id)
+        return doc.get("_chat_execution")
+
+    async def bind_chat_execution(
+        self,
+        thread_id: str,
+        user_message_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        expected_thread_version: int,
+        attachment_refs,
+        metadata,
+    ):
+        """Freeze an edited USER's exact request and command in one same-row CAS."""
+        from core.chat_sessions import canonical_bytes, checked_command
+
+        if type(expected_thread_version) is not int or expected_thread_version < 1:
+            raise ValueError("expected thread version must be a positive integer")
+        desired = _request_refs(attachment_refs)
+        thread = await self.authorize_active_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        if thread.version != expected_thread_version:
+            raise ConversationConflict("thread version conflict")
+        query = {
+            "_id": user_message_id,
+            "thread_id": thread_id,
+            "sequence": thread.message_sequence,
+            "branch_id": thread.active_branch_id,
+            "author_type": "user",
+        }
+        try:
+            doc = await self.messages.find_one(query)
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable("edited request is unavailable") from exc
+        if doc is None:
+            raise ConversationConflict("only the current committed USER tip can prepare a request")
+        message = _message_from_doc(doc)
+        if message.supersedes_message_id is None:
+            raise ConversationConflict("only an edited USER may bind a new prepared execution")
+        retained = lambda refs: tuple(
+            ref
+            for ref in refs
+            if not ref.startswith(_EXECUTION_REF_PREFIXES) and ref != "chat-prepared-execution:v1"
+        )
+        if retained(message.attachment_refs) != retained(desired):
+            raise ConversationConflict("edited request cannot replace original source attachments")
+        message = replace(message, attachment_refs=desired)
+        checked_command(metadata, thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id)
+        canonical_bytes(metadata)
+        existing = doc.get("_chat_execution")
+        if existing is not None:
+            if existing != metadata or self._bound_user_request_refs(_message_from_doc(doc), doc) != desired:
+                raise ConversationConflict("edited request already has different frozen semantics")
+            return thread, message
+        if doc.get("_chat_engine_command") is not None:
+            raise ConversationConflict("edited request already has an original legacy command")
+        bound = self._bound_user_request_refs(_message_from_doc(doc), doc)
+        if "_chat_request_refs" in doc and bound != desired:
+            raise ConversationConflict("edited request already has a different request identity")
+        refs_digest = _request_refs_digest(thread_id, user_message_id, desired)
+        await self._admit_storage(
+            tenant_id=tenant_id,
+            resource_id="conversation-turn-command",
+            write_id="edited-prepared:" + user_message_id + ":" + metadata["record_digest"],
+            payload={"execution_metadata": metadata, "attachment_refs": list(desired)},
+        )
+        try:
+            stored = await self.messages.find_one_and_update(
+                {
+                    **query,
+                    "_chat_execution": {"$exists": False},
+                    "_chat_engine_command": {"$exists": False},
+                    "_chat_request_refs_digest": doc.get("_chat_request_refs_digest"),
+                },
+                {
+                    "$set": {
+                        "_chat_execution": metadata,
+                        "_chat_request_refs": list(desired),
+                        "_chat_request_refs_digest": refs_digest,
+                        "_chat_dispatch": {"state": "ready", "cancel_requested": False},
+                    }
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+            if stored is None:
+                stored = await self.messages.find_one(query)
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable("edited request could not be prepared") from exc
+        if (
+            stored is None
+            or stored.get("_chat_execution") != metadata
+            or self._bound_user_request_refs(_message_from_doc(stored), stored) != desired
+        ):
+            raise ConversationConflict("edited request changed while preparing")
+        current = await self.authorize_active_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        if (
+            current.version != thread.version
+            or current.active_branch_id != thread.active_branch_id
+            or current.message_sequence != message.sequence
+        ):
+            raise ConversationConflict("thread changed before edited request dispatch")
+        return current, message
+
+    async def chat_history_dependencies(self, thread_id, message_ids, *, tenant_id, owner_id):
+        thread = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        ids = sorted(set(message_ids))
+        if len(ids) > 256:
+            raise ConversationConflict("selected chat history exceeds causal dependency bounds")
+        if not ids:
+            return []
+        query = {
+            "thread_id": thread_id,
+            "_id": {"$in": ids},
+            "sequence": {"$lte": thread.message_sequence},
+            "author_type": "user",
+        }
+        projection = {"_chat_dispatch": 0}
+        try:
+            sizes = await self.messages.aggregate(
+                [
+                    {"$match": query},
+                    {"$project": projection},
+                    {"$group": {"_id": None, "bytes": {"$sum": {"$bsonSize": "$$ROOT"}}}},
+                ],
+                maxTimeMS=2000,
+            ).to_list(length=1)
+            if sizes and sizes[0]["bytes"] > 8 * 1024 * 1024:
+                raise ConversationConflict("selected chat dependency metadata exceeds its byte bound")
+            rows = (
+                await self.messages.find(query, projection).limit(256).max_time_ms(2000).to_list(length=256)
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable("selected chat dependencies are unavailable") from exc
+        if len(rows) != len(ids):
+            raise ConversationConflict("selected chat causal user lineage is incomplete")
+        if _storage_bytes(rows) > 8 * 1024 * 1024:
+            raise ConversationConflict("selected chat execution metadata exceeds its byte bound")
+        return [
+            (
+                replace(
+                    _message_from_doc(record),
+                    attachment_refs=self._bound_user_request_refs(_message_from_doc(record), record),
+                ),
+                record.get("_chat_execution"),
+                self._user_engine_command(
+                    _message_from_doc(record),
+                    record,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    thread_data_class=thread.data_class,
+                ),
+            )
+            for record in rows
+        ]
+
+    async def chat_dispatch(
+        self, thread_id, message_id, *, tenant_id, owner_id, record_digest, action="read"
+    ):
+        """Serialize original command admission and owner cancellation on its row."""
+        thread = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        query = {
+            "_id": message_id,
+            "thread_id": thread_id,
+            "sequence": {"$lte": thread.message_sequence},
+            "_chat_execution.record_digest": record_digest,
+        }
+        try:
+            if action == "claim":
+                doc = await self.messages.find_one_and_update(
+                    {
+                        **query,
+                        "_chat_dispatch.state": {"$in": ["ready", "submitting"]},
+                        "_chat_dispatch.cancel_requested": False,
+                    },
+                    {"$set": {"_chat_dispatch.state": "submitting"}},
+                    return_document=ReturnDocument.AFTER,
+                )
+            elif action == "cancel":
+                doc = await self.messages.find_one_and_update(
+                    {**query, "_chat_dispatch.state": "ready"},
+                    {"$set": {"_chat_dispatch.state": "withdrawn", "_chat_dispatch.cancel_requested": True}},
+                    return_document=ReturnDocument.AFTER,
+                )
+                if doc is None:
+                    doc = await self.messages.find_one_and_update(
+                        query,
+                        {"$set": {"_chat_dispatch.cancel_requested": True}},
+                        return_document=ReturnDocument.AFTER,
+                    )
+            elif action == "admitted":
+                doc = await self.messages.find_one_and_update(
+                    {**query, "_chat_dispatch.state": {"$in": ["submitting", "admitted"]}},
+                    {"$set": {"_chat_dispatch.state": "admitted"}},
+                    return_document=ReturnDocument.AFTER,
+                )
+            elif action == "read":
+                doc = await self.messages.find_one(query)
+            else:
+                raise ValueError("unsupported chat dispatch transition")
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable("chat admission state is unavailable") from exc
+        return None if doc is None else doc.get("_chat_dispatch")
 
     async def append_user_message(
         self,
@@ -1668,18 +1725,14 @@ class MongoConversationAuthority:
                 }
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation storage is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         if doc is None:
             raise ConversationNotFound(prior_assistant_message_id)
         prior = _message_from_doc(doc)
         if prior.author_type is not ConversationAuthorType.ASSISTANT:
             raise ConversationConflict("only assistant messages can be regenerated")
         if prior.causal_user_message_id is None:
-            raise ConversationConflict(
-                "assistant message is missing causal user lineage"
-            )
+            raise ConversationConflict("assistant message is missing causal user lineage")
 
         return await self.commit_assistant_message(
             thread_id,
@@ -1740,9 +1793,7 @@ class MongoConversationAuthority:
                 .to_list(length=8)
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation operation result is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation operation result is unavailable") from exc
 
         for doc in docs:
             thread_id = str(doc.get("thread_id") or "")
@@ -1786,60 +1837,85 @@ class MongoConversationAuthority:
                             "$gt": after_sequence,
                             "$lte": thread.message_sequence,
                         },
-                    }
+                    },
+                    {
+                        "_chat_execution": 0,
+                        "_chat_dispatch": 0,
+                        "_chat_engine_command": 0,
+                        "_regeneration_requests": 0,
+                    },
                 )
                 .sort("sequence", ASCENDING)
                 .limit(limit)
                 .to_list(length=limit)
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation storage is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         return tuple(_message_from_doc(doc) for doc in docs)
 
     async def active_transcript(
-        self,
-        thread_id: str,
-        *,
-        tenant_id: str,
-        owner_id: str,
+        self, thread_id: str, *, tenant_id: str, owner_id: str
     ) -> tuple[ConversationMessage, ...]:
-        thread = await self.get_thread(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-        messages = await self.list_messages(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            limit=500,
-        )
-        if not messages:
+        thread = await self._recover_prepared(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        if thread.message_sequence == 0:
             return ()
+        query = {"thread_id": thread_id, "sequence": {"$lte": thread.message_sequence}}
+        projection = {
+            "_chat_execution": 0,
+            "_chat_dispatch": 0,
+            "_chat_engine_command": 0,
+            "_regeneration_requests": 0,
+        }
+        try:
+            # Count and byte admission happen in Mongo before payload fetch.
+            sizes = await self.messages.aggregate(
+                [
+                    {"$match": query},
+                    {"$project": projection},
+                    {
+                        "$group": {
+                            "_id": None,
+                            "count": {"$sum": 1},
+                            "bytes": {"$sum": {"$bsonSize": "$$ROOT"}},
+                        }
+                    },
+                ],
+                maxTimeMS=2000,
+            ).to_list(length=1)
+            if not sizes or sizes[0]["count"] > 10000 or sizes[0]["bytes"] > 8 * 1024 * 1024:
+                raise ConversationStorageUnavailable(
+                    "conversation transcript exceeds its complete-read bound"
+                )
+            docs = (
+                await self.messages.find(query, projection)
+                .sort("sequence", ASCENDING)
+                .limit(10001)
+                .max_time_ms(2000)
+                .to_list(length=10001)
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable("complete conversation transcript is unavailable") from exc
+        if len(docs) > 10000 or _storage_bytes(docs) > 8 * 1024 * 1024:
+            raise ConversationStorageUnavailable("conversation transcript exceeds its complete-read bound")
+        messages = tuple(_message_from_doc(doc) for doc in docs)
         by_id = {message.message_id: message for message in messages}
-        candidates = [
-            message
-            for message in messages
-            if message.branch_id == thread.active_branch_id
-        ]
-        tip = candidates[-1] if candidates else messages[-1]
-        lineage: list[ConversationMessage] = []
-        seen: set[str] = set()
-        current: ConversationMessage | None = tip
+        candidates = [message for message in messages if message.branch_id == thread.active_branch_id]
+        if not candidates:
+            raise ConversationStorageUnavailable("active conversation branch has no committed tip")
+        current = candidates[-1]
+        lineage, seen = [], set()
         while current is not None:
             if current.message_id in seen:
-                raise ConversationStorageUnavailable(
-                    "conversation lineage contains a cycle"
-                )
+                raise ConversationStorageUnavailable("conversation lineage contains a cycle")
             seen.add(current.message_id)
             lineage.append(current)
-            current = (
-                by_id.get(current.parent_message_id)
-                if current.parent_message_id is not None
-                else None
-            )
+            parent_id = current.parent_message_id
+            if parent_id is not None and parent_id not in by_id:
+                raise ConversationStorageUnavailable("conversation lineage has a missing parent")
+            parent = by_id.get(parent_id)
+            if parent is not None and parent.sequence >= current.sequence:
+                raise ConversationStorageUnavailable("conversation lineage parent ordering differs")
+            current = parent
         lineage.reverse()
         return tuple(lineage)
 
@@ -1860,13 +1936,9 @@ class MongoConversationAuthority:
             owner_id=owner_id,
         )
         try:
-            doc = await self.messages.find_one(
-                {"_id": message_id, "thread_id": thread_id}
-            )
+            doc = await self.messages.find_one({"_id": message_id, "thread_id": thread_id})
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation storage is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         if doc is None:
             raise ConversationNotFound(message_id)
         prior = _message_from_doc(doc)
@@ -1883,7 +1955,11 @@ class MongoConversationAuthority:
             content=content,
             parent_message_id=prior.parent_message_id,
             supersedes_message_id=prior.message_id,
-            attachment_refs=prior.attachment_refs,
+            attachment_refs=tuple(
+                ref
+                for ref in prior.attachment_refs
+                if not ref.startswith(_EXECUTION_REF_PREFIXES) and ref != "chat-prepared-execution:v1"
+            ),
             data_class=prior.data_class,
         )
         return await self.append_message(
@@ -1924,9 +2000,15 @@ class MongoConversationAuthority:
         ):
             raise ConversationStorageUnavailable("conversation request binding digest mismatch")
         retained = tuple(
-            ref for ref in message.attachment_refs if not ref.startswith(_EXECUTION_REF_PREFIXES)
+            ref
+            for ref in message.attachment_refs
+            if not ref.startswith(_EXECUTION_REF_PREFIXES) and ref != "chat-prepared-execution:v1"
         )
-        requested_sources = tuple(ref for ref in refs if not ref.startswith(_EXECUTION_REF_PREFIXES))
+        requested_sources = tuple(
+            ref
+            for ref in refs
+            if not ref.startswith(_EXECUTION_REF_PREFIXES) and ref != "chat-prepared-execution:v1"
+        )
         if retained != requested_sources:
             raise ConversationStorageUnavailable("conversation request binding changed source attachments")
         return refs
@@ -1989,9 +2071,15 @@ class MongoConversationAuthority:
                 )
         else:
             retained = tuple(
-                ref for ref in message.attachment_refs if not ref.startswith(_EXECUTION_REF_PREFIXES)
+                ref
+                for ref in message.attachment_refs
+                if not ref.startswith(_EXECUTION_REF_PREFIXES) and ref != "chat-prepared-execution:v1"
             )
-            if retained != tuple(ref for ref in desired if not ref.startswith(_EXECUTION_REF_PREFIXES)):
+            if retained != tuple(
+                ref
+                for ref in desired
+                if not ref.startswith(_EXECUTION_REF_PREFIXES) and ref != "chat-prepared-execution:v1"
+            ):
                 raise ConversationConflict("edited request cannot substitute source attachments")
             digest = _request_refs_digest(thread_id, user_message_id, desired)
             await self._admit_storage(
@@ -2469,6 +2557,12 @@ class MongoConversationAuthority:
                     "branch_id": thread.active_branch_id,
                     "sequence": {"$lte": thread.message_sequence},
                 },
+                projection={
+                    "_chat_execution": 0,
+                    "_chat_dispatch": 0,
+                    "_chat_engine_command": 0,
+                    "_regeneration_requests": 0,
+                },
                 sort=[("sequence", DESCENDING)],
             )
             if doc is None:
@@ -2508,6 +2602,12 @@ class MongoConversationAuthority:
                         "thread_id": thread.thread_id,
                         "sequence": {"$lt": current.sequence, "$lte": thread.message_sequence},
                     },
+                    {
+                        "_chat_execution": 0,
+                        "_chat_dispatch": 0,
+                        "_chat_engine_command": 0,
+                        "_regeneration_requests": 0,
+                    },
                 )
                 if parent is None:
                     raise ConversationStorageUnavailable("conversation parent lineage is incomplete")
@@ -2519,7 +2619,6 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("conversation snapshot is unavailable") from exc
         except (ValueError, TypeError, KeyError) as exc:
             raise ConversationStorageUnavailable("conversation persisted lineage is malformed") from exc
-
 
     async def conversation_snapshot(
         self,
@@ -2574,7 +2673,6 @@ class MongoConversationAuthority:
                 "recovery_requests_truncated": requests_truncated,
             }
         raise ConversationConflict("conversation changed while its snapshot was reconstructed")
-
 
     async def _regeneration_recovery_refs(
         self, thread: ConversationThread
@@ -2646,7 +2744,6 @@ class MongoConversationAuthority:
                 if len(requests) > 32:
                     return requests[:32], True
         return requests, len(rows) == 64
-
 
     async def export_thread(
         self,
@@ -2830,14 +2927,7 @@ class MongoConversationAuthority:
         await self._admit_storage(
             tenant_id=tenant_id,
             resource_id="conversation-thread-state",
-            write_id=(
-                "state:"
-                + str(thread_id)
-                + ":"
-                + str(expected_version)
-                + ":"
-                + state.value
-            ),
+            write_id=("state:" + str(thread_id) + ":" + str(expected_version) + ":" + state.value),
             payload={
                 "thread_id": str(thread_id),
                 "tenant_id": str(tenant_id),
@@ -2867,9 +2957,7 @@ class MongoConversationAuthority:
                 return_document=ReturnDocument.AFTER,
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation storage is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         if updated is None:
             exists = await self.threads.find_one(
                 self._authorized_filter(
@@ -2888,14 +2976,10 @@ class MongoConversationAuthority:
 _conversation_engine_client = EngineClient.from_env()
 conversation_authority = MongoConversationAuthority(
     storage_admitter=(
-        None
-        if _conversation_engine_client is None
-        else _conversation_engine_client.admit_storage_write
+        None if _conversation_engine_client is None else _conversation_engine_client.admit_storage_write
     ),
     governance_registrar=(
-        None
-        if _conversation_engine_client is None
-        else _conversation_engine_client.reconcile_governed_write
+        None if _conversation_engine_client is None else _conversation_engine_client.reconcile_governed_write
     ),
     governance_deletion_planner=(
         None
@@ -2908,9 +2992,7 @@ conversation_authority = MongoConversationAuthority(
         else _conversation_engine_client.acknowledge_governance_deletion
     ),
     governance_inventory_reader=(
-        None
-        if _conversation_engine_client is None
-        else _conversation_engine_client.governance_inventory
+        None if _conversation_engine_client is None else _conversation_engine_client.governance_inventory
     ),
     governance_engine_target_executor=(
         None
@@ -2918,9 +3000,7 @@ conversation_authority = MongoConversationAuthority(
         else _conversation_engine_client.execute_governance_deletion_engine_targets
     ),
     governance_retention_planner=(
-        None
-        if _conversation_engine_client is None
-        else _conversation_engine_client.plan_governance_retention
+        None if _conversation_engine_client is None else _conversation_engine_client.plan_governance_retention
     ),
 )
 

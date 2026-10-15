@@ -2,22 +2,22 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
 import sqlite3
 import threading
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Mapping
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
     EngineAuthorityError,
     EngineAuthorityRegistry,
 )
+from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.contracts.ai_execution import (
     AIExecutionRequest,
     ExecutionState,
@@ -39,17 +39,22 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntimeError,
 )
 from skeleton.intelligence.quota import QuotaError
-from skeleton.provider_contract import ProviderToolDefinition
-from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
-from skeleton.vault.data_governance import DataGovernanceDenied
-from skeleton.vault.data_lifecycle import DeletionPlan, LifecycleError
-from skeleton.vault.governance_registry import GovernanceRegistry
-from skeleton.vault.lifecycle_adapters import LifecycleExecutor
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
     ExecutionRepositoryError,
     SQLiteExecutionRepository,
 )
+from skeleton.provider_contract import ProviderToolDefinition
+from skeleton.provider_runtime import (
+    ProviderUnavailableError,
+    provider_context_selection,
+    provider_context_temperature,
+)
+from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
+from skeleton.vault.data_governance import DataGovernanceDenied
+from skeleton.vault.data_lifecycle import DeletionPlan, LifecycleError
+from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import LifecycleExecutor
 
 
 class EngineServiceError(RuntimeError):
@@ -622,6 +627,11 @@ class EngineExecutionCommand:
                 "compiled context tenant_id mismatch"
             )
         context_policy = dict(self.execution_request.context_policy)
+        try:
+            provider_context_selection(context_policy)
+            provider_context_temperature(context_policy)
+        except ProviderUnavailableError as exc:
+            raise EngineServiceError("execution provider policy is malformed or conflicting") from exc
         if context_policy.get("context_id") != handoff.context_id:
             raise EngineServiceError(
                 "compiled context id does not match execution policy"

@@ -15,6 +15,7 @@ const KEY = 'gameforge_auth_token';
 const EMERGENT_AUTH = 'https://auth.emergentagent.com/';
 
 let _token = '';
+let _tokenLoaded = false;
 let _tenantIdentityCache: {
   token: string;
   identity: { tenantId: string; principalId: string };
@@ -29,6 +30,7 @@ export function authHeaders(extra: Record<string, string> = {}): Record<string, 
 }
 
 async function persist(token: string) {
+  _tokenLoaded = true;
   if (token !== _token) _tenantIdentityCache = null;
   _token = token;
   try {
@@ -57,6 +59,8 @@ export interface MeResult {
   enforced: boolean;
   role: string;
   user: any;
+  observed?: boolean;
+  error?: string;
 }
 
 export type StorageTenantIdentity = {
@@ -83,8 +87,12 @@ function storageIdentityFromUser(user: any): StorageTenantIdentity {
  * storage merely because /auth/me was unreachable.
  */
 export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdentity> {
-  const stored = _token || (await loadStored());
+  const initialToken = _token;
+  const initiallyLoaded = _tokenLoaded;
+  const stored = _tokenLoaded ? _token : await loadStored();
+  if (_token !== initialToken || _tokenLoaded !== initiallyLoaded) throw new Error('Your account changed while resolving storage.');
   _token = stored;
+  _tokenLoaded = true;
 
   if (
     _tenantIdentityCache
@@ -97,11 +105,12 @@ export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdent
     '/api/auth/me',
     stored ? { headers: authHeaders() } : {},
   );
+  if (_token !== stored) throw new Error('Your account changed while verifying storage.');
   if (r.status === 401) {
     await persist('');
     throw new Error('Tenant identity is no longer authenticated.');
   }
-  if (!r.ok || !r.data) {
+  if (!r.ok || !r.data || typeof r.data.authenticated !== 'boolean' || typeof r.data.enforced !== 'boolean') {
     throw new Error('Tenant identity could not be verified.');
   }
 
@@ -128,38 +137,36 @@ export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdent
 
 /** Validate the current token against the backend. Clears it on 401. */
 export async function checkMe(): Promise<MeResult> {
-  const stored = _token || (await loadStored());
+  const unknown = (error: string): MeResult => ({ authenticated: false, enforced: true, role: 'anonymous', user: null, observed: false, error });
+  const initialToken = _token;
+  const initiallyLoaded = _tokenLoaded;
+  const stored = _tokenLoaded ? _token : await loadStored();
+  if (_token !== initialToken || _tokenLoaded !== initiallyLoaded) return unknown('Your account changed. Verify the current session again.');
   _token = stored;
-  const r = await api.get<any>('/api/auth/me', stored ? { headers: authHeaders() } : {});
-  if (!r.ok) return { authenticated: false, enforced: false, role: 'anonymous', user: null };
-  if (r.status === 401) { await persist(''); }
-  const authed = !!r.data?.authenticated;
+  _tokenLoaded = true;
+  const r = await api.get<any>('/api/auth/me', { headers: authHeaders(), timeoutMs: 12000, retries: 0 });
+  if (_token !== stored) return unknown('Your account changed. Verify the current session again.');
+  if (r.status === 401) {
+    await persist('');
+    return { authenticated: false, enforced: true, role: 'anonymous', user: null, observed: true };
+  }
+  if (!r.ok || !r.data || typeof r.data.authenticated !== 'boolean' || typeof r.data.enforced !== 'boolean') {
+    return unknown('The sign-in service could not be verified. Check application readiness and retry.');
+  }
+  const authed = r.data.authenticated;
   if (authed) {
     try {
-      _tenantIdentityCache = {
-        token: stored,
-        identity: storageIdentityFromUser(r.data?.user),
-      };
+      _tenantIdentityCache = { token: stored, identity: storageIdentityFromUser(r.data.user) };
     } catch {
       _tenantIdentityCache = null;
+      return unknown('The account service returned an incomplete identity. Sign in again or check setup.');
     }
-  } else if (!r.data?.enforced) {
-    _tenantIdentityCache = {
-      token: stored,
-      identity: {
-        tenantId: 'anonymous',
-        principalId: 'anonymous',
-      },
-    };
+  } else if (!r.data.enforced) {
+    _tenantIdentityCache = { token: stored, identity: { tenantId: 'anonymous', principalId: 'anonymous' } };
   } else {
     _tenantIdentityCache = null;
   }
-  return {
-    authenticated: authed,
-    enforced: !!r.data?.enforced,
-    role: r.data?.user?.role || 'anonymous',
-    user: authed ? r.data?.user : null,
-  };
+  return { authenticated: authed, enforced: r.data.enforced, role: authed ? r.data.user?.role || 'anonymous' : 'anonymous', user: authed ? r.data.user : null, observed: true };
 }
 
 /** Email + password login (JWT). */

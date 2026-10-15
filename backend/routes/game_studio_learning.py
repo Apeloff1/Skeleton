@@ -39,6 +39,10 @@ class CampaignCreate(WriteRequest):
     max_death_regression: float = Field(default=0, ge=0, le=1, strict=True, allow_inf_nan=False)
     max_worst_seed_regression: float = Field(default=0, ge=0, le=1e9, strict=True, allow_inf_nan=False)
 
+    proposal_width: int = Field(default=2, ge=1, le=4, strict=True)
+    exploration_strategy: Literal["uniform", "least_visited"] = "least_visited"
+    n_step: int = Field(default=4, ge=1, le=16, strict=True)
+
     @model_validator(mode="before")
     @classmethod
     def numeric_types(cls, value):
@@ -63,6 +67,9 @@ class CampaignCreate(WriteRequest):
             max_mean_step_ms=self.max_mean_step_ms,
             max_death_regression=self.max_death_regression,
             max_worst_seed_regression=self.max_worst_seed_regression,
+            proposal_width=self.proposal_width,
+            exploration_strategy=self.exploration_strategy,
+            n_step=self.n_step,
         )
         return self
 

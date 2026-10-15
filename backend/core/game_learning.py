@@ -1392,6 +1392,10 @@ class GameLearningWorkspace:
                 "core_id": pin["core_id"],
                 "registry_digest": pin["registry_digest"],
             }
+            from core.game_console_build import artifact_native_observation
+
+            native = await artifact_native_observation(scope, picked)
+            binding["native_observation_digest"] = native["descriptor_digest"] if native else None
         return binding
 
     async def _authority(self, scope, binding, *, dragon_guarded=False):
@@ -1431,10 +1435,17 @@ class GameLearningWorkspace:
                 )
             bundle = self._source_bundle(scope, row)
             if row["kind"] == "build_artifact":
-                from core.game_console_build import assert_artifact_source
+                from core.game_console_build import assert_artifact_source, _native_observation
 
-                await assert_artifact_source(scope, row, dragon_guarded=dragon_guarded)
+                record, producer = await assert_artifact_source(scope, row, dragon_guarded=dragon_guarded)
                 if expected["source_id"] == binding.get("source_id"):
+                    native = _native_observation(record, producer, row["artifact_manifest"]["core_id"])
+                    if binding.get("native_observation_digest") != (
+                        native["descriptor_digest"] if native else None
+                    ):
+                        raise GameLearningError(
+                            "native_observation_changed", "Native observation authority changed.", 409
+                        )
                     pin = row["artifact_manifest"]
                     expected_pin = {
                         key: pin[key]
@@ -1509,7 +1520,7 @@ class GameLearningWorkspace:
                 raise GameLearningError(
                     "derived_teacher_withdrawn", "An original teacher withdrew consent.", 403
                 )
-            demo = GameDemonstration.from_dict(recorded["demonstration"])
+            demo = GameDemonstration.from_dict(self._stored_evidence(recorded["demonstration"]))
             if (
                 demo.digest != expected["demonstration_digest"]
                 or recorded["input"]["tree_digest"] != expected["tree_digest"]
@@ -1606,6 +1617,7 @@ class GameLearningWorkspace:
         saved = await self.policies.find_one({"_id": policy_id, **scope, "project_id": project_id})
         if saved is None:
             raise GameLearningError("policy_not_found", "An owned completed policy is required.", 404)
+        saved["snapshot"] = self._stored_evidence(saved["snapshot"])
         issuer = await self.jobs.find_one(
             {"_id": saved["job_id"], **scope, "project_id": project_id, "status": "completed"}
         )
@@ -1960,6 +1972,25 @@ class GameLearningWorkspace:
         )
         return result
 
+    @staticmethod
+    def _stored_evidence(value):
+        """Lossless BSON numeric roundtrip at the durable runtime JSON boundary."""
+        try:
+            encoded = json.dumps(
+                value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+            ).encode("utf-8")
+            if len(encoded) > MAX_JSON:
+                raise GameLearningError(
+                    "stored_evidence_limit", "Stored runtime JSON exceeds its byte bound.", 413
+                )
+            return json.loads(encoded)
+        except (TypeError, ValueError, OverflowError, RecursionError, UnicodeError) as exc:
+            if isinstance(exc, GameLearningError):
+                raise
+            raise GameLearningError(
+                "stored_evidence_invalid", "Stored runtime evidence is not finite JSON.", 503
+            ) from exc
+
     async def start_job(self, scope, project_id, kind, body):
         environment = None
         try:
@@ -1994,6 +2025,14 @@ class GameLearningWorkspace:
             project = await self._project(project_id, scope, body["expected_version"])
             if project["_job_count"] >= 512:
                 raise GameLearningError("job_limit", "This project has reached its job limit.", 413)
+            from core.game_play import resource_profiles
+
+            capacity = resource_profiles()["profiles"][0]
+            requested_workers = body.get("workers", 1) if kind == "train" else 1
+            if not capacity["available"] or requested_workers > capacity["max_training_workers"]:
+                raise GameLearningError(
+                    "worker_capacity", "Requested workers exceed current CPU/memory instance capacity.", 429
+                )
             binding = await self._input(
                 scope,
                 project,
@@ -2335,7 +2374,7 @@ class GameLearningWorkspace:
         admission = await self._admit(
             scope,
             "game-learning-checkpoint",
-            job["job_id"] + ":" + snapshot["snapshot_digest"],
+            job["job_id"] + ":" + _digest(payload),
             len(_json(payload)),
         )
         if batch_state is not None and trace is None:
@@ -2423,7 +2462,15 @@ class GameLearningWorkspace:
                         1
                         if row is not None
                         and row["kind"]
-                        in {"build", "successor", "successor_compare", "desktop", "studio_learning", "review"}
+                        in {
+                            "build",
+                            "generate",
+                            "successor",
+                            "successor_compare",
+                            "desktop",
+                            "studio_learning",
+                            "review",
+                        }
                         else 0
                     )
                 )
@@ -2494,7 +2541,15 @@ class GameLearningWorkspace:
                     else (
                         1
                         if admitted["kind"]
-                        in {"build", "successor", "successor_compare", "desktop", "studio_learning", "review"}
+                        in {
+                            "build",
+                            "generate",
+                            "successor",
+                            "successor_compare",
+                            "desktop",
+                            "studio_learning",
+                            "review",
+                        }
                         else 0
                     )
                 )
@@ -2600,6 +2655,9 @@ class GameLearningWorkspace:
             asyncio.run_coroutine_threadsafe(emit_event(payload), loop).result()
 
         try:
+            for key in ("request", "input", "_checkpoint", "_parent"):
+                if job.get(key) is not None:
+                    job[key] = self._stored_evidence(job[key])
             frame_stream_id = str(uuid4())
             await self.jobs.update_one(
                 {"_id": job_id, **scope, "worker_token": token},
@@ -2726,6 +2784,13 @@ class GameLearningWorkspace:
 
         environment = factory()
         try:
+            # A descriptor probe may own a real native subprocess. Release it
+            # before actors claim their physical process budget.
+            environment_spec = environment.spec
+            from skeleton.jeeves.game_learning_demonstrations import close_environment
+
+            close_environment(environment)
+            environment = None
             request = job["request"]
             config = GameLearningConfig(
                 seed=request.get("seed", 0),
@@ -2748,7 +2813,7 @@ class GameLearningWorkspace:
             prior = job.get("_checkpoint")
             if prior is not None:
                 learner = GamePolicyLearner(
-                    environment.spec,
+                    environment_spec,
                     config,
                     policy_id=job["policy_id"],
                     source_lineage=lineage,
@@ -2760,11 +2825,11 @@ class GameLearningWorkspace:
                     newpolicy_id=job["policy_id"],
                     newsource_lineage=lineage,
                     config=config,
-                    expected_spec=environment.spec,
+                    expected_spec=environment_spec,
                 )
             else:
                 learner = GamePolicyLearner(
-                    environment.spec, config, policy_id=job["policy_id"], source_lineage=lineage
+                    environment_spec, config, policy_id=job["policy_id"], source_lineage=lineage
                 )
             from skeleton.jeeves.game_learning_parallel import (
                 GameEnvironmentRequest,
@@ -2841,7 +2906,8 @@ class GameLearningWorkspace:
         finally:
             from skeleton.jeeves.game_learning_demonstrations import close_environment
 
-            close_environment(environment)
+            if environment is not None:
+                close_environment(environment)
 
     async def _generate(self, scope, job, factory, cancelled):
         from skeleton.jeeves.game_learning_generation import GameGenerationRequest, generate_game_project
@@ -3117,6 +3183,7 @@ class GameLearningWorkspace:
     async def environment_request(self, scope, binding):
         from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
         from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry
+        from core.game_console_build import artifact_native_observation
 
         project = await self._authority(scope, binding)
         frozen_files = binding.get("files", project["files"])
@@ -3210,6 +3277,9 @@ class GameLearningWorkspace:
                     content=content,
                     rom_source=rom,
                     filename=filename,
+                    native_observation=(
+                        await artifact_native_observation(scope, selected_source) if compiled else None
+                    ),
                 )
                 return request.as_dict()
         request = GameEnvironmentRequest(
@@ -3336,7 +3406,7 @@ class GameLearningWorkspace:
                     "Recording is unavailable or its consent was withdrawn.",
                     403,
                 )
-            demo = GameDemonstration.from_dict(row["demonstration"])
+            demo = GameDemonstration.from_dict(self._stored_evidence(row["demonstration"]))
             if (
                 demo.digest != reference["demonstration_digest"]
                 or row["input"]["tree_digest"] != binding["tree_digest"]

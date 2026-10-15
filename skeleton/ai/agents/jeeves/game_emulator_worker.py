@@ -77,6 +77,15 @@ class GameInfo(C.Structure):
     _fields_ = [("path", C.c_void_p), ("data", C.c_void_p), ("size", C.c_size_t), ("meta", C.c_void_p)]
 
 
+class InputDescriptor(C.Structure):
+    """Upstream libretro retro_input_descriptor ABI, no pointer retained."""
+    _fields_ = [
+        ("port", C.c_uint), ("device", C.c_uint),
+        ("index", C.c_uint), ("id", C.c_uint),
+        ("description", C.c_void_p),
+    ]
+
+
 class Geometry(C.Structure):
     _fields_ = [
         ("base_width", C.c_uint),
@@ -195,6 +204,13 @@ class NativeCore:
         self.error: str | None = None
         self.shutdown = False
         self.options = dict(config["options"])
+        declared_ports = config.get("controller_port_devices", ["joypad"] * 4)
+        allowed_ports = {"none": 0, "joypad": 1, "mouse": 2, "keyboard": 3, "analog": 5, "pointer": 6}
+        if (not isinstance(declared_ports, list) or len(declared_ports) != 4
+            or any(type(item) is not str or item not in allowed_ports for item in declared_ports)):
+            raise ValueError("Native controller port topology is not a supported bounded declaration")
+        self.controller_port_devices = tuple(declared_ports)
+        self.input_descriptors: list[dict[str, object]] = []
         self.buffers: dict[str, object] = {}
         self.keys_previous: set[int] = set()
         self.keyboard = None
@@ -269,6 +285,7 @@ class NativeCore:
             "valid_extensions": _text(self.system.valid_extensions),
             "need_fullpath": bool(self.system.need_fullpath),
             "block_extract": bool(self.system.block_extract),
+            "controller_port_devices": list(self.controller_port_devices),
         }
         self.core.retro_init()
         self._initialized = True
@@ -291,11 +308,15 @@ class NativeCore:
         if not self.core.retro_load_game(C.byref(game)):
             raise ValueError("native core rejected the supplied content")
         self._loaded = True
-        for port in range(4):
-            self.core.retro_set_controller_port_device(port, 1)
+        for port, device in enumerate(self.controller_port_devices):
+            self.core.retro_set_controller_port_device(port, allowed_ports[device])
         self.av = AvInfo()
         self.core.retro_get_system_av_info(C.byref(self.av))
         self._check_av()
+        # libretro cores may send descriptions before and after load_game;
+        # snapshot them into wire-safe metadata only after both phases.
+        self.info["core_input_descriptors"] = list(self.input_descriptors)
+        self.info["core_input_descriptors_are_user_defined"] = True
         self._check()
 
     def _buffer(self, key: str, value: str) -> int:
@@ -343,6 +364,37 @@ class NativeCore:
                 directory = {9: "/system", 19: "/core/core.so", 30: "/core", 31: "/tmp/saves"}[command]
                 C.cast(data, C.POINTER(C.c_void_p))[0] = self._buffer("directory_" + str(command), directory)
                 return True
+            if command == 11:
+                # RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. Observe labels,
+                # never interpret them as proof of controller compatibility.
+                values=C.cast(data,C.POINTER(InputDescriptor))
+                descriptions=[]
+                seen=set()
+                for index in range(129):
+                    row=values[index]
+                    if not row.description:
+                        break
+                    if index==128:
+                        return False
+                    if not (row.port<4 and row.device in (1,2,3,5,6)
+                            and row.index<=3 and row.id<=511):
+                        return False
+                    label=_text(row.description,96)
+                    if not label or any(ord(c)<32 for c in label):
+                        return False
+                    key=(int(row.port),int(row.device),int(row.index),int(row.id))
+                    if key in seen:
+                        return False
+                    seen.add(key)
+                    descriptions.append({
+                        "port":int(row.port),"device":int(row.device),
+                        "index":int(row.index),"id":int(row.id),
+                        "description":label,
+                    })
+                else:
+                    return False
+                self.input_descriptors=descriptions
+                return True
             if command == 10:
                 pixel_format = C.cast(data, C.POINTER(C.c_int))[0]
                 if pixel_format not in (0, 1, 2):
@@ -380,7 +432,9 @@ class NativeCore:
                         self.error = "operator core option is outside the actual core's choices"
                         return False
                     self.options.setdefault(key, values[0])
-                return False
+                # RETRO_ENVIRONMENT_SET_VARIABLES succeeded: core options are
+                # now available to subsequent RETRO_ENVIRONMENT_GET_VARIABLE.
+                return True
             if command == 24:
                 C.cast(data, C.POINTER(C.c_uint64))[0] = sum(1 << device for device in (1, 2, 3, 5, 6))
                 return True
@@ -482,10 +536,20 @@ class NativeCore:
             return 0
 
     def _input(self, port: int, device: int, index: int, identity: int) -> int:
-        if port >= len(self.controls):
+        if port < 0 or index < 0 or identity < 0 or port >= len(self.controls):
             return 0
-        control = self.controls[port]
         device &= 255
+        selected = self.controller_port_devices[port]
+        requested = {1: "joypad", 2: "mouse", 3: "keyboard", 5: "analog", 6: "pointer"}.get(device)
+        if requested is None or selected == "none":
+            return 0
+        # Retro keyboard events are global, not bound to a joypad port.
+        # Preserve the legacy keyboard callback path for port zero.
+        if requested != selected and not (requested == "keyboard" and port == 0 and self.keyboard):
+            # Analog devices may expose digital joypad buttons as well.
+            if not (selected == "analog" and requested == "joypad"):
+                return 0
+        control = self.controls[port]
         if device == 1:
             if identity == 256:
                 return C.c_int16(control["buttons"]).value
@@ -539,12 +603,16 @@ class NativeCore:
             "video_callbacks": self.video_calls,
             "runs": self.runs,
             "audio_frames": self.audio_frames,
+            "audio_sha256": hashlib.sha256(self.audio).hexdigest(),
             "sample_rate": self.av.timing.sample_rate or None,
             "fps": self.av.timing.fps or None,
             "audio_available": self.audio_frames > 0,
             "shutdown": self.shutdown,
         }
-        return metadata, {"pixels": pixels, "audio": bytes(self.audio)}
+        audio = bytes(self.audio)
+        if len(audio) != self.audio_frames * 4:
+            raise ValueError("native PCM bytes differ from libretro callback frame count")
+        return metadata, {"pixels": pixels, "audio": audio}
 
     def command(
         self, operation: str, payload: dict[str, object], blocks: dict[str, bytes]

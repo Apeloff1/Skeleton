@@ -24,7 +24,7 @@ const BG = '#0b1220';
 const MUTE = '#94a3b8';
 const RED = '#ef4444';
 
-type Status = 'loading' | 'authed' | 'unauth';
+type Status = 'loading' | 'authed' | 'unauth' | 'unavailable';
 
 export interface AuthState {
   role: string;
@@ -36,7 +36,7 @@ export interface AuthState {
 const AuthCtx = React.createContext<AuthState>({ role: 'anonymous', user: null, enforced: false, refresh: () => {} });
 export const useStudioAuth = () => React.useContext(AuthCtx);
 
-export default function StudioLoginGate({ children }: { children: React.ReactNode }) {
+export default function StudioLoginGate({ children, title = 'CNS Studio', requireAuthenticated = false }: { children: React.ReactNode; title?: string; requireAuthenticated?: boolean }) {
   const router = useRouter();
   const [status, setStatus] = React.useState<Status>('loading');
   const [enforced, setEnforced] = React.useState(false);
@@ -55,8 +55,9 @@ export default function StudioLoginGate({ children }: { children: React.ReactNod
     setEnforced(me.enforced);
     setRole(me.role);
     setUser(me.user);
-    setStatus(me.authenticated || !me.enforced ? 'authed' : 'unauth');
-  }, []);
+    if (me.observed === false) { setErr(me.error || 'The sign-in service is unavailable.'); setStatus('unavailable'); }
+    else { setErr(''); setStatus(me.authenticated || (!requireAuthenticated && !me.enforced) ? 'authed' : 'unauth'); }
+  }, [requireAuthenticated]);
 
   React.useEffect(() => {
     (async () => {
@@ -90,8 +91,13 @@ export default function StudioLoginGate({ children }: { children: React.ReactNod
       <SafeAreaView style={[st.root, st.center]}>
         <ActivityIndicator color={GREEN} size="large" />
         <Text style={st.loadingTxt}>Verifying session…</Text>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/setup' as never)} style={{ marginTop: 20, padding: 12 }}><Text style={st.switchTxt}>Setup & readiness</Text></TouchableOpacity>
       </SafeAreaView>
     );
+  }
+
+  if (status === 'unavailable') {
+    return <SafeAreaView style={[st.root, st.center]}><View style={{ maxWidth: 560, padding: 24, gap: 16 }}><Text style={st.headerTitle}>Sign-in service unavailable</Text><Text accessibilityRole="alert" style={st.loadingTxt}>{err}</Text><TouchableOpacity accessibilityRole="button" onPress={() => { setStatus('loading'); void refresh(); }} style={st.primaryBtn}><Text style={st.primaryTxt}>Verify session again</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => router.push('/setup' as never)} style={{ paddingVertical: 12 }}><Text style={st.switchTxt}>Setup & readiness</Text></TouchableOpacity></View></SafeAreaView>;
   }
 
   if (status === 'unauth') {
@@ -101,7 +107,7 @@ export default function StudioLoginGate({ children }: { children: React.ReactNod
           <TouchableOpacity testID="gate-back" onPress={() => router.back()} style={{ padding: 4 }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color={GREEN} />
           </TouchableOpacity>
-          <Text style={st.headerTitle}>Sign in to CNS Studio</Text>
+          <Text style={st.headerTitle}>Sign in to {title}</Text>
         </View>
         <View style={st.body}>
           <View style={st.badgeRow}>
@@ -134,6 +140,7 @@ export default function StudioLoginGate({ children }: { children: React.ReactNod
           </TouchableOpacity>
 
           {!!err && <Text testID="gate-error" style={st.errTxt}>{err}</Text>}
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/setup' as never)} style={{ marginTop: 20, paddingVertical: 12 }}><Text style={st.switchTxt}>Need help getting the app ready? Open setup</Text></TouchableOpacity>
         </View>
       </SafeAreaView>
     );

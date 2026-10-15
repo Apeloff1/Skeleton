@@ -16,9 +16,11 @@ from core.game_console_build import (
     admit_artifact_source,
     start_artifact_play,
     start_artifact_training,
+    start_artifact_campaign,
 )
 from core.game_learning import workspace
 from routes.game_learning import Request, User, WriteRequest, PlayRequest, TrainRequest, _call, _scope
+from routes.game_studio_learning import CampaignCreate
 
 router = APIRouter(prefix="/game-learning", tags=["Console builds"])
 
@@ -80,6 +82,10 @@ class ArtifactTrain(TrainRequest):
     fresh_policy: bool = Field(default=True, strict=True)
 
 
+class ArtifactCampaign(CampaignCreate):
+    source_id: None = None
+
+
 @router.get("/projects/{project_id}/build-artifacts/{artifact_id}/playback")
 async def get_artifact_playback(project_id: str, artifact_id: str, user: User):
     return {"playback": await _call(artifact_playback(_scope(user), project_id, artifact_id))}
@@ -103,4 +109,11 @@ async def play_compiled_source(project_id: str, artifact_id: str, body: Artifact
 async def train_compiled_source(project_id: str, artifact_id: str, body: ArtifactTrain, user: User):
     return await _call(
         start_artifact_training(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
+    )
+
+
+@router.post("/projects/{project_id}/build-artifacts/{artifact_id}/campaign")
+async def campaign_compiled_source(project_id: str, artifact_id: str, body: ArtifactCampaign, user: User):
+    return await _call(
+        start_artifact_campaign(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
     )

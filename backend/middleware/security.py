@@ -11,6 +11,7 @@ Provides three independent layers, each is opt-in via wire-up in server.py:
 The audit buffer is also exposed via /api/security/audit (see telemetry router).
 None of these layers persist data outside RAM — they're zero-overhead at idle.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -42,10 +43,7 @@ def _split_content_type_parts(raw: str) -> list[str] | None:
     """Split a bounded Content-Type value without splitting quoted semicolons."""
     if not raw or len(raw) > _CONTENT_TYPE_MAX_CHARS or not raw.isascii():
         return None
-    if any(
-        (ord(character) < 32 and character != "\t") or ord(character) == 127
-        for character in raw
-    ):
+    if any((ord(character) < 32 and character != "\t") or ord(character) == 127 for character in raw):
         return None
 
     parts: list[str] = []
@@ -187,16 +185,12 @@ def _parse_trusted_proxy_networks(
         try:
             networks.append(ipaddress.ip_network(entry, strict=False))
         except ValueError:
-            log.error(
-                "invalid CODEDOCK_TRUSTED_PROXY_CIDRS configuration; disabling proxy trust"
-            )
+            log.error("invalid CODEDOCK_TRUSTED_PROXY_CIDRS configuration; disabling proxy trust")
             return ()
     return tuple(networks)
 
 
-def _trusted_proxy_networks() -> tuple[
-    ipaddress.IPv4Network | ipaddress.IPv6Network, ...
-]:
+def _trusted_proxy_networks() -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
     return _parse_trusted_proxy_networks(
         os.environ.get(
             "CODEDOCK_TRUSTED_PROXY_CIDRS",
@@ -228,11 +222,7 @@ def _client_ip(
     closed to the direct peer.
     """
     networks = _trusted_proxy_networks() if networks is None else networks
-    peer = (
-        request.client.host.strip()
-        if request.client is not None and request.client.host
-        else "unknown"
-    )
+    peer = request.client.host.strip() if request.client is not None and request.client.host else "unknown"
     canonical_peer = _canonical_ip(peer)
     peer_identity = canonical_peer or peer
 
@@ -313,15 +303,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         bucket_ttl: float | None = None,
     ):
         super().__init__(app)
-        configured_rps = (
-            rps
-            if rps is not None
-            else float(os.environ.get("CODEDOCK_RATE_LIMIT_RPS", "2"))
-        )
+        configured_rps = rps if rps is not None else float(os.environ.get("CODEDOCK_RATE_LIMIT_RPS", "2"))
         configured_burst = (
-            burst
-            if burst is not None
-            else int(os.environ.get("CODEDOCK_RATE_LIMIT_BURST", "120"))
+            burst if burst is not None else int(os.environ.get("CODEDOCK_RATE_LIMIT_BURST", "120"))
         )
         configured_max = (
             max_buckets
@@ -368,11 +352,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     @classmethod
     def _prune_expired(cls, now: float) -> int:
-        expired = [
-            key
-            for key, bucket in cls._buckets.items()
-            if now - bucket.last_refill >= cls._bucket_ttl
-        ]
+        expired = [key for key, bucket in cls._buckets.items() if now - bucket.last_refill >= cls._bucket_ttl]
         for key in expired:
             del cls._buckets[key]
         cls._expired_pruned += len(expired)
@@ -383,8 +363,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not cls._buckets:
             return 1
         seconds = min(
-            max(0.0, cls._bucket_ttl - (now - bucket.last_refill))
-            for bucket in cls._buckets.values()
+            max(0.0, cls._bucket_ttl - (now - bucket.last_refill)) for bucket in cls._buckets.values()
         )
         return min(3600, max(1, math.ceil(seconds)))
 
@@ -429,9 +408,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 self._buckets[key] = bucket
 
             elapsed = max(0.0, now - bucket.last_refill)
-            bucket.tokens = min(
-                float(self._burst), bucket.tokens + elapsed * self._rps
-            )
+            bucket.tokens = min(float(self._burst), bucket.tokens + elapsed * self._rps)
             bucket.last_refill = now
             if bucket.tokens < 1.0:
                 retry_after = min(
@@ -470,9 +447,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     "route": key[1],
                     "tokens_remaining": round(bucket.tokens, 2),
                 }
-                for key, bucket in sorted(
-                    cls._buckets.items(), key=lambda item: item[1].tokens
-                )[:20]
+                for key, bucket in sorted(cls._buckets.items(), key=lambda item: item[1].tokens)[:20]
             ],
         }
 
@@ -493,9 +468,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         self._trusted_proxy_networks = _trusted_proxy_networks()
         if max_entries > AuditMiddleware._max_entries:
             AuditMiddleware._max_entries = max_entries
-            AuditMiddleware._buf = deque(
-                list(AuditMiddleware._buf), maxlen=max_entries
-            )
+            AuditMiddleware._buf = deque(list(AuditMiddleware._buf), maxlen=max_entries)
 
     @staticmethod
     def _declared_size(request: Request) -> int | None:
@@ -586,10 +559,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             total_ms += row["duration_ms"]
         top_paths = sorted(path_counts.items(), key=lambda item: -item[1])[:15]
         slowest = sorted(
-            [
-                (path, max(times), sum(times) / len(times))
-                for path, times in path_times.items()
-            ],
+            [(path, max(times), sum(times) / len(times)) for path, times in path_times.items()],
             key=lambda item: -item[1],
         )[:10]
         return {
@@ -630,9 +600,7 @@ class SizeLimitMiddleware:
         max_inflight_mb: int | None = None,
     ):
         self.app = app
-        configured_mb = max_mb if max_mb is not None else int(
-            os.environ.get("CODEDOCK_MAX_BODY_MB", "25")
-        )
+        configured_mb = max_mb if max_mb is not None else int(os.environ.get("CODEDOCK_MAX_BODY_MB", "25"))
         configured_inflight_mb = (
             max_inflight_mb
             if max_inflight_mb is not None
@@ -703,11 +671,7 @@ class SizeLimitMiddleware:
             if key.lower() == b"content-type"
         ]
 
-        if (
-            len(content_lengths) > 1
-            or len(transfer_encodings) > 1
-            or len(content_types) > 1
-        ):
+        if len(content_lengths) > 1 or len(transfer_encodings) > 1 or len(content_types) > 1:
             await self._reject(
                 scope,
                 receive,
@@ -752,8 +716,7 @@ class SizeLimitMiddleware:
             normalized_declared = raw_declared.lstrip("0") or "0"
             limit_text = str(self.max_bytes)
             if len(normalized_declared) > len(limit_text) or (
-                len(normalized_declared) == len(limit_text)
-                and normalized_declared > limit_text
+                len(normalized_declared) == len(limit_text) and normalized_declared > limit_text
             ):
                 await self._reject(
                     scope,
@@ -860,7 +823,7 @@ class SizeLimitMiddleware:
                     message = buffered[index]
                     index += 1
                     return message
-                return {"type": "http.request", "body": b"", "more_body": False}
+                return await receive()
 
             await self.app(scope, replay_receive, send)
         finally:

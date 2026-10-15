@@ -55,11 +55,11 @@
         "backend_data"
       ],
       "durability": "persistent-volume",
-      "production_role": "application-local support data; local Chroma is rebuildable retrieval projection only",
+      "production_role": "Existing application-local support data: rebuildable local Chroma projection and existing authoritative Curiosity filesystem ledgers at /app/data/curiosity.",
       "network": "not directly network-addressable",
       "authentication": "process boundary",
-      "backup": "optional for local Chroma projection; authoritative product state is backed up through Mongo",
-      "restore": "rebuild local Chroma projections from canonical Mongo/content sources",
+      "backup": "Local Chroma may be rebuilt; retain the complete existing Curiosity directory with backend_data. Canonical conversations and crawler operation state remain backed up through Mongo.",
+      "restore": "Rebuild Chroma from its canonical sources; restore existing Curiosity directory/ownership before its workers start. Curiosity restore qualification remains a candidate.",
       "migration": "canonical Jeeves RAG product state migrated to Mongo; legacy Chroma state imports through RAGService.migrate_legacy_chroma_state",
       "evidence": [
         "docker-compose.yml",
@@ -937,6 +937,58 @@
         "machine/ai_game_studio_learning.json"
       ],
       "continuation": "Existing-store scoped play/controller leases, consented measured demonstrations, immutable media manifests, build-derived artifact receipts and episode-atomic parallel learner checkpoints. Runtime sockets/processes/preview frames/private content files are derived execution handles, never source or consent authority. Console authoring documents, exact original successor candidates, cross-project source and teacher lineage, current edited-world desktop packages use the same scoped authority; editor simulation and native player save files remain derived state. Native compiled artifact membership and agent goal journals use existing sources/chunks/revisions authority; finite goal execution rechecks each current source/action and records exact EngineChat execution/typed command receipts. Existing scheduler may recover only currently authorized bounded campaigns."
+    },
+    {
+      "id": "dragon-crawler-application",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME.dragon_crawler_{sessions,commands}",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "implementation-candidate",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Scoped session/version/lease CAS and immutable command intent before bounded crawl slices; only complete current-token checkpoints publish a core snapshot.",
+      "consistency": "Tenant/owner isolation, exact request digest and bounded source/frontier/provenance state; no synthetic fetched/learned counters and no raw crawl automatically promoted to reviewed knowledge.",
+      "retention": "Bounded owner-controlled source/session lifetime; stop prevents continuation, while explicit data retention/deletion remains distinct.",
+      "backup_restore": "Restore existing CORE_DB before resuming; expired leases expose interrupted work and preserve committed snapshots.",
+      "migration": "Additive scoped collections and indexes in existing store; old Academy reviewed practice authority remains unchanged.",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "machine/ai_dragon_crawler_app.json",
+        "machine/ai_dragon_crawler_operations.json",
+        "backend/core/dragon_crawler.py",
+        "backend/routes/dragon_academy.py"
+      ]
+    },
+    {
+      "id": "backend-curiosity-file-state",
+      "owner_plane": "feedback-learning",
+      "physical_store": "backend-data-volume",
+      "logical_location": "CURIOSITY_DATA_ROOT=/app/data/curiosity",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "implementation-candidate",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Existing CuriosityService filesystem locks and per-owner knowledge/frontier/evidence/truth/epistemic ledgers; no new persistence implementation.",
+      "consistency": "Existing canonical Curiosity and truth owners retain their file protocols; read-only application image never acts as writable state.",
+      "retention": "Existing Curiosity policy and operator volume lifetime; independent of raw crawler snapshots and their consent/erasure authority.",
+      "backup_restore": "Stop existing Curiosity workers, back up the complete directory with existing backend_data volume, and restore with original ownership before startup. This continuation does not claim a completed Curiosity restore drill.",
+      "migration": "Compose explicitly selects existing supported CURIOSITY_DATA_ROOT under the existing durable backend data volume; no automatic import from a different historical directory.",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "backend/core/curiosity_service.py",
+        "backend/core/verified_curiosity.py",
+        "docker-compose.yml",
+        "machine/ai_first_install.json"
+      ]
     }
   ],
   "state_flows": [

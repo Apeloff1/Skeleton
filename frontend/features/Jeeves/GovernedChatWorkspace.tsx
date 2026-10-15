@@ -164,6 +164,9 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const { width } = useWindowDimensions();
   const compact = width < 900;
   const narrow = width < 560;
+  const [companionOpen, setCompanionOpen] = useState(width >= 900);
+  const [composerHeight, setComposerHeight] = useState(180);
+  const [headerHeight, setHeaderHeight] = useState(160);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [archived, setArchived] = useState(false);
@@ -434,6 +437,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     <KeyboardAvoidingView style={s.workspace} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {!compact && sidebar}
       <View style={s.main}>
+        <View onLayout={event => setHeaderHeight(Math.ceil(event.nativeEvent.layout.height))}>
         <View style={[s.header, compact && s.compactHeader]}>
           {compact && <IconButton icon="menu-outline" label="Open conversations" onPress={() => setSidebarOpen(true)} />}
           <View style={s.headerTitles}><Text numberOfLines={1} style={s.headerTitle}>{state.activeThread?.title || 'New conversation'}</Text>
@@ -448,11 +452,13 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
             onPress={() => { setManage({ thread: state.activeThread!, action: 'menu' }); setDialogError(null); }} />}
         </View>
         <JeevesRuntimeStatus />
-        <View style={[s.companionDock, compact && s.companionDockCompact]}>
+        <View style={s.companionToggle}><MiniButton icon="sparkles-outline" label={companionOpen ? 'Hide companion' : 'Show companion'} onPress={() => setCompanionOpen(open => !open)} /></View>
+        </View>
+        {companionOpen && <ScrollView style={[s.companionDock, { top: headerHeight + 8, bottom: composerHeight + 12 }, compact && s.companionDockCompact]} keyboardShouldPersistTaps="handled">
           <DragonCompanionPanel draft={draft}
             lastUserText={messages.slice().reverse().find(message => message.author_type === 'user')?.content || undefined}
             academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
-        </View>
+        </ScrollView>}
         <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
         {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.errorText}>{dragonAcademy.error}</Text>}
         {state.error && <View style={s.alert} accessibilityRole={state.error.kind === 'cancelled' ? undefined : 'alert'}><View style={s.row}>
@@ -472,7 +478,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         {state.notice && <View style={s.alert} accessibilityLiveRegion="polite"><View style={s.row}><Text style={s.alertText}>{state.notice}</Text>
           <IconButton icon="close-outline" label="Dismiss notice" onPress={controller.dismissNotice} /></View></View>}
         {loading ? <View style={s.loading}><ActivityIndicator color={C.primaryHover} /><Text style={s.muted}>{state.ready ? 'Opening conversation…' : 'Opening your conversations…'}</Text></View> :
-          <ScrollView ref={scroll} style={s.scroll} contentContainerStyle={[s.messagesContent, !compact && s.messagesWithCompanion, compact && s.compactContent]}
+          <ScrollView ref={scroll} style={s.scroll} contentContainerStyle={[s.messagesContent, !compact && companionOpen && s.messagesWithCompanion, compact && s.compactContent]}
             keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" scrollEventThrottle={100}
             onScroll={event => { const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
               nearBottom.current = layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
@@ -506,7 +512,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           </ScrollView>}
         {newBelow && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Scroll to latest message" onPress={() => scrollToBottom()} style={s.jump}>
           <Ionicons name="arrow-down-outline" size={16} color={C.text} /><Text style={s.miniText}>Latest message</Text></TouchableOpacity>}
-        <View style={[s.composerArea, compact && s.compactContent]}><View style={s.composerColumn}>
+        <View style={[s.composerArea, compact && s.compactContent]} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}><View style={s.composerColumn}>
           {state.activeThread?.state === 'archived' ? <View style={s.alert}><Text style={s.alertText}>Restore this conversation to continue chatting.</Text>
             <Button icon="arrow-undo-outline" label="Restore conversation" onPress={() => run(() => controller.archive(false))} /></View> : <>
             {!!uploadError && <View style={s.row}><Text style={[s.errorText, { flex: 1 }]} accessibilityRole="alert">{uploadError}</Text><IconButton icon="close-outline" label="Dismiss file error" onPress={() => setUploadError(null)} /></View>}

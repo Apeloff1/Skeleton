@@ -23,7 +23,6 @@ from skeleton.persistence.conversation_repository import (
     encode_thread_cursor,
 )
 
-
 router = APIRouter(prefix="/api/v1/conversations", tags=["Conversations"])
 
 
@@ -120,11 +119,7 @@ def _lineage_to_message(messages, message_id: str):
             raise ConversationConflict("conversation lineage contains a cycle")
         seen.add(current.message_id)
         lineage.append(current)
-        current = (
-            by_id.get(current.parent_message_id)
-            if current.parent_message_id is not None
-            else None
-        )
+        current = by_id.get(current.parent_message_id) if current.parent_message_id is not None else None
     lineage.reverse()
     return tuple(lineage)
 
@@ -181,6 +176,7 @@ async def list_conversations(
 
 
 @router.patch("/{thread_id}")
+@router.patch("/{thread_id}/metadata")
 async def rename_conversation(
     thread_id: str, body: RenameConversationRequest, user=Depends(require_role("viewer"))
 ):
@@ -318,11 +314,7 @@ async def get_messages(
                 owner_id=owner_id,
             )
             if after_sequence:
-                messages = tuple(
-                    message
-                    for message in messages
-                    if message.sequence > after_sequence
-                )
+                messages = tuple(message for message in messages if message.sequence > after_sequence)
             messages = messages[:limit]
         else:
             messages = await conversation_authority.list_messages(
@@ -394,7 +386,43 @@ def _regeneration_command(record, tenant_id, owner_id):
         raise ConversationStorageUnavailable("Stored regeneration request is malformed") from exc
 
 
-async def _project_regeneration(record, *, tenant_id, owner_id, engine):
+async def _assert_regeneration_sources(record, command, *, tenant_id, owner_id, user):
+    """Revalidate exact causal source obligations without changing stored work."""
+    from core.chat_sessions import inherit_history_dependencies, assert_current_dependencies
+    from skeleton.context.sources import conversation_message_segment
+
+    thread = await conversation_authority.get_thread(
+        record["thread_id"], tenant_id=tenant_id, owner_id=owner_id
+    )
+    transcript = await conversation_authority.active_transcript(
+        record["thread_id"], tenant_id=tenant_id, owner_id=owner_id
+    )
+    snapshot = set(command.compiled_context.source_snapshot)
+    from routes.ai import CHAT_INSTRUCTION_POLICY, CHAT_EVIDENCE_POLICY
+
+    selected = [
+        policy.to_segment(tenant_id="*", purpose="model-inference", created_at=command.operation.created_at)
+        for policy in (CHAT_INSTRUCTION_POLICY, CHAT_EVIDENCE_POLICY)
+    ]
+    for message in transcript:
+        if message.content:
+            segment = conversation_message_segment(thread, message, purpose="model-inference")
+            if (segment.segment_id, segment.content_digest) in snapshot:
+                selected.append(segment)
+    dependencies = await inherit_history_dependencies(
+        {},
+        thread=thread,
+        transcript=transcript,
+        selected_segments=selected,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    await assert_current_dependencies(
+        {"dependencies": dependencies}, user=user, tenant_id=tenant_id, owner_id=owner_id
+    )
+
+
+async def _project_regeneration(record, *, tenant_id, owner_id, engine, user):
     from core.engine_client import EngineExecutionFailed, EngineNotFoundError
 
     command = _regeneration_command(record, tenant_id, owner_id)
@@ -509,6 +537,7 @@ async def _project_regeneration(record, *, tenant_id, owner_id, engine):
             "response": None,
             "ai_generated": False,
         }
+    await _assert_regeneration_sources(record, command, tenant_id=tenant_id, owner_id=owner_id, user=user)
     handoff = command.compiled_context
     try:
         thread, message = await conversation_authority.regenerate_assistant_message(
@@ -558,7 +587,18 @@ async def _project_regeneration(record, *, tenant_id, owner_id, engine):
     }
 
 
-async def _submit_regeneration(record, command, *, tenant_id, owner_id, engine):
+async def _submit_regeneration(record, command, *, tenant_id, owner_id, engine, user):
+    from core.chat_sessions import command_expired
+
+    if command_expired(command):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "regeneration_admission_expired",
+                "message": "The exact original regeneration authorization expired.",
+            },
+        )
+    await _assert_regeneration_sources(record, command, tenant_id=tenant_id, owner_id=owner_id, user=user)
     current = await conversation_authority.authorize_active_thread(
         record["thread_id"], tenant_id=tenant_id, owner_id=owner_id
     )
@@ -574,6 +614,17 @@ async def _submit_regeneration(record, command, *, tenant_id, owner_id, engine):
         return
     if dispatch["state"] == "admitted":
         raise ConversationStorageUnavailable("the engine cannot resolve the already admitted regeneration")
+    from core.chat_sessions import command_expired
+
+    if command_expired(command):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "regeneration_admission_expired",
+                "message": "The exact original regeneration authorization expired.",
+            },
+        )
+    await _assert_regeneration_sources(record, command, tenant_id=tenant_id, owner_id=owner_id, user=user)
     acknowledgement = await engine.submit(command)
     engine._validate_ack_identity(acknowledgement, command)
     await conversation_authority.transition_regeneration_dispatch(
@@ -664,6 +715,40 @@ async def regenerate_assistant_message(
                 attachment_refs=attachment_refs,
                 created_at=causal.created_at,
             )
+            from core.chat_sessions import read_prepared, assert_current_dependencies, canonical_bytes
+            from skeleton.context.sources import artifact_segment
+
+            metadata, original = await read_prepared(
+                thread=thread, user_message=causal, tenant_id=tenant_id, owner_id=owner_id
+            )
+            frozen_segments = ()
+            if original is not None:
+                await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+                if any(
+                    "BEGIN UNTRUSTED CONTEXT DATA" in text for _, text in original.compiled_context.history
+                ):
+                    frozen = canonical_bytes(
+                        {
+                            "authority": "derived_untrusted_evidence_only",
+                            "original_handoff_digest": original.compiled_context.handoff_digest,
+                            "original_history": [
+                                [role, text] for role, text in original.compiled_context.history
+                            ],
+                        }
+                    ).decode("utf-8")
+                    frozen_segments = (
+                        artifact_segment(
+                            artifact_id="regeneration-frozen-context:" + causal.message_id,
+                            content=frozen,
+                            tenant_id=tenant_id,
+                            purpose="model-inference",
+                            created_at=causal.created_at,
+                            data_class=original.compiled_context.data_class,
+                            provenance=("engine-handoff:" + original.compiled_context.handoff_digest,),
+                            retention_class="conversation-source-evidence",
+                            priority=600,
+                        ),
+                    )
             context = _compile_chat_context(
                 thread=thread,
                 transcript=lineage,
@@ -674,7 +759,21 @@ async def regenerate_assistant_message(
                 request_context=None,
                 budget=budget,
                 attachment_segments=attachments.segments,
+                extra_segments=frozen_segments,
+                selection=selection,
             )
+            selected = {(segment.segment_id, segment.content_digest) for segment in context.selected_segments}
+            if any(
+                (segment.segment_id, segment.content_digest) not in selected
+                for segment in (*attachments.segments, *frozen_segments)
+            ):
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "regeneration_context_unavailable",
+                        "message": "The original selected evidence does not fit the requested model; use a new message with current sources.",
+                    },
+                )
             started = datetime.now(timezone.utc)
             command = command_from_context(
                 context=context,
@@ -693,7 +792,7 @@ async def regenerate_assistant_message(
                 max_model_turns=4,
                 max_tool_calls=1,
                 max_repeat_tool_batches=1,
-                max_output_tokens=budget.reserved_output_tokens,
+                max_output_tokens=context.budget.reserved_output_tokens,
                 provider_id=selection["selection_provider_id"],
                 model_id=selection["selection_model_id"],
                 temperature=body.temperature,
@@ -729,22 +828,33 @@ async def regenerate_assistant_message(
                 record=record,
             )
         command = _regeneration_command(record, tenant_id, owner_id)
-        projected = await _project_regeneration(record, tenant_id=tenant_id, owner_id=owner_id, engine=engine)
+        projected = await _project_regeneration(
+            record, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
+        )
         if projected.get("terminal") or projected.get("state") == "cancellation_requested":
             return projected
         if projected.get("state") == "awaiting_admission":
-            await _submit_regeneration(record, command, tenant_id=tenant_id, owner_id=owner_id, engine=engine)
+            await _submit_regeneration(
+                record, command, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
+            )
         if body.response_mode == "wait":
             try:
-                await engine.wait_for_terminal(
-                    execution_id=command.execution_request.execution_id,
-                    actor_id=owner_id,
-                    tenant_id=tenant_id,
-                    trace_id=command.operation.trace_id,
+                import asyncio
+
+                await asyncio.wait_for(
+                    engine.wait_for_terminal(
+                        execution_id=command.execution_request.execution_id,
+                        actor_id=owner_id,
+                        tenant_id=tenant_id,
+                        trace_id=command.operation.trace_id,
+                    ),
+                    timeout=15,
                 )
-            except EngineExecutionFailed:
+            except (EngineExecutionFailed, asyncio.TimeoutError):
                 pass
-        return await _project_regeneration(record, tenant_id=tenant_id, owner_id=owner_id, engine=engine)
+        return await _project_regeneration(
+            record, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
+        )
     except HTTPException:
         raise
     except ModelSelectionError as exc:
@@ -775,7 +885,7 @@ async def get_regeneration_turn(
         if record is None:
             raise ConversationNotFound(message_id)
         return await _project_regeneration(
-            record, tenant_id=tenant_id, owner_id=owner_id, engine=_chat_engine()
+            record, tenant_id=tenant_id, owner_id=owner_id, engine=_chat_engine(), user=user
         )
     except HTTPException:
         raise
@@ -801,7 +911,9 @@ async def cancel_regeneration_turn(
             raise ConversationNotFound(message_id)
         command = _regeneration_command(record, tenant_id, owner_id)
         engine = _chat_engine()
-        projected = await _project_regeneration(record, tenant_id=tenant_id, owner_id=owner_id, engine=engine)
+        projected = await _project_regeneration(
+            record, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
+        )
         if projected.get("terminal") or projected.get("state") == "cancellation_requested":
             return projected
         dispatch = await conversation_authority.transition_regeneration_dispatch(
@@ -815,7 +927,9 @@ async def cancel_regeneration_turn(
                 reason=body.reason,
                 trace_id=command.operation.trace_id,
             )
-        result = await _project_regeneration(record, tenant_id=tenant_id, owner_id=owner_id, engine=engine)
+        result = await _project_regeneration(
+            record, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
+        )
         result["cancellation_requested"] = True
         return result
     except HTTPException:
@@ -850,22 +964,33 @@ async def resume_regeneration_turn(
             raise ConversationNotFound(message_id)
         engine = _chat_engine()
         command = _regeneration_command(record, tenant_id, owner_id)
-        projected = await _project_regeneration(record, tenant_id=tenant_id, owner_id=owner_id, engine=engine)
+        projected = await _project_regeneration(
+            record, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
+        )
         if projected.get("terminal") or projected.get("state") == "cancellation_requested":
             return projected
         if projected.get("state") == "awaiting_admission":
-            await _submit_regeneration(record, command, tenant_id=tenant_id, owner_id=owner_id, engine=engine)
+            await _submit_regeneration(
+                record, command, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
+            )
         if body.response_mode == "wait":
             try:
-                await engine.wait_for_terminal(
-                    execution_id=command.execution_request.execution_id,
-                    actor_id=owner_id,
-                    tenant_id=tenant_id,
-                    trace_id=command.operation.trace_id,
+                import asyncio
+
+                await asyncio.wait_for(
+                    engine.wait_for_terminal(
+                        execution_id=command.execution_request.execution_id,
+                        actor_id=owner_id,
+                        tenant_id=tenant_id,
+                        trace_id=command.operation.trace_id,
+                    ),
+                    timeout=15,
                 )
-            except EngineExecutionFailed:
+            except (EngineExecutionFailed, asyncio.TimeoutError):
                 pass
-        return await _project_regeneration(record, tenant_id=tenant_id, owner_id=owner_id, engine=engine)
+        return await _project_regeneration(
+            record, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
+        )
     except HTTPException:
         raise
     except EngineClientError as exc:

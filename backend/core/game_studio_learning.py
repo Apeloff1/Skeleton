@@ -431,11 +431,16 @@ async def create(scope, project_id, body):
         max_mean_step_ms=body.get("max_mean_step_ms"),
         max_death_regression=body.get("max_death_regression", 0.0),
         max_worst_seed_regression=body.get("max_worst_seed_regression", 0.0),
+        proposal_width=body.get("proposal_width", 2),
+        exploration_strategy=body.get("exploration_strategy", "least_visited"),
+        n_step=body.get("n_step", 4),
     )
     binding = await workspace._input(
         scope, project, source_id=body.get("source_id"), episode_steps=body["max_steps"]
     )
-    request = GameEnvironmentRequest.from_dict(await workspace.environment_request(scope, binding))
+    request = GameEnvironmentRequest.from_dict(
+        workspace._stored_evidence(await workspace.environment_request(scope, binding))
+    )
     policy = None
     if body.get("policy_id"):
         admitted = await workspace._admitted_policy(scope, project_id, body["policy_id"])
@@ -1021,8 +1026,10 @@ async def handle_slice(scope, job, cancelled, emit_event):
     if not claim.matched_count:
         raise GameLearningError("campaign_worker_fenced", "Campaign is no longer accepting a worker.", 409)
     await _record_attempt_claim(scope, row, job)
-    request = GameEnvironmentRequest.from_dict(await workspace.environment_request(scope, row["binding"]))
-    expected = GameEnvironmentRequest.from_dict(row["environment_request"])
+    request = GameEnvironmentRequest.from_dict(
+        workspace._stored_evidence(await workspace.environment_request(scope, row["binding"]))
+    )
+    expected = GameEnvironmentRequest.from_dict(workspace._stored_evidence(row["environment_request"]))
     if request.digest != expected.digest:
         raise GameLearningError("campaign_environment_changed", "Campaign executable request changed.", 409)
     await _repair(scope, row)
@@ -1056,13 +1063,13 @@ async def handle_slice(scope, job, cancelled, emit_event):
         campaign_authorize()
         campaign = StudioLearningCampaign(
             request,
-            CampaignConfig(**row["config"]),
-            row["context"],
-            row["lineage"],
-            policy_snapshot=row["policy_snapshot"],
-            snapshot=row["snapshot"],
-            lessons=list(reversed(admitted_lessons)),
-            proposal_priors=row.get("proposal_priors", []),
+            CampaignConfig(**workspace._stored_evidence(row["config"])),
+            workspace._stored_evidence(row["context"]),
+            workspace._stored_evidence(row["lineage"]),
+            policy_snapshot=workspace._stored_evidence(row["policy_snapshot"]),
+            snapshot=workspace._stored_evidence(row["snapshot"]),
+            lessons=workspace._stored_evidence(list(reversed(admitted_lessons))),
+            proposal_priors=workspace._stored_evidence(row.get("proposal_priors", [])),
         )
 
         def checkpoint(snapshot, report):
@@ -1757,7 +1764,7 @@ async def _champion_handoff(scope, row):
         raise GameLearningError(
             "champion_snapshot_unavailable", "A complete current champion snapshot is required.", 409
         )
-    request = GameEnvironmentRequest.from_dict(snapshot["champion_request"])
+    request = GameEnvironmentRequest.from_dict(workspace._stored_evidence(snapshot["champion_request"]))
     if request.digest != snapshot["champion_request_digest"]:
         raise GameLearningError("champion_snapshot_corrupt", "Champion request identity differs.", 503)
     result = {
@@ -2060,7 +2067,7 @@ async def _index_legacy_lessons(scope, project_id):
         )
 
 
-async def _policy_dependencies(scope, row):
+async def _policy_dependencies(scope, row, *, allowed_editor_operation_id=None, dragon_guarded=False):
     sources, teachers, seen = [], [], {}
     pending = [
         (pin.get("project_id", row["project_id"]), pin)
@@ -2079,7 +2086,16 @@ async def _policy_dependencies(scope, row):
         if len(seen) >= 64:
             raise GameLearningError("policy_lineage_limit", "Historical policy ancestry exceeds64.", 413)
         policy = await workspace._admitted_policy(
-            scope, project_id, pin["policy_id"], allow_environment_changed=True
+            scope,
+            project_id,
+            pin["policy_id"],
+            allow_environment_changed=True,
+            dragon_guarded=dragon_guarded,
+            **(
+                {"allowed_editor_operation_id": allowed_editor_operation_id}
+                if allowed_editor_operation_id
+                else {}
+            ),
         )
         if policy["snapshot"]["snapshot_digest"] != pin["snapshot_digest"]:
             raise GameLearningError("parent_policy_changed", "Original policy identity differs.", 403)

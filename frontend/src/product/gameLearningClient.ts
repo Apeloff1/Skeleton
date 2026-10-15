@@ -68,6 +68,37 @@ export type LearningProjectSummary = Pick<LearningProject, 'project_id' | 'name'
 export type LearningExport = { filename: string; mimeType: string; content: string; contentDigest: string; version: number };
 
 const ROOT = '/api/game-learning';
+export type StudioReadiness = {
+  schema_version: 'skeleton.game.studio_readiness.v1'; observed_at: string; status: 'ready' | 'partial' | 'blocked';
+  checks: { id: string; label: string; status: 'ready' | 'blocked' | 'unavailable'; message: string; setup?: string; capabilities?: string[] }[];
+  storage: { connected: boolean; admitter_configured: boolean };
+  model: { configured: boolean; reachable: boolean | null; available: boolean | null; provider?: string | null };
+  native_cores: { approved: number; mapped_targets: number; total_targets: number; registry_digest?: string; observed?: boolean; observed_at?: string };
+  toolchains: { id: string; status: string; message: string }[];
+  worker: { capacity: number; active_jobs: number | null; active_plays: number | null; recovery_scheduler_running: boolean };
+  project_scope?: { project_id: string; version: number; active_jobs: Record<string, unknown>[]; active_plays: Record<string, unknown>[]; goals: Record<string, unknown>[]; campaigns: Record<string, unknown>[] };
+};
+export async function getStudioReadiness(projectId?: string, input: LearningRequest = {}): Promise<StudioReadiness> {
+  if (projectId && projectId.length > 128) invalid('The studio project identity is invalid.');
+  const token = getAuthTokenForBuild();
+  const value = await data(api.get<StudioReadiness>('/api/game-studio-health' + (projectId ? '/projects/' + encodeURIComponent(projectId) : ''), options(input)), 'Studio readiness could not be checked.');
+  if (token !== getAuthTokenForBuild()) throw new ChatClientError('Your account changed. Refresh the studio readiness view.', { kind: 'authorization', retryable: false });
+  if (!value || value.schema_version !== 'skeleton.game.studio_readiness.v1' || !['ready', 'partial', 'blocked'].includes(value.status)
+    || typeof value.observed_at !== 'string' || !Number.isFinite(Date.parse(value.observed_at)) || !Array.isArray(value.checks) || value.checks.length > 128
+    || value.checks.some(check => !check || typeof check.id !== 'string' || typeof check.label !== 'string' || typeof check.message !== 'string' || !['ready', 'blocked', 'unavailable'].includes(check.status))
+    || !value.storage || typeof value.storage.connected !== 'boolean' || typeof value.storage.admitter_configured !== 'boolean'
+    || !value.model || typeof value.model.configured !== 'boolean' || ![true, false, null].includes(value.model.reachable) || ![true, false, null].includes(value.model.available)
+    || !value.native_cores || !value.worker || !Array.isArray(value.toolchains) || value.toolchains.length > 512
+    || JSON.stringify(value).length > 1024 * 1024) invalid('The studio readiness observation is invalid.');
+  for (const count of [value.native_cores.approved, value.native_cores.mapped_targets, value.native_cores.total_targets, value.worker.capacity]) if (!Number.isSafeInteger(count) || count < 0) invalid('The readiness observation contains an invalid resource count.');
+  if (value.native_cores.observed !== undefined && typeof value.native_cores.observed !== 'boolean') invalid('The native core observation flag is invalid.');
+  if (value.native_cores.observed_at !== undefined && (typeof value.native_cores.observed_at !== 'string' || !Number.isFinite(Date.parse(value.native_cores.observed_at)))) invalid('The native core observation time is invalid.');
+  for (const count of [value.worker.active_jobs, value.worker.active_plays]) if (count !== null && (!Number.isSafeInteger(count) || count < 0)) invalid('The active work count is invalid.');
+  if (typeof value.worker.recovery_scheduler_running !== 'boolean') invalid('The worker recovery observation is invalid.');
+  if (projectId && (!value.project_scope || value.project_scope.project_id !== projectId || !Number.isSafeInteger(value.project_scope.version))) invalid('The readiness observation belongs to another project.');
+  if (value.project_scope) for (const rows of [value.project_scope.active_jobs, value.project_scope.active_plays, value.project_scope.goals, value.project_scope.campaigns]) if (!Array.isArray(rows) || rows.length > 128 || rows.some(row => !row || typeof row !== 'object' || Array.isArray(row))) invalid('The active work observation exceeds its bounds.');
+  return value;
+}
 const TERMINAL = new Set(['completed', 'complete', 'succeeded', 'failed', 'cancelled', 'interrupted']);
 export function learningJobTerminal(job: LearningJob): boolean { return TERMINAL.has(job.status); }
 export function learningRequestKey(action: string): string {

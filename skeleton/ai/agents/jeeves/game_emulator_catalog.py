@@ -374,7 +374,21 @@ _CORE_TARGET_GROUPS = {
     "bsnes_mercury_balanced": ("snes",),
     "bsnes_mercury_performance": ("snes",),
     "mame2003": ("neo_geo",),
-    "mame2016": ("neo_geo", "fairchild_channel_f", "rca_studio_ii", "bally_astrocade", "apple_ii", "apple_iigs", "bbc_micro", "acorn_electron", "trs80_model_i", "ti_99_4a", "oric_atmos", "fm_towns", "philips_cdi"),
+    "mame2016": (
+        "neo_geo",
+        "fairchild_channel_f",
+        "rca_studio_ii",
+        "bally_astrocade",
+        "apple_ii",
+        "apple_iigs",
+        "bbc_micro",
+        "acorn_electron",
+        "trs80_model_i",
+        "ti_99_4a",
+        "oric_atmos",
+        "fm_towns",
+        "philips_cdi",
+    ),
     "fbalpha2012_neogeo": ("neo_geo",),
     "dosbox_core": ("dos_8086", "dos_vga", "dos_cga", "dos_ega", "dos_vesa", "windows_31"),
     "mame": (
@@ -416,6 +430,14 @@ _CORE_CONTENT_EXTENSIONS = {
     "px68k": "dim|img|d88|88d|hdm|dup|2hd|xdf|hdf|cmd|m3u",
     "quasi88": "d88|m3u|t88|cmt",
     "mednafen_saturn": "cue|ccd|chd|toc|m3u",
+    "gambatte": "gb|gbc|dmg",
+    "fceumm": "fds|nes|unf|unif",
+    "genesis_plus_gx": "m3u|mdx|md|smd|gen|bin|cue|iso|chd|bms|sms|gg|sg|68k|sgd",
+    "snes9x": "smc|sfc|swc|fig|bs|st",
+    "mgba": "gba|gb|gbc|sgb",
+    "pcsx_rearmed": "bin|cue|img|mdf|pbp|toc|cbn|m3u|chd|iso|exe",
+    "parallel_n64": "n64|v64|z64|bin|u1|ndd",
+    "mednafen_pcfx": "cue|ccd|toc|chd",
     "stella2014": "a26|bin|mvc",
     "prosystem": "a78|bin|cdf",
     "handy": "lnx|lyx|o",
@@ -1412,7 +1434,14 @@ def load_game_content_for_core(
     source admission does not infer game compatibility or execute archived code.
     """
     (registry or GameEmulatorRegistry.from_environment()).revalidate(core)
-    if core.core_id not in {"dosbox_pure", "fbneo", "mame2003_plus", "mame2003", "mame2016", "fbalpha2012_neogeo"}:
+    if core.core_id not in {
+        "dosbox_pure",
+        "fbneo",
+        "mame2003_plus",
+        "mame2003",
+        "mame2016",
+        "fbalpha2012_neogeo",
+    }:
         return load_game_content(
             data, filename, entrypoint=entrypoint, expected_source_digest=expected_source_digest
         )

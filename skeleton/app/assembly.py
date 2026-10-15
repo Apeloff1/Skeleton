@@ -11,10 +11,11 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from dataclasses import dataclass, field
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
-from typing import Iterable, Mapping
+from urllib.parse import urlsplit, urlunsplit
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,7 @@ class ServiceSpec:
     profile: str = ""
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> "ServiceSpec":
+    def from_mapping(cls, value: Mapping[str, object]) -> ServiceSpec:
         name = str(value.get("name", "")).strip()
         role = str(value.get("role", "")).strip()
         path = str(value.get("path", "")).strip()
@@ -290,7 +291,6 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     )
 
 
-
 def load_manifest() -> AssemblyManifest:
     """Load and validate the packaged application assembly manifest."""
 
@@ -313,6 +313,23 @@ def find_repo_root(start: Path | None = None) -> Path:
     raise FileNotFoundError("could not locate Skeleton repository root")
 
 
+def _dotenv_value(raw: str) -> str:
+    """Read ordinary values and the literal secret format written by setup."""
+
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            decoded = json.loads(value)
+        except ValueError:
+            pass  # Preserve compatibility with older non-JSON quoted values.
+        else:
+            if isinstance(decoded, str):
+                return decoded.replace("$$", "$")
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        return value[1:-1].replace("\\'", "'")
+    return value.split(" #", 1)[0].rstrip()
+
+
 def _read_dotenv(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     if not path.is_file():
@@ -325,8 +342,7 @@ def _read_dotenv(path: Path) -> dict[str, str]:
         key = key.strip()
         if not key:
             continue
-        value = value.strip().strip('"').strip("'")
-        values[key] = value
+        values[key] = _dotenv_value(value)
     return values
 
 
@@ -335,6 +351,56 @@ def _runtime_env(root: Path, environ: Mapping[str, str] | None) -> dict[str, str
     source = os.environ if environ is None else environ
     values.update({str(key): str(value) for key, value in source.items()})
     return values
+
+
+def runtime_manifest(
+    manifest: AssemblyManifest | None = None,
+    *,
+    root: Path | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> AssemblyManifest:
+    """Resolve operator-selected host ports without changing canonical topology."""
+
+    manifest = manifest or load_manifest()
+    values = _runtime_env(root or find_repo_root(), environ)
+    port_keys = {
+        "FRONTEND_PORT": "3000",
+        "BACKEND_PORT": "8001",
+        "SKELETON_PORT": "8010",
+        "MONGO_PORT": "27017",
+        "CHROMA_PORT": "8000",
+    }
+    for key, fallback in port_keys.items():
+        raw = values.get(key, "") or fallback
+        if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+            raise ValueError(f"{key} must be an integer from 1 to 65535")
+    public_ports = [
+        int(values.get(key, "") or port_keys[key])
+        for key in ("FRONTEND_PORT", "BACKEND_PORT", "SKELETON_PORT", "MONGO_PORT")
+    ]
+    if len(public_ports) != len(set(public_ports)):
+        raise ValueError("FRONTEND_PORT, BACKEND_PORT, SKELETON_PORT and MONGO_PORT must differ")
+    services = []
+    for service in manifest.services:
+        key = {
+            "frontend": "FRONTEND_PORT",
+            "backend": "BACKEND_PORT",
+            "skeleton": "SKELETON_PORT",
+            "chroma": "CHROMA_PORT",
+        }.get(service.name)
+        raw = values.get(key, "") if key else ""
+        if raw and service.public_url:
+            if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+                raise ValueError(f"{key} must be an integer from 1 to 65535")
+            url = urlsplit(service.public_url)
+            host = url.hostname or "localhost"
+            if ":" in host:
+                host = "[" + host + "]"
+            service = replace(
+                service, public_url=urlunsplit((url.scheme, f"{host}:{int(raw)}", url.path, "", ""))
+            )
+        services.append(service)
+    return replace(manifest, services=tuple(services))
 
 
 def _usable_secret(value: str) -> bool:
@@ -431,10 +497,14 @@ def preflight(
             )
         )
         values = _runtime_env(root, environ)
+        try:
+            runtime_manifest(manifest, root=root, environ=values)
+        except ValueError as exc:
+            checks.append(AssemblyCheck("runtime:ports", False, str(exc)))
         for key in manifest.required_env:
             value = values.get(key, "")
             ok = _usable_secret(value)
-            if key == "SKL_ENGINE_SERVICE_TOKEN":
+            if key in {"SKL_ENGINE_SERVICE_TOKEN", "JWT_SECRET", "GAMEFORGE_JWT_SECRET"}:
                 ok = ok and 32 <= len(value) <= 4096 and value == value.strip()
             checks.append(
                 AssemblyCheck(
@@ -443,7 +513,28 @@ def preflight(
                     message=(
                         f"runtime value configured: {key}"
                         if ok
-                        else f"runtime value missing, invalid or placeholder: {key}"
+                        else f"runtime value missing, invalid or placeholder: {key}; run python -m skeleton app setup"
+                    ),
+                )
+            )
+        seed_email = values.get("GAMEFORGE_SEED_ADMIN_EMAIL", "").strip()
+        seed_password = values.get("GAMEFORGE_SEED_ADMIN_PASSWORD", "")
+        if seed_email or seed_password:
+            paired = (
+                bool(seed_email and seed_password)
+                and "@" in seed_email
+                and not seed_email.startswith("@")
+                and not seed_email.endswith("@")
+                and len(seed_password) >= 16
+            )
+            checks.append(
+                AssemblyCheck(
+                    "env:GAMEFORGE_SEED_ADMIN",
+                    paired,
+                    (
+                        "optional operator-admin credentials configured"
+                        if paired
+                        else "Configure both GAMEFORGE_SEED_ADMIN_EMAIL and a password of at least 16 characters in private .env, or leave both empty"
                     ),
                 )
             )
@@ -490,9 +581,9 @@ def compose_command(
         command.extend(plan.services)
         return tuple(command)
     if action == "down":
-        return tuple([*base, "down", "--remove-orphans"])
+        return (*base, "down", "--remove-orphans")
     if action == "ps":
-        return tuple([*base, "ps"])
+        return (*base, "ps")
     if action == "logs":
         command = [*base, "logs"]
         if follow:
@@ -503,7 +594,9 @@ def compose_command(
             command.append(service)
         return tuple(command)
     if action == "config":
-        return tuple([*base, "config"])
+        # Rendered Compose output contains Mongo/password/JWT/provider values.
+        # Operator validation must never dump those into a diagnostic receipt.
+        return (*base, "config", "--quiet")
 
     raise ValueError(f"unsupported compose action: {action}")
 

@@ -147,12 +147,7 @@ class EngineClientConfig:
         object.__setattr__(self, "base_url", base)
         token = self.service_token
         if token is not None:
-            if (
-                not isinstance(token, str)
-                or token != token.strip()
-                or len(token) < 32
-                or len(token) > 4096
-            ):
+            if not isinstance(token, str) or token != token.strip() or len(token) < 32 or len(token) > 4096:
                 raise EngineProtocolError(
                     "engine service token must be normalized and at least 32 characters"
                 )
@@ -224,9 +219,7 @@ class EngineClientConfig:
             return None
         raw_token = os.getenv("SKL_ENGINE_SERVICE_TOKEN")
         if raw_token is None or not raw_token.strip():
-            raise EngineProtocolError(
-                "engine service token is required when engine URL is configured"
-            )
+            raise EngineProtocolError("engine service token is required when engine URL is configured")
         try:
             return cls(
                 base_url=raw_url.strip(),
@@ -238,15 +231,9 @@ class EngineClientConfig:
                     ).strip()
                     or "codedock-backend"
                 ),
-                request_timeout_s=float(
-                    os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")
-                ),
-                poll_interval_s=float(
-                    os.getenv("SKELETON_ENGINE_POLL_INTERVAL_S", "0.05")
-                ),
-                execution_timeout_s=float(
-                    os.getenv("SKELETON_ENGINE_EXECUTION_TIMEOUT_S", "120")
-                ),
+                request_timeout_s=float(os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")),
+                poll_interval_s=float(os.getenv("SKELETON_ENGINE_POLL_INTERVAL_S", "0.05")),
+                execution_timeout_s=float(os.getenv("SKELETON_ENGINE_EXECUTION_TIMEOUT_S", "120")),
                 max_response_bytes=int(
                     os.getenv(
                         "SKELETON_ENGINE_MAX_RESPONSE_BYTES",
@@ -259,14 +246,10 @@ class EngineClientConfig:
                         str(48 * 1024 * 1024),
                     )
                 ),
-                max_poll_attempts=int(
-                    os.getenv("SKELETON_ENGINE_MAX_POLL_ATTEMPTS", "2400")
-                ),
+                max_poll_attempts=int(os.getenv("SKELETON_ENGINE_MAX_POLL_ATTEMPTS", "2400")),
             )
         except (TypeError, ValueError) as exc:
-            raise EngineProtocolError(
-                "engine environment configuration is invalid"
-            ) from exc
+            raise EngineProtocolError("engine environment configuration is invalid") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,9 +288,7 @@ class EngineContextBinding:
             maximum=192,
         )
         if execution_id != expected_execution_id:
-            raise EngineProtocolError(
-                "handoff binding execution identity mismatch"
-            )
+            raise EngineProtocolError("handoff binding execution identity mismatch")
         actor_id = _text(
             body.get("actor_id"),
             "handoff_binding.actor_id",
@@ -319,9 +300,7 @@ class EngineContextBinding:
             maximum=512,
         )
         if actor_id != expected_actor_id or tenant_id != expected_tenant_id:
-            raise EngineProtocolError(
-                "handoff binding actor/tenant identity mismatch"
-            )
+            raise EngineProtocolError("handoff binding actor/tenant identity mismatch")
         context_digest = _text(
             body.get("context_digest"),
             "handoff_binding.context_digest",
@@ -336,25 +315,17 @@ class EngineContextBinding:
             ("context_digest", context_digest),
             ("handoff_digest", handoff_digest),
         ):
-            if len(digest) != 64 or any(
-                ch not in "0123456789abcdef" for ch in digest
-            ):
-                raise EngineProtocolError(
-                    f"handoff binding {name} is not lowercase sha256"
-                )
+            if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+                raise EngineProtocolError(f"handoff binding {name} is not lowercase sha256")
 
         raw_snapshot = body.get("source_snapshot")
         if not isinstance(raw_snapshot, list) or not raw_snapshot:
-            raise EngineProtocolError(
-                "handoff binding source_snapshot is missing"
-            )
+            raise EngineProtocolError("handoff binding source_snapshot is missing")
         snapshot: list[tuple[str, str]] = []
         seen: set[str] = set()
         for index, raw in enumerate(raw_snapshot):
             if not isinstance(raw, list) or len(raw) != 2:
-                raise EngineProtocolError(
-                    f"handoff binding source_snapshot[{index}] is invalid"
-                )
+                raise EngineProtocolError(f"handoff binding source_snapshot[{index}] is invalid")
             segment_id = _text(
                 raw[0],
                 f"handoff binding source_snapshot[{index}].segment_id",
@@ -365,14 +336,8 @@ class EngineContextBinding:
                 f"handoff binding source_snapshot[{index}].digest",
                 maximum=64,
             )
-            if (
-                segment_id in seen
-                or len(digest) != 64
-                or any(ch not in "0123456789abcdef" for ch in digest)
-            ):
-                raise EngineProtocolError(
-                    "handoff binding source snapshot is invalid"
-                )
+            if segment_id in seen or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+                raise EngineProtocolError("handoff binding source snapshot is invalid")
             seen.add(segment_id)
             snapshot.append((segment_id, digest))
 
@@ -387,9 +352,7 @@ class EngineContextBinding:
             "confidential",
             "restricted",
         }:
-            raise EngineProtocolError(
-                "handoff binding data_class is invalid"
-            )
+            raise EngineProtocolError("handoff binding data_class is invalid")
         return cls(
             operation_id=_text(
                 body.get("operation_id"),
@@ -465,11 +428,7 @@ class EngineTerminalResult:
         status = _text(body.get("status"), "result.status", maximum=64)
         if status != "completed":
             usage = _json_object(body.get("usage", {}), "result.usage")
-            failure_code = (
-                None
-                if usage.get("error_code") is None
-                else str(usage["error_code"])
-            )
+            failure_code = None if usage.get("error_code") is None else str(usage["error_code"])
             raise EngineExecutionFailed(
                 "engine execution did not complete successfully"
                 + (" (" + failure_code + ")" if failure_code else ""),
@@ -480,26 +439,20 @@ class EngineTerminalResult:
             )
         final_output = body.get("final_output")
         if not isinstance(final_output, str) or not final_output.strip():
-            raise EngineProtocolError(
-                "completed engine result is missing final_output"
-            )
+            raise EngineProtocolError("completed engine result is missing final_output")
         verification_receipt = body.get("verification_receipt")
         if verification_receipt is not None and not isinstance(
             verification_receipt,
             Mapping,
         ):
-            raise EngineProtocolError(
-                "engine verification_receipt must be an object"
-            )
+            raise EngineProtocolError("engine verification_receipt must be an object")
 
         def refs(field: str) -> tuple[str, ...]:
             raw = body.get(field, [])
             if not isinstance(raw, list) or any(
                 not isinstance(item, str) or not item.strip() for item in raw
             ):
-                raise EngineProtocolError(
-                    f"engine result {field} must be a string list"
-                )
+                raise EngineProtocolError(f"engine result {field} must be a string list")
             return tuple(dict.fromkeys(item.strip() for item in raw))
 
         return cls(
@@ -525,11 +478,7 @@ class EngineTerminalResult:
                     maximum=4096,
                 )
             ),
-            verification_receipt=(
-                None
-                if verification_receipt is None
-                else dict(verification_receipt)
-            ),
+            verification_receipt=(None if verification_receipt is None else dict(verification_receipt)),
             evidence_refs=refs("evidence_refs"),
             provider_receipts=refs("provider_receipts"),
             tool_receipts=refs("tool_receipts"),
@@ -574,6 +523,7 @@ def command_from_context(
     specific_tool_id: str | None = None,
     context_seed_refs: Sequence[str] = (),
     memory_write_intent: Mapping[str, Any] | None = None,
+    structured_output_schema: Mapping[str, Any] | None = None,
 ) -> EngineExecutionCommand:
     """Build a digest-bound engine command from one immutable context snapshot."""
 
@@ -590,21 +540,13 @@ def command_from_context(
     projection = project_provider_context(context)
     projected_instructions = projection.instructions.strip()
     instruction_text = _text(
-        (
-            projected_instructions
-            if projected_instructions
-            else str(instructions).strip()
-        ),
+        (projected_instructions if projected_instructions else str(instructions).strip()),
         "instructions",
         maximum=1_000_000,
     )
     projected_prompt = projection.prompt.strip()
     prompt_text = _text(
-        (
-            projected_prompt
-            if projected_prompt
-            else str(prompt).strip()
-        ),
+        (projected_prompt if projected_prompt else str(prompt).strip()),
         "prompt",
         maximum=1_000_000,
     )
@@ -632,9 +574,7 @@ def command_from_context(
         "assistant.chat",
         "assistant.compat",
     }:
-        raise EngineProtocolError(
-            "assistant_proposal verification requires assistant capability"
-        )
+        raise EngineProtocolError("assistant_proposal verification requires assistant capability")
     started = _aware(
         created_at or datetime.now(timezone.utc),
         "created_at",
@@ -652,13 +592,9 @@ def command_from_context(
     seen_tool_ids: set[str] = set()
     for index, tool in enumerate(tools):
         if not isinstance(tool, ProviderToolDefinition):
-            raise EngineProtocolError(
-                f"tools[{index}] must be ProviderToolDefinition"
-            )
+            raise EngineProtocolError(f"tools[{index}] must be ProviderToolDefinition")
         if tool.tool_id in seen_tool_ids:
-            raise EngineProtocolError(
-                "tools contain duplicate tool_id"
-            )
+            raise EngineProtocolError("tools contain duplicate tool_id")
         seen_tool_ids.add(tool.tool_id)
         normalized_tools.append(tool)
         if len(normalized_tools) > 256:
@@ -681,13 +617,9 @@ def command_from_context(
     }:
         raise EngineProtocolError("tool_choice is unsupported")
     if not normalized_tools and resolved_tool_choice != "none":
-        raise EngineProtocolError(
-            "tool_choice requires at least one offered tool"
-        )
+        raise EngineProtocolError("tool_choice requires at least one offered tool")
     if normalized_tools and resolved_tool_choice == "none":
-        raise EngineProtocolError(
-            "offered tools require an executable tool_choice"
-        )
+        raise EngineProtocolError("offered tools require an executable tool_choice")
     normalized_specific_tool_id = (
         None
         if specific_tool_id is None
@@ -699,27 +631,16 @@ def command_from_context(
     )
     if resolved_tool_choice == "specific":
         if normalized_specific_tool_id is None:
-            raise EngineProtocolError(
-                "specific tool choice requires specific_tool_id"
-            )
+            raise EngineProtocolError("specific tool choice requires specific_tool_id")
         if normalized_specific_tool_id not in seen_tool_ids:
-            raise EngineProtocolError(
-                "specific_tool_id is not offered"
-            )
+            raise EngineProtocolError("specific_tool_id is not offered")
     elif normalized_specific_tool_id is not None:
-        raise EngineProtocolError(
-            "specific_tool_id requires tool_choice='specific'"
-        )
+        raise EngineProtocolError("specific_tool_id requires tool_choice='specific'")
     if profile == "assistant_proposal" and normalized_tools:
-        raise EngineProtocolError(
-            "assistant_proposal verification requires tool-free execution"
-        )
+        raise EngineProtocolError("assistant_proposal verification requires tool-free execution")
 
     context_data_class = max(
-        (
-            segment.data_class
-            for segment in context.selected_segments
-        ),
+        (segment.data_class for segment in context.selected_segments),
         default="internal",
         key=("public", "internal", "confidential", "restricted").index,
     )
@@ -740,13 +661,10 @@ def command_from_context(
             "provenance_refs",
             "content_from",
         }
-        unknown_memory_fields = sorted(
-            set(intent) - allowed_memory_fields
-        )
+        unknown_memory_fields = sorted(set(intent) - allowed_memory_fields)
         if unknown_memory_fields:
             raise EngineProtocolError(
-                "memory_write_intent contains unsupported fields: "
-                + ",".join(unknown_memory_fields)
+                "memory_write_intent contains unsupported fields: " + ",".join(unknown_memory_fields)
             )
         subject_id = _text(
             intent.get("subject_id"),
@@ -766,18 +684,14 @@ def command_from_context(
         try:
             MemoryKind(kind)
         except ValueError as exc:
-            raise EngineProtocolError(
-                "memory_write_intent.kind is unsupported"
-            ) from exc
+            raise EngineProtocolError("memory_write_intent.kind is unsupported") from exc
         content_from = _text(
             intent.get("content_from", "verified_final_output"),
             "memory_write_intent.content_from",
             maximum=64,
         )
         if content_from != "verified_final_output":
-            raise EngineProtocolError(
-                "memory_write_intent may only persist verified_final_output"
-            )
+            raise EngineProtocolError("memory_write_intent may only persist verified_final_output")
         data_class = _text(
             intent.get("data_class", context_data_class),
             "memory_write_intent.data_class",
@@ -789,9 +703,7 @@ def command_from_context(
             "confidential",
             "restricted",
         }:
-            raise EngineProtocolError(
-                "memory_write_intent.data_class is unsupported"
-            )
+            raise EngineProtocolError("memory_write_intent.data_class is unsupported")
         expires_at = intent.get("expires_at")
         normalized_expiry = None
         if expires_at is not None:
@@ -799,18 +711,17 @@ def command_from_context(
                 expires_at,
                 "memory_write_intent.expires_at",
             ).isoformat()
-            if _aware(
-                expires_at,
-                "memory_write_intent.expires_at",
-            ) <= started:
-                raise EngineProtocolError(
-                    "memory_write_intent.expires_at must follow execution creation"
+            if (
+                _aware(
+                    expires_at,
+                    "memory_write_intent.expires_at",
                 )
+                <= started
+            ):
+                raise EngineProtocolError("memory_write_intent.expires_at must follow execution creation")
         raw_refs = intent.get("provenance_refs", [])
         if not isinstance(raw_refs, list):
-            raise EngineProtocolError(
-                "memory_write_intent.provenance_refs must be a list"
-            )
+            raise EngineProtocolError("memory_write_intent.provenance_refs must be a list")
         provenance_refs: list[str] = []
         for index, raw_ref in enumerate(raw_refs):
             ref = _text(
@@ -821,9 +732,7 @@ def command_from_context(
             if ref not in provenance_refs:
                 provenance_refs.append(ref)
             if len(provenance_refs) > 128:
-                raise EngineProtocolError(
-                    "memory_write_intent.provenance_refs exceeds maximum count"
-                )
+                raise EngineProtocolError("memory_write_intent.provenance_refs exceeds maximum count")
         normalized_memory_intent = {
             "subject_id": subject_id,
             "namespace": namespace,
@@ -847,21 +756,13 @@ def command_from_context(
     # projection contains no conversation/evidence history of its own.
     # This prevents stale or attacker-controlled compatibility text from
     # overriding compiled conversation lineage or untrusted evidence framing.
-    projected_history = (
-        projection.history
-        if projection.history
-        else tuple(history)
-    )
+    projected_history = projection.history if projection.history else tuple(history)
     for index, item in enumerate(projected_history):
         if not isinstance(item, Mapping):
-            raise EngineProtocolError(
-                f"history[{index}] must be an object"
-            )
+            raise EngineProtocolError(f"history[{index}] must be an object")
         role = _text(item.get("role"), f"history[{index}].role", maximum=32)
         if role not in {"user", "assistant"}:
-            raise EngineProtocolError(
-                f"history[{index}].role is not supported"
-            )
+            raise EngineProtocolError(f"history[{index}].role is not supported")
         content = _text(
             str(item.get("content") or "").strip(),
             f"history[{index}].content",
@@ -871,19 +772,13 @@ def command_from_context(
         if len(normalized_history) > 1024:
             raise EngineProtocolError("history exceeds maximum turn count")
 
-    input_capacity = context.budget.input_capacity(
-        tools_enabled=bool(normalized_tools)
-    )
+    input_capacity = context.budget.input_capacity(tools_enabled=bool(normalized_tools))
     if context.selected_tokens_estimate > input_capacity:
-        raise EngineProtocolError(
-            "compiled context exceeds bound input capacity"
-        )
+        raise EngineProtocolError("compiled context exceeds bound input capacity")
 
     reserved_output = int(context.budget.reserved_output_tokens)
     if reserved_output <= 0:
-        raise EngineProtocolError(
-            "compiled context requires positive output reserve"
-        )
+        raise EngineProtocolError("compiled context requires positive output reserve")
     if max_output_tokens is None:
         resolved_output_tokens = reserved_output
     else:
@@ -892,13 +787,8 @@ def command_from_context(
             "max_output_tokens",
             maximum=131_072,
         )
-        if (
-            reserved_output > 0
-            and resolved_output_tokens > reserved_output
-        ):
-            raise EngineProtocolError(
-                "max_output_tokens exceeds compiled context reserve"
-            )
+        if reserved_output > 0 and resolved_output_tokens > reserved_output:
+            raise EngineProtocolError("max_output_tokens exceeds compiled context reserve")
 
     resource_budget = {
         "max_model_turns": _positive_int(
@@ -912,18 +802,12 @@ def command_from_context(
             maximum=1024,
         ),
         "max_input_tokens": input_capacity,
-        "selected_input_tokens_estimate": (
-            context.selected_tokens_estimate
-        ),
-        "max_tool_result_tokens": int(
-            context.budget.reserved_tool_result_tokens
-        ),
+        "selected_input_tokens_estimate": (context.selected_tokens_estimate),
+        "max_tool_result_tokens": int(context.budget.reserved_tool_result_tokens),
         "max_elapsed_seconds": (due - started).total_seconds(),
     }
     if resolved_output_tokens > 0:
-        resource_budget["max_output_tokens"] = (
-            resolved_output_tokens
-        )
+        resource_budget["max_output_tokens"] = resolved_output_tokens
     stop_policy = {
         "max_repeat_tool_batches": _positive_int(
             max_repeat_tool_batches,
@@ -974,10 +858,7 @@ def command_from_context(
         "handoff_digest": handoff.handoff_digest,
         "tool_choice": resolved_tool_choice,
         "specific_tool_id": normalized_specific_tool_id,
-        "source_snapshot": [
-            [segment_id, digest]
-            for segment_id, digest in context.source_snapshot
-        ],
+        "source_snapshot": [[segment_id, digest] for segment_id, digest in context.source_snapshot],
     }
     if normalized_memory_intent is not None:
         context_policy["memory_write_intent"] = normalized_memory_intent
@@ -988,10 +869,10 @@ def command_from_context(
         selected_model = _text(model_id, "model_id", maximum=512)
         # The immutable execution policy binds the exact requested selection,
         # not an implicit or mutable provider fallback.
-        context_policy["provider_selection"] = {
-            "provider_id": selected_provider, "model_id": selected_model,
+        context_policy["model_selection"] = {
+            "provider_id": selected_provider,
+            "model_id": selected_model,
         }
-        context_policy["provider_model"] = selected_model
     if temperature is not None:
         if (
             isinstance(temperature, bool)
@@ -1000,8 +881,16 @@ def command_from_context(
             or not 0 <= temperature <= 2
         ):
             raise EngineProtocolError("temperature must be finite and within [0, 2]")
-        context_policy["provider_temperature"] = float(temperature)
+        context_policy["temperature"] = float(temperature)
 
+    if structured_output_schema is not None:
+        from skeleton.skills.tool_contract import validate_json_schema
+        import json
+
+        encoded_schema = json.dumps(dict(structured_output_schema), allow_nan=False, ensure_ascii=False)
+        if len(encoded_schema.encode()) > 65536:
+            raise EngineProtocolError("structured output schema exceeds64KiB")
+        context_policy["structured_output_schema"] = validate_json_schema(json.loads(encoded_schema))
     execution_request = AIExecutionRequest(
         operation_id=context.operation_id,
         execution_id=context.execution_id,
@@ -1009,10 +898,7 @@ def command_from_context(
         context_policy=context_policy,
         tool_policy={
             "tenant_id": context.tenant_id,
-            "allowed_tool_ids": [
-                tool.tool_id
-                for tool in normalized_tools
-            ],
+            "allowed_tool_ids": [tool.tool_id for tool in normalized_tools],
         },
         resource_budget=resource_budget,
         stop_policy=stop_policy,
@@ -1055,9 +941,7 @@ def command_from_context(
         if ref not in refs:
             refs.append(ref)
         if len(refs) > 1024:
-            raise EngineProtocolError(
-                "too many context seed references"
-            )
+            raise EngineProtocolError("too many context seed references")
 
     return EngineExecutionCommand(
         operation=operation,
@@ -1104,18 +988,12 @@ class EngineClient:
     def _url(self, suffix: str) -> str:
         if not suffix.startswith("/"):
             raise EngineProtocolError("engine path must be absolute")
-        return (
-            self.config.base_url
-            + "/api/v1/engine"
-            + suffix
-        )
+        return self.config.base_url + "/api/v1/engine" + suffix
 
     def _headers(self, *, trace_id: str | None = None) -> dict[str, str]:
         token = self.config.service_token
         if token is None:
-            raise EngineAuthorizationError(
-                "engine service token is not configured"
-            )
+            raise EngineAuthorizationError("engine service token is not configured")
         headers = {
             "authorization": "Bearer " + token,
             "x-zaibatsu-attester": self.config.service_principal,
@@ -1154,13 +1032,9 @@ class EngineClient:
                     params=None if params is None else dict(params),
                 )
         except (httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise EngineUnavailableError(
-                "engine transport is unavailable"
-            ) from exc
+            raise EngineUnavailableError("engine transport is unavailable") from exc
         except httpx.HTTPError as exc:
-            raise EngineUnavailableError(
-                "engine transport failed"
-            ) from exc
+            raise EngineUnavailableError("engine transport failed") from exc
 
         response_limit = (
             self.config.max_response_bytes
@@ -1176,44 +1050,28 @@ class EngineClient:
             try:
                 advertised = int(content_length)
             except ValueError as exc:
-                raise EngineProtocolError(
-                    "engine content-length is invalid"
-                ) from exc
+                raise EngineProtocolError("engine content-length is invalid") from exc
             if advertised > response_limit:
-                raise EngineProtocolError(
-                    "engine response exceeds configured size bound"
-                )
+                raise EngineProtocolError("engine response exceeds configured size bound")
         if len(response.content) > response_limit:
-            raise EngineProtocolError(
-                "engine response exceeds configured size bound"
-            )
+            raise EngineProtocolError("engine response exceeds configured size bound")
 
         if response.status_code == 404:
             raise EngineNotFoundError("engine resource was not found")
         if response.status_code == 409:
             raise EngineConflictError("engine rejected conflicting request")
         if response.status_code in {401, 403}:
-            raise EngineAuthorizationError(
-                "engine rejected delegated authority"
-            )
+            raise EngineAuthorizationError("engine rejected delegated authority")
         if response.status_code >= 500:
-            raise EngineUnavailableError(
-                "engine service is unavailable"
-            )
+            raise EngineUnavailableError("engine service is unavailable")
         if response.status_code >= 400:
-            raise EngineProtocolError(
-                f"engine rejected request with status {response.status_code}"
-            )
+            raise EngineProtocolError(f"engine rejected request with status {response.status_code}")
         try:
             payload = response.json()
         except ValueError as exc:
-            raise EngineProtocolError(
-                "engine returned invalid JSON"
-            ) from exc
+            raise EngineProtocolError("engine returned invalid JSON") from exc
         if not isinstance(payload, Mapping):
-            raise EngineProtocolError(
-                "engine response must be an object"
-            )
+            raise EngineProtocolError("engine response must be an object")
         return dict(payload)
 
     @staticmethod
@@ -1223,38 +1081,22 @@ class EngineClient:
         maximum_items: int = 4,
     ) -> dict[str, Any]:
         images = payload.get("images")
-        if (
-            not isinstance(images, list)
-            or not images
-            or len(images) > maximum_items
-        ):
-            raise EngineProtocolError(
-                "engine image response has invalid image count"
-            )
+        if not isinstance(images, list) or not images or len(images) > maximum_items:
+            raise EngineProtocolError("engine image response has invalid image count")
         for item in images:
             if not isinstance(item, Mapping):
-                raise EngineProtocolError(
-                    "engine image item must be an object"
-                )
+                raise EngineProtocolError("engine image item must be an object")
             data = item.get("data")
             if not isinstance(data, str) or not data:
-                raise EngineProtocolError(
-                    "engine image item is missing base64 data"
-                )
+                raise EngineProtocolError("engine image item is missing base64 data")
             if len(data) > 32 * 1024 * 1024:
-                raise EngineProtocolError(
-                    "engine image payload exceeds size bound"
-                )
+                raise EngineProtocolError("engine image payload exceeds size bound")
             try:
                 decoded = base64.b64decode(data, validate=True)
             except (ValueError, binascii.Error) as exc:
-                raise EngineProtocolError(
-                    "engine image payload is invalid base64"
-                ) from exc
+                raise EngineProtocolError("engine image payload is invalid base64") from exc
             if not decoded or len(decoded) > 24 * 1024 * 1024:
-                raise EngineProtocolError(
-                    "engine image payload exceeds decoded size bound"
-                )
+                raise EngineProtocolError("engine image payload exceeds decoded size bound")
         return dict(payload)
 
     async def generate_image(
@@ -1342,9 +1184,7 @@ class EngineClient:
         if len(image) > 20 * 1024 * 1024:
             raise EngineProtocolError("image exceeds media size bound")
         if mask is not None and (
-            not isinstance(mask, (bytes, bytearray))
-            or not mask
-            or len(mask) > 20 * 1024 * 1024
+            not isinstance(mask, (bytes, bytearray)) or not mask or len(mask) > 20 * 1024 * 1024
         ):
             raise EngineProtocolError("mask exceeds media size bound")
         payload = await self._request(
@@ -1359,11 +1199,7 @@ class EngineClient:
                     maximum=512,
                 ),
                 "image_base64": base64.b64encode(bytes(image)).decode("ascii"),
-                "mask_base64": (
-                    None
-                    if mask is None
-                    else base64.b64encode(bytes(mask)).decode("ascii")
-                ),
+                "mask_base64": (None if mask is None else base64.b64encode(bytes(mask)).decode("ascii")),
                 "prompt": _text(prompt, "prompt", maximum=16_384),
                 "size": _text(size, "size", maximum=64),
             },
@@ -1409,19 +1245,13 @@ class EngineClient:
         )
         raw = payload.get("audio_base64")
         if not isinstance(raw, str) or not raw:
-            raise EngineProtocolError(
-                "engine speech response is missing audio"
-            )
+            raise EngineProtocolError("engine speech response is missing audio")
         try:
             audio = base64.b64decode(raw, validate=True)
         except (ValueError, binascii.Error) as exc:
-            raise EngineProtocolError(
-                "engine speech payload is invalid base64"
-            ) from exc
+            raise EngineProtocolError("engine speech payload is invalid base64") from exc
         if not audio or len(audio) > 24 * 1024 * 1024:
-            raise EngineProtocolError(
-                "engine speech payload exceeds size bound"
-            )
+            raise EngineProtocolError("engine speech payload exceeds size bound")
         payload = dict(payload)
         payload["audio"] = audio
         return payload
@@ -1442,9 +1272,7 @@ class EngineClient:
             or storage_bytes < 1
             or storage_bytes > 1024 * 1024 * 1024
         ):
-            raise EngineProtocolError(
-                "storage_bytes must be within [1, 1GiB]"
-            )
+            raise EngineProtocolError("storage_bytes must be within [1, 1GiB]")
         return await self._request(
             "POST",
             "/admission/storage",
@@ -1492,29 +1320,19 @@ class EngineClient:
     ) -> dict[str, Any]:
         if isinstance(purposes, (str, bytes)):
             raise EngineProtocolError("purposes must be a sequence")
-        normalized_purposes = [
-            _text(value, "purpose", maximum=256).lower()
-            for value in purposes
-        ]
+        normalized_purposes = [_text(value, "purpose", maximum=256).lower() for value in purposes]
         if not 1 <= len(normalized_purposes) <= 32:
-            raise EngineProtocolError(
-                "purposes must contain between 1 and 32 values"
-            )
+            raise EngineProtocolError("purposes must contain between 1 and 32 values")
 
         normalized_targets: list[str] | None = None
         if deletion_targets is not None:
             if isinstance(deletion_targets, (str, bytes)):
-                raise EngineProtocolError(
-                    "deletion_targets must be a sequence"
-                )
+                raise EngineProtocolError("deletion_targets must be a sequence")
             normalized_targets = [
-                _text(value, "deletion_target", maximum=256).lower()
-                for value in deletion_targets
+                _text(value, "deletion_target", maximum=256).lower() for value in deletion_targets
             ]
             if not 1 <= len(normalized_targets) <= 32:
-                raise EngineProtocolError(
-                    "deletion_targets must contain between 1 and 32 values"
-                )
+                raise EngineProtocolError("deletion_targets must contain between 1 and 32 values")
 
         def timestamp(value: float | None, field: str) -> float | None:
             if value is None:
@@ -1595,14 +1413,9 @@ class EngineClient:
         if record_ids is not None:
             if isinstance(record_ids, (str, bytes)):
                 raise EngineProtocolError("record_ids must be a sequence")
-            normalized_ids = [
-                _text(value, "record_id", maximum=512)
-                for value in record_ids
-            ]
+            normalized_ids = [_text(value, "record_id", maximum=512) for value in record_ids]
             if not 1 <= len(normalized_ids) <= 10_000:
-                raise EngineProtocolError(
-                    "record_ids must contain between 1 and 10000 values"
-                )
+                raise EngineProtocolError("record_ids must contain between 1 and 10000 values")
         return await self._request(
             "POST",
             "/governance/deletions",
@@ -1719,9 +1532,23 @@ class EngineClient:
             trace_id=command.operation.trace_id,
         )
 
+    async def tenant_model_inventory(
+        self, *, actor_id: str, tenant_id: str, trace_id: str | None = None
+    ) -> dict[str, Any]:
+        """Read inventory through the authenticated tenant-scoped engine route.
+
+        Actor ownership is authenticated by the calling application route; the
+        engine enforces its sealed service-principal and tenant grant. The model
+        registry has no distinct actor-specific model grants.
+        """
+        _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        return await self.provider_status(tenant_id=tenant, trace_id=trace_id)
+
     async def provider_status(
         self,
         *,
+        tenant_id: str | None = None,
         trace_id: str | None = None,
     ) -> dict[str, Any]:
         """Read non-secret provider identity from the canonical engine."""
@@ -1729,6 +1556,7 @@ class EngineClient:
         payload = await self._request(
             "GET",
             "/providers",
+            params=({} if tenant_id is None else {"tenant_id": _text(tenant_id, "tenant_id", maximum=512)}),
             trace_id=trace_id,
         )
         active = _text(
@@ -1738,21 +1566,15 @@ class EngineClient:
         )
         available = payload.get("available")
         if not isinstance(available, bool):
-            raise EngineProtocolError(
-                "provider_status.available must be boolean"
-            )
+            raise EngineProtocolError("provider_status.available must be boolean")
         raw_providers = payload.get("providers")
         if not isinstance(raw_providers, list) or not raw_providers:
-            raise EngineProtocolError(
-                "provider_status.providers must be a non-empty list"
-            )
+            raise EngineProtocolError("provider_status.providers must be a non-empty list")
         providers: list[dict[str, Any]] = []
         seen: set[str] = set()
         for index, raw in enumerate(raw_providers):
             if not isinstance(raw, Mapping):
-                raise EngineProtocolError(
-                    f"provider_status.providers[{index}] must be an object"
-                )
+                raise EngineProtocolError(f"provider_status.providers[{index}] must be an object")
             item = dict(raw)
             provider_id = _text(
                 item.get("id"),
@@ -1760,19 +1582,13 @@ class EngineClient:
                 maximum=128,
             )
             if provider_id in seen:
-                raise EngineProtocolError(
-                    "provider_status contains duplicate provider id"
-                )
+                raise EngineProtocolError("provider_status contains duplicate provider id")
             seen.add(provider_id)
             if not isinstance(item.get("available"), bool):
-                raise EngineProtocolError(
-                    f"provider_status.providers[{index}].available must be boolean"
-                )
+                raise EngineProtocolError(f"provider_status.providers[{index}].available must be boolean")
             providers.append(item)
         if active not in seen:
-            raise EngineProtocolError(
-                "provider_status active provider is not declared"
-            )
+            raise EngineProtocolError("provider_status active provider is not declared")
         return {
             "active": active,
             "available": available,
@@ -1923,30 +1739,22 @@ class EngineClient:
             trace_id=trace_id,
         )
         if payload.get("execution_id") != execution_id:
-            raise EngineProtocolError(
-                "pending approval execution identity mismatch"
-            )
+            raise EngineProtocolError("pending approval execution identity mismatch")
         raw_pending = payload.get("pending")
         if not isinstance(raw_pending, list):
-            raise EngineProtocolError(
-                "pending approval response is malformed"
-            )
+            raise EngineProtocolError("pending approval response is malformed")
         rows: list[dict[str, str]] = []
         seen_calls: set[str] = set()
         for index, raw in enumerate(raw_pending):
             if not isinstance(raw, Mapping):
-                raise EngineProtocolError(
-                    f"pending[{index}] must be an object"
-                )
+                raise EngineProtocolError(f"pending[{index}] must be an object")
             call_id = _text(
                 raw.get("call_id"),
                 f"pending[{index}].call_id",
                 maximum=256,
             )
             if call_id in seen_calls:
-                raise EngineProtocolError(
-                    "pending approval response has duplicate call_id"
-                )
+                raise EngineProtocolError("pending approval response has duplicate call_id")
             seen_calls.add(call_id)
             tool_id = _text(
                 raw.get("tool_id"),
@@ -1958,13 +1766,8 @@ class EngineClient:
                 f"pending[{index}].arguments_digest",
                 maximum=64,
             )
-            if (
-                len(digest) != 64
-                or any(ch not in "0123456789abcdef" for ch in digest)
-            ):
-                raise EngineProtocolError(
-                    "pending approval arguments_digest is invalid"
-                )
+            if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+                raise EngineProtocolError("pending approval arguments_digest is invalid")
             idem = _text(
                 raw.get("idempotency_key"),
                 f"pending[{index}].idempotency_key",
@@ -1976,9 +1779,7 @@ class EngineClient:
                 maximum=1024,
             )
             if not approval_ref.startswith("approval:"):
-                raise EngineProtocolError(
-                    "pending approval_ref is invalid"
-                )
+                raise EngineProtocolError("pending approval_ref is invalid")
             rows.append(
                 {
                     "call_id": call_id,
@@ -2013,13 +1814,8 @@ class EngineClient:
             "arguments_digest",
             maximum=64,
         )
-        if (
-            len(digest) != 64
-            or any(ch not in "0123456789abcdef" for ch in digest)
-        ):
-            raise EngineProtocolError(
-                "arguments_digest must be lowercase sha256"
-            )
+        if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise EngineProtocolError("arguments_digest must be lowercase sha256")
         payload = await self._request(
             "POST",
             f"/executions/{execution}/tool-approvals",
@@ -2055,9 +1851,7 @@ class EngineClient:
             trace_id=trace_id,
         )
         if payload.get("execution_id") != execution_id:
-            raise EngineProtocolError(
-                "approval execution identity mismatch"
-            )
+            raise EngineProtocolError("approval execution identity mismatch")
         approval_id = _text(
             payload.get("approval_id"),
             "approval_id",
@@ -2069,21 +1863,13 @@ class EngineClient:
             maximum=1024,
         )
         if not approval_ref.startswith("approval:"):
-            raise EngineProtocolError(
-                "approval response has invalid approval_ref"
-            )
+            raise EngineProtocolError("approval response has invalid approval_ref")
         if payload.get("call_id") != call_id:
-            raise EngineProtocolError(
-                "approval call identity mismatch"
-            )
+            raise EngineProtocolError("approval call identity mismatch")
         if payload.get("tool_id") != tool_id:
-            raise EngineProtocolError(
-                "approval tool identity mismatch"
-            )
+            raise EngineProtocolError("approval tool identity mismatch")
         if payload.get("arguments_digest") != digest:
-            raise EngineProtocolError(
-                "approval arguments identity mismatch"
-            )
+            raise EngineProtocolError("approval arguments identity mismatch")
         result = dict(payload)
         result["approval_id"] = approval_id
         result["approval_ref"] = approval_ref
@@ -2095,47 +1881,31 @@ class EngineClient:
     ) -> Mapping[str, Any] | None:
         events = payload.get("events")
         if not isinstance(events, list):
-            raise EngineProtocolError(
-                "engine events response is missing events"
-            )
+            raise EngineProtocolError("engine events response is missing events")
         result: Mapping[str, Any] | None = None
         seen_ids: set[str] = set()
         last_sequence = -1
         for event in events:
             if not isinstance(event, Mapping):
-                raise EngineProtocolError(
-                    "engine event must be an object"
-                )
+                raise EngineProtocolError("engine event must be an object")
             event_id = _text(
                 event.get("event_id"),
                 "event.event_id",
                 maximum=4096,
             )
             if event_id in seen_ids:
-                raise EngineProtocolError(
-                    "engine event stream contains duplicate event id"
-                )
+                raise EngineProtocolError("engine event stream contains duplicate event id")
             seen_ids.add(event_id)
             sequence = event.get("sequence")
-            if (
-                isinstance(sequence, bool)
-                or not isinstance(sequence, int)
-                or sequence < 0
-            ):
-                raise EngineProtocolError(
-                    "engine event sequence is invalid"
-                )
+            if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+                raise EngineProtocolError("engine event sequence is invalid")
             if sequence <= last_sequence:
-                raise EngineProtocolError(
-                    "engine event stream is not strictly ordered"
-                )
+                raise EngineProtocolError("engine event stream is not strictly ordered")
             last_sequence = sequence
             if event.get("type") == "execution.result":
                 candidate = event.get("result")
                 if not isinstance(candidate, Mapping):
-                    raise EngineProtocolError(
-                        "execution.result event is malformed"
-                    )
+                    raise EngineProtocolError("execution.result event is malformed")
                 result = candidate
         return result
 
@@ -2171,20 +1941,13 @@ class EngineClient:
         )
         result = self._result_from_events(events)
         if result is None:
-            raise EngineProtocolError(
-                "terminal engine execution is missing result event"
-            )
+            raise EngineProtocolError("terminal engine execution is missing result event")
         if state != "completed":
             usage = result.get("usage")
             failure_code = (
                 str(usage.get("error_code"))
-                if isinstance(usage, Mapping)
-                and usage.get("error_code") is not None
-                else (
-                    None
-                    if status.get("failure_code") is None
-                    else str(status["failure_code"])
-                )
+                if isinstance(usage, Mapping) and usage.get("error_code") is not None
+                else (None if status.get("failure_code") is None else str(status["failure_code"]))
             )
             raise EngineExecutionFailed(
                 "engine execution reached non-success terminal state"
@@ -2196,9 +1959,7 @@ class EngineClient:
             )
         normalized = EngineTerminalResult.from_payload(result)
         if normalized.execution_id != execution_id:
-            raise EngineProtocolError(
-                "terminal result execution identity mismatch"
-            )
+            raise EngineProtocolError("terminal result execution identity mismatch")
         return normalized
 
     async def wait_for_terminal(
@@ -2224,13 +1985,9 @@ class EngineClient:
         while True:
             attempts += 1
             if attempts > self.config.max_poll_attempts:
-                raise EngineUnavailableError(
-                    "engine polling budget exhausted"
-                )
+                raise EngineUnavailableError("engine polling budget exhausted")
             if monotonic() - started > timeout:
-                raise EngineUnavailableError(
-                    "engine execution did not reach terminal state in time"
-                )
+                raise EngineUnavailableError("engine execution did not reach terminal state in time")
 
             terminal = await self.terminal_result_if_available(
                 execution_id=execution_id,
@@ -2270,13 +2027,9 @@ class EngineClient:
             maximum=192,
         )
         if operation_id != command.operation.operation_id:
-            raise EngineProtocolError(
-                "recovered engine status operation identity mismatch"
-            )
+            raise EngineProtocolError("recovered engine status operation identity mismatch")
         if execution_id != command.execution_request.execution_id:
-            raise EngineProtocolError(
-                "recovered engine status execution identity mismatch"
-            )
+            raise EngineProtocolError("recovered engine status execution identity mismatch")
         return True
 
     @staticmethod
@@ -2290,18 +2043,14 @@ class EngineClient:
             maximum=192,
         )
         if execution_id != command.execution_request.execution_id:
-            raise EngineProtocolError(
-                "engine acknowledgement execution identity mismatch"
-            )
+            raise EngineProtocolError("engine acknowledgement execution identity mismatch")
         ack_operation = _text(
             ack.get("operation_id"),
             "ack.operation_id",
             maximum=192,
         )
         if ack_operation != command.operation.operation_id:
-            raise EngineProtocolError(
-                "engine acknowledgement operation identity mismatch"
-            )
+            raise EngineProtocolError("engine acknowledgement operation identity mismatch")
         return execution_id
 
     async def _cancel_after_client_abort(

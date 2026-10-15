@@ -1,0 +1,125 @@
+{
+  "schema_version": "skeleton.application.first_install.v1",
+  "status": "implementation_candidate_unpromoted",
+  "owner": "skeleton/app",
+  "plane": "deployment-release",
+  "sources": [
+    "machine/manifest.json",
+    "machine/architecture.json",
+    "machine/ai_app_construction.json",
+    "skeleton/app/manifest.json"
+  ],
+  "implementation": [
+    "skeleton/app/installer.py",
+    "skeleton/app/setup_runtime.py",
+    "skeleton/app/preloader.py",
+    "skeleton/app/assembly.py",
+    "skeleton/app/first_install.py",
+    "skeleton/app/cli.py",
+    "scripts/install_app.py",
+    "docker-compose.yml",
+    "backend/server.py",
+    "Dockerfile",
+    "Dockerfile.dockerignore",
+    "backend/Dockerfile",
+    "backend/Dockerfile.dockerignore",
+    "frontend/Dockerfile"
+  ],
+  "services": [
+    "mongo",
+    "skeleton",
+    "backend",
+    "frontend",
+    "chroma"
+  ],
+  "entrypoints": {
+    "bootstrap": "python scripts/install_app.py --start",
+    "setup": "python -m skeleton app setup",
+    "preflight": "python -m skeleton app check --runtime",
+    "diagnostics": "python -m skeleton app doctor --live --json",
+    "launch": "python -m skeleton app up",
+    "stop": "python -m skeleton app down"
+  },
+  "invariants": [
+    "Reuse the existing application assembly, Docker Compose supervisor, provider boundary and canonical data stores; create no service or model executor.",
+    "The repository-local bootstrap must import only the standard library before installing canonical Python metadata.",
+    "A first install generates private stable Mongo, JWT and engine-service credentials; valid existing credentials are preserved unless the operator explicitly requests rotation.",
+    "Receipts, diagnostics and subprocess failures contain no credential values or rendered Compose environment.",
+    "Default local mode is unavailable until a genuine trained model is configured; healthy application services do not establish AI or crawler readiness.",
+    "Provider credentials and model construction remain engine-owned; diagnostics never invoke a model or crawl a URL.",
+    "Operator-approved emulator cores and toolchains remain optional and do not become ready merely because configuration variables exist.",
+    "Startup and live probes use the declared topology and actual configured public ports; parameter validation precedes startup mutation.",
+    "Missing dependencies, daemon access and configuration produce actionable bounded failures without installing privileged prerequisites automatically.",
+    "GameForge auth uses its existing independently generated persistent GAMEFORGE_JWT_SECRET; no public fallback key or default-password admin account is created.",
+    "Minimal first-install startup retains schema/index/auth bootstrap but skips bulk generated content, launch prefill and automatic Android toolchain installation. Heavy content is an explicit operator opt-in, not evidence of learned or crawled knowledge.",
+    "Consolidate source-copy layers and explicitly bound build concurrency; do not change the managed Docker storage driver or delete unrelated images, runtime containers or volumes to recover capacity.",
+    "Production Expo embeds only explicit public backend/engine build endpoints, and backend CORS receives an explicit origin allowlist; runtime-only environment variables cannot reconfigure an already exported browser bundle.",
+    "Setup creates the operator-owned local-model bind directory before Docker can auto-create it as root, without acquiring assets, modifying existing assets or activating a model. Existing empty directories that the operator cannot write produce an actionable failure.",
+    "The existing Curiosity owner uses the declared backend_data volume via CURIOSITY_DATA_ROOT=/app/data/curiosity rather than the read-only source tree. Minimal installation keeps its automatic idle research disabled unless explicitly enabled.",
+    "Compose forwards the existing DB_NAME setting to core.databases, keeping the configured CORE_DB Mongo namespace authoritative instead of silently ignoring operator database selection.",
+    "Both uppercase and lowercase NO_PROXY explicitly include Compose service and loopback hosts while retaining operator bypass entries, so inherited proxy settings cannot intercept private authenticated backend-to-engine traffic. External proxy configuration remains available to its existing owners.",
+    "The production Nginx loopback health probe explicitly disables wget proxy use; external proxy configuration cannot turn a healthy local listener into a false health failure."
+  ],
+  "diagnostic_report": {
+    "schema_version": "skeleton.application.first_install_report.v1",
+    "fields": [
+      "schema_version",
+      "platform_ready",
+      "configuration_ready",
+      "services_ready",
+      "ai",
+      "checks",
+      "endpoints",
+      "next_steps",
+      "crawler"
+    ],
+    "limits": {
+      "http_response_bytes": 65536,
+      "probe_timeout_seconds": 10,
+      "maximum_checks": 256
+    },
+    "semantics": "Read-only configuration and observed canonical health projection. Unprobed capability states remain unknown; configuration is not execution evidence."
+  },
+  "qualification": {
+    "automated_tests_run": false,
+    "production_promoted": false,
+    "masterplan_completion_granted": false
+  },
+  "existing_security_authority": "backend/core/auth_security.py",
+  "configuration": {
+    "stable_secrets": [
+      "MONGO_INITDB_ROOT_PASSWORD",
+      "JWT_SECRET",
+      "GAMEFORGE_JWT_SECRET",
+      "SKL_ENGINE_SERVICE_TOKEN"
+    ],
+    "optional_operator_admin": [
+      "GAMEFORGE_SEED_ADMIN_EMAIL",
+      "GAMEFORGE_SEED_ADMIN_PASSWORD"
+    ],
+    "minimal_startup": "SKIP_HEAVY_SEED=true"
+  },
+  "engine_image": {
+    "base": "python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170",
+    "abi": "glibc Debian Trixie, matching operator-provisioned Linux llama.cpp CLI; no Windows-native or ARM-model-recipe readiness claim",
+    "runtime_libraries": [
+      "libgomp1",
+      "libstdc++6"
+    ],
+    "optional_readonly_model_mount": "/app/local-ai",
+    "model_activation": "explicit AI_LOCAL_DEPLOYMENT_PATH only after exact operator assets are prepared",
+    "build_proxy_ca": "optional BuildKit secret only; never installed into image layers",
+    "dependency_source": "pyproject.toml project.dependencies plus local-inference/hosted-inference and exact build-system requirements, resolved before source; editable canonical package registration uses --no-deps"
+  },
+  "operator_bootstrap": {
+    "commands": [
+      "app setup --admin-email EMAIL --admin-password-file FILE",
+      "app install --admin-email EMAIL --admin-password-file FILE"
+    ],
+    "authority": "existing backend/core/auth_security.py resolve_seed_admin + routes/gameforge_auth.py seed_admin",
+    "input": "paired explicit email and private regular password file; no password argument, no public default or automatic first-user elevation",
+    "password_bounds": "at least 16 Unicode characters, at most 72 UTF-8 bytes, no embedded control characters; optional single trailing line ending",
+    "serialization": "literal quoted Compose-compatible .env, dollar interpolation escaped, never return credential values",
+    "preflight": "validate both inputs before creating or changing .env"
+  }
+}

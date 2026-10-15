@@ -212,5 +212,72 @@
       "POST /ai/chat synchronous terminal result",
       "GET /ai/chat/turns/{thread_id} deferred terminal finalizer"
     ]
+  },
+  "application_first_install": {
+    "status": "implementation_candidate",
+    "owners": [
+      "backend/routes/ai.py",
+      "backend/core/chat_sessions.py",
+      "backend/core/conversations.py",
+      "backend/core/engine_client.py",
+      "backend/core/model_catalog.py"
+    ],
+    "authority": "Existing canonical conversation thread/message Mongo rows and chat-turn journal; canonical engine owns execution/provider/tools/memory/governance. No new store, service, scheduler or provider boundary.",
+    "prepared_execution": {
+      "schema_version": "backend.ai.chat-execution.v1",
+      "storage": "Private bounded operational metadata on the same canonical USER message write-ahead row; exact EngineExecutionCommand and request digest are persisted before thread sequence commit.",
+      "replay": "First committed message command wins; exact request digest, message/actor/tenant/operation/execution/context identities and command SHA revalidated on every read/resume. No reconstruction of changed prompt/options/context/deadline.",
+      "maximum_utf8_bytes": 2097152,
+      "expiry": "Never reissue expired delegated command; canonical terminal failure marker frees conversation ordering without fabricated model output.",
+      "cancellation": "Private same-row dispatch CAS: ready -> submitting before engine intake; only ready can be atomically withdrawn without claiming engine cancellation. Submitting/admitted cancellation remains intent until actual canonical terminal truth; exact frozen retry never forks or reissues a withdrawn command.",
+      "generic_edit": "Generic conversation edit rejects an original USER with prepared AI execution metadata or marker before publication. Copy into a new message instead; editing requires a separately frozen canonical command and fresh request identity, and is not exposed as supported by this integration."
+    },
+    "interfaces": [
+      "GET /api/ai/models",
+      "GET /api/ai/chat/readiness",
+      "POST /api/ai/chat",
+      "POST /api/ai/chat/turns/{thread_id}/resume",
+      "GET /api/ai/chat/turns/{thread_id}/stream",
+      "GET /api/ai/chat/turns/{thread_id}",
+      "existing JSON event projection retained",
+      "PATCH /api/v1/conversations/{thread_id}/metadata {title,expected_thread_version}",
+      "GET /api/v1/conversations/{thread_id}/export?format=json|markdown&expected_thread_version"
+    ],
+    "stream": {
+      "source": "Existing immutable digest-chained chat-turn events; no synthetic engine-event cursors or fabricated token deltas. Canonical final text only after verified assistant commit.",
+      "event": "chat.event with id sequence:event_digest",
+      "terminal": "chat.final without SSE id, exact canonical turn response",
+      "reconnect": "Last-Event-ID or explicit after_sequence+last_event_digest; validate cursor against canonical journal even for empty replay pages. Disconnect detaches only.",
+      "max_connection_seconds": 120,
+      "max_connections_per_process": 32,
+      "page_events": 100,
+      "body_replay": "Existing bounded body middleware replays each buffered request chunk once, then delegates to the original ASGI receive for real disconnect/cancellation. It never fabricates recurring empty http.request frames. Initial size/in-flight byte admission unchanged."
+    },
+    "context": {
+      "memory": "Explicit bounded memory IDs only from canonical governed memory authority, exact owner/tenant/current active/version/content identity; never new memory bank or caller text promoted to memory.",
+      "crawler": "Explicit bounded current owned crawler records through dragon_crawler adapter; fetched text remains untrusted evidence, review/rights/current source checks remain owner authoritative. No direct feature fetch or automatic training.",
+      "dispatch": "Revalidate current referenced records before admission/replay/final commit; no stale withdrawn evidence reuse.",
+      "history": "Selected canonical history user/assistant messages inherit exact original operational source dependencies through causal user IDs. Bound full original metadata before materialization: max256 causal users/8MiB; validate each complete command+record digest against canonical causal USER before extracting refs. Flatten/deduplicate pins within total8memory/4crawler bounds or fail before message/model dispatch. Fresh users carry a constant prepared-execution marker so missing private command is corruption, not absent source obligations. Legacy unmarked pre-wave rows retain explicit compatibility. Withdrawal fences transitively prevent future inference through retained assistant text.",
+      "citation_metadata": "Crawler evidence is one bounded untrusted canonical JSON envelope containing exact current canonical source URL, title, authority/review labels, passage text and its independently validated passage SHA. Segment content SHA binds the entire model-visible envelope; provenance retains exact captured-source and passage SHA. URLs are supplied evidence, not verified model citations; generated citation quality is not asserted."
+    },
+    "tools": "Only existing typed delegated application owners; read/research context remains data. No model-supplied unconstrained tool executor or capability expansion.",
+    "validation": "Static source checks and authorized actual API/model workloads only; user no-tests instruction persists.",
+    "conversation_bounds": {
+      "max_messages": 10000,
+      "max_public_utf8_bytes": 8388608,
+      "admission": "Mongo aggregates bounded public-record BSON bytes/count before returning transcript payloads; private command metadata excluded from public reads. Missing parents/cycles/active branch fail closed, never silent first500 history.",
+      "metadata": "Title1..200 under existing owned active/archived exact-version CAS and canonical governed storage admission."
+    },
+    "bson_timestamps": "Canonical conversation and chat-turn adapters request timezone-aware UTC BSON decoding on their own collection handles only. Newly issued Mongo lease grant/expiry timestamps are normalized to BSON milliseconds before hashing/persistence. Existing journal/receipt hashes are never rewritten; old incompatible leases expire before a new fenced epoch. Shared legacy database defaults and pure contracts remain unchanged.",
+    "readiness": "Public /ai/status, /providers and model discovery read canonical provider inventory under a 2-second bound. configured and availability_observed are distinct; engine URL presence never means a ready model. No generation/health probe or secret transport data during discovery.",
+    "export": "Authenticated exact owned active/archived thread and expected-version fence; server renders canonical active lineage only after every thread/message lifecycle record is active, exportable and within retention. Bound8MiB UTF8; SHA of exact returned content. Excludes private prepared commands, internal instructions, raw source/attachment payloads and other tenant inventory."
+  },
+  "current_main_reconciliation": {
+    "authority": "Existing canonical conversation USER row, prepared engine command and current-tip/version CAS; no second command owner/store.",
+    "edited_user_rebind": "Main Save and resend remains supported. A canonical edit removes superseded execution metadata; a fresh exact request/prepared command/source snapshot/dispatch binding is written once together on that same current USER row under current tip/version CAS. Inherited old bindings cannot be replayed as the edited request.",
+    "historical_records": "Read adapters recognize immutable main command/request-reference metadata and the continuation envelope without rewriting original bytes/digests. Ambiguous or unprovable legacy authority is observe-only/fail-closed.",
+    "public_exports": "Retain main governed conversation export schema and the explicitly labelled continuation export projection with the same owner/version/retention/size/digest authority.",
+    "existing_attachment_and_dragon_dependencies": "Preserve main bounded attachment refs and explicitly consented configured Dragon projection. Existing prepared context envelope may pin at most four exact canonical attachment segments and three configured Dragon query/source checkpoints. Existing resolvers recheck identity/permission/retention before dispatch, resume and final publication and when selected through inherited conversation history. Existing memory/crawler-only receipts remain readable; no new source, model or state authority.",
+    "current_input_lineage": "Prospective current input is explicitly identified by the preparing canonical route, validated as the expected USER/thread/next sequence or current edited tip and matched to the exact compiled segment ID/content digest. Only that current input is excluded from prior-history traversal; unknown historical IDs remain fail-closed. Current direct source dependencies retain their own authority checks."
   }
 }

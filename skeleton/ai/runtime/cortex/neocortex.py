@@ -117,11 +117,14 @@ class JeevesCortex:
         self.shadow["own"] = {"wins": 0, "trials": 0}
         self.hive = HiveMind(bus=self._bus)
         self.auto_surpass = True
-        from skeleton.cortex.device import attach_lm, probe
+        from skeleton.cortex.device import probe
         from skeleton.cortex.lm import gameforge_vocab
-        self.transformer = attach_lm(
-            vocab=gameforge_vocab(), dim=8, ctx=8, seed=19,
-            n_heads=2, n_layers=2, d_ff=32, device="auto",
+        from skeleton.cortex.production_profile import build_initial_speaking_model
+        # An explicit nonlegacy profile configures initial capacity only.
+        # On restoring SKELETON_OWN, the saved production architecture remains
+        # authoritative; profile selection never silently migrates weights.
+        self.transformer = build_initial_speaking_model(
+            vocab=gameforge_vocab(), seed=19,
         )
         from skeleton.cortex.transformer import TinyTransformer
         self.neo_rms = TinyTransformer(
@@ -604,7 +607,37 @@ class JeevesCortex:
             "contact": self.contact_engine.snapshot(),
             "genos": self.genos_engine.snapshot(),
         }
-        p.write_text(json.dumps(blob), encoding="utf-8")
+        # Never truncate live weights on a crash or overwrite a symlink.
+        # Temporary and destination are on the same filesystem for os.replace.
+        import os
+        import tempfile
+        if p.is_symlink():
+            raise CortexError("refusing symlink as Jeeves production state")
+        raw = json.dumps(blob, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        staged = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", prefix=".jeeves-cortex-", suffix=".tmp",
+                dir=p.parent, delete=False,
+            ) as handle:
+                staged = Path(handle.name)
+                os.chmod(staged, 0o600)
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if p.is_symlink():
+                raise CortexError("Jeeves persistence target changed into symlink")
+            os.replace(staged, p)
+            staged = None
+            if os.name == "posix":
+                fd = os.open(p.parent, os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        finally:
+            if staged is not None:
+                staged.unlink(missing_ok=True)
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
 
     def load(self, path) -> Dict[str, Any]:
@@ -632,26 +665,25 @@ class JeevesCortex:
         if blob.get("transformer"):
             snap = blob["transformer"]
             if (snap or {}).get("kind") == "torch-stack":
-                try:
-                    from skeleton.cortex.torch_lm import TorchTransformer
-                    self.transformer = TorchTransformer.from_snapshot(snap)
-                except Exception:
-                    from skeleton.cortex.transformer import TinyTransformer
-                    self.transformer = TinyTransformer.from_snapshot(snap)
+                # Failure to restore the actual torch architecture must not
+                # silently replace its trained weights with a random native LM.
+                from skeleton.cortex.torch_lm import TorchTransformer
+                self.transformer = TorchTransformer.from_snapshot(snap)
             else:
                 from skeleton.cortex.transformer import TinyTransformer
                 self.transformer = TinyTransformer.from_snapshot(snap)
         if blob.get("neo_rms"):
-            from skeleton.cortex.transformer import TinyTransformer
-            self.neo_rms = TinyTransformer.from_snapshot(blob["neo_rms"])
+            rms_snapshot = blob["neo_rms"]
+            if (rms_snapshot or {}).get("kind") == "torch-stack":
+                from skeleton.cortex.torch_lm import TorchTransformer
+                self.neo_rms = TorchTransformer.from_snapshot(rms_snapshot)
+            else:
+                from skeleton.cortex.transformer import TinyTransformer
+                self.neo_rms = TinyTransformer.from_snapshot(rms_snapshot)
         if blob.get("winner"):
             self._winner_mouth = str(blob.get("winner") or "neo")
         if "mouth_override" in blob:
             self._mouth_override = blob.get("mouth_override")
-        if getattr(self, "bpe", None) is not None:
-            self.transformer.bpe = self.bpe
-            if getattr(self, "neo_rms", None) is not None:
-                self.neo_rms.bpe = self.bpe
         if blob.get("contact"):
             self.contact_engine.restore(blob.get("contact"))
         if blob.get("genos"):
@@ -667,6 +699,13 @@ class JeevesCortex:
         if blob.get("bpe"):
             from skeleton.cortex.bpe import BytePairEncoder
             self.bpe = BytePairEncoder.from_snapshot(blob["bpe"])
+        # Bind the restored encoder, not the bootstrap encoder.  This must
+        # happen AFTER loading the saved BPE vocabulary and merge rules so
+        # that resumed production inference uses the tokenizer it persisted.
+        if getattr(self, "bpe", None) is not None:
+            self.transformer.bpe = self.bpe
+            if getattr(self, "neo_rms", None) is not None:
+                self.neo_rms.bpe = self.bpe
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:

@@ -616,14 +616,14 @@ export async function getConversationExport(
   thread: ConversationThread, format: 'json' | 'markdown', input: ConversationRequestOptions = {},
 ): Promise<ConversationExport> {
   const data = await requireData(api.get<{
-    thread_id: string; snapshot_version: number; scope: string; format: string;
+    schema_version: string; thread_id: string; snapshot_version: number; scope: string; format: string;
     filename: string; media_type: string; content: string; content_digest: string;
     message_count: number; attachments_embedded: boolean;
   }>('/api/v1/conversations/' + encodeURIComponent(thread.thread_id) + '/export'
     + '?format=' + format + '&expected_thread_version=' + thread.version,
   { ...requestOptions(input), timeoutMs: 30000 }), 'Could not export conversation.');
   if (input.signal?.aborted) throw new ChatClientError('Export detached.', { kind: 'cancelled' });
-  if (data.thread_id !== thread.thread_id || data.snapshot_version !== thread.version
+  if (!['skeleton.chat.export.v1', 'skeleton.conversation.export.v1'].includes(data.schema_version) || data.thread_id !== thread.thread_id || data.snapshot_version !== thread.version
     || data.scope !== 'canonical_active_lineage' || data.format !== format
     || data.attachments_embedded !== false || typeof data.content !== 'string'
     || typeof data.media_type !== 'string'

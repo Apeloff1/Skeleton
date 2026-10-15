@@ -1,7 +1,7 @@
 """Authenticated request-driven Jeeves studio assistant goals."""
 
 from typing import Literal
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import Field, model_validator
 from core import game_studio_agent as agent
 from routes.game_learning import Request, WriteRequest, _call, _scope
@@ -17,6 +17,7 @@ class GoalCreate(WriteRequest):
     allow_edits: bool = Field(default=False, strict=True)
     authorization_seconds: int = Field(default=600, ge=60, le=3600, strict=True)
     max_model_calls: int = Field(default=4, ge=1, le=8, strict=True)
+    max_output_tokens: int = Field(default=1024, ge=256, le=4096, strict=True)
     max_jobs: int = Field(default=2, ge=0, le=4, strict=True)
 
     @model_validator(mode="after")
@@ -38,9 +39,56 @@ class GoalControl(Request):
     action: Literal["pause", "resume", "cancel"]
 
 
+class GoalRetry(Request):
+    expected_goal_version: int = Field(ge=1, strict=True)
+    idempotency_key: str = Field(min_length=1, max_length=512)
+    target: Literal["planner", "action", "job", "play", "reconcile"]
+    new_planner_attempt: bool = Field(default=False, strict=True)
+
+    @model_validator(mode="after")
+    def new_attempt_scope(self):
+        if self.new_planner_attempt and self.target != "planner":
+            raise ValueError("only planner recovery can request a fresh bounded model attempt")
+        return self
+
+
+class GoalAuthorization(Request):
+    expected_goal_version: int = Field(ge=1, strict=True)
+    idempotency_key: str = Field(min_length=1, max_length=512)
+    authorization_seconds: int = Field(ge=60, le=3600, strict=True)
+
+
+@router.get("/catalog")
+async def catalog(user=Depends(get_current_user)):
+    return await _call(agent.catalog(_scope(user)))
+
+
+@router.post("/goals/{goal_id}/retry")
+async def retry(goal_id: str, body: GoalRetry, user=Depends(get_current_user)):
+    return {"goal": await _call(agent.retry(_scope(user), goal_id, body.model_dump()))}
+
+
+@router.post("/goals/{goal_id}/authorization")
+async def authorize(goal_id: str, body: GoalAuthorization, user=Depends(get_current_user)):
+    return {"goal": await _call(agent.authorize_goal(_scope(user), goal_id, body.model_dump()))}
+
+
+@router.get("/goals/{goal_id}/history")
+async def history(
+    goal_id: str,
+    after: int = Query(default=0, ge=0, le=16),
+    limit: int = Query(default=8, ge=1, le=8),
+    user=Depends(get_current_user),
+):
+    return await _call(agent.history(_scope(user), goal_id, after, limit))
+
+
 @router.post("/projects/{project_id}/goals")
 async def create_goal(project_id: str, body: GoalCreate, user=Depends(get_current_user)):
-    return {"goal": await _call(agent.create(_scope(user), project_id, body.model_dump()))}
+    payload = body.model_dump()
+    if "max_output_tokens" not in body.model_fields_set:
+        payload.pop("max_output_tokens")
+    return {"goal": await _call(agent.create(_scope(user), project_id, payload))}
 
 
 @router.get("/projects/{project_id}/goals")

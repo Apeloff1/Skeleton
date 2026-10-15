@@ -6,12 +6,12 @@ scanner. Repository file contents are not copied into the retrieval index.
 """
 from __future__ import annotations
 
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
-import re
-from typing import Iterable
 
-from .model import FileRecord, RepositoryModel
+from .model import RepositoryModel
 
 _TOKEN = re.compile(r"[A-Za-z0-9_./:-]{2,}")
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -99,7 +99,7 @@ class RepositoryRetrievalIndex:
         for intent, vocabulary in _INTENT_KINDS.items():
             self._zones_by_intent[intent] = {
                 zone for zone in zones
-                if _tokens(zone).intersection(vocabulary)
+                if vocabulary.intersection(_tokens(zone))
             }
 
     def _infer_intents(self, terms: set[str]) -> tuple[str, ...]:
