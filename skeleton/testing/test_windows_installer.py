@@ -362,3 +362,29 @@ def test_disk_preflight_fails_closed_when_installation_drive_disappears(tmp_path
     assert report.ready is False
     assert "cannot inspect installation filesystem" in disk.detail
     assert "drive missing" not in disk.detail
+
+
+def test_windows_hidden_runner_forwards_streaming_compose_output(monkeypatch, tmp_path):
+    from skeleton.app import windows_launcher
+
+    observed = {}
+    def fake_run(command, **kwargs):
+        observed.update(kwargs)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(windows_launcher.subprocess, "run", fake_run)
+    log_path = tmp_path / "build.log"
+    with log_path.open("w", encoding="utf-8") as output:
+        result = windows_launcher._hidden_runner(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=tmp_path, check=False,
+            stdout=output, stderr=subprocess.STDOUT, text=True,
+            env={"APP_MODE": "production"},
+        )
+    assert result.returncode == 0
+    assert observed["stdout"].closed
+    assert observed["stderr"] is subprocess.STDOUT
+    assert observed["capture_output"] is False
+    assert observed["cwd"] == tmp_path
+    assert observed["env"]["APP_MODE"] == "production"
+    assert observed["shell"] is False
