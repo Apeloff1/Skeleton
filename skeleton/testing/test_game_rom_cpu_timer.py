@@ -109,6 +109,43 @@ class DMGEdgeTimerCases(unittest.TestCase):
         core._advance(16)
         self.assertEqual(core.snapshot(), first)
 
+    def test_stop_freezes_divider_tima_ppu_until_controller_resume(self):
+        rom = bytearray(synthetic_rom(0x00, 0, 0))
+        rom[0x100:0x103] = bytes((0x10, 0x00, 0x00))
+        core = GameBoyMachine(bytes(rom))
+        core.divider = 8
+        core.write(0xFF07, 5)
+        core.instruction()  # Original STOP instruction, 2-byte opcode.
+        self.assertTrue(core.stopped)
+        divider = core.divider
+        tima = core.read(0xFF05)
+        frame = core.frames
+        rtc_remainder = core.rtc_cycle_remainder
+        source_ticks = core.cycles
+        result = core.run(1024)
+        self.assertGreater(result["cycles"], 0)
+        self.assertGreater(core.cycles, source_ticks)
+        self.assertEqual(core.divider, divider)
+        self.assertEqual(core.read(0xFF05), tima)
+        self.assertEqual(core.frames, frame)
+        self.assertEqual(core.rtc_cycle_remainder, rtc_remainder)
+        core.set_buttons(("a",))
+        self.assertFalse(core.stopped)
+        core.instruction()
+        self.assertNotEqual(core.divider, divider)
+
+    def test_halt_keeps_source_timer_oscillator_running(self):
+        rom = bytearray(synthetic_rom(0x00, 0, 0))
+        rom[0x100] = 0x76
+        core = GameBoyMachine(bytes(rom))
+        core.divider = 8
+        core.write(0xFF07, 5)
+        core.instruction()
+        self.assertTrue(core.halted)
+        first_divider = core.divider
+        core.instruction()
+        self.assertNotEqual(core.divider, first_divider)
+
     def test_corrupt_pending_overflow_phase_is_rejected(self):
         core = machine()
         original = core.snapshot()
