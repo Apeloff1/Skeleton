@@ -90,6 +90,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     href: capabilityHref('jeeves'),
     backendSurface: '/api/jeeves',
     actions: [
+      { id: 'reason-execute', title: 'Reason with Jeeves', description: 'Execute an admitted reason operation through the canonical Jeeves provider.', operation: 'jeeves.reason' },
       { id: 'reason', title: 'AI chat', description: 'Work through a problem with the configured engine and durable conversation history.', navigationId: 'jeeves.chat.canonical', href: '/jeeves-chat' },
       { id: 'governed-chat', title: 'Conversation workspace', description: 'Use governed attachments, message editing and regeneration with canonical conversation history.', navigationId: 'jeeves.chat.governed', href: '/ai-chat' },
       { id: 'capture-web', title: 'Capture web knowledge', description: 'Authorize a bounded crawl and inspect captured sources.', navigationId: 'jeeves.crawler', href: '/crawler' },
