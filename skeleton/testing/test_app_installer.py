@@ -517,3 +517,27 @@ def test_setup_atomic_write_removes_secret_temp_file_on_replace_failure(tmp_path
         _atomic_write(original, "JWT_SECRET=new-sensitive-value\n")
     assert original.read_text(encoding="utf-8") == "JWT_SECRET=original-value\n"
     assert list(tmp_path.glob(".env.*.tmp")) == []
+
+def test_setup_never_retargets_remote_mongo_uri_containing_placeholder_word(tmp_path):
+    # A remote hostname can contain "change-me" as a normal DNS label.
+    external = _test_mongo_uri(
+        "remote-user", "operator-secret", "db.change-me.example.net:27017", "app"
+    )
+    external_engine = _test_mongo_uri(
+        "remote-user", "change-me-is-not-an-endpoint", "cluster.example.net:27017",
+        "skeleton",
+    )
+    (tmp_path / ".env").write_text(
+        "MONGO_INITDB_ROOT_USERNAME=admin\n"
+        "MONGO_INITDB_ROOT_PASSWORD=local-root-password\n"
+        f"MONGO_URL={external}\n"
+        f"SKL_MONGO_URI={external_engine}\n"
+        "JWT_SECRET=operator-jwt-secret\n",
+        encoding="utf-8",
+    )
+    receipt = ensure_runtime_environment(tmp_path)
+    values = _read_values(tmp_path / ".env")
+    assert values["MONGO_URL"] == external
+    assert values["SKL_MONGO_URI"] == external_engine
+    assert {"MONGO_URL", "SKL_MONGO_URI"} <= set(receipt.preserved_keys)
+    assert not ensure_runtime_environment(tmp_path).changed

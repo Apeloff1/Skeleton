@@ -247,14 +247,17 @@ def ensure_runtime_environment(
     for key, generated in generated_uris.items():
         current = values.get(key, "")
         local_generated_uri = _bundled_mongo_endpoint(current)
-        # A legacy environment may hold a concrete-looking local URI whose
-        # credentials are now stale after a password repair. Keep intentionally
-        # external Mongo targets untouched, but rebind the bundled local ones.
-        if _is_placeholder(current) or (
-            # The installed Docker stack authenticates using its configured
-            # root credentials; repair mismatched locally generated URIs
-            # even if those credentials were already valid and preserved.
-            local_generated_uri and current != generated
+        # A remote URI may legitimately contain "change-me" in its hostname
+        # or credential. Never redirect any operator-supplied remote Mongo
+        # endpoint to the bundled database, even if a placeholder token
+        # appears within that URI. Malformed/weak remote config fails the
+        # separate runtime preflight rather than silently changing ownership.
+        current_is_mongo_uri = current.lower().startswith(
+            ("mongodb://", "mongodb+srv://")
+        )
+        if (
+            (not current_is_mongo_uri and _is_placeholder(current))
+            or (local_generated_uri and current != generated)
         ):
             text = _replace_env_value(text, key, generated)
             values[key] = generated
