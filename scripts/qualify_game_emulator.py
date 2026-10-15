@@ -43,6 +43,43 @@ def _read_operator_source(path: Path) -> tuple[bytes, str]:
     finally:
         os.close(descriptor)
 
+def _read_controller_tape(path: Path) -> list:
+    """Read an exact bounded JSON-only four-port input tape, rejecting duplicate keys."""
+    if path.is_symlink():
+        raise ValueError("Controller tape may not be a symlink")
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or not 2 <= before.st_size <= 128 * 1024:
+            raise ValueError("Controller tape JSON exceeds its bounded file size")
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            raw = stream.read(128 * 1024 + 1)
+        after = os.fstat(fd)
+        if (len(raw) != before.st_size or
+            (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)):
+            raise ValueError("Controller tape changed while being read")
+    finally:
+        os.close(fd)
+
+    def pairs(items):
+        parsed = {}
+        for key, value in items:
+            if key in parsed:
+                raise ValueError("Controller tape contains duplicate JSON keys")
+            parsed[key] = value
+        return parsed
+
+    def invalid(value):
+        raise ValueError("Nonfinite controller coordinates are forbidden")
+
+    tape = json.loads(raw.decode("utf-8"), object_pairs_hook=pairs, parse_constant=invalid)
+    if not isinstance(tape, list) or not 1 <= len(tape) <= 64:
+        raise ValueError("Controller tape must be a JSON list of 1–64 input frames")
+    from skeleton.jeeves.game_emulator_host import _controls
+
+    return [_controls(frame) for frame in tape]
+
 
 def main(argv: list[str] | None = None) -> int:
     from skeleton.jeeves.game_emulator_catalog import (
@@ -56,7 +93,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target", required=True, help="Canonical hardware target ID")
     parser.add_argument("--core", required=True, help="Explicit approved libretro core ID")
     parser.add_argument("--source", type=Path, required=True, help="Local 1–16 MiB lawful ROM/homebrew data")
-    parser.add_argument("--action", action="append", required=True, choices=sorted((*_ACTIONS, *_KEY_ACTIONS)))
+    tape_group = parser.add_mutually_exclusive_group(required=True)
+    tape_group.add_argument("--action", action="append", choices=sorted((*_ACTIONS, *_KEY_ACTIONS)))
+    tape_group.add_argument("--controller-tape-json", type=Path, help="Explicit 1–64 step JSON input tape for four-player button/axis/key/mouse/pointer controls")
     parser.add_argument("--runs", type=int, default=3, help="2–10 independent isolated worker sessions")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--frames-per-step", type=int, default=1)
@@ -76,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
         registry = GameEmulatorRegistry(registry_path)
         registry.resolve_core(args.core)
         os.environ[REGISTRY_ENV] = str(registry_path)
+        tape = _read_controller_tape(args.controller_tape_json) if args.controller_tape_json is not None else None
         result = run_emulator_qualification(
             args.target,
             core_id=args.core,
@@ -83,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
             rom_source=source,
             filename=name,
             actions=args.action,
+            controller_tape=tape,
             runs=args.runs,
             seed=args.seed,
             frames_per_step=args.frames_per_step,

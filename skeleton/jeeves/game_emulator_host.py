@@ -521,7 +521,7 @@ class EmulatorEnvironment:
         self.spec = GameEnvironmentSpec(
             "libretro:" + core.core_id + ":" + materialized_digest[:24],
             _digest(self._descriptor),
-            (*_ACTIONS, *_KEY_ACTIONS),
+            (*_ACTIONS, *_KEY_ACTIONS, "controller_input"),
             {key: bins for key in ("screen_mean", "visual_change", "audio_rms", "step_fraction")},
             ("visual_change",),
             self.max_steps,
@@ -1007,6 +1007,24 @@ class EmulatorEnvironment:
             self, actions, seed=seed, rights_evidence_digest=rights_evidence_digest
         )
 
+    def capture_controller_trace(
+        self,
+        controller_tape: Sequence[Sequence[Mapping[str, object]]],
+        *,
+        seed: int = 0,
+        rights_evidence_digest: str | None = None,
+    ) -> dict[str, object]:
+        """Capture real multi-port button/axis/key/mouse/pointer combinations."""
+        if not isinstance(controller_tape, (list, tuple)) or not 1 <= len(controller_tape) <= self.max_steps:
+            raise EmulatorHostError("emulator_trace_budget", "Controller tape exceeds the episode horizon")
+        return capture_emulator_trace(
+            self,
+            ["controller_input"] * len(controller_tape),
+            seed=seed,
+            rights_evidence_digest=rights_evidence_digest,
+            controller_tape=controller_tape,
+        )
+
     @staticmethod
     def audit_training_replays(traces: Sequence[Mapping[str, object]]) -> dict[str, object]:
         """Score 2–10 native replay receipts; never certify game success or weight promotion."""
@@ -1259,6 +1277,7 @@ def capture_emulator_trace(
     *,
     seed: int = 0,
     rights_evidence_digest: str | None = None,
+    controller_tape: Sequence[Sequence[Mapping[str, object]]] | None = None,
 ) -> dict[str, object]:
     """Record actual libretro frames, input, audio and hash-chained transitions.
 
@@ -1272,6 +1291,24 @@ def capture_emulator_trace(
         raise EmulatorHostError("emulator_trace_budget", "Trace actions exceed the bounded episode horizon")
     if not all(type(action) is str and action in environment.spec.actions for action in actions):
         raise EmulatorHostError("emulator_trace_action", "Trace controls must use declared policy actions")
+    if controller_tape is None:
+        if "controller_input" in actions:
+            raise EmulatorHostError("emulator_trace_action", "Raw controller action requires an exact controller tape")
+        normalized_tape = None
+    else:
+        if (not isinstance(controller_tape, (list, tuple))
+            or len(controller_tape) != len(actions)
+            or any(action != "controller_input" for action in actions)):
+            raise EmulatorHostError("emulator_trace_action", "Controller tape requires exactly one raw-control action per step")
+        # Validate the entire tape before resetting or executing the native core.
+        normalized_tape = [_controls(ports) for ports in controller_tape]
+        for ports in normalized_tape:
+            for index, control in enumerate(ports):
+                if environment._controller_devices[index] == "none" and (
+                    control["buttons"] or any(control["axes"]) or control["keys"]
+                    or any(control["mouse"]) or any(control["pointer"])
+                ):
+                    raise EmulatorHostError("invalid_emulator_controller", "Unconnected controller ports cannot carry input")
     _int(seed, 0, 2**63 - 1, "episode trace seed")
     if rights_evidence_digest is not None:
         _sha(rights_evidence_digest)
@@ -1281,7 +1318,11 @@ def capture_emulator_trace(
     transitions = []
     rewards = []
     for index, action in enumerate(actions, 1):
-        step = environment.step(action)
+        step = (
+            environment.step(action)
+            if normalized_tape is None
+            else environment.input_step(normalized_tape[index - 1])
+        )
         value = step.as_dict()
         evidence = value["info"].get("evidence")
         if not isinstance(evidence, dict):
@@ -1335,6 +1376,7 @@ def capture_emulator_trace(
         "source_code_digest": descriptor["source_code_digest"],
         "frames_per_step": environment.frames_per_step,
         "controller_port_devices": list(environment._controller_devices),
+        "controller_tape_digest": _digest(normalized_tape) if normalized_tape is not None else None,
         "rights_evidence_digest": rights_evidence_digest,
         "capture_nonce": os.urandom(16).hex(),
         "capture_process_independently_attested": False,

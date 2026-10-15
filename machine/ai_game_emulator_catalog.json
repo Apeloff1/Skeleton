@@ -574,5 +574,14 @@
     "training": "No model weights are trained or promoted; success metrics cannot be inferred from visual reward alone",
     "measured_gameplay_certifications": 0,
     "executed_during_this_code_change": false
+  },
+  "multi_controller_training_2026_10_15": {
+    "state": "implemented source-only, not live hardware qualified",
+    "native_input": "Four-port simultaneous buttons (16-bit mask), analog axis pairs, keyboard keycodes, six mouse fields, and 3 pointer fields subject to _controls input validation",
+    "trace": "EmulatorEnvironment.capture_controller_trace(tape, seed=...) records native frame/audio SHA, full controller-tape digest, hashes per input step, firmware/ROM/core identities; validation via canonical offline skeleton.game.trace.v1",
+    "replay": "Exact control tape digest is compared across runs and modes cannot be mixed; replay audit does not attest independent execution",
+    "qualifier": "run_emulator_qualification accepts either actions or controller_tape; operator CLI --controller-tape-json uses strict size, schema and duplicate-key validation",
+    "safety": "1–64 frames, maximum four controller ports, 2–10 replay runs, bounded native worker, no ROM/firmware fetching, no automatic game or model success promotion",
+    "limits": "No instrument-specific accuracy, controller emulation completeness, rights verification, game playability or weight gain established"
   }
 }

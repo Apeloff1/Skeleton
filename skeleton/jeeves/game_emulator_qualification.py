@@ -31,7 +31,8 @@ def run_emulator_qualification(
     *,
     core_id: str,
     expected_registry_digest: str,
-    actions: Sequence[str],
+    actions: Sequence[str] | None = None,
+    controller_tape: Sequence[Sequence[Mapping[str, object]]] | None = None,
     content: object | None = None,
     rom_source: bytes | None = None,
     filename: str = "game.bin",
@@ -59,12 +60,20 @@ def run_emulator_qualification(
         raise EmulatorQualificationError("Explicit canonical core, target and registry digest are required")
     if type(runs) is not int or not 2 <= runs <= MAX_REPLAY_RUNS:
         raise EmulatorQualificationError("Native mirror pass count must be 2 through 10")
-    if (not isinstance(actions, (list, tuple))
-        or not 1 <= len(actions) <= MAX_ACTIONS
-        or any(type(action) is not str for action in actions)):
-        raise EmulatorQualificationError("Exact policy action tape must contain 1 through 64 finite strings")
+    if (actions is None) == (controller_tape is None):
+        raise EmulatorQualificationError("Choose an action tape or multi-port controller tape, not both")
+    if controller_tape is None:
+        if (not isinstance(actions, (list, tuple))
+            or not 1 <= len(actions) <= MAX_ACTIONS
+            or any(type(action) is not str for action in actions)):
+            raise EmulatorQualificationError("Exact policy action tape requires 1 through 64 finite strings")
+        tape_length = len(actions)
+    else:
+        if not isinstance(controller_tape, (list, tuple)) or not 1 <= len(controller_tape) <= MAX_ACTIONS:
+            raise EmulatorQualificationError("Multi-port controller tape requires 1 through 64 bounded input frames")
+        tape_length = len(controller_tape)
     if (type(frames_per_step) is not int or not 1 <= frames_per_step <= 8
-        or (frames_per_step * len(actions) + 32) * runs > MAX_FRAME_BUDGET):
+        or (frames_per_step * tape_length + 32) * runs > MAX_FRAME_BUDGET):
         raise EmulatorQualificationError("Total native frame budget exceeds its 4,096-frame hard bound")
     if type(seed) is not int or not 0 <= seed < 2**63:
         raise EmulatorQualificationError("Native replay seed is not a bounded episode label")
@@ -79,7 +88,14 @@ def run_emulator_qualification(
         or any(char not in "0123456789abcdef" for char in rights_evidence_digest)
     ):
         raise EmulatorQualificationError("Optional rights evidence requires an exact SHA-256 identity")
-    from .game_emulator_host import create_emulator_environment
+    from .game_emulator_host import _ACTIONS, _KEY_ACTIONS, _controls, create_emulator_environment
+
+    if actions is not None and any(action not in (*_ACTIONS, *_KEY_ACTIONS) for action in actions):
+        raise EmulatorQualificationError("Policy tape contains an undeclared native input action")
+    normalized_tape = None
+    if controller_tape is not None:
+        # Validate *all* raw control frames before spawning a worker.
+        normalized_tape = [_controls(frame) for frame in controller_tape]
 
     traces = []
     run_receipts = []
@@ -102,9 +118,14 @@ def run_emulator_qualification(
             timeout_seconds=timeout_seconds,
             cancelled=cancelled,
         ) as environment:
-            trace = environment.capture_training_trace(
-                actions, seed=seed, rights_evidence_digest=rights_evidence_digest
-            )
+            if normalized_tape is None:
+                trace = environment.capture_training_trace(
+                    actions, seed=seed, rights_evidence_digest=rights_evidence_digest
+                )
+            else:
+                trace = environment.capture_controller_trace(
+                    normalized_tape, seed=seed, rights_evidence_digest=rights_evidence_digest
+                )
         traces.append(trace)
         last = trace["transitions"][-1]["info"]
         run_receipts.append({
@@ -128,7 +149,8 @@ def run_emulator_qualification(
         "source_registry_sha256": expected_registry_digest,
         "episode_seed": seed,
         "frames_per_step": frames_per_step,
-        "requested_native_frames_upper_bound": runs * len(actions) * frames_per_step + runs * 32,
+        "requested_native_frames_upper_bound": runs * tape_length * frames_per_step + runs * 32,
+        "controller_input_mode": "multi_port_raw" if normalized_tape is not None else "policy_actions",
         "runs_requested": runs,
         "runs_completed": len(traces),
         "trace_digests": [row["trace_digest"] for row in traces],
