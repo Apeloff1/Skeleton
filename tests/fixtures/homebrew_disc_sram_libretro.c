@@ -68,7 +68,7 @@ void retro_get_system_av_info(struct av_info *out){
 }
 void retro_init(void){
     if(env){
-        unsigned format=0;
+        unsigned format=2; /* RGB565 for the emitted 16-bit fixture pixels */
         env(10,&format);
         unsigned version=0;
         if(env(57,&version)&&version>=1)
