@@ -419,10 +419,11 @@ class SimulationController:
                 "passed": not failures}
 
 
-def simulate_once(scene: dict[str, Any], controls: dict[str, int], *,
-                  frame_ms: int = 100) -> dict[str, Any]:
-    controller = SimulationController(scene, controls, frame_ms=frame_ms)
-    trace = controller.run()
+def receipt_from_controller(controller: SimulationController) -> dict[str, Any]:
+    """Summarize an existing finished trace, including a resumed run."""
+    _require(controller.cursor == len(controller.times) and not controller.paused,
+             "cannot publish an incomplete simulator")
+    trace = tuple(controller.trace)
     reverse = controller.reverse_audit()
     issues = {}
     for entry in trace:
@@ -472,6 +473,13 @@ def simulate_once(scene: dict[str, Any], controls: dict[str, int], *,
     return summary
 
 
+def simulate_once(scene: dict[str, Any], controls: dict[str, int], *,
+                  frame_ms: int = 100) -> dict[str, Any]:
+    controller = SimulationController(scene, controls, frame_ms=frame_ms)
+    controller.run()
+    return receipt_from_controller(controller)
+
+
 def run_batch(scene: dict[str, Any], *, variations: tuple[dict[str, int], ...],
               workers: int = 1, frame_ms: int = 100) -> dict[str, Any]:
     """Run bounded independent parameterized rehearsals in deterministic order."""
@@ -492,6 +500,20 @@ def run_batch(scene: dict[str, Any], *, variations: tuple[dict[str, int], ...],
             futures = [pool.submit(simulate_once, scene, v, frame_ms=frame_ms)
                        for v in variations]
             results = [f.result() for f in futures]
+    return assemble_batch_receipts(scene, results, workers)
+
+
+def assemble_batch_receipts(scene: dict[str, Any], results: list[dict[str, Any]],
+                            workers: int) -> dict[str, Any]:
+    """Aggregate already executed simulations; never restart their scenes."""
+    validated = validate_scene(scene)
+    _bounded_int(workers, 1, 8, "sim workers")
+    _require(type(results) is list and 1 <= len(results) <= MAX_SIMULATIONS,
+             "invalid already-executed simulation receipts")
+    for row in results:
+        _require(row.get("receipt_sha256") == _hash({
+            k: v for k, v in row.items() if k != "receipt_sha256"
+        }), "simulation receipt changed before aggregation")
     _require(all(r["source_digest"] == validated["source_digest"] for r in results),
              "cross-project evidence splice")
     forward_count = sum(r["frames_executed"] for r in results)
@@ -657,6 +679,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--candidate-output", type=Path,
                         help="new quarantined two-direction training review JSONL")
+    parser.add_argument("--pause-after", type=int,
+                        help="pause one original sim after N frames; write immutable cursor")
+    parser.add_argument("--checkpoint-out", type=Path,
+                        help="new private snapshot for paused simulation state")
+    parser.add_argument("--resume-checkpoint", type=Path,
+                        help="resume a pinned scene from a previously saved cursor")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--limit", type=int, default=64)
     parser.add_argument("--frame-ms", type=int, default=100)
@@ -671,7 +699,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.audit_report is not None:
-            _require(args.scene is None and args.output is None,
+            _require(args.scene is None and args.output is None
+                     and args.pause_after is None and args.checkpoint_out is None
+                     and args.resume_checkpoint is None,
                      "reverse-only audit cannot start another simulation")
             source_report = _read_json(args.audit_report, 32 * 1024 * 1024)
             output = verify_batch_report(source_report)
@@ -683,15 +713,50 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _require(args.scene is not None, "operator scene source required")
             scene = _read_json(args.scene, 128 * 1024)
-            variations = variation_controls(
+            if args.resume_checkpoint is not None:
+                _require(args.pause_after is None and args.checkpoint_out is None,
+                         "resume cannot also pause the simulator")
+                saved = _read_json(args.resume_checkpoint, 8 * 1024 * 1024)
+                controller = SimulationController.from_checkpoint(scene, saved)
+                controller.run()
+                result = receipt_from_controller(controller)
+                output = assemble_batch_receipts(scene, [result], workers=1)
+            elif args.pause_after is not None:
+                _require(args.checkpoint_out is not None and args.output is None
+                         and args.candidate_output is None,
+                         "pause requires a new checkpoint, not a final report")
+                variations = variation_controls(
+                    offsets=tuple(args.yaw_offsets), pan_rates=tuple(args.pan_rates),
+                    lens_offsets=tuple(args.fov_offsets),
+                    item_mass_deltas=tuple(args.item_mass_deltas),
+                    apparel_drag_deltas=tuple(args.apparel_drag_deltas),
+                    seeds=tuple(args.seeds), item_variants=tuple(args.item_variants),
+                    apparel_variants=tuple(args.apparel_variants), limit=1)
+                controller = SimulationController(scene, variations[0], frame_ms=args.frame_ms)
+                _bounded_int(args.pause_after, 1, len(controller.times)-1, "pause frame count")
+                for _ in range(args.pause_after):
+                    controller.step()
+                controller.pause()
+                snapshot = controller.checkpoint()
+                _write_new(args.checkpoint_out, snapshot)
+                print(json.dumps({"status": "paused_at_checkpoint",
+                                  "cursor": controller.cursor,
+                                  "source_digest": controller.validation["source_digest"],
+                                  "checkpoint_sha256": snapshot["checkpoint_sha256"],
+                                  "model_training_executed": False}))
+                return 0
+            else:
+                _require(args.checkpoint_out is None,
+                         "checkpoint output requires --pause-after")
+                variations = variation_controls(
                 offsets=tuple(args.yaw_offsets), pan_rates=tuple(args.pan_rates),
                 lens_offsets=tuple(args.fov_offsets),
                 item_mass_deltas=tuple(args.item_mass_deltas),
                 apparel_drag_deltas=tuple(args.apparel_drag_deltas),
                 seeds=tuple(args.seeds), item_variants=tuple(args.item_variants),
                 apparel_variants=tuple(args.apparel_variants), limit=args.limit)
-            output = run_batch(scene, variations=variations, workers=args.workers,
-                               frame_ms=args.frame_ms)
+                output = run_batch(scene, variations=variations, workers=args.workers,
+                                   frame_ms=args.frame_ms)
             if args.output is not None:
                 _write_new(args.output, output)
             if args.candidate_output is not None:
