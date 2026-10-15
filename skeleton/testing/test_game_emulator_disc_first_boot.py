@@ -67,6 +67,51 @@ class OriginalStreamedDiscAcceptance(unittest.TestCase):
             self.assertEqual((Path(output) / self.bin.name).read_bytes(),
                              self.bin.read_bytes())
 
+    def test_original_two_disc_playlist_resolves_and_streams_every_dependency(self):
+        folder = Path(self.private.name)
+        second_cue = folder / "original-second.cue"
+        second_bin = folder / "original-second.bin"
+        playlist = folder / "two-disc-original.m3u"
+        second_cue.write_bytes(
+            b'FILE "original-second.bin" BINARY\n'
+            b'  TRACK 01 MODE1/2352\n'
+            b'  INDEX 01 00:00:00\n'
+        )
+        second_bin.write_bytes(b"Second original synthetic game track" * 128)
+        playlist.write_bytes(
+            (self.cue.name + "\n" + second_cue.name + "\n").encode("utf-8")
+        )
+        playlist_case = json.loads(json.dumps(self.case))
+        playlist_case["entrypoint"] = playlist.name
+        for file in (playlist, second_cue, second_bin):
+            playlist_case["files"].append({
+                "name": file.name,
+                "path": str(file),
+                "size_bytes": file.stat().st_size,
+                "sha256": digest(file.read_bytes()),
+            })
+        cases = _manifest(self._manifest_file([playlist_case]))
+        bundle, reader, _ = _media_bundle(cases[0])
+        with tempfile.TemporaryDirectory() as output:
+            materialized = bundle.materialize_private(output, reader=reader)
+            self.assertEqual(materialized.name, playlist.name)
+            self.assertEqual(materialized.read_bytes(), playlist.read_bytes())
+            self.assertEqual((Path(output) / self.cue.name).read_bytes(), self.cue.read_bytes())
+            self.assertEqual((Path(output) / second_bin.name).read_bytes(),
+                             second_bin.read_bytes())
+
+    def test_symlinked_parent_directory_is_not_an_approved_local_media_root(self):
+        alias = Path(self.private.name) / "original-source-dir-alias"
+        actual = Path(self.private.name) / "real-original-source"
+        actual.mkdir()
+        inside = actual / "original-track.bin"
+        inside.write_bytes(self.bin.read_bytes())
+        alias.symlink_to(actual, target_is_directory=True)
+        wrong = json.loads(json.dumps(self.case))
+        wrong["files"][1]["path"] = str(alias / inside.name)
+        with self.assertRaises(DiscAcceptanceError):
+            _manifest(self._manifest_file([wrong]))
+
     def test_source_changed_after_admission_refuses_before_native_core(self):
         cases = _manifest(self._manifest_file([self.case]))
         self.bin.write_bytes(self.bin.read_bytes() + b"different content")
