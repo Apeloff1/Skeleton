@@ -35,6 +35,7 @@ from skeleton.jeeves.game_decompilation_learning import (
 from skeleton.jeeves.game_decompilation_quality import derive_game_quality_brief
 from skeleton.jeeves.game_decompilation_evidence import (verify_game_decompilation_report, verify_human_label_against_report)
 from skeleton.jeeves.game_learning_ingestion import _GB_LOGO
+from skeleton.jeeves.game_decompilation_capabilities import build_game_decompilation_target_matrix
 
 
 def digest(data: bytes) -> str:
@@ -464,6 +465,21 @@ class ShadowQualityTrainingContracts(unittest.TestCase):
         bad[0]["human_quality_score_0_to_100"]=100
         with self.assertRaises(ValueError):
             train_shadow_asset_quality_model(bad,authorize=lambda:True)
+
+
+class AllCoreCapabilityGapContracts(unittest.TestCase):
+    def test_every_catalogued_console_gets_truthful_code_asset_status(self):
+        from skeleton.jeeves.game_emulator_catalog import canonical_targets
+        report=build_game_decompilation_target_matrix()
+        self.assertEqual(report["summary"]["canonical_targets"],len(canonical_targets()))
+        self.assertTrue(report["target_inventory_not_actual_running_emulator_count"])
+        self.assertEqual(report["summary"]["production_game_model_weight_promotions_in_this_audit"],0)
+        by_id={row["target_id"]:row for row in report["target_rows"]}
+        self.assertEqual(by_id["nes"]["static_code_decoder"],"nrom_6502_vectors_only")
+        self.assertEqual(by_id["game_boy"]["static_code_decoder"],"sm83_fixed_bank_entry_only")
+        self.assertFalse(by_id["snes"]["static_code_supported_subset"])
+        self.assertTrue(all(row["native_core_or_game_detected_in_this_audit"] is False
+                            for row in report["target_rows"]))
 
 
 if __name__=="__main__":
