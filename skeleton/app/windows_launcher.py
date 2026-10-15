@@ -16,7 +16,7 @@ import sys
 import threading
 import webbrowser
 
-from skeleton.app.assembly import checks_ok, compose_command, load_manifest, preflight
+from skeleton.app.assembly import checks_ok, compose_command, load_manifest, preflight, public_service_urls
 from skeleton.app.health import probe_application, probes_ok
 from skeleton.app.installer import InstallReceipt, install_application
 from skeleton.app.preloader import PreloadReport, inspect_host
@@ -156,9 +156,13 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
 
 
 def runtime_status(root: Path | None = None) -> tuple[bool, str]:
-    del root
+    root = (root or installation_root()).resolve()
     try:
-        results = probe_application(manifest=load_manifest(), timeout=2.0)
+        manifest = load_manifest()
+        urls = public_service_urls(root, manifest=manifest)
+        results = probe_application(
+            manifest=manifest, timeout=2.0, public_url_overrides=urls,
+        )
     except Exception as exc:
         return False, f"Runtime probe failed: {type(exc).__name__}: {exc}"
     if not results:
@@ -177,12 +181,15 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
     if not online:
         return False, "Application not ready:\n" + detail
     try:
-        opened = webbrowser.open(APP_URL)
-    except (OSError, webbrowser.Error) as exc:
-        return False, f"Application ready at {APP_URL}; browser failed: {type(exc).__name__}"
+        app_url = public_service_urls(
+            (root or installation_root()).resolve(),
+        ).get("frontend", APP_URL)
+        opened = webbrowser.open(app_url)
+    except (OSError, ValueError, webbrowser.Error) as exc:
+        return False, f"Application is ready; browser failed: {type(exc).__name__}"
     if not opened:
-        return False, f"Application ready at {APP_URL}; no browser accepted the URL"
-    return True, f"Application opened at {APP_URL}\n" + detail
+        return False, f"Application ready at {app_url}; no browser accepted the URL"
+    return True, f"Application opened at {app_url}\n" + detail
 
 
 class WindowsLauncher:
