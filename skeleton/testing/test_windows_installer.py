@@ -95,7 +95,9 @@ def test_inno_setup_contract_is_per_user_and_uninstallable():
     assert "Uninstallable=yes" in source
     assert 'Filename: "{app}\\{#AppExeName}"' in source
     assert 'Parameters: "--stop --quiet"' in source
-    assert 'Type: files; Name: "{app}\\.env"' in source
+    # Uninstall retains database volumes: credentials must survive for reinstall.
+    assert 'Type: files; Name: "{app}\\.env"' not in source
+    assert "User-generated .env intentionally remains" in source
     assert "{userdesktop}\\Skeleton" in source
     assert "{commondesktop}" not in source
 
@@ -261,3 +263,10 @@ def test_windows_launcher_failure_receipts_do_not_show_ready_status(tmp_path):
     assert not _action_succeeded(blocked)
     assert not _action_succeeded((False, "cannot stop services"))
     assert _action_succeeded((True, "stopped"))
+
+def test_default_uninstall_retains_credentials_needed_by_existing_mongo_volume():
+    source = Path("packaging/windows/SkeletonSetup.iss").read_text(encoding="utf-8")
+    assert "[UninstallRun]" in source
+    assert 'Parameters: "--stop --quiet"' in source
+    assert "[UninstallDelete]" not in source
+    assert "preserves named database volumes" in source
