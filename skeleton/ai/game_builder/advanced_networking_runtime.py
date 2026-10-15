@@ -8,10 +8,18 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-ACTIONS = ("inspect", "tick", "tick:4", "tick:16", "sync",
-           "predict", "disconnect:1", "disconnect:2",
-           "join:1", "join:2", "send:1:left", "send:1:right",
-           "send:2:left", "send:2:right", "retire")
+_PRIMARY_ACTIONS = ("inspect", "tick", "tick:4", "tick:16", "sync",
+                    "predict", "disconnect:1", "disconnect:2",
+                    "join:1", "join:2", "send:1:left", "send:1:right",
+                    "send:2:left", "send:2:right", "retire")
+# The configuration admits as many as 256 local peer identities, not just two.
+_EXTRA_PEERS = tuple(
+    command + ":" + str(peer) + (":" + direction if direction else "")
+    for peer in range(3, 256)
+    for command, direction in (("join", ""), ("send", "left"),
+                               ("send", "right"), ("disconnect", ""))
+)
+ACTIONS = _PRIMARY_ACTIONS + _EXTRA_PEERS
 
 
 class NetworkingActionError(ValueError):
@@ -123,7 +131,7 @@ def step(state, config, action):
         raise NetworkingActionError("unavailable netcode command")
     events = []
     if action.startswith("join:"):
-        peer = action[-1]
+        peer = action.partition(":")[2]
         if int(peer) >= config["max_players"]:
             raise NetworkingActionError("peer exceeds authored player capacity")
         if peer in state["players"] and state["players"][peer]["connected"]:
@@ -134,9 +142,9 @@ def step(state, config, action):
             "connected": True, "x": state["spawn"][0],
             "confirmed_x": state["spawn"][0], "last_seq": 0,
         }
-        events.append("authenticated_local_peer_slot_reserved")
+        events.append("original_test_peer_slot_reserved")
     elif action.startswith("disconnect:"):
-        peer = action[-1]
+        peer = action.partition(":")[2]
         if peer not in state["players"] or not state["players"][peer]["connected"]:
             raise NetworkingActionError("peer not active")
         state["players"][peer]["connected"] = False

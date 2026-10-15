@@ -9,10 +9,16 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 
-ACTIONS = ("inspect", "advance", "advance:10", "damage", "heal",
-           "save:0", "save:1", "save:2", "load:0", "load:1", "load:2",
-           "delete:0", "delete:1", "delete:2", "autosave",
-           "migrate", "verify", "retire")
+_PRIMARY_ACTIONS = ("inspect", "advance", "advance:10", "damage", "heal",
+                    "save:0", "save:1", "save:2", "load:0", "load:1", "load:2",
+                    "delete:0", "delete:1", "delete:2", "autosave",
+                    "migrate", "verify", "retire")
+# The source-bound actions cover all 1000 finite editor slots.
+ACTIONS = _PRIMARY_ACTIONS + tuple(
+    operation + ":" + str(slot)
+    for slot in range(3, 1000)
+    for operation in ("save", "load", "delete")
+)
 
 
 class SaveSystemActionError(ValueError):
@@ -155,11 +161,11 @@ def step(state, config, action):
         state["health"] = min(100, state["health"] + 12)
         events.append("resource_conserved_healing")
     elif action.startswith("save:"):
-        _write(state, config, int(action[-1]), events)
+        _write(state, config, int(action.partition(":")[2]), events)
     elif action.startswith("load:"):
-        _load(state, config, int(action[-1]), events)
+        _load(state, config, int(action.partition(":")[2]), events)
     elif action.startswith("delete:"):
-        slot = str(int(action[-1]))
+        slot = str(int(action.partition(":")[2]))
         if slot not in state["slots"]:
             raise SaveSystemActionError("cannot delete a nonexistent save")
         del state["slots"][slot]

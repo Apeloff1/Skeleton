@@ -29,6 +29,28 @@ class ExecutableSubsystems(unittest.TestCase):
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("networking",actions=["send:1:left"])
 
+    def test_large_room_and_save_slot_numeric_identities(self):
+        room={"max_players":256}
+        net=run_advanced_session("networking",room,[
+            "join:255","send:255:right","tick:4","sync",
+            "disconnect:255","retire"
+        ],seed=8)
+        self.assertTrue(net["state"]["finished"])
+        self.assertEqual(net["state"]["players"]["255"]["confirmed_x"],9)
+        self.assertTrue(verify_advanced_session(net,room))
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("networking",{"max_players":2},["join:255"])
+        settings={"save_slots":1000}
+        game=run_advanced_session("save_system",settings,[
+            "save:999","advance:10","load:999","retire"
+        ],seed=9)
+        self.assertTrue(game["state"]["finished"])
+        self.assertEqual(game["state"]["position"],9)
+        self.assertIn("999",game["state"]["slots"])
+        self.assertTrue(verify_advanced_session(game,settings))
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("save_system",{"save_slots":1},["save:999"])
+
     def test_save_system_actual_restore_migration_and_history(self):
         cfg={"save_slots":3,"history_depth":2}
         doc=run_advanced_session("save_system",cfg,
