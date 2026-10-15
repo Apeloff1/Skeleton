@@ -17,7 +17,7 @@ def sample_study(count=30):
         games.append({
             "id": name, "title": name, "series_id": "synthetic_series",
             "release_order": idx + 1, "release_year": 2000 + idx,
-            "series_phase": ("earlier", "middle", "after")[idx % 3],
+            "series_phase": ("earlier" if idx < 10 else "middle" if idx < 20 else "after"),
             "target_id": "nes", "core_id": "fceumm",
             "source_path": "/approved/" + name + ".nes",
             "source_sha256": digest(["rom", name]),
