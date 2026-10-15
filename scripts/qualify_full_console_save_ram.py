@@ -134,8 +134,13 @@ def main(argv: list[str] | None = None) -> int:
                     or bytes_again != ram):
                     raise ValueError("Fresh native worker SRAM readback did not match saved content")
                 resumed.reset(game["seed"])
+                post_reset, post_reset_bytes = resumed.export_save_ram()
+                if (post_reset["save_ram_sha256"] != metadata["save_ram_sha256"]
+                    or post_reset_bytes != ram):
+                    raise ValueError("Fresh core reset replaced or modified the restored SRAM bytes")
                 cold_resume = {
                     "attempted": True, "verified": True,
+                    "survived_native_reset": True,
                     "cold_environment_sha256": resumed.spec.environment_digest,
                     "reset_frame_sha256": resumed._frame["pixel_sha256"],
                     "hardware_save_compatibility_verified": False,
