@@ -239,6 +239,10 @@ class GameBoyMachine:
             return 0xC0 | select | low
         if address == 0xFF04:
             return self.divider >> 8
+        if address == 0xFF07:
+            # DMG TAC bits 7..3 are read-high, while only 2..0 can
+            # select timer enable/frequency.
+            return 0xF8 | (self.memory[address] & 7)
         if address == 0xFF41:
             ly = self.memory[0xFF44]
             mode = (
