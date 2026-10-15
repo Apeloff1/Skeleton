@@ -1080,15 +1080,31 @@ class EmulatorEnvironment:
                     break
         return self._step(list(controls), exact)
 
+    def input_frame_step(
+        self, controls: Sequence[Mapping[str, object]], frames: int = 1,
+    ) -> EpisodeStep:
+        """Core-neutral frame precision: a real bounded retro_run count, never a playback illusion."""
+        if not isinstance(controls, (tuple, list)) or not 1 <= len(controls) <= 4:
+            raise EmulatorHostError("invalid_emulator_controller", "Controller ports exceed capacity")
+        count = _int(frames, 1, 60, "native frame precision")
+        return self._step(_controls(controls), None, frame_count=count)
+
     @_serialized_native_operation
-    def _step(self, controls: list[Mapping[str, object]], action: str | None) -> EpisodeStep:
+    def _step(
+        self, controls: list[Mapping[str, object]], action: str | None,
+        *, frame_count: int | None = None,
+    ) -> EpisodeStep:
         if self._seed is None or self.done:
             raise EmulatorHostError(
                 "emulator_episode_inactive", "Reset an active native episode before stepping"
             )
         controls = _controls(controls)
+        requested_frames = (
+            self.frames_per_step if frame_count is None
+            else _int(frame_count, 1, 60, "native frame precision")
+        )
         previous = self._chain
-        metadata, blocks = self._exchange("step", {"frames": self.frames_per_step, "controls": controls})
+        metadata, blocks = self._exchange("step", {"frames": requested_frames, "controls": controls})
         self._steps += 1
         observation = self._accept_frame(metadata, blocks)
         self._controls = json.loads(json.dumps(controls))
@@ -1104,6 +1120,7 @@ class EmulatorEnvironment:
             "controller_only": action is None,
             "frame_digest": metadata["pixel_sha256"],
             "native_runs": metadata["runs"],
+            "requested_native_frames": requested_frames,
             "video_callbacks": metadata["video_callbacks"],
             "audio_frames": metadata["audio_frames"],
             "audio_sha256": metadata["audio_sha256"],
@@ -1125,6 +1142,24 @@ class EmulatorEnvironment:
                 "game_success_available": False,
             },
             self._chain,
+        )
+
+    @_serialized_native_operation
+    def inspect_frame(self) -> dict[str, object]:
+        """Freeze the current verified RGB frame for a bounded tile-level asset audit.
+
+        This method performs NO worker request, native run, memory probe or
+        mutation. Callers can compare hashes and inspect full-resolution PNG
+        through preview(), separately. Samples are explicitly not full-color
+        histograms.
+        """
+        from .game_emulator_timing import inspect_rgb_frame
+        if self._seed is None or self._closed or self._pixels is None or not isinstance(self._frame, dict):
+            raise EmulatorHostError("native_frame_unavailable", "Reset and capture an actual frame before inspection")
+        return inspect_rgb_frame(
+            self._pixels, int(self._frame["width"]), int(self._frame["height"]),
+            str(self._frame["pixel_sha256"]), str(self._frame["audio_sha256"]),
+            int(self._frame["runs"]),
         )
 
     def capture_training_trace(
