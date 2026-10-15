@@ -423,6 +423,68 @@ def _png(pixels: bytes, width: int, height: int) -> tuple[dict[str, object], byt
     }, image
 
 
+
+def _measured_signal_channels(pixels: bytes, width: int, height: int,
+                              samples: list[int]) -> dict[str, float]:
+    """Bounded deterministic measurements from REAL native pixels and S16LE audio.
+
+    Signals are telemetry, not claims about semantic objects, melodies,
+    cinematic quality, game score, or AI capability. At most 4096 spatial
+    samples and 4096 audio pairs per emitted frame.
+    """
+    count = width * height
+    stride = max(1, (count + 4095) // 4096)
+    histogram = [0] * 16
+    examined = 0
+    total, squared = 0.0, 0.0
+    edges, edge_count = 0, 0
+    saturation, bias = 0.0, 0.0
+    for pixel in range(0, count, stride):
+        offset = 3 * pixel
+        red, green, blue = pixels[offset], pixels[offset + 1], pixels[offset + 2]
+        luma = (77 * red + 150 * green + 29 * blue) >> 8
+        histogram[luma >> 4] += 1
+        examined += 1
+        total += luma
+        squared += luma * luma
+        saturation += max(red, green, blue) - min(red, green, blue)
+        bias += abs(red - green) + abs(green - blue) + abs(blue - red)
+        if pixel % width + 1 < width:
+            neighbor = offset + 3
+            other = (77 * pixels[neighbor] + 150 * pixels[neighbor + 1]
+                     + 29 * pixels[neighbor + 2]) >> 8
+            edges += abs(luma - other)
+            edge_count += 1
+    probability = [value / examined for value in histogram if value]
+    entropy = -sum(value * math.log2(value) for value in probability) / 4
+    mean = total / examined
+    contrast = math.sqrt(max(0.0, squared / examined - mean * mean)) / 128
+    peak = max((abs(sample) for sample in samples), default=0) / 32768
+    # Interleaved stereo samples are indexed in aligned LEFT/RIGHT pairs.
+    pair_count = len(samples) // 2
+    spacing = max(1, (pair_count + 4095) // 4096)
+    crossings, compared, stereo_sum = 0, 0, 0
+    last = None
+    for pair in range(0, pair_count, spacing):
+        left, right = samples[2 * pair], samples[2 * pair + 1]
+        stereo_sum += abs(left - right)
+        if last is not None:
+            crossings += int((left < 0) != (last < 0))
+            compared += 1
+        last = left
+    observed_pairs = (pair_count + spacing - 1) // spacing if pair_count else 0
+    return {
+        "frame_entropy": min(1.0, max(0.0, entropy)),
+        "luma_contrast": min(1.0, contrast),
+        "spatial_edges": edges / (255 * edge_count) if edge_count else 0.0,
+        "color_saturation": saturation / (255 * examined),
+        "color_bias": min(1.0, bias / (510 * examined)),
+        "audio_peak": min(1.0, peak),
+        "audio_zero_crossing": crossings / compared if compared else 0.0,
+        "stereo_difference": stereo_sum / (65535 * observed_pairs) if observed_pairs else 0.0,
+    }
+
+
 class EmulatorEnvironment:
     def __init__(
         self,
@@ -506,7 +568,15 @@ class EmulatorEnvironment:
             "libretro:" + core.core_id + ":" + materialized_digest[:24],
             _digest(self._descriptor),
             (*_ACTIONS, *_KEY_ACTIONS),
-            {key: bins for key in ("screen_mean", "visual_change", "audio_rms", "step_fraction")},
+            {
+                key: bins
+                for key in (
+                    "screen_mean", "visual_change", "audio_rms", "step_fraction",
+                    "frame_entropy", "luma_contrast", "spatial_edges",
+                    "color_saturation", "color_bias", "audio_peak",
+                    "audio_zero_crossing", "stereo_difference",
+                )
+            },
             ("visual_change",),
             self.max_steps,
         )
@@ -890,6 +960,7 @@ class EmulatorEnvironment:
             "visual_change": change,
             "audio_rms": rms,
             "step_fraction": self._steps / self.max_steps,
+            **_measured_signal_channels(pixels, width, height, values),
         }
         return dict(self._observation)
 
