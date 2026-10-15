@@ -11,7 +11,7 @@ import math
 from collections import Counter
 from typing import Any
 
-from .game_console_assets import TileCodec, decode_tiles, png_rgba
+from .game_console_assets import TileCodec, decode_tiles, png_rgba, decode_png, decode_tim, decode_pcm_wav
 from .game_learning_ingestion import _rom_nes
 
 MAX_TILE_BYTES = 32768
@@ -164,3 +164,60 @@ def extract_nes_chr(
         "true_graphic_elements_not_guaranteed": True,
         "unlicensed_copying_is_not_approved": True,
     }, tuple(files)
+
+
+def inspect_standalone_media(
+    data: bytes, *, media_format: str, preview_authorized: bool = False,
+) -> tuple[dict[str, Any], bytes | None]:
+    """Decode real standalone PNG, PS1 TIM or bounded PCM WAV, never guess type."""
+    if type(data) is not bytes or type(preview_authorized) is not bool:
+        raise ValueError("Exact media bytes and explicit authorized preview scope required")
+    source_hash = _sha(data)
+    preview = None
+    if media_format == "png":
+        width, height, rgba = decode_png(data)
+        real_format = "png_rgba_validated"
+        channels = None
+        alpha_nonopaque = sum(rgba[i] != 255 for i in range(3,len(rgba),4))
+        rgba_hash = _sha(rgba)
+        if preview_authorized:
+            # Already validated PNG, but reserialize deterministically to
+            # eliminate embedded metadata such as user comments or paths.
+            preview = png_rgba(rgba,width,height)
+    elif media_format == "playstation_tim_candidate":
+        image = decode_tim(data)
+        width, height = image.width, image.height
+        rgba = image.rgba_bytes()
+        rgba_hash = _sha(rgba)
+        alpha_nonopaque = sum(rgba[i] != 255 for i in range(3,len(rgba),4))
+        real_format = "ps1_tim_" + str(image.bits_per_pixel) + "bpp"
+        channels = image.palette_width * image.palette_height if image.palette_words else 0
+        if preview_authorized:
+            preview = png_rgba(rgba,width,height)
+    elif media_format == "wav":
+        sound = decode_pcm_wav(data)
+        result = {
+            "schema_version":"skeleton.game.decompiled_standalone_media.v1",
+            "source_sha256":source_hash,"format":"pcm_wav",
+            "channels":sound["channels"],"sample_rate":sound["sample_rate"],
+            "sample_width":sound["sample_width"],
+            "sample_frames":sound["sample_frames"],
+            "duration_seconds":sound["duration_seconds"],
+            "pcm_sha256":sound["pcm_sha256"],
+            "raw_pcm_embedded":False,
+            "precise_music_notes_or_instrumentation_identified":False,
+            "source_media_bytes_exported":False,
+        }
+        return result, None
+    else:
+        raise ValueError("Unknown standalone media format cannot be decoded")
+    return {
+        "schema_version":"skeleton.game.decompiled_standalone_media.v1",
+        "source_sha256":source_hash,"format":real_format,
+        "width":width,"height":height,"pixel_count":width*height,
+        "rgba_sha256":rgba_hash,"nonopaque_pixel_count":alpha_nonopaque,
+        "palette_entry_count":channels,
+        "original_animation_or_sprite_semantics_recognized":False,
+        "output_preview_png_sha256":_sha(preview) if preview is not None else None,
+        "source_media_bytes_exported":False,
+    }, preview
