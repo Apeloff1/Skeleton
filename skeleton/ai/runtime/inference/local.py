@@ -624,6 +624,17 @@ class LocalInferenceEngine:
             identity["execution_profile"] = profile
         return _digest(identity)
 
+
+    async def safe_generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
+        """Failsafe generate: never propagates unexpected errors; returns a cancelled/error sentinel or re-raises domain errors."""
+        try:
+            return await self.generate(request)
+        except LocalInferenceCancelled:
+            raise
+        except Exception as exc:
+            # Fail-closed sentinel for unexpected paths
+            raise LocalInferenceCancelled(f"safe_generate failsafe: {type(exc).__name__}") from exc
+
     async def generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
