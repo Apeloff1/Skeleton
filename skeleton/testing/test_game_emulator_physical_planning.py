@@ -96,7 +96,9 @@ def fake_host():
 
 
 def neural_candidate(spec):
-    features, actions = list(spec.observation_bins), list(spec.actions)
+    # Neural candidates inherit canonical GamePolicyLearner feature order,
+    # not the native source's acquisition/insertion order.
+    features, actions = sorted(spec.observation_bins), list(spec.actions)
     width = 4
     model = {
         "schema_version": MODEL_SCHEMA,
