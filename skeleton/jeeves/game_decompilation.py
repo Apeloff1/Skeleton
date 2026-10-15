@@ -29,7 +29,8 @@ SCOPE_CODE = "reverse_engineer_code"
 SCOPE_ASSETS = "decode_assets"
 SCOPE_PREVIEWS = "export_asset_previews"
 SCOPE_QUALITY = "derive_quality_features"
-SCOPES = frozenset((SCOPE_STRUCTURE, SCOPE_CODE, SCOPE_ASSETS, SCOPE_PREVIEWS, SCOPE_QUALITY))
+SCOPE_SHADOW = "human_labeled_shadow_training"
+SCOPES = frozenset((SCOPE_STRUCTURE, SCOPE_CODE, SCOPE_ASSETS, SCOPE_PREVIEWS, SCOPE_QUALITY, SCOPE_SHADOW))
 ROM_EXTENSIONS = frozenset((
     ".nes", ".gb", ".gbc", ".gba", ".sfc", ".smc", ".gen", ".md", ".smd",
     ".z64", ".v64", ".n64", ".a78", ".lnx", ".sms", ".gg", ".nds", ".pbp",
@@ -232,3 +233,28 @@ def decompile_authorized_game(
     if len(_canonical(body)) > 8 * 1024 * 1024:
         raise ValueError("Decompilation report exceeds bounded eight-MiB evidence contract")
     return DecompilationResult(body, tuple(previews))
+
+def prepare_reviewed_training_candidate(
+    result: DecompilationResult, *, grant: GameDecompilationGrant,
+    authorize: Callable[[str, GameDecompilationGrant], bool],
+    human_score: int, reviewer_ref: str, label_evidence_digest: str,
+) -> dict[str, Any]:
+    """Human-label original measured features; never store recovered game assets."""
+    from .game_decompilation_learning import make_human_labeled_candidate
+
+    if (not isinstance(result, DecompilationResult)
+        or not isinstance(grant, GameDecompilationGrant)
+        or result.report.get("source_sha256") != grant.source_sha256
+        or result.report.get("provenance", {}).get("rights_evidence_digest") != grant.rights_evidence_digest
+        or result.report.get("schema_version") != REPORT_SCHEMA):
+        raise PermissionError("Labeled asset learning must bind the exact source/grant")
+    _authorize(grant, SCOPE_SHADOW, authorize)
+    brief = result.report.get("quality_brief")
+    if not isinstance(brief, dict):
+        raise ValueError("No exact numeric human-review brief exists for this authorized source")
+    return make_human_labeled_candidate(
+        brief, score=human_score, reviewer_ref=reviewer_ref,
+        label_evidence_digest=label_evidence_digest,
+        training_rights_digest=grant.rights_evidence_digest,
+        authorize=lambda: authorize(SCOPE_SHADOW, grant) is True,
+    )
