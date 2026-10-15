@@ -270,3 +270,13 @@ def test_default_uninstall_retains_credentials_needed_by_existing_mongo_volume()
     assert 'Parameters: "--stop --quiet"' in source
     assert "[UninstallDelete]" not in source
     assert "preserves named database volumes" in source
+
+def test_windows_installer_runs_actual_frozen_payload_preflight():
+    launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    assert 'mode.add_argument("--verify-payload"' in launcher
+    assert "preflight(root, runtime=False, manifest=load_manifest())" in launcher
+    assert "return 0 if checks_ok(checks) else 1" in launcher
+    assert 'ArgumentList @("--verify-payload")' in workflow
+    assert "SkeletonOffline.exe" in workflow
+    assert 'ArgumentList @("--help") -Wait -PassThru' in workflow
