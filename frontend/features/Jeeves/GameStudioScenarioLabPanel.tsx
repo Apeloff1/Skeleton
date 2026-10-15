@@ -279,6 +279,26 @@ export default function GameStudioScenarioLabPanel({
                   Source-replayed steps {receipt.completed_cycle_game_steps} ·
                   scrutiny {receipt.scrutiny_checks.map(item => item.name).join(', ')}
                 </Text>
+                {receipt.cycle >= sim.cycles_executed - 1 && (
+                  <View style={{ paddingLeft: 8, gap: 3 }}>
+                    <Text style={muted}>Detailed primary and shadow source receipts</Text>
+                    {[['primary',receipt.primary_step_receipts],
+                      ['shadow',receipt.shadow_step_receipts]].map(([kind,steps]) => (
+                      <View key={kind as string}>
+                        <Text style={muted}>{String(kind).toUpperCase()}</Text>
+                        {(steps as typeof receipt.primary_step_receipts).map(step => (
+                          <Text selectable key={step.index} style={muted}>
+                            #{step.index} {step.action} · {step.accepted ? 'accepted' : 'rejected'}
+                            {' · reward '}{step.reward_total.toFixed(5)}
+                            {' · state '}{Object.entries(step.observation_after)
+                              .map(([k,v]) => k + '=' + v.toFixed(3)).join(', ')}
+                            {' · transition '}{step.transition_digest.slice(0,16)}
+                          </Text>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             ))}
           </View>

@@ -50,6 +50,12 @@ class ShadowSaturationTests(unittest.TestCase):
         self.assertEqual(sim["peak_additional_scrutiny_checks"],8)
         self.assertTrue(all(x["fork"]["same_source_same_checkpoint_verified"]
                             for x in sim["receipts"]))
+        sample=sim["receipts"][0]["primary_step_receipts"][0]
+        self.assertIn("observation_before",sample)
+        self.assertIn("observation_after",sample)
+        self.assertIn("source_head_digest",sample)
+        self.assertIn("reward_components",sample)
+        self.assertIn("rejection_error_type",sample)
         self.assertTrue(verify_shadow_receipts(report))
 
     def test_budget_is_inconclusive_not_false_saturation(self):

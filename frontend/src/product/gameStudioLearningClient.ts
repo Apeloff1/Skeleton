@@ -231,9 +231,17 @@ export type StudioShadowCycleReceipt = {
     parent_next_action: string; shadow_alternative_action: string;
     distinct_available_action: boolean; digest: string };
   primary_step_receipts: { index: number; action: string; accepted: boolean;
-    semantic_behavior_digest: string; transition_digest: string }[];
+    semantic_behavior_digest: string; transition_digest: string;
+    observation_before: Record<string, number>; observation_after: Record<string, number>;
+    source_session_digest: string; source_head_digest: string;
+    reward_components: Record<string, number>; reward_total: number;
+    rejection_error_type?: string | null }[];
   shadow_step_receipts: { index: number; action: string; accepted: boolean;
-    semantic_behavior_digest: string; transition_digest: string }[];
+    semantic_behavior_digest: string; transition_digest: string;
+    observation_before: Record<string, number>; observation_after: Record<string, number>;
+    source_session_digest: string; source_head_digest: string;
+    reward_components: Record<string, number>; reward_total: number;
+    rejection_error_type?: string | null }[];
   completed_cycle_game_steps: number; cumulative_game_steps: number;
 };
 export type StudioShadowAuditResult = {
