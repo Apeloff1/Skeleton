@@ -133,7 +133,8 @@
     "skeleton/testing/test_game_original_mapper_bus_audit.py",
     "skeleton/testing/test_game_rom_virtual_rtc.py",
     "skeleton/testing/test_game_rom_cpu_timer.py",
-    "skeleton/testing/test_game_rom_instruction_divergence.py"
+    "skeleton/testing/test_game_rom_instruction_divergence.py",
+    "skeleton/testing/test_game_rom_dma_timing.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -193,9 +194,11 @@
     "source": "operator-approved installed native libretro core + exact lawful ROM SHA256",
     "limits": {
       "max_cases": 32,
-      "max_single_rom_bytes": 2097152,
+      "max_single_rom_bytes": 16777216,
       "native_steps_per_case": 3,
-      "per_command_timeout_seconds_max": 30
+      "per_command_timeout_seconds_max": 30,
+      "content_limit_source": "skeleton/jeeves/game_emulator_catalog.MAX_CONTENT_BYTES",
+      "supported_media": "single-file cartridge ROMs up to host inline content ceiling; multi-file optical discs separately governed"
     },
     "sequence": [
       "approve exact installed native core and lawful ROM hash",
@@ -320,7 +323,8 @@
       "five mapper source bus audit",
       "generated original ROM Q and neural candidate evidence",
       "source-authored original goal-conditioned Q",
-      "artifact content integrity and report custody validation"
+      "artifact content integrity and report custody validation",
+      "real source OAM DMA clocked-byte/scanline test with mid-transfer rewind custody"
     ],
     "failure": "nonzero subprocess and phase_*.json status, absence of suite-acceptance.json",
     "production_model_promotion": false,
@@ -402,7 +406,8 @@
       "divider/TIMA/TMA/TAC/IF/IE/pending overflow",
       "cartridge ROM/RAM bank and RTC control",
       "SHA256 of actual RAM, VRAM, IO, OAM, cartridge SRAM and framebuffer",
-      "original authorship declared game score, position and completion registers"
+      "original authorship declared game score, position and completion registers",
+      "in-flight sprite OAM DMA source page, copy progress, 4T byte phase and timing provenance"
     ],
     "acceptance": "same exact pre-branch CPU state, independently execute and replay every input branch; reject run if full digests differ; per-sample digests independently checked",
     "limits": {
@@ -416,5 +421,29 @@
     "tests": "skeleton/testing/test_game_rom_instruction_divergence.py",
     "no_automatic_model_promotion": true,
     "actual_instruction_runs_executed_during_authoring": 0
+  },
+  "original_dmg_oam_dma": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "status": "source_implemented_not_hardware_or_exec_verified",
+    "engine": "actual 160-byte sprite DMA copied on T-cycles, not immediate FF46 memcpy",
+    "source_address": "FF46 upper byte 0x00-0xDF, bounded original ROM/WRAM page",
+    "transfer_timing": "four T-cycle startup plus one byte every four subsequent T-cycles, 160-byte total",
+    "controller_restart": "new FF46 write resets DMA startup/source/progress, can restart in-flight source",
+    "source_read_timing": "read from cartridge/WRAM on each real transfer tick, not at register write",
+    "visual_observation": "PPU line raster and STAT edge now clocked after DMA copy tick on the SAME emulated T-cycle",
+    "source_savestate": "dma_active, dma_source, dma_index, dma_tcycles, dma_startup all restored with source CPU/memory/raster evidence",
+    "on_stop": "remains frozen until controller wakes source CPU",
+    "test": "skeleton/testing/test_game_rom_dma_timing.py",
+    "unsupported_hardware": [
+      "CPU bus access restriction to HRAM while DMA active",
+      "cycle-accurate OAM PPU fetch conflicts",
+      "DMG source pages E0-FF and arbitrary floating-bus modes",
+      "CGB DMA/HDMA/GDMA",
+      "true sound/PPU cycle exactness"
+    ],
+    "producer_source_grounding": "skeleton/jeeves/game_rom_instruction_divergence.py captures real DMA source, byte index/phase and SHA256 of actual sprite OAM",
+    "reference": "https://gbdev.io/pandocs/OAM_DMA_Transfer.html",
+    "source_tests_executed": false
   }
 }
