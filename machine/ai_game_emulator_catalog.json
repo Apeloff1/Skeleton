@@ -920,6 +920,24 @@
       "live": "LiveComparison displays actual core reported descriptions for running lane's native controller ports directly below unobscured game screen",
       "tests": "tests/test_game_comparison_core_input_descriptors.py added and wired into manual only focused-emulator-comparison workflow",
       "actual_real_core_tested": false
+    },
+    "actual_controlled_gameplay_experiments": {
+      "owner": "skeleton/jeeves/game_comparison_counterfactual.py",
+      "cli": "python3 scripts/run_game_comparison_counterfactual.py --manifest /srv/studies/study.json --registry /srv/approved/cores.json --game first --game second --step 2 --replacement left --repeats 2 --rights-acknowledged --output-dir /srv/studies/controlled",
+      "scope": "2–10 lawful source-receipted study games; each game has matched baseline and one-action-change tapes of 3–64 actions, repeated in two or three fresh native libretro worker processes per arm",
+      "safety": "Native Linux sandbox preflight and approved registry, conservative disk budget, SHA-receipted content, no model weights changed",
+      "outputs": [
+        "<study>_controlled_input.json",
+        "<study>_counterfactual_dragon_review.json"
+      ],
+      "evidence": "Every native frame, PCM, input action and transition is SHA-chain bound; controlled-experiment verifier rejects any intra-arm mismatch, missing run, corrupted receipt, core swap, or more than one altered action",
+      "dragon": "Separate reviewed research-candidate envelope with objective differences and repeat consistency; no automatic memory authority or weight promotion",
+      "limitations": "No claim of proven mechanics, source rights, real hardware accuracy, intelligent game mastery or verified generalization",
+      "tests": [
+        "tests/test_game_comparison_counterfactual.py",
+        "tests/test_game_comparison_counterfactual_integrity.py"
+      ],
+      "real_gameplay_executed_this_chat": false
     }
   }
 }

@@ -36,6 +36,8 @@ jobs:
             skeleton/jeeves/game_comparison_controllers.py \
             skeleton/jeeves/game_emulator_worker.py \
             skeleton/jeeves/game_comparison_live_evidence.py \
+            skeleton/jeeves/game_comparison_counterfactual.py \
+            skeleton/ai/webcrawler/dragon_comparative_game_bridge.py \
             skeleton/jeeves/game_comparison_live_http.py \
             skeleton/jeeves/game_comparison_live_viewer.py \
             skeleton/jeeves/game_comparison_host_preflight.py \
@@ -45,12 +47,15 @@ jobs:
             scripts/live_game_comparison.py \
             scripts/qualify_live_game_comparison.py \
             scripts/doctor_game_comparison.py \
-            scripts/audit_game_emulator_169_targets.py
+            scripts/audit_game_emulator_169_targets.py \
+            scripts/run_game_comparison_counterfactual.py
       - name: Run focused source-contract regressions (no ROMs)
         run: |
           python -m unittest -v \
             tests.test_game_comparison_live \
             tests.test_game_comparison_core_input_descriptors \
+            tests.test_game_comparison_counterfactual \
+            tests.test_game_comparison_counterfactual_integrity \
             tests.test_game_comparison_live_http \
             tests.test_game_comparison_raw_qualification_regression \
             tests.test_game_comparison_readiness \
