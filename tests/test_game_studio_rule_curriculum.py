@@ -60,6 +60,22 @@ class TestModelProposedEngineRules(unittest.TestCase):
             [layout("nodes/0/price", "add", 7)], scene_seed=2,
         )
 
+    def test_ai_can_discover_real_schema_but_not_ownership_controls(self):
+        from skeleton.jeeves.game_studio_rule_curriculum import rule_authoring_contract
+        contract=rule_authoring_contract(self.base)
+        self.assertEqual(contract["editor"],"economy")
+        self.assertEqual(contract["base_digest"],source_hash(self.base))
+        fields={row["path"]:row for row in contract["editable_settings"]}
+        self.assertIn("trade_tax",fields)
+        self.assertEqual(fields["trade_tax"]["minimum"],0)
+        self.assertEqual(fields["trade_tax"]["maximum"],100)
+        self.assertIn("add",fields["trade_tax"]["operators"])
+        protected=make_studio_source("platform_profile")
+        gates=rule_authoring_contract(protected)
+        self.assertNotIn("homebrew_only",{
+            row["path"] for row in gates["editable_settings"]
+        })
+
     def test_ai_rules_change_real_playable_engine_source(self):
         original = deepcopy(self.base)
         candidate = apply_rule_proposal(self.base, self.tax)

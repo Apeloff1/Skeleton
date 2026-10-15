@@ -129,3 +129,91 @@ frame as telemetry, never as actual engine-world pixels or audio.
 
 This is a visual monitor for learning mechanics, not a game renderer. Native
 emulator RGB remains bound to the approved actual libretro framebuffer.
+
+## AI-proposed rules and multi-circumstance model learning
+
+`skeleton/jeeves/game_studio_rule_curriculum.py` is a pure, bounded
+`rule_authoring_contract(source)` and `apply_rule_proposal(source, proposal)`
+gateway. Jeeves may propose source-bound, non-executable typed data edits,
+but never arbitrary Python, imported code, unknown model knobs, player
+inventory, victory, identity, source ownership or policy promotion. The
+existing editor and authored-scene normalization revalidates every change.
+A proposal is pinned to a SHA-256 digest of the original canonical game
+source; a stale model suggestion cannot mutate another engine version.
+
+Admitted edit operations: `set` existing typed value, `add` or
+`multiply` bounded integer settings, `toggle` existing boolean, or
+one source-bound scalar leaf in an authored layout. At most 12 edits per
+proposal and seven variants per curriculum are admitted. Layout edits
+cannot create new objects, change IDs, add script/URL fields, bypass
+original-only constraints, or silently reuse a scene under incompatible
+settings. For engines without authored scenes, only settings variation is
+available.
+
+**Example rule batch for the default economy engine.** Generate the parent
+SHA-256 from a canonical source through the `rule_authoring_contract`
+helper, rather than typing or guessing it:
+
+```json
+{
+  "schema_version": "skeleton.game_builder.ai_rule_batch.v1",
+  "proposals": [
+    {
+      "schema_version": "skeleton.game_builder.ai_rule_proposal.v1",
+      "proposal_id": "high-price-volatility",
+      "base_digest": "<actual hash returned by rule_authoring_contract>",
+      "reason": "Challenge the economic policy with more elastic market prices.",
+      "scene_seed": null,
+      "operations": [
+        {"scope": "settings", "path": "price_elasticity", "op": "add", "value": 3},
+        {"scope": "settings", "path": "trade_tax", "op": "add", "value": 5}
+      ]
+    }
+  ]
+}
+```
+
+After the source hash is inserted and the operator clears the source
+training rights, the candidate-only CLI can use this reviewed proposal
+JSON and the existing source instead of a new external provider:
+
+```bash
+python -m skeleton.jeeves.game_studio_rule_training_cli \
+  --editor economy --proposals /private/ai-rule-batch.json \
+  --episodes-per-scenario 4 --max-steps 24 --seed 23 \
+  --output /private/new-rule-policy.json \
+  --neural-corpus-output /private/new-rule-neural-corpus.json \
+  --authorized --rights-cleared
+```
+
+The outcome contains a single policy conditioned on the actual scenario,
+measured Q updates, baseline-vs-candidate returns for each circumstance
+on disjoint held-out seeds, source and transition digests, and no
+automatic production promotion.
+
+`skeleton/ai/training/jeeves_studio_rule_corpus.py` replays one
+actual policy-training trajectory per scenario, pins all distinct game
+rules and scenario seeds, and generates bounded observed learning text.
+`load_studio_curriculum` independently reconstructs that multi-source
+corpus and checks the caller-supplied, independently obtained SHA-256.
+The existing `jeeves_production_game_session` can then ingest the file
+with its `--studio-corpus` and `--studio-corpus-expected-sha256` flags.
+This **only** adds operator-admitted candidate neural-training data; the
+compiled app must supply the real attested live checkpoint, run the optimizer
+and independently evaluate generated outputs before any production promotion.
+
+**Existing governed campaigns:** `skeleton/jeeves/game_studio_learning.py`
+now advertises actual studio engine setting knobs to its deterministic
+bandit search. It proposes schema-validated edits to the exact
+`game/studio/session.json` source, runs candidate Q-training in the
+existing campaign authority and compares real source-bound evaluations
+against the champion and adversarial perturbations. Invalid changes are
+recorded as rejected proposals. The bandit is *not* falsely represented
+as another natural-language LLM inference call; separate AI-model text
+proposals enter through the explicit declarative proposal contract.
+
+Release gates remain pending: exact-head Python tests, worker/IPC
+integration, runtime security checks, actual campaign trials, actual
+neural optimizer run, independent domain benchmarks and engine/world quality.
+No complete engine/app, hardware, audio, rendering or real-world
+generalization quality claim follows merely from these registrations.

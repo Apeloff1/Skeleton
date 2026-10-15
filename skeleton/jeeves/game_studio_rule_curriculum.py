@@ -153,6 +153,56 @@ def _layout_op(layout: dict, op: Mapping[str, object]) -> None:
         raise RuleCurriculumError("layout rule must address an existing leaf")
 
 
+def rule_authoring_contract(base_source: Mapping[str, object]) -> dict[str, object]:
+    """Expose actual engine-rule limits to Jeeves without giving it code authority."""
+    source = parse_studio_source(_plain(base_source))
+    metadata = editor_spec(source["editor"])
+    fields = []
+    for field in metadata["fields"]:
+        key = field["key"]
+        if key in _LOCKED or field["kind"] not in ("int", "bool", "enum"):
+            continue
+        fields.append({
+            "path": key,
+            "type": field["kind"],
+            "current": source["settings"][key],
+            "minimum": field["minimum"],
+            "maximum": field["maximum"],
+            "options": field["options"],
+            "operators": (
+                ["set", "add", "multiply"] if field["kind"] == "int"
+                else ["set", "toggle"] if field["kind"] == "bool"
+                else ["set"]
+            ),
+        })
+    return {
+        "schema_version": "skeleton.game_builder.ai_rule_authoring_contract.v1",
+        "proposal_schema_version": PROPOSAL_SCHEMA,
+        "editor": source["editor"],
+        "base_digest": _sha(source),
+        "max_proposals_per_curriculum": MAX_PROPOSALS,
+        "max_operations_per_proposal": MAX_OPERATIONS,
+        "modification_scope": "canonical_engine_settings_and_validated_scene_leaves_only",
+        "editable_settings": fields,
+        "authored_scene_allowed": source["editor"] not in ("maze", "rpg"),
+        "scene_seed": None if source["scene"] is None else source["scene"]["seed"],
+        "protected": sorted(_LOCKED),
+        "allowed_operation_fields": ["scope", "path", "op", "value"],
+        "proposal_fields": [
+            "schema_version", "proposal_id", "base_digest", "reason",
+            "scene_seed", "operations"
+        ],
+        "sample_operation": {
+            "scope": "settings",
+            "path": fields[0]["path"] if fields else None,
+            "op": "set",
+            "value": fields[0]["current"] if fields else None,
+        },
+        "neural_weight_training_automatic": False,
+        "automatic_rule_promotion": False,
+    }
+
+
 def apply_rule_proposal(base_source: Mapping[str, object],
                         proposal: Mapping[str, object]) -> dict[str, object]:
     """Accept untrusted AI-suggested rule changes only as validated game data."""
@@ -466,6 +516,6 @@ class RuleCurriculumEnvironment:
 
 __all__ = [
     "PROPOSAL_SCHEMA", "PLAN_SCHEMA", "SNAPSHOT_SCHEMA", "MAX_PROPOSALS",
-    "RuleCurriculumError", "apply_rule_proposal", "make_rule_curriculum",
+    "RuleCurriculumError", "rule_authoring_contract", "apply_rule_proposal", "make_rule_curriculum",
     "verify_rule_curriculum", "RuleCurriculumEnvironment",
 ]

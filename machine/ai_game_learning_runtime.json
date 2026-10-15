@@ -68,5 +68,24 @@
       "requires operator rights and training admission",
       "CI and independent validation pending"
     ]
+  },
+  "ai_rule_variation": {
+    "status": "implementation_candidate_not_verified",
+    "owner": "skeleton/jeeves/game_studio_rule_curriculum.py",
+    "trainer": "skeleton/jeeves/game_studio_rule_training_cli.py",
+    "neural_corpus": "skeleton/ai/training/jeeves_studio_rule_corpus.py",
+    "campaign_owner": "skeleton/jeeves/game_studio_learning.py",
+    "interface": "AI model supplies bounded declarative source-specific rules; typed original-game editor and scene validators authenticate changes, no arbitrary executable source.",
+    "evaluation": "Single scenario-conditioned GamePolicyLearner, disjoint heldout scenario seeds, parent policy baseline, replay receipts. Current studio campaign also supports bounded typed rule mutations in its existing champion/adversarial evaluation.",
+    "production": "Training-derived candidate policy and optional replay-verifiable corpus only; real attested neural checkpoint required for separate candidate neural optimization and independent acceptance.",
+    "hard_limits": [
+      "maximum seven simultaneous model-proposed variants",
+      "maximum twelve edits per variant",
+      "source SHA bound",
+      "no arbitrary code, filesystem, network or provider invocation",
+      "no rule/policy promotion without separate authorization",
+      "no hardware game execution claim"
+    ],
+    "verification": "Not yet passed exact-head runtime tests, security and benchmark review."
   }
 }
