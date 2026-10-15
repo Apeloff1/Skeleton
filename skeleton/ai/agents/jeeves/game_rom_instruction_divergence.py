@@ -40,6 +40,7 @@ class InstructionDivergenceConfig:
     max_cycles_per_branch: int = 131072
     boot_cycles: int = FRAME_CYCLES
     action_subset: tuple[str, ...] = ("idle", "a", "right", "a_right")
+    temporal_sequences: tuple[tuple[str, ...], ...] = ()
 
     def __post_init__(self) -> None:
         for key, minimum, maximum in (
@@ -60,6 +61,15 @@ class InstructionDivergenceConfig:
             or self.action_subset[0] != "idle"
             or len(set(self.action_subset)) != len(self.action_subset)
             or any(action not in ACTIONS for action in self.action_subset)
+            or not isinstance(self.temporal_sequences, tuple)
+            or len(self.action_subset) + len(self.temporal_sequences) > 8
+            or len(set(self.temporal_sequences)) != len(self.temporal_sequences)
+            or any(
+                not isinstance(sequence, tuple)
+                or not 2 <= len(sequence) <= 8
+                or any(action not in ACTIONS for action in sequence)
+                for sequence in self.temporal_sequences
+            )
         ):
             raise InstructionDivergenceError("bounded unique controls with idle baseline and finite sampling required")
 
@@ -140,17 +150,36 @@ def _capture(machine: GameBoyMachine, index: int, pc_before: int, opcode: int) -
 
 def _run_from_exact_state(
     machine: GameBoyMachine, checkpoint: Mapping[str, Any],
-    action: str, config: InstructionDivergenceConfig,
+    action: str | tuple[str, ...], config: InstructionDivergenceConfig,
 ) -> dict[str, Any]:
     machine.restore(checkpoint)
-    buttons = tuple() if action == "idle" else tuple(action.split("_"))
-    machine.set_buttons(buttons)
+    phases = (action,) if isinstance(action, str) else action
+    if not phases or any(phase not in ACTIONS for phase in phases):
+        raise InstructionDivergenceError("finite source action schedule requires legal controller tokens")
+    boundaries = [
+        (phase_index * config.instruction_count) // len(phases)
+        for phase_index in range(len(phases))
+    ]
+    if len(set(boundaries)) != len(phases):
+        raise InstructionDivergenceError("source profile has more phases than instruction budget")
+    schedule = [
+        {"at_source_instruction": step, "action": phase}
+        for step, phase in zip(boundaries, phases, strict=True)
+    ]
+    machine.set_buttons(
+        tuple() if phases[0] == "idle" else tuple(phases[0].split("_"))
+    )
     row = _capture(machine, 0, machine.pc, machine.read(machine.pc))
     points = [row]
-    start_cycles = machine.cycles
     total_cycles = 0
-    prior_opcode = row["last_observed_opcode_byte"]
+    next_phase = 1
     for ordinal in range(1, config.instruction_count + 1):
+        # An instruction boundary controls the input; it is a measured CPU
+        # instruction count, NOT a wall time or a promise of frame timing.
+        if next_phase < len(boundaries) and ordinal - 1 == boundaries[next_phase]:
+            phase = phases[next_phase]
+            machine.set_buttons(tuple() if phase == "idle" else tuple(phase.split("_")))
+            next_phase += 1
         before_pc = machine.pc
         opcode = machine.read(before_pc)
         elapsed = machine.instruction()
@@ -161,10 +190,13 @@ def _run_from_exact_state(
             raise InstructionDivergenceError("actual source branch exceeded CPU-cycle cap")
         if ordinal % config.sample_stride == 0 or ordinal == config.instruction_count:
             points.append(_capture(machine, ordinal, before_pc, opcode))
-        prior_opcode = opcode
+    if next_phase != len(phases):
+        raise InstructionDivergenceError("bounded original ROM input schedule was not fully exercised")
     final_snapshot = machine.snapshot()
     return {
-        "control": action,
+        "control": "->".join(phases),
+        "source_input_schedule": schedule,
+        "source_controller_changes": len(schedule),
         "real_source_cpu_instructions": config.instruction_count,
         "real_source_cycles": total_cycles,
         "real_source_sample_count": len(points),
@@ -173,7 +205,6 @@ def _run_from_exact_state(
         "time_and_video_evidence": points,
         "actual_source_output_digest": _digest(points),
     }
-
 
 def _first_difference(
     passive: Mapping[str, Any], active: Mapping[str, Any],
@@ -227,7 +258,8 @@ def compare_original_rom_instruction_branches(
     if not 0 < boot["instructions"] or core.metadata["mapper"] != "rom_only":
         raise InstructionDivergenceError("expected source-executed original DMG boot is missing")
     results = []
-    for action in config.action_subset:
+    controlled = list(config.action_subset) + list(config.temporal_sequences)
+    for action in controlled:
         first = _run_from_exact_state(core, checkpoint, action, config)
         replay = _run_from_exact_state(core, checkpoint, action, config)
         if first != replay:
@@ -235,7 +267,8 @@ def compare_original_rom_instruction_branches(
                 f"original Game Boy CPU source controls {action} failed deterministic instruction replay"
             )
         results.append({
-            "control": action,
+            "control": first["control"],
+            "source_input_schedule": first["source_input_schedule"],
             "actual_repeated_physical_cpu_runs": 2,
             "source_replay_identical": True,
             "first_run": first,
@@ -262,9 +295,13 @@ def compare_original_rom_instruction_branches(
         "requested_instructions_per_branch": config.instruction_count,
         "sample_stride_in_source_instructions": config.sample_stride,
         "real_source_instruction_executions": (
-            2 * len(config.action_subset) * config.instruction_count
+            2 * len(controlled) * config.instruction_count
         ),
         "actual_passive_and_controller_interventions": results,
+        "actually_executed_temporal_sequences": len(config.temporal_sequences),
+        "controlled_source_input_change_events": sum(
+            len(record["source_input_schedule"]) for record in results
+        ),
         "paired_replay_verified_differences": contrasts,
         "all_source_replays_identical": True,
         "source_instruction_and_memory_trace": True,
