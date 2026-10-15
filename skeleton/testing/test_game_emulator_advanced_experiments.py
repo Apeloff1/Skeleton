@@ -282,9 +282,8 @@ class CrossCoreCases(unittest.TestCase):
         self.assertEqual(report["compared_approved_native_cores"], 2)
         self.assertTrue(report["all_repeats_stable"])
         self.assertEqual(len(report["cross_core_differences"]), 1)
-        self.assertGreater(
-            report["cross_core_differences"][0]["measured_total_reward_delta"]
-            != 0, False
+        self.assertNotEqual(
+            report["cross_core_differences"][0]["measured_total_reward_delta"], 0.0,
         )
         self.assertFalse(report["limits"]["pixel_match_proves_hardware_compatibility"])
 
