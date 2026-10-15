@@ -484,3 +484,36 @@ def test_setup_does_not_rewrite_external_unauthenticated_database(tmp_path):
     )
     ensure_runtime_environment(tmp_path)
     assert _read_values(tmp_path / ".env")["MONGO_URL"] == remote
+
+def test_setup_atomic_write_removes_secret_temp_file_on_fsync_failure(tmp_path, monkeypatch):
+    import os
+    from skeleton.app.setup_runtime import _atomic_write
+
+    original = tmp_path / ".env"
+    original.write_text("JWT_SECRET=original-value\n", encoding="utf-8")
+
+    def broken_fsync(_fd):
+        raise OSError("simulated disk I/O failure")
+
+    monkeypatch.setattr(os, "fsync", broken_fsync)
+    with pytest.raises(OSError, match="disk I/O failure"):
+        _atomic_write(original, "JWT_SECRET=new-sensitive-value\n")
+    assert original.read_text(encoding="utf-8") == "JWT_SECRET=original-value\n"
+    assert list(tmp_path.glob(".env.*.tmp")) == []
+
+
+def test_setup_atomic_write_removes_secret_temp_file_on_replace_failure(tmp_path, monkeypatch):
+    import os
+    from skeleton.app.setup_runtime import _atomic_write
+
+    original = tmp_path / ".env"
+    original.write_text("JWT_SECRET=original-value\n", encoding="utf-8")
+
+    def broken_replace(_source, _destination):
+        raise OSError("simulated rename failure")
+
+    monkeypatch.setattr(os, "replace", broken_replace)
+    with pytest.raises(OSError, match="rename failure"):
+        _atomic_write(original, "JWT_SECRET=new-sensitive-value\n")
+    assert original.read_text(encoding="utf-8") == "JWT_SECRET=original-value\n"
+    assert list(tmp_path.glob(".env.*.tmp")) == []

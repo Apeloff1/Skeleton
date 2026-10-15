@@ -108,26 +108,31 @@ def _replace_env_value(text: str, key: str, value: str) -> str:
 
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        delete=False,
-    ) as handle:
-        handle.write(text)
-        handle.flush()
-        os.fsync(handle.fileno())
-        temporary = Path(handle.name)
+    temporary: Path | None = None
     try:
+        # Include temp-file creation, write, flush and fsync in the cleanup
+        # boundary. The previous implementation entered try only *after*
+        # successful fsync, leaving secret-bearing .env.*.tmp files behind
+        # when disks filled or storage synchronization failed.
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary, path)
         try:
             path.chmod(0o600)
         except OSError:
             pass
     finally:
-        if temporary.exists():
+        if temporary is not None:
             temporary.unlink(missing_ok=True)
 
 
