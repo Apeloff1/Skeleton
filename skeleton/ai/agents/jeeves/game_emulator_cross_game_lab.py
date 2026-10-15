@@ -33,6 +33,7 @@ MAX_PROGRAM_ACTIONS = 8
 MAX_TOTAL_ACTIONS = 32
 MAX_REPORT_BYTES = 2 * 1024 * 1024
 MAX_PREVIEW_PIXEL_BYTES = 8 * 1024 * 1024
+MAX_PRIVATE_SNAPSHOT_BYTES = 64 * 1024 * 1024
 
 
 class CrossGameComparisonError(ValueError):
@@ -66,6 +67,23 @@ def _encoded(value: object) -> bytes:
 
 def _digest(value: object) -> str:
     return hashlib.sha256(_encoded(value)).hexdigest()
+
+
+def _private_snapshot_digest(snapshot: Mapping[str, Any]) -> str:
+    # Some approved native libretro cores expose multi-megabyte private
+    # serializable source states. Only *their hash* enters the 2-MiB
+    # published evidence budget; never reject ordinary multi-MiB native
+    # savestates using the much smaller report-size limit.
+    try:
+        blob = json.dumps(
+            snapshot, sort_keys=True, separators=(",", ":"),
+            allow_nan=False, ensure_ascii=True,
+        ).encode("utf-8")
+    except (TypeError, ValueError, RecursionError, OverflowError) as exc:
+        raise CrossGameComparisonError("source machine savestate cannot be deterministically hashed") from exc
+    if not 1 <= len(blob) <= MAX_PRIVATE_SNAPSHOT_BYTES:
+        raise CrossGameComparisonError("private game source savestate exceeds 64-MiB custody bound")
+    return hashlib.sha256(blob).hexdigest()
 
 
 def _sha(value: str) -> str:
@@ -138,7 +156,7 @@ def _snapshot(environment: Any) -> tuple[Mapping[str, Any], str]:
         raise CrossGameComparisonError("real emulator lacks exact CPU/core savestate")
     # Never include content/savestate bytes in the resulting comparison
     # output. Hash only the private same-source state representation.
-    return snapshot, _digest(snapshot)
+    return snapshot, _private_snapshot_digest(snapshot)
 
 
 def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str, ...]) -> dict[str, Any]:
@@ -146,7 +164,7 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
     if not isinstance(before, Mapping):
         raise CrossGameComparisonError("emulator failed to restore exact observation")
     _, digest_before = _snapshot(environment)
-    if _digest(start) != digest_before:
+    if _private_snapshot_digest(start) != digest_before:
         raise CrossGameComparisonError("same-core restore changed exact pre-intervention source state")
     previous_frame = _frame(environment)
     previous_observation = dict(before)
