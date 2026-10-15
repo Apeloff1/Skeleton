@@ -556,5 +556,23 @@
     "verified_contract": "Host pins exact port topology into episode environment digest and native-worker initialization; native worker acknowledges and sets libretro controller device for each port. Replay audits compare exact port topology.",
     "boundaries": "No live native core execution, tests, new lightgun ABI or new native emulator compiled in this change. A declared peripheral does not prove the core supports it.",
     "security": "No dynamic device ID, uncontrolled pointer type, arbitrary callbacks or runtime code injection; only finite libretro device IDs admitted."
+  },
+  "active_native_qualification_2026_10_15": {
+    "schema": "skeleton.game.native_emulator_qualification.v1",
+    "runner": "skeleton/jeeves/game_emulator_qualification.py::run_emulator_qualification",
+    "cli": "python3 scripts/qualify_game_emulator.py --registry <approved-cores-json> --target <canonical-id> --core <approved-id> --source <lawful-rom> --action idle --action right --runs 3",
+    "execution_model": "Explicit opt-in only; a fresh bounded Linux bubblewrap native worker per run. No sample/mock fallback.",
+    "run_limits": {
+      "min_runs": 2,
+      "max_runs": 10,
+      "max_actions_per_run": 64,
+      "max_total_frames_including_reset_budget": 4096,
+      "max_export_bytes": 8388608
+    },
+    "evidence": "Canonical ingested source hash, exact registry digest, per-run capture nonce, native video/audio frame digests, timestamp-independent run receipts, first divergence and dimension counters",
+    "rights": "No copyrighted games, commercial ROM content, BIOS or proprietary SDK bundled, downloaded or redistributed",
+    "training": "No model weights are trained or promoted; success metrics cannot be inferred from visual reward alone",
+    "measured_gameplay_certifications": 0,
+    "executed_during_this_code_change": false
   }
 }
