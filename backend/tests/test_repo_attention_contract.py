@@ -130,8 +130,8 @@ def test_rejects_merge_queue_state_churn() -> None:
     for event in ("enqueued", "dequeued"):
         source = _replace_once(
             _source(),
-            "      - auto_merge_disabled\n",
-            f"      - auto_merge_disabled\n      - {event}\n",
+            "      - review_request_removed\n",
+            f"      - review_request_removed\n      - {event}\n",
         )
         assert f"merge-queue state churn: {event}" in _messages(source)
 
