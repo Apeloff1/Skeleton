@@ -199,6 +199,24 @@ class GameBoyMachine:
         if self.dma_index == 160:
             self.dma_active = False
 
+    def _serial_tick(self) -> None:
+        # DMG internal clock is 8192 Hz: one bit per 512 CPU T-cycles.
+        # No external link peer is attached. The input line therefore
+        # idles high. External clock mode intentionally cannot advance.
+        if not self.serial_active or not self.memory[0xFF02] & 0x01:
+            return
+        self.serial_phase += 1
+        if self.serial_phase != SERIAL_INTERNAL_BIT_CYCLES:
+            return
+        self.serial_phase = 0
+        self.memory[0xFF01] = ((self.memory[0xFF01] << 1) | 1) & 0xFF
+        self.serial_bits += 1
+        if self.serial_bits == 8:
+            self.serial_active = False
+            self.serial_bits = 0
+            self.memory[0xFF02] &= ~0x80
+            self.memory[0xFF0F] |= 0x08
+
     def _rtc_advance(self, cycles: int) -> None:
         """Advance the virtual clock in O(1), never using host wall time."""
         if not self.metadata["virtual_rtc"] or self.rtc_regs[4] & 0x40:
@@ -844,6 +862,7 @@ class GameBoyMachine:
             self.divider = (self.divider + 1) & 65535
             self._timer_apply_edge(old_signal)
             self._dma_tick()
+            self._serial_tick()
             self._ppu_tick()
         self.cycles += cycles
         self._rtc_advance(cycles)
