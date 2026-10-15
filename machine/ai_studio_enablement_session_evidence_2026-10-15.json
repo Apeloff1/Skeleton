@@ -99,7 +99,87 @@
     }
   },
   "final_integration_qualification": {
-    "status": "pending_combined_runtime_and_source_freeze"
+    "status": "all_source_implemented_native_fix_requalification_and_final_image_pending",
+    "native_api_union": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/integration/native-api-union.json",
+      "sha256": "b88e11dba866f95ecfcca33334644e59c439274152dead8b7dc67c88f97f629b"
+    },
+    "source_health": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/final-source-ready-health.json",
+      "sha256": "866adfd050bad449fba27a9738d6e273134cea58d7a93e2a3a784fc697d9b5e6"
+    },
+    "native_builder": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/combined-native-tools-20261015-01/receipt.json",
+      "sha256": "368e6e26fee40152b10a5b189e3d9b3173c1762dc8114844334ffde4e6a01ebf"
+    },
+    "source_validation": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/changed-source-validation.json",
+      "sha256": "fdf98c72f617c46285c5b4f98faf40042ad179e22c9e12dfe5f277a53f6586cf"
+    },
+    "lint_delta": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/lint-delta.json",
+      "sha256": "737653e50be56f2693280443827299be11e2357ec82cba66fecfa0d75d4e670f"
+    },
+    "actual_native_builder": {
+      "project_id": "91b7c47f-e0b8-519e-b00b-50434c2edaef",
+      "project_version": 3,
+      "artifact_id": "039fbb62-e33c-5b84-bdf5-b98f58d66af5",
+      "artifact_bytes": 32768,
+      "artifact_sha256": "7fe00d91fe474502536ea3f128571032c6d95e68fb10ec883e41271e9f3f17d5",
+      "steps": 64,
+      "actual_downloads_verified": true,
+      "model_planned": false
+    },
+    "parallel_training": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-combined/receipt.json",
+      "sha256": "4dbc07ae449c0feab806a542f73e78609fdfd74625df1b3bccf7924621f232d8"
+    },
+    "post_reload_policy_read": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-combined/post-reload-projection-receipt.json",
+      "sha256": "8eb02db79c80452052677fa26ae754aaddfdc59a27e403009f5c60dce6689734"
+    },
+    "paired_review": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/review/20261015T161219Z-747ee0d2/summary.json",
+      "sha256": "b6be3dce1219de09396f4af7d2ee09cce4ed62eeda050728642d47caf0aae0bc"
+    },
+    "browser": {
+      "local_path": "/workspace/scratch/jeeves-studio-operations-runtime/browser/qualification-summary.json",
+      "sha256": "9c13430d95c47d25c804abf0957edd9d64ea2495c352b449b1d063a9b0afaaec"
+    },
+    "training_observations": {
+      "actors_per_batch": 2,
+      "distinct_actor_pids": 10,
+      "all_observed_actors_exited": true,
+      "initial_committed_updates": 256,
+      "initial_heldout_return_delta": 0.04250649565293289,
+      "initial_gate": true,
+      "candidate_committed_updates": 64,
+      "candidate_inherited_updates": 256,
+      "candidate_heldout_return_delta": -0.021077885452638872,
+      "candidate_gate": false,
+      "default_policy_retained": true,
+      "rejected_candidate_exportable": true
+    },
+    "paired_review_observations": {
+      "status": "paired_observation",
+      "actual_steps_each": 32,
+      "observed_regressions": [
+        "task_return"
+      ],
+      "quality_improvement_verified": false,
+      "export_digest_matches": null
+    },
+    "frontend_artifact": {
+      "archive": "/workspace/scratch/jeeves-app-oct15-studio-operations-qualified-final.zip",
+      "archive_bytes": 10120286,
+      "archive_sha256": "dff74cd15f53c415fb84fa86c4360c4a23d0e1fc80287ffb2785744c94ad6d0d",
+      "frontend_source_files": 822,
+      "frontend_source_manifest_sha256": "60965fe54d02bd6c5548f4884eb067c09a9f33c8ce22464a1371d8ac55ff38e7",
+      "source_drift": false,
+      "actual_ui_native_steps": 16,
+      "final_javascript_errors": 0,
+      "automated_tests_run": false
+    }
   },
   "limitations": [
     "Configured catalogue targets are not proof of universal emulation, full per-console editors or arbitrary ROM understanding.",
@@ -108,5 +188,76 @@
     "The observed rejected candidate did not improve held-out returns; no automatic production promotion is authorized.",
     "The first model planning operation failed before inference and remains retained as failed evidence.",
     "Scratch receipts and large model/toolchain/frontend assets are local operational evidence, not bundled repository deliverables."
-  ]
+  ],
+  "integrated_main_commit": "389ea48a78c6e420e0ad7b01df8d7844b315cfa3",
+  "integration_merge_commit": "e938cc79f58cb980182a453d89ab91c4b6191269",
+  "upstream_preservation": {
+    "both_parent_api_union_missing_methods": 0,
+    "both_parent_api_union_missing_parameters": 0,
+    "disc_save_ram_controller_precision_timing_retained": true,
+    "n_step_least_visited_and_native_memory_observation_retained": true,
+    "canonical_only_modules_retained": 14,
+    "historical_host_worker_copies_preserved": true,
+    "source_pinned_exact_comparison_mirrors_refreshed": 5,
+    "incoming_tests_authored_or_run_by_this_work": false
+  },
+  "model_planner_observations": {
+    "canonical_inference_completed": true,
+    "first_compact_context": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/combined-model-goal-20261015-01/receipt.json",
+      "sha256": "8fbf927d5378260b85660494854d09f9bc2cf7fb358e812d24e39d3b5e8da2d6"
+    },
+    "strict_done_schema": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/strict-model-goal-20261015-final-01/receipt.json",
+      "sha256": "f99d4f7d1fb685a53c603d53a6a4f2093872efb100a62467fe42de17eaa3ccc4"
+    },
+    "first_output": "Premature completion blocked against four unverified host checks; no fabricated work",
+    "strict_output": "Real console.edit decision with empty payload blocked by owner before mutation; no fabricated edit",
+    "next_correction": "Operation-specific schemas are implemented and statically compiled for all41 operations; bounded actual model committed edit and binary build.",
+    "ai_built_complete_game_verified": false,
+    "operation_specific_schema": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/typed-schema-compilation-final-bounded.json",
+      "sha256": "68afade609fa06577c7843644dd7132c66823af0b213dddc9e84df9307e197d9"
+    },
+    "bounded_typed_run": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/builder/typed-payload-model-goal-20261015-final-01/receipt.json",
+      "sha256": "350d75ed67f1014395e9262fd5866fdceafd3defab5d105df1b1657f3156de67"
+    },
+    "canonical_model_calls": 3,
+    "actual_owner_accepted_actions": [
+      "console.edit",
+      "build"
+    ],
+    "edit_verified": true,
+    "binary_build_verified": true,
+    "preview_verified": false,
+    "export_verified": false,
+    "final_status": "blocked",
+    "remaining_model_limitation": "Third decision supplied an invalid preview action; owner blocked it without fabricating playback. A complete autonomous workflow is unverified.",
+    "transport_recovery": {
+      "initial_http_status": 504,
+      "steps_per_resumed_advance": 1,
+      "terminal_retries": 0
+    }
+  },
+  "runtime_code_commit": "fe29da41ba1cab0ddb59745c8fa9d6a469dabd05",
+  "native_training_discovery": {
+    "failed_attempt": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/training/final-native/failure-receipt.json",
+      "sha256": "b6b8706869938b637de3fc26a675996f67123809ad84e27282260002a98ef60e"
+    },
+    "actual_committed_checkpoint_updates": 32,
+    "policy_issued": false,
+    "cause": "controller_input was listed as a finite policy action but requires a separate actual controller vector; held-out random selection correctly failed on the undispatchable marker",
+    "fix": {
+      "local_path": "/workspace/scratch/jeeves-studio-enablement-2026-10-15/integration/native-policy-actions-fix.json",
+      "sha256": "746b44e105e22f30af30ec965a039c687482e5564672ec3b9551f0c6ec37132e"
+    },
+    "fixed_finite_policy_actions": 31,
+    "rich_controller_apis_preserved": true,
+    "fresh_qualification_status": "pending_source_reload_and_fresh_job_no_old_checkpoint_relabel"
+  },
+  "automated_tests_authored": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false
 }
