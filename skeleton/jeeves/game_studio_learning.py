@@ -1564,7 +1564,10 @@ class StudioLearningCampaign:
             play.pop("_trace", None)
         steps = trained.updates + sum(p["steps"] for p in baseline + measured + baseline_adv + measured_adv)
         if scenario_mirror is not None:
-            steps += sum(2 * min(6, self.config.episode_steps) for _ in scenario_mirror["mirrors"])
+            steps += sum(
+                row["baseline_executed_steps"] + row["candidate_executed_steps"]
+                for row in scenario_mirror["mirrors"]
+            )
         curriculum = {
             "kind": self.config.curriculum,
             "training_seeds": training_seeds,

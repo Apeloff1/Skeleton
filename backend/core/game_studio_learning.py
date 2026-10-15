@@ -2167,15 +2167,25 @@ async def scenario_drafts(scope, identifier, *, limit=4):
     for item in records:
         checked=_checked_round_record(row,item)
         # Only recorded measurements, never user-supplied invented labels.
-        performance=checked.get("performance") or {}
         vector=checked.get("objective_vector") or {}
-        value=vector.get("return",performance.get("return",0))
-        if type(value) not in (int,float):
+        candidate_metrics=vector.get("candidate") or {}
+        role=(checked.get("roles") or {}).get("jeeves") or {}
+        play=role.get("play") or {}
+        value=candidate_metrics.get("return",play.get("return",0))
+        if type(value) not in (int,float) or not __import__("math").isfinite(value):
             value=0
+        survival=candidate_metrics.get("survival")
+        if type(survival) not in (int,float) or not 0<=survival<=1:
+            failure=1.0 if play.get("dead") is True else 0.0
+        else:
+            failure=1.0-float(survival)
+        episodes=role.get("actual_training_episodes",1)
+        if type(episodes) is not int or not 1<=episodes<=4:
+            episodes=1
         measured.append({
             "mean_return": max(-1e9,min(1e9,float(value))),
-            "failure_rate": 1.0 if checked.get("status") == "rejected" else 0.0,
-            "episodes": 1,
+            "failure_rate": failure,
+            "episodes": episodes,
         })
     result=propose_scenarios(source,observations=measured,limit=limit)
     return {
