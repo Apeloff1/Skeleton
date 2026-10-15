@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping as MappingABC
-from dataclasses import dataclass, field
 import hashlib
 import json
 import math
+from collections.abc import Mapping, Sequence
+from collections.abc import Mapping as MappingABC
+from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Mapping, Protocol, Sequence
+from typing import Protocol
 
 from skeleton.ai.runtime.inference import ReferenceNGramModel
 
@@ -132,7 +133,7 @@ class TrainingDataset:
         rights_refs: Sequence[str],
         lineage_refs: Sequence[str] = (),
         metadata: Mapping[str, object] | None = None,
-    ) -> "TrainingDataset":
+    ) -> TrainingDataset:
         return cls(
             dataset_id=dataset_id,
             content_digest=corpus_digest(corpus),
@@ -917,6 +918,8 @@ __all__ = [
 
 # Pickle/deepcopy support for MappingProxyType
 import copyreg
+
+
 def _proxy_reduce(proxy):
     return (MappingProxyType, (dict(proxy),))
 copyreg.pickle(MappingProxyType, _proxy_reduce)
