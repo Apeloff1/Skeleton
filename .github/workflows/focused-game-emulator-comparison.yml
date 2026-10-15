@@ -40,6 +40,8 @@ jobs:
         run: |
           python -m compileall -q \
             skeleton/jeeves/game_comparison_live.py \
+            skeleton/jeeves/game_comparison_pairwise.py \
+            skeleton/jeeves/game_comparison_portfolio.py \
             skeleton/jeeves/game_comparison_controllers.py \
             skeleton/jeeves/game_emulator_worker.py \
             skeleton/jeeves/game_comparison_live_evidence.py \
@@ -56,6 +58,8 @@ jobs:
             skeleton/jeeves/game_emulator_target_gap_matrix.py \
             skeleton/jeeves/game_comparison_studio.py \
             scripts/live_game_comparison.py \
+            scripts/analyze_live_game_comparison.py \
+            scripts/analyze_game_comparison_portfolio.py \
             scripts/qualify_live_game_comparison.py \
             scripts/doctor_game_comparison.py \
             scripts/audit_game_emulator_169_targets.py \
@@ -73,6 +77,8 @@ jobs:
             tests.test_game_comparison_boomerang \
             tests.test_game_comparison_multispectral \
             tests.test_game_comparison_live_http \
+            tests.test_game_comparison_pairwise \
+            tests.test_game_comparison_portfolio \
             tests.test_game_comparison_raw_qualification_regression \
             tests.test_game_comparison_readiness \
             tests.test_game_comparison_host_preflight \
