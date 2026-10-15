@@ -5,17 +5,16 @@
  */
 import React from 'react';
 import {
-  ActivityIndicator, Platform, SafeAreaView, ScrollView, StyleSheet,
+  ActivityIndicator, SafeAreaView, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 
 import StudioLoginGate, { useStudioAuth } from '../src/auth/StudioLoginGate';
 import { authHeaders, getAuthToken } from '../src/auth/gameforgeAuth';
 import { API_BASE } from '../utils/apiBase';
 import DragonOriginalPuzzleEditor from '../src/components/DragonOriginalPuzzleEditor';
+import {saveNativeSourceZip} from '../features/Jeeves/companion/saveNativeSourceZip';
 
 type PlatformCapability = {
   id: string;
@@ -60,58 +59,6 @@ function supported(capability: PlatformCapability, style: string): boolean {
 
 function formatStyle(style: string): string {
   return style.replace(/_/g, ' ');
-}
-
-async function saveBundle(blob: Blob, name: string): Promise<void> {
-  if (!blob.size || blob.size > MAX_DOWNLOAD_BYTES) {
-    throw new Error('The native source ZIP exceeds the maximum download size.');
-  }
-  if (Platform.OS === 'web') {
-    const url = URL.createObjectURL(blob);
-    try {
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = name;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-    } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 15_000);
-    }
-    return;
-  }
-  if (!FileSystem.documentDirectory) {
-    throw new Error('Device storage for native source ZIPs is unavailable.');
-  }
-  // The backend enforces a strict 3-MiB source-only bundle. Do not persist
-  // credentials, private rights notes, or request payloads with the archive.
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Unable to decode the native source archive.'));
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Invalid native source archive result.'));
-        return;
-      }
-      const separator = reader.result.indexOf(',');
-      if (separator < 0) {
-        reject(new Error('Invalid source archive encoding.'));
-        return;
-      }
-      resolve(reader.result.slice(separator + 1));
-    };
-    reader.readAsDataURL(blob);
-  });
-  const destination = FileSystem.documentDirectory + name;
-  await FileSystem.writeAsStringAsync(destination, base64, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(destination, {
-      mimeType: 'application/zip',
-      dialogTitle: 'Share original Dragon native sources',
-    });
-  }
 }
 
 type PixelPreview = {
@@ -389,7 +336,7 @@ function NativeSourceEditor() {
       if (!/^[a-f0-9]{64}$/.test(digest)) {
         throw new Error('Source archive lacks its canonical content digest.');
       }
-      await saveBundle(blob,
+      await saveNativeSourceZip(blob,
         'dragon-original-' + identity.slice(0, 12) + '-' + digest.slice(0, 12) + '.zip');
       if (!controller.signal.aborted) {
         setSuccess('Original source ZIP delivered. Compile with an authorized local toolchain. Emulator and hardware playtesting are still required.');
