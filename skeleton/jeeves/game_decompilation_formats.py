@@ -57,7 +57,7 @@ def inspect_pe(data: bytes) -> dict[str, Any]:
 
 
 def inspect_elf(data: bytes) -> dict[str, Any]:
-    if len(data) < 64 or not data.startswith(b"\x7fELF"):
+    if len(data) < 52 or not data.startswith(b"\x7fELF"):
         raise ValueError("Invalid or truncated ELF header")
     elf_class = data[4]
     endian_marker = data[5]
