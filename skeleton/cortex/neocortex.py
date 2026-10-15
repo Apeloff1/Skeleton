@@ -604,7 +604,37 @@ class JeevesCortex:
             "contact": self.contact_engine.snapshot(),
             "genos": self.genos_engine.snapshot(),
         }
-        p.write_text(json.dumps(blob), encoding="utf-8")
+        # Never truncate live weights on a crash or overwrite a symlink.
+        # Temporary and destination are on the same filesystem for os.replace.
+        import os
+        import tempfile
+        if p.is_symlink():
+            raise CortexError("refusing symlink as Jeeves production state")
+        raw = json.dumps(blob, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        staged = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", prefix=".jeeves-cortex-", suffix=".tmp",
+                dir=p.parent, delete=False,
+            ) as handle:
+                staged = Path(handle.name)
+                os.chmod(staged, 0o600)
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if p.is_symlink():
+                raise CortexError("Jeeves persistence target changed into symlink")
+            os.replace(staged, p)
+            staged = None
+            if os.name == "posix":
+                fd = os.open(p.parent, os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        finally:
+            if staged is not None:
+                staged.unlink(missing_ok=True)
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
 
     def load(self, path) -> Dict[str, Any]:
