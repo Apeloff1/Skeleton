@@ -509,7 +509,7 @@ def _deep_emulator(args) -> dict[str, Any]:
     evidence = {key: value for key, value in result.items() if key != "policy_snapshot"}
     evidence["policy_snapshot_digest"] = result["policy_snapshot"]["snapshot_digest"]
     evidence["evidence_digest"] = hashlib.sha256(
-        json.dumps(evidence, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        json.dumps(evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
     ).hexdigest()
     _write_json(args.evidence_file, evidence, replace=False)
     return {
