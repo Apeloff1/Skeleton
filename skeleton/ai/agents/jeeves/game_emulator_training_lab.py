@@ -494,6 +494,7 @@ def run_emulator_training_lab(
     next_boomerang = config.boomerang_interval
     measured_runs = 0
     stagnant = 0
+    visual_stagnant = 0
     steps = 0
     updates = 0
     status = "budget_exhausted_before_saturation"
@@ -509,9 +510,31 @@ def run_emulator_training_lab(
         )
         new_signatures = set(item["state_signature"] for item in receipt["modalities"]) - seen
         seen.update(item["state_signature"] for item in receipt["modalities"])
+        prior_q = {
+            tuple(row["state"]): row["values"]
+            for row in learner.snapshot()["q_table"]
+        }
         # Measured visual novelty is not game mastery. Every trace admitted to
         # the learner is first replayed from exact states with all rewards bound.
         result = learner.train_offline([trace], cancel=cancel, authorize=authorize)
+        current_q = {
+            tuple(row["state"]): row["values"]
+            for row in result.snapshot["q_table"]
+        }
+        q_states_added = len(set(current_q) - set(prior_q))
+        max_q_value_delta = max(
+            (
+                abs(new_value - old_value)
+                for state, values in current_q.items()
+                for new_value, old_value in zip(
+                    values,
+                    prior_q.get(state, [0.0] * len(values)),
+                    strict=True,
+                )
+            ),
+            default=0.0,
+        )
+        q_evidence_changed = q_states_added > 0 or max_q_value_delta > 1e-6
         updates += result.updates
         steps += trace["steps"]
         measured_runs += 1
@@ -540,12 +563,17 @@ def run_emulator_training_lab(
         receipt["curriculum_selection"] = scheduling_proof
         receipt["curriculum_result"] = curriculum_proof
         receipt["new_visual_state_signatures"] = len(new_signatures)
+        receipt["new_learned_q_states"] = q_states_added
+        receipt["max_absolute_q_value_change"] = max_q_value_delta
+        receipt["q_values_moved_beyond_threshold"] = max_q_value_delta > 1e-6
+        receipt["measured_learning_progress"] = bool(new_signatures) or q_evidence_changed
         receipt["actual_tabular_q_updates"] = result.updates
         receipt["policy_snapshot_digest_after"] = learner.snapshot_digest
         receipt["training_commit"] = True
         receipt["receipt_digest"] = _digest({k: v for k, v in receipt.items() if k != "receipt_digest"})
         evidence.append(receipt)
-        stagnant = 0 if new_signatures else stagnant + 1
+        visual_stagnant = 0 if new_signatures else visual_stagnant + 1
+        stagnant = 0 if new_signatures or q_evidence_changed else stagnant + 1
         if len(ring) < config.boomerang_retained:
             ring.append(retained)
         else:
@@ -575,9 +603,11 @@ def run_emulator_training_lab(
                 "last_trace_digest": trace["trace_digest"],
                 "last_run_receipt_digest": receipt["receipt_digest"],
                 "stagnant_runs": stagnant,
+                "visual_only_stagnant_runs": visual_stagnant,
+                "last_q_max_absolute_value_change": max_q_value_delta,
             })
         if stagnant >= config.stagnation_runs:
-            status = "visual_novelty_saturated"
+            status = "observed_q_and_visual_learning_plateau"
             break
     heldout_seeds = [
         int(_digest(["heldout", config.seed, index])[:15], 16)
@@ -603,7 +633,9 @@ def run_emulator_training_lab(
         "actual_q_table_updates": updates,
         "actual_neural_parameter_updates": 0,
         "unique_visual_state_signatures": len(seen),
-        "consecutive_runs_without_new_visual_signature": stagnant,
+        "consecutive_runs_without_new_visual_signature": visual_stagnant,
+        "consecutive_runs_without_measured_q_or_visual_progress": stagnant,
+        "q_value_progress_threshold": 1e-6,
         "stagnation_threshold": config.stagnation_runs,
         "audited_run_receipts": evidence,
         "boomerang_replay_receipts": boomerangs,
