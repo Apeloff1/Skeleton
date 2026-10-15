@@ -18,3 +18,11 @@ The parent `tests/test_game_emulator_homebrew_native_abi.py` compiles this C sou
 A local compile and direct ctypes-driven smoke run **did execute successfully** during this development pass: 21 standard exported functions, two core-reported button descriptions, four native frame/audio callbacks, input-dependent distinct frame hashes and exact deterministic savestate restore. The tracked subprocess test source was added to the manual-only focused qualification job; its exact CI execution is not yet confirmed.
 
 **Unqualified remains:** actual Bubblewrap isolated host launch and IPC, integration with one of the approved source-pinned emulator cores, real legacy hardware fidelity, 169-platform completeness, real game copyright rights and measured model-weight improvement. This fixture proves an ABI foundation, not any commercial game playability.
+
+## Linux-only full sandbox host qualification
+
+A second test, `tests/test_game_emulator_homebrew_bwrap_host.py`, takes the exact same original C fixture through Skeleton's **real operator registry inspector and Bubblewrap worker transport**, not direct ctypes calls alone. It compiles a temporary native ELF, registers a test-only core identity via in-process-only metadata monkeypatch (never a production catalog entry), creates an exact SHA-pinned approved registry, and supplies only the 12-byte original homebrew marker as content.
+
+If Linux, `cc`, and `bwrap` are installed, the test requests actual isolated worker reset, actual libretro metadata and controller descriptions, an input-induced RGB frame change, native PCM callback, and snapshot/restore frame reproducibility. Absence of these host prerequisites skips the test with an explicit reason; it does **not** silently report passed sandbox execution. The **manually triggered focused qualification workflow** installs Bubblewrap when needed before launching it. The exact Linux-host test result remains pending until that workflow runs and its native worker succeeds.
+
+The fixture uses the NES inventory identity solely to satisfy the test-internal canonical-target schema; it is **not a NES core**, and its temporary test-only core ID is not included in source-pinned emulator recipes, normal registries or released hardware compatibility claims.

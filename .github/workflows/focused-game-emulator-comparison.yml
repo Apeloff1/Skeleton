@@ -29,6 +29,13 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11"
+      - name: Ensure sandbox tool for synthetic native host qualification
+        run: |
+          if ! command -v bwrap >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq bubblewrap
+          fi
+          command -v bwrap
       - name: Compile touched runtime modules and operator entry points
         run: |
           python -m compileall -q \
@@ -65,6 +72,7 @@ jobs:
             tests.test_game_comparison_boomerang \
             tests.test_game_comparison_multispectral \
             tests.test_game_emulator_homebrew_native_abi \
+            tests.test_game_emulator_homebrew_bwrap_host \
             tests.test_game_comparison_live_http \
             tests.test_game_comparison_raw_qualification_regression \
             tests.test_game_comparison_readiness \
