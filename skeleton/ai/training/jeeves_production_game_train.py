@@ -188,9 +188,15 @@ def _publish_new(path: Path, payload: bytes) -> None:
 def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           epochs: int, lr: float, min_coverage: float, max_domain_regression: float,
           expand_vocabulary: bool = False,
+          capacity_growth: str = "none",
+          max_added_parameters: int = 500000,
+          adaptive_replay: bool = False,
+          replay_examples: int = 64,
+          max_scored_examples: int = 128,
           max_optimizer_steps: int = 25000,
           max_training_seconds: int = 1200,
           dataset_manifest: Path | None = None,
+          training_view: str | None = None,
           progress_directory: Path | None = None,
           progress_run_id: str | None = None,
           resume: bool = False,
@@ -199,6 +205,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     from skeleton.cortex.transformer import TinyTransformer
     from skeleton.cortex.bpe import BytePairEncoder
 
+    if training_view is not None and training_view not in ("constructive", "adversarial"):
+        raise ValueError("training view must be constructive or adversarial")
+    if training_view is not None and dataset_manifest is None:
+        raise ProductionCheckpointError("mirror training requires rights-approved multidomain corpus")
     if type(resume) is not bool:
         raise ValueError("resume must be boolean")
     if (progress_directory is None) != (progress_run_id is None):
@@ -211,6 +221,20 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         raise ValueError("max_training_seconds must be an integer in [1, 86400]")
     if type(expand_vocabulary) is not bool:
         raise ValueError("expand_vocabulary must be boolean")
+    from .jeeves_capacity_growth import PROFILE_FACTORS
+    if capacity_growth not in PROFILE_FACTORS:
+        raise ValueError("unsupported Jeeves capacity growth profile")
+    if type(max_added_parameters) is not int or not 1 <= max_added_parameters <= 2000000:
+        raise ValueError("max_added_parameters must be a bounded positive integer")
+    if type(adaptive_replay) is not bool:
+        raise ValueError("adaptive_replay must be an explicit boolean")
+    if adaptive_replay and dataset_manifest is None:
+        raise ProductionCheckpointError("training-only capability replay requires approved external corpus")
+    if adaptive_replay and (
+            type(replay_examples) is not int or not 6 <= replay_examples <= 256 or
+            type(max_scored_examples) is not int or not 6 <= max_scored_examples <= 256 or
+            replay_examples > max_scored_examples):
+        raise ValueError("invalid capability-replay scoring or example budget")
     if type(epochs) is not int or not 1 <= epochs <= 3:
         raise ValueError("epochs must be 1..3")
     if type(lr) is not float or not math.isfinite(lr) or not 0 < lr <= 0.03:
@@ -251,8 +275,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "heldout_examples": sum(len(items) for items in heldout.values()),
         }
     else:
-        from .jeeves_game_corpus import load_approved_corpus
-        dataset, heldout, dataset_receipt = load_approved_corpus(dataset_manifest)
+        from .jeeves_multidomain import load_training_corpus
+        dataset, heldout, dataset_receipt = load_training_corpus(
+            dataset_manifest, training_view=training_view)
     if measured_examples:
         heldout_text = {line for cases in heldout.values() for line in cases}
         if heldout_text.intersection(measured_examples):
@@ -278,6 +303,12 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             raise ProductionCheckpointError("restored native embeddings differ from production checkpoint")
     if model.snapshot()["steps"] != original_snapshot["steps"]:
         raise ProductionCheckpointError("restored transformer training cursor mismatch")
+    if capacity_growth != "none" and not torch_stack:
+        raise ProductionCheckpointError(
+            "actual FFN parameter growth requires the attested torch-stack speaking model")
+    parent_parameter_count = (
+        sum(int(p.numel()) for p in model.net.parameters() if p.requires_grad)
+        if torch_stack else None)
     curriculum_and_eval = dataset + tuple(
         case for rows in heldout.values() for case in rows
     )
@@ -318,6 +349,18 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             f"production vocabulary coverage {vocab_coverage:.4f} < {min_coverage:.4f}; "
             "refusing ineffective UNK-token specialization"
         )
+    growth_receipt: dict[str, Any] | None = None
+    if torch_stack:
+        from .jeeves_capacity_growth import grow_feedforward
+        model, growth_receipt = grow_feedforward(
+            model, profile=capacity_growth,
+            max_added_parameters=max_added_parameters)
+    replay_receipt: dict[str, Any] | None = None
+    if adaptive_replay:
+        from .jeeves_capability_replay import schedule_capability_replay
+        dataset, replay_receipt = schedule_capability_replay(
+            model, dataset, max_examples=replay_examples,
+            max_scored_examples=max_scored_examples, deadline=deadline)
     before, sample_before = _heldout(model, heldout, deadline=deadline)
     steps_before = model.steps
     if torch_stack:
@@ -351,12 +394,20 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "dataset": list(dataset),
             "heldout": heldout,
             "dataset_receipt": dataset_receipt,
+            "training_view": training_view,
             "epochs": epochs,
             "learning_rate": lr,
             "max_optimizer_steps": max_optimizer_steps,
             "min_coverage": min_coverage,
             "max_domain_regression": max_domain_regression,
             "native_vocabulary_expansion": expand_vocabulary,
+            "capacity_growth": capacity_growth,
+            "max_added_parameters": max_added_parameters,
+            "capacity_growth_receipt": growth_receipt,
+            "adaptive_replay": adaptive_replay,
+            "capability_replay_receipt": replay_receipt,
+            "replay_examples": replay_examples,
+            "max_scored_examples": max_scored_examples,
             "active_model_key": selected_key,
             "architecture": "torch-stack" if torch_stack else "TinyTransformer",
             "expected_optimizer_updates": expected_steps,
@@ -442,6 +493,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "candidate_promoted": False,
         "curriculum_exposures_per_epoch": len(dataset),
         "dataset_receipt": dataset_receipt,
+        "training_view": training_view or "all",
         "built_in_smoke_curriculum_only": dataset_manifest is None and not measured_examples,
         "studio_corpus_sha256": studio_digest,
         "studio_replay_verified_examples": len(measured_examples),
@@ -460,6 +512,19 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "vocabulary_coverage": vocab_coverage,
         "vocabulary_expansion": expansion,
         "vocabulary_growth_opted_in": expand_vocabulary,
+        "capacity_growth_profile": capacity_growth,
+        "capacity_growth": growth_receipt,
+        "max_added_parameters": max_added_parameters,
+        "capability_replay_enabled": adaptive_replay,
+        "capability_replay": replay_receipt,
+        "parent_trainable_parameters": parent_parameter_count,
+        "candidate_trainable_parameters": (
+            sum(int(p.numel()) for p in model.net.parameters() if p.requires_grad)
+            if torch_stack else None),
+        "trainable_parameters_added_by_growth": (
+            growth_receipt["new_trainable_parameters"] if growth_receipt else 0),
+        "new_parameters_received_optimizer_updates": bool(
+            capacity_growth != "none" and observed_steps > 0),
         "parent_heldout_losses_before_vocabulary_growth": parent_heldout,
         "parent_generated_before_vocabulary_growth": parent_generations,
         "losses_across_changed_vocabulary_not_directly_comparable": bool(expansion and expansion["new_tokens"]),
@@ -510,6 +575,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-coverage", type=float, default=0.80)
     parser.add_argument("--expand-vocabulary", action="store_true",
                         help="explicitly add missing BPE pieces or Torch tokens to the cloned active production LM only")
+    parser.add_argument("--capacity-growth", choices=("none", "micro", "balanced", "large", "xlarge"),
+                        default="none", help="real Torch FFN trainable parameter growth, candidate-only")
+    parser.add_argument("--max-added-parameters", type=int, default=500000,
+                        help="hard cap on extra trainable candidate parameters")
+    parser.add_argument("--adaptive-replay", action="store_true",
+                        help="score and select source-approved weak and retention examples using TRAIN only")
+    parser.add_argument("--replay-examples", type=int, default=64)
+    parser.add_argument("--max-scored-examples", type=int, default=128)
     parser.add_argument("--max-domain-regression", type=float, default=0.0)
     args = parser.parse_args(argv)
     try:
@@ -518,6 +591,11 @@ def main(argv: list[str] | None = None) -> int:
                        min_coverage=args.min_coverage,
                        max_domain_regression=args.max_domain_regression,
                        expand_vocabulary=args.expand_vocabulary,
+                       capacity_growth=args.capacity_growth,
+                       max_added_parameters=args.max_added_parameters,
+                       adaptive_replay=args.adaptive_replay,
+                       replay_examples=args.replay_examples,
+                       max_scored_examples=args.max_scored_examples,
                        max_optimizer_steps=args.max_optimizer_steps,
                        max_training_seconds=args.max_training_seconds,
                        dataset_manifest=args.dataset_manifest,

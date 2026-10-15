@@ -1,4 +1,4 @@
-.PHONY: install dev app app-preload app-setup app-install windows-installer app-check app-status app-down test test-feature smoke verify quality ci lint clean
+.PHONY: install dev app app-preload app-setup app-install windows-installer app-check app-status app-down precompile precompile-full test test-feature smoke verify quality ci lint clean
 
 install:
 	pip install -r requirements.txt
@@ -23,6 +23,35 @@ windows-installer:
 
 app-check:
 	python -m skeleton app check
+
+# Read-only precompilation contract pass; not a compiled/runtime release verdict.
+# Keep execution local to avoid unnecessary GitHub Actions runs.
+precompile:
+	python scripts/check_architecture_map.py
+	python scripts/check_ai_app_construction.py
+	python scripts/check_capability_interfaces.py
+	python scripts/check_provider_bootstrap.py
+	python scripts/check_state_topology.py
+	python scripts/check_ai_file_tree.py
+	python scripts/check_ai_file_tree_ownership.py
+	python scripts/check_jeeves_training_modules.py
+	python -m skeleton app cinematic-sim --help
+	python -m skeleton app adaptive-sim --help
+	python -m skeleton app boomerang-queue --help
+	python -m skeleton.ai.training.jeeves_production_game_train --help
+	python -m skeleton.ai.training.jeeves_parallel_mirrors --help
+	python scripts/check_enterprise_ai_superiority.py --json
+	python scripts/check_enterprise_ai_implementation_notes.py --json
+	python scripts/check_app_assembly.py
+	python scripts/check_toolchain_contract.py
+	python -m skeleton app check
+
+# Compile and typecheck ALL assembled Python/TypeScript sources after local
+# toolchains are provisioned; this is not a substitute for an installed E2E.
+precompile-full: precompile
+	python -m compileall -q skeleton backend
+	cd frontend && yarn typecheck
+	cd frontend && yarn export:web
 
 app-status:
 	python -m skeleton app status

@@ -1,6 +1,15 @@
 name: Provider Surface Closure Gate
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/provider-surface-closure.yml"
+      - "backend/core/conversations.py"
+      - "backend/core/providers/**"
+      - "machine/ai_master_plan.json"
+      - "scripts/check_provider_surface_closure.py"
   workflow_dispatch:
 
 permissions:

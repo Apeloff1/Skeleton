@@ -34,7 +34,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: "3.14.7"
+  PYTHON_VERSION: "3.11"
 
 jobs:
   build-windows-installer:
@@ -67,6 +67,14 @@ jobs:
             /skeleton/
             /scripts/
             /packaging/
+            /machine/jeeves_training_modules.json
+            /machine/
+            /docs/
+            /.cursor/rules/architecture.mdc
+            /.github/copilot-instructions.md
+            /AGENTS.md
+            /CLAUDE.md
+            /GEMINI.md
 
       - name: Verify exact head provenance for Windows installer
         shell: pwsh
@@ -94,8 +102,8 @@ jobs:
         env:
           PYTHONPATH: "."
         run: |
-          python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic==2.13.5" "pydantic-settings==2.15.0"
-          python -m pytest -q skeleton/testing/test_windows_installer.py
+          python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2.14.0,<3" "pydantic-settings>=2.15.0,<3"
+          python -m pytest -q skeleton/testing/test_windows_installer.py skeleton/testing/test_jeeves_multidomain.py skeleton/testing/test_jeeves_cinematic_simulation.py skeleton/testing/test_jeeves_adaptive_sim_training.py skeleton/testing/test_jeeves_capacity_growth.py skeleton/testing/test_jeeves_capability_replay.py skeleton/testing/test_jeeves_boomerang_queue.py
 
       - name: Build installer
         shell: pwsh
@@ -162,6 +170,38 @@ jobs:
 
           # The command below performs actual bounded native transformer
           # inference inside the frozen executable. No Docker/credentials/GUI.
+          $catalogSmoke = Start-Process -FilePath $launcher -ArgumentList @("--training-modules") -Wait -PassThru
+          if ($catalogSmoke.ExitCode -ne 0) {
+            throw "installed executable Jeeves training catalogue failed its structural check"
+          }
+          $cinematicSmoke = Start-Process -FilePath $launcher -ArgumentList @("--cinematic-sim", "--help") -Wait -PassThru
+          if ($cinematicSmoke.ExitCode -ne 0) {
+            throw "installed cinematic simulation command failed to load"
+          }
+          $adaptiveSmoke = Start-Process -FilePath $launcher -ArgumentList @("--adaptive-sim", "--help") -Wait -PassThru
+          if ($adaptiveSmoke.ExitCode -ne 0) {
+            throw "installed Jeeves adaptive simulation route failed to load"
+          }
+          $boomerangSmoke = Start-Process -FilePath $launcher -ArgumentList @("--boomerang-queue", "--help") -Wait -PassThru
+          if ($boomerangSmoke.ExitCode -ne 0) {
+            throw "installed Jeeves boomerang queue CLI failed to load"
+          }
+          # Exercise actual installed frozen executable against all mandatory
+          # shipped application files, without relying on Docker Desktop on CI.
+          $payloadSmoke = Start-Process -FilePath $launcher -ArgumentList @("--verify-payload") -Wait -PassThru
+          if ($payloadSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe runtime payload preflight exited $($payloadSmoke.ExitCode)"
+          }
+
+          $offlineConsole = Join-Path $installDir "SkeletonOffline.exe"
+          if (-not (Test-Path -LiteralPath $offlineConsole)) {
+            throw "installed SkeletonOffline.exe missing"
+          }
+          $offlineHelp = Start-Process -FilePath $offlineConsole -ArgumentList @("--help") -Wait -PassThru
+          if ($offlineHelp.ExitCode -ne 0) {
+            throw "installed SkeletonOffline.exe help smoke exited $($offlineHelp.ExitCode)"
+          }
+
           $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru
           if ($nativeSmoke.ExitCode -ne 0) {
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"

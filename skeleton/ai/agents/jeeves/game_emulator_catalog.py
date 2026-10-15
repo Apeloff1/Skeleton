@@ -353,6 +353,30 @@ _CORE_TARGET_GROUPS = {
         "windows_me",
     ),
     "dosbox_svn": ("dos_8086", "dos_vga", "dos_cga", "dos_ega", "dos_vesa", "windows_31"),
+    "gearboy": ("game_boy", "game_boy_color", "game_boy_pocket", "game_boy_light"),
+    "gearsystem": ("master_system", "sega_mark_iii", "sega_sg1000", "game_gear"),
+    "gpsp": ("game_boy_advance", "game_boy_micro", "game_boy_player"),
+    "mednafen_psx": ("ps1",),
+    "snes9x2005": ("snes",),
+    "snes9x2010": ("snes",),
+    "mednafen_supafaust": ("snes",),
+    "blastem": ("genesis",),
+    "snes9x2002": ("snes",),
+    "smsplus_gx": ("master_system", "sega_mark_iii", "sega_sg1000", "game_gear"),
+    "tgbdual": ("game_boy", "game_boy_color", "game_boy_pocket", "game_boy_light"),
+    "mednafen_lynx": ("lynx",),
+    "meteor": ("game_boy_advance", "game_boy_micro", "game_boy_player"),
+    "mame2003_plus": ("neo_geo",),
+    "genesis_plus_gx_wide": ("genesis",),
+    "mesen_s": ("snes",),
+    "bnes": ("nes",),
+    "bsnes_mercury_accuracy": ("snes",),
+    "bsnes_mercury_balanced": ("snes",),
+    "bsnes_mercury_performance": ("snes",),
+    "mame2003": ("neo_geo",),
+    "mame2016": ("neo_geo", "fairchild_channel_f", "rca_studio_ii", "bally_astrocade", "apple_ii", "apple_iigs", "bbc_micro", "acorn_electron", "trs80_model_i", "ti_99_4a", "oric_atmos", "fm_towns", "philips_cdi"),
+    "fbalpha2012_neogeo": ("neo_geo",),
+    "dosbox_core": ("dos_8086", "dos_vga", "dos_cga", "dos_ega", "dos_vesa", "windows_31"),
     "mame": (
         "fairchild_channel_f",
         "rca_studio_ii",
@@ -374,6 +398,24 @@ _CORE_TARGET_GROUPS = {
 # declarations. The worker validates its actual loaded implementation again.
 # Unsafe archive containers and DSi-specific content are intentionally excluded.
 _CORE_CONTENT_EXTENSIONS = {
+    # Extension hints are grounded in the pinned libretro system-info sources.
+    # These DO NOT activate a core or bypass the worker's live extension check.
+    "nestopia": "nes|unf|unif",
+    "sameboy": "gb|gbc",
+    "vba_next": "gba",
+    "a5200": "a52|bin",
+    "vice_x64sc": "d64|d71|d80|d81|d82|g64|g41|x64|t64|tap|prg|p00|crt|bin|cmd|m3u|vfl|vsf|rom",
+    "vice_x128": "d64|d71|d81|g64|x64|t64|tap|prg|p00|crt|bin|cmd|m3u",
+    "vice_xvic": "d64|t64|tap|prg|p00|crt|bin|cmd|m3u|rom",
+    "vice_xplus4": "d64|d81|t64|tap|prg|p00|crt|bin|cmd|m3u|rom",
+    "vice_xpet": "d64|t64|tap|prg|p00|bin|cmd|m3u|rom",
+    "mesen": "nes|unf|unif",
+    "bluemsx": "rom|ri|mx1|mx2|dsk|col|sg|sc|sf|cas|m3u",
+    "fmsx": "rom|mx1|mx2|dsk|fdi|cas|m3u",
+    "vice_x64": "d64|d71|d80|d81|d82|g64|g41|x64|t64|tap|prg|p00|crt|bin|cmd|m3u|vfl|vsf|rom",
+    "px68k": "dim|img|d88|88d|hdm|dup|2hd|xdf|hdf|cmd|m3u",
+    "quasi88": "d88|m3u|t88|cmt",
+    "mednafen_saturn": "cue|ccd|chd|toc|m3u",
     "stella2014": "a26|bin|mvc",
     "prosystem": "a78|bin|cdf",
     "handy": "lnx|lyx|o",
@@ -400,6 +442,38 @@ _CORE_CONTENT_EXTENSIONS = {
     "fbneo": "zip|cue|chd",
     "ppsspp": "elf|iso|cso|prx|pbp|chd",
     "flycast": "chd|cdi|elf|cue|gdi|lst|bin|dat|m3u",
+    "bsnes": "sfc|smc|fig|swc|bs",
+    "puae": "adf|adz|dms|fdi|ipf|hdf|hdz|m3u",
+    "np2kai": "d88|d98|fdi|hdm|nfd|nhd|hdi|hdd|m3u",
+    "dosbox_svn": "exe|com|bat|conf|iso|cue|img|ima",
+    "yabause": "cue|iso|ccd|mds|chd|m3u",
+    "hatari": "st|msa|stx|dim|ipf|m3u",
+    "swanstation": "cue|bin|img|chd|pbp|m3u|iso",
+    "mupen64plus_next": "n64|v64|z64|bin",
+    "bnes": "nes|unf|unif",
+    "bsnes_mercury_accuracy": "sfc|smc|fig|swc",
+    "bsnes_mercury_balanced": "sfc|smc|fig|swc",
+    "bsnes_mercury_performance": "sfc|smc|fig|swc",
+    "mame2003": "zip",
+    "mame2016": "zip",
+    "fbalpha2012_neogeo": "zip",
+    "dosbox_core": "exe|com|bat|conf|img|iso|cue|ima",
+    "snes9x2002": "sfc|smc|fig|swc",
+    "smsplus_gx": "sms|gg|sg|bin|rom",
+    "tgbdual": "gb|gbc",
+    "mednafen_lynx": "lnx|lyx|o",
+    "meteor": "gba",
+    "mame2003_plus": "zip",
+    "genesis_plus_gx_wide": "bin|gen|md|smd",
+    "mesen_s": "sfc|smc|fig|swc",
+    "gearboy": "gb|gbc|dmg|sgb",
+    "gearsystem": "sms|gg|sg|bin|rom",
+    "gpsp": "gba|bin",
+    "mednafen_psx": "cue|ccd|chd|toc|m3u",
+    "snes9x2005": "sfc|smc|fig|swc",
+    "snes9x2010": "sfc|smc|fig|swc",
+    "mednafen_supafaust": "sfc|smc|fig|swc",
+    "blastem": "md|bin|gen|smd",
 }
 
 
@@ -1332,13 +1406,13 @@ def load_game_content_for_core(
     expected_source_digest: str | None = None,
     registry: GameEmulatorRegistry | None = None,
 ) -> GameContentBundle:
-    """Keep native DOS/arcade ZIPs intact after bounded actual archive inspection.
+    """Keep explicitly authorized native DOS/arcade ZIPs intact after bounded archive inspection.
 
     The worker must also verify its actual ``block_extract`` declaration. This
     source admission does not infer game compatibility or execute archived code.
     """
     (registry or GameEmulatorRegistry.from_environment()).revalidate(core)
-    if core.core_id not in {"dosbox_pure", "fbneo"}:
+    if core.core_id not in {"dosbox_pure", "fbneo", "mame2003_plus", "mame2003", "mame2016", "fbalpha2012_neogeo"}:
         return load_game_content(
             data, filename, entrypoint=entrypoint, expected_source_digest=expected_source_digest
         )

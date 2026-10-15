@@ -18,8 +18,8 @@ $LauncherDist = "$ShortDrive\launcher-dist"
 $LauncherWork = "$ShortDrive\launcher-work"
 $LauncherSpec = "$ShortDrive\launcher-spec"
 $ArchivePath = "$ShortDrive\source.zip"
-$EntryPoint = Join-Path $RepoRoot "packaging\windows\launcher_entry.py"
-$InstallerScript = Join-Path $RepoRoot "packaging\windows\SkeletonSetup.iss"
+# The compiled entrypoints and installer recipe must come from the archived
+# SourceRef, not potentially divergent files in the working checkout.
 
 if (-not $Version) {
     $PyProject = Get-Content -Raw -LiteralPath $PyProjectPath
@@ -50,9 +50,22 @@ if (Test-Path $ShortDrive) {
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ShortDrive)) {
     throw "Unable to create short Windows build drive $ShortDrive"
 }
+# Only clean up a drive mapping after the successful SUBST above. A global
+# trap can also catch failures before SUBST (including a user-owned W: drive).
+try {
 New-Item -ItemType Directory -Force -Path $PayloadDir, $LauncherDist, $LauncherWork, $LauncherSpec | Out-Null
 
 Write-Host "==> Staging curated application payload from $SourceRef via $ShortDrive"
+# Read the assembly contract from the exact archived ref. All declared required
+# paths must be carried into the installable payload, not just the five services.
+$SourceManifestText = & git -C $RepoRoot show "$($SourceRef):skeleton/app/manifest.json"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to load application assembly manifest from SourceRef $SourceRef"
+}
+$SourceManifest = ($SourceManifestText -join "`n") | ConvertFrom-Json
+if (-not $SourceManifest.required_paths) {
+    throw "Archived application manifest has no required_paths"
+}
 $RuntimePaths = @(
     ".dockerignore",
     ".env.example",
@@ -67,12 +80,39 @@ $RuntimePaths = @(
     "skeleton",
     "scripts",
     "packaging",
+    # The governance/build configuration is consumed by several application
+    # subsystems after installation, not just at Docker image build time.
+    # This source tree contains no paths over the portable 190-char budget.
+    "machine",
+    # The installed launcher runs the same assembly preflight as the checkout.
+    # Include every otherwise-unbundled manifest requirement and every root/
+    # backend Dockerfile COPY input. Missing inputs make the first install fail
+    # before Docker can build the services.
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+    ".cursor/rules/architecture.mdc",
+    "docs/ARCHITECTURE_MAP.md",
+    "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "machine/manifest.json",
+    "machine/architecture.json",
+    "machine/ai_app_construction.json",
+    "machine/capability_interfaces.json",
+    "machine/state_topology.json",
+    "machine/ai_capabilities.json",
+    "machine/ai_runtime_schemas.json",
+    "machine/ai_implementation_handoff.json",
+    "machine/ai_closure_evidence.json",
+    "machine/enterprise_ai_superiority.json",
+    "machine/enterprise_ai_implementation_notes_index.json",
     # Historical MasterMap progression snapshots are repository evidence, not
     # runtime inputs. Some intentionally verbose names breach Win32's legacy
     # destination-path boundary when installed under a normal user profile.
     ":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json",
     ":(exclude)skeleton/ai/research/legacy/gameforge/jeeves/jeeves_mastermap_*.json"
-)
+) + @($SourceManifest.required_paths)
+$RuntimePaths = @($RuntimePaths | Select-Object -Unique)
 $ArchiveArgs = @(
     "-C", $RepoRoot,
     "archive",
@@ -86,6 +126,60 @@ if ($LASTEXITCODE -ne 0) {
     throw "git archive failed"
 }
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
+
+foreach ($RequiredPath in $SourceManifest.required_paths) {
+    $StagedPath = Join-Path $PayloadDir $RequiredPath
+    if (-not (Test-Path -LiteralPath $StagedPath -PathType Leaf)) {
+        throw "Windows payload missing required assembly path: $RequiredPath"
+    }
+}
+
+$EntryPoint = Join-Path $PayloadDir "packaging\windows\launcher_entry.py"
+$ConsoleEntryPoint = Join-Path $PayloadDir "packaging\windows\offline_cli_entry.py"
+$InstallerScript = Join-Path $PayloadDir "packaging\windows\SkeletonSetup.iss"
+foreach ($RequiredSource in @($EntryPoint, $ConsoleEntryPoint, $InstallerScript)) {
+    if (-not (Test-Path -LiteralPath $RequiredSource -PathType Leaf)) {
+        throw "Staged installer source missing: $RequiredSource"
+    }
+}
+$StagedPyProject = Get-Content -Raw -LiteralPath (Join-Path $PayloadDir "pyproject.toml")
+if ($StagedPyProject -notmatch '(?ms)^\[project\].*?^version\s*=\s*"([^"]+)"') {
+    throw "Staged pyproject.toml has no project version"
+}
+if ($Matches[1] -ne $Version) {
+    throw "Installer version does not match archived SourceRef: $Version versus $($Matches[1])"
+}
+Write-Host "Archived source version verified: $Version"
+
+# Fail before PyInstaller/Inno Setup if the packaged checkout cannot pass the
+# very same file preflight that Skeleton.exe uses on first launch.
+$PayloadManifestPath = Join-Path $PayloadDir "skeleton\app\manifest.json"
+if (-not (Test-Path -LiteralPath $PayloadManifestPath)) {
+    throw "Staged application manifest is missing: $PayloadManifestPath"
+}
+$PayloadManifest = Get-Content -Raw -LiteralPath $PayloadManifestPath | ConvertFrom-Json
+$RequiredPayloadPaths = @($PayloadManifest.required_paths)
+# Docker COPY inputs are not all named in the assembly manifest. Validate the
+# root and backend Dockerfiles' explicit machine/docs inputs as well.
+foreach ($Dockerfile in @("Dockerfile", "backend\Dockerfile")) {
+    $DockerPath = Join-Path $PayloadDir $Dockerfile
+    if (-not (Test-Path -LiteralPath $DockerPath)) {
+        throw "Staged Dockerfile is missing: $Dockerfile"
+    }
+    foreach ($Line in (Get-Content -LiteralPath $DockerPath)) {
+        if ($Line -match '^\s*COPY\s+.*?\s((?:machine|docs)/[^\s]+)\s') {
+            $RequiredPayloadPaths += $Matches[1]
+        }
+    }
+}
+$MissingPayloadPaths = @(
+    $RequiredPayloadPaths | Sort-Object -Unique | Where-Object {
+        -not (Test-Path -LiteralPath (Join-Path $PayloadDir $_))
+    }
+)
+if ($MissingPayloadPaths.Count -gt 0) {
+    throw ("Windows payload lacks required app/Docker inputs: " + ($MissingPayloadPaths -join ", "))
+}
 
 # Keep the installed runtime portable across ordinary Windows user-profile
 # paths. This is checked before compilation so path regressions fail cheaply
@@ -113,7 +207,7 @@ if ($PathBudgetViolations.Count -gt 0) {
 }
 
 Write-Host "==> Building standalone Skeleton.exe"
-& python -m pip install --disable-pip-version-check --no-input "pyinstaller==6.22.3" "pydantic==2.13.5" "pydantic-settings==2.15.0"
+& python -m pip install --disable-pip-version-check --no-input "pyinstaller==6.22.3" "pydantic>=2.14.0,<3" "pydantic-settings>=2.15.0,<3"
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller/runtime dependency installation failed"
 }
@@ -128,7 +222,7 @@ $PyInstallerArgs = @(
     "--distpath", $LauncherDist,
     "--workpath", $LauncherWork,
     "--specpath", $LauncherSpec,
-    "--paths", $RepoRoot,
+    "--paths", $PayloadDir,
     "--collect-data", "skeleton.app",
     "--hidden-import", "skeleton.app.health",
     "--hidden-import", "skeleton.app.installer",
@@ -151,6 +245,13 @@ $PyInstallerArgs = @(
     "--hidden-import", "skeleton.app.offline_workspace",
     "--hidden-import", "skeleton.app.offline_audit",
     "--hidden-import", "skeleton.app.offline_readiness",
+    "--hidden-import", "skeleton.ai.training.jeeves_multidomain",
+    "--hidden-import", "skeleton.ai.training.jeeves_parallel_mirrors",
+    "--hidden-import", "skeleton.ai.training.jeeves_capacity_growth",
+    "--hidden-import", "skeleton.ai.training.jeeves_capability_replay",
+    "--hidden-import", "skeleton.ai.training.jeeves_cinematic_simulation",
+    "--hidden-import", "skeleton.ai.training.jeeves_adaptive_sim_training",
+    "--hidden-import", "skeleton.ai.training.jeeves_boomerang_queue",
     "--hidden-import", "skeleton.app.offline_index_queue",
     "--hidden-import", "skeleton.app.offline_http",
     "--hidden-import", "skeleton.app.offline_knowledge",
@@ -171,6 +272,11 @@ $PyInstallerArgs = @(
     "--hidden-import", "tkinter",
     $EntryPoint
 )
+# Force both freezes to resolve first-party modules from the staged revision.
+$PreviousPythonPath = $env:PYTHONPATH
+$env:PYTHONPATH = $PayloadDir
+Push-Location -LiteralPath $PayloadDir
+try {
 & python @PyInstallerArgs
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller launcher build failed"
@@ -193,7 +299,7 @@ if ($WindowFlagIndex -lt 0 -or $ConsoleNameIndex -lt 0 -or $ConsoleEntryIndex -l
 }
 $ConsoleArgs[$WindowFlagIndex] = "--console"
 $ConsoleArgs[$ConsoleNameIndex] = "SkeletonOffline"
-$ConsoleArgs[$ConsoleEntryIndex] = Join-Path $RepoRoot "packaging\windows\offline_cli_entry.py"
+$ConsoleArgs[$ConsoleEntryIndex] = $ConsoleEntryPoint
 & python @ConsoleArgs
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller offline console build failed"
@@ -203,6 +309,10 @@ if (-not (Test-Path -LiteralPath $ConsoleExe)) {
     throw "Expected offline console not found: $ConsoleExe"
 }
 Copy-Item -LiteralPath $ConsoleExe -Destination (Join-Path $PayloadDir "SkeletonOffline.exe") -Force
+} finally {
+    Pop-Location
+    $env:PYTHONPATH = $PreviousPythonPath
+}
 
 
 $CompilerCandidates = @(
@@ -246,4 +356,7 @@ Write-Host "Windows installer built successfully:"
 Write-Host "  $($Installer.FullName)"
 Write-Host "  SHA256 $($Hash.Hash)"
 
-& subst $ShortDrive /D
+}
+finally {
+    & subst $ShortDrive /D | Out-Null
+}

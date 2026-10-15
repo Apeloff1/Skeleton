@@ -33,6 +33,7 @@ from typing import Any
 from uuid import uuid4
 
 from .game_learning import (
+    MAX_LIFETIME_EPISODES,
     GameLearningCancelled,
     GameLearningError,
     GamePolicyLearner,
@@ -90,7 +91,7 @@ class GameEnvironmentRequest:
         _int(self.max_steps, "environment episode steps", 1, 4096)
         _int(self.cycles_per_step, "ROM cycles per step", 4, 140448)
         _int(self.frames_per_step, "emulator frames per step", 1, 16)
-        if self.kind not in ("builtin", "libretro", "console_editor", "successor", "studio"):
+        if self.kind not in ("builtin", "libretro", "console_editor", "successor", "studio", "studio_rules"):
             raise GameLearningError("environment request kind is undeclared")
         if (
             isinstance(self.emulator_timeout_seconds, bool)
@@ -121,7 +122,7 @@ class GameEnvironmentRequest:
                 raise GameLearningError("emulator request needs exactly one admitted content source")
         elif any(value is not None for value in (self.core_id, self.registry_digest, self.content)):
             raise GameLearningError("builtin request cannot carry an emulator registry or content descriptor")
-        if self.kind in ("console_editor", "successor", "studio") and (
+        if self.kind in ("console_editor", "successor", "studio", "studio_rules") and (
             self.tree is None or self.rom_source is not None or self.gameplay_dialect is not None
         ):
             raise GameLearningError("authored environment needs an exact file tree without ROM or dialect")
@@ -131,6 +132,16 @@ class GameEnvironmentRequest:
             or set(self.tree) != {"game/studio/session.json"}
         ):
             raise GameLearningError("studio learning requires an exact source-bound engine tree")
+        if self.kind == "studio_rules" and (
+            not self.target_id.startswith("studio-rules:")
+            or self.tree is None
+            or set(self.tree) != {"game/studio/rule_curriculum.json"}
+            or len(self.tree["game/studio/rule_curriculum.json"].encode("utf-8")) > 192000
+            or self.max_steps > 128
+        ):
+            raise GameLearningError(
+                "AI rules environment requires one bounded source-bound curriculum tree"
+            )
         _name(self.filename, "emulator content filename")
         if self.gameplay_dialect is not None:
             _name(self.gameplay_dialect, "environment gameplay dialect")
@@ -210,6 +221,33 @@ class GameEnvironmentRequest:
             return EditorSimulationEnvironment(
                 ConsoleProject.from_files(self.tree, target_id=self.target_id), max_steps=self.max_steps
             )
+        if self.kind == "studio_rules":
+            from .game_studio_rule_curriculum import (
+                RuleCurriculumEnvironment, verify_rule_curriculum,
+            )
+
+            def pairs(rows):
+                output = {}
+                for key, value in rows:
+                    if key in output:
+                        raise GameLearningError("duplicated authored scenario key")
+                    output[key] = value
+                return output
+
+            raw = self.tree["game/studio/rule_curriculum.json"]
+            try:
+                document = json.loads(
+                    raw, object_pairs_hook=pairs,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        GameLearningError("nonfinite AI game-rule number")),
+                )
+            except (ValueError, UnicodeError, RecursionError) as exc:
+                raise GameLearningError("invalid finite original game-rule source") from exc
+            plan = verify_rule_curriculum(document)
+            if (self.target_id != "studio-rules:" + plan["base_source"]["editor"]
+                    or self.max_steps != plan["max_steps"]):
+                raise GameLearningError("AI rule scenario target or max-step identity changed")
+            return RuleCurriculumEnvironment(plan)
         if self.kind == "studio":
             from .game_studio_environment import create_studio_game_environment
 
@@ -284,6 +322,7 @@ def _implementation() -> str:
         Path(__file__).with_name("game_learning.py"),
         Path(__file__).with_name("game_learning_demonstrations.py"),
         Path(__file__).with_name("game_studio_environment.py"),
+        Path(__file__).with_name("game_studio_rule_curriculum.py"),
     ]
     return _digest(
         {
@@ -930,7 +969,7 @@ class ParallelGamePolicyTrainer:
         current = self.learner.snapshot()
         if (
             current["committed_episodes"] + count > self.learner.config.max_episodes
-            or len(current["inherited_episodes"]) + current["committed_episodes"] + count > 1024
+            or len(current["inherited_episodes"]) + current["committed_episodes"] + count > MAX_LIFETIME_EPISODES
         ):
             raise GameLearningError("parallel requested work exceeds cumulative episode budgets")
         initial_updates = current["committed_updates"]

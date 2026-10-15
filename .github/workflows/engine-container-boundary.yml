@@ -20,6 +20,8 @@ on:
       - "skeleton/testing/live_engine_process_app.py"
       - "scripts/check_engine_container_boundary.py"
       - "scripts/verify_engine_application_boundary_closure.py"
+      - "scripts/check_engine_container_boundary.py"
+      - "tests/test_engine_container_boundary_context.py"
       - "tests/test_engine_application_boundary_independent_verifier.py"
       - "machine/ai_app_construction.json"
       - "machine/ai_implementation_handoff.json"
@@ -79,6 +81,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           tests/test_engine_application_boundary_independent_verifier.py
+          tests/test_engine_container_boundary_context.py
 
       - name: Emit exact-head Stage-5 closure receipt
         env:
@@ -178,6 +181,39 @@ jobs:
 
           print("Stage-5 closure contract is internally consistent")
           PY
+
+      - name: Initialize isolated engine-test secret material
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Never weaken Compose required-variable checks or commit fallback
+          # credentials. Each ephemeral CI job receives independent test-only
+          # signing, authentication and encryption material.
+          python - <<'PY'
+          import os
+          import secrets
+
+          required = (
+              "GF_SEAL_SECRET",
+              "GF_KEYHOLDER_SEED",
+              "GAMEFORGE_JWT_SECRET",
+              "SKELETON_MASTER_SECRET",
+          )
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as target:
+              for name in required:
+                  value = secrets.token_hex(32)
+                  # GITHUB_ENV values are injected into later workflow steps.
+                  # Mask before injection so the runner's environment/step
+                  # dumps cannot expose live, albeit CI-only, credentials.
+                  print(f"::add-mask::{value}")
+                  target.write(f"{name}={value}\n")
+          print(f"Initialized {len(required)} ephemeral test secret identities")
+          PY
+
+      - name: Validate isolated test Compose environment
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml config --quiet
 
       - name: Build and start canonical engine topology
         run: |

@@ -17,6 +17,14 @@ AUTOMATION_MAIN_ONLY_EXCLUSION_RE = re.compile(
 )
 DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
 QUEUE_DRAIN_WORKFLOW = "queue-drain.yml"
+# These listeners deliberately admit only default-branch producer completions
+# to avoid high-volume skipped Actions runs on every PR branch. The job guards
+# must independently verify both the same-repository producer and main.
+DEFAULT_BRANCH_CONSUMERS = {
+    "branch-clean.yml",
+    "idle-studio.yml",
+    "p2-ci-qualification.yml",
+}
 REPAIR_WORKFLOW = "repair-intake.yml"
 IDLE_WORKFLOW = "idle-studio.yml"
 QUEUE_DEFAULT_BRANCH_GUARD = (
@@ -82,6 +90,24 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             ]
             automation_main_only_exclusion = ignored == ["main"]
 
+    # Only explicitly reviewed default-branch consumers may filter
+    # workflow_run at the trigger. Never generalize this exemption to
+    # identity-sensitive PR automation/repair flows.
+    guarded_job = re.search(
+        r"(?m)^    if:\s*>-\s*$\n(?P<body>(?:      .*\n)+)", text
+    )
+    job_condition = guarded_job.group("body") if guarded_job else ""
+    default_branch_only = (
+        path_name in DEFAULT_BRANCH_CONSUMERS
+        and "branches: [main]" in workflow_run_block
+        and "github.event.workflow_run.head_repository.full_name == github.repository" in job_condition
+        and (
+            "github.event.workflow_run.head_branch == github.event.repository.default_branch"
+            in job_condition
+            or "github.event.workflow_run.head_branch == 'main'" in job_condition
+        )
+    )
+
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
         and "branches: [main]" in workflow_run_block
@@ -98,6 +124,7 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
         not has_all_branch_globs
         and not automation_main_only_exclusion
         and not queue_default_branch_only
+        and not default_branch_only
     ):
         findings.append(
             f"{path_name}: workflow_run consumers must match every completing head "

@@ -1,6 +1,14 @@
 name: P1 Scope Freeze Gate
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/p1-scope-freeze.yml"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
   workflow_dispatch:
 
 permissions:

@@ -137,6 +137,61 @@ def _exception_errors(record_id: str, exc: object) -> list[str]:
     return errors
 
 
+SECURITY_CANDIDATE = ROOT / "machine" / "ai_security_governance_gapfill_candidate.json"
+
+
+def _historical_wave4_verification_pending_independent_scope(
+    volume: dict, record: dict, candidate: dict
+) -> bool:
+    """Recognize a signed legacy result without upgrading independent closure.
+
+    Historical wave-4 organ tests were signed at an earlier exact head. That
+    evidence is immutable, but is narrower than the subsequently required
+    cross-plane security-governance candidate. Never erase the older signed
+    verification or treat it as proof of the pending expanded acceptance.
+    """
+    expected = {
+        "VOL-166", "VOL-167", "VOL-169", "VOL-172", "VOL-173",
+        "VOL-174", "VOL-175", "VOL-176", "VOL-177", "VOL-178",
+    }
+    state = candidate.get("promotion_state")
+    if (
+        candidate.get("schema_version") != "skeleton.ai.security_governance_gapfill_candidate.v1"
+        or candidate.get("status") != "implementation_candidate"
+        or set(candidate.get("volume_refs", ())) != expected
+        or not isinstance(state, dict)
+        or any(state.get(flag) is not False for flag in (
+            "completion_checkbox", "implementation_signed",
+            "verification_signed", "may_self_close", "production_authority",
+        ))
+        or volume.get("key") not in expected
+        or volume.get("implementation_status") != "implemented"
+        or volume.get("completion_checkbox") is not False
+        or volume.get("completion_checkbox_mark") != "[ ]"
+        or not volume.get("gaps")
+        or record.get("id") != "ACC-" + volume["key"]
+        or record.get("status") != "verified"
+        or record.get("checkbox") is not True
+        or record.get("checkbox_mark") != "[x]"
+    ):
+        return False
+    impl, verified = record.get("implementation_signoff"), record.get("verification_signoff")
+    history = record.get("history")
+    return (
+        isinstance(impl, dict)
+        and isinstance(verified, dict)
+        and impl.get("signed") is True
+        and verified.get("signed") is True
+        and impl.get("signer_id") != verified.get("signer_id")
+        and "wave-4" in str(verified.get("statement", "")).lower()
+        and isinstance(history, list)
+        and bool(history)
+        and history[-1].get("to_status") == "verified"
+        and bool(record.get("evidence"))
+        and bool(record.get("completed_at_utc"))
+    )
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     for path in (LEDGER, HUMAN, MASTER, QUEUE, P1, CATALOG, PRIORITY):
@@ -157,6 +212,14 @@ def validate() -> list[str]:
     p1 = json.loads(P1.read_text(encoding="utf-8"))
     catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     priority = json.loads(PRIORITY.read_text(encoding="utf-8"))
+    # Historical accountability is not rewritten when an independent
+    # expanded verification scope is opened. The candidate gate separately
+    # validates the pending exact-head security/AI mirror obligations.
+    try:
+        security_candidate = json.loads(SECURITY_CANDIDATE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        security_candidate = {}
+        errors.append("independent security candidate registry unavailable")
     records = ledger.get("records")
     if not isinstance(records, list):
         return ["ledger.records must be a list"]
@@ -344,9 +407,15 @@ def validate() -> list[str]:
             continue
         if volume.get("signing_required") is not True:
             errors.append(f"{volume['key']}: signing_required must be true")
-        if str(volume.get("implementation_status", "")).lower() != str(rec.get("status", "")).lower():
+        # Different verification scopes must not be conflated: wave-4 is
+        # already signed in this immutable historical ledger; independent
+        # security gap-fill is explicitly not yet verified in the masterplan.
+        legacy_scope = _historical_wave4_verification_pending_independent_scope(
+            volume, rec, security_candidate
+        )
+        if str(volume.get("implementation_status", "")).lower() != str(rec.get("status", "")).lower() and not legacy_scope:
             errors.append(f"{volume['key']}: volume implementation_status disagrees with accountability ledger")
-        if volume.get("completion_checkbox") != rec.get("checkbox"):
+        if volume.get("completion_checkbox") != rec.get("checkbox") and not legacy_scope:
             errors.append(f"{volume['key']}: volume checkbox disagrees with ledger")
 
     for entry in catalog["entries"]:

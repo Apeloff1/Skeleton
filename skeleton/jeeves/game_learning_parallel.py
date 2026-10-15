@@ -33,6 +33,7 @@ from typing import Any
 from uuid import uuid4
 
 from .game_learning import (
+    MAX_LIFETIME_EPISODES,
     GameLearningCancelled,
     GameLearningError,
     GamePolicyLearner,
@@ -968,7 +969,7 @@ class ParallelGamePolicyTrainer:
         current = self.learner.snapshot()
         if (
             current["committed_episodes"] + count > self.learner.config.max_episodes
-            or len(current["inherited_episodes"]) + current["committed_episodes"] + count > 1024
+            or len(current["inherited_episodes"]) + current["committed_episodes"] + count > MAX_LIFETIME_EPISODES
         ):
             raise GameLearningError("parallel requested work exceeds cumulative episode budgets")
         initial_updates = current["committed_updates"]
