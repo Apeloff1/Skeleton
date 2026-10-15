@@ -1,0 +1,90 @@
+{
+  "schema_version": "skeleton.ai.game_emulator_training_lab.v1",
+  "status": "implementation_candidate_not_executed",
+  "physical_owner": "skeleton/jeeves/game_emulator_training_lab.py",
+  "governed_mirror": "skeleton/ai/agents/jeeves/game_emulator_training_lab.py",
+  "operator_entrypoint": "python -m skeleton.jeeves.game_learning_cli train-emulator-deep",
+  "source_authority": "Only a typed source-bound GameEnvironmentRequest using installed-libretro or original in-process DMG ROM is eligible; explicit operator assertion of rights required; no forged human demonstration issuer",
+  "application_scope": "Runs actual emulator steps, audits reversibility, and only then commits real tabular Q-learning updates",
+  "physical_channels": [
+    "screen_mean",
+    "visual_change",
+    "audio_rms",
+    "step_fraction",
+    "frame_entropy",
+    "luma_contrast",
+    "spatial_edges",
+    "color_saturation",
+    "color_bias",
+    "audio_peak",
+    "audio_zero_crossing",
+    "stereo_difference"
+  ],
+  "angles": [
+    "exploration",
+    "policy",
+    "adversarial",
+    "temporal",
+    "boundary",
+    "recovery",
+    "perturbation",
+    "causal",
+    "reversal",
+    "boomerang"
+  ],
+  "counterfactual_execution": "Saved emulator state -> actual alternative action -> measured reward/frame -> restore original; cannot train from unrecorded hypothetical transition",
+  "multi_controller": "Explicit alternate combined buttons, two-port and four-port actual libretro input_step probes, read-only measurements; marked controller-only and excluded from Q policy updates",
+  "reverse_evidence": "For every run record multiple actual state snapshots; replay each suffix in reverse checkpoint order; require exact per-transition observation/reward/native evidence and final snapshot identity prior to training",
+  "boomerang": "Randomized seeded intervals and reservoir-preserved older runs; recreate approved host and replay saved original actual-state traces. Revisits never count as newly learned episodes or Q updates.",
+  "scrutiny_controls": [
+    "core_and_content_spec_identity",
+    "rights_authority_declared",
+    "exact_initial_snapshot_recorded",
+    "trace_sha256_validated",
+    "native_action_schema_verified",
+    "finite_measured_reward",
+    "frame_digests_grounded",
+    "observed_steps_accounted",
+    "reverse_checkpoint_replays_verified",
+    "unmodified_final_native_state"
+  ],
+  "saturation": "After at least 10 consecutive source-executed runs showing no new visual state signatures, terminate with visual_novelty_saturated; do not assert neural convergence, game mastery, or no possible further learning.",
+  "bounded_resources": {
+    "runs_max": 256,
+    "steps_per_run_max": 128,
+    "total_actual_training_steps_max": 8192,
+    "reverse_checkpoint_stride_min": 1,
+    "reverse_checkpoint_stride_max": 32,
+    "counterfactual_action_branches_max": 8,
+    "boomerang_retained_max": 8,
+    "heldout_episodes_max": 8,
+    "native_spatial_samples_per_frame_max": 4096,
+    "native_audio_pairs_per_frame_max": 4096
+  },
+  "model_training": {
+    "algorithm": "existing measured tabular Q-policy updates only",
+    "real_q_updates": "per-run measured counters",
+    "neural_candidate_data": "source-bound trace transitions, numeric observations and rewards; heldout excluded",
+    "actual_neural_parameter_updates": 0,
+    "production_weight_promotion_authorized": false,
+    "heldout": "independent disjoint episode seeds compared with random baseline, observational only for uncontrolled libretro RNG"
+  },
+  "security": {
+    "firmware": "operator-installed legitimate files only; no key or BIOS acquisition",
+    "emulator_sandbox": "existing fail-closed isolated bubblewrap host, approved immutable library SHA, no unsafe fallback",
+    "rights": "operator rights acknowledgement not independent copyright/legal verification",
+    "snapshots": "actual opaque native state and source identity; never trust request-supplied snapshots as issuer",
+    "worker_failure": "abort without durable false success; incomplete checkpoint not promotion"
+  },
+  "acceptance_needed": [
+    "local synthetic regression execution",
+    "real original ROM generation and boot",
+    "per-core approved executable ABI and worker path",
+    "independent reverse/boomerang execution on representative native cores",
+    "native audio/video numeric telemetry parity",
+    "heldout evaluation reproducibility on original ROMs",
+    "license/firmware review",
+    "authorized candidate neural training run and independent model improvement evidence if neural capability is claimed"
+  ],
+  "qualification": "No real installed core, native ROM session, CI check, neural weight optimization or production promotion executed in this change."
+}
