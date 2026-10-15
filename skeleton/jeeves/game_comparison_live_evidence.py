@@ -50,8 +50,8 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         if initial!=expect:
             raise LiveEvidenceError("First native state hash differs from the initial approved environment")
         events=lane.get("native_events")
-        if not isinstance(events,list) or len(events)>264:
-            raise LiveEvidenceError("Native event recording exceeds the 256-step + 4-reset + 2-checkpoint + 2-rewind cap")
+        if not isinstance(events,list) or len(events)>4104:
+            raise LiveEvidenceError("Native event recording exceeds the 4096-step + 4-reset + 2-checkpoint + 2-rewind cap")
         reset_generation=0
         episode_step=0
         steps=0
