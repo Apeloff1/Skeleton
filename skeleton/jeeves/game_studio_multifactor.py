@@ -21,6 +21,7 @@ from .game_studio_environment import make_studio_source, parse_studio_source, st
 from .game_studio_scenario_lab import _lane
 from .game_learning import GameLearningConfig, GamePolicyLearner
 from .game_learning_parallel import GameEnvironmentRequest
+from .game_studio_factorial_scrutiny import scrutinize_interactions
 
 SCHEMA="skeleton.game_builder.multifactor_training.v1"
 MAX_AXES=8
@@ -401,9 +402,21 @@ def execute_multifactor_scenarios(
         # One-factor removals reveal whether joint changes still affect
         # measured behavior. A two-way difference-of-differences tests a
         # particular interaction rather than ascribing all gain to one item.
-        changed_indices=[
+        all_changed_indices=[
             i for i,value in enumerate(row["levels"]) if value
-        ][:4]
+        ]
+        changed_indices=all_changed_indices[:4]
+        # Two/three-way factorial contrasts evaluate every corner rather
+        # than interpreting one joint return as a factor interaction. Two
+        # additional independent seeds expose sign reversals and instability.
+        factorial=(
+            scrutinize_interactions(
+                original,plan["axes"],row["levels"],
+                seed=trial_seed,steps=min(steps,8),seed_count=2,
+                selected_indices=all_changed_indices[:3],
+            )
+            if len(all_changed_indices)>=2 else None
+        )
         counterfactuals=[]
         def controlled_intervention(removed):
             adjusted=list(row["levels"])
@@ -524,6 +537,17 @@ def execute_multifactor_scenarios(
                 ),
                 "heldout_mean_return_difference":heldout["mean_return_difference"],
                 "heldout_regression_observed":heldout["mean_return_difference"]<0,
+                "factorial_scrutiny_complete":(
+                    factorial is not None
+                    and factorial["source_factorial_design_complete"]
+                ),
+                "factorial_interaction_weight_attribution_authorized":(
+                    factorial is not None
+                    and factorial["whole_joint_variant_examined"]
+                    and factorial["observed_joint_gain_proven"]
+                    and heldout["mean_return_difference"]>=0
+                    and all_selected_exercised
+                ),
                 "neural_parameter_updates_observed":0,
                 "claimed_converged_or_SOTA":False,
             }
@@ -571,6 +595,15 @@ def execute_multifactor_scenarios(
                 item["action"] for item in action_receipts if not item["accepted"]
             ],
             "factor_ablation_receipts":counterfactuals,
+            "factorial_scrutiny":factorial,
+            "factorial_evidence_complete":(
+                factorial is not None
+                and factorial["source_factorial_design_complete"]
+            ),
+            "whole_joint_variant_factorially_explained":(
+                factorial is not None
+                and factorial["whole_joint_variant_examined"]
+            ),
             "pairwise_interaction_witness":pair_interaction,
             "actual_weight_training":learned,
             "native_audio_or_visual_content_created":False,
@@ -598,6 +631,21 @@ def execute_multifactor_scenarios(
         ),
         "scenarios_with_rejected_or_unexecuted_factor_actions":sum(
             not x["all_selected_actions_accepted"] for x in experiments
+        ),
+        "exact_source_replayed_factorial_corners":sum(
+            (x["factorial_scrutiny"] or {}).get("source_replayed_corner_count",0)
+            for x in experiments
+        ),
+        "factorial_scrutiny_checks_passed":sum(
+            (x["factorial_scrutiny"] or {}).get("audited_checks_count",0)
+            for x in experiments
+        ),
+        "complete_factorial_scenarios":sum(
+            x["factorial_evidence_complete"] for x in experiments
+        ),
+        "incomplete_factorial_scenarios":sum(
+            bool(x["factorial_scrutiny"]) and not x["factorial_evidence_complete"]
+            for x in experiments
         ),
         "experiments":experiments,
         "independently_heldout_from_training":True,
