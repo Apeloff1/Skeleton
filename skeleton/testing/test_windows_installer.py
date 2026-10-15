@@ -139,8 +139,11 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert '"skeleton"' in source
     assert '"machine"' in source
     assert '":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json"' in source
-    assert "$MaxRuntimeRelativePathUnits = 190" in source
+    assert "$MaxRuntimeRelativePathChars = 190" in source
+    assert "$MaxRuntimeDefaultInstallChars = 240" in source
+    assert "--install-root $DefaultInstallRoot" in source
     assert "[Text.Encoding]::UTF8.GetByteCount($portable)" in source
+    assert "[Text.Encoding]::UTF8.GetByteCount($absolute)" in source
     assert "& python $ArchivePreflight --archive $ArchivePath" in source
     assert "$PathBudgetViolations" in source
     assert "& git @ArchiveArgs" in source
