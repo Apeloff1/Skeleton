@@ -18,7 +18,7 @@ import shutil
 import sys
 from typing import Any
 
-from .jeeves_multidomain import digest_with_mirrors, load_multidomain_corpus, validate_catalog
+from .jeeves_multidomain import CATALOG, digest_with_mirrors, load_multidomain_corpus, validate_catalog
 from .jeeves_production_game_train import ProductionCheckpointError, _production_source
 from .jeeves_production_readiness import _load_attestation, _save_new_private
 
@@ -180,7 +180,7 @@ def run_parallel_candidates(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--catalog", type=Path, default=Path("machine/jeeves_training_modules.json"))
+    parser.add_argument("--catalog", type=Path, default=CATALOG)
     parser.add_argument("--dataset-manifest", type=Path)
     parser.add_argument("--attestation", type=Path)
     parser.add_argument("--output-directory", type=Path)

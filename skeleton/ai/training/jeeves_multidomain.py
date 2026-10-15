@@ -12,11 +12,14 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
+import sys
 from typing import Any
 
 SCHEMA = "skeleton.jeeves.multidomain_corpus.v1"
 CATALOG_SCHEMA = "skeleton.jeeves.training_modules.v1"
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = (Path(sys.executable).resolve().parent
+        if getattr(sys, "frozen", False)
+        else Path(__file__).resolve().parents[3])
 CATALOG = ROOT / "machine/jeeves_training_modules.json"
 DOMAINS = ("gaming", "ai", "coding")
 LENSES = ("construct", "counterexample", "repair", "edge_cases",
