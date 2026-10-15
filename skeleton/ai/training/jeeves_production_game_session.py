@@ -83,6 +83,8 @@ def run(
     max_training_seconds: int = 1200,
     resume: bool = False,
     dataset_manifest: Path | None = None,
+    studio_corpus: Path | None = None,
+    studio_corpus_expected_sha256: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(run_id, str) or not _RUN_ID.fullmatch(run_id):
         raise ProductionCheckpointError("run id must be 3-48 safe lowercase characters")
@@ -99,6 +101,19 @@ def run(
             raise ProductionCheckpointError("invalid " + label)
     if learning_rate <= 0:
         raise ProductionCheckpointError("training learning rate must be > 0")
+    if (studio_corpus is None) != (studio_corpus_expected_sha256 is None):
+        raise ProductionCheckpointError("studio training corpus must be independently pinned")
+    if studio_corpus is not None and dataset_manifest is not None:
+        raise ProductionCheckpointError(
+            "approved external holdout corpus and original-only game corpus cannot be combined"
+        )
+    replayed_count = 0
+    if studio_corpus is not None:
+        from .jeeves_studio_curriculum import load_studio_curriculum
+        measured, _ = load_studio_curriculum(
+            studio_corpus, expected_sha256=studio_corpus_expected_sha256,
+        )
+        replayed_count = len(measured)
     report = inspect(
         attestation=attestation, candidate_directory=output_directory,
         allow_vocabulary_expansion=expand_vocabulary,
@@ -108,7 +123,7 @@ def run(
         minimum = required_free_bytes(
             checkpoint_bytes=report["checkpoint_bytes"],
             snapshot_bytes=report["selected_model_snapshot_bytes"],
-            batches_per_epoch=report["training_batches_per_epoch"],
+            batches_per_epoch=report["training_batches_per_epoch"] + (replayed_count + 7) // 8,
             epochs=epochs,
         )
         report["estimated_required_free_bytes"] = minimum
@@ -125,6 +140,8 @@ def run(
             "production_weights_modified": False,
             "candidate_promoted": False,
             "preflight": report,
+            "studio_corpus_sha256": studio_corpus_expected_sha256,
+            "studio_replayed_examples": replayed_count,
         }
     baseline = Path(report["checkpoint_path"])
     if output_directory.resolve() == baseline.parent.resolve():
@@ -177,6 +194,8 @@ def run(
         max_domain_regression=float(max_domain_regression),
         expand_vocabulary=expand_vocabulary,
         dataset_manifest=dataset_manifest,
+        studio_corpus=studio_corpus,
+        studio_corpus_expected_sha256=studio_corpus_expected_sha256,
         max_optimizer_steps=max_optimizer_steps,
         max_training_seconds=max_training_seconds,
         progress_directory=out,
@@ -192,6 +211,8 @@ def run(
             "parent_checkpoint_sha256": start_sha,
             "parent_backup_sha256": backup["parent_sha256"],
             "training_report_path": str(names["training"].resolve()),
+            "studio_corpus_sha256": trained["studio_corpus_sha256"],
+            "studio_replay_verified_examples": trained["studio_replay_verified_examples"],
             "candidate_promoted": False,
             "game_design_improvement_established": False,
             "production_weights_modified": False,
@@ -228,6 +249,8 @@ def run(
         "resumable_optimizer_cursors": True,
         "dataset_manifest": None if dataset_manifest is None else str(dataset_manifest.resolve()),
         "dataset_source": trained["dataset_receipt"],
+        "studio_corpus_sha256": trained["studio_corpus_sha256"],
+        "studio_replay_verified_examples": trained["studio_replay_verified_examples"],
         "human_review_complete": False,
         "game_design_improvement_established": False,
         "production_weights_modified": False,
@@ -240,6 +263,8 @@ def run(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--studio-corpus", type=Path)
+    parser.add_argument("--studio-corpus-expected-sha256")
     parser.add_argument("--dataset-manifest", type=Path,
                         help="rights-approved external game training/evaluation corpus")
     parser.add_argument("--attestation", required=True, type=Path)
@@ -271,6 +296,8 @@ def main(argv: list[str] | None = None) -> int:
             max_training_seconds=args.max_training_seconds,
             resume=args.resume,
             dataset_manifest=args.dataset_manifest,
+            studio_corpus=args.studio_corpus,
+            studio_corpus_expected_sha256=args.studio_corpus_expected_sha256,
         )
         print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
         return 0 if result["status"] in (

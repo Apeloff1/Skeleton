@@ -199,7 +199,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           training_view: str | None = None,
           progress_directory: Path | None = None,
           progress_run_id: str | None = None,
-          resume: bool = False) -> dict[str, Any]:
+          resume: bool = False,
+          studio_corpus: Path | None = None,
+          studio_corpus_expected_sha256: str | None = None) -> dict[str, Any]:
     from skeleton.cortex.transformer import TinyTransformer
     from skeleton.cortex.bpe import BytePairEncoder
 
@@ -245,6 +247,21 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         if path.exists() or path.is_symlink() or not path.parent.is_dir():
             raise ProductionCheckpointError("outputs must be new paths in existing directories")
 
+    if (studio_corpus is None) != (studio_corpus_expected_sha256 is None):
+        raise ProductionCheckpointError("original-game corpus requires pinned SHA256")
+    if dataset_manifest is not None and studio_corpus is not None:
+        raise ProductionCheckpointError(
+            "approved training/evaluation manifest and studio-only corpus are mutually exclusive"
+        )
+    measured_examples: tuple[str, ...] = ()
+    studio_digest = None
+    if studio_corpus is not None:
+        from .jeeves_studio_curriculum import load_studio_curriculum
+        measured_examples, studio_digest = load_studio_curriculum(
+            studio_corpus, expected_sha256=studio_corpus_expected_sha256,
+        )
+        if not measured_examples:
+            raise ProductionCheckpointError("studio curriculum has no independently replayed episodes")
     parent_path, original, parent_sha = _production_source(source, expected)
     if parent_path.resolve() in (candidate.resolve(), report.resolve()):
         raise ProductionCheckpointError("outputs cannot overwrite active production checkpoint")
@@ -261,6 +278,17 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         from .jeeves_multidomain import load_training_corpus
         dataset, heldout, dataset_receipt = load_training_corpus(
             dataset_manifest, training_view=training_view)
+    if measured_examples:
+        heldout_text = {line for cases in heldout.values() for line in cases}
+        if heldout_text.intersection(measured_examples):
+            raise ProductionCheckpointError(
+                "original game transition text leaked into independent heldout domain"
+            )
+        dataset = dataset + measured_examples
+        dataset_receipt = dict(dataset_receipt)
+        dataset_receipt["studio_replayed_examples"] = len(measured_examples)
+        dataset_receipt["studio_corpus_sha256"] = studio_digest
+        dataset_receipt["independent_studio_generalization_established"] = False
     selected_key, original_snapshot, mouth = _active_snapshot(original)
     torch_stack = original_snapshot.get("kind") == "torch-stack"
     if torch_stack:
@@ -466,7 +494,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "curriculum_exposures_per_epoch": len(dataset),
         "dataset_receipt": dataset_receipt,
         "training_view": training_view or "all",
-        "built_in_smoke_curriculum_only": dataset_manifest is None,
+        "built_in_smoke_curriculum_only": dataset_manifest is None and not measured_examples,
+        "studio_corpus_sha256": studio_digest,
+        "studio_replay_verified_examples": len(measured_examples),
         "epochs": epochs,
         "training_steps_before": steps_before,
         "training_steps_after": model.steps,
@@ -510,6 +540,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     }
     if sha256(parent_path.read_bytes()).hexdigest() != parent_sha:
         raise ProductionCheckpointError("live checkpoint changed during training; refusing stale candidate")
+    if studio_corpus is not None and sha256(studio_corpus.read_bytes()).hexdigest() != studio_digest:
+        raise ProductionCheckpointError("original-game training corpus changed during training")
     if result["status"] != "rejected_evaluation_gate":
         output = dict(original)
         output[selected_key] = trained_snapshot
@@ -534,6 +566,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-training-seconds", type=int, default=1200)
     parser.add_argument("--dataset-manifest", type=Path,
                         help="rights-reviewed SHA-pinned external game corpus, rather than built-in smoke examples")
+    parser.add_argument("--studio-corpus", type=Path)
+    parser.add_argument("--studio-corpus-expected-sha256")
     parser.add_argument("--progress-directory", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument("--resume", action="store_true")
@@ -565,6 +599,8 @@ def main(argv: list[str] | None = None) -> int:
                        max_optimizer_steps=args.max_optimizer_steps,
                        max_training_seconds=args.max_training_seconds,
                        dataset_manifest=args.dataset_manifest,
+                       studio_corpus=args.studio_corpus,
+                       studio_corpus_expected_sha256=args.studio_corpus_expected_sha256,
                        progress_directory=args.progress_directory,
                        progress_run_id=args.run_id,
                        resume=args.resume)

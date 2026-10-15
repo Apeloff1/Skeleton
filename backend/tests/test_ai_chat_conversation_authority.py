@@ -277,7 +277,7 @@ def test_chat_retry_replays_existing_assistant_without_provider_call(
             ),
         ),
     )
-    operation_id = str(uuid4())
+    operation_id = route._chat_turn_ids(initial.thread_id, user_message.message_id)[0]
     assistant = ConversationMessage(
         message_id=str(uuid4()),
         thread_id=initial.thread_id,
@@ -312,6 +312,12 @@ def test_chat_retry_replays_existing_assistant_without_provider_call(
     async def active_transcript(*args, **kwargs):
         return user_message, assistant
 
+    async def get_thread(*args, **kwargs):
+        return current
+
+    async def no_materialized_turn(*args, **kwargs):
+        return None
+
     async def provider_must_not_run(*args, **kwargs):
         raise AssertionError("completed idempotent retry must not call provider")
 
@@ -324,10 +330,12 @@ def test_chat_retry_replays_existing_assistant_without_provider_call(
         SimpleNamespace(
             append_user_message=append_user_message,
             active_transcript=active_transcript,
+            get_thread=get_thread,
             commit_assistant_message=assistant_must_not_commit,
         ),
     )
     monkeypatch.setattr(route, "call_llm", provider_must_not_run)
+    monkeypatch.setattr(route, "chat_turn_lifecycle", SimpleNamespace(get_if_present=no_materialized_turn))
 
     response = client.post(
         "/ai/chat",
@@ -513,6 +521,12 @@ def test_successful_chat_retry_reuses_committed_assistant_without_provider(
     async def active_transcript(*args, **kwargs):
         return user_message, assistant
 
+    async def get_thread(*args, **kwargs):
+        return thread
+
+    async def no_materialized_turn(*args, **kwargs):
+        return None
+
     async def provider_must_not_run(*args, **kwargs):
         raise AssertionError("provider must not rerun after assistant commit")
 
@@ -522,9 +536,11 @@ def test_successful_chat_retry_reuses_committed_assistant_without_provider(
         SimpleNamespace(
             append_user_message=append_user_message,
             active_transcript=active_transcript,
+            get_thread=get_thread,
         ),
     )
     monkeypatch.setattr(route, "call_llm", provider_must_not_run)
+    monkeypatch.setattr(route, "chat_turn_lifecycle", SimpleNamespace(get_if_present=no_materialized_turn))
 
     response = client.post(
         "/ai/chat",

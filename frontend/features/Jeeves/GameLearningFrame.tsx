@@ -108,12 +108,12 @@ export default function GameLearningFrame({ frame }: { frame: Frame }) {
   if (!size || !frame.pixels_base64 && !geometry?.length) return <Text style={s.muted}>This runtime reports render commands and scene state rather than a raster frame.</Text>;
   return <View style={{ width: '100%', gap: 8 }}>
     {loading ? <ActivityIndicator color={C.primaryHover} /> : error ? <Text style={s.muted}>{error}</Text> : uri ?
-      <Image source={{ uri }} resizeMode="contain" style={s.frame} accessibilityLabel="Actual returned engine framebuffer" /> :
+      <Image source={{ uri }} resizeMode="contain" style={s.frame} accessibilityLabel={frame.render_kind === 'reference_state_telemetry_raster' ? 'Original engine state telemetry chart, not a game framebuffer' : 'Actual returned engine framebuffer'} /> :
       <Svg width="100%" height={280} viewBox={`0 0 ${size.width} ${size.height}`} accessibilityLabel={runs ? 'Actual returned engine framebuffer' : 'Reference render command geometry'}>
         {runs ? runs.map((run, index) => <Rect key={index} x={run.x} y={run.y} width={run.width} height={1} fill={run.color} />) : geometry &&
           geometry.map((command, index) => command.kind === 'rect' ? <Rect key={index} x={command.values[0]} y={command.values[1]} width={Math.max(0, command.values[2])} height={Math.max(0, command.values[3])}
             fill={command.values[4] === 0 ? C.bg : C.text} /> : <Line key={index} x1={command.values[0]} y1={command.values[1]} x2={command.values[2]} y2={command.values[3]} stroke={C.text} strokeWidth={1} />)}
       </Svg>}
-    <Text style={s.dim}>{frame.pixels_base64 ? frame.experimental ? 'Experimental ROM framebuffer' : 'Measured raster frame' : 'Reference command geometry · schematic colours'}</Text>
+    <Text style={s.dim}>{frame.pixels_base64 ? frame.render_kind === 'reference_state_telemetry_raster' ? 'Reference telemetry · measured game state, not game-world graphics' : frame.experimental ? 'Experimental ROM framebuffer' : 'Measured raster frame' : 'Reference command geometry · schematic colours'}</Text>
   </View>;
 }

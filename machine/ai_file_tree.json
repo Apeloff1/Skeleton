@@ -477,7 +477,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "5b5a3aa7e4209b7fdba23ff1f3437660afdbba58",
+      "source_git_object_sha": "a9aaa8380ece2ba3b60cc1451ee1098d9237c5fb",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -5749,7 +5749,10 @@
         "jeeves_adaptive_sim_training.py",
         "jeeves_capacity_growth.py",
         "jeeves_capability_replay.py",
-        "jeeves_boomerang_queue.py"
+        "jeeves_boomerang_queue.py",
+        "jeeves_studio_curriculum.py",
+        "jeeves_studio_multifactor_corpus.py",
+        "jeeves_studio_rule_corpus.py"
       ]
     },
     {
