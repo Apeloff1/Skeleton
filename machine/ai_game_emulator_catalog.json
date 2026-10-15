@@ -942,6 +942,20 @@
       "real_gameplay_executed_this_chat": false,
       "offline_dashboard": "skeleton/jeeves/game_comparison_counterfactual_viewer.py",
       "ui": "Hash-verified interactive offline visual-change and PCM RMS graphs, repeated native A/B arm stability, input perturbation and per-step controller/frame/PCM receipts, no source game media embedded"
+    },
+    "boomerang_experimental_curriculum": {
+      "schema": "skeleton.game.comparison_boomerang_curriculum.v1",
+      "owner": "skeleton/jeeves/game_comparison_boomerang.py",
+      "operator_cli": "scripts/run_game_comparison_boomerang.py",
+      "scope": "2–10 declared source-rights-receipted games; 1–8 distinct early/middle/after input interventions; 0–2 deterministic boomerang revisit rounds; each A/B arm 2–3 fresh native runs",
+      "max_native_executions": 480,
+      "default_plan_only": true,
+      "execution_requirements": "Explicit --execute, --rights-acknowledged, installed approved core registry, Linux Bubblewrap host gate, --approve-native-runs at or above exact plan estimate",
+      "checkpoint": "Per-intervention complete native JSON receipts, source-pinned plan and SHA-verified resumable progress, per-treatment offline A/B graph viewer",
+      "scientific_status": "Response signature novelty is descriptive observed native AV behavior; no causality of game mechanics, no generalization guarantee, no neural model weight changes",
+      "deterministic_source_and_revisit_plan": true,
+      "test_file": "tests/test_game_comparison_boomerang.py",
+      "native_cores_qualified_in_this_turn": false
     }
   }
 }
