@@ -20,7 +20,7 @@ class ActualInterpreterMapperMatrixTests(unittest.TestCase):
     def test_five_source_rom_mapper_types_with_exact_bank_and_ram_checks(self):
         report = audit_mapper_matrix()
         self.assertEqual(report["tested_actual_mapper_categories"], 5)
-        self.assertEqual(report["tested_bank_geometry_profiles"], 6)
+        self.assertEqual(report["tested_bank_geometry_profiles"], 8)
         self.assertGreater(report["verified_source_bus_checks"], 20)
         self.assertTrue(all(
             proof["actual_memory_cpu_savestate_roundtrip"]
@@ -38,7 +38,10 @@ class ActualInterpreterMapperMatrixTests(unittest.TestCase):
             with self.subTest(mapper=label):
                 rom = _rom(cartridge, rom_size, ram_size)
                 metadata = inspect_dmg_cartridge(rom)
-                self.assertEqual(metadata["mapper"], "mbc1" if label.startswith("mbc1_") else label)
+                self.assertEqual(
+                    metadata["mapper"],
+                    "mbc1" if label.startswith("mbc1_") else "mbc3" if label.startswith("mbc3_") else label,
+                )
                 self.assertEqual(metadata["rom_bytes"], len(rom))
 
     def test_source_diagnostic_refuses_corrupt_or_foreign_bus(self):
@@ -57,7 +60,7 @@ class ActualInterpreterMapperMatrixTests(unittest.TestCase):
             verified = _verify_mapper_bus(Path(temp))
             self.assertTrue(verified["accepted"])
             self.assertEqual(verified["real_interpreter_mapper_types"][-1], "mbc5")
-        self.assertEqual(verified["verified_cartridge_geometry_profiles"], 6)
+        self.assertEqual(verified["verified_cartridge_geometry_profiles"], 8)
             report["mapper_results"][1]["verified_register_and_memory_cases"].pop()
             report["mapper_results"][1]["real_source_bus_checks"] -= 1
             report["mapper_results"][1]["receipt_digest"] = _sha(_canonical({
