@@ -38,3 +38,9 @@ A successful invocation writes a small JSON report with real native boot, input,
 6. The 169-target matrix still distinguishes declared mappings, approved installations and real observed boots. A listed target is not a completed emulator.
 
 Real native execution, physical-console timing accuracy, gameplay completion, source rights, and production AI training gains are not inferred from these code changes.
+
+## Original compiled homebrew native ABI regression
+
+The added disposable C source at tests/fixtures/homebrew_disc_sram_libretro.c is compiled only inside a temporary source-contract test, never shipped as a proprietary emulator or game. The subprocess in tests/fixtures/verify_homebrew_disc_sram.py calls Skeleton's actual NativeCore ctypes worker against the freshly built shared library. It checks an actual registered three-image disk table, ejected-tray UINT_MAX handling, controller-dependent real RGB565 video, native PCM callback frames, SAVE_RAM byte import/readback, SRAM retention across retro_reset, and a successful 0-to-2 disc switch. tests/test_game_emulator_homebrew_disc_sram_abi.py runs the bounded compiler/subprocess test.
+
+This test has been **committed but not executed in the current session**. It is not an actual commercial game or hardware compatibility claim, nor a full Bubblewrap host transport qualification.
