@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import ast
-from collections import defaultdict
 import hashlib
 import os
-from pathlib import Path, PurePosixPath
 import posixpath
 import re
 import stat
-from typing import Iterable
+from collections import defaultdict
+from collections.abc import Iterable
+from pathlib import Path, PurePosixPath
 
 from .config import MachineConfig, load_machine_config
 from .model import (
@@ -93,9 +93,9 @@ def _python_metadata(content: str) -> tuple[int, tuple[str, ...]]:
 
 def _generic_imports(language: str, content: str) -> tuple[str, ...]:
     if language in {"javascript", "typescript"}:
-        return tuple(sorted(set(match.group(1) for match in _JS_IMPORT.finditer(content))))
+        return tuple(sorted({match.group(1) for match in _JS_IMPORT.finditer(content)}))
     if language == "java":
-        return tuple(sorted(set(match.group(1) for match in _JAVA_IMPORT.finditer(content))))
+        return tuple(sorted({match.group(1) for match in _JAVA_IMPORT.finditer(content)}))
     return ()
 
 
