@@ -18,7 +18,19 @@
     "color_bias",
     "audio_peak",
     "audio_zero_crossing",
-    "stereo_difference"
+    "stereo_difference",
+    "motion_energy",
+    "motion_fraction",
+    "motion_centroid_x",
+    "motion_centroid_y",
+    "motion_quadrant_tl",
+    "motion_quadrant_tr",
+    "motion_quadrant_bl",
+    "motion_quadrant_br",
+    "frame_luma_drift",
+    "audio_energy_change",
+    "audio_positive_onset",
+    "audio_zero_crossing_shift"
   ],
   "angles": [
     "exploration",
@@ -48,7 +60,7 @@
     "reverse_checkpoint_replays_verified",
     "unmodified_final_native_state"
   ],
-  "saturation": "After at least 10 consecutive source-executed runs showing no new visual state signatures, terminate with visual_novelty_saturated; do not assert neural convergence, game mastery, or no possible further learning.",
+  "saturation": "After at least 10 consecutive actually measured runs without both new coarse visual signatures and new Q states or material Q-value movement above 1e-6, terminate with observed_q_and_visual_learning_plateau; this does not establish global learning convergence.",
   "bounded_resources": {
     "runs_max": 256,
     "steps_per_run_max": 128,
@@ -84,7 +96,44 @@
     "native audio/video numeric telemetry parity",
     "heldout evaluation reproducibility on original ROMs",
     "license/firmware review",
-    "authorized candidate neural training run and independent model improvement evidence if neural capability is claimed"
+    "authorized candidate neural training run and independent model improvement evidence if neural capability is claimed",
+    "controlled real-ROM action and multi-core source experiments",
+    "actual candidate neural optimizer plus independent heldout accuracy proof"
   ],
-  "qualification": "No real installed core, native ROM session, CI check, neural weight optimization or production promotion executed in this change."
+  "qualification": "No real installed core, native ROM session, CI check, neural weight optimization or production promotion executed in this change.",
+  "actual_neural_world_model": {
+    "module": "skeleton/jeeves/game_emulator_neural_world.py",
+    "cli": "fit-emulator-world-model",
+    "algorithm": "real numeric two hidden tanh layers AdamW and gradient clipping",
+    "source": "only exact reconstituted approved rights-declared Q episode receipts",
+    "holdout": "disjoint source trace groups, train-only normalization",
+    "next_state_training": true,
+    "reward_model_training": true,
+    "production_promotion_authorized": false,
+    "actual_training_executed_in_this_change": false,
+    "transformer_weights_modified": false
+  },
+  "multicore_experiments": {
+    "module": "skeleton/jeeves/game_emulator_cross_core_lab.py",
+    "actual_cores_required": 2,
+    "max_cores": 4,
+    "same_rom": true,
+    "independent_repeats": true,
+    "hardware_correctness_certified": false
+  },
+  "controlled_experiments": {
+    "module": "skeleton/jeeves/game_emulator_experiment_lab.py",
+    "actual_state_rewind": true,
+    "counterfactual_order_and_duration": true,
+    "native_multiport": true,
+    "opaque_memory_watch_max": 8,
+    "semantic_game_success_claimed": false
+  },
+  "curriculum": {
+    "module": "skeleton/jeeves/game_emulator_curriculum.py",
+    "angles": 10,
+    "adaptive_priority": "verified source evidence from previous ROM runs",
+    "rare_action_priority": true,
+    "heldout_selection_leakage": false
+  }
 }
