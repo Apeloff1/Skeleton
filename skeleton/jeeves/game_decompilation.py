@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .game_decompilation_archives import analyze_zip_project
-from .game_decompilation_assets import decode_tile_region, extract_nes_chr
+from .game_decompilation_assets import decode_tile_region, extract_nes_chr, inspect_standalone_media
 from .game_decompilation_code import disassemble_gb_sm83, disassemble_nes_nrom
 from .game_decompilation_formats import inspect_binary_structure
 from .game_decompilation_quality import derive_game_quality_brief
@@ -187,6 +187,12 @@ def decompile_authorized_game(
             previews.extend(approved)
         elif fmt == "zip_container":
             package = analyze_zip_project(data)
+        elif fmt in {"png", "wav", "playstation_tim_candidate"}:
+            assets, media_preview = inspect_standalone_media(
+                data,media_format=fmt,preview_authorized=export_previews,
+            )
+            if media_preview is not None:
+                previews.append(("single_media_preview.png", media_preview))
         else:
             assets = {
                 "supported": False,
