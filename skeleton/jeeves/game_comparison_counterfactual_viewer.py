@@ -159,6 +159,15 @@ function render(){
  const diffs=txt("div","");diffs.className="metrics";
  Object.entries(analysis.measured_objective_changes).forEach(([name,value])=>diffs.append(metric(name,Number(value).toFixed(6))));
  panel.append(diffs);
+ const multi=analysis.multispectral_abstract_comparison;
+ if(multi?.available){
+  const section=txt("div","");section.className="metrics";
+  Object.entries(multi.abstract_differences||{}).forEach(([name,value])=>{
+   if(typeof value==="number"&&Number.isFinite(value))
+    section.append(metric("Multispectral · "+name,value.toFixed(6)));
+  });
+  panel.append(txt("h3","Abstract spatial motion / frequency-energy descriptors"),section)
+ }else panel.append(txt("p","Multispectral features not available at the altered-input frame."));
  draw($("visual"),baseline.step_points,changed.step_points,"visual_change");
  draw($("audio"),baseline.step_points,changed.step_points,"audio_rms");
  const evidence=$("evidence");evidence.replaceChildren(txt("h2","Native controller/action and hash-chain evidence"));

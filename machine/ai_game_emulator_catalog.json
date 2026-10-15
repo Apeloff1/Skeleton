@@ -956,6 +956,18 @@
       "deterministic_source_and_revisit_plan": true,
       "test_file": "tests/test_game_comparison_boomerang.py",
       "native_cores_qualified_in_this_turn": false
+    },
+    "native_multispectral_training_observation": {
+      "owner": "skeleton/jeeves/game_comparison_multispectral.py",
+      "model": "CPU-bounded 4x4 coarse native RGB frame-to-frame change/energy, 8-bin Hann-windowed DFT spectral PCM energy/centroid on up to 512 decimated actual stereo frames",
+      "source_verification": "Every multispectral feature receipt verifies exact native frame and PCM SHA-256 hashes before measuring",
+      "live_integration": "Each actual native controller step may include abstract spatial motion and spectral PCM metadata bound to its existing SHA-linked receipt; source-contract fake cores omit data instead of inventing features",
+      "controlled_experiment": "Repeated source-verified A/B arms attach actual audiovisual features and compare abstract deltas at changed input step, under independent preintervention/within-arm repeat gates",
+      "dragon_review": "Only coarse numerical deltas travel into unpromoted candidate package; no source ROM/image/audio bytes, characters, dialogue or melody are exported",
+      "operator_dashboard": "Offline A/B viewer displays actual observed abstract feature differences next to native graphics/audio metrics",
+      "tests": "tests/test_game_comparison_multispectral.py added to manually triggered focused qualification",
+      "limitations": "Not pixel optical flow, speech/music recognition, musical composition, game-mechanics discovery, learned LLM weights or independent core hardware accuracy",
+      "real_native_game_source_exercised_here": false
     }
   }
 }
