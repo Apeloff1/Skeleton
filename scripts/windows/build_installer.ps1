@@ -54,6 +54,16 @@ try {
 New-Item -ItemType Directory -Force -Path $PayloadDir, $LauncherDist, $LauncherWork, $LauncherSpec | Out-Null
 
 Write-Host "==> Staging curated application payload from $SourceRef via $ShortDrive"
+# Read the assembly contract from the exact archived ref. All declared required
+# paths must be carried into the installable payload, not just the five services.
+$SourceManifestText = & git -C $RepoRoot show "$($SourceRef):skeleton/app/manifest.json"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to load application assembly manifest from SourceRef $SourceRef"
+}
+$SourceManifest = ($SourceManifestText -join "`n") | ConvertFrom-Json
+if (-not $SourceManifest.required_paths) {
+    throw "Archived application manifest has no required_paths"
+}
 $RuntimePaths = @(
     ".dockerignore",
     ".env.example",
@@ -73,7 +83,8 @@ $RuntimePaths = @(
     # destination-path boundary when installed under a normal user profile.
     ":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json",
     ":(exclude)skeleton/ai/research/legacy/gameforge/jeeves/jeeves_mastermap_*.json"
-)
+) + @($SourceManifest.required_paths)
+$RuntimePaths = @($RuntimePaths | Select-Object -Unique)
 $ArchiveArgs = @(
     "-C", $RepoRoot,
     "archive",
@@ -87,6 +98,13 @@ if ($LASTEXITCODE -ne 0) {
     throw "git archive failed"
 }
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
+
+foreach ($RequiredPath in $SourceManifest.required_paths) {
+    $StagedPath = Join-Path $PayloadDir ($RequiredPath -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $StagedPath)) {
+        throw "Windows payload missing required assembly path: $RequiredPath"
+    }
+}
 
 $EntryPoint = Join-Path $PayloadDir "packaging\windows\launcher_entry.py"
 $ConsoleEntryPoint = Join-Path $PayloadDir "packaging\windows\offline_cli_entry.py"
