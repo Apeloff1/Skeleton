@@ -633,3 +633,64 @@ The standalone source command and focused regression
 `skeleton/testing/test_game_rom_instruction_divergence.py` are committed;
 they have **not** been run during this authoring pass, and there is
 no claim of observed emulator fidelity or production neural weight gain.
+
+
+## M. Actual OAM sprite DMA timing as source-verified learning evidence
+
+The experimental DMG ROM interpreter previously copied all 160 OAM sprite
+attribute bytes immediately on a write to `FF46`. That fabricated an
+impossible source timing relationship: later DMA data could appear to be
+present at an earlier moment in a replayed game's framebuffer.
+
+The current source implementation introduces a bounded CPU-cycle DMA engine:
+
+- `FF46` source pages `00` through `DF` start a transfer. Pages whose
+  bus behavior has not been modeled are **rejected** rather than assigned
+  fictitious source values.
+- The transfer has four startup T-cycles, then reads one byte from the
+  actual cartridge/WRAM bus every four T-cycles, copying into `FE00–FE9F`
+  (160 bytes). A later write to `FF46` can restart the source.
+- Source reads take place at their actual simulated DMA transfer tick,
+  rather than pre-sampling all source bytes when the transfer begins.
+- Native interpreter savestates seal the source page, DMA active flag,
+  copied-byte count, fractional four-cycle phase and startup remaining.
+  Partial transfers can be rewound and completed with identical OAM
+  contents, even when a snapshot falls between byte-copy ticks.
+- The Game Boy PPU's scanline and STAT edge are now advanced on the **same
+  individual T-cycle** as the divider and DMA. A scanline drawn earlier
+  cannot observe future sprite bytes from the rest of an instruction.
+- The original-ROM CPU counterfactual module records those real DMA fields
+  plus a SHA256 digest of the current OAM, allowing AI source-evidence
+  analysis to distinguish a memory-transfer effect from game-state effects.
+
+The new focused source regression module
+`skeleton/testing/test_game_rom_dma_timing.py` probes delayed start,
+per-byte copy phase, no prefetch of changing ROM/RAM source bytes,
+mid-transfer source restart, exact savestate recovery, STOP pause, invalid
+source pages, and raster scanline ordering. It is included in the
+**manual-only** original ROM AI acceptance suite.
+
+The timing references are documented by
+<https://gbdev.io/pandocs/OAM_DMA_Transfer.html>. **Known unsupported
+hardware behavior remains significant**: DMG CPU bus restrictions during
+DMA, exact OAM scan/pixel-fetch contention, unsupported upper bus pages,
+CGB general-purpose/HDMA, LCD fetch pipeline cycle perfection, boot ROM
+and sound chip. This is an intermediate fidelity upgrade, not full
+hardware certification.
+
+### Native cartridge first boot above 2 MiB
+
+The independent approved-libretro first-boot operator gate now uses the
+exact `MAX_CONTENT_BYTES` budget from the existing emulator catalog,
+which is **16 MiB** for a single inline ROM, rather than an inconsistent
+2 MiB cap. This enables actual source-first-boot auditing of larger
+lawful cartridges, including some SNES and GBA homebrew titles.
+Optical-disc, multi-file cue/bin, and large CHD content still need an
+independent governed referenced-media route; they must not be force-loaded
+as giant in-memory single-ROM blobs or claimed verified by this
+cartridge-only check.
+
+The code and synthetic regressions have been committed but **not executed
+during authoring**. No new native core has a verified boot, no original
+ROM training result is reported as measured, and no production Jeeves
+model weights are updated by these changes.
