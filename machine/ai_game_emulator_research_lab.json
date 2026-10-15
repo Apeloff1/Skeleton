@@ -9,7 +9,8 @@
     "skeleton/jeeves/game_emulator_neural_world.py",
     "skeleton/jeeves/game_emulator_planning_lab.py",
     "skeleton/jeeves/game_emulator_goal_lab.py",
-    "skeleton/jeeves/game_original_rom_goal_training.py"
+    "skeleton/jeeves/game_original_rom_goal_training.py",
+    "skeleton/jeeves/game_rom_instruction_divergence.py"
   ],
   "governed_mirrors": [
     "skeleton/ai/agents/jeeves/game_emulator_experiment_lab.py",
@@ -18,7 +19,8 @@
     "skeleton/ai/agents/jeeves/game_emulator_neural_world.py",
     "skeleton/ai/agents/jeeves/game_emulator_planning_lab.py",
     "skeleton/ai/agents/jeeves/game_emulator_goal_lab.py",
-    "skeleton/ai/agents/jeeves/game_original_rom_goal_training.py"
+    "skeleton/ai/agents/jeeves/game_original_rom_goal_training.py",
+    "skeleton/ai/agents/jeeves/game_rom_instruction_divergence.py"
   ],
   "entrypoints": [
     "python -m skeleton.jeeves.game_learning_cli train-emulator-deep",
@@ -31,7 +33,8 @@
     "python scripts/accept_original_rom_ai_pipeline.py",
     "python -m skeleton.jeeves.game_original_rom_goal_training",
     "python scripts/run_game_rom_acceptance_suite.py",
-    "python scripts/audit_original_gameboy_mapper_matrix.py"
+    "python scripts/audit_original_gameboy_mapper_matrix.py",
+    "python scripts/audit_original_rom_instruction_divergence.py"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -128,7 +131,9 @@
     "skeleton/testing/test_game_original_rom_goal_training.py",
     "skeleton/testing/test_game_rom_acceptance_suite.py",
     "skeleton/testing/test_game_original_mapper_bus_audit.py",
-    "skeleton/testing/test_game_rom_virtual_rtc.py"
+    "skeleton/testing/test_game_rom_virtual_rtc.py",
+    "skeleton/testing/test_game_rom_cpu_timer.py",
+    "skeleton/testing/test_game_rom_instruction_divergence.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -310,6 +315,7 @@
     "entrypoint": "python scripts/run_game_rom_acceptance_suite.py",
     "readiness": "operator-only, source implementation committed but not yet run",
     "phases": [
+      "actual original-ROM CPU instruction input divergence traces, independent save/replay and per-sample SHA256",
       "focused synthetic and original ROM regressions",
       "five mapper source bus audit",
       "generated original ROM Q and neural candidate evidence",
@@ -350,5 +356,65 @@
     "hardware_accuracy_verified": false,
     "test": "skeleton/testing/test_game_rom_virtual_rtc.py",
     "reference": "https://gbdev.io/pandocs/MBC3.html"
+  },
+  "gameboy_cpu_timer_engine": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "implementation": "actual DMG timer falling edges from selected DIV bit; checked TIMA four T-cycle pending overflow reload and IF request; DIV/TAC write-triggered falling edges; explicit TIMA cancellation during pending interval",
+    "divider_bits": {
+      "tac_00": 9,
+      "tac_01": 3,
+      "tac_10": 5,
+      "tac_11": 7
+    },
+    "overflow_pending_cycles": 4,
+    "source_snapshot": "checked timer_reload_delay persisted in CPU register source state, including pending phase",
+    "stop_halt": "STOP resets DIV and freezes time-driven registers until a controller event; HALT keeps the oscillator active",
+    "known_limitations": [
+      "CPU memory writes are still handled at instruction-level rather than true mid-instruction bus phases",
+      "same-cycle timer reload TMA collision not cycle-accurate",
+      "CGB speed switch, audio divider events and full DMA blocking unavailable",
+      "scheduler cycles during STOP represent budget consumed, not clock oscillator time"
+    ],
+    "spec_reference": "https://gbdev.io/pandocs/Timer_and_Divider_Registers.html",
+    "focused_test": "skeleton/testing/test_game_rom_cpu_timer.py",
+    "real_local_execution_verified": false
+  },
+  "original_rom_cpu_microtrace": {
+    "owner": "skeleton/jeeves/game_rom_instruction_divergence.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_instruction_divergence.py",
+    "operator_entrypoint": "python scripts/audit_original_rom_instruction_divergence.py",
+    "source": "only locally generated original homebrew ROM, real GameBoyMachine instructions",
+    "controls": [
+      "idle",
+      "up",
+      "down",
+      "left",
+      "right",
+      "a",
+      "b",
+      "start",
+      "select",
+      "a_right"
+    ],
+    "audited_domains": [
+      "CPU registers/PC/opcode/IME",
+      "divider/TIMA/TMA/TAC/IF/IE/pending overflow",
+      "cartridge ROM/RAM bank and RTC control",
+      "SHA256 of actual RAM, VRAM, IO, OAM, cartridge SRAM and framebuffer",
+      "original authorship declared game score, position and completion registers"
+    ],
+    "acceptance": "same exact pre-branch CPU state, independently execute and replay every input branch; reject run if full digests differ; per-sample digests independently checked",
+    "limits": {
+      "max_instructions_per_branch": 16384,
+      "max_samples": 1024,
+      "max_branches": 8,
+      "max_branch_cycles": 524288,
+      "max_report_bytes": 8388608
+    },
+    "source_ci": "manual-only original ROM acceptance orchestrator",
+    "tests": "skeleton/testing/test_game_rom_instruction_divergence.py",
+    "no_automatic_model_promotion": true,
+    "actual_instruction_runs_executed_during_authoring": 0
   }
 }
