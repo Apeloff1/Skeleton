@@ -25,6 +25,13 @@ sys.path.insert(0, str(ROOT))
 from skeleton.jeeves.game_rom_runtime import GameBoyMachine, GameRomRuntimeError
 
 SCHEMA = "skeleton.game.original_lr35902_opcode_matrix.v1"
+CONDITIONAL_BRANCHES = (
+    0x20, 0x28, 0x30, 0x38,  # JR NZ/Z/NC/C
+    0xC0, 0xC8, 0xD0, 0xD8,  # RET NZ/Z/NC/C
+    0xC2, 0xCA, 0xD2, 0xDA,  # JP NZ/Z/NC/C
+    0xC4, 0xCC, 0xD4, 0xDC,  # CALL NZ/Z/NC/C
+)
+CONDITIONAL_FLAGS = (0x00, 0x10, 0x80, 0x90)
 INVALID_BASE = frozenset((
     0xD3, 0xDB, 0xDD, 0xE3, 0xE4, 0xEB, 0xEC, 0xED,
     0xF4, 0xFC, 0xFD,
@@ -113,13 +120,22 @@ def _expected_reference(opcode: int, cb: int | None, flags: int) -> tuple[int, i
     return expected, reference["bytes"], reference["mnemonic"]
 
 
-def _result(opcode: int, cb: int | None = None) -> dict:
+def _result(
+    opcode: int, cb: int | None = None, *,
+    initial_flags: int | None = None,
+) -> dict:
     cart = _cartridge(opcode, cb)
     machine = GameBoyMachine(cart)
     machine.sp = 0xDFF0
     machine._set_pair(2, 0xC010)
     machine.memory[0xC010] = 0x81
     machine.memory[0xC020] = 0xA6
+    machine.memory[0xDFF0] = 0x23
+    machine.memory[0xDFF1] = 0xC1
+    if initial_flags is not None:
+        if opcode not in CONDITIONAL_BRANCHES or initial_flags not in CONDITIONAL_FLAGS:
+            raise OpcodeMatrixError("explicit flags only allowed for bounded conditional CPU instructions")
+        machine.f = initial_flags
     original = machine.snapshot()
     reference_cycles, reference_bytes, mnemonic = _expected_reference(
         opcode, cb, machine.f
@@ -156,6 +172,35 @@ def _result(opcode: int, cb: int | None = None) -> dict:
         or first["rom_digest"] != original["rom_digest"]
     ):
         raise OpcodeMatrixError("original CPU instruction accounting or cycle bound is inconsistent")
+    conditional_outcome = None
+    if opcode in CONDITIONAL_BRANCHES and initial_flags is not None:
+        z, carry = bool(initial_flags & 0x80), bool(initial_flags & 0x10)
+        choice = (opcode - 0x20) // 8 if opcode < 0x40 else opcode >> 3 & 3
+        taken = (not z, z, not carry, carry)[choice]
+        if opcode < 0x40:
+            expected_pc = 0x122 if taken else 0x102
+            expected_sp = 0xDFF0
+        elif opcode in (0xC0, 0xC8, 0xD0, 0xD8):
+            expected_pc = 0xC123 if taken else 0x101
+            expected_sp = 0xDFF2 if taken else 0xDFF0
+        else:
+            expected_pc = 0xC020 if taken else 0x103
+            expected_sp = 0xDFEE if taken and opcode in (0xC4, 0xCC, 0xD4, 0xDC) else 0xDFF0
+        if first["registers"]["pc"] != expected_pc or first["registers"]["sp"] != expected_sp:
+            raise OpcodeMatrixError(
+                f"conditional source control {opcode:02x} flags={initial_flags:02x}: "
+                f"actual PC/SP {first['registers']['pc']:04x}/{first['registers']['sp']:04x} "
+                f"did not match independently expected {expected_pc:04x}/{expected_sp:04x}"
+            )
+        conditional_outcome = {
+            "initial_z_c_flags": initial_flags,
+            "expected_branch_taken": taken,
+            "expected_pc_after": expected_pc,
+            "observed_pc_after": first["registers"]["pc"],
+            "expected_sp_after": expected_sp,
+            "observed_sp_after": first["registers"]["sp"],
+            "reference_conditional_branch_verified": True,
+        }
     machine.restore(original)
     repeated_cycles = machine.instruction()
     repeated = machine.snapshot()
@@ -170,6 +215,7 @@ def _result(opcode: int, cb: int | None = None) -> dict:
         "reference_documented_instruction_bytes": reference_bytes,
         "reference_documented_mnemonic": mnemonic,
         "source_reference_cycles_verified": True,
+        "conditional_control_result": conditional_outcome,
         "actual_source_rom_sha256": hashlib.sha256(cart).hexdigest(),
         "source_registers_after_sha256": _digest(first["registers"]),
         "source_snapshot_after_sha256": _digest(first),
@@ -182,6 +228,18 @@ def _result(opcode: int, cb: int | None = None) -> dict:
 def audit_cpu_opcode_matrix() -> dict:
     base = [_result(opcode) for opcode in range(256) if opcode != 0xCB]
     prefixed = [_result(0xCB, opcode) for opcode in range(256)]
+    conditional = [
+        _result(opcode, initial_flags=flags)
+        for opcode in CONDITIONAL_BRANCHES for flags in CONDITIONAL_FLAGS
+    ]
+    if (
+        len(conditional) != 64
+        or sum(bool(row["conditional_control_result"]["reference_conditional_branch_verified"])
+               for row in conditional) != 64
+        or sum(bool(row["conditional_control_result"]["expected_branch_taken"])
+               for row in conditional) != 32
+    ):
+        raise OpcodeMatrixError("both branch outcomes under the full Z/C flag matrix are required")
     if (
         len(base) != 255 or len(prefixed) != 256
         or sum(bool(row["real_instruction_executed"]) for row in base) != 244
@@ -196,10 +254,14 @@ def audit_cpu_opcode_matrix() -> dict:
         "actual_base_opcode_single_step_executed": 244,
         "actual_cb_prefix_expansions_executed": len(prefixed),
         "expected_illegal_base_opcodes_rejected": 11,
-        "actual_total_single_step_source_replays": (244 + len(prefixed)) * 2,
+        "actual_total_single_step_source_replays": (244 + len(prefixed) + len(conditional)) * 2,
+        "conditional_branch_flags_tested": list(CONDITIONAL_FLAGS),
+        "conditional_branch_opcodes_tested": list(CONDITIONAL_BRANCHES),
+        "conditional_real_executions": len(conditional),
+        "conditional_source_receipts": conditional,
         "original_generated_synthetic_cartridges": True,
         "external_sm83_reference_commit": _reference_table()["provenance"]["upstream_commit_sha"],
-        "source_reference_opcodes_compared_to_actual_timing": 500,
+        "source_reference_opcodes_compared_to_actual_timing": 500 + len(conditional),
         "base_instruction_receipts": base,
         "prefixed_instruction_receipts": prefixed,
         "hardware_instruction_cycle_accuracy_independently_proven": False,
@@ -230,6 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({
             "status": report["status"],
             "real_opcodes_single_stepped_and_replayed": report["actual_total_single_step_source_replays"],
+            "conditional_flag_state_trials_replayed": report["conditional_real_executions"],
             "illegal_cpu_opcodes_refused": report["expected_illegal_base_opcodes_rejected"],
             "hardware_accuracy_certified": False,
             "receipt_file": str(path),
