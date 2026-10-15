@@ -82,6 +82,7 @@ def run(
     max_optimizer_steps: int = 25000,
     max_training_seconds: int = 1200,
     resume: bool = False,
+    dataset_manifest: Path | None = None,
 ) -> dict[str, Any]:
     if not isinstance(run_id, str) or not _RUN_ID.fullmatch(run_id):
         raise ProductionCheckpointError("run id must be 3-48 safe lowercase characters")
@@ -101,6 +102,7 @@ def run(
     report = inspect(
         attestation=attestation, candidate_directory=output_directory,
         allow_vocabulary_expansion=expand_vocabulary,
+        dataset_manifest=dataset_manifest,
     )
     if report["status"] == "ready_for_operator_training":
         minimum = required_free_bytes(
@@ -159,6 +161,7 @@ def run(
             candidate_directory=out,
             copy_destination=names["backup"],
             allow_vocabulary_expansion=expand_vocabulary,
+            dataset_manifest=dataset_manifest,
         )
     if _sha(baseline) != _sha(names["backup"]):
         raise ProductionCheckpointError("serving weights differ from prepared backup")
@@ -173,6 +176,7 @@ def run(
         min_coverage=float(min_coverage),
         max_domain_regression=float(max_domain_regression),
         expand_vocabulary=expand_vocabulary,
+        dataset_manifest=dataset_manifest,
         max_optimizer_steps=max_optimizer_steps,
         max_training_seconds=max_training_seconds,
         progress_directory=out,
@@ -222,6 +226,8 @@ def run(
         "max_training_seconds": max_training_seconds,
         "resumed_from_existing_progress": resume,
         "resumable_optimizer_cursors": True,
+        "dataset_manifest": None if dataset_manifest is None else str(dataset_manifest.resolve()),
+        "dataset_source": trained["dataset_receipt"],
         "human_review_complete": False,
         "game_design_improvement_established": False,
         "production_weights_modified": False,
@@ -234,6 +240,8 @@ def run(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--dataset-manifest", type=Path,
+                        help="rights-approved external game training/evaluation corpus")
     parser.add_argument("--attestation", required=True, type=Path)
     parser.add_argument("--output-directory", required=True, type=Path)
     parser.add_argument("--dry-run", action="store_true")
@@ -262,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
             max_optimizer_steps=args.max_optimizer_steps,
             max_training_seconds=args.max_training_seconds,
             resume=args.resume,
+            dataset_manifest=args.dataset_manifest,
         )
         print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
         return 0 if result["status"] in (
