@@ -14,6 +14,8 @@ class FakeStudy:
     def __init__(self):
         self.steps=0
         self.swaps=0
+        self.timings=0
+        self.inspections=0
         self.closed=False
     def state(self):
         return {"schema_version":"synthetic-test-view","lanes":{}}
@@ -25,6 +27,12 @@ class FakeStudy:
     def swap_disc(self, packet):
         self.swaps+=1
         return {"status":"synthetic_disc_transaction","request":packet}
+    def set_timing(self, packet):
+        self.timings+=1
+        return {"status":"synthetic_timing","request":packet}
+    def inspect(self, packet):
+        self.inspections+=1
+        return {"status":"synthetic_inspection","request":packet}
     def export_evidence(self):
         return {"schema_version":"synthetic-no-native-evidence"}
     def close(self):
@@ -99,6 +107,22 @@ class LocalOriginContracts(unittest.TestCase):
         self.assertEqual(status,200)
         self.assertEqual(result["status"],"synthetic_disc_transaction")
         self.assertEqual(self.study.swaps,1)
+
+    def test_timing_and_inspection_enforce_same_origin_authentication(self):
+        speed={"game_id":"synthetic","mode":"slow","factor":4}
+        freeze={"game_id":"synthetic"}
+        for path,packet in (("/api/timing",speed),("/api/inspect",freeze)):
+            unauthenticated,_=self._call(path,method="POST",body=packet,origin=self.base)
+            self.assertEqual(unauthenticated,403)
+            foreign,_=self._call(path,method="POST",body=packet,
+                token=self.server.secret,origin="https://cross-origin.example")
+            self.assertEqual(foreign,403)
+            success,payload=self._call(path,method="POST",body=packet,
+                token=self.server.secret,origin=self.base)
+            self.assertEqual(success,200)
+            self.assertEqual(payload["request"],packet)
+        self.assertEqual(self.study.timings,1)
+        self.assertEqual(self.study.inspections,1)
 
     def test_home_page_restrictive_security_policy(self):
         request=urllib.request.Request(self.base+"/")
