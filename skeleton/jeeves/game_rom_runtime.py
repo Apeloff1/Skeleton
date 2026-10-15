@@ -49,6 +49,8 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
         raise GameRomRuntimeError("Cartridge bytes do not match the declared ROM bank count")
     if cartridge in (0x00, 0x08, 0x09) and size_code != 0:
         raise GameRomRuntimeError("ROM-only cartridges must have two ROM banks")
+    if cartridge < 0x19 and size_code > 6:
+        raise GameRomRuntimeError("MBC1/MBC3 ROM banking cannot address this cartridge size")
     checksum = 0
     for byte in rom[0x134:0x14D]:
         checksum = (checksum - byte - 1) & 255
