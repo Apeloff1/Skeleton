@@ -67,6 +67,28 @@ $RuntimePaths = @(
     "skeleton",
     "scripts",
     "packaging",
+    # The installed launcher runs the same assembly preflight as the checkout.
+    # Include every otherwise-unbundled manifest requirement and every root/
+    # backend Dockerfile COPY input. Missing inputs make the first install fail
+    # before Docker can build the services.
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+    ".cursor/rules/architecture.mdc",
+    "docs/ARCHITECTURE_MAP.md",
+    "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "machine/manifest.json",
+    "machine/architecture.json",
+    "machine/ai_app_construction.json",
+    "machine/capability_interfaces.json",
+    "machine/state_topology.json",
+    "machine/ai_capabilities.json",
+    "machine/ai_runtime_schemas.json",
+    "machine/ai_implementation_handoff.json",
+    "machine/ai_closure_evidence.json",
+    "machine/enterprise_ai_superiority.json",
+    "machine/enterprise_ai_implementation_notes_index.json",
     # Historical MasterMap progression snapshots are repository evidence, not
     # runtime inputs. Some intentionally verbose names breach Win32's legacy
     # destination-path boundary when installed under a normal user profile.
@@ -86,6 +108,36 @@ if ($LASTEXITCODE -ne 0) {
     throw "git archive failed"
 }
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
+
+# Fail before PyInstaller/Inno Setup if the packaged checkout cannot pass the
+# very same file preflight that Skeleton.exe uses on first launch.
+$PayloadManifestPath = Join-Path $PayloadDir "skeleton\app\manifest.json"
+if (-not (Test-Path -LiteralPath $PayloadManifestPath)) {
+    throw "Staged application manifest is missing: $PayloadManifestPath"
+}
+$PayloadManifest = Get-Content -Raw -LiteralPath $PayloadManifestPath | ConvertFrom-Json
+$RequiredPayloadPaths = @($PayloadManifest.required_paths)
+# Docker COPY inputs are not all named in the assembly manifest. Validate the
+# root and backend Dockerfiles' explicit machine/docs inputs as well.
+foreach ($Dockerfile in @("Dockerfile", "backend\Dockerfile")) {
+    $DockerPath = Join-Path $PayloadDir $Dockerfile
+    if (-not (Test-Path -LiteralPath $DockerPath)) {
+        throw "Staged Dockerfile is missing: $Dockerfile"
+    }
+    foreach ($Line in (Get-Content -LiteralPath $DockerPath)) {
+        if ($Line -match '^\s*COPY\s+.*?\s((?:machine|docs)/[^\s]+)\s') {
+            $RequiredPayloadPaths += $Matches[1]
+        }
+    }
+}
+$MissingPayloadPaths = @(
+    $RequiredPayloadPaths | Sort-Object -Unique | Where-Object {
+        -not (Test-Path -LiteralPath (Join-Path $PayloadDir $_))
+    }
+)
+if ($MissingPayloadPaths.Count -gt 0) {
+    throw ("Windows payload lacks required app/Docker inputs: " + ($MissingPayloadPaths -join ", "))
+}
 
 # Keep the installed runtime portable across ordinary Windows user-profile
 # paths. This is checked before compilation so path regressions fail cheaply
