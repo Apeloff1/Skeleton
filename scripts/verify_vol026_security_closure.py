@@ -278,6 +278,14 @@ threat_payload = {
         }
         for item in model.threats
     ],
+    "impact_triggers": [
+        {
+            "id": trigger.trigger_id,
+            "domains": list(trigger.domains),
+            "rationale": trigger.rationale,
+        }
+        for trigger in model.impact_triggers
+    ],
 }
 threat_expected = hashlib.sha256(
     canonical_json_bytes(threat_payload)
@@ -466,7 +474,7 @@ def _validate_behavior(
         errors.append("threat identities are not unique canonical strings")
     if threat.get("digest") != threat.get("expected_digest"):
         errors.append("threat-model identity is not shared-canonical")
-    if threat.get("model_version") != "vol026-v1":
+    if threat.get("model_version") != "vol026-v2":
         errors.append("unexpected VOL-026 threat-model version")
 
     validations = threat.get("validation_paths")
