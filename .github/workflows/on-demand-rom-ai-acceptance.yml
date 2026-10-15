@@ -45,6 +45,7 @@ jobs:
             scripts/run_game_rom_acceptance_suite.py \
             scripts/audit_original_gameboy_mapper_matrix.py \
             scripts/audit_original_gameboy_cpu_opcodes.py \
+            scripts/audit_original_gameboy_interrupts.py \
             scripts/audit_original_gameboy_alu_flags.py \
             scripts/audit_original_rom_instruction_divergence.py \
             scripts/audit_game_emulator_first_boot.py \
