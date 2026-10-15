@@ -75,8 +75,9 @@ def _observe_one(
     cancelled: Callable[[], bool] | None,
     timeout_seconds: float,
 ) -> dict[str, Any]:
-    from .game_emulator_host import create_emulator_environment
+    from .game_emulator_host import create_emulator_environment, _ACTIONS, _KEY_ACTIONS
     from .game_comparison_signal_features import describe_native_frame, describe_native_audio
+    from .game_comparison_controllers import controller_layout_for_target
 
     if cancelled is not None and cancelled():
         raise ComparativeStudyError("Operator cancelled the comparative study")
@@ -87,6 +88,8 @@ def _observe_one(
     checkpoints = _stage_checkpoints(len(tape))
     observed: dict[str, Any] = {}
     observation_count = 0
+    step_receipts: list[dict[str, Any]] = []
+    event_chain = digest(["comparative-native-session", game["id"], content_sha256])
     summaries: dict[str, list[float]] = {name: [] for name in ("visual_change", "audio_rms", "screen_mean")}
     with create_emulator_environment(
         game["target_id"],
@@ -105,6 +108,25 @@ def _observe_one(
                 raise ComparativeStudyError("Operator cancelled comparative native observation")
             step = env.step(action)
             observation_count += 1
+            frame_now = env._frame
+            metrics_now = {
+                name: float(step.observation[name])
+                for name in ("visual_change", "audio_rms", "screen_mean", "step_fraction")
+            }
+            receipt = {
+                "step": index, "action": action,
+                "native_frame_sha256": frame_now["pixel_sha256"],
+                "native_pcm_sha256": frame_now["audio_sha256"],
+                "native_frame_count": frame_now["runs"],
+                "native_audio_frames": frame_now["audio_frames"],
+                "transition_sha256": step.transition_digest,
+                "objective_observations": metrics_now,
+                "input_protocol": "approved_libretro_policy_action",
+                "gameplay_success_verified": False,
+            }
+            event_chain = digest([event_chain, receipt])
+            receipt["receipt_chain_sha256"] = event_chain
+            step_receipts.append(receipt)
             for name in summaries:
                 summaries[name].append(float(step.observation[name]))
             for phase, chosen in checkpoints.items():
@@ -115,6 +137,10 @@ def _observe_one(
                 stage = {
                     "phase": phase,
                     "step": index,
+                    "action_at_checkpoint": action,
+                    "action_retropad_mask": _ACTIONS.get(action),
+                    "action_keyboard_code": _KEY_ACTIONS.get(action),
+                    "controller_input_receipt_sha256": event_chain,
                     "source": "actual_isolated_libretro",
                     "evidence_ref": game["id"] + ":" + phase,
                     "evidence_sha256": digest([
@@ -195,6 +221,10 @@ def _observe_one(
         "metrics": metrics,
         "canonical_offline_trace_sha256": trace["trace_digest"],
         "trace_step_count": trace["steps"],
+        "controller_layout": controller_layout_for_target(game["target_id"], game["controller_devices"]),
+        "native_session_event_receipts": step_receipts,
+        "native_session_log_digest": event_chain,
+        "native_session_log_steps": len(step_receipts),
         "study_local_tabular_training": training,
         "legal_rom_rights_independently_verified": False,
         "human_gameplay_quality_verified": False,

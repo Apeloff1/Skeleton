@@ -770,6 +770,27 @@
       "integration": "All three per-game native checkpoints and their pairwise objective comparisons, Dragon/Jeeves synthesis and HTML viewer",
       "semantics": "Signal texture is not a sound/music genre classifier, camera tracker, plot comprehension model, mechanical quality winner or AI weight gain",
       "tests": "tests/test_game_comparison_signal_features.py added; no native-game run"
+    },
+    "controller_telemetry_panel": {
+      "module": "skeleton/jeeves/game_comparison_controllers.py",
+      "ui": "skeleton/jeeves/game_comparison_viewer.py",
+      "targets": "One panel for every canonical target, hardware-style legends on selected families, visibly generic fallback on others",
+      "native_types": [
+        "joypad",
+        "analog",
+        "keyboard",
+        "mouse",
+        "pointer",
+        "none"
+      ],
+      "max_ports": 4,
+      "placement": "Controller deck bolted under each game image, never over gameplay view",
+      "recording": "Offline HTML lets user select digital input chords per port and export up to 64-frame real native controller-tape JSON; replay requires operator-run libretro qualifier",
+      "observations": "Each actual native session records <=64 ordered step receipts with policy action, frame and PCM SHA, transition SHA, bounded objective numeric graph features, chained receipt digest",
+      "presentation": "Two synchronized game views, dynamic graphs and expandable native event logs, no false semantic understanding",
+      "authentic_controller_hardware_verified": false,
+      "live_input_from_html_to_core": false,
+      "actual_native_tested": false
     }
   }
 }

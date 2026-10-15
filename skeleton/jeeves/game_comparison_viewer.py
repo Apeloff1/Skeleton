@@ -42,6 +42,18 @@ textarea{width:100%;min-height:100px;resize:vertical}select{max-width:100%;min-w
 .compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .scene{background:#111827;border:1px solid #364455;border-radius:10px;padding:12px}
 .scene img{display:block;width:100%;height:auto;max-height:360px;object-fit:contain;image-rendering:auto;background:#000;border-radius:7px;margin:12px auto}
+.controller-bolt{margin-top:12px;border:1px solid #4a607b;background:#182537;border-radius:10px;padding:10px;clear:both}
+.controller-deck{height:156px;width:100%;position:relative;background:#202d3f;border-radius:16px;margin-top:9px}
+.controller-key{position:absolute;transform:translate(-50%,-50%);min-width:38px;max-width:70px;font:11px system-ui;border-radius:20px;touch-action:manipulation;cursor:pointer}
+.controller-key.active{background:#d5edc8;color:#102117;border-color:#6fb899}
+.controller-key:focus-visible{outline:3px solid #fbdd89}
+.controller-tools{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px;align-items:center}
+.controller-tools button{font-size:12px}
+.chart-panel{margin-top:14px;border:1px solid #3a4b60;border-radius:9px;padding:9px}
+.chart-panel canvas{width:100%;height:156px;background:#101827;border-radius:6px;display:block}
+.event-table{width:100%;border-collapse:collapse;font-size:11px}
+.event-table td,.event-table th{border-bottom:1px solid #34435a;padding:5px;text-align:left}
+.event-log{max-height:230px;overflow:auto;margin-top:9px}
 .scene h3{margin:0;font-size:17px;overflow-wrap:anywhere}.meta{font-size:12px;color:#bfcede;overflow-wrap:anywhere;line-height:1.6}
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
 .stat{padding:10px;background:#111827;border-radius:8px}.stat strong{display:block}
@@ -69,6 +81,8 @@ footer{margin-top:20px;color:#bbc6d5;font-size:12px}
 </div>
 <div id="question" class="muted"></div>
 <div class="compare" id="comparison"></div>
+<h2>Native session graphs, logs and evidence</h2>
+<div id="telemetry"></div>
 <h2>Objective observations, not quality rankings</h2>
 <div class="stats" id="stats"></div>
 <h2>Series / evolution</h2><div id="timeline"></div>
@@ -98,6 +112,70 @@ const pairList=report.pairs||[];
 const $=id=>document.getElementById(id);
 const txt=(tag,content,cls)=>{const e=document.createElement(tag);e.textContent=String(content==null?"":content);if(cls)e.className=cls;return e};
 const localNotes=[];
+const controllerDrafts=new Map();
+const activeControlSelections=new Map();
+const defaultControl=()=>({buttons:0,axes:[0,0,0,0],keys:[],mouse:[0,0,0,0,0,0],pointer:[0,0,0]});
+function draftFor(id){if(!controllerDrafts.has(id))controllerDrafts.set(id,[]);return controllerDrafts.get(id)}
+function controlsFor(id,port){const key=id+":"+port;if(!activeControlSelections.has(key))activeControlSelections.set(key,new Map());return activeControlSelections.get(key)}
+function exportOfflineJSON(name,data){
+ const uri=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+ const a=document.createElement("a");a.href=uri;a.download=name.replace(/[^a-z0-9_-]/gi,"_")+".json";
+ document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(uri),5000)
+}
+function buildControllerBolt(game){
+ const layout=game.controller_layout;
+ if(!layout)return txt("p","Controller metadata unavailable; physical layout unverified.","muted");
+ const wrap=txt("section","", "controller-bolt");
+ wrap.append(txt("strong",layout.profile_name+" • "+(layout.generic_fallback?"generic RetroPad mapping":"hardware-style legend, core not certified")));
+ wrap.append(txt("div","Input panel is bolted under the view. Click/tap keys to compose an offline raw controller replay frame; this report cannot control a running emulator.","meta"));
+ const tools=txt("div","", "controller-tools");
+ const portSelect=document.createElement("select");
+ layout.ports.forEach(port=>{const o=option("Port "+(port.port+1)+" • "+port.device,String(port.port));portSelect.append(o)});
+ tools.append(txt("label","Port "),portSelect);
+ const record=txt("button","Record input frame"),clear=txt("button","Clear selection");
+ const save=txt("button","Export replay JSON"),status=txt("small","No frames drafted","muted");
+ [record,clear,save].forEach(b=>{b.type="button";tools.append(b)});tools.append(status);
+ const deck=txt("div","", "controller-deck");
+ function renderDeck(){
+  deck.replaceChildren();
+  const port=layout.ports[Number(portSelect.value)||0],selection=controlsFor(game.id,port.port);
+  if(port.device==="none"){deck.append(txt("p","Disconnected port — no controls","muted"));return}
+  (port.controls||[]).forEach(input=>{
+   const b=txt("button",input.legend,"controller-key"+(selection.has(input.id)?" active":""));
+   b.type="button";b.title=input.id+" • "+input.input_kind;
+   b.style.left=String(input.x)+"%";b.style.top=String(input.y)+"%";
+   b.setAttribute("aria-pressed",String(selection.has(input.id)));
+   b.onclick=()=>{selection.has(input.id)?selection.delete(input.id):selection.set(input.id,input);renderDeck()};
+   deck.append(b)
+  });
+  if(port.device==="analog")deck.append(txt("small","Analog axis defaults to neutral; typed axis vectors may be authored in exported JSON.","muted"));
+  if(port.device==="mouse"||port.device==="pointer")deck.append(txt("small","Coordinates default to zero; move values can be edited in exported JSON.","muted"))
+ }
+ portSelect.onchange=renderDeck;
+ record.onclick=()=>{
+  const tape=draftFor(game.id);
+  if(tape.length>=64){status.textContent="64-frame native tape limit reached";return}
+  const frame=layout.ports.map(()=>defaultControl());
+  layout.ports.forEach(port=>{
+   const chosen=controlsFor(game.id,port.port);
+   for(const entry of chosen.values()){
+    if(entry.input_kind==="bitmask")frame[port.port].buttons|=entry.mask;
+    else if(entry.input_kind==="keycode")frame[port.port].keys.push(entry.key_code);
+    else if(entry.input_kind==="mouse_button")frame[port.port].mouse[entry.mouse_index]=1;
+    else if(entry.input_kind==="pointer_button")frame[port.port].pointer[entry.pointer_index]=1;
+   }
+  });
+  tape.push(frame);
+  layout.ports.forEach(p=>controlsFor(game.id,p.port).clear());
+  status.textContent=tape.length+" captured local replay frames, not executed";
+  renderDeck()
+ };
+ clear.onclick=()=>{layout.ports.forEach(p=>controlsFor(game.id,p.port).clear());renderDeck()};
+ save.onclick=()=>{const tape=draftFor(game.id);if(!tape.length){status.textContent="Record an input frame first";return}
+  exportOfflineJSON(game.id+"_controller_tape",tape);status.textContent="JSON exported. Execute only with separately approved native qualifier."
+ };
+ wrap.append(deck,tools);renderDeck();return wrap
+}
 let activePairs=pairList;
 const categories=["movement","input","combat","navigation","story","dialogue","camera","cutscene","character","npc","environment","pacing","challenge","reward","audio","music","ambience","visuals","interface","accessibility","emergence","economy","physics","mission","level_design","consequence","world_design","other"];
 for(const category of categories){const o=txt("option",category);o.value=category;$("dimension").append(o)}
@@ -117,6 +195,7 @@ function card(id,phase){
  if(typeof p.image_data_uri==="string"&&/^data:image\/png;base64,[a-zA-Z0-9+/=]+$/.test(p.image_data_uri)){
   const image=document.createElement("img");image.src=p.image_data_uri;image.alt="Actual bounded native screenshot for "+g.title+" at "+phase+" checkpoint";c.append(image);
  }else{c.append(txt("p","No native preview stored; raw frame SHA-256 remains available.","muted"))}
+ c.append(buildControllerBolt(g));
  c.append(txt("div","Step "+p.step+" • "+p.width+"×"+p.height+" • audio frames "+p.audio_frames,"meta"));
  if(g.study_local_tabular_training){c.append(txt("div","Study-local Q updates: "+g.study_local_tabular_training.updates_applied+" • policy "+g.study_local_tabular_training.trained_policy_sha256+" • NOT production LLM weights","meta"))}
  c.append(txt("div","Frame "+p.frame_sha256+" • evidence "+p.evidence_sha256,"meta"));
@@ -139,12 +218,52 @@ function renderSynthesis(){
   dest.append(txt("div","Parameter hypothesis: "+p.parameter_name+" • "+p.proposal_count+" proposals • "+(p.conflicting_values_or_units?"conflicting values; independent review required":"not experimentally verified"),"note"))
  });
 }
+function renderTelemetry(pair){
+ const target=$("telemetry");target.replaceChildren();
+ for(const id of [pair.left_id,pair.right_id]){
+  const g=gameMap[id];
+  if(!g||!Array.isArray(g.native_session_event_receipts)||!g.native_session_event_receipts.length){
+   target.append(txt("p",id+": no live native event receipts captured","muted"));continue
+  }
+  const root=txt("section","","chart-panel");
+  root.append(txt("strong",g.title+" • "+g.native_session_event_receipts.length+" verified native-step receipts"));
+  const canvas=document.createElement("canvas");canvas.width=640;canvas.height=156;canvas.setAttribute("aria-label","Objective visual change and audio RMS values over executed frame steps");
+  root.append(canvas);
+  const ctx=canvas.getContext("2d");
+  if(ctx){
+   ctx.fillStyle="#101827";ctx.fillRect(0,0,640,156);
+   const colors=["#80c1e5","#d6bc91"];
+   ["visual_change","audio_rms"].forEach((key,ix)=>{
+    const data=g.native_session_event_receipts.map(x=>Number(x.objective_observations[key]||0));
+    const maximum=Math.max(1e-6,...data.map(Math.abs));
+    ctx.strokeStyle=colors[ix];ctx.lineWidth=2;ctx.beginPath();
+    data.forEach((v,n)=>{const x=12+616*n/Math.max(1,data.length-1);const y=145-120*Math.min(1,Math.abs(v)/maximum);
+      if(n===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)
+    });ctx.stroke()
+   })
+  }
+  root.append(txt("small","Blue: relative visual-change magnitude • Gold: relative PCM RMS • independent scales; not a quality score","muted"));
+  const details=document.createElement("details");const summary=txt("summary","Open event log and hash receipts");details.append(summary);
+  const events=txt("div","", "event-log"),table=document.createElement("table");table.className="event-table";
+  const headers=document.createElement("tr");
+  ["Step","Action","Visual Δ","Audio RMS","Receipt SHA-256"].forEach(h=>headers.append(txt("th",h)));
+  table.append(headers);
+  g.native_session_event_receipts.forEach(e=>{
+   const tr=document.createElement("tr");
+   [e.step,e.action,Number(e.objective_observations.visual_change).toFixed(5),
+    Number(e.objective_observations.audio_rms).toFixed(5),e.receipt_chain_sha256].forEach(v=>tr.append(txt("td",v)));
+   table.append(tr)
+  });
+  events.append(table);details.append(events);root.append(details);target.append(root)
+ }
+}
 function currentPair(){return activePairs[Number($("pair").value)||0]||null}
 function render(){
  const p=currentPair(),phase=$("phase").value;
  $("comparison").replaceChildren();$("stats").replaceChildren();$("question").replaceChildren();$("timeline").replaceChildren();$("notes").replaceChildren();
  if(!p){$("comparison").append(txt("p","No comparison matches this series. Select another series."));return}
  $("comparison").append(card(p.left_id,phase),card(p.right_id,phase));
+ renderTelemetry(p);
  $("question").append(txt("p",(p.questions&&p.questions.length?p.questions.join(" • "):"Choose a stage to compare native observations and write your own evidence-grounded notes.")));
  const phaseMatch=(p.phase_comparisons||[]).find(x=>x.phase===phase);
  if(phaseMatch){
