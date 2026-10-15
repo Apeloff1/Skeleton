@@ -162,6 +162,10 @@ jobs:
 
           # The command below performs actual bounded native transformer
           # inference inside the frozen executable. No Docker/credentials/GUI.
+          $catalogSmoke = Start-Process -FilePath $launcher -ArgumentList @("--training-modules") -Wait -PassThru
+          if ($catalogSmoke.ExitCode -ne 0) {
+            throw "installed executable Jeeves training catalogue failed its structural check"
+          }
           $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru
           if ($nativeSmoke.ExitCode -ne 0) {
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"

@@ -614,7 +614,12 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from multiprocessing import freeze_support
+    freeze_support()  # required for the two spawned optimizers in frozen Windows.
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "--training-modules":
+        from skeleton.ai.training.jeeves_parallel_mirrors import main as training_main
+        return training_main(arguments[1:])
     if "--offline-command" in arguments:
         # The frozen executable shares the canonical offline CLI. This path
         # is usable on a headless host and never initializes Tk or Compose.

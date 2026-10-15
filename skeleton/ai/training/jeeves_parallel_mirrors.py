@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ProcessPoolExecutor
 from hashlib import sha256
+import ctypes
 import json
 from multiprocessing import get_context
 import os
@@ -20,6 +21,32 @@ from typing import Any
 from .jeeves_multidomain import digest_with_mirrors, load_multidomain_corpus, validate_catalog
 from .jeeves_production_game_train import ProductionCheckpointError, _production_source
 from .jeeves_production_readiness import _load_attestation, _save_new_private
+
+def available_memory_bytes() -> int:
+    """Read host available RAM without assuming an unbundled third-party package."""
+    if os.name == "nt":
+        class MemoryStatus(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_uint32),
+                ("dwMemoryLoad", ctypes.c_uint32),
+                ("ullTotalPhys", ctypes.c_uint64),
+                ("ullAvailPhys", ctypes.c_uint64),
+                ("ullTotalPageFile", ctypes.c_uint64),
+                ("ullAvailPageFile", ctypes.c_uint64),
+                ("ullTotalVirtual", ctypes.c_uint64),
+                ("ullAvailVirtual", ctypes.c_uint64),
+                ("ullAvailExtendedVirtual", ctypes.c_uint64),
+            ]
+        status = MemoryStatus()
+        status.dwLength = ctypes.sizeof(status)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            raise ProductionCheckpointError("Windows RAM admission probe failed")
+        return int(status.ullAvailPhys)
+    try:
+        return int(os.sysconf("SC_AVPHYS_PAGES")) * int(os.sysconf("SC_PAGE_SIZE"))
+    except (AttributeError, OSError, ValueError) as exc:
+        raise ProductionCheckpointError("platform cannot prove free RAM for parallel training") from exc
+
 
 SCHEMA = "skeleton.jeeves.parallel_training_receipt.v1"
 ARMS = (("constructive", 0.005, 1), ("adversarial", 0.003, 2))
@@ -91,11 +118,7 @@ def run_parallel_candidates(
     source, parent_sha = _source(attestation_path)
     if shutil.disk_usage(output_directory).free < 1024 ** 3:
         raise ProductionCheckpointError("at least 1 GiB free disk is required")
-    try:
-        import psutil
-    except ImportError as exc:
-        raise ProductionCheckpointError("psutil is required for RAM-based dual optimizer admission") from exc
-    if psutil.virtual_memory().available < max(2 * 1024 ** 3, 16 * source.stat().st_size):
+    if available_memory_bytes() < max(2 * 1024 ** 3, 16 * source.stat().st_size):
         raise ProductionCheckpointError("insufficient available RAM for two isolated model copies")
     names: dict[str, tuple[Path, Path]] = {}
     for name, _lr, _epochs in ARMS:
