@@ -221,6 +221,41 @@ def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
     }
 
 
+def _verify_alu_reference(directory: Path) -> dict[str, Any]:
+    document, reference = _json_file(directory / "original-alu-flags.json")
+    _verify_digest(document, "report_digest")
+    if (
+        document.get("schema_version") != "skeleton.game.original_sm83_alu_reference.v1"
+        or document.get("source") != "actual_GameBoyMachine_ALU_vs_independent_reference"
+        or document.get("independent_hardware_flag_math_reference") is not True
+        or document.get("actual_source_flag_comparisons") != 5184
+        or document.get("actual_passed_alu_operations") != 8
+        or document.get("full_game_accuracy_certified") is not False
+        or document.get("production_model_updates") != 0
+    ):
+        raise AcceptanceSuiteError("original CPU ALU results fail the independent source flag reference")
+    details = document.get("real_machine_results")
+    if not isinstance(details, list) or len(details) != 8:
+        raise AcceptanceSuiteError("each original CPU arithmetic operation needs a separate receipt")
+    for index, row in enumerate(details):
+        if (
+            not isinstance(row, dict)
+            or row.get("operation") != index
+            or row.get("observed_real_machine_cases") != 648
+            or row.get("source_arithmetic_flags_matched") is not True
+            or not isinstance(row.get("bounded_reference_result_sha256"), str)
+            or len(row["bounded_reference_result_sha256"]) != 64
+        ):
+            raise AcceptanceSuiteError("source ALU boundary sample counts, ordered flag math or digest differ")
+    return {
+        "accepted": True,
+        "actual_independently_checked_ALU_flags": 5184,
+        "operation_families": 8,
+        "receipt_file": reference,
+        "full_hardware_accuracy_certified": False,
+    }
+
+
 def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
     report, reference = _json_file(directory / "original-cpu-opcodes.json")
     _verify_digest(report, "report_digest")
@@ -509,6 +544,16 @@ def run_acceptance_suite(
                 output_directory, "focused_synthetic_and_real_original_rom_regressions",
                 seconds=process_timeout_seconds,
             ))
+        alu_path = output_directory / "original-alu-flags.json"
+        processes.append(_run(
+            [
+                sys.executable, "scripts/audit_original_gameboy_alu_flags.py",
+                "--evidence-file", str(alu_path),
+            ],
+            output_directory, "original_sm83_alu_reference",
+            seconds=process_timeout_seconds,
+        ))
+        alu_reference = _verify_alu_reference(output_directory)
         opcode_path = output_directory / "original-cpu-opcodes.json"
         processes.append(_run(
             [
@@ -579,6 +624,7 @@ def run_acceptance_suite(
             "original_cartridge_bus_matrix_verified": True,
             "source_instruction_replay_and_divergence_verified": True,
             "all_legal_source_opcodes_replay_verified": True,
+            "independent_cpu_alu_flags_reference_verified": True,
             "source_q_rewind_proven": True,
             "neural_candidate_optimized_and_scored": True,
             "source_goal_replay_and_neutral_control_verified": True,
@@ -587,6 +633,7 @@ def run_acceptance_suite(
             "real_cartridge_bus_matrix": mapper,
             "source_cpu_instruction_divergence": instruction,
             "original_cpu_opcode_coverage": opcode_matrix,
+            "original_cpu_alu_reference": alu_reference,
             "bounded_worker_receipts": processes,
             "real_libretro_installed_core_tested": False,
             "independent_game_hardware_accuracy_certified": False,
