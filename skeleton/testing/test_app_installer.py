@@ -246,3 +246,39 @@ def test_setup_preserves_external_mongo_when_local_credentials_are_repaired(tmp_
     values = _read_values(tmp_path / ".env")
     assert values["MONGO_URL"] == remote_uri
     assert values["MONGO_INITDB_ROOT_PASSWORD"] in values["SKL_MONGO_URI"]
+
+
+def test_installer_validates_compose_with_start_mode_environment(tmp_path, monkeypatch):
+    from skeleton.app.assembly import load_manifest
+    report = PreloadReport(
+        root=tmp_path,
+        platform="test",
+        python="3.11",
+        checks=(PreloadCheck("host:ready", True, "ready"),),
+    )
+    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda *args, **kwargs: report)
+    monkeypatch.setattr("skeleton.app.installer.preflight", lambda *args, **kwargs: ())
+    monkeypatch.setattr("skeleton.app.installer.checks_ok", lambda checks: True)
+    monkeypatch.setattr(
+        "skeleton.app.installer.ensure_runtime_environment",
+        lambda *args, **kwargs: type("Setup", (), {
+            "created": False, "changed": False,
+            "env_path": tmp_path / ".env", "configured_keys": (),
+        })(),
+    )
+    manifest = load_manifest()
+    commands = []
+    def runner(command, **kwargs):
+        commands.append((tuple(command), kwargs.get("env", {})))
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    receipt = install_application(tmp_path, install_python=False, production=True, runner=runner)
+    assert receipt.ok
+    assert len(commands) == 1
+    command, env = commands[0]
+    assert command[-1] == "config"
+    assert env["BUILD_TARGET"] == "production"
+    assert env["FRONTEND_BUILD_TARGET"] == "production"
+    assert env["FRONTEND_CONTAINER_PORT"] == "8080"
+    assert env["NODE_ENV"] == "production"
+
