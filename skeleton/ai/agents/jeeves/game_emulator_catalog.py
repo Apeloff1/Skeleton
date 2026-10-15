@@ -377,6 +377,14 @@ _CORE_CONTENT_EXTENSIONS = {
     # Extension hints are grounded in the pinned libretro system-info sources.
     # These DO NOT activate a core or bypass the worker's live extension check.
     "nestopia": "nes|unf|unif",
+    "sameboy": "gb|gbc",
+    "vba_next": "gba",
+    "a5200": "a52|bin",
+    "vice_x64sc": "d64|d71|d80|d81|d82|g64|g41|x64|t64|tap|prg|p00|crt|bin|cmd|m3u|vfl|vsf|rom",
+    "vice_x128": "d64|d71|d81|g64|x64|t64|tap|prg|p00|crt|bin|cmd|m3u",
+    "vice_xvic": "d64|t64|tap|prg|p00|crt|bin|cmd|m3u|rom",
+    "vice_xplus4": "d64|d81|t64|tap|prg|p00|crt|bin|cmd|m3u|rom",
+    "vice_xpet": "d64|t64|tap|prg|p00|bin|cmd|m3u|rom",
     "mesen": "nes|unf|unif",
     "bluemsx": "rom|ri|mx1|mx2|dsk|col|sg|sc|sf|cas|m3u",
     "fmsx": "rom|mx1|mx2|dsk|fdi|cas|m3u",
