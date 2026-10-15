@@ -573,9 +573,9 @@ def validate_neural_world_checkpoint(snapshot: Mapping[str, Any]) -> str:
     if (
         not isinstance(features, list) or not 1 <= len(features) <= 32
         or not isinstance(actions, list) or not 2 <= len(actions) <= 32
+        or any(type(item) is not str or not 1 <= len(item) <= 64 for item in features + actions)
         or len(set(features)) != len(features)
         or len(set(actions)) != len(actions)
-        or any(type(item) is not str or not 1 <= len(item) <= 64 for item in features + actions)
         or type(width) is not int or not 4 <= width <= 64
     ):
         raise EmulatorNeuralError("candidate model sensor, action or hidden basis exceeds physical bounds")
