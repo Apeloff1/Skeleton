@@ -209,3 +209,40 @@ def test_installer_skip_python_runs_bounded_validation(tmp_path, monkeypatch):
     ]
     assert receipt.phases[2].required is False
     assert commands == [("docker", "compose", "config")]
+
+
+def test_setup_repairs_stale_local_mongo_uris_after_password_repair(tmp_path):
+    (tmp_path / ".env").write_text(
+        "MONGO_INITDB_ROOT_USERNAME=admin\n"
+        "MONGO_INITDB_ROOT_PASSWORD=change-me\n"
+        "MONGO_URL=mongodb://admin:oldpass@mongo:27017/tutolage?authSource=admin\n"
+        "SKL_MONGO_URI=mongodb://admin:oldpass@mongo:27017/skeleton?authSource=admin\n"
+        "JWT_SECRET=some-valid-preserved-jwt-secret\n",
+        encoding="utf-8",
+    )
+    result = ensure_runtime_environment(tmp_path)
+    values = _read_values(tmp_path / ".env")
+    new_password = values["MONGO_INITDB_ROOT_PASSWORD"]
+
+    assert result.changed
+    assert new_password not in ("", "change-me", "oldpass")
+    assert f"mongodb://admin:{new_password}@mongo:27017/" in values["MONGO_URL"]
+    assert f"mongodb://admin:{new_password}@mongo:27017/" in values["SKL_MONGO_URI"]
+    assert {"MONGO_URL", "SKL_MONGO_URI"} <= set(result.configured_keys)
+    assert not ensure_runtime_environment(tmp_path).changed
+
+
+def test_setup_preserves_external_mongo_when_local_credentials_are_repaired(tmp_path):
+    remote_uri = "mongodb://service:remote-password@db.example.net:27017/app"
+    (tmp_path / ".env").write_text(
+        "MONGO_INITDB_ROOT_USERNAME=admin\n"
+        "MONGO_INITDB_ROOT_PASSWORD=change-me\n"
+        f"MONGO_URL={remote_uri}\n"
+        "SKL_MONGO_URI=mongodb://admin:oldpass@mongo:27017/skeleton?authSource=admin\n"
+        "JWT_SECRET=some-valid-preserved-jwt-secret\n",
+        encoding="utf-8",
+    )
+    ensure_runtime_environment(tmp_path)
+    values = _read_values(tmp_path / ".env")
+    assert values["MONGO_URL"] == remote_uri
+    assert values["MONGO_INITDB_ROOT_PASSWORD"] in values["SKL_MONGO_URI"]
