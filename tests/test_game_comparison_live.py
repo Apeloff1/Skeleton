@@ -252,6 +252,7 @@ class NativeLiveComparisonContracts(unittest.TestCase):
     def _disc_session(self):
         session=self._session()
         lane=session._lanes["first"]
+        lane.native_content_digest=digest(["admitted_native_bundle",lane.content_digest])
         state={"supported":True,"interface_version":1,"image_count":3,
                "image_index":0,"ejected":False}
         tracked={"count":0,"sha":digest([
@@ -266,7 +267,7 @@ class NativeLiveComparisonContracts(unittest.TestCase):
             receipt={
                 "schema_version":"skeleton.game.native_disc_swap_receipt.v1",
                 "core_sha256":lane.env.core.library_sha256,
-                "content_digest":lane.content_digest,
+                "content_digest":lane.native_content_digest,
                 "environment_digest":lane.env.spec.environment_digest,
                 "event_index":tracked["count"]+1,
                 "episode_step_before_swap":lane.step_count,
