@@ -127,6 +127,33 @@ Keep the previous private environment backup for rollback; never attach it to
 diagnostic reports. Setup alone does not install trained AI weights or prove
 model readiness.
 
+### Pre-compilation readiness
+
+Before creating any installer or claiming the assembled app can ship, run the
+read-only contract pass from a configured development environment:
+
+```bash
+make precompile
+```
+
+This sequences the architecture map, AI construction and capability interfaces,
+provider bootstrap, app assembly, toolchain contract, and structural application
+checks. It does **not** install dependencies, mutate `.env`, launch Docker,
+compile release binaries, train the model, or qualify an enterprise release.
+A passing pre-compilation contract pass is necessary but not sufficient for
+a completed app; it must be followed by exact-head build, runtime journey,
+security, Windows installation, and independent release evidence.
+
+The Windows build compiles both frozen executables and the Inno Setup recipe
+from the same `git archive` source revision as the installed payload. The
+payload is expanded with **all** `required_paths` declared by the archived
+`skeleton/app/manifest.json`, and it fails before compilation if any file is
+missing, a path exceeds the Windows portability budget, or its project version
+differs from the requested installer version. The Windows CI interpreter is
+aligned to the Python 3.11.16 toolchain baseline and the application package's
+Pydantic minimum. Build failures release the temporary drive so repair attempts
+are not blocked by stale mappings.
+
 ### Windows Setup.exe
 
 The Windows distribution wraps the same setup/runtime plane in two executable
@@ -309,3 +336,309 @@ because the Expo development server is not the production reverse proxy.
 6. Existing subsystem work should reconcile through bounded integration
    branches based on the latest assembled `main`; do not revive the superseded
    mega-diff consolidation trunk or create a competing application root.
+
+### Jeeves multidisciplinary specialization and mirrors
+
+The app ships with **384 executable curriculum specialization contracts**
+(16 specialties by 8 review lenses in each of gaming, AI and coding). These are
+training/evaluation routes, **not** 384 separately trained neural models.
+Inspect the registry without running a model:
+
+```bash
+python -m skeleton app training-modules
+```
+
+For four parallel, independent data-analysis angles, supply a rights-reviewed
+multidomain manifest pointing to content-addressed train and heldout JSONL:
+
+```bash
+python -m skeleton app training-modules --dataset-manifest PATH_TO_APPROVED_MANIFEST
+```
+
+To launch **two actual CPU-process optimizers concurrently**, the operator must
+supply a running-app Jeeves attestation, configured persisted SKELETON_OWN
+checkpoint, explicit rights review, existing output directory, and new receipt:
+
+```bash
+python -m skeleton app training-modules --train-mirrors \
+  --dataset-manifest PATH_TO_APPROVED_MANIFEST \
+  --attestation PATH_TO_IN_PROCESS_ATTESTATION \
+  --output-directory PATH_TO_PRIVATE_CANDIDATES \
+  --receipt PATH_TO_PRIVATE_CANDIDATES/mirror-receipt.json
+```
+
+The implementation fails closed on unsupported checkpoints, missing attestation,
+dataset contamination, insufficient RAM/disk, or heldout regression. It never
+writes to serving weights and never auto-promotes a candidate. The mirrors
+perform distinct optimizer schedules; separate blinded human/independent model
+review is still required to establish improvement beyond language loss.
+
+The installed Windows launcher also provides a **Jeeves Training Modules**
+read-only catalogue panel. It validates the same manifest checksum and
+specialization schema without initializing the model or changing any weights.
+Windows installer CI now runs the specialist data-partition tests and executes
+the installed catalogue check before native inference smoke tests.
+
+The two real optimizer arms now select **disjoint rights-reviewed teaching
+lenses**: constructive work (construct, repair, resource, portability) and
+adversarial work (counterexample, edge cases, security, verification).
+Both are scored against the same untouched held-out examples. If either view
+lacks sufficient reviewed material in gaming, AI and coding, training aborts
+before spawning optimizers; synthetic placeholder data is not substituted.
+
+### Cinematic angle, cutscene, item and apparel simulation
+
+The authored scene validator supports original `pan_to`, `tilt`, `dolly`,
+`crane`, `orbit`, `rack_focus`, `handheld`, tracking and cut types.
+Jeeves can simulate timed camera positions, look targets, yaw/pitch, focal
+range, spoken-line chronology, costume mobility, and item carrying constraints
+without rendering images or pretending a fitted clothing-physics model exists.
+
+Use the installed Windows **Cutscene Multi-Sim** control with a
+rights-reviewed original scene JSON, or the operator CLI:
+
+```bash
+python -m skeleton app cinematic-sim --scene my-cutscene.json \
+  --output cinematic-evidence.json --candidate-output cutscene-review.jsonl \
+  --workers 4 --limit 128 --frame-ms 100 \
+  --yaw-offsets -30 -15 0 15 30 --pan-rates 70 100 130 \
+  --fov-offsets -10 0 10 --item-mass-deltas 0 250 \
+  --apparel-drag-deltas 0 15 \
+  --item-variants lantern shield --apparel-variants cloak armor
+```
+
+A simulation is one continuous frame evolution; the engine audits its
+collected digest chain **backwards per run without restarting the sim**.
+This supplies two complementary audit/readout directions, *not* twice the
+independent model training. Each distinct trace can yield two quarantined,
+linked review exercises. Duplicate traces are not counted as novel evidence.
+Only an independently reviewed and rights-cleared corpus may later enter
+the attested candidate optimizer; no serving weights are changed here.
+
+Use `--audit-report cinematic-evidence.json` to inspect an existing
+receipt without starting a new simulation; optionally combine that with
+`--candidate-output` to export review-only pairs from the existing trace
+summary. Every simulation run is bounded by per-run and global frame,
+memory, worker and variation budgets. Item/apparel variants may only refer
+to approved source identities; voice, scene chronology and screen direction
+are kept invariant. Data includes shot-level camera range, occlusion, carry
+capacity, outfit mobility and reverse integrity statistics. This is a
+pre-render structural simulator, **not** a playable video-rendering engine.
+
+### Pause and resume an individual cinematic simulation
+
+The frame control plane supports in-process `pause`, `step`, `seek`,
+`resume`, `checkpoint` and hash-checked `from_checkpoint`. A paused
+run can also be saved and resumed from the app CLI:
+
+```bash
+python -m skeleton app cinematic-sim --scene original-scene.json \
+  --pause-after 32 --checkpoint-out paused-cinema.json
+
+python -m skeleton app cinematic-sim --scene original-scene.json \
+  --resume-checkpoint paused-cinema.json --output resumed-cinema-report.json
+
+python -m skeleton app cinematic-sim --audit-report resumed-cinema-report.json
+```
+
+The cursor stores already observed frames with a chained checksum. Restoration
+rejects tampered observations and changed source identities, then computes only
+remaining frames. It does not repeat earlier simulation steps or alter any
+model weights. Paused artifacts are private and require an unused output path.
+
+### Adaptive scenario, environment and adversarial simulator
+
+Jeeves also includes a coverage-guided stress-rehearsal controller:
+```bash
+python -m skeleton app adaptive-sim --scene approved-original-scene.json \
+  --output adaptive-campaign.json --draft-output review-drafts.jsonl \
+  --budget 48 --workers 4 --seed 7 --frame-ms 100
+```
+
+The scheduler maximizes coverage across pursuit, rescue, combat, stealth,
+dialogue and exploration; clear/fog/rain/snow/storm conditions, light, crowd,
+noise, friction and approved camera/item/apparel stresses. It runs a *real*
+deterministic camera/prop simulator per scenario and applies documented,
+bounded **proxy** risk formulas to each observed frame. It does not render
+rain, NPC crowds, acoustics or fluid physics. It compares each scenario to a
+shared immutable baseline, prioritizes measured failures in a feedback stage,
+and performs source-derived reverse audits without restarting a scene.
+
+The `--draft-output` pairs situational diagnosis, one-factor repair requests
+and adversarial edge-case review prompts. Every generated draft is **quarantined,
+unlabelled and ineligible for optimizer updates** until independent rights,
+quality, project-split and leakage review. This adds controlled evidence,
+not fictitious model learning. The installed Windows launcher exposes an
+opt-in **Adaptive Simulation** control.
+
+Adaptive campaigns also materialize a **paired counterfactual ledger**:
+each second-stage attack or repair records the parent scenario, changed
+dimensions, exact targeted failure family, measured before/after counts and
+observed reduction or regression. These are *executed* comparisons against
+the original authored source, not merely plausible improvement prose.
+The reverse audit and immutable campaign hash detect forged measurements.
+The output stays quarantined until independent evaluator/rights approval.
+
+### Real candidate parameter growth (no implied trained improvement)
+
+Jeeves' persisted **Torch-stack** speaking model can now acquire *actual
+trainable neurons* in every feed-forward layer by a private, candidate-only
+operation. The operator selects `micro` (+12.5%), `balanced` (+25%),
+`large` (+50%) or `xlarge` (+100%) of FFN width. Existing tensor rows,
+token identities and optimizer counters remain pinned to the live parent,
+while the new incoming FFN rows get deterministic nonzero weights and the
+new outgoing columns start at zero. The widened candidate must reproduce
+parent logits within a strict tolerance *before* training new weights.
+
+This makes genuinely new optimizer-addressable parameters, without
+pretending that larger weights immediately improve game production.
+Growth is limited to 2,000,000 added parameters in a candidate, 16,000,000
+total trainable parameters, independent operator caps, and host memory
+admission. Native non-Torch checkpoints fail closed rather than silently
+switching model architectures. An attested production Torch checkpoint and
+approved training corpus are still required.
+
+```bash
+skeleton-jeeves-production-train --checkpoint LIVE_OWN.json \
+  --expected-sha256 VERIFIED_64_HEX \
+  --dataset-manifest APPROVED_DATASET.json \
+  --capacity-growth balanced --max-added-parameters 500000 \
+  --max-optimizer-steps 10000 --candidate candidate.json --report report.json
+```
+
+To grow the two process-isolated candidate arms differently:
+
+```bash
+python -m skeleton app training-modules --train-mirrors \
+  --dataset-manifest APPROVED_DATASET.json \
+  --attestation LIVE_ATTESTATION.json \
+  --output-directory PRIVATE_OUTPUT_DIR --receipt PRIVATE_OUTPUT_DIR/receipt.json \
+  --constructive-capacity balanced --adversarial-capacity micro \
+  --max-added-parameters 500000
+```
+
+The result records original and grown parameter counts, exact new tensor
+count, parent/candidate checksums, equivalence maximum error, measured
+SGD updates, holdout loss/regression and withheld production promotion.
+These are *capacity and candidate optimization results*, not independent
+proof of improved game-design capabilities.
+
+### Measured capability rehearsal (real training data, not test-set leakage)
+
+The attested candidate trainer also offers opt-in **training-only hard-example
+selection**. This uses the current model's actual average token log-probability
+to score *approved training texts only*. It reserves both weak and easier
+retention examples in gaming, AI and coding; then favors distinct specialties
+and higher-loss cases. No held-out example enters this scheduler, selected
+texts are content-hashed, and selection is checkpoint/resume-bound.
+
+```bash
+skeleton-jeeves-production-train --checkpoint LIVE_OWN.json \
+  --expected-sha256 VERIFIED_64_HEX \
+  --dataset-manifest APPROVED_DATASET.json \
+  --capacity-growth balanced --max-added-parameters 500000 \
+  --adaptive-replay --replay-examples 64 --max-scored-examples 128 \
+  --candidate candidate.json --report report.json
+```
+
+The same switches work on `python -m skeleton app training-modules --train-mirrors`
+for separate constructive and adversarial optimizer processes. The scorer
+refuses unreviewed/synthetic inputs, duplicate training texts, absent domains,
+nonfinite losses and source datasets above the explicit inference budget.
+Validation and production promotion remain independent requirements. Increases
+in trainable parameter count or training loss exposure **do not establish**
+a capability uplift without blind external evaluation.
+
+### Boomerang re-analysis queue (second and third pass without replay inflation)
+
+The Jeeves Boomerang queue accepts **completed, rights-reviewed adaptive
+simulation evidence** rather than restarting the original scene. Each
+source-pinned immutable queue entry can be analyzed on return twice, using
+new control settings selected from its archived camera, environment, item,
+apparel and gameplay-risk observations. Old simulation frames are *never*
+executed again merely to advance the queue; only newly selected
+counterfactual scenarios are simulated.
+
+```bash
+python -m skeleton app boomerang-queue --create \
+  --scene original-scene.json --archive adaptive-campaign.json \
+  --output boomerang-0.json
+
+python -m skeleton app boomerang-queue --advance \
+  --queue boomerang-0.json --output boomerang-1.json \
+  --probes 8 --workers 2 --draft-output boomerang-review.jsonl
+
+python -m skeleton app boomerang-queue --advance \
+  --queue boomerang-1.json --output boomerang-2.json --probes 8
+
+python -m skeleton app boomerang-queue --inspect --queue boomerang-2.json
+```
+
+A persisted queue can hold 32 independent archived sources; `--enqueue`
+adds a fresh original report to a **new** queue snapshot. FIFO advancement
+with `--max-entries` caps work per command. The source and report files are
+bound by exact byte SHA256 and original provenance; changed inputs abort
+rather than silently replay incompatible evidence.
+
+**Second pass** explores missed control combinations and previous failure
+signals. **Third pass** prioritizes actual second-pass findings. Each
+pass records novelty compared against *all earlier passes*: new failure
+families, distinct controlled risk signatures, original/novel camera traces,
+per-run forward/reverse checks and before/after targeted risk counts.
+Budgeted fallback exploration is labeled as exploration, not a causal repair.
+Completed entries refuse a fourth boomerang pass.
+
+Optional `--draft-output` emits evidence-grouped, quarantined forward
+diagnosis, reverse-forensic and minimize/retest proposals. Duplicate scene
+sources or already-run scenario IDs are rejected. **These are not fresh
+independent training examples, SGD updates or proven new model capabilities.**
+The Windows GUI has a **Boomerang Sim Queue** control for explicit creation
+and one-pass advancement. Neither the GUI nor CLI automatically modifies
+Jeeves's serving weights.
+
+### Randomized boomerang reshuffle after pass three
+
+Previously completed three-pass boomerang queues can now be migrated into a
+**versioned, audit-preserving randomized-return queue**, without losing a
+single earlier observation or rerunning an original simulation:
+
+```bash
+python -m skeleton app boomerang-queue --reshuffle \
+  --queue boomerang-2.json --output boomerang-scheduled.json \
+  --shuffle-seed 1234 --min-return-seconds 3600 \
+  --max-return-seconds 86400 --max-return-visits 16 --plateau-limit 10
+
+python -m skeleton app boomerang-queue --inspect \
+  --queue boomerang-scheduled.json
+
+# One manual scheduler tick; only work due at the current UTC time runs.
+python -m skeleton app boomerang-queue --advance \
+  --queue boomerang-scheduled.json --output boomerang-next.json \
+  --max-entries 2 --probes 8 --workers 2
+
+# Optional continuously running local foreground scheduler.
+python -m skeleton app boomerang-queue --watch \
+  --queue boomerang-scheduled.json --output-directory ./boomerang-archive \
+  --max-watch-runs 16 --poll-seconds 60 --probes 8 --workers 2
+```
+
+The scheduler uses a deterministic SHA-256-seeded pseudorandom draw within
+the operator's actual wall-clock min/max interval. That makes the interval
+randomized yet independently recomputable from pinned evidence, seed, pass
+digest, return index and schedule time. Due historical simulations are
+reshuffled alongside fresh second-/third-pass work, with aging so due older
+work is not starved. Both the source and original full campaign remain pinned.
+
+Every after-third-pass revisit executes **new effective controls** only,
+preserves the old pass history and records independently audited forward and
+reverse observations. It measures new **failure contexts** across situation,
+weather, lighting and attack, deliberately *not* counting seed-only or
+micro-camera adjustments as new discoveries. A consecutive no-new-context
+plateau retires the source (default 10 returns), as does the hard 16-return
+cap. Both limits and the interval range are operator-configurable.
+
+The optional `--watch` executor runs only as an explicit, live local
+process. It waits for actual UTC due times, writes every queue generation to
+a new immutable filename, and stops on retirement or the configured cycle
+cap. It is not an always-on service unless the operator runs it as one.
+No autonomous checkpoint training or live-model promotion is performed.

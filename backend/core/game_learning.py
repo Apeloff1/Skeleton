@@ -275,8 +275,25 @@ class GameLearningWorkspace:
             else:
                 row["actions"] = []
             consoles.append(row)
+        from skeleton.ai.game_builder.advanced_gameplay_runtime import ENGINES as STUDIO_ENGINES
+        from skeleton.ai.game_builder.advanced_gameplay_runtime import ACTION_HELP as STUDIO_ACTIONS
+
         return {
             "consoles": consoles,
+            "studio_engines": [
+                {
+                    "id": editor,
+                    "target_id": "studio:" + editor,
+                    "runtime_kind": "original_game_reference_runtime",
+                    "request_kind": "studio",
+                    "learning_available": True,
+                    "action_count": len(STUDIO_ACTIONS[editor]),
+                    "native_hardware_verified": False,
+                    "neural_training_automatic": False,
+                    "source_path": "game/studio/session.json",
+                }
+                for editor in STUDIO_ENGINES
+            ],
             "generation_genres": [{"id": value, "label": value.replace("_", " ")} for value in ERA_IDS],
             "algorithms": [
                 {
@@ -295,9 +312,28 @@ class GameLearningWorkspace:
         from skeleton.jeeves.game_learning_runtime import GameLearningEnvironment
 
         await self.ensure_indexes()
-        target = resolve_console(body["console_id"])
+        requested = body["console_id"]
+        studio = requested.startswith("studio:") and len(requested) <= 128
+        if studio:
+            from skeleton.jeeves.game_studio_environment import (
+                make_studio_source, studio_request_tree,
+            )
+            from skeleton.ai.game_builder.advanced_gameplay_runtime import ENGINES
+            editor = requested.removeprefix("studio:")
+            if editor not in ENGINES:
+                raise GameLearningError(
+                    "studio_engine_unavailable",
+                    "Requested original-game engine is not registered as executable.", 409,
+                )
+            target = None
+            initial_studio = studio_request_tree(make_studio_source(editor))
+            resolved_target_id = requested
+        else:
+            target = resolve_console(requested)
+            initial_studio = None
+            resolved_target_id = target.target_id
         project_id = _key(scope["tenant_id"] + ":" + scope["owner_id"], "project", body["idempotency_key"])
-        request_digest = _digest({"name": body["name"], "console_id": target.target_id})
+        request_digest = _digest({"name": body["name"], "console_id": resolved_target_id})
         existing = await self.projects.find_one({"_id": project_id, **scope})
         if existing is not None:
             if existing["request_digest"] != request_digest:
@@ -306,7 +342,12 @@ class GameLearningWorkspace:
                 )
             return await self.get_project(scope, project_id)
         files = (
-            []
+            _files([
+                {"path": path, "content": content, "language": "json"}
+                for path, content in initial_studio.items()
+            ])
+            if studio
+            else []
             if not target.reference_supported
             else _files(
                 [
@@ -330,9 +371,11 @@ class GameLearningWorkspace:
             "schema_version": "skeleton.game_learning.project.v1",
             "project_id": project_id,
             "name": body["name"],
-            "console_id": target.target_id,
-            "engine_era": target.era.value,
+            "console_id": resolved_target_id,
+            "engine_era": "studio_reference" if studio else target.era.value,
             "execution_mode": (
+                "reference"
+                if studio else
                 "rom"
                 if target.requires_rom
                 else (
@@ -444,7 +487,9 @@ class GameLearningWorkspace:
                 kind = self.authored_environment_kind(tree)
                 current_environment = (
                     GameEnvironmentRequest(
-                        project["console_id"], kind=kind, tree=self.authored_runtime_tree(tree, kind)
+                        self.authored_runtime_target(tree, kind, project["console_id"]),
+                        kind=kind, tree=self.authored_runtime_tree(tree, kind),
+                        max_steps=64 if kind == "studio" else 256,
                     ).build()
                     if kind
                     else create_game_environment(
@@ -455,9 +500,10 @@ class GameLearningWorkspace:
                 )
                 try:
                     result["environment_actions"] = list(current_environment.spec.actions)
+                    descriptor = getattr(current_environment, "descriptor", None)
                     result["execution_descriptor"] = (
-                        current_environment.descriptor()
-                        if callable(getattr(current_environment, "descriptor", None))
+                        descriptor() if callable(descriptor)
+                        else dict(descriptor) if isinstance(descriptor, Mapping)
                         else current_environment.spec.as_dict()
                     )
                 finally:
@@ -1316,7 +1362,27 @@ class GameLearningWorkspace:
                 "A prepared editor save must finish or recover before starting new work.",
                 409,
             )
-        target = resolve_console(project["console_id"])
+        studio_project = project["console_id"].startswith("studio:")
+        if studio_project:
+            from skeleton.jeeves.game_studio_environment import studio_source_target
+            tree = {item["path"]: item["content"] for item in project["files"]}
+            actual = studio_source_target(
+                {"game/studio/session.json": tree["game/studio/session.json"]}
+            ) if "game/studio/session.json" in tree else None
+            if actual != project["console_id"]:
+                raise GameLearningError(
+                    "studio_source_changed",
+                    "Project studio identity no longer matches saved executable source.", 409,
+                )
+            target = None
+            if type(episode_steps) is not int or episode_steps < 1:
+                raise GameLearningError("episode_limit", "Studio episode length must be positive.", 422)
+            # All consumers (live play, training, campaign, reset/simulate)
+            # must store the same length they send into the emulator-style
+            # child environment. No phantom 4096-step session can exist.
+            episode_steps = min(128, episode_steps)
+        else:
+            target = resolve_console(project["console_id"])
         selected = source_id or project.get("default_source_id")
         sources = (
             await self.sources.find(
@@ -1342,7 +1408,7 @@ class GameLearningWorkspace:
             in {"game/generated/game.json", "game/editor/console.json", "game/successor/spec.json"}
             for item in project["files"]
         )
-        if target.requires_rom and not generated_grid and not compiled:
+        if target is not None and target.requires_rom and not generated_grid and not compiled:
             selected = selected or next(
                 (row["source_id"] for row in sources if row["kind"] in {"rom", "content_bundle"}), None
             )
@@ -3137,10 +3203,11 @@ class GameLearningWorkspace:
         authored_kind = self.authored_environment_kind(tree)
         if authored_kind and not compiled:
             return GameEnvironmentRequest(
-                binding["console_id"],
+                self.authored_runtime_target(tree, authored_kind, binding["console_id"]),
                 kind=authored_kind,
                 tree=self.authored_runtime_tree(tree, authored_kind),
-                max_steps=binding["episode_steps"],
+                max_steps=(min(128, binding["episode_steps"]) if authored_kind == "studio"
+                           else binding["episode_steps"]),
             ).as_dict()
         generated = "game/generated/game.json" in tree and not compiled
         rom, content, filename = None, None, "game.bin"
@@ -3223,14 +3290,33 @@ class GameLearningWorkspace:
 
     @staticmethod
     def authored_environment_kind(tree):
-        if "game/successor/spec.json" in tree:
-            return "successor"
-        if "game/editor/console.json" in tree:
-            return "console_editor"
-        return None
+        markers = {
+            "game/successor/spec.json": "successor",
+            "game/editor/console.json": "console_editor",
+            "game/studio/session.json": "studio",
+        }
+        present = [kind for path, kind in markers.items() if path in tree]
+        if len(present) > 1 or (present and "game/generated/game.json" in tree):
+            raise GameLearningError(
+                "ambiguous_engine_source",
+                "A project cannot execute multiple competing authored engine roots.", 409,
+            )
+        return present[0] if present else None
+
+    @staticmethod
+    def authored_runtime_target(tree, kind, fallback):
+        if kind == "studio":
+            from skeleton.jeeves.game_studio_environment import studio_source_target
+
+            return studio_source_target(
+                {"game/studio/session.json": tree["game/studio/session.json"]}
+            )
+        return fallback
 
     @staticmethod
     def authored_runtime_tree(tree, kind):
+        if kind == "studio":
+            return {"game/studio/session.json": tree["game/studio/session.json"]}
         if kind == "console_editor":
             from skeleton.jeeves.game_console_editor import file_manifest_digest
 

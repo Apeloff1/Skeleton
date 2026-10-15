@@ -154,6 +154,9 @@ async def test_message_replay_does_not_readmit_or_reinsert() -> None:
     authority = object.__new__(MongoConversationAuthority)
     authority.storage_admitter = admit
     authority.governance_registrar = govern
+    # Sparse replay adapters intentionally omit the optional Dragon projection.
+    # The canonical append must still succeed and remain exactly-once.
+    assert not hasattr(authority, "dragon_projection")
 
     async def recover(*_args, **_kwargs):
         return committed if inserted["value"] else initial

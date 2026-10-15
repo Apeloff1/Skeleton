@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 import json
 import math
 import random
@@ -119,6 +120,8 @@ def _implementation() -> str:
         "game_console_assets.py",
         "game_emulator_host.py",
         "game_studio_review.py",
+        "game_studio_environment.py",
+        "game_studio_rule_curriculum.py",
     )
     return digest(
         {
@@ -160,7 +163,7 @@ class CampaignConfig:
     def __post_init__(self) -> None:
         _int(self.round_limit, "campaign rounds", 1, 100000)
         _int(self.slice_rounds, "slice rounds", 1, 8)
-        _int(self.episodes_per_round, "round training episodes", 1, 4)
+        _int(self.episodes_per_round, "round training episodes", 1, 10)
         _int(self.episode_steps, "episode steps", 1, 4096)
         _int(self.seed, "campaign seed", 0, 2**63 - 1)
         _int(self.max_slice_steps, "slice step budget", 1, 131072)
@@ -692,6 +695,29 @@ class StudioLearningCampaign:
                 arms.append({"id": "map.terrain_path", "family": "layout", "kind": "terrain_path"})
             if spec.get("fidelity", {"profile": "pixel"})["profile"] != "cinematic":
                 arms.append({"id": "fidelity.profile", "family": "fidelity", "kind": "fidelity"})
+        elif request.kind == "studio":
+            from .game_studio_environment import parse_studio_source
+            from skeleton.ai.game_builder.system_editors import editor_spec
+
+            source = parse_studio_source(json.loads(request.tree["game/studio/session.json"]))
+            for field in editor_spec(source["editor"])["fields"]:
+                key = field["key"]
+                if key == "homebrew_only" or field["kind"] not in ("int", "bool", "enum"):
+                    continue
+                if field["kind"] == "int" and field["minimum"] == field["maximum"]:
+                    continue
+                if field["kind"] == "enum" and len(field["options"]) < 2:
+                    continue
+                arms.append({
+                    "id": "studio." + key,
+                    "family": "mechanics",
+                    "kind": "studio_rule_setting",
+                    "key": key,
+                    "field_kind": field["kind"],
+                    "minimum": field["minimum"],
+                    "maximum": field["maximum"],
+                    "options": field["options"],
+                })
         elif request.kind == "console_editor":
             from .game_console_editor import ConsoleProject
 
@@ -897,6 +923,61 @@ class StudioLearningCampaign:
                     if row["kind"] == "enemy":
                         change(row["properties"], "health", "entities." + row["id"] + ".health", 1, 100, True)
             tree = ConsoleProject(document, tree).export_files()
+        elif request.kind == "studio":
+            from .game_studio_environment import (
+                parse_studio_source, studio_request_tree,
+            )
+            from .game_studio_rule_curriculum import (
+                PROPOSAL_SCHEMA, RuleCurriculumError, apply_rule_proposal, _sha,
+            )
+
+            source = parse_studio_source(json.loads(tree["game/studio/session.json"]))
+            key = arm["key"]
+            old = source["settings"][key]
+            if arm["field_kind"] == "int":
+                minimum, maximum = arm["minimum"], arm["maximum"]
+                increment = max(1, round(max(1, abs(old)) * 0.08))
+                new = max(minimum, min(maximum, old + direction * increment))
+                if new == old:
+                    new = max(minimum, min(maximum, old - direction * increment))
+                operation = {"scope":"settings", "path":key, "op":"set", "value":new}
+            elif arm["field_kind"] == "bool":
+                new = not old
+                operation = {"scope":"settings", "path":key, "op":"toggle", "value":None}
+            else:
+                choices = arm["options"]
+                new = choices[(choices.index(old) + direction) % len(choices)]
+                operation = {"scope":"settings", "path":key, "op":"set", "value":new}
+            proposal = {
+                "schema_version": PROPOSAL_SCHEMA,
+                "proposal_id": "campaign-" + str(index).zfill(6),
+                "base_digest": _sha(source),
+                "reason": "Explore a distinct original-game mechanic under verified replay.",
+                "scene_seed": None if source["scene"] is None else source["scene"]["seed"],
+                "operations": [operation],
+            }
+            try:
+                changed = apply_rule_proposal(source, proposal)
+            except RuleCurriculumError as exc:
+                facts.update(
+                    supported=False,
+                    proposal_rejected=True,
+                    strategy="studio_rule_violates_canonical_bounds",
+                    validation_error=str(exc)[:256],
+                )
+                return request, facts
+            tree = studio_request_tree(changed)
+            changes.append({
+                "path":"game/studio/session.json/settings/" + key,
+                "before":old,"after":new,
+                "source_before_digest":_sha(source),
+                "source_after_digest":_sha(changed),
+                "rule_proposal_digest":_sha(proposal),
+                "source_rule_validated":True,
+            })
+            facts["strategy"]="bandit_selected_source_verified_game_rule"
+            facts["model_weights_modified"]=False
+            facts["runtime_engine_changed"]=False
         raw = request.as_dict()
         raw["tree"] = tree
         request = GameEnvironmentRequest.from_dict(raw)
@@ -1345,30 +1426,45 @@ class StudioLearningCampaign:
         all_eval = ordinary_seeds + jitter_seeds
         if len(set(all_eval)) != len(all_eval) or blocked.intersection(all_eval):
             raise GameLearningError("campaign evaluation partitions collide with current/inherited training")
-        baseline, measured, baseline_adv, measured_adv = [], [], [], []
-        for seed in ordinary_seeds:
-            baseline.append(
-                self._play(
-                    self.champion,
-                    seed,
-                    self.champion_policy,
-                    jitter=False,
-                    cancel=cancel,
-                    authorize=authorize,
-                )
+        # All scenario comparisons are read-only, seed-paired and independent.
+        # Studio reference engines support concurrently isolated instances;
+        # native emulator providers keep their existing sequential evaluation.
+        evaluations = [
+            (self.champion, seed, self.champion_policy, False, "baseline")
+            for seed in ordinary_seeds
+        ] + [
+            (candidate, seed, policy, False, "measured")
+            for seed in ordinary_seeds
+        ] + [
+            (self.champion, seed, self.champion_policy, True, "baseline_adv")
+            for seed in jitter_seeds
+        ] + [
+            (candidate, seed, policy, True, "measured_adv")
+            for seed in jitter_seeds
+        ]
+
+        def evaluate_one(item):
+            req, sample_seed, evaluator, perturbed, role = item
+            return role, self._play(
+                req, sample_seed, evaluator, jitter=perturbed,
+                cancel=cancel, authorize=authorize,
             )
-            measured.append(
-                self._play(candidate, seed, policy, jitter=False, cancel=cancel, authorize=authorize)
-            )
-        for seed in jitter_seeds:
-            baseline_adv.append(
-                self._play(
-                    self.champion, seed, self.champion_policy, jitter=True, cancel=cancel, authorize=authorize
-                )
-            )
-            measured_adv.append(
-                self._play(candidate, seed, policy, jitter=True, cancel=cancel, authorize=authorize)
-            )
+
+        if self.champion.kind == "studio" and candidate.kind == "studio":
+            with ThreadPoolExecutor(
+                max_workers=min(4, len(evaluations)),
+                thread_name_prefix="jeeves-round-evaluation",
+            ) as workers:
+                results = list(workers.map(evaluate_one, evaluations))
+        else:
+            results = [evaluate_one(item) for item in evaluations]
+        grouped = {role: [] for role in (
+            "baseline", "measured", "baseline_adv", "measured_adv"
+        )}
+        for role, execution in results:
+            grouped[role].append(execution)
+        baseline, measured = grouped["baseline"], grouped["measured"]
+        baseline_adv, measured_adv = grouped["baseline_adv"], grouped["measured_adv"]
         if any(
             p["environment_digest"] != candidate_spec.environment_digest for p in measured + measured_adv
         ) or any(
@@ -1400,7 +1496,37 @@ class StudioLearningCampaign:
         death_regression = max(
             before["survival"] - after["survival"], adv_before["survival"] - adv_after["survival"]
         )
+        scenario_mirror = None
+        # All ten mirror angles are evidence-based conservative gates;
+        # they never automatically certify subjective game quality or cause
+        # changes in production weights. Full training-seed holds remain
+        # disjoint from this measured evaluation.
+        if (self.champion.kind == "studio" and candidate.kind == "studio"
+                and mutation.get("supported") and candidate.digest != self.champion.digest):
+            from .game_studio_environment import parse_studio_source
+            from .game_studio_scenario_lab import ANGLES, mirrored_rule_comparison
+
+            original = parse_studio_source(
+                json.loads(self.champion.tree["game/studio/session.json"])
+            )
+            variant = parse_studio_source(
+                json.loads(candidate.tree["game/studio/session.json"])
+            )
+            scenario_mirror = mirrored_rule_comparison(
+                original, variant,
+                seed=self._seed(index, "mirrored-angles") % (2**31 - 16),
+                steps=min(6, self.config.episode_steps), angles=ANGLES,
+            )
         constraints = {
+            "mirrored_rule_has_observed_mechanics_effect": (
+                scenario_mirror is None or
+                scenario_mirror["informative_for_rule_selection"]
+            ),
+            "mirrored_original_rule_nonregression": (
+                scenario_mirror is None
+                or scenario_mirror["worst_return_difference"]
+                >= -self.config.max_worst_seed_regression - 1e-9
+            ),
             "visual_source_resource_floor": dragon["passed"],
             "typed_proposal_valid": not mutation.get("proposal_rejected", False),
             "ordinary_mean_return_nonregression": improvement >= -1e-9,
@@ -1441,6 +1567,11 @@ class StudioLearningCampaign:
         for play in baseline + measured + baseline_adv + measured_adv:
             play.pop("_trace", None)
         steps = trained.updates + sum(p["steps"] for p in baseline + measured + baseline_adv + measured_adv)
+        if scenario_mirror is not None:
+            steps += sum(
+                row["baseline_executed_steps"] + row["candidate_executed_steps"]
+                for row in scenario_mirror["mirrors"]
+            )
         curriculum = {
             "kind": self.config.curriculum,
             "training_seeds": training_seeds,
@@ -1480,6 +1611,7 @@ class StudioLearningCampaign:
                 "evaluations": measured_adv,
                 "champion_evaluations": baseline_adv,
                 "seed_partitions_disjoint": True,
+                "source_bound_six_angle_mirror": scenario_mirror,
                 "semantic_generalization_claim": False,
             },
         }
@@ -1514,6 +1646,18 @@ class StudioLearningCampaign:
                 "mean_step_wall_ms": mean_step_ms,
                 "limit_ms": self.config.max_mean_step_ms,
                 "render_time_included": False,
+                "mirrored_effectiveness": (
+                    None if scenario_mirror is None else {
+                        "informative": scenario_mirror["informative_for_rule_selection"],
+                        "classification": scenario_mirror["effectiveness_classification"],
+                        "measured_behavior_differences": scenario_mirror["measured_behavior_differences"],
+                        "productive_state_changes": scenario_mirror["productive_state_changes"],
+                        "total_executed_steps": scenario_mirror["total_executed_steps"],
+                        "actual_replayed_action_applications": scenario_mirror["total_replayed_action_applications"],
+                        "novelty_per_100_replayed_actions": scenario_mirror["novelty_per_100_replayed_actions"],
+                        "worst_return_difference": scenario_mirror["worst_return_difference"],
+                    }
+                ),
             },
             "bandit_observation": {
                 "arm_id": mutation["proposal_selection"]["arm_id"],
@@ -1528,6 +1672,10 @@ class StudioLearningCampaign:
                 "ordinary_return_delta": improvement,
                 "adversarial_return_delta": adversarial_delta,
                 "worst_seed_return_delta": min(ordinary_pairs + adv_pairs),
+                "mirrored_worst_return_delta": (
+                    None if scenario_mirror is None
+                    else scenario_mirror["worst_return_difference"]
+                ),
                 "death_rate_regression": death_regression,
                 "minimum_improvement": self.config.min_improvement,
                 "minimum_improvement_unit": "weighted_normalized_objective_gain",
@@ -1609,10 +1757,18 @@ class StudioLearningCampaign:
             raise GameLearningError("campaign already executing a slice")
         if self.cursor + count > self.config.round_limit:
             raise GameLearningError("campaign requested beyond admitted total round budget")
+        # Account for twenty baseline/candidate audited mirror episodes.
+        # Their real steps must be admitted
+        # *before* a campaign slice starts, not only after checkpointing.
+        studio_mirror_allowance = (
+            20 * min(6, self.config.episode_steps)
+            if self.champion.kind == "studio" else 0
+        )
         planned = (
-            count
-            * (self.config.episodes_per_round + 4 * self.config.evaluation_seeds)
-            * self.config.episode_steps
+            count * (
+                (self.config.episodes_per_round + 4 * self.config.evaluation_seeds)
+                * self.config.episode_steps + studio_mirror_allowance
+            )
         )
         if planned > self.config.max_slice_steps:
             raise GameLearningError("campaign planned slice exceeds cumulative step budget")
@@ -1624,6 +1780,8 @@ class StudioLearningCampaign:
             for _ in range(count):
                 previous = self.snapshot()
                 report, candidate, policy, counterexamples = self._round(self.cursor + 1, cancel, authorize)
+                if actual + report["actual_steps"] > self.config.max_slice_steps:
+                    raise GameLearningError("executed campaign steps exceeded admitted slice budget")
                 _guard(cancel, authorize)
                 if _implementation() != self.implementation_digest:
                     raise GameLearningError("studio code changed before round commit")

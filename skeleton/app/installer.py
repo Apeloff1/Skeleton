@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
+from tempfile import TemporaryFile
 from typing import Callable, Sequence
 
 from skeleton.app.assembly import (
@@ -16,6 +18,7 @@ from skeleton.app.assembly import (
     find_repo_root,
     load_manifest,
     preflight,
+    public_service_urls,
 )
 from skeleton.app.preloader import PreloadReport, inspect_host
 from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment
@@ -64,25 +67,28 @@ def _run(
     runner: Runner,
     label: str,
     timeout: float | None = None,
+    env: dict[str, str] | None = None,
 ) -> InstallPhase:
     try:
-        completed = runner(
-            list(command),
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        kwargs = {
+            "cwd": root,
+            "check": False,
+            "capture_output": True,
+            "text": True,
+            "timeout": timeout,
+        }
+        if env is not None:
+            kwargs["env"] = env
+        completed = runner(list(command), **kwargs)
     except (OSError, subprocess.SubprocessError) as exc:
         return InstallPhase(label, False, f"{label} failed: {type(exc).__name__}")
 
-    stdout = (completed.stdout or "").strip().splitlines()
-    stderr = (completed.stderr or "").strip().splitlines()
-    tail = stdout[-1] if stdout else (stderr[-1] if stderr else "")
+    # Docker Compose configuration and build output can contain resolved
+    # credentials, database URIs and registry tokens. Never attach raw child
+    # process stdout/stderr to an installer receipt or GUI status text.
     detail = f"{label} completed" if completed.returncode == 0 else f"{label} exited {completed.returncode}"
-    if tail:
-        detail += f": {tail[:240]}"
+    if completed.returncode != 0:
+        detail += "; inspect Docker Desktop diagnostics for further details"
     return InstallPhase(label, completed.returncode == 0, detail)
 
 
@@ -106,6 +112,11 @@ def _setup_phase(result: SetupResult) -> InstallPhase:
         detail = f"runtime environment already configured at {result.env_path}"
     if result.configured_keys:
         detail += "; configured " + ", ".join(result.configured_keys)
+    if result.warnings:
+        # Setup warnings contain only bounded configuration-key diagnostics,
+        # not secret material. Never silently report a fully configured AI
+        # runtime when the optional provider key or signing seed is missing.
+        detail += "; advisories: " + "; ".join(result.warnings)
     return InstallPhase("setup-runtime", True, detail)
 
 
@@ -187,18 +198,28 @@ def install_application(
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
 
+    # Validate precisely the configuration used for startup. The production
+    # frontend uses port 8080, unlike the default development Compose model.
+    mode = "production" if production else "development"
+    compose_env = {**os.environ, **manifest.mode_env(mode)}
     compose_validate = _run(
-        compose_command("config", manifest=manifest),
+        compose_command("config", manifest=manifest, full=full, hot=hot),
         root=root,
         runner=runner,
         label="compose-config",
         timeout=60.0,
+        env=compose_env,
     )
     phases.append(compose_validate)
     if not compose_validate.ok or not start:
         return InstallReceipt(root=root, phases=tuple(phases))
 
-    mode = "production" if production else "development"
+    try:
+        host_urls = public_service_urls(root, manifest=manifest)
+    except ValueError as exc:
+        phases.append(InstallPhase("public-endpoints", False, str(exc)))
+        return InstallReceipt(root=root, phases=tuple(phases))
+
     command = compose_command(
         "up",
         manifest=manifest,
@@ -207,19 +228,26 @@ def install_application(
         hot=hot,
     )
     try:
-        completed = runner(
-            list(command),
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            env={**__import__("os").environ, **manifest.mode_env(mode)},
-        )
+        # Docker image builds can emit massive output on first installation.
+        # Stream it to a private temporary file rather than retaining the
+        # whole build log in GUI/Python process memory. Never echo credentials
+        # from Compose output into installer receipts.
+        with TemporaryFile(mode="w+t", encoding="utf-8") as build_log:
+            completed = runner(
+                list(command),
+                cwd=root,
+                check=False,
+                stdout=build_log,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=compose_env,
+            )
         ok = completed.returncode == 0
-        tail_lines = ((completed.stdout or "") + "\n" + (completed.stderr or "")).strip().splitlines()
-        detail = "application services started" if ok else f"application start exited {completed.returncode}"
-        if tail_lines:
-            detail += f": {tail_lines[-1][:240]}"
+        detail = (
+            "application services started"
+            if ok
+            else f"application start exited {completed.returncode}; inspect Docker Desktop diagnostics"
+        )
         phases.append(InstallPhase("start", ok, detail))
     except (OSError, subprocess.SubprocessError) as exc:
         phases.append(InstallPhase("start", False, f"application start failed: {type(exc).__name__}"))
@@ -233,6 +261,7 @@ def install_application(
             timeout=3.0,
             attempts=12,
             delay=1.0,
+            public_url_overrides=host_urls,
         )
         healthy = probes_ok(results)
         failed = [result.service for result in results if not result.ok]

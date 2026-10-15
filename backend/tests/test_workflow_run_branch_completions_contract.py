@@ -201,3 +201,28 @@ def test_live_identity_adapters_fail_closed_on_association_http_and_status_oids(
     assert "canonical_commit_oid" in sweep
     assert "canonical_commit_oid" in idle
     assert COMMIT_OID_PATTERN in idle
+
+
+def test_default_branch_only_completion_consumers_require_trusted_job_guards() -> None:
+    from scripts.check_workflow_run_branch_completions import DEFAULT_BRANCH_CONSUMERS
+
+    for name in sorted(DEFAULT_BRANCH_CONSUMERS):
+        source = (WORKFLOWS / name).read_text(encoding="utf-8")
+        assert violations_for_text(name, source) == []
+        unguarded = source.replace(
+            "github.event.workflow_run.head_repository.full_name == github.repository",
+            "true",
+            1,
+        )
+        assert unguarded != source, name
+        messages = "\n".join(violations_for_text(name, unguarded))
+        assert "every completing head" in messages, name
+
+
+def test_unlisted_completion_consumer_cannot_restrict_to_main_without_exemption() -> None:
+    from scripts.check_workflow_run_branch_completions import DEFAULT_BRANCH_CONSUMERS
+
+    source = (WORKFLOWS / "branch-clean.yml").read_text(encoding="utf-8")
+    assert "branch-clean-fake.yml" not in DEFAULT_BRANCH_CONSUMERS
+    messages = "\n".join(violations_for_text("branch-clean-fake.yml", source))
+    assert "every completing head" in messages

@@ -16,6 +16,11 @@ from .advanced_gameplay_runtime import (
     ENGINES, _layout, _tactics_start, _racing_start, _survival_start,
 )
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_engine_bindings import (
+    DEFAULT_LAYOUTS as BINDING_DEFAULT_LAYOUTS,
+    NORMALIZE_LAYOUTS as BINDING_NORMALIZE_LAYOUTS,
+    ERRORS as BINDING_ERRORS,
+)
 from .advanced_genre_engines import STARTS as GENRE_STARTS, CARDS, puzzle_default_layout
 from .advanced_quest_director_runtime import (default_layout as quest_layout,
     normalize_layout as validate_quest_layout,QuestDirectorError)
@@ -188,12 +193,19 @@ def _default_layout(engine, config, seed):
         return sailing_layout(config,seed)
     if engine == "physics":
         return physics_layout(config,seed)
+    if engine in BINDING_DEFAULT_LAYOUTS:
+        return BINDING_DEFAULT_LAYOUTS[engine](config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
 def _normalize_layout(engine, config, layout):
     if type(layout) is not dict:
         raise SceneError("authored layout must be a JSON object")
+    if engine in BINDING_NORMALIZE_LAYOUTS:
+        try:
+            return BINDING_NORMALIZE_LAYOUTS[engine](config,layout)
+        except BINDING_ERRORS as exc:
+            raise SceneError(str(exc)) from exc
     if engine=="quest_director":
         try:
             return validate_quest_layout(config,layout)

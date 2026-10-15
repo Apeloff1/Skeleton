@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Iterable
 
 from .model import RepositoryModel
 
@@ -51,10 +51,9 @@ class ImpactReport:
 
 
 def _normalize_path(path: str) -> str:
-    normalized = path.replace("\\", "/")
-    while normalized.startswith("./"):
-        normalized = normalized[2:]
-    return normalized.lstrip("/")
+    return "/".join(
+        part for part in path.replace("\\", "/").split("/") if part and part != "."
+    )
 
 
 def _zone_for_path(model: RepositoryModel, path: str, exact: dict[str, str] | None = None) -> str:
@@ -116,8 +115,7 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *, tran
                 frontier.append(dependent)
             elif new_depth == distances[dependent]:
                 path_counts[dependent] = min(100, path_counts.get(dependent, 1) + path_counts.get(zone, 1))
-                if confidence > path_confidence[dependent]:
-                    path_confidence[dependent] = confidence
+                path_confidence[dependent] = max(path_confidence[dependent], confidence)
 
     all_affected = set(distances) - set(zones)
     dependency_zones = set()

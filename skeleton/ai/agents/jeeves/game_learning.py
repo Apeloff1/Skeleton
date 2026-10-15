@@ -31,8 +31,8 @@ POLICY_SCHEMA = "skeleton.jeeves.game_learning_policy.v2"
 TRACE_SCHEMA = "skeleton.game.trace.v1"
 ALGORITHM = "tabular_q_learning_v1"
 MAX_BYTES = 8 * 1024 * 1024
-MAX_LIFETIME_EPISODES = 1024
-MAX_LIFETIME_UPDATES = 1048576
+MAX_LIFETIME_EPISODES = 65536
+MAX_LIFETIME_UPDATES = 16777216
 
 
 def _exclusive(method: Callable[..., Any]) -> Callable[..., Any]:
@@ -201,7 +201,7 @@ class GameLearningConfig:
     seed: int = 0
     max_updates: int = 65536
     max_states: int = 16384
-    max_episodes: int = 256
+    max_episodes: int = 1024
     reward_clip: float = 100.0
     trace_byte_limit: int = MAX_BYTES
     imitation_strength: float = 1.0
@@ -215,9 +215,9 @@ class GameLearningConfig:
         if self.min_epsilon > self.epsilon:
             raise GameLearningError("minimum epsilon exceeds initial epsilon")
         _int(self.seed, "seed", 0, 2**63 - 1)
-        _int(self.max_updates, "update budget", 1, 65536)
+        _int(self.max_updates, "update budget", 1, 1048576)
         _int(self.max_states, "state budget", 1, 16384)
-        _int(self.max_episodes, "episode budget", 1, 256)
+        _int(self.max_episodes, "episode budget", 1, 8192)
         _int(self.trace_byte_limit, "trace byte budget", 1024, MAX_BYTES)
         clip = _number(self.reward_clip, "reward clip", 1e6)
         if clip <= 0:

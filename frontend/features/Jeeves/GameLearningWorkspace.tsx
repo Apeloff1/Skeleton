@@ -454,7 +454,18 @@ export default function GameLearningWorkspace() {
     });
   };
   const download = (jobId?: string) => { void perform('Preparing export', async (current, signal) => { const token = getAuthToken(); const file = await exportLearningProject(current, { signal }, jobId); if (!signal.aborted && token === getAuthToken()) { await saveLearningExport(file); setNotice('Project export prepared.'); } }); };
-  const consoleList = useMemo(() => catalogue?.consoles.filter(value => `${value.label} ${value.family || ''}`.toLowerCase().includes(consoleQuery.toLowerCase())) || [], [catalogue, consoleQuery]);
+   const consoleList = useMemo(() => {
+     const hardware = catalogue?.consoles || [];
+     const studio: LearningConsole[] = (catalogue?.studio_engines || []).map(engine => ({
+       console_id: engine.target_id, label: 'Original game · ' + human(engine.id),
+       family: 'Studio reference', engine_kind: engine.runtime_kind,
+       available: engine.learning_available,
+       readiness: { message: 'Executable source-bound game simulation; local policy training. Native hardware not certified.' },
+       supported_source_kinds: ['text'], actions: [],
+     }));
+     return [...hardware, ...studio].filter(value =>
+       `${value.label} ${value.family || ''}`.toLowerCase().includes(consoleQuery.toLowerCase()));
+   }, [catalogue, consoleQuery]);
   const visibleProjects = [...projects].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
   const library = <View style={[s.sidebar, compact && s.mobileSidebar]}>
     <View style={s.between}><Text style={s.title}>Projects</Text>{compact && <IconButton label="Close projects" icon="close-outline" onPress={() => setSidebar(false)} />}</View>

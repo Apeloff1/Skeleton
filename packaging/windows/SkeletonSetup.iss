@@ -56,6 +56,9 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Name: "{group}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
 Name: "{group}\Skeleton Local AI (offline)"; Filename: "{app}\{#AppExeName}"; Parameters: "--local-ai"; WorkingDir: "{app}"
 Name: "{group}\Skeleton Offline CLI"; Filename: "{app}\SkeletonOffline.exe"; WorkingDir: "{app}"
+Name: "{group}\Jeeves training modules"; Filename: "{app}\{#AppExeName}"; Parameters: "--training-modules"; WorkingDir: "{app}"
+Name: "{group}\Jeeves Adaptive Sim"; Filename: "{app}\{#AppExeName}"; Parameters: "--adaptive-sim --help"; WorkingDir: "{app}"
+Name: "{group}\Jeeves Boomerang Queue"; Filename: "{app}\{#AppExeName}"; Parameters: "--boomerang-queue --help"; WorkingDir: "{app}"
 Name: "{group}\Repair Skeleton"; Filename: "{app}\{#AppExeName}"; Parameters: "--repair"; WorkingDir: "{app}"
 Name: "{userdesktop}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
@@ -65,5 +68,8 @@ Filename: "{app}\{#AppExeName}"; Description: "Launch Skeleton setup and runtime
 [UninstallRun]
 Filename: "{app}\{#AppExeName}"; Parameters: "--stop --quiet"; WorkingDir: "{app}"; RunOnceId: "StopSkeleton"; Flags: runhidden skipifdoesntexist
 
-[UninstallDelete]
-Type: files; Name: "{app}\.env"
+ ; User-generated .env intentionally remains after uninstall. Compose "down"
+; preserves named database volumes, which retain the old Mongo root account.
+; Deleting .env but retaining volumes breaks reinstall and data recovery.
+; Erasing installation credentials and Docker volumes requires an explicit
+; user-requested data wipe; do not perform it by default.

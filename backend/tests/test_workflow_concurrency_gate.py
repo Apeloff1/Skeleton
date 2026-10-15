@@ -401,8 +401,12 @@ def test_native_platform_pr_runs_preempt_only_obsolete_heads() -> None:
     )
     for name in preemptible:
         text = (workflows / name).read_text(encoding="utf-8")
-        assert "  pull_request:" in text, name
+        # Native console compilation is deliberately manual-only on some
+        # targets. Preserve the no-automatic-run policy when throttled.
         assert "  workflow_dispatch:" in text, name
+        if "  pull_request:" not in text:
+            assert "  push:" not in text, name
+            assert "  schedule:" not in text, name
         assert "github.event.pull_request.number || github.ref" in text, name
         assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in text, name
         assert _scan(text, name) == [], name

@@ -12,6 +12,11 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_engine_bindings import (
+    ACTIONS as BINDING_ACTIONS, STARTS as BINDING_STARTS,
+    STEPS as BINDING_STEPS, APPLY_SCENES as BINDING_APPLY_SCENES,
+    ERRORS as BINDING_ERRORS,
+)
 from .advanced_physics_runtime import (
     ACTIONS as PHYSICS_ACTIONS, PhysicsActionError,
     start as physics_start, step as physics_step, apply_scene as apply_physics_scene,
@@ -71,7 +76,7 @@ from .advanced_world_rpg_runtime import (
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("maze", "rpg", "platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics")
+ENGINES = ("maze", "rpg", "platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics") + tuple(BINDING_STARTS)
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -107,6 +112,8 @@ ACTION_HELP = {
     "physics": PHYSICS_ACTIONS,
     **GENRE_ACTIONS,
 }
+
+ACTION_HELP.update(BINDING_ACTIONS)
 
 
 class AdvancedRuntimeError(SystemEditorError):
@@ -724,11 +731,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "sailing":sail_start,
         "physics":physics_start,
         **GENRE_STARTS,
+        **BINDING_STARTS,
     }
     try:
         state=starts[editor](rules,seed)
     except (WorldGameError,GenreActionError,FarmingActionError,FactoryActionError,
-            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError) as exc:
+            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError, *BINDING_ERRORS) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         # Maze/RPG runtime scenes are not yet in the strict authored-scene
@@ -792,6 +800,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_sail_scene(state,rules,layout)
         elif editor=="physics":
             apply_physics_scene(state,rules,layout)
+        elif editor in BINDING_APPLY_SCENES:
+            BINDING_APPLY_SCENES[editor](state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -826,10 +836,11 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "sailing":sail_step,
             "physics":physics_step,
             **GENRE_STEPS,
+        **BINDING_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (WorldGameError,GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError) as exc:
+        except (WorldGameError,GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError,*BINDING_ERRORS) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,

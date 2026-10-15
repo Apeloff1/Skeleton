@@ -1,9 +1,9 @@
 """Compact navigation index optimized for agent path discovery."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
-from typing import Iterable
 
 from .model import FileRecord, RepositoryModel
 
@@ -14,7 +14,7 @@ class _Node:
     files: int = 0
     source: int = 0
     tests: int = 0
-    children: dict[str, "_Node"] = field(default_factory=dict)
+    children: dict[str, _Node] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +83,6 @@ class NavigationIndex:
                 if part not in node.children:
                     return NavigationEntry(normalized, 0, 0, 0, (), ())
                 node = node.children[part]
-        path_prefix = normalized + "/" if normalized else ""
         zones = tuple(sorted(self._zones_by_prefix.get(normalized, set())))
         return NavigationEntry(
             prefix=normalized,

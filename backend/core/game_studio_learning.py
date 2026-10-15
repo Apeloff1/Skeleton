@@ -420,7 +420,9 @@ async def create(scope, project_id, body):
         round_limit=body["round_limit"],
         slice_rounds=body["slice_rounds"],
         episodes_per_round=body["episodes"],
-        episode_steps=body["max_steps"],
+        episode_steps=(min(128,body["max_steps"])
+                       if project["console_id"].startswith("studio:")
+                       else body["max_steps"]),
         seed=body["seed"],
         evaluation_seeds=body.get("evaluation_seeds", 3),
         curriculum=body.get("curriculum", "mixed"),
@@ -2102,3 +2104,279 @@ async def _policy_dependencies(scope, row):
     return list({_digest(ref): ref for ref in sources}.values()), list(
         {_digest(ref): ref for ref in teachers}.values()
     )
+
+
+# Read-only spectator simulations are never a write path to training state.
+# This limits backend fan-out even when several users watch the same campaign.
+_scenario_spectator_slots = asyncio.Semaphore(2)
+
+
+async def scenario_mirror_views(scope, identifier, *, lanes=10, steps=12, sample=0):
+    """Owner-authorized, bounded parallel replay telemetry while campaigns train."""
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+    from skeleton.jeeves.game_studio_environment import parse_studio_source
+    from skeleton.jeeves.game_studio_scenario_lab import ANGLES, mirrored_simulations
+
+    if (type(lanes) is not int or not 1 <= lanes <= 10
+            or type(steps) is not int or not 1 <= steps <= 24
+            or type(sample) is not int or not 0 <= sample <= 255):
+        raise GameLearningError("spectator_bounds", "Bounded spectator controls required.", 422)
+    row = await _read(scope, identifier)
+    latest = (row.get("snapshot") or {}).get("champion_request")
+    executable = GameEnvironmentRequest.from_dict(latest or row["environment_request"])
+    if executable.kind != "studio" or executable.target_id != row["environment_request"]["target_id"]:
+        raise GameLearningError("spectator_engine", "Only original-engine studio campaigns have mirrored reference telemetry.", 409)
+    source = parse_studio_source(__import__("json").loads(executable.tree["game/studio/session.json"]))
+    # Sampling advances spectator seeds only, not campaign/training RNG or rows.
+    seed = ((row["config"]["seed"] + row["cursor"] * 257 + sample * 7)
+            % (2**31 - 16))
+    async with _scenario_spectator_slots:
+        result = await asyncio.to_thread(
+            mirrored_simulations, source,
+            seed=seed, steps=steps, angles=ANGLES[:lanes], workers=min(4,lanes),
+        )
+    return {
+        **result, "campaign_id": identifier, "campaign_cursor": row["cursor"],
+        "ten_pass_audits_verified": result["scrutiny_checked_runs"]==len(result["lanes"]),
+        "spectral_hardware_available":False,
+        "campaign_status": row["status"], "sample":sample,
+        "spectator_only":True,
+        "frames_show_training_episodes":False,
+        "native_gameplay_rendering_claimed":False,
+    }
+
+
+async def scenario_drafts(scope, identifier, *, limit=4):
+    """Draft original possible scenarios from actual committed campaign signals."""
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+    from skeleton.jeeves.game_studio_environment import parse_studio_source
+    from skeleton.jeeves.game_studio_scenario_lab import propose_scenarios
+
+    if type(limit) is not int or not 1 <= limit <= 5:
+        raise GameLearningError("scenario_bounds", "Scenario draft limit outside bounds.", 422)
+    row = await _read(scope, identifier)
+    req = GameEnvironmentRequest.from_dict(
+        (row.get("snapshot") or {}).get("champion_request") or row["environment_request"]
+    )
+    if req.kind != "studio":
+        raise GameLearningError("scenario_engine", "This campaign does not run an original studio engine.", 409)
+    source = parse_studio_source(__import__("json").loads(req.tree["game/studio/session.json"]))
+    records = await round_records.find({
+        **scope, "campaign_id":identifier, "kind":"round",
+        "round_index":{"$lte":row["cursor"]},
+    }).sort("round_index",-1).limit(16).to_list(length=16)
+    measured=[]
+    already_explored=set()
+    for item in records:
+        checked=_checked_round_record(row,item)
+        mutation=checked.get("mutation") or {}
+        for edit in mutation.get("changes",[]):
+            if type(edit) is not dict:
+                continue
+            value=edit.get("source_after_digest")
+            if (type(value) is str and len(value)==64
+                    and all(char in "0123456789abcdef" for char in value)):
+                already_explored.add(value)
+        # Only recorded measurements, never user-supplied invented labels.
+        vector=checked.get("objective_vector") or {}
+        candidate_metrics=vector.get("candidate") or {}
+        role=(checked.get("roles") or {}).get("jeeves") or {}
+        play=role.get("play") or {}
+        value=candidate_metrics.get("return",play.get("return",0))
+        if type(value) not in (int,float) or not __import__("math").isfinite(value):
+            value=0
+        survival=candidate_metrics.get("survival")
+        if type(survival) not in (int,float) or not 0<=survival<=1:
+            failure=1.0 if play.get("dead") is True else 0.0
+        else:
+            failure=1.0-float(survival)
+        episodes=role.get("actual_training_episodes",1)
+        if type(episodes) is not int or not 1<=episodes<=4:
+            episodes=1
+        measured.append({
+            "mean_return": max(-1e9,min(1e9,float(value))),
+            "failure_rate": failure,
+            "episodes": episodes,
+        })
+    result=propose_scenarios(
+        source,observations=measured,limit=limit,
+        excluded_source_digests=sorted(already_explored),
+    )
+    return {
+        **result, "campaign_id":identifier,"measured_committed_rounds":len(measured),
+        "already_explored_rule_variants":len(already_explored),
+        "current_champion_source":True,"drafts_only":True,
+        "no_automatic_gameplay_promotion":True,
+    }
+
+
+async def scenario_engine_test_manifest(scope, editor):
+    """Authenticated inspect-only test matrix; pass status is never fabricated."""
+    from skeleton.jeeves.game_studio_scenario_lab import test_manifest
+    from skeleton.jeeves.game_learning import GameLearningError as LearnerError
+    try:
+        return test_manifest(editor)
+    except (ValueError, LearnerError) as exc:
+        raise GameLearningError("test_manifest_engine", "Unknown studio engine.", 404) from exc
+
+
+_engine_probe_slots = asyncio.Semaphore(1)
+
+
+async def engine_probe_page(scope, editor, *, offset=0, limit=8):
+    """Read-only, owner-authenticated executable controls, never synthetic pass."""
+    if (type(offset) is not int or not 0 <= offset <= 100000
+            or type(limit) is not int or not 1 <= limit <= 16):
+        raise GameLearningError("engine_test_bounds", "Engine diagnostics page exceeds safe limits.", 422)
+    from skeleton.jeeves.game_studio_engine_diagnostics import (
+        run_engine_contract_diagnostics, engine_action_diagnostics,
+    )
+    from skeleton.jeeves.game_studio_scenario_lab import ScenarioLabError
+    from skeleton.jeeves.game_studio_engine_diagnostics import EngineDiagnosticsError
+    try:
+        async with _engine_probe_slots:
+            contract, actions = await asyncio.to_thread(
+                lambda: (
+                    run_engine_contract_diagnostics(editor),
+                    engine_action_diagnostics(editor,offset=offset,limit=limit),
+                )
+            )
+    except (ScenarioLabError, EngineDiagnosticsError, ValueError) as exc:
+        raise GameLearningError(
+            "engine_test_failed", "Actual engine diagnostic failed; no verified pass is claimed.", 409,
+        ) from exc
+    return {"engine":editor, "contract":contract, "actions":actions,
+            "release_certified":False,"full_engine_state_exhausted":False}
+
+
+_shadow_audit_slots = asyncio.Semaphore(1)
+
+
+async def scenario_shadow_audit(
+    scope, identifier, *, angle="explore", steps=2,
+    max_cycles=12, replay_budget=600,
+):
+    """Owner-scoped, read-only, bounded one-sim shadow convergence probe."""
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+    from skeleton.jeeves.game_studio_environment import parse_studio_source
+    from skeleton.jeeves.game_studio_scenario_lab import ANGLES
+    from skeleton.jeeves.game_studio_shadow_saturation import (
+        run_shadow_saturation, verify_shadow_receipts,
+    )
+
+    if (type(angle) is not str or angle not in ANGLES
+        or type(steps) is not int or not 1<=steps<=4
+        or type(max_cycles) is not int or not 10<=max_cycles<=16
+        or type(replay_budget) is not int or not 100<=replay_budget<=1000):
+        raise GameLearningError("shadow_limits","Source-bound shadow audit budget exceeded.",422)
+    row=await _read(scope,identifier)
+    candidate=(row.get("snapshot") or {}).get("champion_request")
+    request=GameEnvironmentRequest.from_dict(candidate or row["environment_request"])
+    if (request.kind!="studio" or
+        request.target_id!=row["environment_request"]["target_id"]):
+        raise GameLearningError("shadow_source","Only owner-registered original studios admit shadow reviews.",409)
+    source=parse_studio_source(__import__("json").loads(request.tree["game/studio/session.json"]))
+    seed=(row["config"]["seed"]+row["cursor"]*101)%(2**31-12000)
+    async with _shadow_audit_slots:
+        result=await asyncio.to_thread(
+            run_shadow_saturation,source,seed=seed,steps=steps,
+            angles=(angle,),workers=1,max_cycles_per_sim=max_cycles,
+            max_replay_work_per_sim=replay_budget,train_policy=False,
+        )
+    if not verify_shadow_receipts(result):
+        raise GameLearningError("shadow_evidence","Shadow receipt chain verification failed.",409)
+    return {
+        **result,"campaign_id":identifier,"campaign_cursor":row["cursor"],
+        "spectator_only":True,"training_weight_changes":False,
+        "complete_run_proof_scope":"ten_consecutive_zero_gain_cycles_only_if_reached",
+        "native_spectral_camera_claim":False,
+    }
+
+
+_multifactor_probe_slots=asyncio.Semaphore(1)
+
+
+async def _multifactor_original_source(scope, identifier):
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+    from skeleton.jeeves.game_studio_environment import parse_studio_source
+    row=await _read(scope,identifier)
+    pinned=(row.get("snapshot") or {}).get("champion_request")
+    req=GameEnvironmentRequest.from_dict(pinned or row["environment_request"])
+    if (req.kind!="studio" or
+            req.target_id!=row["environment_request"]["target_id"]):
+        raise GameLearningError(
+            "multifactor_source",
+            "Multi-factor training requires an authorized original-game studio source.",409,
+        )
+    source=parse_studio_source(__import__("json").loads(req.tree["game/studio/session.json"]))
+    return row,source
+
+
+async def multifactor_control_catalog(scope, identifier):
+    from skeleton.jeeves.game_studio_multifactor import multifactor_capabilities
+    row,source=await _multifactor_original_source(scope,identifier)
+    return {
+        **multifactor_capabilities(source),
+        "campaign_id":identifier,"campaign_cursor":row["cursor"],
+        "automatic_neural_training":False,
+        "native_multimedia_simulation_assumed":False,
+    }
+
+
+async def multifactor_plan_preview(scope, identifier, *, axis_offset=0, count=6, order=3):
+    from skeleton.jeeves.game_studio_multifactor import (
+        plan_multifactor_scenarios, MultiFactorError,
+    )
+    if (type(axis_offset) is not int or not 0<=axis_offset<=63
+        or type(count) is not int or not 2<=count<=8
+        or type(order) is not int or order not in (2,3)):
+        raise GameLearningError("multifactor_limits","Factor design bounds differ.",422)
+    row,source=await _multifactor_original_source(scope,identifier)
+    try:
+        design=await asyncio.to_thread(
+            plan_multifactor_scenarios,source,interaction_order=order,
+            axis_offset=axis_offset,max_scenarios=count,
+        )
+    except MultiFactorError as exc:
+        raise GameLearningError(
+            "multifactor_plan","No source-legal combination is available in the selected control bank.",409,
+        ) from exc
+    return {
+        **design,"campaign_id":identifier,"campaign_cursor":row["cursor"],
+        "training_performed":False,"production_neural_weights_changed":False,
+    }
+
+
+async def multifactor_verified_experiments(
+    scope,identifier,*,axis_offset=0,count=2,steps=2,
+):
+    """Authorized campaign owner requests audited source-control experiments only.
+
+    Separate CLI needs explicit operator rights to update local Q candidates.
+    Network reader never promotes weights, adopts worlds, or trains models.
+    """
+    from skeleton.jeeves.game_studio_multifactor import (
+        execute_multifactor_scenarios, MultiFactorError,
+    )
+    if (type(axis_offset) is not int or not 0<=axis_offset<=63
+        or type(count) is not int or not 2<=count<=3
+        or type(steps) is not int or not 1<=steps<=4):
+        raise GameLearningError("multifactor_limits","Factor experiment budgets exceeded.",422)
+    row,source=await _multifactor_original_source(scope,identifier)
+    seed=(row["config"]["seed"]+row["cursor"]*163)%(2**31-22000)
+    try:
+        async with _multifactor_probe_slots:
+            result=await asyncio.to_thread(
+                execute_multifactor_scenarios,source,interaction_order=3,
+                axis_offset=axis_offset,max_scenarios=count,
+                steps=steps,seed=seed,train=False,
+            )
+    except MultiFactorError as exc:
+        raise GameLearningError(
+            "multifactor_execution",
+            "A source-verified multi-factor experiment could not be completed.",409,
+        ) from exc
+    return {
+        **result,"campaign_id":identifier,"campaign_cursor":row["cursor"],
+        "spectator_only":True,"actual_production_weights_changed":False,
+    }

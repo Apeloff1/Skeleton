@@ -16,6 +16,22 @@ Allowed signature methods are identity-bound only: `github_identity`, `git_gpg`,
 
 Completion requires implementation sign-off plus independent verification sign-off, non-empty evidence, a terminal status, completion timestamp, and a validated `[x]` checkbox.
 
+## Scope-qualified historical security verification
+
+The historical ledger records signed wave-4 organ-level verification for VOL-166,
+VOL-167, VOL-169, VOL-172 through VOL-178. These prior checks and signatures
+remain **unchanged** and continue to be attributed to their original signers.
+
+The newer independent security-governance gap-fill requires additional
+cross-plane replay, adversarial and exact-head evidence. Its completion authority
+is represented separately by `machine/ai_security_governance_gapfill_candidate.json`
+and the corresponding **implemented but unverified** entries in
+`machine/ai_master_plan.json`. Neither a historical checked ledger entry nor a
+successful contract validator self-grants this newer verification or a production
+promotion. The accountability check accepts these two scopes only when all ten
+historical records are signed and the separate candidate remains fail-closed
+with all promotion flags false.
+
 ## Lifecycle
 
 ```text
