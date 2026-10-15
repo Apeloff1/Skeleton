@@ -180,12 +180,15 @@ def _run_case(case: Mapping[str, str], registry_digest: str, *, timeout: float) 
 
 
 def run_matrix(
-    cases: list[dict[str, str]], *, timeout: float = 5.0,
+    cases: list[dict[str, str]], *,
+    rights_acknowledged: bool,
+    timeout: float = 5.0,
 ) -> dict:
     from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry
 
     if (
-        not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES
+        rights_acknowledged is not True
+        or not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES
         or type(timeout) not in (int, float) or not 0.1 <= timeout <= 30
     ):
         raise FirstBootError("first-boot execution budget invalid")
@@ -242,7 +245,7 @@ def main(argv=None) -> int:
         if args.evidence_file.exists() or args.evidence_file.is_symlink():
             raise FirstBootError("evidence destination must be a new non-symlink file")
         rows = _manifest(args.manifest_file)
-        result = run_matrix(rows, timeout=args.timeout)
+        result = run_matrix(rows, rights_acknowledged=True, timeout=args.timeout)
         # Safe atomic create-only publication; never clobber prior receipts.
         args.evidence_file.parent.mkdir(parents=True, exist_ok=True)
         encoded = (json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n").encode()
