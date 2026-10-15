@@ -55,7 +55,7 @@ def _signed(value: int) -> int:
 
 def disassemble_nes_nrom(rom: bytes, *, limit: int = MAX_INSTRUCTIONS) -> dict[str, Any]:
     """Decode CPU-reachable code only for mapper-0 NROM, never guess other banks."""
-    if (type(rom) is not bytes or len(rom) < 16 or rom[:4] != b"NES\\x1a"
+    if (type(rom) is not bytes or len(rom) < 16 or rom[:4] != b"NES\x1a"
         or type(limit) is not int or not 1 <= limit <= MAX_INSTRUCTIONS):
         raise ValueError("Valid bounded iNES binary and instruction limit required")
     nes2 = (rom[7] & 12) == 8
