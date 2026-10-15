@@ -168,6 +168,22 @@ def persist() -> dict:
     return saved
 
 
+def attest_training_checkpoint(destination: str | Path) -> dict[str, Any]:
+    """Operator seam to attest the *already running* Jeeves in this process.
+
+    Must be invoked from the compiled app's privileged local operator surface.
+    Never starts a second cortex or creates a substitute model. Call persist()
+    first if the live weights legitimately changed since the loaded snapshot.
+    """
+    with _LOCK:
+        if _live_cortex is None or not _LAST_LOAD.get("loaded"):
+            raise CortexPersistenceError("no restored production Jeeves is running to attest")
+        if not persistence_configured():
+            raise CortexPersistenceError("SKELETON_OWN is required for production attestation")
+        from skeleton.ai.training.jeeves_production_readiness import attest_running_cortex
+        return attest_running_cortex(_live_cortex, Path(destination))
+
+
 def reset_live(*, wipe_disk: bool = False) -> None:
     global _live_cortex, _live_control, _JEEVES, _LAST_LOAD
     with _LOCK:
