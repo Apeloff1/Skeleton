@@ -131,10 +131,13 @@ def wait_for_application(
     manifest = manifest or load_manifest()
     latest: tuple[ProbeResult, ...] = ()
     for attempt in range(attempts):
-        latest = probe_application(
-            manifest=manifest, full=full, timeout=timeout,
-            public_url_overrides=public_url_overrides,
-        )
+        if public_url_overrides is None:
+            latest = probe_application(manifest=manifest, full=full, timeout=timeout)
+        else:
+            latest = probe_application(
+                manifest=manifest, full=full, timeout=timeout,
+                public_url_overrides=public_url_overrides,
+            )
         if probes_ok(latest):
             return latest
         if attempt + 1 < attempts and delay:
