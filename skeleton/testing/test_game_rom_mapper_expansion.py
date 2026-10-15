@@ -112,13 +112,16 @@ class ExperimentalMbcExpansionTests(unittest.TestCase):
         machine.restore(snapshot)
         self.assertEqual(machine.read(0xA123), 0x66)
 
-    def test_mbc3_refuses_rtc_selection_and_rtc_cartridges(self):
+    def test_mbc3_non_timer_rejects_rtc_selection_and_timer_header_is_typed(self):
         machine = GameBoyMachine(synthetic_rom(0x12, 1, 2))
         with self.assertRaises(GameRomRuntimeError):
             machine.write(0x4000, 8)
-        for kind in (0x0F, 0x10):
-            with self.subTest(kind=kind), self.assertRaises(GameRomRuntimeError):
-                inspect_dmg_cartridge(synthetic_rom(kind, 1, 3))
+        with self.assertRaises(GameRomRuntimeError):
+            inspect_dmg_cartridge(synthetic_rom(0x0F, 1, 3))
+        timer_with_ram = inspect_dmg_cartridge(synthetic_rom(0x10, 1, 3))
+        self.assertEqual(timer_with_ram["mapper"], "mbc3")
+        self.assertTrue(timer_with_ram["virtual_rtc"])
+        self.assertEqual(timer_with_ram["ram_bytes"], 32768)
 
     def test_mbc5_selects_ninth_rom_bank_bit(self):
         machine = GameBoyMachine(synthetic_rom(0x1B, 8, 4))
