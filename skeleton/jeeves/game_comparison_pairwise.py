@@ -25,9 +25,15 @@ def _signals(value: object) -> dict[str, float]:
     values = {}
     for key in SIGNALS:
         n = value[key]
-        if type(n) not in (int, float) or not math.isfinite(n) or abs(n) > 1_000_000:
+        if type(n) not in (int, float):
+            raise PairwiseObservationError("Native signal must be a finite number")
+        try:
+            measured = float(n)
+        except (OverflowError, ValueError) as exc:
+            raise PairwiseObservationError("Native signal cannot be represented safely") from exc
+        if not math.isfinite(measured) or abs(measured) > 1_000_000:
             raise PairwiseObservationError("Nonfinite or unbounded native signal")
-        values[key] = float(n)
+        values[key] = measured
     return values
 
 def _input_activity(ports: list[dict[str, Any]]) -> int:
