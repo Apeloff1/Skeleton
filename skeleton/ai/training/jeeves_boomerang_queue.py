@@ -170,6 +170,8 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
         seen = set(entry["initial_scenario_ids"])
         _require(len(seen) == len(entry["initial_scenario_ids"]),
                  "duplicate original experiment identity")
+        known_families = set(entry["initial_risk_families"])
+        past_rows: dict[str, dict] = {}
         for count, part in enumerate(entry["passes"], start=2):
             _require(part["pass_number"] == count and
                      part["pass_sha256"] == _hash({
@@ -181,6 +183,12 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
                      part["reverse_observations"] == part["forward_observations"] ==
                      sum(x["frames_executed"] for x in rows),
                      "boomerang pass observation counts changed")
+            new_families = set().union(*(set(row["risk_counts"]) for row in rows))
+            _require(part["novel_failure_families"] ==
+                     sorted(new_families - known_families) and
+                     part["novel_family_count"] == len(new_families - known_families),
+                     "claimed boomerang discoveries do not match observations")
+            known_families.update(new_families)
             for row in rows:
                 case = validate_scenario(row["scenario"])
                 _require(row["source_digest"] == entry["source"]["source_digest"]
@@ -188,8 +196,43 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
                          and case["scenario_id"] not in seen,
                          "duplicate scenario, source splice or reverse audit failure")
                 seen.add(case["scenario_id"])
+            for pair in part["comparisons"]:
+                child = next((x for x in rows if
+                              x["scenario"]["scenario_id"] == pair["child_scenario"]), None)
+                parent = past_rows.get(pair["parent_scenario"])
+                # Pass-two parent comes from the archived report and is checked
+                # during verify_sources, without running its simulation again.
+                if parent is not None and child is not None:
+                    family = pair["target_failure_family"]
+                    _require(pair["before"] == parent["risk_counts"].get(family, 0) and
+                             pair["after"] == child["risk_counts"].get(family, 0) and
+                             pair["observed_reduction"] == (pair["after"] < pair["before"]) and
+                             pair["observed_regression"] == (pair["after"] > pair["before"]),
+                             "counterfactual measurement does not match prior run")
+            past_rows.update({row["scenario"]["scenario_id"]: row for row in rows})
         if verify_sources:
             _scene, source_archive = _load_source(entry)
+            archived_by_id = {row["scenario"]["scenario_id"]: row
+                              for row in source_archive["cases"]}
+            for part in entry["passes"]:
+                by_child = {r["scenario"]["scenario_id"]: r for r in part["results"]}
+                for pair in part["comparisons"]:
+                    parent = archived_by_id.get(pair["parent_scenario"])
+                    child = by_child.get(pair["child_scenario"])
+                    if parent is None:
+                        parent = next((row for previous in entry["passes"]
+                                       if previous["pass_number"] < part["pass_number"]
+                                       for row in previous["results"]
+                                       if row["scenario"]["scenario_id"] ==
+                                          pair["parent_scenario"]), None)
+                    _require(parent is not None and child is not None,
+                             "counterfactual has no original parent/child receipt")
+                    family = pair["target_failure_family"]
+                    _require(pair["before"] == parent["risk_counts"].get(family, 0) and
+                             pair["after"] == child["risk_counts"].get(family, 0) and
+                             pair["observed_reduction"] == (pair["after"] < pair["before"]) and
+                             pair["observed_regression"] == (pair["after"] > pair["before"]),
+                             "counterfactual values changed since source re-analysis")
             _require(entry["initial_case_count"] == source_archive["budget_requested"] and
                      entry["initial_risk_families"] == source_archive["risk_families_observed"] and
                      entry["initial_scenario_ids"] == sorted({
@@ -260,9 +303,18 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
     source_bounds = validate_scene(scene)
     per_sim = (source_bounds["total_ms"] + frame_ms - 1) // frame_ms + 1
     _require(budget * per_sim <= 180000, "boomerang aggregate frame quota exceeded")
-    ordered = sorted(latest, key=lambda row: (
-        -row["risk_severity"], -len(row["risk_counts"]),
-        row["scenario"]["scenario_id"]))
+    previous_families = set(archive["risk_families_observed"])
+    if pass_number == 3:
+        # On the third visit, newly exposed second-pass failures outrank
+        # familiar high-volume problems already documented the first time.
+        ordered = sorted(latest, key=lambda row: (
+            -len(set(row["risk_counts"]) - previous_families),
+            -len(row["risk_counts"]), -row["risk_severity"],
+            row["scenario"]["scenario_id"]))
+    else:
+        ordered = sorted(latest, key=lambda row: (
+            -row["risk_severity"], -len(row["risk_counts"]),
+            row["scenario"]["scenario_id"]))
     proposals, parent_of, targeted = [], {}, {}
     used = set(old_ids)
     for iteration in range(1, 11):
@@ -324,6 +376,9 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
         "reverse_observations": sum(row["frames_executed"] for row in results),
         "novel_failure_families": sorted(new_families),
         "novel_family_count": len(new_families),
+        "control_parse_policy": (
+            "third_pass_new_failure_priority" if pass_number == 3
+            else "second_pass_archived_failure_priority"),
         "novel_control_context_risk_signatures": len(new_signatures),
         "risk_signatures_not_independent_training_proof": True,
         "new_camera_trace_digests": len(new_traces),
