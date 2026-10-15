@@ -115,8 +115,6 @@
     "skeleton/testing/test_game_emulator_advanced_experiments.py",
     "skeleton/testing/test_game_emulator_neural_world.py",
     "skeleton/testing/test_game_emulator_physical_planning.py",
-    "skeleton/testing/test_game_emulator_operator_goals.py",
-    "skeleton/testing/test_game_emulator_physical_planning.py",
     "skeleton/testing/test_game_emulator_operator_goals.py"
   ],
   "tests_executed": false,
@@ -134,7 +132,6 @@
   "operator_docs": [
     "docs/ROM_EMULATOR_COMPLETION.md",
     "docs/ROM_EMULATOR_TRAINING_LAB.md",
-    "docs/ROM_EMULATOR_ADVANCED_RESEARCH.md",
     "docs/ROM_EMULATOR_ADVANCED_RESEARCH.md"
   ],
   "replay_temporal_audio": {
