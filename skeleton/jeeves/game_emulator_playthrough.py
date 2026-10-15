@@ -237,6 +237,8 @@ def run_native_full_playthrough(
         plan_digest = _digest(canonical)
         environment_digest = environment.spec.environment_digest
         total = sum(row["repeat"] for row in canonical["instructions"])
+        if (total + checkpoint_every - 1) // checkpoint_every > 250000:
+            raise PlaythroughError("checkpoint schedule exceeds 250,000 durable evidence files")
         checkpoint_path = directory / "checkpoint.json"
         receipt_chain = _digest({
             "plan_digest": plan_digest, "environment_digest": environment_digest,
@@ -387,3 +389,81 @@ def run_native_full_playthrough(
         }
     finally:
         lock.unlink(missing_ok=True)
+
+
+def audit_native_playthrough_directory(directory: Path) -> dict[str, object]:
+    """Verify durable ledger continuity; do not infer a game's real ending."""
+    root = _private_dir(Path(directory))
+    checkpoint = _load(root / "checkpoint.json")
+    if checkpoint.get("schema_version") != CHECKPOINT_SCHEMA:
+        raise PlaythroughError("playthrough checkpoint schema differs")
+    encoded = dict(checkpoint)
+    digest = encoded.pop("checkpoint_digest", None)
+    if digest != _digest(encoded):
+        raise PlaythroughError("checkpoint integrity differs")
+    filenames = sorted(root.glob("receipt-*.json"))
+    if not 1 <= len(filenames) <= 250000:
+        raise PlaythroughError("playthrough receipt count outside audited bounds")
+    previous = None
+    cursor = 0
+    windows = 0
+    status = "running"
+    for filename in filenames:
+        if filename.is_symlink():
+            raise PlaythroughError("playthrough receipt cannot be a symlink")
+        value = _load(filename)
+        if value.get("schema_version") != RECEIPT_SCHEMA:
+            raise PlaythroughError("playthrough receipt schema differs")
+        payload = dict(value)
+        signature = payload.pop("receipt_digest", None)
+        if signature != _digest(payload):
+            raise PlaythroughError("playthrough receipt digest differs")
+        start = _integer(value.get("from_step"), 0, MAX_TOTAL_STEPS, "receipt start")
+        finish = _integer(value.get("to_step"), start, MAX_TOTAL_STEPS, "receipt finish")
+        count = _integer(value.get("continuation_windows"), 0, MAX_TOTAL_STEPS, "receipt windows")
+        if (filename.name != f"receipt-{finish:012d}.json"
+            or start != cursor or count < windows
+            or value.get("previous_receipt_digest") != previous
+            or value.get("plan_digest") != checkpoint["plan_digest"]
+            or value.get("environment_digest") != checkpoint["environment_digest"]
+            or value.get("certified_game_completion") is not False
+            or value.get("model_weights_promoted") is not False):
+            raise PlaythroughError("playthrough receipt identity, order, or unverified claims differ")
+        samples = value.get("samples")
+        if not isinstance(samples, list) or len(samples) > 4096:
+            raise PlaythroughError("evidence sample sequence exceeds bounded audit")
+        last = start
+        for sample in samples:
+            if not isinstance(sample, dict):
+                raise PlaythroughError("evidence sample row is not an object")
+            sampled_step = _integer(sample.get("step"), start + 1, finish, "sample cursor")
+            if sampled_step <= last:
+                raise PlaythroughError("evidence samples are not strictly ordered")
+            for field in ("frame_sha256", "controller_sha256", "transition_digest"):
+                item = sample.get(field)
+                if type(item) is not str or len(item) != 64 or any(c not in "0123456789abcdef" for c in item):
+                    raise PlaythroughError("evidence sample is missing a native SHA256")
+            last = sampled_step
+        previous, cursor, windows = signature, finish, count
+        status = value["stop_reason"]
+        if status not in ("running", "input_exhausted", "completion_rule_matched", "cancelled", "time_budget_exhausted"):
+            raise PlaythroughError("unknown native playthrough stop reason")
+        if status != "running" and filename != filenames[-1]:
+            raise PlaythroughError("a terminal playthrough receipt has unexpected successors")
+    if (checkpoint["absolute_step"] != cursor
+        or checkpoint["windows"] != windows
+        or checkpoint["previous_receipt_digest"] != previous
+        or checkpoint["status"] != status):
+        raise PlaythroughError("latest durable checkpoint and receipt ledger disagree")
+    return {
+        "schema_version": "skeleton.game.native_playthrough_audit.v1",
+        "status": status,
+        "audited_receipts": len(filenames),
+        "audited_steps": cursor,
+        "continued_windows": windows,
+        "last_receipt_digest": previous,
+        "checkpoint_digest": digest,
+        "receipt_integrity_verified": True,
+        "game_completion_verified": False,
+        "external_execution_attestation": False,
+    }
