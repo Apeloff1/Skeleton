@@ -166,6 +166,7 @@ def _observed(
     value = 0.0
     measurements = []
     frames = []
+    ended_before_horizon = False
     for index, action in enumerate(actions):
         _guard(cancel, authorize)
         step = env.step(action)
@@ -197,8 +198,10 @@ def _observed(
         frames.append(frame)
         observed = after
         if step.terminated or step.truncated:
+            ended_before_horizon = index + 1 < len(actions)
             break
     return {
+        "ended_before_horizon": ended_before_horizon,
         "actions_requested": list(actions),
         "real_steps": len(measurements),
         "actual_discounted_objective": value,
@@ -243,6 +246,8 @@ def run_native_confirmed_planning(
         or model.get("measured_predictive_gate") != "candidate_predictive_gain_measured"
     ):
         raise EmulatorPlanningError("unqualified or mismatched neural candidate cannot direct source actions")
+    if request.max_steps < config.anchors - 1 + config.horizon:
+        raise EmulatorPlanningError("real episode cannot contain the anchor prefix and full proposed horizon")
     if config.objective == "audio_activity" and "audio_rms" not in model.get("observation_features", []):
         raise EmulatorPlanningError("audio objective requires real measured native audio channels")
     _guard(cancel, authorize)
@@ -316,6 +321,11 @@ def run_native_confirmed_planning(
                      item["actual_discounted_objective"])
                     for item in trials
                 }) == 1
+                full_length_observed = all(
+                    not trial["ended_before_horizon"]
+                    and trial["real_steps"] == config.horizon
+                    for trial in trials + base_trials
+                )
                 paired_gain = [
                     trial["actual_discounted_objective"] - baseline["actual_discounted_objective"]
                     for trial, baseline in zip(trials, base_trials, strict=True)
@@ -330,10 +340,12 @@ def run_native_confirmed_planning(
                     "real_trials": trials,
                     "source_replay_stable": stable,
                     "baseline_replay_stable": baseline_stable,
+                    "full_proposed_horizon_executed": full_length_observed,
                     "measured_gain_over_neutral": paired_gain,
                     "mean_end_observation_prediction_error": math.fsum(prediction_errors) / len(prediction_errors),
                     "actual_measured_positive_gain": (
-                        stable and baseline_stable and all(gain > 0 for gain in paired_gain)
+                        stable and baseline_stable and full_length_observed
+                        and all(gain > 0 for gain in paired_gain)
                     ),
                     "semantic_game_success_certified": False,
                     "policy_or_neural_weights_promoted": False,
