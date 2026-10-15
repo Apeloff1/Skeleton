@@ -50,14 +50,14 @@ PYTHONPATH=. python scripts/decompile_game_assets.py ./homebrew.nes \
 
 Run without `--export-previews` for a metadata-only evidence export. Use `--candidate-tile 0x200:256:gb_2bpp` **only** when the offset/codec is independently documented; output is labeled as a *candidate*, not a proven graphics region. No output directory will be overwritten. Source is opened without symlink traversal, and the output is a new private directory.
 
-For reviewed quality data, add `--human-score 76 --reviewer original_reviewer --label-evidence-digest <sha>` and ensure explicit shadow rights. This adds a bounded human-label candidate to the local evidence, **not** a trained model.
+For reviewed quality data, add `--human-score 76 --reviewer original_reviewer --label-evidence-digest <sha>` and ensure explicit shadow rights. This creates a separate `shadow_training_candidate.json` alongside the immutable original `report.json`, so human labels cannot invalidate or rewrite the original report hash. It does **not** train a model.
 
 To **actually train** a local shadow numeric regressor from **8–128 distinct, human-labeled reports**:
 
 ```bash
 PYTHONPATH=. python scripts/train_game_asset_quality_shadow.py \
   --authorize-shadow-training --output ./shadow_quality_checkpoint.json \
-  ./evidence/game_*/report.json
+  ./evidence/game_*/shadow_training_candidate.json
 ```
 
 The fit uses fixed-feature logarithmic normalization, deterministic source-disjoint train/holdout split, bounded batch-gradient MSE updates with L2 weight shrinkage, per-source evidence digests and a checkpoint checksum. A better holdout MSE is **not sufficient for automatic promotion**; reviewers must also evaluate score bias, representativeness, originality, robustness, legal source rights, adversarial game design/animation and independent playtest outcomes. Even a failed holdout guard records actual local model learning but is not promotion admissible. The production Jeeves/Dragon/LLM weights remain unchanged.
