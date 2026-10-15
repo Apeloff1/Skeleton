@@ -66,6 +66,12 @@ def _run(control: int):
         or core.pc != 0x108
     ):
         raise SerialProofError("original source opcode program did not start DMG serial transfer")
+    if (
+        actual_source_cpu_cycles != 40
+        or core.serial_bits != 0
+        or core.serial_phase != (12 if control == 0x81 else 0)
+    ):
+        raise SerialProofError("source SM83 SB/SC opcode timings or immediate serial phase differ")
     beginning = core.snapshot()
     if core.instruction() != 4 or not core.halted:
         raise SerialProofError("original source HALT did not preserve clocked serial bus")
@@ -102,6 +108,8 @@ def _run(control: int):
         "actual_cpu_clock_advance_instructions": 1 + halfway_idle_instructions + 512,
         "source_program_cpu_instruction_calls": 4 + 1 + halfway_idle_instructions + 512,
         "serial_start_opcode_clocked_tcycles": start_opcode_serial_cycles,
+        "actual_source_SB_SC_program_tcycles": actual_source_cpu_cycles,
+        "real_serial_phase_just_after_SC_opcode": 12 if control == 0x81 else 0,
         "hardware_clock_t_cycles_observed": 4096,
         "source_ROM_SHA256": core.metadata["rom_digest"],
         "source_initial_snapshot_sha256": _digest(beginning),
