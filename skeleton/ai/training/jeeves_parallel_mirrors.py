@@ -72,7 +72,8 @@ def _source(attestation_path: Path) -> tuple[Path, str]:
 def _candidate_worker(
     name: str, lr: float, epochs: int, source: Path, parent_sha: str,
     manifest: Path, candidate: Path, report: Path,
-    expand_vocabulary: bool, max_optimizer_steps: int, max_training_seconds: int,
+    expand_vocabulary: bool, capacity_growth: str, max_added_parameters: int,
+    max_optimizer_steps: int, max_training_seconds: int,
 ) -> dict[str, Any]:
     """A spawned child does real candidate SGD through the existing optimizer."""
     from .jeeves_production_game_train import train
@@ -80,7 +81,8 @@ def _candidate_worker(
         source, expected=parent_sha, candidate=candidate, report=report,
         epochs=epochs, lr=lr, min_coverage=.80, max_domain_regression=0.0,
         expand_vocabulary=expand_vocabulary, dataset_manifest=manifest,
-        training_view=name,
+        training_view=name, capacity_growth=capacity_growth,
+        max_added_parameters=max_added_parameters,
         max_optimizer_steps=max_optimizer_steps,
         max_training_seconds=max_training_seconds)
     return {
@@ -88,6 +90,10 @@ def _candidate_worker(
         "learning_rate": lr, "epochs": epochs,
         "status": result["status"],
         "real_optimizer_updates": result["observed_optimizer_updates"],
+        "capacity_growth_profile": capacity_growth,
+        "capacity_growth": result.get("capacity_growth"),
+        "candidate_trainable_parameters": result.get("candidate_trainable_parameters"),
+        "new_trainable_parameters": result.get("trainable_parameters_added_by_growth", 0),
         "candidate_sha256": result.get("candidate_sha256"),
         "candidate_file": candidate.name if candidate.is_file() else None,
         "report_file": report.name,
@@ -102,6 +108,8 @@ def run_parallel_candidates(
     output_directory: Path, receipt_path: Path,
     max_optimizer_steps: int = 10000, max_training_seconds: int = 1200,
     expand_vocabulary: bool = False,
+    constructive_capacity: str = "none", adversarial_capacity: str = "none",
+    max_added_parameters: int = 500000,
 ) -> dict[str, Any]:
     if type(max_optimizer_steps) is not int or not 1 <= max_optimizer_steps <= 25000:
         raise ProductionCheckpointError("optimizer step budget outside 1..25000")
@@ -109,6 +117,12 @@ def run_parallel_candidates(
         raise ProductionCheckpointError("optimizer wall-clock budget outside 1..3600")
     if type(expand_vocabulary) is not bool:
         raise ProductionCheckpointError("vocabulary expansion must be explicitly boolean")
+    from .jeeves_capacity_growth import PROFILE_FACTORS
+    if (constructive_capacity not in PROFILE_FACTORS or
+            adversarial_capacity not in PROFILE_FACTORS):
+        raise ProductionCheckpointError("mirror growth profiles must be supported")
+    if type(max_added_parameters) is not int or not 1 <= max_added_parameters <= 2000000:
+        raise ProductionCheckpointError("mirror FFN new-parameter budget outside 1..2,000,000")
     if (os.cpu_count() or 1) < 2:
         raise ProductionCheckpointError("two training arms require at least two CPU cores")
     if output_directory.is_symlink() or not output_directory.is_dir():
@@ -143,12 +157,15 @@ def run_parallel_candidates(
     if any(receipt_path == path for files in names.values() for path in files):
         raise ProductionCheckpointError("receipt cannot alias candidate or report")
     results: list[dict[str, Any]] = []
+    capacity_by_arm = {"constructive": constructive_capacity,
+                       "adversarial": adversarial_capacity}
     # Spawned independent CPU processes, not Python threads sharing a mutable LM.
     with ProcessPoolExecutor(max_workers=2, mp_context=get_context("spawn")) as pool:
         jobs = [
             (name, pool.submit(_candidate_worker, name, lr, epochs,
                                source, parent_sha, manifest_path, *names[name],
-                               expand_vocabulary, max_optimizer_steps,
+                               expand_vocabulary, capacity_by_arm[name],
+                               max_added_parameters, max_optimizer_steps,
                                max_training_seconds))
             for name, lr, epochs in ARMS
         ]
@@ -178,6 +195,12 @@ def run_parallel_candidates(
         "registered_modules": catalog["modules"],
         "active_modules": len(corpus["active_modules"]),
         "candidate_arms": results,
+        "capacity_growth_profiles": capacity_by_arm,
+        "new_parameter_admission_per_arm": max_added_parameters,
+        "real_model_parameter_growth_ran": any(
+            item.get("new_trainable_parameters", 0) > 0
+            and item.get("real_optimizer_updates", 0) > 0 for item in results
+            if item.get("real_optimizer_updates") is not None),
         "optimizer_views": {
             name: {"train_examples": receipt["train_examples"],
                    "training_view": receipt["training_view"]}
@@ -204,6 +227,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--train-mirrors", action="store_true")
     parser.add_argument("--expand-vocabulary", action="store_true")
+    parser.add_argument("--constructive-capacity",
+                        choices=("none", "micro", "balanced", "large", "xlarge"),
+                        default="none")
+    parser.add_argument("--adversarial-capacity",
+                        choices=("none", "micro", "balanced", "large", "xlarge"),
+                        default="none")
+    parser.add_argument("--max-added-parameters", type=int, default=500000)
     parser.add_argument("--max-optimizer-steps", type=int, default=10000)
     parser.add_argument("--max-training-seconds", type=int, default=1200)
     parser.add_argument("--workers", type=int, default=4)
@@ -224,7 +254,10 @@ def main(argv: list[str] | None = None) -> int:
             receipt_path=args.receipt,
             max_optimizer_steps=args.max_optimizer_steps,
             max_training_seconds=args.max_training_seconds,
-            expand_vocabulary=args.expand_vocabulary)
+            expand_vocabulary=args.expand_vocabulary,
+            constructive_capacity=args.constructive_capacity,
+            adversarial_capacity=args.adversarial_capacity,
+            max_added_parameters=args.max_added_parameters)
         print(json.dumps(result, sort_keys=True, indent=2))
         return 0 if result["status"] == "two_candidates_pending_independent_review" else 3
     except (OSError, RuntimeError, ValueError, TypeError, OverflowError) as exc:
