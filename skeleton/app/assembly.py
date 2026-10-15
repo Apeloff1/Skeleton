@@ -11,11 +11,11 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from urllib.parse import urlsplit
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, Mapping
+from urllib.parse import urlsplit
 
 
 @dataclass(frozen=True)
