@@ -81,14 +81,20 @@ class ProductionGameCheckpointTests(unittest.TestCase):
         self.assertEqual((key, mouth), ("transformer", "gelu"))
         self.assertEqual(selected["steps"], 7)
 
-    def test_no_silent_fallback_for_unknown_or_torch_mouth(self) -> None:
+    def test_no_silent_fallback_for_unknown_or_malformed_mouth(self) -> None:
         from skeleton.ai.training.jeeves_production_game_train import _active_snapshot
         xf = {"itos": ["__unk__"], "E": [[0.1]], "layers": [{}],
               "dim": 8, "ctx": 6, "steps": 10, "fitted": 1}
         with self.assertRaisesRegex(ProductionCheckpointError, "unsupported active"):
             _active_snapshot({"transformer": xf, "winner": "pfc"})
-        with self.assertRaisesRegex(ProductionCheckpointError, "torch-stack"):
+        with self.assertRaisesRegex(ProductionCheckpointError, "weight-bearing"):
             _active_snapshot({"transformer": {**xf, "kind": "torch-stack"}, "winner": "neo"})
+        key, active, mouth = _active_snapshot({
+            "transformer": {**xf, "kind": "torch-stack", "state": {"weight": [[0.1]]}},
+            "winner": "neo",
+        })
+        self.assertEqual((key, mouth), ("transformer", "neo"))
+        self.assertEqual(active["kind"], "torch-stack")
         with self.assertRaisesRegex(ProductionCheckpointError, "speaking weights missing"):
             _active_snapshot({"transformer": xf, "winner": "rms"})
 
