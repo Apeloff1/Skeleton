@@ -49,6 +49,7 @@ export const useStorage = () => {
   const mutationEpochRef = useRef(0);
   const progressRef = useRef<BibleProgress>(DEFAULT_BIBLE_PROGRESS);
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const hydrationRef = useRef<Promise<void>>(Promise.resolve());
 
   // A rejected storage write must not poison the next queued write.
   const enqueueWrite = useCallback((key: string, value: string) => {
@@ -86,7 +87,7 @@ export const useStorage = () => {
         if (!cancelled && mountedRef.current) setIsLoading(false);
       }
     };
-    void loadAllData();
+    hydrationRef.current = loadAllData();
 
     return () => {
       cancelled = true;
@@ -95,6 +96,8 @@ export const useStorage = () => {
   }, []);
 
   const setTutorialCompleted = useCallback(async (value: boolean) => {
+    await hydrationRef.current;
+    if (!mountedRef.current) return;
     mutationEpochRef.current++;
     if (mountedRef.current) setTutorialCompletedState(value);
     try {
@@ -105,6 +108,8 @@ export const useStorage = () => {
   }, [enqueueWrite]);
 
   const setAdvancedUnlocked = useCallback(async (value: boolean) => {
+    await hydrationRef.current;
+    if (!mountedRef.current) return;
     mutationEpochRef.current++;
     if (mountedRef.current) setAdvancedUnlockedState(value);
     try {
@@ -115,6 +120,8 @@ export const useStorage = () => {
   }, [enqueueWrite]);
 
   const updateBibleProgress = useCallback(async (updates: Partial<BibleProgress>) => {
+    await hydrationRef.current;
+    if (!mountedRef.current) return;
     mutationEpochRef.current++;
     const next = { ...progressRef.current, ...updates };
     progressRef.current = next;
