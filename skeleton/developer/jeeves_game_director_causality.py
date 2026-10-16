@@ -45,6 +45,14 @@ def audit(root: Path, *, session: str, page: int = 1,
     transport_modes = Counter()
     world_flag_created_at = {}
     faction_standing_moves = Counter()
+    NPC_contacts = Counter()
+    shop_purchases = Counter()
+    shop_sales = Counter()
+    dialogue_periods = Counter()
+    wallet_spent = 0
+    wallet_received = 0
+    trust_earned_at = {}
+    society_action_total = 0
     world_consequence_edges = []
     world_consequence_count = 0
 
@@ -91,6 +99,8 @@ def audit(root: Path, *, session: str, page: int = 1,
         action_totals[action.kind] += 1
         new_world_flags = []
         reputation_deltas = []
+        trust_deltas = []
+        shop_wallet_delta = 0
         if state.world_state is not None:
             if previous.world_state is None:
                 raise ValueError("existing reputation history disappeared")
@@ -123,6 +133,46 @@ def audit(root: Path, *, session: str, page: int = 1,
                     "at_sequence": index, "kind": "world_flag",
                     "flag": flag, "caused_by": action.kind + ":" + action.key,
                 })
+            if state.world_state.society is not None:
+                if previous.world_state.society is None:
+                    raise ValueError("original NPC save unexpectedly appeared mid-session")
+                before_society = previous.world_state.society
+                after_society = state.world_state.society
+                previous_trust = dict(before_society.relationships)
+                for npc, now in after_society.relationships:
+                    if now != previous_trust[npc]:
+                        trust_deltas.append({
+                            "resident": npc, "before": previous_trust[npc],
+                            "after": now, "delta": now - previous_trust[npc],
+                        })
+                        trust_earned_at[npc] = index
+                        record_world_consequence({
+                            "at_sequence": index, "kind": "npc_trust",
+                            "resident": npc, "before": previous_trust[npc],
+                            "after": now, "caused_by": action.kind + ":" + action.key,
+                        })
+                shop_wallet_delta = (
+                    after_society.balance - before_society.balance)
+                wallet_spent += max(0, -shop_wallet_delta)
+                wallet_received += max(0, shop_wallet_delta)
+                if action.kind == "speak":
+                    NPC_contacts[action.key] += 1
+                elif action.kind == "buy":
+                    shop_purchases[action.key] += 1
+                elif action.kind == "sell":
+                    shop_sales[action.key] += 1
+                if action.kind in {"speak", "buy", "sell", "rest"}:
+                    society_action_total += 1
+                    from skeleton.ai.game_builder.quest_society import phase
+                    rules = world.dynamics.society
+                    moment = phase(rules, previous.turn)
+                    dialogue_periods[moment["phase"]] += 1
+                    record_world_consequence({
+                        "at_sequence": index, "kind": "society_action",
+                        "action": action.kind + ":" + action.key,
+                        "calendar": moment["phase"],
+                        "wallet_delta": shop_wallet_delta,
+                    })
         for result in fresh:
             quest = quest_lookup[result.quest]
             stage = next((item for item in quest.stages if item.key == result.stage), None)
@@ -163,6 +213,8 @@ def audit(root: Path, *, session: str, page: int = 1,
                 "inventory_consumed": sorted(set(previous.acquired) - set(state.acquired)),
                 "world_flags_earned": new_world_flags,
                 "faction_reputation_changes": reputation_deltas,
+                "npc_trust_changes": trust_deltas,
+                "shop_wallet_delta": shop_wallet_delta,
                 "cast_present_after_action": list(here.cast),
             })
     if state != final:
@@ -189,6 +241,14 @@ def audit(root: Path, *, session: str, page: int = 1,
         "action_kinds": dict(sorted(action_totals.items())),
         "transport_modes": dict(sorted(transport_modes.items())),
         "faction_standing_changes": dict(sorted(faction_standing_moves.items())),
+        "NPC_conversation_counts": dict(sorted(NPC_contacts.items())),
+        "market_buy_counts": dict(sorted(shop_purchases.items())),
+        "market_sell_counts": dict(sorted(shop_sales.items())),
+        "society_actions_replayed": society_action_total,
+        "society_actions_by_time_phase": dict(sorted(dialogue_periods.items())),
+        "shop_currency_spent": wallet_spent,
+        "shop_currency_received": wallet_received,
+        "NPC_trust_last_change_at": dict(sorted(trust_earned_at.items())),
         "world_flags_created_at": dict(sorted(world_flag_created_at.items())),
         "world_consequence_edges": world_consequence_edges,
         "world_consequence_edge_count": world_consequence_count,
