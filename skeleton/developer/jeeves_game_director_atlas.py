@@ -203,7 +203,7 @@ renderer/rendering_method.mobile="gl_compatibility"
 def export(root: Path, *, source: str, dry_run: bool = False) -> dict[str, Any]:
     contents, manifest = _payload(root, source)
     identity = manifest["source_sha256"]
-    dirname = manifest["director_world_sha256"][:20] + "-live-v7"
+    dirname = manifest["director_world_sha256"][:20] + "-live-v8"
     directory = _parent(root)
     destination = directory / dirname
     if destination.is_symlink() or destination.exists():
@@ -232,7 +232,7 @@ def export(root: Path, *, source: str, dry_run: bool = False) -> dict[str, Any]:
 
 def verify(root: Path, *, source: str) -> dict[str, Any]:
     contents, manifest = _payload(root, source)
-    location = _parent(root) / (manifest["director_world_sha256"][:20] + "-live-v7")
+    location = _parent(root) / (manifest["director_world_sha256"][:20] + "-live-v8")
     if location.is_symlink() or not location.is_dir():
         raise ValueError("Director atlas missing or unsafe")
     # Godot generates nested .godot caches and resource .import sidecars.
