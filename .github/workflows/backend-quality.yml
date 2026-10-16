@@ -133,6 +133,7 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_jeeves_game_completion.py
           skeleton/testing/test_jeeves_game_multidomain_upscale.py
+          tests/test_game_builder_story_direction_quality.py
           skeleton/testing/test_jeeves_game_direction.py
           skeleton/testing/test_jeeves_game_render.py
           skeleton/testing/test_jeeves_game_quality.py
