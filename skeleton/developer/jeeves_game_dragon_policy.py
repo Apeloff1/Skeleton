@@ -58,6 +58,8 @@ def _context(state: Any) -> str:
                 "shop_stock": [list(x) for x in society.shop_stock],
                 "owned_goods": [list(x) for x in society.owned],
                 "last_talk": [list(x) for x in society.last_talk_cycle],
+                "dialogue_choices_previously_made": [
+                    list(x) for x in society.dialogue_history],
                 "game_turn": state.turn,
             }
     return _hash(feature)
