@@ -560,8 +560,9 @@ def director_initial(world: DirectorWorld) -> DirectorState:
 def _progress(world: DirectorWorld, state: DirectorState):
     if not isinstance(state, DirectorState) or state.world_digest != world.digest:
         raise DirectorError("foreign narrative history")
-    if state.turn > MAX_EVENTS * 60:
-        raise DirectorError("turn budget exceeded")
+    # Long-form projects accumulate any number of accepted turns across
+    # bounded replay slices. MAX_EVENTS guards an individual replay invocation,
+    # never the lifetime of a game or its verified progress.
     qmap = {q.key: q for q in world.quests}
     return qmap, dict(state.stage_index)
 
