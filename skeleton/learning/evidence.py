@@ -35,6 +35,9 @@ from typing import Any
 from skeleton.kernel.errors import KernelError
 
 MAX_ID_CHARS = 128
+# Subject identities also originate from assessment skill IDs, which may
+# exceed the narrower internal record/parent ID limit.
+MAX_SUBJECT_ID_CHARS = 256
 MAX_CLAIM_CHARS = 4_096
 MAX_SOURCE_CHARS = 256
 MAX_PAYLOAD_KEYS = 64
@@ -294,7 +297,7 @@ class Observation:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "observation_id", _text("observation_id", self.observation_id, MAX_ID_CHARS))
-        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_ID_CHARS))
+        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_SUBJECT_ID_CHARS))
         frozen = _freeze_payload(self.payload)
         object.__setattr__(self, "payload", frozen)
         _require_provenance(self.provenance, expected_fingerprint=canonical_fingerprint(frozen))
@@ -330,7 +333,7 @@ class Feature:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "feature_id", _text("feature_id", self.feature_id, MAX_ID_CHARS))
-        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_ID_CHARS))
+        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_SUBJECT_ID_CHARS))
         object.__setattr__(self, "name", _text("name", self.name, MAX_ID_CHARS))
         object.__setattr__(self, "value", _json_scalar("value", self.value))
         object.__setattr__(self, "observation_ids", _ids("observation_id", self.observation_ids))
@@ -376,7 +379,7 @@ class Hypothesis:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "hypothesis_id", _text("hypothesis_id", self.hypothesis_id, MAX_ID_CHARS))
-        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_ID_CHARS))
+        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_SUBJECT_ID_CHARS))
         object.__setattr__(self, "claim", _text("claim", self.claim, MAX_CLAIM_CHARS))
         object.__setattr__(self, "feature_ids", _ids("feature_id", self.feature_ids))
         object.__setattr__(self, "confidence", _unit("confidence", self.confidence))
@@ -1258,6 +1261,20 @@ class LearningEvidenceStore:
                 and existing.name == feature.name
                 and not _values_equal(existing.value, feature.value)
             ):
+                # Measurements from strictly later source observations are
+                # longitudinal facts, not competing claims about one moment.
+                # Preserve both immutable features and their parent evidence.
+                # Equal, overlapping or older observation windows fail closed.
+                prior_times = tuple(
+                    self._observations[oid].provenance.observed_at
+                    for oid in existing.observation_ids
+                )
+                incoming_times = tuple(
+                    self._observations[oid].provenance.observed_at
+                    for oid in feature.observation_ids
+                )
+                if min(incoming_times) > max(prior_times):
+                    continue
                 raise LearningEvidenceError(
                     "contradictory feature signal; values are not averaged",
                     context={
