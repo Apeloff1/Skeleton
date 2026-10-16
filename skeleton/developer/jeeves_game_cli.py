@@ -158,7 +158,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "camera-plan", "camera-render",
                                             "direction-audit", "direction-workorder", "production-gap-matrix",
                                             "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt",
-                                            "director-draft", "director-examine", "director-promote",
+                                            "director-draft", "director-revise", "director-examine", "director-promote",
                                             "director-board", "director-prepare-training"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
@@ -176,6 +176,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--dragon-digest")
     parser.add_argument("--seed", type=int)
     parser.add_argument("--regions")
+    parser.add_argument("--revision")
     parser.add_argument("--quest-types")
     parser.add_argument("--stages", type=int)
     parser.add_argument("--goal")
@@ -206,11 +207,12 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
-        director_actions = {"director-draft", "director-examine", "director-promote",
+        director_actions = {"director-draft", "director-revise", "director-examine", "director-promote",
                             "director-board", "director-prepare-training"}
         if args.action in director_actions:
             allowed = {
                 "director-draft": {"action", "seed", "regions", "quest_types", "stages", "goal", "dragon_digest"},
+                "director-revise": {"action", "source", "revision"},
                 "director-examine": {"action", "source", "routes"},
                 "director-promote": {"action", "source", "routes", "approve"},
                 "director-board": {"action", "source", "routes", "dragon_digest"},
@@ -229,6 +231,11 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                              goal=args.goal, dragon_digest=args.dragon_digest)
             if not args.source:
                 raise ValueError("Director production commands require --source")
+            if args.action == "director-revise":
+                from skeleton.developer.jeeves_game_director_revision import revise
+                if not args.revision:
+                    raise ValueError("director-revise requires --revision design/<file>.json")
+                return revise(root, source=args.source, revision=args.revision)
             if args.action in {"director-examine", "director-promote"}:
                 from skeleton.developer.jeeves_game_director_factory import examine, promote
                 if args.action == "director-examine":
@@ -246,7 +253,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 routes=args.routes if args.routes is not None else 3,
                 dragon_digest=args.dragon_digest, approve=args.approve)
         if any(value is not None for value in (
-                args.seed, args.regions, args.quest_types, args.stages, args.goal, args.routes)):
+                args.seed, args.regions, args.revision, args.quest_types, args.stages, args.goal, args.routes)):
             raise ValueError("Director forge options require a director-* action")
         if args.dragon_digest is not None and args.action != "propose":
             raise ValueError("--dragon-digest only supports proposal authoring")
