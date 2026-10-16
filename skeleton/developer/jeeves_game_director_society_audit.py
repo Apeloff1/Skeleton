@@ -136,10 +136,7 @@ def analyze(world: Any) -> dict[str, Any]:
                 "market_goods_required": sorted(
                     set(record.requirements.items) & goods
                 ),
-                "initially_open": (
-                    not rule_type == "transit" and record.destination in
-                    {x.key for x in ()}
-                ),  # overwritten below by canonical engine state
+                "initially_open": False,  # computed using exact starting state
             }
             from skeleton.ai.game_builder.quest_world_dynamics import permits
             requirement["initially_open"] = permits(record.requirements, initial)
