@@ -52,12 +52,13 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
     transports: Counter[str] = Counter()
     transport_turns = 0
 
-    def close(reason: str, index: int) -> None:
+    def close(reason: str, index: int, destination: str | None = None) -> None:
         nonlocal start, moved, total_hops, total_shortest, full_walk, episode_count
+        endpoint = state.scene if destination is None else destination
         if not moved:
-            start = state.scene
+            start = endpoint
             return
-        shortest = _shortest(graph, start, state.scene)
+        shortest = _shortest(graph, start, endpoint)
         surplus = moved - shortest
         if surplus < 0:
             raise ValueError("authored shortest path exceeds actual valid replayed journey")
@@ -66,7 +67,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         episode_count += 1
         episodes.append({
             "end_sequence": index, "boundary": reason,
-            "origin": start, "destination": state.scene,
+            "origin": start, "destination": endpoint,
             "actual_hops": moved, "shortest_hops": shortest,
             "extra_hops_vs_shortest": surplus,
             "walk": list(full_walk),
@@ -76,7 +77,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
             episodes.sort(key=lambda x: (-x["extra_hops_vs_shortest"],
                                          -x["actual_hops"], x["end_sequence"]))
             del episodes[20:]
-        start, moved, full_walk = state.scene, 0, deque([state.scene], maxlen=32)
+        start, moved, full_walk = endpoint, 0, deque([endpoint], maxlen=32)
 
     for index in range(1, count + 1):
         item = _read_doc(folder / f"{index:08d}.json")
@@ -97,7 +98,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         elif step.kind == "transit":
             # A ferry/portal is not a walking detour. Static walking paths
             # cannot serve as a fair distance baseline for a paid vehicle.
-            close("before_transport", index)
+            close("before_transport", index, destination=step.scene)
             if world.dynamics is None:
                 raise ValueError("observed transport has no original-world contract")
             route = next((p for p in world.dynamics.passages
@@ -105,6 +106,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
             if route is None:
                 raise ValueError("unknown transit observed in Dragon replay")
             transports[route.mode] += 1
+            visited[state.scene] += 1
             transport_turns += state.turn - previous_turn
             start, moved, full_walk = state.scene, 0, deque([state.scene], maxlen=32)
         else:
