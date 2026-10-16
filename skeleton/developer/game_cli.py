@@ -341,7 +341,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves = subs.add_parser("jeeves", help="Jeeves design planning, source audit and developer handoff")
     jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
-                                                   "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "production-init",
+                                                   "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "production-init",
                                                    "production-status", "production-cycle"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
