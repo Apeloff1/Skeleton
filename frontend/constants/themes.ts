@@ -2,7 +2,6 @@
  * No competing palette: useTheme reads the current skin for dark mode.
  */
 import design, { colors as canonicalColors } from '../theme/tokens';
-import { onPrimaryFor } from '../theme/skins';
 
 export interface ThemeColors {
   background: string;
@@ -64,8 +63,8 @@ export const themes = {
 };
 
 export const darkTheme: ThemeColors = new Proxy({} as ThemeColors, {
-  get(_target, key: string) {
-    return getThemeColors('dark')[key as keyof ThemeColors];
+  get(_target, key: string | symbol) {
+    return typeof key === 'string' ? getThemeColors('dark')[key as keyof ThemeColors] : undefined;
   },
   ownKeys() { return Object.keys(getThemeColors('dark')); },
   getOwnPropertyDescriptor() { return { enumerable: true, configurable: true }; },
