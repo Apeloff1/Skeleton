@@ -365,7 +365,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "camera-plan", "camera-render",
                                                    "direction-audit", "direction-workorder", "production-gap-matrix",
                                                    "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt",
-                                                   "director-draft", "director-examine", "director-promote",
+                                                   "director-draft", "director-revise", "director-examine", "director-promote",
                                                    "director-board", "director-prepare-training"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
@@ -385,6 +385,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--dragon-digest")
     jeeves.add_argument("--seed", type=int)
     jeeves.add_argument("--regions")
+    jeeves.add_argument("--revision")
     jeeves.add_argument("--quest-types")
     jeeves.add_argument("--stages", type=int)
     jeeves.add_argument("--goal")
@@ -446,6 +447,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--direction-source", options.direction_source),
                                 ("--dragon-digest", options.dragon_digest),
                                 ("--seed", options.seed), ("--regions", options.regions),
+                                ("--revision", options.revision),
                                 ("--quest-types", options.quest_types), ("--stages", options.stages),
                                 ("--goal", options.goal), ("--routes", options.routes),
                                 ("--output", options.output), ("--mode", options.mode),
