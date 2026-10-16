@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from skeleton.ai.game_builder.quest_scene_engine import DirectorWorld
+from skeleton.ai.game_builder.quest_scene_engine import DirectorError
 from skeleton.ai.game_builder.quest_scene_forge import forge_director
 from skeleton.ai.game_builder.quest_campaign_completion import (
     CampaignCompletionError, play_campaign, compare_campaign_branches,
@@ -91,9 +91,10 @@ def test_dependency_cycle_is_blocked_instead_of_masquerading_as_a_win():
         quest_types=("main_story", "rival_story"), stages=2,
     )
     first = replace(world.quests[0], requires_quests=(world.quests[1].key,))
-    cyclic = replace(world, quests=(first, world.quests[1]))
-    with pytest.raises(CampaignCompletionError, match="dependency cycle"):
-        play_campaign(cyclic)
+    # The canonical DirectorWorld constructor already rejects the cycle.
+    # A campaign never needs to override or bypass that source authority.
+    with pytest.raises(DirectorError, match="dependency cycle"):
+        replace(world, quests=(first, world.quests[1]))
 
 
 @pytest.mark.parametrize("bad", [-1, 8, True, 1.5])
