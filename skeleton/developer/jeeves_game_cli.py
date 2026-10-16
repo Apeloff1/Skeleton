@@ -202,16 +202,39 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             output["ok"] = bool(output.get("ok", True))
             return output
         if args.action in ("direction-audit", "direction-workorder", "production-gap-matrix"):
-            allowed = {"action", "source"} if args.action != "production-gap-matrix" else {"action"}
+            allowed = {"action", "source", "passes"} if args.action != "production-gap-matrix" else {"action"}
             for key, value in vars(args).items():
                 if key not in allowed and value is not None and value is not False:
                     raise ValueError("unrelated director option --" + key.replace("_", "-"))
             if args.action == "production-gap-matrix":
                 from skeleton.developer.jeeves_game_production_gaps import gaps
                 return gaps(root)
-            from skeleton.developer.jeeves_game_direction import audit, workorder
+            from skeleton.developer.jeeves_game_quality import _read
+            from skeleton.developer.jeeves_game_direction import audit, workorder, SCHEMA as DIRECTION_SCHEMA
+            from skeleton.developer.jeeves_game_direction_cli import SCHEMA as LEGACY_DIRECTION_SCHEMA, direction
             source = args.source or "design/direction_manifest.json"
-            return audit(root, source=source) if args.action == "direction-audit" else workorder(root, source=source)
+            passes = args.passes if args.passes is not None else 1
+            if type(passes) is not int or not 1 <= passes <= 8:
+                raise ValueError("director scrutiny supports 1..8 passes per invocation")
+            dossier, _ = _read(root, source, 16 * 1024 * 1024)
+            if dossier.get("schema") == LEGACY_DIRECTION_SCHEMA:
+                return direction(
+                    root, action="direction-audit" if args.action == "direction-audit"
+                    else "direction-revision", source=source, passes=passes)
+            if dossier.get("schema") != DIRECTION_SCHEMA:
+                raise ValueError("unsupported story direction source schema")
+            result = None
+            identity = None
+            for _ in range(passes):
+                current = audit(root, source=source) if args.action == "direction-audit" else workorder(root, source=source)
+                observed = current.get("manifest_sha256", current.get("source_sha256"))
+                if identity is not None and observed != identity:
+                    raise ValueError("narrative source changed during multi-pass scrutiny")
+                identity = observed
+                result = current
+            result["source_scrutiny_passes"] = passes
+            result["independent_review_performed_by_replays"] = False
+            return result
         world_args = (args.pattern, args.frames, args.frame_height, args.richness,
                       args.focus, args.pan, args.distance, args.ambience,
                       args.depth, args.yaw, args.pitch, args.parallax_planes)
