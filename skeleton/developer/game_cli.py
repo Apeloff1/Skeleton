@@ -364,7 +364,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "upscale-review", "vividness-review", "queue-upscaled-training",
                                                    "camera-plan", "camera-render",
                                                    "direction-audit", "direction-workorder", "production-gap-matrix",
-                                                   "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt"))
+                                                   "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt",
+                                                   "director-draft", "director-examine", "director-promote",
+                                                   "director-board", "director-prepare-training"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -381,6 +383,12 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--source")
     jeeves.add_argument("--direction-source")
     jeeves.add_argument("--dragon-digest")
+    jeeves.add_argument("--seed", type=int)
+    jeeves.add_argument("--regions")
+    jeeves.add_argument("--quest-types")
+    jeeves.add_argument("--stages", type=int)
+    jeeves.add_argument("--goal")
+    jeeves.add_argument("--routes", type=int)
     jeeves.add_argument("--output")
     jeeves.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     jeeves.add_argument("--factor", type=int)
@@ -437,6 +445,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--target", options.target), ("--source", options.source),
                                 ("--direction-source", options.direction_source),
                                 ("--dragon-digest", options.dragon_digest),
+                                ("--seed", options.seed), ("--regions", options.regions),
+                                ("--quest-types", options.quest_types), ("--stages", options.stages),
+                                ("--goal", options.goal), ("--routes", options.routes),
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
                                 ("--gate", options.gate),
