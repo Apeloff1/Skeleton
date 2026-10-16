@@ -181,6 +181,12 @@ def test_p0_acceptance_diagnostic_never_confuses_source_with_release(tmp_path):
     assert report["blocked_p0_gates"] == 20
     assert report["p0_complete"] is False
     assert report["product_release_qualified"] is False
+    assert report["whole_application_p0_complete"] is False
+    additional = report["additional_noncompensable_app_p0"]
+    assert {"CHAT-01", "CHAT-02", "CHAT-10", "DRAGON-P0", "APP-E2E"}.issubset(
+        {row["id"] for row in additional}
+    )
+    assert all(row["state"] == "blocked_unverified" for row in additional)
     assert set(row["id"] for row in report["gates"]) == {
         "P0-" + str(n).zfill(2) for n in range(1, 21)
     }
