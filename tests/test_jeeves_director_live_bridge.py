@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from skeleton.ai.game_builder.quest_scene_forge import forge_director
 from skeleton.developer.game_cli import SCHEMA as WORKSPACE_SCHEMA
@@ -15,6 +16,7 @@ from skeleton.developer.jeeves_game_director_session import begin, choose, inspe
 from skeleton.developer.jeeves_game_director_atlas import export, verify
 from skeleton.developer.jeeves_game_dragon_lab import queue as dragon_lab
 from skeleton.developer.jeeves_game_director_coverage import coverage
+from skeleton.developer.jeeves_game_director_godot_smoke import smoke
 from skeleton.developer.jeeves_game_director_events import delta
 from skeleton.developer.jeeves_game_production_board import _load_world
 from skeleton.ai.game_builder.quest_campaign_completion import play_campaign
@@ -95,6 +97,26 @@ class DirectorBridgeIntegrationTests(unittest.TestCase):
         self.assertFalse(presentation["native_cinematic_rendering_verified"])
         with self.assertRaises(ValueError):
             delta(self.root, session="primary", before=before, after=before)
+
+    def test_godot_smoke_requires_real_binary_and_tracks_phases(self):
+        export(self.root, source=self.source)
+        with patch("skeleton.forge.playtest.resolve_binary",
+                   return_value=(None, "absent", False)):
+            report = smoke(self.root, source=self.source)
+        self.assertFalse(report["ok"])
+        self.assertFalse(report["native_gameplay_verified"])
+        simulated = [{"executed": True, "exit_code": 0, "passed": True,
+                      "stdout_tail": "4.4.stable", "stderr_tail": ""}]
+        simulated.extend([{"executed": True, "exit_code": 0, "passed": True,
+                           "stdout_tail": "", "stderr_tail": ""} for _ in range(3)])
+        with patch("skeleton.forge.playtest.resolve_binary",
+                   return_value=("/bin/godot", "test-stub", False)):
+            with patch("skeleton.developer.jeeves_game_director_godot_smoke._execute",
+                       side_effect=simulated) as execute:
+                result = smoke(self.root, source=self.source)
+        self.assertEqual(execute.call_count, 4)
+        self.assertTrue(result["source_import_and_two_scenes_started"])
+        self.assertFalse(result["native_gameplay_verified"])
 
     def test_comparative_learning_requires_same_verified_world(self):
         begin(self.root, source=self.source, session="alternate")
