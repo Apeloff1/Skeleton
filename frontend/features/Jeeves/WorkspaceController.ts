@@ -441,7 +441,7 @@ export class WorkspaceController {
     })));
   }
 
-  async send(attachment?: Attachment, preferences: Pick<ChatBody, 'provider_id' | 'model_id' | 'max_output_tokens' | 'crawler_context'> = {}): Promise<void> {
+  async send(attachment?: Attachment, preferences: Pick<ChatBody, 'provider_id' | 'model_id' | 'max_output_tokens' | 'crawler_context' | 'context'> = {}): Promise<void> {
     if (!this.snapshot.ready || this.running) return;
     const conversation = this.active;
     if (conversation.archived) { this.notify('Restore this canonical conversation before sending another turn.'); return; }
@@ -478,6 +478,12 @@ export class WorkspaceController {
       Date.now(),
       message.id,
     );
+    // Settings are sent as ordinary user context, never as a privileged
+    // system override. Reject oversize snapshots before persisting a retry.
+    if (preferences.context !== undefined && preferences.context.length > MAX_CONTEXT) {
+      this.notify(`Jeeves request context exceeds the ${MAX_CONTEXT}-character bound.`);
+      return;
+    }
     Object.assign(body, preferences);
     const { message: _message, client_message_id: _client, image_base64: _image, pdf_base64: _pdf, ...retryRequest } = body;
     message.retryRequest = retryRequest;
