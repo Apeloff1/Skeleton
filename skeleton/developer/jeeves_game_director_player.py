@@ -28,6 +28,7 @@ var token_input: LineEdit
 var status_text: Label
 var view: VBoxContainer
 var snapshot: Dictionary = {}
+var last_presentation: Dictionary = {}
 var world: Dictionary = {}
 var scene_lookup: Dictionary = {}
 var busy: bool = false
@@ -153,6 +154,9 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
         status_text.text = "Director did not provide a canonical state"
         return
     snapshot = parsed["snapshot"]
+    last_presentation = {}
+    if parsed.get("presentation") is Dictionary:
+        last_presentation = parsed["presentation"]
     status_text.text = "Canonical turn " + str(snapshot.get("turn", 0)) + " | actions " + str(snapshot.get("sequence", 0))
     _draw()
 
@@ -190,6 +194,17 @@ func _draw() -> void:
               " — " + str(event.get("approach", "")) +
               " — " + str(event.get("consequence", "")))
     _line("Narrative outcomes: " + str(snapshot.get("narrative_flags", [])))
+    if not last_presentation.is_empty():
+        _line("New canonical narrative and cinematic presentation cues:")
+        for outcome in last_presentation.get("new_story_results", []):
+            _line("  Outcome: " + str(outcome.get("quest", "")) + " / " +
+                  str(outcome.get("stage", "")) + " — " + str(outcome.get("consequence", "")))
+        for cinematic in last_presentation.get("presentation_timelines", []):
+            _line("  Timeline: " + str(cinematic.get("title", "")) +
+                  " | " + str(cinematic.get("trigger_reason", "")))
+            for cue in cinematic.get("cues", []):
+                _line("    " + str(cue.get("at", 0)) + "ms " +
+                      str(cue.get("kind", "")) + ": " + str(cue.get("value", "")))
     _line("State digest: " + str(snapshot.get("current_state_sha256", "")))
     _line("These are authoritative Python Director actions through a local server. Rendered world/asset quality is not certified.")
 '''
