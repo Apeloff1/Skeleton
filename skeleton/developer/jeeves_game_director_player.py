@@ -339,6 +339,7 @@ func _render_state() -> void:
         view.remove_child(item)
     var here: String = str(snapshot.get("scene", ""))
     var region = scene_lookup.get(here, {})
+    native_map.blocked_routes(snapshot.get("conditional_walking_links_blocked", []))
     if here != previous_scene:
         previous_scene = here
         stage.apply_scene(region)
@@ -348,6 +349,22 @@ func _render_state() -> void:
     _line("Weather: " + str(snapshot.get("weather", "")) +
           " | Lighting: " + str(snapshot.get("lighting", "")) +
           " | Score cue: " + str(snapshot.get("music_cue", "")))
+    if snapshot.get("world_state") is Dictionary:
+        var living: Dictionary = snapshot["world_state"]
+        _line("Persistent world status:")
+        for reputation in living.get("standings", []):
+            if reputation is Array and reputation.size() == 2:
+                _line("  Faction " + str(reputation[0]) + ": " + str(reputation[1]))
+        _line("  Earned world changes: " + str(living.get("world_flags", [])))
+        _line("  Transport history: " + str(living.get("passage_uses", [])))
+        for blocked in snapshot.get("conditional_walking_links_blocked", []):
+            _line("  Locked walking exit to " + str(blocked.get("destination", "")) +
+                  " — " + str(blocked.get("gate_label", "")))
+        for passage in snapshot.get("transport_options", []):
+            if passage is Dictionary:
+                _line("  " + str(passage.get("mode", "")) + " to " +
+                      str(passage.get("destination", "")) + " : " +
+                      ("AVAILABLE" if passage.get("available", false) else "LOCKED"))
     _line("Quest progress:")
     for quest in snapshot.get("quests", []):
         var qline: String = str(quest["title"]) + " (" + str(quest["stage_index"]) + "/" + str(quest["stage_total"]) + ")"
