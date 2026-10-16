@@ -1,39 +1,8 @@
-name: Cost Admission Closure Gate
+name: "[Specialized] Cost Admission Closure Gate"
 
+# SPECIALIZED: heavyweight verification; explicit dispatch only.
+# Not running is NOT a passed release/security qualification.
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/intelligence/**"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/skills/**"
-      - "skeleton/api/**"
-      - "skeleton/ai/runtime/**"
-      - "skeleton/artifact_plane/**"
-      - "skeleton/memory/**"
-      - "skeleton/persistence/**"
-      - "backend/core/conversations.py"
-      - "backend/core/engine_client.py"
-      - "backend/tests/test_conversation_storage_admission.py"
-      - "skeleton/testing/test_cost_admission.py"
-      - "skeleton/testing/test_admission_runtime.py"
-      - "skeleton/testing/test_tenant_quota.py"
-      - "skeleton/testing/test_tenant_quota_sqlite.py"
-      - "skeleton/testing/test_shared_pressure.py"
-      - "skeleton/testing/test_artifact_usage.py"
-      - "skeleton/testing/test_engine_execution_service.py"
-      - "skeleton/testing/test_memory_writeback.py"
-      - "skeleton/testing/test_memory_projection.py"
-      - "skeleton/testing/test_tool_runtime.py"
-      - "skeleton/testing/test_provider_contract.py"
-      - "scripts/verify_cost_admission_closure.py"
-      - "tests/test_cost_admission_independent_verifier.py"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_implementation_handoff.json"
-      - ".github/workflows/cost-admission-closure.yml"
   workflow_dispatch:
 
 permissions:

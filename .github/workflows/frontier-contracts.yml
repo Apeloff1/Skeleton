@@ -1,34 +1,9 @@
-name: Frontier Contracts
+name: "[Specialized] Frontier Contracts"
 
+# SPECIALIZED: heavyweight verification; explicit dispatch only.
+# Not running is NOT a passed release/security qualification.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'skeleton/**'
-      - 'backend/requirements.txt'
-      - 'backend/server.py'
-      - 'scripts/check_provider_runtime_boundary.py'
-      - 'tests/test_provider_runtime_boundary.py'
-      - 'tests/test_frontier_runtime_memory_retrieval.py'
-      - 'tests/test_model_runtime.py'
-      - 'tests/test_model_routing.py'
-      - 'docs/PROVIDER_RUNTIME.md'
-      - 'pyproject.toml'
-      - '.github/workflows/frontier-contracts.yml'
-  push:
-    branches:
-      - 'frontier/**'
-    paths:
-      - 'skeleton/**'
-      - 'backend/requirements.txt'
-      - 'backend/server.py'
-      - 'scripts/check_provider_runtime_boundary.py'
-      - 'tests/test_provider_runtime_boundary.py'
-      - 'tests/test_frontier_runtime_memory_retrieval.py'
-      - 'docs/PROVIDER_RUNTIME.md'
-      - 'pyproject.toml'
-      - '.github/workflows/frontier-contracts.yml'
+  workflow_dispatch:
 
 concurrency:
   # A frontier branch with an open PR receives both push and pull_request

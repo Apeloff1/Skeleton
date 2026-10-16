@@ -1,36 +1,8 @@
-name: P3 T2 Governed Storage Plane
+name: "[Specialized] P3 T2 Governed Storage Plane"
 
+# SPECIALIZED: heavyweight verification; explicit dispatch only.
+# Not running is NOT a passed release/security qualification.
 on:
-  pull_request:
-    paths:
-      - "skeleton/storage/**"
-      - "skeleton/ai/runtime/storage/**"
-      - "skeleton/testing/test_content_addressing.py"
-      - "skeleton/testing/test_cache_architecture.py"
-      - "skeleton/testing/test_distributed_transactions.py"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_continuation_frontier.json"
-      - "machine/ai_p3t2_storage_candidate.json"
-      - "scripts/check_p3t2_storage_candidate.py"
-      - "tests/test_p3t2_storage_candidate.py"
-      - ".github/workflows/p3t2-governed-storage.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/storage/**"
-      - "skeleton/ai/runtime/storage/**"
-      - "skeleton/testing/test_content_addressing.py"
-      - "skeleton/testing/test_cache_architecture.py"
-      - "skeleton/testing/test_distributed_transactions.py"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_continuation_frontier.json"
-      - "machine/ai_p3t2_storage_candidate.json"
-      - "scripts/check_p3t2_storage_candidate.py"
-      - "tests/test_p3t2_storage_candidate.py"
-      - ".github/workflows/p3t2-governed-storage.yml"
   workflow_dispatch:
 
 permissions:
