@@ -222,3 +222,35 @@ def test_existing_v2_model_proposal_still_reviews_without_direction_packet(tmp_p
     assert stored["schema"]=="skeleton.jeeves.game_proposal.v2"
     assert run_game_cli(["jeeves","review","--project",str(root),
                          "--digest",result["proposal_sha256"]])["ok"]
+
+
+
+def test_production_cycle_checks_real_signed_story_and_never_invents_quality(tmp_path):
+    init=run_game_cli(["init","complete-story","--dir",str(tmp_path)])
+    assert init["ok"]
+    root=tmp_path/"complete-story"
+    policy=run_game_cli(["jeeves","production-init","--project",str(root),
+                         "--target","nes","--genre","Platformer",
+                         "--period","1985-1989"])
+    assert policy["ok"],policy
+    absent=run_game_cli(["jeeves","production-cycle","--project",str(root),
+                         "--gate","story_continuity"])
+    assert absent["ok"]
+    assert absent["observations"][0]["outcome"]=="failed"
+    bible,history=scenes(1)
+    packet=root/"design"/"story_direction_packet.json"
+    packet.write_text(json.dumps({
+        "schema":"skeleton.jeeves.direction_dossier.v1",
+        "bible":bible,"scenes":history,"expert_reviews":claimed_panel(),
+    }),encoding="utf-8")
+    reviewed=run_game_cli(["jeeves","production-cycle","--project",str(root),
+                           "--gate","story_continuity","--passes","3"])
+    assert reviewed["ok"],reviewed
+    assert all(o["outcome"]=="blocked" for o in reviewed["observations"])
+    assert not reviewed["project_complete"]
+    status=run_game_cli(["jeeves","production-status","--project",str(root)])
+    quality=[x for x in status["gates"] if x["gate"]=="story_continuity"][0]
+    assert quality["outcome"]=="blocked"
+    assert "independent" in quality["last_reason"]
+    assert status["quality_floor"]==90
+    assert not status["production_qualified"]
