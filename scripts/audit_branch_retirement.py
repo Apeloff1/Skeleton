@@ -60,6 +60,9 @@ def audit(
     main = _git(root, "rev-parse", "--verify", "refs/heads/main^{commit}").strip()
     if main != expected_main:
         raise RetirementAuditError("main moved: expected SHA lease is stale")
+    main_tree = _git(root, "rev-parse", "--verify", main + "^{tree}").strip()
+    if not _SHA.fullmatch(main_tree):
+        raise RetirementAuditError("invalid main tree object identity")
 
     # Ask Git for the exact immutable object identity of every local branch.
     # A refs/heads scope deliberately excludes remote-tracking and tags.
@@ -99,22 +102,31 @@ def audit(
     for name, sha, commit_time in sorted(rows):
         # Git's ancestor check returns 1 for "not ancestor", so query ahead
         # and behind counts using rev-list --left-right --count instead.
+        # The enumerated SHA values are the custody contract. Using mutable
+        # branch names here could produce a mixed-time ancestry decision.
         counts = _git(root, "rev-list", "--left-right", "--count",
-                      "refs/heads/main..." + "refs/heads/" + name).strip().split()
+                      main + "..." + sha).strip().split()
         if len(counts) != 2 or not all(item.isdecimal() for item in counts):
             raise RetirementAuditError("invalid Git ancestry count")
         behind, ahead = (int(item) for item in counts)
+        tip_tree = _git(root, "rev-parse", "--verify", sha + "^{tree}").strip()
+        if not _SHA.fullmatch(tip_tree):
+            raise RetirementAuditError("invalid pinned branch tree identity")
+        same_tree = tip_tree == main_tree
         protected = (name in _PROTECTED
                      or any(name.startswith(prefix) for prefix in _PROTECTED if prefix.endswith("/")))
         old_enough = as_of - commit_time >= min_age_days * 86400
         reason = (
             "protected_name" if protected
+            else "tree_equivalent_but_divergent_history" if same_tree and ahead
             else "divergent_history" if ahead
             else "young_ref" if not old_enough
             else "ancestor_only_requires_external_pr_and_owner_review"
         )
         report.append({
             "branch": name, "tip_sha": sha,
+            "tree_sha": tip_tree,
+            "content_equivalent_to_main": same_tree,
             "commit_time": commit_time,
             "ahead": ahead, "behind": behind,
             "age_days": (as_of - commit_time) // 86400,
@@ -131,14 +143,17 @@ def audit(
         raise RetirementAuditError("branch references moved during audit")
     return {
         "schema": "skeleton.branches.retirement-audit.v1",
-        "head": main, "as_of": as_of,
+        "head": main, "main_tree_sha": main_tree,
+        "scope": "local_refs_heads_only",
+        "remote_coverage_complete": False,
+        "as_of": as_of,
         "generated_at": datetime.fromtimestamp(as_of, tz=timezone.utc).isoformat(),
         "branch_count": len(report),
         "ancestry_candidates": sum(row["ancestry_candidate"] for row in report),
         "refs": report,
         "all_deletion_authorized": False,
         "requires_live_github_pr_checks": True,
-        "coverage_complete": True,
+        "coverage_complete": True,  # exhaustive LOCAL refs/heads only
     }
 
 
