@@ -102,13 +102,18 @@ def accept(root: Path, *, source: str, timeout: float = 90.0) -> dict[str, Any]:
         finally:
             service.stop()
         after = inspect(scratch, session=session)
+        after_import = verify(scratch, source=mirrored)
         action_verified = bool(
+            after_import["source_manifest_verified"] and
             observed["passed"] and observed["probe_success_marker"]
             and after["sequence"] == before["sequence"] + 1
             and after["turn"] == before["turn"] + 1
             and after["world_sha256"] == world.digest
             and after["current_state_sha256"] != before["current_state_sha256"]
         )
+    from skeleton.developer.jeeves_game_quality import _read
+    if _read(root, source, 16 * 1024 * 1024)[1] != original_sha:
+        raise ValueError("original Director source changed during native Godot verification")
     return {
         "ok": action_verified, "schema": SCHEMA,
         "action": "director-native-http-e2e",
