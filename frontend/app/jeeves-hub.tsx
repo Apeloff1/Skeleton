@@ -429,6 +429,41 @@ function JeevesHubScreen() {
             label="Settings"
             onPress={() => router.push('/settings/jeeves' as any)}
           />
+          <QuickAction
+            icon="construct-outline"
+            label="Workbench"
+            onPress={() => router.push('/jeeves-workbench' as any)}
+          />
+          <QuickAction
+            icon="server-outline"
+            label="AI models"
+            onPress={() => router.push('/ai-chat' as any)}
+          />
+          <QuickAction
+            icon="pulse-outline"
+            label="Model health"
+            onPress={() => router.push('/setup' as any)}
+          />
+          <QuickAction
+            icon="school-outline"
+            label="Academy"
+            onPress={() => router.push('/mega-academy' as any)}
+          />
+          <QuickAction
+            icon="planet-outline"
+            label="Galaxy Studio"
+            onPress={() => router.push('/studio' as any)}
+          />
+          <QuickAction
+            icon="git-network-outline"
+            label="Snowball"
+            onPress={() => router.push('/snowball' as any)}
+          />
+          <QuickAction
+            icon="flask-outline"
+            label="Training"
+            onPress={() => router.push('/game-learning' as any)}
+          />
           {flagAudioTest && (
             <QuickAction
               icon="volume-high-outline"
