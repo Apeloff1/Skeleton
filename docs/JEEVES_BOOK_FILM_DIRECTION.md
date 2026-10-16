@@ -395,3 +395,53 @@ referential integrity, not an IP clearance or independent approval.
 The model receives only bounded original evidence metrics and statuses,
 including source-verified payoff/branch counts, never the full quest
 action history or authored manuscript text without explicit request.
+
+## Consecutive quest playthrough recording (checkpoint-chained mode)
+
+A named `replays` entry may use the original bounded `actions` array or
+`segments` instead. Each segment has exactly `actions`, `start_digest`, and
+`end_digest`. These are *recomputed* `DirectorState.digest` values, not
+author-chosen ratings. The first start is `director_initial(world).digest`;
+later starts must equal the previous segment's actual final digest.
+
+```json
+{
+  "name": "original_longform_route",
+  "segments": [
+    {
+      "actions": [{"kind": "use", "key": "authored_action", "scene": "authored_scene"}],
+      "start_digest": "<actual genesis state SHA-256>",
+      "end_digest": "<actual state SHA-256 after first action>"
+    },
+    {
+      "actions": [{"kind": "travel", "key": "next_scene", "scene": "authored_scene"}],
+      "start_digest": "<the first segment's exact end_digest>",
+      "end_digest": "<actual state SHA-256 after the travel>"
+    }
+  ]
+}
+```
+
+The placeholders above are NOT valid hashes or a runnable authored game.
+Obtain each checkpoint from the actual Director state returned by
+`director_step`, or from a verified capture of the same original game.
+Each slice can contain at most 8,192 actions and must be nonempty; there
+is **no cumulative action or turn limit** in the segmented verifier.
+An existing dossier remains capped by CLI file-size admission and 64
+named routes, so a single source file is not limitless persistent storage.
+The end-to-end project journal can be extended through further bounded
+production cycles; external storage/capacity requirements still apply.
+
+The verifier independently re-executes every slice, checks legal actions,
+requires exact start/end state hashes, double-checks replay determinism,
+and builds a SHA-256 receipt chain. It preserves actual inventory, quest
+stages, consequences and movement between segments, while retaining
+legacy `actions` replay compatibility. Reports include
+`replay_segment_receipts`, and the combined direction audit surfaces
+recording-segment counts and the final receipt hash per route.
+
+This is actual **canonical quest runtime** progress evidence, not a
+native save/load implementation, a full exported-game playthrough,
+professional manuscript certification, training completion or verified
+creative quality. A hash alone is not a digital signature; human-author
+approval and independent runtime qualification remain separate.
