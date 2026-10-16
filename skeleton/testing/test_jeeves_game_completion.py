@@ -196,3 +196,121 @@ def test_unknown_console_cannot_masquerade_as_supported_hardware(tmp_path):
     result = run_game_cli(["jeeves", "fidelity-plan", "--project", str(root),
                            "--target", "fictional_unbuilt_console"])
     assert not result["ok"]
+
+
+
+def test_upscale_technical_verifier_reconstructs_all_pixels(tmp_path):
+    root = workspace(tmp_path)
+    pixels = bytes((17, 42, 86, 255, 200, 120, 63, 255,
+                    90, 99, 100, 255, 255, 0, 255, 255))
+    (root / "assets" / "source.png").write_bytes(png_rgba(pixels, 2, 2))
+    cmd = ["jeeves", "upscale", "--project", str(root),
+           "--target", "nes", "--source", "assets/source.png",
+           "--output", "assets/upscaled.png", "--mode", "scale2x", "--factor", "2"]
+    made = run_game_cli(cmd)
+    assert made["ok"], made
+    verification = run_game_cli(
+        ["jeeves", "upscale-verify", "--project", str(root), "--target", "nes",
+         "--source", "assets/source.png", "--output", "assets/upscaled.png",
+         "--mode", "scale2x", "--factor", "2", "--passes", "5"]
+    )
+    assert verification["ok"], verification
+    assert verification["scrutiny_passes"] == 5
+    assert len(verification["checks"]) == 5
+    assert all(row["algorithm_reconstruction_exact"] for row in verification["checks"])
+    assert all(not row["evidence_independent"] for row in verification["checks"])
+    bad = root / "assets" / "upscaled.png"
+    w, h, rgba = decode_png(bad.read_bytes())
+    corrupted = bytearray(rgba)
+    corrupted[0] ^= 0x10
+    bad.write_bytes(png_rgba(bytes(corrupted), w, h))
+    result = run_game_cli(
+        ["jeeves", "upscale-verify", "--project", str(root), "--target", "nes",
+         "--source", "assets/source.png", "--output", "assets/upscaled.png",
+         "--mode", "scale2x", "--factor", "2"]
+    )
+    assert result["ok"] is False
+    assert "differ" in result["error"]
+
+
+def test_legacy_pixel_aspect_and_pillarboxes_are_not_stretched(tmp_path):
+    root = workspace(tmp_path)
+    plan = run_game_cli([
+        "jeeves", "display-plan", "--project", str(root),
+        "--target", "nes", "--native-width", "256", "--native-height", "240",
+        "--screen-width", "1920", "--screen-height", "1080",
+    ])
+    assert plan["ok"], plan
+    assert plan["integer_scale"] == 4
+    assert plan["presented_pixels"] == [1024, 960]
+    assert plan["letterbox_pixels"] == {
+        "left": 448, "right": 448, "top": 60, "bottom": 60}
+    assert plan["stretching_permitted"] is False
+    assert plan["tiled_or_gpu_render_required"] is False
+    par = run_game_cli([
+        "jeeves", "display-plan", "--project", str(root),
+        "--target", "nes", "--native-width", "128", "--native-height", "120",
+        "--screen-width", "1920", "--screen-height", "1080",
+        "--pixel-aspect-num", "3", "--pixel-aspect-den", "2",
+    ])
+    assert par["ok"], par
+    assert par["physical_block_size"] == [12, 8]
+    assert par["presented_pixels"] == [1536, 960]
+    assert par["aspect_ratio_preserved"] is True
+    assert not run_game_cli([
+        "jeeves", "display-plan", "--project", str(root),
+        "--target", "nes", "--native-width", "256", "--native-height", "240",
+        "--screen-width", "1920", "--screen-height", "1080",
+        "--pixel-aspect-num", "0",
+    ])["ok"]
+
+
+def test_real_console_inventory_names_every_declared_target_and_gaps(tmp_path):
+    root = workspace(tmp_path)
+    matrix = run_game_cli(["jeeves", "fidelity-matrix", "--project", str(root)])
+    assert matrix["ok"], matrix
+    assert matrix["declared_console_targets"] >= 20
+    by_id = {r["target_id"]: r for r in matrix["targets"]}
+    assert "nes" in by_id and "ps1" in by_id
+    assert by_id["nes"]["upscale_kind"] == "native_grid_integer_and_scale2x"
+    assert by_id["ps1"]["upscale_kind"] == "texture_pixel_resampling_only"
+    assert matrix["any_console_fully_certified_by_this_tool"] is False
+    assert matrix["missing_native_production_qualifications"] == matrix["declared_console_targets"]
+
+
+def test_repair_rechecks_original_gate_and_does_not_overwrite_quality_bar(tmp_path, monkeypatch):
+    root = workspace(tmp_path)
+    initialize(root)
+    checks = {"n": 0, "repairs": 0}
+    def probe(*args):
+        checks["n"] += 1
+        return ("failed" if checks["n"] == 1 else "passed",
+                hashlib.sha256(str(checks["n"]).encode()).hexdigest(),
+                "canonical_source", "quality gate rechecked")
+    def build(root, options):
+        checks["repairs"] += 1
+        assert options.overwrite is True
+        assert options.repair_mode == "apply"
+        return {"ok": True}
+    monkeypatch.setattr(prod, "_probe", probe)
+    monkeypatch.setattr("skeleton.developer.game_cli._build", build)
+    result = run_game_cli(["jeeves", "production-cycle", "--project", str(root),
+                           "--gate", "source_integrity", "--repair-generated", "--passes", "2"])
+    assert result["ok"], result
+    assert checks["repairs"] == 1
+    assert checks["n"] >= 2
+    assert result["repairs_attempted"] == ["source_integrity"]
+    assert result["quality_threshold_lowered"] is False
+    assert result["project_complete"] is False
+
+
+def test_unknown_quality_gate_cannot_be_deleted_or_lowered(tmp_path):
+    root = workspace(tmp_path)
+    initialize(root)
+    result = run_game_cli(["jeeves", "production-cycle", "--project", str(root),
+                           "--gate", "remove_gameplay_checks", "--passes", "3"])
+    assert not result["ok"]
+    assert not run_game_cli(["jeeves", "production-cycle", "--project", str(root),
+                             "--passes", "0"])["ok"]
+    assert not run_game_cli(["jeeves", "production-cycle", "--project", str(root),
+                             "--passes", "9"])["ok"]
