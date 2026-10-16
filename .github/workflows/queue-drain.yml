@@ -2,15 +2,9 @@ name: Drain superseded Actions queue
 
 on:
   workflow_dispatch:
-  workflow_run:
-    # Non-cancelled main validation wakes immediately. A half-hour fallback
-    # avoids polling persistent provider-conflict runs too aggressively.
-    workflows: ["Merge Readiness", "Prune redundant branches safely"]
-    types: [completed]
-    branches: [main]
   schedule:
-    # Recover periodically without starting six idle workers an hour.
-    - cron: "2,32 * * * *"
+    # Hourly recovery only; no workflow-run trigger cascade.
+    - cron: "7 * * * *"
   push:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
@@ -28,12 +22,6 @@ jobs:
     # Main failures still trigger immediate recovery. Cancelled/skipped main
     # head checks are supersession tombstones, not useful new queue evidence.
     # The schedule still recovers capacity if no checks complete successfully.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.head_repository.full_name == github.repository &&
-       github.event.workflow_run.head_branch == github.event.repository.default_branch &&
-       github.event.workflow_run.conclusion != 'cancelled' &&
-       github.event.workflow_run.conclusion != 'skipped')
     permissions:
       actions: write
       contents: read
