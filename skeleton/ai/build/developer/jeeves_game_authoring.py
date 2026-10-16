@@ -160,12 +160,21 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
         raise AuthoringError("media design proposal requires verified market benchmark binding")
     if v3:
         direction = value["direction_dossier"]
-        if not isinstance(direction, dict) or set(direction) != {"path", "sha256"}:
+        if not isinstance(direction, dict) or set(direction) not in (
+            {"path", "sha256"}, {"path", "sha256", "linked_gameplay"}
+        ):
             raise AuthoringError("malformed direction review identity")
         from skeleton.developer.jeeves_game_quality import _read
         _, current_sha = _read(root, direction["path"], 16*1024*1024)
         if direction["sha256"] != current_sha:
             raise AuthoringError("direction dossier changed since model proposal")
+        if "linked_gameplay" in direction:
+            dependency = direction["linked_gameplay"]
+            if not isinstance(dependency, dict) or set(dependency) != {"path", "sha256"}:
+                raise AuthoringError("invalid dependent gameplay source identity")
+            _, actual_gameplay_sha = _read(root, dependency["path"], 16*1024*1024)
+            if actual_gameplay_sha != dependency["sha256"]:
+                raise AuthoringError("gameplay replay dossier changed since model proposal")
     return value
 
 
@@ -290,6 +299,15 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
                 }
                 if checked.get("cinematic_direction") is not None else None
             ),
+            "played_dramatic_payoffs": (
+                {"declared": checked["playable_payoffs"]["declared_dramatic_threads"],
+                 "played": checked["playable_payoffs"]["dramatic_threads_with_played_payoff"],
+                 "missing": checked["playable_payoffs"]["unresolved_or_unplayed_threads"][:20],
+                 "branching_required": checked["playable_payoffs"]["requires_alternative_outcomes"],
+                 "source_replay_sha256": checked["playable_payoffs"]["source_replay_join_sha256"],
+                 "professionally_qualified": False}
+                if checked.get("playable_payoffs") is not None else None
+            ),
             "dialogue_repetition_fraction": metrics["exact_dialogue_repeat_fraction"],
             "revision_targets": [r["kind"] for r in checked["revision_work"][:10]],
             "qualitative_dimensions": list(checked["quality_bars"].keys()),
@@ -299,6 +317,8 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         direction_binding = {
             "path": direction_source, "sha256": checked["dossier_sha256"],
         }
+        if checked.get("gameplay_dependency") is not None:
+            direction_binding["linked_gameplay"] = checked["gameplay_dependency"]
     notes = _notes(root) if include_notes else []
     context_sha = _notes_digest(notes) if include_notes else None
     # Small, explicitly opted-in context. No credentials or model state.
@@ -331,6 +351,11 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         _, now_sha = _read(root, direction_binding["path"], 16*1024*1024)
         if now_sha != direction_binding["sha256"]:
             raise AuthoringError("direction source changed while model was drafting")
+        if "linked_gameplay" in direction_binding:
+            dependent = direction_binding["linked_gameplay"]
+            _, gameplay_sha = _read(root, dependent["path"], 16*1024*1024)
+            if gameplay_sha != dependent["sha256"]:
+                raise AuthoringError("gameplay replay source changed while model was drafting")
     _valid_text(provenance.get("provider"), "provider", 128)
     _valid_text(provenance.get("model"), "model", 128)
     if provenance.get("request_id") is not None:
