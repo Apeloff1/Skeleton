@@ -10,18 +10,17 @@ from collections import Counter
 from hashlib import sha256
 from pathlib import Path
 import json
-import math
 import re
 from typing import Any
 
 from skeleton.ai.game_builder.story_canon_fabric import (
-    verify_story_history, validate_story_bible, StoryCanonError,
+    verify_story_history, validate_story_bible,
 )
 from skeleton.ai.game_builder.story_continuity_assurance import (
     validate_contract, verify_production_history,
 )
 from skeleton.ai.game_builder.story_cinematic_review import (
-    verify_cinematic_shots, CAMERAS,
+    verify_cinematic_shots,
 )
 from skeleton.developer.jeeves_game_quality import _read
 
@@ -133,6 +132,11 @@ def audit(root:Path, *, source:str="design/direction_manifest.json") -> dict[str
         scenes.append(scene)
         file_hashes.append({"path":path,"sha256":digest})
     index=verify_story_history(bible,scenes)
+    # The original GameBuilder lens already computes speaker lexical diversity,
+    # repeated dialogue, causal links and character state transitions.
+    # Reuse its published metrics rather than inventing an inconsistent score.
+    from skeleton.ai.game_builder.story_direction_quality import evaluate_direction
+    literary=evaluate_direction(bible, scenes, reviewers=None, passes=1)
     contract=None
     quality_confirmation=None
     contract_sha=None
@@ -226,6 +230,13 @@ def audit(root:Path, *, source:str="design/direction_manifest.json") -> dict[str
         "creative_panel":review,
         "creative_scores_operator_reported":review is not None,
         "canonical_source_replay_passed":True,
+        "canonical_literary_quality_lens":{
+            "source_identity":literary["source_identity"],
+            "observed_story_metrics":literary["observed_story_metrics"],
+            "speakers":literary["speakers"],
+            "revision_work":literary["revision_work"],
+            "reviewer_evidence_independently_verified":False,
+        },
         "missing_qualification_gates":missing,
         "narrative_world_class_certified":False,
         "hollywood_rendered_direction_certified":False,
@@ -244,6 +255,12 @@ def workorder(root:Path, *, source:str="design/direction_manifest.json") -> dict
             "all_story_highlights_closed",
         ) else "P1","gate":key,
                       "acceptance":"Provide real canonical scene receipts, independent evidence, or qualified runtime results; never lower quality bar"})
+    for finding in review["canonical_literary_quality_lens"]["revision_work"]:
+        cards.append({
+            "priority":finding["priority"],
+            "gate":"literary_"+finding["kind"],
+            "acceptance":finding["why"]+"; revise with reviewed canonical approval and recheck the full history",
+        })
     if review["creative_panel"] is not None:
         for name,value in review["creative_panel"]["minimum_scores"].items():
             if value<SCORE_FLOOR:
