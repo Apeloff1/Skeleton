@@ -517,6 +517,8 @@ let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
 let heartbeatStopped = true;
 let heartbeatEpoch = 0;
 let heartbeatController: AbortController | null = null;
+let heartbeatLeases = 0;
+let manualHeartbeatRequested = false;
 
 function _nextHeartbeatDelay(): number {
   const status = _health.status;
@@ -579,19 +581,43 @@ async function heartbeat(epoch: number) {
   scheduleHeartbeat(epoch, _nextHeartbeatDelay());
 }
 
-export function startHeartbeat() {
+function ensureHeartbeatRunning() {
   if (!heartbeatStopped) return;
   heartbeatStopped = false;
   scheduleHeartbeat(++heartbeatEpoch, 500);
 }
 
-export function stopHeartbeat() {
+function haltHeartbeat() {
   heartbeatStopped = true;
   heartbeatEpoch++;
   if (heartbeatTimer) clearTimeout(heartbeatTimer);
   heartbeatTimer = null;
   heartbeatController?.abort();
   heartbeatController = null;
+}
+
+// Explicit manual lifecycle remains independent of mounted subscribers.
+export function startHeartbeat() {
+  manualHeartbeatRequested = true;
+  ensureHeartbeatRunning();
+}
+
+export function stopHeartbeat() {
+  manualHeartbeatRequested = false;
+  if (heartbeatLeases === 0) haltHeartbeat();
+}
+
+/** Scoped lease for UI subscribers; the last one stops background polling. */
+export function retainHeartbeat(): () => void {
+  heartbeatLeases++;
+  ensureHeartbeatRunning();
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    heartbeatLeases = Math.max(0, heartbeatLeases - 1);
+    if (heartbeatLeases === 0 && !manualHeartbeatRequested) haltHeartbeat();
+  };
 }
 
 // ── Cache management (debug / manual) ────────────────────────────────
