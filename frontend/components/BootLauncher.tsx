@@ -22,7 +22,7 @@ const requestIdleTask = (callback: () => void) => {
   const id = setTimeout(callback, 0);
   return { cancel: () => clearTimeout(id) };
 };import { safeGetItem, safeSetItem } from '../utils/safeStorage';
-import { traceStep, getMemoryTrace, clearCrashes } from '../utils/bootTracer';
+import { traceStep, getMemoryTrace } from '../utils/bootTracer';
 import { STAGES, BootRunner, RunnerSnapshot, readBootCache, writeBootCache } from '../src/boot';
 import api from '../src/utils/apiClient';
 import { onMemoryPressure, getMemTier } from '../utils/memoryGuard';
@@ -206,8 +206,9 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
       if (cancelled) return;
       shedRef.current = true;
       durable('boot_mem_pressure_shed', { phase0: phase0DoneRef.current });
-      if (phase0DoneRef.current && !phaseLockedRef.current) {
-        clearCrashes().catch(() => {});
+      // Memory pressure may shed optional background work, not bypass an
+      // unverified critical local stage or erase crash-loop evidence.
+      if (phase0DoneRef.current && runnerRef.current?.snapshot().criticalOk && !phaseLockedRef.current) {
         commitPhase('ready');
       }
     });
@@ -230,11 +231,10 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
           age < WARM_BOOT_MAX_AGE_MS
         ) {
           if (cancelled) return;
+          // The previous process' cache is advisory. Do not skip current
+          // critical checks, or classify the new boot as healthy yet.
           setWarmBoot(true);
-          setProgress(100);
-          setActiveLabel('Resuming session');
-          commitPhase('ready');
-          clearCrashes().catch(() => {});
+          setActiveLabel('Checking local session');
           await traceStep(`bootlauncher_warm_score${cache.score}_age${age}ms`);
         }
       } catch {}
@@ -336,7 +336,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         if (cancelled) return;
 
         commitPhase('ready');
-        clearCrashes().catch(() => {});
+        // ProductShellRoute marks the boot clean only after it renders.
         await traceStep(
           `bootlauncher_ready_phase0_${Math.round(localSnapshot.phaseProgress[0] || 0)}_${localSnapshot.elapsedMs}ms`,
         );
@@ -376,9 +376,15 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
     durable('watchdog_scheduled', { ms: watchdogMs, tier: memTier });
     const watchdog = setTimeout(() => {
       if (cancelled || phaseLockedRef.current) return;
-      durable('watchdog_fired_force_ready');
-      clearCrashes().catch(() => {});
-      commitPhase('ready');
+      const snapshot = runner.snapshot();
+      durable('watchdog_fired', { criticalOk: snapshot.criticalOk, phase0Done: snapshot.phaseDone[0] });
+      if (snapshot.phaseDone[0] && snapshot.criticalOk) {
+        commitPhase('ready');
+      } else {
+        // Use the independent static launcher instead of pretending boot
+        // succeeded. It preserves access to Product and Safe Mode.
+        onEscalate('phase0_watchdog');
+      }
     }, watchdogMs);
 
     return () => {
@@ -416,7 +422,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
 
   const handleRetryBoot = React.useCallback(async () => {
     durable('user_retry');
-    try { await safeSetItem('@boot/crash_count', '0'); } catch {}
+    // Keep the crash counter until a product screen has actually rendered.
     await traceStep('bootlauncher_user_retry');
     setProgress(0);
     setPhase1Pct(0);
