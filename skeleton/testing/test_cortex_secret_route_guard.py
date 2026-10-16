@@ -15,6 +15,8 @@ from skeleton.api.cortex_mount_guard import reject_cortex_secret_routes
     "/api/v1/%73ecrets/{name}",
     "/API/V1/SECRETS/{name}",
     "/api/v1//secrets/{name}",
+    "/api/v1///secrets/{name}",
+    "/api/v1/%2573ecrets/{name}",
 ])
 def test_unchartered_secret_routes_are_rejected(path: str) -> None:
     app = SimpleNamespace(routes=[SimpleNamespace(path=path)])
