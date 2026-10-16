@@ -15,6 +15,7 @@ from typing import Any
 from .game_learning import _digest
 
 CURRICULUM_SCHEMA = "skeleton.game.emulator_evidence_curriculum.v1"
+MAX_CURRICULUM_RECORDS = 1024
 ANGLES = (
     "exploration", "policy", "adversarial", "temporal", "boundary",
     "recovery", "perturbation", "causal", "reversal", "boomerang",
@@ -73,7 +74,7 @@ class EvidenceCurriculum:
 
     def select(self) -> tuple[str, dict[str, Any]]:
         index = len(self.records)
-        if index >= 256:
+        if index >= MAX_CURRICULUM_RECORDS:
             raise EmulatorCurriculumError("curriculum lifetime exhausted")
         untried = [angle for angle in ANGLES if not self._angle_records(angle)]
         if untried:
@@ -227,6 +228,7 @@ class EvidenceCurriculum:
             "actions": dict(self._action_uses),
             "by_angle": by_angle,
             "limits": {
+                "maximum_verified_runs": MAX_CURRICULUM_RECORDS,
                 "adaptation_signal": "actual replay-verified visual novelty and control contrast",
                 "game_skill_inferred": False,
                 "model_neural_parameter_updates": 0,
