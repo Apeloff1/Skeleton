@@ -158,6 +158,19 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
   },
 ] as const;
 
+/** Verified Expo Router entry points; navigation never implies model/engine readiness. */
+export const PRODUCT_WORKSPACES = [
+  { id: 'academy', title: 'Academy', subtitle: 'Curricula and lessons', href: '/mega-academy' },
+  { id: 'galaxy', title: 'Galaxy Studio', subtitle: 'Build, polish and export', href: '/studio' },
+  { id: 'snowball', title: 'Snowball Flow', subtitle: 'Choose a project in Studio', href: '/studio' },
+  { id: 'jeeves', title: 'Jeeves Chat', subtitle: 'Canonical assistant conversations', href: '/jeeves-chat' },
+  { id: 'cockpit', title: 'Jeeves Cockpit', subtitle: 'Live service health', href: '/jeeves-hub' },
+  { id: 'neural', title: 'AI Models', subtitle: 'Observed model readiness', href: '/ai-chat' },
+  { id: 'training', title: 'Game Learning', subtitle: 'Controlled training workspace', href: '/game-learning' },
+  { id: 'mirror', title: 'Mirror Room', subtitle: 'Review and simulation', href: '/mirror-room' },
+  { id: 'settings', title: 'Settings', subtitle: 'Jeeves, Academy and Studio', href: '/settings' },
+] as const;
+
 export function capabilitiesFor(pillar: ProductPillar): readonly ProductCapability[] {
   return PRODUCT_CAPABILITIES.filter((capability) => capability.pillar === pillar);
 }
