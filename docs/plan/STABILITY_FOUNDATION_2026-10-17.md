@@ -303,3 +303,32 @@ Windows installer and offline AI browser restart, real database
 backup/restore, required architecture validators, Python failure-injection
 suite, full game creation and playthrough with the actual model checkpoint,
 and exact-head sign-off. No new CI workflow was created in this pass.
+
+
+### Destructive wipe sequencing and operator evidence
+
+An additional race was identified in the full-storage Safe Mode wipe: native
+project/settings mutations could still be running when `AsyncStorage.clear()`
+completed, allowing late writes to revive deleted entries. The existing
+`NativeMutationFence` now implements `pauseAndDrain()`, which rejects new
+wrapper writes until every accepted native mutation actually settles.
+`safeStorage` exposes a bounded operator admission helper and explicit
+release control. The Safe Mode wipe refuses to begin when the drain or
+boot-trace reset cannot be confirmed.
+
+The full native clear also has a bounded *UI decision*, not a claimed native
+cancellation. If native clear is still pending at the deadline, the wrapper
+remains fenced until that actual promise completes; the operator sees an
+unconfirmed result instead of a false success. This cannot atomically stop
+other direct AsyncStorage writers outside the wrapper or guarantee power-loss
+durability. The long-term production requirement remains a single physical
+state authority for project records, transaction-safe migrations, and
+installed-device destructive-action qualification.
+
+A new fault-injection test confirms that paused native storage rejects new
+operations both before and after old writes settle until the operator releases
+the fence. **Eight additional ordered-write and mutation-fence tests passed
+at the exact committed blob hashes**, with strict TypeScript checks for their
+two pure implementation modules. Combined with the earlier 18 regressions,
+the focused policy suite has **26/26 passing cases** across this series.
+Full native/typecheck/first-install/E2E qualification is still outstanding.
