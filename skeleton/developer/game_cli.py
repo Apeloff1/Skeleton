@@ -370,7 +370,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
-                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e"))
+                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
+                                            "director-causality", "director-story-contrast"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -397,6 +398,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--session")
     jeeves.add_argument("--at", type=int)
     jeeves.add_argument("--tail", type=int)
+    jeeves.add_argument("--destination")
+    jeeves.add_argument("--route-profile", choices=("fastest", "scenic", "quiet", "novel", "quest"))
+    jeeves.add_argument("--alternatives", type=int)
     jeeves.add_argument("--sessions")
     jeeves.add_argument("--port", type=int)
     jeeves.add_argument("--timeout", type=float)
@@ -464,6 +468,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--goal", options.goal), ("--routes", options.routes),
                                 ("--session", options.session), ("--other-session", options.other_session),
                                 ("--at", options.at), ("--tail", options.tail),
+                                ("--destination", options.destination), ("--route-profile", options.route_profile),
+                                ("--alternatives", options.alternatives),
                                 ("--sessions", options.sessions),
                                 ("--port", options.port),
                                 ("--timeout", options.timeout),

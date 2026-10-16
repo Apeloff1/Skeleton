@@ -108,6 +108,32 @@ def handler(root: Path, session: str, token: str, port: int,
                                    "authoritative_runtime": "Python Director",
                                    "native_engine_e2e_verified": False})
                 return
+            if self.path == "/v1/navigation" or self.path.startswith("/v1/navigation?"):
+                try:
+                    from urllib.parse import urlsplit, parse_qs
+                    from skeleton.developer.jeeves_game_director_labyrinth import plan
+                    if len(self.path) > 256:
+                        raise ValueError("route query too long")
+                    parsed = urlsplit(self.path)
+                    parameters = parse_qs(parsed.query, keep_blank_values=True,
+                                          strict_parsing=True, max_num_fields=3)
+                    if (parsed.path != "/v1/navigation" or not
+                            set(parameters).issubset({"destination", "profile", "alternatives"})
+                            or any(len(v) != 1 for v in parameters.values())):
+                        raise ValueError("invalid navigation query shape")
+                    chosen = parameters.get("profile", ["fastest"])[0]
+                    target = parameters.get("destination", [None])[0]
+                    limit = parameters.get("alternatives", ["3"])[0]
+                    if not limit.isascii() or not limit.isdecimal() or len(limit) > 2:
+                        raise ValueError("invalid route alternative count")
+                    route = plan(root, session=session, destination=target,
+                                 profile=chosen, alternatives=int(limit))
+                    self._answer(200, {"ok": True, "schema": SCHEMA,
+                                       "navigation": route})
+                except (OSError, ValueError, KeyError, TypeError):
+                    self._answer(409, {"ok": False,
+                                       "error": "invalid target or stale labyrinth route"})
+                return
             if self.path == "/v1/advice":
                 if policy_digest is None:
                     self._answer(404, {"ok": False, "error": "Dragon micro-model not enabled"})
