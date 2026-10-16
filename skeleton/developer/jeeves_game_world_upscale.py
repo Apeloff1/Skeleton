@@ -314,7 +314,8 @@ def stage(root: Path, *, source: str, output: str, target: str,
                             parallax_planes=len(layers))
     out = {
         **spec, "enhancement": {
-            "schema": SCHEMA, "source_sha256":src_sha, "target":policy["target_id"],
+            "schema": SCHEMA, "source_path":source,
+            "source_sha256":src_sha, "target":policy["target_id"],
             "richness":richness, "focus":focus, "dressing":positions,
             "parallax":bound_layers, "camera":camera,
             "route_verified":True, "start_to_goal_route":path,
@@ -551,3 +552,90 @@ def parallax(root: Path, *, source: str, output: str, target: str,
             root,category="parallax",source=source,output=output,
             input_sha256=sha,output_sha256=result["output_sha256"],target=target)
     return result
+
+
+
+def vividness(root: Path, *, source: str, passes: int = 3) -> dict[str,Any]:
+    """Multi-pass authored-stage scrutiny with measurable density/readability.
+
+    A deterministic world graph score is NOT expert aesthetics or gameplay.
+    Verify every linked plane and generated decoration, not a sample thereof.
+    """
+    if type(passes) is not int or not 1<=passes<=8:
+        raise WorldUpscaleError("vividness requires 1..8 review passes")
+    findings=[]
+    receipts=[]
+    for attempt in range(1,passes+1):
+        data,digest=_source_json(root,source)
+        if data.get("schema")!=STAGE_SCHEMA or "enhancement" not in data:
+            raise WorldUpscaleError("vividness review needs an executed stage upscale")
+        enhanced=data["enhancement"]
+        if not isinstance(enhanced,dict) or enhanced.get("schema")!=SCHEMA:
+            raise WorldUpscaleError("invalid stage enhancement receipt")
+        original, src_sha=_source_json(root,enhanced["source_path"])
+        if src_sha!=enhanced.get("source_sha256"):
+            raise WorldUpscaleError("original stage changed after enhancement")
+        if original.get("grid")!=data.get("grid") or original.get("layers")!=data.get("layers"):
+            raise WorldUpscaleError("stage geometry or layer identity changed")
+        w,h,grid=_grid(data["grid"])
+        route=_route(grid)
+        route_set={tuple(x) for x in route}
+        if route!=enhanced["start_to_goal_route"]:
+            raise WorldUpscaleError("recorded traversal route no longer matches original map")
+        placements=enhanced["dressing"]
+        if not isinstance(placements,list):
+            raise WorldUpscaleError("stage enhancement dressing invalid")
+        covered=set()
+        categories=set()
+        for item in placements:
+            if not isinstance(item,dict) or set(item)!={"x","y","kind","collidable","source"}:
+                raise WorldUpscaleError("malformed environment decoration")
+            x,y=item["x"],item["y"]
+            if (type(x) is not int or type(y) is not int or not 0<=x<w or not 0<=y<h or
+                grid[y][x]!="." or (x,y) in route_set or (x,y) in covered or item["collidable"] is not False):
+                raise WorldUpscaleError("upscaled dressing blocked a route or duplicated occupancy")
+            covered.add((x,y))
+            categories.add(item["kind"])
+        files=[]
+        for layer in enhanced["parallax"]:
+            path=layer["asset_path"]
+            file=_path(root,path,must_exist=True)
+            sha=sha256(file.read_bytes()).hexdigest()
+            if sha!=layer["asset_sha256"]:
+                raise WorldUpscaleError("original stage parallax texture changed after enhancement")
+            files.append({"path":path,"sha256":sha})
+        walkable=sum(ch!="#" for row in grid for ch in row)
+        density=len(covered)/max(1,walkable-len(route))
+        diversity=len(categories)
+        if density<0.1:
+            findings.append({"pass":attempt,"code":"sparse_stage",
+                             "detail":"Consider richer environment dressing without blocking routes"})
+        if density>0.52:
+            findings.append({"pass":attempt,"code":"overdressed_stage",
+                             "detail":"Inspect for visual noise, clutter and lost landmarks"})
+        if diversity<2:
+            findings.append({"pass":attempt,"code":"low_domain_diversity",
+                             "detail":"Consider original foliage, shadow or ambience variety"})
+        output={
+            "pass":attempt,"source_sha256":src_sha,"stage_sha256":digest,
+            "authoring_assets_checked":len(files),
+            "dressing_elements_inspected":len(covered),
+            "walkable_cells":walkable,"path_cells_protected":len(route),
+            "decoration_density":round(density,5),
+            "independent_environment_categories":diversity,
+            "parallax_layers":len(files),
+            "route_preserved":True,"spatial_readability_preflight":True,
+            "subjective_vividness_assessed":False,
+        }
+        receipts.append(output)
+    stable=len({r["stage_sha256"] for r in receipts})==1
+    return {
+        "ok":stable,"action":"vividness-review","stage":source,
+        "passes":receipts,"scrutiny_passes":passes,
+        "issues":findings,"source_stable":stable,
+        "every_stage_dressing_item_scrutinized":True,
+        "every_referenced_parallax_asset_scrutinized":True,
+        "rendered_gameplay_view_inspected":False,
+        "professional_quality_certified":False,
+        "production_qualified":False,
+    }
