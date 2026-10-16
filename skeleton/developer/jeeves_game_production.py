@@ -280,12 +280,15 @@ def _probe(root: Path, policy: dict[str, Any], gate: str) -> tuple[str, str, str
     return "blocked", _digest({"gate":gate,"unavailable":True}), "operator_observation", "independent stage-specific evaluator not connected"
 
 
-def cycle(root: Path, *, passes: int = 1, gate: str | None = None) -> dict[str, Any]:
+def cycle(root: Path, *, passes: int = 1, gate: str | None = None,
+          repair_generated: bool = False) -> dict[str, Any]:
     """One explicit bounded execution slice; total project lifetime is uncapped."""
     if type(passes) is not int or not 1 <= passes <= 8:
         raise ProductionError("a single cycle accepts 1-8 scrutiny passes, resumable without lifetime cap")
     if gate is not None and gate not in REQUIRED_GATES:
         raise ProductionError("unknown immutable completion gate")
+    if type(repair_generated) is not bool:
+        raise ProductionError("repair_generated must be bool")
     policy = _read_policy(root)
     folder = _safe_folder(root, create=True) / "events"
     if folder.is_symlink() or (folder.exists() and not folder.is_dir()):
@@ -298,12 +301,28 @@ def cycle(root: Path, *, passes: int = 1, gate: str | None = None) -> dict[str, 
     for entry in _events(root, state["policy_sha256"]):
         latest[entry["gate"]] = entry
     observations = []
+    repaired_gates: set[str] = set()
     # Only true evaluators consume budget. Missing subsystem tooling is never
     # classified as a successful test or retried pointlessly in a tight loop.
     selected = (gate,) if gate is not None else tuple(sorted(AUTOMATED_GATES))
     for iteration in range(1, passes + 1):
         for name in selected:
             result, evidence, owner, reason = _probe(root, policy, name)
+            if (repair_generated and result == "failed"
+                and name in {"source_integrity", "runtime_boot"}
+                and name not in repaired_gates):
+                repaired_gates.add(name)
+                from types import SimpleNamespace
+                from skeleton.developer.game_cli import _build
+                try:
+                    outcome = _build(root, SimpleNamespace(
+                        overwrite=True, playtest="off", repair_mode="apply"))
+                    repair_detail = "existing canonical GameForge repair attempted; build succeeded" if outcome.get("ok") else "existing canonical GameForge repair reported failure"
+                except (ValueError, OSError) as exc:
+                    repair_detail = "canonical GameForge repair failed: " + str(exc)[:500]
+                # Quality bar remains identical; re-run ORIGINAL test.
+                result, evidence, owner, reason = _probe(root, policy, name)
+                reason = (repair_detail + "; rechecked: " + reason)[:2000]
             current = latest.get(name)
             # Record EVERY parse, including identical observations, forever.
             # Duplicated hashes are not independent quality evidence.
@@ -338,4 +357,6 @@ def cycle(root: Path, *, passes: int = 1, gate: str | None = None) -> dict[str, 
             "quality_threshold_lowered": False,
             "project_complete": after["project_complete"],
             "pending_gates": after["next_work"],
+            "repair_generated_requested": repair_generated,
+            "repairs_attempted": sorted(repaired_gates),
             "next_step": "repair failed prerequisites, gather independent evidence and run another resumable cycle"}
