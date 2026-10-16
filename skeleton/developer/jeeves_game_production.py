@@ -179,7 +179,7 @@ def _events(root: Path, policy_sha: str):
         if not isinstance(item, dict) or set(item) != {
             "schema", "sequence", "policy_sha256", "previous_sha256", "gate",
             "outcome", "evidence_sha256", "evidence_kind", "reason",
-            "pass_number", "at_utc", "digest"
+            "pass_number", "at_utc", "novel_evidence", "digest"
         }:
             raise ProductionError("invalid event fields")
         if (item["schema"] != EVENT_SCHEMA or item["sequence"] != index + 1
@@ -189,6 +189,7 @@ def _events(root: Path, policy_sha: str):
             or not isinstance(item["evidence_sha256"], str)
             or HASH.fullmatch(item["evidence_sha256"]) is None
             or type(item["pass_number"]) is not int or item["pass_number"] < 1
+            or type(item["novel_evidence"]) is not bool
             or not isinstance(item["reason"], str) or len(item["reason"]) > 2000
             or not isinstance(item["at_utc"], str)):
             raise ProductionError("invalid event identity")
@@ -304,16 +305,13 @@ def cycle(root: Path, *, passes: int = 1, gate: str | None = None) -> dict[str, 
         for name in selected:
             result, evidence, owner, reason = _probe(root, policy, name)
             current = latest.get(name)
-            # Same result + same source provides no new independent evidence:
-            # preserve the result but avoid meaningless replays and disk churn.
-            if current and all((
+            # Record EVERY parse, including identical observations, forever.
+            # Duplicated hashes are not independent quality evidence.
+            novelty = not (current and all((
                 current["outcome"] == result,
                 current["evidence_sha256"] == evidence,
                 current["reason"] == reason,
-            )):
-                observations.append({"gate": name, "outcome": result, "new_evidence": False,
-                                     "reason": reason})
-                continue
+            )))
             seq += 1
             payload = {
                 "schema": EVENT_SCHEMA, "sequence": seq,
@@ -323,13 +321,14 @@ def cycle(root: Path, *, passes: int = 1, gate: str | None = None) -> dict[str, 
                 "evidence_sha256": evidence, "evidence_kind": owner,
                 "reason": reason, "pass_number": iteration,
                 "at_utc": datetime.now(timezone.utc).isoformat(),
+                "novel_evidence": bool(novelty),
             }
             payload["digest"] = _digest(payload)
             _publish(folder / f"{seq:012d}.json", payload)
             latest[name] = payload
             previous = payload["digest"]
-            observations.append({"gate": name, "outcome": result, "new_evidence": True,
-                                 "reason": reason})
+            observations.append({"gate": name, "outcome": result,
+                                 "new_evidence": bool(novelty), "reason": reason})
     after = status(root)
     return {"ok": True, "action": "production-cycle", "passes_in_this_slice": passes,
             "observations": observations,
