@@ -154,7 +154,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "upscale-foliage", "upscale-animation", "upscale-shadow",
                                             "upscale-parallax", "upscale-music", "asset-inventory",
                                             "upscale-review", "vividness-review", "queue-upscaled-training",
-                                            "camera-plan"))
+                                            "camera-plan", "camera-render"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
