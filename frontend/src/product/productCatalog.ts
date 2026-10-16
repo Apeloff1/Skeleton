@@ -162,6 +162,40 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
   },
 ] as const;
 
+/**
+ * Existing product surfaces are exposed directly on the consolidated home.
+ * Resolve from canonical navigation actions so deep links cannot drift away
+ * from the capability catalog. These links NEVER admit backend operations.
+ */
+export const PRODUCT_HOME_SHORTCUT_IDS = [
+  'studio.galaxy.unified',
+  'studio.snowball',
+  'academy.mega',
+  'jeeves.cockpit',
+  'jeeves.workbench',
+  'jeeves.chat.governed',
+  'jeeves.runtime.setup',
+  'ops.settings',
+] as const;
+
+export const PRODUCT_HOME_SHORTCUTS: readonly {
+  id: string;
+  title: string;
+  href: string;
+  pillar: ProductPillar;
+}[] = PRODUCT_CAPABILITIES.flatMap((capability) =>
+  capability.actions
+    .filter((action) =>
+      typeof action.navigationId === 'string' &&
+      (PRODUCT_HOME_SHORTCUT_IDS as readonly string[]).includes(action.navigationId))
+    .map((action) => ({
+      id: action.id,
+      title: action.title,
+      href: action.href as string,
+      pillar: capability.pillar,
+    })),
+);
+
 export function capabilitiesFor(pillar: ProductPillar): readonly ProductCapability[] {
   return PRODUCT_CAPABILITIES.filter((capability) => capability.pillar === pillar);
 }
