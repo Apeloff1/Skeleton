@@ -164,6 +164,34 @@ def test_game_cli_accepts_chunked_story_quest_dossier(tmp_path):
     assert len(reviewed["scrutiny_passes"]) == 2
     assert len(reviewed["replay_segment_receipts"]["original_route_0"]) == 2
     assert reviewed["actual_full_game_playthrough_verified"] is False
+    direction = {
+        "schema": "skeleton.jeeves.direction_dossier.v1",
+        "bible": bible, "scenes": scenes, "expert_reviews": [],
+        "gameplay_source": "design/story_gameplay_dossier.json",
+    }
+    (root / "design" / "story_direction_packet.json").write_text(json.dumps(direction))
+    combined = run_game_cli([
+        "jeeves", "direction-audit", "--project", str(root),
+        "--source", "design/story_direction_packet.json",
+    ])
+    assert combined["ok"], combined
+    assert combined["playable_story"]["verified_recording_segments"] == 2
+    assert "original_route_0" in combined["playable_story"]["recorded_playthrough_checkpoint_heads"]
+
+
+def test_unbounded_total_progress_beyond_256_steps_across_safe_slices():
+    _, _, world, _, _ = story_fixture()
+    state = director_initial(world)
+    packets = []
+    for _ in range(3):
+        action = DirectorAction("wait", "wait", state.scene)
+        part, state = _segment(world, state, [action] * 120)
+        packets.append(part)
+    proof = replay_director_segments(world, packets)
+    assert proof.action_count == 360
+    assert proof.final.turn == 360
+    assert len(proof.segment_receipts) == 3
+    assert proof.final.digest == state.digest
 
 
 def test_large_segment_or_invalid_action_fails_closed():
