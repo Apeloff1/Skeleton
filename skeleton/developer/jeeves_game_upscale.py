@@ -306,3 +306,65 @@ def display_plan(*, target: str, native_width: int, native_height: int,
         "actually_rendered": False,
         "native_hardware_certified": False,
     }
+
+
+
+def verify_upscale(root: Path, *, source: str, output: str,
+                   target: str, mode: str = "nearest",
+                   factor: int = 2, passes: int = 3) -> dict[str, Any]:
+    """Re-decode and independently reconstruct all pixels; no cosmetic claims.
+
+    Passes rerun identical deterministic controls and MUST NOT be counted as
+    independent reviewers or new model training evidence.
+    """
+    if type(passes) is not int or not 1 <= passes <= 8:
+        raise UpscaleError("per invocation verification requires 1..8 resumable scrutiny passes")
+    if type(factor) is not int or not 1 <= factor <= 8:
+        raise UpscaleError("invalid upscaling factor")
+    if mode not in PIXEL_MODES or (mode == "scale2x" and factor not in (2, 4)):
+        raise UpscaleError("invalid upscaling algorithm/factor pairing")
+    policy = _policy(target)
+    src = _path(root, source, must_exist=True)
+    dest = _path(root, output, must_exist=True)
+    if src == dest:
+        raise UpscaleError("source and output must differ")
+    from skeleton.jeeves.game_console_assets import decode_png
+    old = src.read_bytes()
+    new = dest.read_bytes()
+    old_digest = hashlib.sha256(old).hexdigest()
+    new_digest = hashlib.sha256(new).hexdigest()
+    checks: list[dict[str, Any]] = []
+    for iteration in range(1, passes + 1):
+        in_w, in_h, input_pixels = decode_png(old)
+        out_w, out_h, output_pixels = decode_png(new)
+        if out_w != in_w * factor or out_h != in_h * factor:
+            raise UpscaleError("resized output does not match declared integer factor")
+        expected = _expand(input_pixels, in_w, in_h, factor, mode)
+        if expected != output_pixels:
+            raise UpscaleError(f"scrutiny pass {iteration}: output pixels differ from canonical reconstruction")
+        distinct_before = {input_pixels[i:i + 4] for i in range(0, len(input_pixels), 4)}
+        distinct_after = {output_pixels[i:i + 4] for i in range(0, len(output_pixels), 4)}
+        if not distinct_after.issubset(distinct_before):
+            raise UpscaleError("output color or transparency differs from original palette")
+        if hashlib.sha256(src.read_bytes()).hexdigest() != old_digest:
+            raise UpscaleError("source changed during fidelity scrutiny")
+        if hashlib.sha256(dest.read_bytes()).hexdigest() != new_digest:
+            raise UpscaleError("candidate changed during fidelity scrutiny")
+        checks.append({
+            "pass": iteration,
+            "algorithm_reconstruction_exact": True,
+            "source_sha256": old_digest,
+            "output_sha256": new_digest,
+            "no_new_palette_colors": True,
+            "evidence_independent": False,
+        })
+    return {
+        "ok": True, "action": "upscale-verify", "schema": SCHEMA,
+        "target_policy": policy, "source": source, "output": output,
+        "mode": mode, "factor": factor, "checks": checks,
+        "scrutiny_passes": passes, "output_pixels": [out_w, out_h],
+        "exact_algorithm_output": True,
+        "native_console_quality_verified": False,
+        "subjective_fidelity_verified": False,
+        "production_qualified": False,
+    }
