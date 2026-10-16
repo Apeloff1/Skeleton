@@ -12,12 +12,14 @@ import struct
 import tempfile
 import unittest
 import wave
+from unittest.mock import patch
 
 from skeleton.ai.game_builder.quest_scene_forge import forge_director
 from skeleton.developer.game_cli import SCHEMA as WORKSPACE_SCHEMA, run_game_cli
 from skeleton.developer.jeeves_game_director_media import generate
 from skeleton.developer.jeeves_game_director_atlas import export, verify
 from skeleton.developer.jeeves_game_director_e2e import run
+from skeleton.developer.jeeves_game_director_native_e2e import accept
 
 
 class DirectorMediaE2ETests(unittest.TestCase):
@@ -101,6 +103,32 @@ class DirectorMediaE2ETests(unittest.TestCase):
         self.assertTrue(all(r["all_stage_results"] == 4 for r in report["results"]))
         self.assertFalse(report["godot_binary_executed"])
         self.assertFalse(report["human_player_tested"])
+        self.assertFalse((self.root / ".jeeves" / "director_sessions").exists())
+
+    def test_native_probe_requires_real_binary_and_real_journal_action(self):
+        with patch("skeleton.forge.playtest.resolve_binary",
+                   return_value=(None, "absent", False)):
+            result = accept(self.root, source=self.source)
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["native_quest_input_verified"])
+        # Even a forged subprocess success marker is insufficient without
+        # a matching replayed action in the isolated canonical session.
+        fake_import = {
+            "binary_launched": True, "passed": True, "exit_code": 0,
+            "probe_success_marker": False, "stderr_nonempty": False,
+        }
+        fake_action = {
+            "binary_launched": True, "passed": True, "exit_code": 0,
+            "probe_success_marker": True, "stderr_nonempty": False,
+        }
+        with patch("skeleton.forge.playtest.resolve_binary",
+                   return_value=("/path/to/godot", "test-double", False)):
+            with patch("skeleton.developer.jeeves_game_director_native_e2e._run_godot",
+                       side_effect=[fake_import, fake_action]) as executed:
+                result = accept(self.root, source=self.source)
+        self.assertEqual(executed.call_count, 2)
+        self.assertFalse(result["native_quest_input_verified"])
+        self.assertFalse(result["ok"])
         self.assertFalse((self.root / ".jeeves" / "director_sessions").exists())
 
     def test_cli_rejects_unrelated_e2e_options(self):
