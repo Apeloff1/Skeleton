@@ -346,3 +346,38 @@ These are advisory heuristics, not downgraded quality gates. No recorded
 acting, acoustics, lip-sync, accessibility or actual film is certified.
 Jeeves model prompts receive only aggregate verified counts and warnings;
 unrequested original dialogue text is never added to the cinematic brief.
+
+
+## Played dramatic payoff assurance (additional milestone)
+
+When a direction dossier contains BOTH dramatic_threads and gameplay_source,
+the producer now joins canonical literary causality with actual Director
+action replay evidence. The original StoryCanon signer and Director replay
+owner remain the ONLY source authorities. The join requires a resolved
+thread's exact signed payoff scene and node ID to appear in a replayed,
+executed quest result. A solved, unrelated quest can never qualify that
+literary promise. Open threads remain unresolved, even if other quests
+were won.
+
+An optional explicit direction-dossier property:
+
+    "payoff_alternatives_required": true
+
+requires each original dramatic payoff to be associated with TWO OR MORE
+genuinely different approach/consequence pairs for the SAME quest stage
+and the SAME signed payoff anchor. The flag cannot be supplied without
+both original signed dramatic threads and real replayed quest evidence.
+False claims, mismatch of story histories, duplicate replays, and
+unplayed payoffs stay blocked, not promoted to a completed game.
+
+    python -m skeleton dev game jeeves direction-audit --project . --source design/story_direction_packet.json --passes 8
+    python -m skeleton dev game jeeves direction-revision --project . --source design/story_direction_packet.json --passes 8
+
+The audit adds playable_payoffs, showing actual played consequences,
+unresolved original threads and source-plus-replay SHA-256 fingerprints.
+A revision creates P0 work items for individually unplayed payoffs and
+does not edit the manuscript. Every complete score still requires
+professional literary/film creative review, real native game runtime
+execution, human playtest comprehension and actual platform release.
+A matched source node and replayed choice does NOT independently prove
+that the consequence's narrative meaning makes sense to an audience.
