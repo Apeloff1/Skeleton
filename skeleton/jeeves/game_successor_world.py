@@ -361,6 +361,22 @@ class WorldSuccessorEnvironment:
             "crop_ready": (0.5,),
             "time_fraction": (0.25, 0.5, 0.75),
             "enemy_distance": (0.1, 0.3, 0.6),
+            "pond_dx": (-0.75, -0.25, -0.05, 0.05, 0.25, 0.75),
+            "pond_dy": (-0.75, -0.25, -0.05, 0.05, 0.25, 0.75),
+            "farm_dx": (-0.75, -0.25, -0.05, 0.05, 0.25, 0.75),
+            "farm_dy": (-0.75, -0.25, -0.05, 0.05, 0.25, 0.75),
+            "facing_x": (-0.5, 0.5),
+            "facing_y": (-0.5, 0.5),
+            "target_soil": (-0.5, 0.5),
+            "target_growth": (-0.5, 0.0, 0.25, 0.5, 0.75, 1.0),
+            "target_water": (-0.5, 0.1, 0.5, 0.9),
+            "selected_seeds": (0.0, 0.2, 0.5, 1.0),
+            "crop_inventory": (0.0, 0.125, 0.5, 1.0),
+            "coins": (0.0, 0.1, 0.15, 0.3, 0.6, 1.0),
+            "rod_level": (0.5, 0.8),
+            "has_key": (0.5,),
+            "npc_dx": (-0.75, -0.25, -0.05, 0.05, 0.25, 0.75),
+            "npc_dy": (-0.75, -0.25, -0.05, 0.05, 0.25, 0.75),
         }
         self.spec = GameEnvironmentSpec(
             "successor_world:" + self.authored["project_id"], identity, ACTIONS, bins, REWARDS, max_steps
@@ -496,9 +512,35 @@ class WorldSuccessorEnvironment:
 
     def _observe(self):
         s, world, m = self.state, self.world, self.mechanics
-        _, pond = self._near(world.get("ponds", []))
-        _, farm = self._near(world.get("farm_plots", []))
+        pond_row, pond = self._near(world.get("ponds", []))
+        farm_row, farm = self._near(world.get("farm_plots", []))
+        npc_row, _ = self._near(world.get("villagers", []))
         _, enemy = self._near([row for row in s["enemies"] if row["hp"] > 0])
+
+        def direction(row):
+            if row is None:
+                return 0.0, 0.0
+            x, y = s["x"] + BODY_W / 2, s["y"] + BODY_H / 2
+            return (
+                _clamp((_clamp(x, row["x"], row["x"] + row.get("w", 0)) - x) / VIEW_W, -1, 1),
+                _clamp((_clamp(y, row["y"], row["y"] + row.get("h", 0)) - y) / VIEW_H, -1, 1),
+            )
+
+        pond_dx, pond_dy = direction(pond_row)
+        farm_dx, farm_dy = direction(farm_row)
+        npc_dx, npc_dy = direction(npc_row)
+        tile = world["tile_size"]
+        target_x = math.floor((s["x"] + 9 + s["facing_x"] * 28) / tile) * tile
+        target_y = math.floor((s["y"] + 10 + s["facing_y"] * 28) / tile) * tile
+        zone = next(
+            (
+                row
+                for row in world.get("farm_plots", [])
+                if row["x"] <= target_x < row["x"] + row["w"] and row["y"] <= target_y < row["y"] + row["h"]
+            ),
+            None,
+        )
+        plot = next((row for row in s["plots"] if row["x"] == target_x and row["y"] == target_y), None)
         return {
             "x": s["x"] / world["width"],
             "y": s["y"] / world["height"],
@@ -516,6 +558,22 @@ class WorldSuccessorEnvironment:
             "fish_tension": s["fish"]["tension"],
             "crop_ready": float(any(p["crop"] >= 0 and p["growth"] >= 1 for p in s["plots"])),
             "time_fraction": s["clock"] / m["farming"]["day_seconds"],
+            "pond_dx": pond_dx,
+            "pond_dy": pond_dy,
+            "farm_dx": farm_dx,
+            "farm_dy": farm_dy,
+            "facing_x": float(s["facing_x"]),
+            "facing_y": float(s["facing_y"]),
+            "target_soil": -1.0 if zone is None else 0.0 if plot is None else 1.0,
+            "target_growth": plot["growth"] if plot and plot["crop"] >= 0 else -1.0,
+            "target_water": plot["water"] if plot else -1.0,
+            "selected_seeds": min(1.0, s["seeds"][s["crop"]] / 5.0),
+            "crop_inventory": min(1.0, sum(s["crop_inventory"]) / 8.0),
+            "coins": min(10.0, s["coins"] / 100.0),
+            "rod_level": s["rod_level"] / 3.0,
+            "has_key": float(s["keys"] > 0),
+            "npc_dx": npc_dx,
+            "npc_dy": npc_dy,
         }
 
     def current_observation(self):

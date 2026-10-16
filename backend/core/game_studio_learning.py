@@ -78,6 +78,21 @@ async def ensure_campaign_indexes():
             ],
             name="studio_lesson_transfer",
         )
+        await lesson_records.create_index(
+            [
+                ("tenant_id", 1),
+                ("owner_id", 1),
+                ("context.target_id", 1),
+                ("context.genre", 1),
+                ("context.engine", 1),
+                ("context.code_digest", 1),
+                ("lesson.role", 1),
+                ("context.source_digest", 1),
+                ("created_at", -1),
+                ("_id", -1),
+            ],
+            name="studio_decision_transfer",
+        )
         _indexes_ready = True
 
 
@@ -89,11 +104,22 @@ def _lesson_terms(lesson):
 
 def _code_digest():
     root = Path(__file__).resolve().parents[2] / "skeleton" / "jeeves"
+    game_builder = root.parent / "ai" / "game_builder"
+    dependencies = sorted(game_builder.glob("advanced_*_runtime.py")) + [
+        game_builder / "advanced_level_scenes.py",
+        game_builder / "system_editors.py",
+    ]
+    if len(dependencies) > 64:
+        raise GameLearningError("campaign_code_inventory", "Studio runtime inventory exceeds64.", 503)
     return _digest(
         {
             name: hashlib.sha256((root / name).read_bytes()).hexdigest()
             for name in (
                 "game_studio_learning.py",
+                "game_studio_environment.py",
+                "game_studio_frame.py",
+                "game_studio_rule_curriculum.py",
+                "game_studio_scenario_lab.py",
                 "game_learning.py",
                 "game_learning_parallel.py",
                 "game_learning_demonstrations.py",
@@ -103,6 +129,7 @@ def _code_digest():
                 "game_console_simulation.py",
                 "game_console_assets.py",
                 "game_successor_runtime.py",
+                "game_successor.py",
                 "game_successor_world.py",
                 "game_successor_assets.py",
                 "game_emulator_host.py",
@@ -111,6 +138,10 @@ def _code_digest():
                 "game_style_analysis.py",
                 "game_studio_review.py",
             )
+        }
+        | {
+            "game_builder/" + path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in dependencies
         }
     )
 
@@ -278,7 +309,12 @@ def _checked_lesson(row, record):
 
     lesson = workspace._stored_evidence(record["lesson"])
     _json(lesson, 262144)
-    if record["lesson_digest"] != _digest(lesson) or record["context"] != row["context"]:
+    if (
+        record["lesson_digest"] != _digest(lesson)
+        or record["context"] != row["context"]
+        or record.get("campaign_id") != row["campaign_id"]
+        or record.get("project_id") != row["project_id"]
+    ):
         raise GameLearningError("lesson_evidence_corrupt", "Committed lesson evidence differs.", 503)
     try:
         checked = validate_lesson(lesson, context_digest=runtime_digest(row["context"]))
@@ -287,6 +323,29 @@ def _checked_lesson(row, record):
     if checked["round_index"] != record["round_index"] or checked["round_index"] > row["cursor"]:
         raise GameLearningError("lesson_evidence_corrupt", "Lesson cursor differs.", 503)
     return checked
+
+
+async def _admitted_lesson(scope, issuer, record, *, round_cache=None):
+    """A projected lesson is usable only with its exact issued round."""
+    lesson = _checked_lesson(issuer, record)
+    identifier = issuer["campaign_id"] + ":" + str(lesson["round_index"])
+    proof = None if round_cache is None else round_cache.get(identifier)
+    if proof is None:
+        issued = await round_records.find_one({"_id": identifier, **scope, "kind": "round"})
+        if issued is None:
+            raise GameLearningError("lesson_issuer_missing", "Lesson lacks a committed round.", 503)
+        report = _checked_round_record(issuer, issued)
+        if not isinstance(report.get("lessons"), list) or len(report["lessons"]) != 4:
+            raise GameLearningError("lesson_issuer_missing", "Round lesson count differs.", 503)
+        proof = {
+            "round_digest": report["round_digest"],
+            "lesson_digests": {_digest(value) for value in report["lessons"]},
+        }
+        if round_cache is not None:
+            round_cache[identifier] = proof
+    if record.get("round_digest") != proof["round_digest"] or _digest(lesson) not in proof["lesson_digests"]:
+        raise GameLearningError("lesson_issuer_missing", "Lesson differs from its issued round.", 503)
+    return lesson
 
 
 async def _repair(scope, row):
@@ -352,56 +411,70 @@ async def _repair(scope, row):
 async def _proposal_inputs(scope, context, binding):
     from skeleton.jeeves.game_studio_learning import make_proposal_prior
 
-    records = (
-        await lesson_records.find(
-            {**scope, **{"context." + k: context[k] for k in ("target_id", "genre", "engine", "code_digest")}}
+    predicate = {
+        **scope,
+        **{"context." + k: context[k] for k in ("target_id", "genre", "engine", "code_digest")},
+        "lesson.role": "decision",
+    }
+    records = []
+    # Fix both pools before issuance. A popular same-build campaign cannot
+    # consume the other-build page, and later worker restarts do not refresh
+    # either pool or inherit newly appearing unbound source obligations.
+    for source_filter in (context["source_digest"], {"$ne": context["source_digest"]}):
+        records.extend(
+            await lesson_records.find({**predicate, "context.source_digest": source_filter})
+            .sort([("created_at", -1), ("_id", -1)])
+            .limit(64)
+            .max_time_ms(2000)
+            .to_list(length=64)
         )
-        .sort("created_at", -1)
-        .limit(128)
-        .to_list(length=128)
-    )
+    # Give distinct actual design arms a slot before filling the remaining
+    # bounded prior set with repeated trials of a popular arm.
+    first, repeated, mechanics = [], [], set()
+    for record in records:
+        mechanic = record.get("lesson", {}).get("facts", {}).get("mechanic")
+        if not isinstance(mechanic, str) or not 1 <= len(mechanic) <= 128:
+            raise GameLearningError("lesson_evidence_corrupt", "Decision mechanic identity differs.", 503)
+        if mechanic in mechanics:
+            repeated.append(record)
+        else:
+            first.append(record)
+            mechanics.add(mechanic)
+    records = first + repeated
     priors, source_refs, teacher_refs, seen = (
         [],
         list(binding.get("derived_sources", [])),
         list(binding.get("derived_demonstrations", [])),
         set(),
     )
+    issuers, round_cache = {}, {}
     for record in records:
-        if record["context"].get("source_digest") == context["source_digest"]:
-            continue
         try:
-            origin = await _read(scope, record["campaign_id"], historical=True)
+            if record["campaign_id"] not in issuers:
+                issuers[record["campaign_id"]] = await _read(scope, record["campaign_id"], historical=True)
+            origin = issuers[record["campaign_id"]]
         except GameLearningError as exc:
             if exc.status in {403, 404, 409}:
                 continue
             raise
-        lesson = _checked_lesson(origin, record)
+        lesson = await _admitted_lesson(scope, origin, record, round_cache=round_cache)
         if lesson["lesson_digest"] in seen:
             continue
-        round_row = await round_records.find_one(
-            {"_id": origin["campaign_id"] + ":" + str(record["round_index"]), **scope, "kind": "round"}
-        )
-        if round_row is None or _digest(lesson) not in {
-            _digest(v) for v in _checked_round_record(origin, round_row)["lessons"]
-        }:
-            raise GameLearningError(
-                "lesson_issuer_missing", "Proposal lesson lacks exact committed round evidence.", 503
-            )
         prior = make_proposal_prior(lesson, origin_context=origin["context"], destination_context=context)
         original = origin["binding"]
         policy_sources, policy_teachers = await _policy_dependencies(scope, origin)
-        source_refs.extend(policy_sources)
-        teacher_refs.extend(policy_teachers)
-        refs = [{**v, "project_id": origin["project_id"]} for v in original["sources"]] + original.get(
-            "derived_sources", []
+        refs = (
+            [{**v, "project_id": origin["project_id"]} for v in original["sources"]]
+            + original.get("external_sources", [])
+            + original.get("derived_sources", [])
         )
-        merged_sources = {(v["project_id"], v["source_id"]): v for v in source_refs + refs}
+        merged_sources = {_digest(v): v for v in source_refs + policy_sources + refs}
         teachers = list(original.get("derived_demonstrations", []))
         teachers += [
             {**v, "project_id": origin["project_id"], "tree_digest": original["tree_digest"]}
             for v in original.get("demonstrations", []) + original.get("inherited_demonstrations", [])
         ]
-        merged_teachers = {v["recording_id"]: v for v in teacher_refs + teachers}
+        merged_teachers = {_digest(v): v for v in teacher_refs + policy_teachers + teachers}
         if len(merged_sources) > 64 or len(merged_teachers) > 64 or len(_json(priors + [prior])) > 262144:
             continue
         priors.append(prior)
@@ -462,6 +535,14 @@ async def create(scope, project_id, body):
     request = GameEnvironmentRequest.from_dict(
         workspace._stored_evidence(await workspace.environment_request(scope, binding))
     )
+    mirror_steps = 20 * min(6, config.episode_steps) if request.kind == "studio" else 0
+    planned = min(config.slice_rounds, config.round_limit) * (
+        (config.episodes_per_round + 4 * config.evaluation_seeds) * config.episode_steps + mirror_steps
+    )
+    if planned > config.max_slice_steps:
+        raise GameLearningError(
+            "campaign_step_budget", "Configured slice exceeds its bounded actual-step admission.", 422
+        )
     policy = None
     if body.get("policy_id"):
         admitted = await workspace._admitted_policy(scope, project_id, body["policy_id"])
@@ -487,7 +568,11 @@ async def create(scope, project_id, body):
             else (
                 "console_scene"
                 if request.kind == "console_editor"
-                else "native_observation" if request.kind == "libretro" else "reference"
+                else (
+                    "authored_studio"
+                    if request.kind == "studio"
+                    else "native_observation" if request.kind == "libretro" else "reference"
+                )
             )
         ),
         "engine": request.kind,
@@ -1054,22 +1139,6 @@ async def handle_slice(scope, job, cancelled, emit_event):
     if request.digest != expected.digest:
         raise GameLearningError("campaign_environment_changed", "Campaign executable request changed.", 409)
     await _repair(scope, row)
-    admitted_lessons = []
-    records = (
-        await lesson_records.find(
-            {**scope, "project_id": row["project_id"], "context_digest": _digest(row["context"])}
-        )
-        .sort("round_index", -1)
-        .limit(32)
-        .to_list(length=32)
-    )
-    seen_lessons = set()
-    for record in records:
-        issuer = await _read(scope, record["campaign_id"], historical=True)
-        checked = _checked_lesson(issuer, record)
-        if checked["lesson_digest"] not in seen_lessons:
-            admitted_lessons.append(checked)
-            seen_lessons.add(checked["lesson_digest"])
     loop = asyncio.get_running_loop()
 
     def run(authorize, event):
@@ -1089,7 +1158,6 @@ async def handle_slice(scope, job, cancelled, emit_event):
             workspace._stored_evidence(row["lineage"]),
             policy_snapshot=workspace._stored_evidence(row["policy_snapshot"]),
             snapshot=workspace._stored_evidence(row["snapshot"]),
-            lessons=workspace._stored_evidence(list(reversed(admitted_lessons))),
             proposal_priors=workspace._stored_evidence(row.get("proposal_priors", [])),
         )
 
@@ -1250,11 +1318,13 @@ async def lessons(scope, project_id, query="", limit=32, cursor=None):
         .max_time_ms(2000)
         .to_list(length=limit + 1)
     )
-    output, issuers = [], {}
+    output, issuers, round_cache = [], {}, {}
     for record in records[:limit]:
         if record["campaign_id"] not in issuers:
             issuers[record["campaign_id"]] = await _read(scope, record["campaign_id"], historical=True)
-        checked = _checked_lesson(issuers[record["campaign_id"]], record)
+        checked = await _admitted_lesson(
+            scope, issuers[record["campaign_id"]], record, round_cache=round_cache
+        )
         if record.get("search_terms") is not None and record["search_terms"] != _lesson_terms(checked):
             raise GameLearningError("lesson_index_corrupt", "Derived lesson search index differs.", 503)
         output.append(
@@ -1854,6 +1924,8 @@ async def _champion_handoff(scope, row):
         "reason": "No accepted current champion round.",
         "target_id": request.target_id,
         "kind": request.kind,
+        "source_changed_from_admission": dict(request.tree or {})
+        != dict(row["environment_request"].get("tree") or {}),
     }
     record = await round_records.find_one(
         {
@@ -1874,7 +1946,7 @@ async def _champion_handoff(scope, row):
             "champion_policy_corrupt", "Current champion policy differs from its exact issued promotion.", 503
         )
     result.update(round_index=report["round_index"], round_digest=report["round_digest"])
-    if request.kind not in {"successor", "console_editor"} or not request.tree:
+    if request.kind not in {"successor", "console_editor", "studio"} or not request.tree:
         result["reason"] = "This runtime champion has no editable typed source handoff."
         return result
     project = await workspace._project(row["project_id"], scope, row["binding"]["project_version"])
@@ -1896,7 +1968,13 @@ async def _champion_handoff(scope, row):
 
     _files(files)
     _json({"files": files}, 1048576)
-    result.update(files=files, tree_digest=_digest(tree), eligible_for_adoption=True, reason=None)
+    changed = result["source_changed_from_admission"]
+    result.update(
+        files=files,
+        tree_digest=_digest(tree),
+        eligible_for_adoption=changed,
+        reason=None if changed else "Policy-only gains do not change the admitted source tree.",
+    )
     return result
 
 
@@ -1942,9 +2020,11 @@ async def adopt_champion(scope, identifier, body):
                 "champion_handoff_stale", "An exact accepted current editable champion is required.", 409
             )
         project = await workspace._project(row["project_id"], scope, body["expected_version"])
-        entrypoint = (
-            "game/successor/spec.json" if handoff["kind"] == "successor" else "game/editor/console.json"
-        )
+        entrypoint = {
+            "successor": "game/successor/spec.json",
+            "console_editor": "game/editor/console.json",
+            "studio": "game/studio/session.json",
+        }[handoff["kind"]]
         editor = {
             "expected_version": body["expected_version"],
             "idempotency_key": "studio-champion:" + receipt_id,
@@ -2091,7 +2171,7 @@ async def adopt_champion(scope, identifier, body):
 
 async def export_champion(scope, identifier):
     data = await champion(scope, identifier)
-    if not data["champion"]["eligible_for_adoption"]:
+    if not data["champion"]["files"] or not data["champion"]["round_digest"]:
         raise GameLearningError(
             "champion_export_unavailable", "No accepted editable champion source is available.", 409
         )

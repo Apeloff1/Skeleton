@@ -4,6 +4,21 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-10-15 — Integrated studio and first-install preparation
+
+- Combine studio completion, security/intake repairs, adventure systems, production
+  planning, asset/bible helpers and both reference corpus packs.
+- Preserve real local-inference deadlines, decoded-media/source identity, bounded
+  staging and source-bound scrutiny; invalid evidence never becomes a success sentinel.
+- Make canonical Jeeves source and governed mirror membership agree for the new helpers.
+- Keep reference corpus bytes losslessly in compact archives with source/checksum manifests.
+- Keep default local provisioning at 8,192 tokens and allow explicit bounded context
+  choices, including 12,288 for the recorded original studio workflow.
+- Update first-install, owner, AI activation, custom-port, recovery and capability
+  documentation; replace starter frontend/backend readmes with real app information.
+- Retain historical evidence and capability limits; no automatic model-weight training
+  or universal-console compatibility is claimed.
+
 ## 2026-09-18 — F-60..F-67 idempotency headers, bool TTL/rate, era allow-list, identity audits
 
 - IdempotencyGuard header lookup is case-insensitive so Starlette-lowercased

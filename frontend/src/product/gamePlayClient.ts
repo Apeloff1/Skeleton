@@ -11,7 +11,7 @@ export type GamePlay = {
   control_token?: string; input_version: number; latest_frame?: Record<string, unknown> | null;
   observation?: Record<string, unknown>; steps: number; reward: number; recording_id?: string | null;
   keyboard_bindings?: Record<string, string> | null; policy_id?: string | null; source_id?: string | null; input_epoch?: number;
-  capabilities?: { held_buttons?: boolean; keyboard?: boolean; gamepad?: boolean; max_fps?: number };
+  capabilities?: { held_buttons?: boolean; keyboard?: boolean; gamepad?: boolean; max_fps?: number; input_mode?: string; idle_advances_environment?: boolean };
   error?: string | null; resume_available?: boolean;
 };
 export type GameRecording = {
@@ -52,6 +52,7 @@ export function validateGamePlay(value: GamePlay, projectId?: string, playId?: s
     || value.actions !== undefined && (!Array.isArray(value.actions) || value.actions.length > 128 || value.actions.some(action => typeof action !== 'string' || action.length > 100))
     || !Number.isSafeInteger(value.steps) || value.steps < 0 || !Number.isFinite(value.reward)
     || value.control_token !== undefined && (typeof value.control_token !== 'string' || value.control_token.length > 512)) invalid('The server returned an invalid play session.');
+  if (value.capabilities && (value.capabilities.held_buttons !== undefined && typeof value.capabilities.held_buttons !== 'boolean' || value.capabilities.idle_advances_environment !== undefined && typeof value.capabilities.idle_advances_environment !== 'boolean' || value.capabilities.input_mode !== undefined && (typeof value.capabilities.input_mode !== 'string' || value.capabilities.input_mode.length > 80))) invalid('The game input capabilities are invalid.');
   frame(value.latest_frame); return { ...value, actions: value.actions || [] };
 }
 export async function startGamePlay(project: LearningProject, config: { sourceId?: string; seed: number; controller: 'human' | 'ai'; policyId?: string; fps?: number; maxSteps?: number }, input: LearningRequest = {}, key = learningRequestKey('play')): Promise<GamePlay> {

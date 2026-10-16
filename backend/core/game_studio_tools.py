@@ -61,7 +61,15 @@ def _mutation_receipt(value):
     """Keep successful mutation receipts usable without copying full frames/traces."""
     if not isinstance(value, dict):
         return value
-    omitted = {"snapshot", "last_frame", "latest_frame", "transitions", "files", "policy_snapshot"}
+    omitted = {
+        "snapshot",
+        "last_frame",
+        "latest_frame",
+        "transitions",
+        "files",
+        "policy_snapshot",
+        "control_token",
+    }
     result = {key: item for key, item in value.items() if key not in omitted}
     for field in ("last_frame", "latest_frame"):
         frame = value.get(field)
@@ -105,6 +113,91 @@ def _authoring_summary(row, *, inventory=False):
             ]
         else:
             result[key] = value
+    return result
+
+
+def _world_projection(value, payload):
+    """Expose exact authoring identities and small pages, never generated code."""
+    _only(payload, ("section", "record_id", "field", "offset", "limit"))
+    offset, limit = _page({key: payload[key] for key in ("offset", "limit") if key in payload})
+    spec = value["spec"]
+    section = payload.get("section")
+    sections = {key: spec[key] for key in value["editable_sections"] if key in spec}
+    sections.update({"world." + key: item for key, item in spec["world"].items()})
+    sections.update({"mechanics." + key: item for key, item in spec["mechanics"].items()})
+    for parent, item in list(sections.items()):
+        if isinstance(item, dict):
+            sections.update(
+                {parent + "." + key: child for key, child in item.items() if isinstance(child, list)}
+            )
+    result = {
+        "project": _project_summary(value["project"]),
+        "spec_digest": value["spec_digest"],
+        "environment": value["environment"],
+        "sections": sorted(sections),
+        "editable_sections": value["editable_sections"],
+    }
+    if section is None:
+        if "record_id" in payload or "field" in payload:
+            raise GameLearningError(
+                "studio_section_required", "Select a world section before its record or field.", 422
+            )
+        result["spec"] = {
+            key: item
+            for key, item in spec.items()
+            if key not in {"world", "assets", "sprite_atlas", "source_files"}
+        }
+        result["world"] = {
+            key: ({"count": len(item)} if isinstance(item, list) else item)
+            for key, item in spec["world"].items()
+        }
+        return result
+    if not isinstance(section, str) or section not in sections:
+        raise GameLearningError(
+            "studio_section_unknown", "Select an exact saved world or mechanic section.", 422
+        )
+    selected = sections[section]
+    if "record_id" in payload:
+        identifier = _id(payload, "record_id")
+        selected = (
+            next((row for row in selected if isinstance(row, dict) and row.get("id") == identifier), None)
+            if isinstance(selected, list)
+            else None
+        )
+        if selected is None:
+            raise GameLearningError("studio_record_absent", "The requested world record is unavailable.", 404)
+    if "field" in payload:
+        field = payload["field"]
+        if not isinstance(selected, dict) or not isinstance(field, str) or field not in selected:
+            raise GameLearningError(
+                "studio_field_absent", "Select an existing field of the inspected record.", 404
+            )
+        selected = selected[field]
+    if isinstance(selected, list):
+        result["selected"] = {
+            "rows": selected[offset : offset + limit],
+            "total": len(selected),
+            "offset": offset,
+            "limit": limit,
+        }
+    elif isinstance(selected, str):
+        result["selected"] = {
+            "text": selected[offset : offset + 1500],
+            "total_characters": len(selected),
+            "offset": offset,
+            "sha256": hashlib.sha256(selected.encode()).hexdigest(),
+        }
+    elif isinstance(selected, dict):
+        result["selected"] = {
+            key: (
+                {"count": len(item), "inspect_section": section + "." + key}
+                if isinstance(item, list)
+                else item
+            )
+            for key, item in selected.items()
+        }
+    else:
+        result["selected"] = selected
     return result
 
 
@@ -359,14 +452,61 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
         return {key: value for key, value in result.items() if key != "project"} | {
             "project": _project_summary(result["project"])
         }
-    if operation == "successor.inspect":
-        from core.game_successor import candidate
+    if operation == "world.inspect":
+        from core.game_successor import world
+
+        return _world_projection(await world(scope, command.project_id), payload)
+    if operation == "desktop.inspect":
+        from core.game_successor import desktop_catalog
+
+        _only(payload, ())
+        targets = await desktop_catalog()
+        return {
+            **targets,
+            "project_id": command.project_id,
+            "project_version": project["version"],
+            "adopted_world": any(item["path"] == "game/successor/spec.json" for item in project["files"]),
+            "compilation_executed": False,
+            "foreign_os_execution_verified": False,
+        }
+    if operation == "successor.adopt":
+        from core.game_successor import adopt, candidate
+        from routes.game_learning import WriteRequest
+
+        identifier = _id(payload, "candidate_id")
+        issued = await candidate(scope, identifier)
+        if issued["project_id"] != command.project_id:
+            raise GameLearningError("studio_project_mismatch", "Candidate belongs to another project.", 403)
+        body = _model(WriteRequest, {key: item for key, item in payload.items() if key != "candidate_id"})
+        result = await adopt(scope, identifier, body)
+        return {key: item for key, item in result.items() if key != "project"} | {
+            "project": _project_summary(result["project"])
+        }
+    if operation in {"successor.inspect", "successor.export"}:
+        from core.game_successor import candidate, export_candidate
 
         _only(payload, ("candidate_id",), required=("candidate_id",))
         value = await candidate(scope, _id(payload, "candidate_id"))
         if value["project_id"] != command.project_id:
             raise GameLearningError("studio_project_mismatch", "Candidate belongs to another project.", 403)
-        return {key: value for key, value in value.items() if key not in {"files", "source_files"}}
+        if operation == "successor.export":
+            exported = await export_candidate(scope, value["candidate_id"])
+            return {
+                "project_id": command.project_id,
+                "candidate_id": value["candidate_id"],
+                "recipe_digest": value["recipe_digest"],
+                "filename": exported["filename"],
+                "content_digest": exported["content_digest"],
+                "bytes": len(exported["content"].encode()),
+                "media_type": exported["media_type"],
+                "download_path": f"/game-successor/candidates/{value['candidate_id']}/export",
+                "state": "export_prepared",
+                "client_download_verified": False,
+            }
+        result = {key: item for key, item in value.items() if key not in {"files", "source_files", "recipe"}}
+        result["recipe"] = {key: item for key, item in value["recipe"].items() if key != "files"}
+        result["generated_file_count"] = len(value["recipe"]["files"])
+        return result
     if operation in {"job.inspect", "play.inspect", "play.input", "play.control"}:
         field = "job_id" if operation == "job.inspect" else "play_id"
         identifier = _id(payload, field)
@@ -552,7 +692,7 @@ def studio_application_schemas() -> dict[str, Any]:
         ArtifactPreview,
     )
     from routes.game_console_studio import EditConsoleProject
-    from routes.game_learning import SimulationRequest, TrainRequest
+    from routes.game_learning import PlayRequest, SimulationRequest, TrainRequest, WriteRequest
     from routes.game_studio_learning import (
         CampaignCreate,
         CampaignControl,
@@ -567,6 +707,7 @@ def studio_application_schemas() -> dict[str, Any]:
         "world.edit": WorldRequest,
         "simulate": SimulationRequest,
         "train": TrainRequest,
+        "play.start": PlayRequest,
         "build": ConsoleBuildBody,
         "build.inspect": ConsoleBuildPlanBody,
         "project.review": StudioReviewBody,
@@ -607,6 +748,46 @@ def studio_application_schemas() -> dict[str, Any]:
         "additionalProperties": False,
         "properties": {"expected_version": {"type": "integer", "minimum": 1}},
         "description": "Prepare the genuine current canonical project JSON export; no source assets or arbitrary paths.",
+    }
+    shapes["successor.adopt"] = WriteRequest.model_json_schema()
+    shapes["successor.adopt"]["properties"]["candidate_id"] = {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+    }
+    shapes["successor.adopt"].setdefault("required", []).append("candidate_id")
+    shapes["successor.adopt"][
+        "description"
+    ] = "Adopt an exact owned completed successor candidate into the current saved project through source-authorized revision CAS."
+    shapes["successor.export"] = {
+        "required": ["candidate_id"],
+        "additionalProperties": False,
+        "properties": {"candidate_id": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "description": "Prepare exact candidate recipe/source JSON; this is distinct from a compiled binary and a client download.",
+    }
+    shapes["world.inspect"] = {
+        "additionalProperties": False,
+        "properties": {
+            "section": {"type": "string", "maxLength": 128},
+            "record_id": {"type": "string", "minLength": 1, "maxLength": 128},
+            "field": {"type": "string", "maxLength": 128},
+            "offset": {"type": "integer", "minimum": 0, "maximum": 100000},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 32},
+        },
+        "description": "Read actual saved original-world identity and controls. No section returns mechanic values and entity counts. Select world.ponds, world.farm_plots, world.terrain or mechanics.fishing, then exact record_id/field; lists page at32 records, strings at1500Unicodecharacters.",
+    }
+    shapes["world.edit"][
+        "x-invariants"
+    ] = "Select exactly one of complete changes or1..64 typed edits. set_field targets only an existing editable field; upsert_entity uses a complete inspected entity; remove_entity uses exact ID; paint_terrain changes at most256 existing cells. Full canonical geometry/mechanics validation and exact spec/version CAS still apply. Origins and runtime identity are immutable."
+    shapes["world.edit"]["x-owner-edit-examples"] = [
+        {"op": "set_field", "path": ["mechanics", "movement", "max_speed"], "value": 175},
+        {"op": "set_field", "path": ["fidelity"], "value": {"profile": "enhanced"}},
+        {"op": "paint_terrain", "x": 1, "y": 1, "width": 2, "height": 2, "tile": "1"},
+    ]
+    shapes["desktop.inspect"] = {
+        "additionalProperties": False,
+        "properties": {},
+        "description": "Inspect actual approved desktop toolchain/sandbox prerequisites for five OS/architecture targets. No compilation or target-OS execution is performed.",
     }
     for name in ("campaign.champion.adopt", "campaign.authorization"):
         shapes[name]["properties"]["campaign_id"] = {"type": "string", "maxLength": 128}

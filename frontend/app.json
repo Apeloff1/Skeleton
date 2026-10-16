@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Skeleton",
+    "description": "Local-first game studio with Jeeves AI chat, Dragon source review, editing, play and bounded training.",
     "slug": "codedock-quantum-nexus",
     "version": "16.0.0",
     "orientation": "portrait",
