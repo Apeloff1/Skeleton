@@ -27,6 +27,22 @@ const MAX_SESSIONS    = 6;                   // keep last 6 session traces
 const KEY_CRASH_COUNT = '@boot/crash_count';
 const KEY_LAST_CLEAN  = '@boot/last_clean_boot';
 const MAX_TRACE_LEN   = 150;
+const STORAGE_READ_BUDGET_MS = 1_200;
+
+function readStorageBounded(key: string): Promise<string | null> {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = (value: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), STORAGE_READ_BUDGET_MS);
+    try { AsyncStorage.getItem(key).then(finish, () => finish(null)); }
+    catch { finish(null); }
+  });
+}
 
 /** Process-start epoch so every trace line carries a monotonic +Xms offset. */
 const _T0 = Date.now();
@@ -177,10 +193,13 @@ export function installCrashTrace(): void {
 
 export async function getLastTrace(): Promise<TraceStep[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEY_TRACE);
-    if (!raw) return [];
-    return JSON.parse(raw) as TraceStep[];
-  } catch { return []; }
+    const raw = await readStorageBounded(KEY_TRACE);
+    if (!raw) return getMemoryTrace();
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(
+      row => row && typeof row.step === 'string' && typeof row.ts === 'number',
+    ).slice(-MAX_TRACE_LEN) as TraceStep[] : getMemoryTrace();
+  } catch { return getMemoryTrace(); }
 }
 
 export interface ArchivedSession { at: number; steps: TraceStep[] }
@@ -193,7 +212,7 @@ export interface ArchivedSession { at: number; steps: TraceStep[] }
  */
 export async function getSessionArchive(): Promise<ArchivedSession[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEY_SESSIONS);
+    const raw = await readStorageBounded(KEY_SESSIONS);
     if (!raw) return [];
     const arc = JSON.parse(raw);
     return Array.isArray(arc) ? arc : [];
@@ -227,7 +246,7 @@ const _rotationReady = rotateSessionsOnce();
 
 export async function getCrashCount(): Promise<number> {
   try {
-    const v = await AsyncStorage.getItem(KEY_CRASH_COUNT);
+    const v = await readStorageBounded(KEY_CRASH_COUNT);
     return v ? parseInt(v, 10) || 0 : 0;
   } catch { return 0; }
 }
@@ -304,11 +323,20 @@ export async function markBootClean(): Promise<void> {
 
 /** Wipes boot state (for "Reset & retry" buttons). */
 export async function resetBootState(): Promise<void> {
+  if (_flushTimer !== null) { clearTimeout(_flushTimer); _flushTimer = null; }
+  // Drain queued snapshots BEFORE removal: a delayed old write must never
+  // restore the previous crash trace after an explicit operator reset.
+  try { await Promise.race([
+    _traceWriteTail,
+    new Promise<void>(resolve => setTimeout(resolve, STORAGE_READ_BUDGET_MS)),
+  ]); } catch {}
   try {
-    await AsyncStorage.multiRemove([KEY_TRACE, KEY_CRASH_COUNT, KEY_LAST_CLEAN]);
+    await Promise.race([
+      AsyncStorage.multiRemove([KEY_TRACE, KEY_CRASH_COUNT, KEY_LAST_CLEAN]),
+      new Promise<void>(resolve => setTimeout(resolve, STORAGE_READ_BUDGET_MS)),
+    ]);
   } catch { /* swallow */ }
   _memoryTrace = [];
-  if (_flushTimer !== null) { clearTimeout(_flushTimer); _flushTimer = null; }
 }
 
 /** Read-only synchronous mirror of the in-process trace (since boot). */
@@ -318,7 +346,7 @@ export function getMemoryTrace(): TraceStep[] {
 
 export async function getLastCleanBoot(): Promise<number | null> {
   try {
-    const v = await AsyncStorage.getItem(KEY_LAST_CLEAN);
+    const v = await readStorageBounded(KEY_LAST_CLEAN);
     return v ? parseInt(v, 10) : null;
   } catch { return null; }
 }
