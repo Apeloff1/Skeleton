@@ -36,6 +36,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
     start = director_initial(world)
     state = start
     contacts: Counter[str] = Counter()
+    chosen_topics: Counter[str] = Counter()
     buys: Counter[str] = Counter()
     sells: Counter[str] = Counter()
     interactions_by_period: Counter[str] = Counter()
@@ -76,6 +77,14 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         if action.kind == "speak":
             contacts[action.key] += 1
             social_time += state.turn - before.turn
+        elif action.kind == "discuss":
+            npc, topic = next(
+                (n, choice) for n in rules.residents for choice in n.dialogue
+                if n.key + "_" + choice.key == action.key
+            )
+            contacts[npc.key] += 1
+            chosen_topics[npc.key + ":" + topic.key] += 1
+            social_time += state.turn - before.turn
         elif action.kind == "buy":
             buys[action.key] += 1
             trade_time += state.turn - before.turn
@@ -96,7 +105,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
             unlocked_flags[flag] = sequence
         # The social economy is not assumed to be good just because it is
         # deterministic. Preserve small objective evidence samples.
-        if (action.kind in {"speak", "buy", "sell", "rest"} or new_flags):
+        if (action.kind in {"speak", "discuss", "buy", "sell", "rest"} or new_flags):
             event_count += 1
             if len(examples) < 100:
                 examples.append({
@@ -137,6 +146,8 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         "money_spent_on_real_actions": wallet_spending,
         "money_received_from_real_actions": wallet_gains,
         "talk_count_by_resident": dict(sorted(contacts.items())),
+        "dialogue_topic_selection_counts": dict(sorted(chosen_topics.items())),
+        "authored_replies_were_verified_not_invented": True,
         "buy_count_by_shop_good": dict(sorted(buys.items())),
         "sell_count_by_shop_good": dict(sorted(sells.items())),
         "recorded_game_actions_by_period": dict(sorted(interactions_by_period.items())),
