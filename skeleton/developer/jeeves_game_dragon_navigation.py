@@ -49,6 +49,8 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
     total_hops = total_shortest = 0
     use_interactions = 0
     waits = 0
+    transports: Counter[str] = Counter()
+    transport_turns = 0
 
     def close(reason: str, index: int) -> None:
         nonlocal start, moved, total_hops, total_shortest, full_walk, episode_count
@@ -81,6 +83,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         step = DirectorAction(**item["action"])
         if item["before_sha256"] != state.digest:
             raise ValueError("Dragon maze evidence diverges from canonical replay")
+        previous_turn = state.turn
         state = director_step(world, state, step)
         if item["after_sha256"] != state.digest:
             raise ValueError("Dragon maze evidence action hash differs")
@@ -91,6 +94,19 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         elif step.kind == "use":
             use_interactions += 1
             close("interaction", index)
+        elif step.kind == "transit":
+            # A ferry/portal is not a walking detour. Static walking paths
+            # cannot serve as a fair distance baseline for a paid vehicle.
+            close("before_transport", index)
+            if world.dynamics is None:
+                raise ValueError("observed transport has no original-world contract")
+            route = next((p for p in world.dynamics.passages
+                          if p.key == step.key), None)
+            if route is None:
+                raise ValueError("unknown transit observed in Dragon replay")
+            transports[route.mode] += 1
+            transport_turns += state.turn - previous_turn
+            start, moved, full_walk = state.scene, 0, deque([state.scene], maxlen=32)
         else:
             waits += 1
             close("wait", index)
@@ -114,6 +130,9 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         "surplus_travel_hops_vs_reference": total_hops - total_shortest,
         "travel_episode_count": episode_count, "interaction_actions": use_interactions,
         "wait_actions": waits,
+        "transport_uses": dict(sorted(transports.items())),
+        "transport_turns": transport_turns,
+        "walking_vs_multimodal_savings_conflated": False,
         "scene_entrance_counts": dict(sorted(visited.items())),
         "largest_route_deviations": material,
         "unique_scenes_visited": len(visited),
