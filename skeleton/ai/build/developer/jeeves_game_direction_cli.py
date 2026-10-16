@@ -283,7 +283,8 @@ def gameplay(root: Path, *, source: str, passes: int = 1) -> dict[str, Any]:
     return checked
 
 
-def campaign(root: Path, *, source: str, routes: int = 2) -> dict[str, Any]:
+def campaign(root: Path, *, source: str, routes: int = 2,
+             save_prefix: str | None = None) -> dict[str, Any]:
     """Read-only, original approved blueprint -> complete executable quest witnesses."""
     from skeleton.developer.jeeves_game_quality import _read
     from skeleton.developer.game_cli import _load
@@ -309,4 +310,50 @@ def campaign(root: Path, *, source: str, routes: int = 2) -> dict[str, Any]:
     report["source_dossier_sha256"] = identity
     report["source_dossier_path"] = source
     report["author_approval_externally_verified"] = False
+    report["saved_campaigns"] = []
+    if save_prefix is not None:
+        from skeleton.ai.game_builder.quest_campaign_completion import CampaignWitness
+        from skeleton.ai.game_builder.quest_campaign_save import write_campaign_save
+        for index, (report_row, recorded) in enumerate(zip(
+            report["route_reports"], report["replays_for_signed_story_binding"]
+        )):
+            name = save_prefix + "_" + str(index)
+            report["saved_campaigns"].append(
+                write_campaign_save(
+                    root, name, world, CampaignWitness(report_row, recorded)
+                )
+            )
     return report
+
+
+def reopen_campaign(root: Path, *, source: str, save_name: str) -> dict[str, Any]:
+    """Reopen original Director logic-state from legal exact-source action replay."""
+    from skeleton.developer.jeeves_game_quality import _read
+    from skeleton.developer.game_cli import _load
+    from skeleton.ai.game_builder.quest_scene_forge import compile_director_blueprint
+    from skeleton.ai.game_builder.quest_campaign_save import read_campaign_save
+    from skeleton.ai.game_builder.quest_campaign_completion import CampaignCompletionError
+
+    doc, identity = _read(root, source, 16 * 1024 * 1024)
+    if (not isinstance(doc, dict) or set(doc) != {
+        "schema", "director_world", "author_review_acknowledged"
+    } or doc.get("schema") != "skeleton.jeeves.director_campaign_source.v1"
+        or doc["author_review_acknowledged"] is not True):
+        raise CampaignCompletionError("reopen requires reviewed original Director blueprint")
+    world = compile_director_blueprint(doc["director_world"], human_reviewed=True)
+    if world.project_id != _load(root)["name"].replace("-", "_"):
+        raise CampaignCompletionError("saved campaign belongs to another game project")
+    state = read_campaign_save(root, save_name, world)
+    _, final_source_sha = _read(root, source, 16 * 1024 * 1024)
+    if identity != final_source_sha:
+        raise CampaignCompletionError("campaign source changed during reopen")
+    return {
+        "ok": True, "schema": "skeleton.game_builder.director_save_reopen.v1",
+        "action": "direction-campaign-reopen", "project": world.project_id,
+        "save": save_name, "source_sha256": identity,
+        "director_world_digest": world.digest, "actual_restored_state_sha256": state.digest,
+        "turn": state.turn, "restored_completed_quests": list(state.complete),
+        "restored_quest_stage_results": [r.payload() for r in state.results],
+        "native_godot_savegame_verified": False,
+        "installed_game_recovery_qualified": False,
+    }
