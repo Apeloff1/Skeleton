@@ -342,7 +342,12 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                                    "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
-                                                   "production-status", "production-cycle", "production-training"))
+                                                   "production-status", "production-cycle", "production-training",
+                                                   "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
+                                                   "upscale-foliage", "upscale-animation", "upscale-shadow",
+                                                   "upscale-parallax", "upscale-music", "asset-inventory",
+                                                   "upscale-review", "vividness-review", "queue-upscaled-training",
+                                                   "camera-plan"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -358,7 +363,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--target")
     jeeves.add_argument("--source")
     jeeves.add_argument("--output")
-    jeeves.add_argument("--mode", choices=("nearest", "scale2x"))
+    jeeves.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     jeeves.add_argument("--factor", type=int)
     jeeves.add_argument("--dry-run", action="store_true")
     jeeves.add_argument("--passes", type=int)
@@ -366,6 +371,18 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--page", type=int)
     jeeves.add_argument("--page-size", type=int)
     jeeves.add_argument("--repair-generated", action="store_true")
+    jeeves.add_argument("--pattern", choices=("wind", "breathe", "bob", "shimmer", "water"))
+    jeeves.add_argument("--frames", type=int)
+    jeeves.add_argument("--frame-height", type=int)
+    jeeves.add_argument("--richness", type=int)
+    jeeves.add_argument("--focus", choices=("world", "environment", "foliage", "clutter", "shadow"))
+    jeeves.add_argument("--pan", type=int)
+    jeeves.add_argument("--distance", type=int)
+    jeeves.add_argument("--ambience")
+    jeeves.add_argument("--depth", choices=("2d", "2_5d", "2_9d", "3d"))
+    jeeves.add_argument("--yaw", type=float)
+    jeeves.add_argument("--pitch", type=float)
+    jeeves.add_argument("--parallax-planes", type=int)
     for dimension in ("native-width", "native-height", "screen-width",
                       "screen-height", "pixel-aspect-num", "pixel-aspect-den"):
         jeeves.add_argument("--" + dimension, type=int)
@@ -404,6 +421,18 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--gate", options.gate),
                                 ("--page", options.page),
                                 ("--page-size", options.page_size),
+                                ("--pattern", options.pattern),
+                                ("--frames", options.frames),
+                                ("--frame-height", options.frame_height),
+                                ("--richness", options.richness),
+                                ("--focus", options.focus),
+                                ("--pan", options.pan),
+                                ("--distance", options.distance),
+                                ("--ambience", options.ambience),
+                                ("--depth", options.depth),
+                                ("--yaw", options.yaw),
+                                ("--pitch", options.pitch),
+                                ("--parallax-planes", options.parallax_planes),
                                 ("--native-width", options.native_width),
                                 ("--native-height", options.native_height),
                                 ("--screen-width", options.screen_width),
