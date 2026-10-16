@@ -295,3 +295,21 @@ def test_asset_cannot_claim_commercial_top_tier_without_qualifying_reference(tmp
                              "--console", "PC", "--genre", "RPG", "--period", "2015-2019",
                              "--evidence", "design/asset_qa.json"])
     assert not rejected["ok"] and "qualifying" in rejected["error"]
+
+
+@pytest.mark.parametrize("published", ["2037-01-01", "2026-02-31", "2010-01-01"])
+def test_unsupported_source_dates_block_commercial_inspiration(tmp_path, published):
+    root = _workspace(tmp_path)
+    rows = [_benchmark_row(i) for i in range(1,9)]
+    rows[0]["sales_source"]["published"] = published
+    _write(root, rows)
+    result = _rank(root)
+    assert result["ok"] is False
+
+
+def test_self_referential_rating_issuer_fails_independence(tmp_path):
+    root = _workspace(tmp_path)
+    rows = [_benchmark_row(i) for i in range(1,9)]
+    rows[0]["rating_source"]["issuer"] = rows[0]["sales_source"]["issuer"]
+    _write(root, rows)
+    assert not _rank(root)["ok"]
