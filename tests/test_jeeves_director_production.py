@@ -12,6 +12,7 @@ import unittest
 
 from skeleton.developer.game_cli import SCHEMA as WORKSPACE_SCHEMA
 from skeleton.developer.jeeves_game_director_factory import draft, examine, promote
+from skeleton.developer.jeeves_game_director_revision import revise
 from skeleton.developer.jeeves_game_production_board import board, prepare_dragon_research
 from skeleton.developer.jeeves_game_direction_cli import campaign, reopen_campaign
 
@@ -90,6 +91,58 @@ class DirectorMilestoneTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             prepare_dragon_research(self.root, source=source, routes=3,
                                     approve=preview["candidate_sha256"])
+
+    def test_authored_story_and_cinematic_revision_replays(self) -> None:
+        base = self._draft()
+        original = json.loads((self.root / base["source"]).read_text())
+        chosen = next(scene for scene in original["director_world"]["scenes"]
+                      if scene["cutscenes"])
+        cutscene = chosen["cutscenes"][0]
+        revision_path = self.root / "design" / "revision.json"
+        edits = [
+            {"target": "bible", "field": "theme", "value": "Hope survives in a floating city"},
+            {"target": "scene", "key": "scene_00", "field": "setting",
+             "value": "An original lantern market overlooking the submerged harbor"},
+            {"target": "quest", "key": "quest_00", "field": "consequences",
+             "value": "The choice changes trust and travel options"},
+            {"target": "stage", "quest": "quest_00", "key": "stage_00",
+             "field": "lore", "value": "The hero recovers the city's lost chart"},
+            {"target": "cue", "scene": chosen["key"], "cutscene": cutscene["key"],
+             "index": 0, "field": "value", "value": "Original panoramic opening"},
+        ]
+        revision_path.write_text(json.dumps({
+            "schema": "skeleton.jeeves.director_revision.v1",
+            "project": self.config["name"],
+            "base_candidate_sha256": base["candidate_sha256"],
+            "edits": edits,
+        }))
+        changed = revise(self.root, source=base["source"],
+                         revision="design/revision.json")
+        self.assertEqual(changed["revision_edits"], 5)
+        audit = examine(self.root, source=changed["source"], routes=3)
+        self.assertTrue(audit["all_routes_completed"])
+        promoted = promote(self.root, source=changed["source"],
+                           approved_digest=changed["candidate_sha256"], routes=3)
+        self.assertTrue(promoted["eligible_for_canonical_logic_replay"])
+        revision_path.write_text(revision_path.read_text().replace(
+            "Hope survives", "History survives"))
+        with self.assertRaises(ValueError):
+            examine(self.root, source=changed["source"], routes=3)
+
+    def test_reject_revision_that_breaks_scene_reachability(self) -> None:
+        base = self._draft()
+        revision_path = self.root / "design" / "revision.json"
+        revision_path.write_text(json.dumps({
+            "schema": "skeleton.jeeves.director_revision.v1",
+            "project": self.config["name"],
+            "base_candidate_sha256": base["candidate_sha256"],
+            "edits": [{
+                "target": "scene", "key": "scene_00", "field": "links", "value": [],
+            }],
+        }))
+        with self.assertRaises(ValueError):
+            revise(self.root, source=base["source"],
+                   revision="design/revision.json")
 
     def test_reject_unapproved_or_modified_candidates(self) -> None:
         candidate = self._draft()
