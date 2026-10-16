@@ -554,6 +554,32 @@ def test_rollback_restores_a_prior_version() -> None:
     assert store.plane_of("obs-1").value == "fact"
 
 
+def test_first_mutation_can_rollback_to_empty_version_zero() -> None:
+    store = _store()
+    initial = store.state_digest()
+    store.record_observation(_observation())
+    assert store.version == 1
+    record = store.rollback(0, expected_state_digest=initial)
+    assert record.kind is UpdateKind.ROLLBACK
+    assert record.target_id == "v0"
+    assert store.observations() == ()
+    assert store.features() == ()
+    assert store.version == 2
+    assert store.state_digest() != initial  # versioned rollback receipt, empty facts
+
+
+def test_version_zero_expires_with_the_first_bounded_history_entry() -> None:
+    store = _store(max_history=2)
+    for index in range(3):
+        store.record_observation(
+            _observation(observation_id=f"obs-zero-{index}", payload={"score": index})
+        )
+    assert [item.version for item in store.history()] == [2, 3]
+    with pytest.raises(LearningEvidenceError) as caught:
+        store.rollback(0)
+    assert caught.value.context["reason"] == "rollback_unavailable"
+
+
 def test_bounded_history_evicts_old_versions_and_refuses_their_rollback() -> None:
     store = _store(max_history=3)
     for index in range(4):
