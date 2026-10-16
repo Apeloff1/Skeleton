@@ -43,10 +43,14 @@ def dev_help_text() -> str:
         jeeves benchmark-matrix [--profile design/market_benchmarks.json]
         jeeves asset-gate --console ID --genre ID --period YYYY-YYYY --evidence design/asset_qa.json
         jeeves fidelity-plan --target CONSOLE
+        jeeves fidelity-matrix
+        jeeves display-plan --target CONSOLE --native-width PX --native-height PX --screen-width PX --screen-height PX [--pixel-aspect-num N --pixel-aspect-den N]
+        jeeves upscale-verify --target CONSOLE --source assets/in.png --output assets/out.png [--mode nearest|scale2x] [--passes 1..8]
         jeeves upscale --target CONSOLE --source assets/input.png --output assets/hd.png [--factor 2|4|8] [--mode nearest|scale2x]
         jeeves production-init --target CONSOLE --genre GENRE --period YYYY-YYYY
         jeeves production-status [--project DIR]
-        jeeves production-cycle [--passes 1..8] [--gate IMMUTABLE_GATE]
+        jeeves production-cycle [--passes 1..8] [--gate IMMUTABLE_GATE] [--repair-generated]
+        jeeves production-training [--page N] [--page-size 1..256]
         Production retries resume indefinitely across bounded, recorded passes
         jeeves review --digest SHA256 [--project DIR]
         jeeves apply --digest SHA256 --approve SHA256 [--project DIR]
