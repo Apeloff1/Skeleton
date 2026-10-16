@@ -71,9 +71,78 @@ class DesktopRequest(WriteRequest):
     timeout_seconds: int = Field(default=180, ge=10, le=300, strict=True)
 
 
+WorldSection = Literal[
+    "obstacles_rects",
+    "platforms",
+    "ponds",
+    "farm_plots",
+    "villagers",
+    "dungeons",
+    "shops",
+    "collectibles",
+    "enemies",
+    "doors",
+    "checkpoints",
+    "landmarks",
+    "crop_variants",
+    "fish_variants",
+    "quests",
+]
+
+
+class SetWorldField(Request):
+    op: Literal["set_field"]
+    path: list[str | StrictInt] = Field(min_length=1, max_length=5)
+    value: Any
+
+
+class UpsertWorldEntity(Request):
+    op: Literal["upsert_entity"]
+    section: WorldSection
+    entity: dict[str, Any] = Field(min_length=1, max_length=32)
+
+
+class RemoveWorldEntity(Request):
+    op: Literal["remove_entity"]
+    section: WorldSection
+    entity_id: str = Field(min_length=1, max_length=128)
+
+
+class PaintWorldTerrain(Request):
+    op: Literal["paint_terrain"]
+    x: int = Field(ge=0, le=511, strict=True)
+    y: int = Field(ge=0, le=511, strict=True)
+    width: int = Field(default=1, ge=1, le=64, strict=True)
+    height: int = Field(default=1, ge=1, le=64, strict=True)
+    tile: Literal["0", "1", "2", "3", "4", "5", "6", "7"]
+
+    @model_validator(mode="after")
+    def cell_budget(self):
+        if self.width * self.height > 256:
+            raise ValueError("terrain edits contain at most 256 cells")
+        return self
+
+
+WorldEdit = Annotated[
+    SetWorldField | UpsertWorldEntity | RemoveWorldEntity | PaintWorldTerrain,
+    Field(discriminator="op"),
+]
+
+
 class WorldRequest(WriteRequest):
     expected_spec_digest: str = Field(pattern="^[a-f0-9]{64}$")
-    changes: dict[str, Any] = Field(min_length=1, max_length=8)
+    changes: dict[str, Any] | None = Field(default=None, min_length=1, max_length=8)
+    edits: list[WorldEdit] | None = Field(default=None, min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def authoring_payload(self):
+        if (self.changes is None) == (self.edits is None):
+            raise ValueError("provide complete changes or bounded typed edits")
+        return self
+
+    def admitted_request(self):
+        # Old changes requests must keep the same exact prepared-operation key.
+        return self.model_dump(exclude_none=True)
 
 
 @router.get("/sources")
@@ -153,4 +222,4 @@ async def get_world(project_id: str, user=Depends(get_current_user)):
 
 @router.patch("/projects/{project_id}/world")
 async def edit_world(project_id: str, body: WorldRequest, user=Depends(get_current_user)):
-    return await _call(successor.edit_world(_scope(user), project_id, body.model_dump()))
+    return await _call(successor.edit_world(_scope(user), project_id, body.admitted_request()))

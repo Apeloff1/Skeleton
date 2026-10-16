@@ -19,15 +19,23 @@ class GoalCreate(WriteRequest):
     max_model_calls: int = Field(default=4, ge=1, le=8, strict=True)
     max_output_tokens: int = Field(default=1024, ge=256, le=4096, strict=True)
     max_jobs: int = Field(default=2, ge=0, le=4, strict=True)
-    completion_requirements: list[Literal["edit", "build", "preview", "export"]] | None = Field(
-        default=None, max_length=4
-    )
+    completion_mode: Literal["native", "original"] = "native"
+    completion_requirements: (
+        list[Literal["edit", "build", "preview", "export", "simulate", "review", "package"]] | None
+    ) = Field(default=None, max_length=5)
 
     @model_validator(mode="after")
     def normalized_goal(self):
         if not self.goal.strip():
             raise ValueError("describe a concrete studio goal")
         if self.completion_requirements is not None:
+            supported = (
+                {"edit", "simulate", "review", "package", "export"}
+                if self.completion_mode == "original"
+                else {"edit", "build", "preview", "export"}
+            )
+            if set(self.completion_requirements) - supported:
+                raise ValueError("select completion requirements supported by this workflow mode")
             if len(set(self.completion_requirements)) != len(self.completion_requirements):
                 raise ValueError("select each completion requirement once")
             if self.completion_requirements and self.execution_mode != "run":
@@ -100,6 +108,8 @@ async def create_goal(project_id: str, body: GoalCreate, user=Depends(get_curren
         payload.pop("max_output_tokens")
     if "completion_requirements" not in body.model_fields_set:
         payload.pop("completion_requirements")
+    if "completion_mode" not in body.model_fields_set:
+        payload.pop("completion_mode")
     return {"goal": await _call(agent.create(_scope(user), project_id, payload))}
 
 
