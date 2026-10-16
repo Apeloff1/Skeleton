@@ -364,7 +364,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "upscale-review", "vividness-review", "queue-upscaled-training",
                                                    "camera-plan", "camera-render",
                                                    "direction-audit", "direction-workorder", "production-gap-matrix",
-                                                   "dragon-ingest", "dragon-plan", "dragon-adopt"))
+                                                   "dragon-review", "dragon-ingest", "dragon-plan", "dragon-adopt"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
