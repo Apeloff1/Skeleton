@@ -9,6 +9,7 @@ from __future__ import annotations
 import http.client
 from http.server import HTTPServer
 import json
+from dataclasses import replace
 from pathlib import Path
 import tempfile
 import threading
@@ -37,6 +38,12 @@ from skeleton.developer.jeeves_game_director_dynamic_author import (
 from skeleton.developer.jeeves_game_dragon_world import study, queue, compare
 from skeleton.developer.jeeves_game_director_bridge import handler
 from skeleton.developer.jeeves_game_director_events import delta
+from skeleton.developer.jeeves_game_director_causality import (
+    audit as causal_audit, contrast as causal_contrast,
+)
+from skeleton.developer.jeeves_game_dragon_navigation import study as navigation_study
+from skeleton.developer.jeeves_game_dragon_policy import _context
+
 from skeleton.developer.jeeves_game_director_atlas import export, verify
 
 
@@ -235,6 +242,58 @@ class OriginalLivingWorldTests(unittest.TestCase):
                             for x in second["routes"]))
         with self.assertRaises(ValueError):
             plan(self.root, session="hero", destination="../../other_game")
+
+    def test_fare_is_consumed_only_when_it_was_actually_held(self):
+        paid = next((p for p in self.status.dynamics.passages
+                     if p.key == "ticketed"), None)
+        if paid is None:
+            self.skipTest("This particular original forge has no ticket-producing affordance")
+        initial = director_initial(self.status)
+        denied = DirectorAction("transit", paid.key, self.start)
+        self.assertNotIn(denied, available_director_actions(self.status, initial))
+        # Seed an explicit acquired-item precondition to isolate the engine's
+        # resource-consumption logic; NOT an evidence claim about how the user
+        # originally earned the item.
+        equipped = replace(initial, acquired=(paid.consume_item,))
+        self.assertIn(denied, available_director_actions(self.status, equipped))
+        arrived = director_step(self.status, equipped, denied)
+        self.assertEqual(arrived.scene, self.neighbor)
+        self.assertNotIn(paid.consume_item, arrived.acquired)
+        self.assertEqual(arrived.world_state.passage_uses, (("ticketed", 1),))
+        with self.assertRaises(ValueError):
+            director_step(self.status, arrived, denied)
+
+    def test_dragon_policy_cannot_confuse_locked_and_unlocked_same_scene(self):
+        start = director_initial(self.status)
+        ferried = director_step(self.status, start,
+                                DirectorAction("transit", "ferry", self.start))
+        back = director_step(self.status, ferried,
+                             DirectorAction("transit", "ferry", self.neighbor))
+        self.assertEqual(start.scene, back.scene)
+        self.assertEqual(start.stage_index, back.stage_index)
+        self.assertNotEqual(_context(start), _context(back))
+        self.assertEqual(back.world_state.standings, (("council", 60),))
+        self.assertIn("charter", back.world_state.world_flags)
+
+    def test_story_audit_and_navigation_distinguish_transport_from_footpath(self):
+        self._start()
+        self._step("hero", "transit:ferry")
+        self._step("hero", "transit:ferry")
+        ledger = causal_audit(self.root, session="hero", page_size=5)
+        self.assertEqual(ledger["summary"]["transport_modes"]["ferry"], 2)
+        self.assertEqual(ledger["summary"]["world_flags_created_at"]["charter"], 1)
+        self.assertEqual(ledger["summary"]["faction_standing_changes"]["council"], 2)
+        self.assertTrue(ledger["summary"]["world_consequence_edges"])
+        maze = navigation_study(self.root, session="hero")
+        self.assertEqual(maze["transport_uses"]["ferry"], 2)
+        self.assertEqual(maze["travel_hops"], 0)
+        self.assertEqual(maze["transport_turns"], 8)
+        self.assertFalse(maze["walking_vs_multimodal_savings_conflated"])
+        begin(self.root, source=self.dynamic_file, session="other")
+        compared = causal_contrast(self.root, first="hero", second="other")
+        self.assertTrue(compared["canon_story_differences_observed"])
+        self.assertEqual(compared["world_flags_unique_to_first"], ["charter"])
+        self.assertTrue(compared["faction_standing_differences"])
 
     def test_explicit_dynamics_consistency_assurance(self):
         self._start()
