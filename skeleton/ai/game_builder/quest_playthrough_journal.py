@@ -45,7 +45,7 @@ class SegmentedDirectorTrace:
 def replay_director_segments(
     world: DirectorWorld, segments: Any,
 ) -> SegmentedDirectorTrace:
-    """Verify every consecutive signed checkpoint from the real genesis.
+    """Verify every consecutive hash-linked checkpoint from the real genesis.
 
     Each segment is an independent resource-bounded replay slice with
     exactly actions, start_digest and end_digest. The caller may append
