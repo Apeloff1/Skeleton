@@ -165,7 +165,13 @@ def run(root: Path, *, source: str, routes: int = 2) -> dict[str, Any]:
                         service.start()
                         status, reloaded, elapsed = service.request("GET", "/v1/status")
                         milliseconds += elapsed * 1000
-                        if status != 200 or reloaded.get("snapshot") != snapshot:
+                        # A POST snapshot has action=director-session-step;
+                        # a resumed GET has action=director-session-status. This
+                        # metadata differs, the canonical state must not.
+                        restored = reloaded.get("snapshot", {})
+                        if (status != 200 or not isinstance(restored, dict)
+                                or {k: v for k, v in restored.items() if k != "action"}
+                                != {k: v for k, v in snapshot.items() if k != "action"}):
                             raise ValueError("Director HTTP save recovery changed gameplay state")
                         restart_completed = True
                 if first_state is not None:
