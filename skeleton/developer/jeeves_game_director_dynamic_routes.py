@@ -66,7 +66,8 @@ def _state_identity(world: Any, state: Any) -> tuple[Any, ...]:
 def _transport_details(world: Any, state: Any, action: DirectorAction) -> dict:
     if action.kind in {"speak", "discuss", "rest", "buy", "sell"}:
         rules = world.dynamics.society
-        duration = rules.phase_turns if action.kind == "rest" else (
+        from skeleton.ai.game_builder.quest_society import phase
+        duration = phase(rules, state.turn)["turns_until_next_phase"] if action.kind == "rest" else (
             2 if action.kind in {"buy", "sell"} else 1
         )
         return {
