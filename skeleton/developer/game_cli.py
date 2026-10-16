@@ -342,7 +342,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                                    "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "production-init",
-                                                   "production-status", "production-cycle"))
+                                                   "production-status", "production-cycle", "production-training"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -363,6 +363,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--dry-run", action="store_true")
     jeeves.add_argument("--passes", type=int)
     jeeves.add_argument("--gate")
+    jeeves.add_argument("--page", type=int)
+    jeeves.add_argument("--page-size", type=int)
     jeeves.add_argument("--repair-generated", action="store_true")
     for dimension in ("native-width", "native-height", "screen-width",
                       "screen-height", "pixel-aspect-num", "pixel-aspect-den"):
@@ -400,6 +402,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
                                 ("--gate", options.gate),
+                                ("--page", options.page),
+                                ("--page-size", options.page_size),
                                 ("--native-width", options.native_width),
                                 ("--native-height", options.native_height),
                                 ("--screen-width", options.screen_width),
