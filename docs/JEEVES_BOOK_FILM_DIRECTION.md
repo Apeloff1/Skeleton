@@ -181,3 +181,53 @@ Run:
     python scripts/check_ai_app_construction.py
     python scripts/check_capability_interfaces.py
     python scripts/check_provider_bootstrap.py
+
+
+## Medium-specific benchmark comparison (new source-only gate)
+
+Book success, film success, television audience measurements and game
+unit sales cannot be pooled. The read-only direction-benchmark checks
+exact SAME-medium, genre, release decade, territory and commercial
+measurement unit cohorts. Its quality axis uses original source-reported
+professional critic scores (0–100) with an explicit review-count floor,
+and commercial reach uses a single unit appropriate to its medium:
+
+- novel: audited_print_copies, at least five professional critical reviews;
+- film: ticket_admissions, at least fifteen professional critical reviews;
+- television: audited_viewer_hours, at least fifteen critical reviews;
+- interactive_game: reported_units, at least seven critical reviews.
+
+Each cohort needs five to 512 distinct works, three or more distinct values
+per axis, matching historical release years, and separate HTTPS sources
+for commercial and critic numbers. A work qualifies only if top quartile
+on both commercially comparable reach and professional rating with
+critic score at least 85. Zero qualifying references is an evidence gap,
+not permission to change categories or ease the target.
+
+Importantly the underlying issuer numbers are not fetched or
+independently certified by this tool. Film admissions aren't box-office
+dollars, and print-book POS records are not global lifetime print+
+ebook+audio totals. For example, Circana states that its BookScan
+covers roughly 85% of U.S. trade-print sales, not all formats:
+https://www.circana.com/industries/books
+Metacritic describes weighted professional critic aggregation, with
+individual title review counts rather than self-reported audience ratings:
+https://www.metacritic.com/movie/?page=1
+
+Dossier location: design/story_reference_cohorts.json.
+Required schema: skeleton.jeeves.story_media_benchmark.v1.
+Required exact top-level fields: schema, cohorts.
+Every cohort: medium, genre, period, territory, commercial_unit, works.
+Every work: id, release_year, commercial_quantity, professional_score,
+professional_reviews, commercial_source, review_source.
+Every source: url, issuer, published, kind.
+Commercial source kinds: publisher_or_studio_disclosure or
+audited_industry_measurement. Review source kinds:
+independent_critic_aggregate or professional_review_archive.
+
+    python -m skeleton dev game jeeves direction-benchmark --project . --source design/story_reference_cohorts.json
+
+This returns qualified original reference lists and sources but
+**does not train Jeeves, import scripts or license their characters**.
+Literary/film grade work remains an original production objective
+requiring independently witnessed read-throughs and audience/film reviews.
