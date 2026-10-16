@@ -1135,6 +1135,11 @@ def create_app() -> Any:
         from skeleton.cortex import live
         return live.status()
 
+    # Cortex's historical register_routes() contains unchartered GET/POST
+    # /api/v1/secrets endpoints. Validate the final assembled HTTP routes,
+    # not merely today's static import graph, before exposing the app.
+    from skeleton.api.cortex_mount_guard import reject_cortex_secret_routes
+    reject_cortex_secret_routes(app)
     return app
 
 
