@@ -154,7 +154,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "upscale-foliage", "upscale-animation", "upscale-shadow",
                                             "upscale-parallax", "upscale-music", "asset-inventory",
                                             "upscale-review", "vividness-review", "queue-upscaled-training",
-                                            "camera-plan", "camera-render"))
+                                            "camera-plan", "camera-render",
+                                            "direction-audit", "direction-workorder", "production-gap-matrix"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -198,6 +199,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             output = dispatch(args, root)
             output["ok"] = bool(output.get("ok", True))
             return output
+        if args.action in ("direction-audit", "direction-workorder", "production-gap-matrix"):
+            allowed = {"action", "source"} if args.action != "production-gap-matrix" else {"action"}
+            for key, value in vars(args).items():
+                if key not in allowed and value is not None and value is not False:
+                    raise ValueError("unrelated director option --" + key.replace("_", "-"))
+            if args.action == "production-gap-matrix":
+                from skeleton.developer.jeeves_game_production_gaps import gaps
+                return gaps(root)
+            from skeleton.developer.jeeves_game_direction import audit, workorder
+            source = args.source or "design/direction_manifest.json"
+            return audit(root, source=source) if args.action == "direction-audit" else workorder(root, source=source)
         world_args = (args.pattern, args.frames, args.frame_height, args.richness,
                       args.focus, args.pan, args.distance, args.ambience,
                       args.depth, args.yaw, args.pitch, args.parallax_planes)
