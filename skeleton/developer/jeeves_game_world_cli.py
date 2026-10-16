@@ -8,7 +8,7 @@ ACTIONS = (
     "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
     "upscale-foliage", "upscale-animation", "upscale-shadow", "upscale-parallax",
     "upscale-music", "asset-inventory", "upscale-review", "vividness-review",
-    "queue-upscaled-training", "camera-plan",
+    "queue-upscaled-training", "camera-plan", "camera-render",
 )
 
 COMMON = {"target","source","output","dry_run"}
@@ -27,6 +27,7 @@ REQUIRED = {
     "vividness-review": set(),
     "queue-upscaled-training": set(),
     "camera-plan": {"depth"},
+    "camera-render": {"target","source","output"},
 }
 ALLOWED = {
     "upscale-world":COMMON | {"richness","focus"},
@@ -43,6 +44,7 @@ ALLOWED = {
     "vividness-review":{"passes","source"},
     "queue-upscaled-training":{"page","page_size"},
     "camera-plan":{"depth","yaw","pitch","parallax_planes"},
+    "camera-render":COMMON,
 }
 DEFAULTS = {
     "page":0,"page_size":64,"passes":3,"richness":3,"pattern":"wind",
@@ -73,6 +75,10 @@ def dispatch(args: Any, root: Path) -> dict[str,Any]:
         _load(root)
         return camera_profile(args.depth,yaw=arg("yaw"),pitch=arg("pitch"),
                               parallax_planes=arg("parallax_planes"))
+    if name=="camera-render":
+        from skeleton.developer.jeeves_game_world_upscale import camera_render
+        return camera_render(root,source=args.source,output=args.output,
+                             target=args.target,dry_run=args.dry_run)
     if name=="asset-inventory":
         from skeleton.developer.jeeves_game_world_upscale import inventory
         return inventory(root,page=arg("page"),page_size=arg("page_size"))
