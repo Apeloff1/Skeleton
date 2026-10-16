@@ -200,7 +200,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 if any((*other_content, *quality_args, args.target, args.source, args.output,
                         args.mode, args.factor, args.dry_run, *display_args)):
                     raise ValueError("production-cycle accepts --passes and optional --gate only")
-                output = cycle(root, passes=args.passes or 1, gate=args.gate,
+                output = cycle(root, passes=args.passes if args.passes is not None else 1, gate=args.gate,
                                repair_generated=args.repair_generated)
         elif args.action in {"fidelity-plan", "fidelity-matrix", "display-plan", "upscale"}:
             from skeleton.developer.jeeves_game_upscale import fidelity_plan, fidelity_matrix, display_plan, upscale
@@ -297,17 +297,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 output = apply(root, digest=args.digest, approved_digest=args.approve)
         elif args.action == "plan":
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
-                    *quality_args)):
+                    *quality_args, *render_args)):
                 raise ValueError("unused Jeeves options")
             output = _plan(root)
         elif args.action == "audit":
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
-                    *quality_args)):
+                    *quality_args, *render_args)):
                 raise ValueError("unused Jeeves options")
             output = _audit(root)
         elif args.action == "context":
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
-                    *quality_args)):
+                    *quality_args, *render_args)):
                 raise ValueError("unused Jeeves options")
             cfg, _ = _context(root)
             notes = _notes(root)
@@ -317,7 +317,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                                for n in notes])}
         else:
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
-                    *quality_args)):
+                    *quality_args, *render_args)):
                 raise ValueError("unused Jeeves options")
             planned, audited = _plan(root), _audit(root)
             recs = _recommendations(planned["plan"], audited)
