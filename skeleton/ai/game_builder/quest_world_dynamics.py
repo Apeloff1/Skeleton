@@ -16,6 +16,9 @@ from dataclasses import dataclass
 from typing import Any
 import re
 
+from .quest_society import (SocietyRules, SocietyState, TrustRequirement,
+                           compile_society, initial as society_initial)
+
 ID = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
 FLAGS = ("none", "local", "quest", "global")
 MODES = ("foot", "rail", "ferry", "airship", "portal", "elevator", "shuttle",
@@ -88,6 +91,7 @@ class Requirements:
     standings: tuple[StandingRequirement, ...] = ()
     forbidden_flags: tuple[str, ...] = ()
     forbidden_world_flags: tuple[str, ...] = ()
+    trust: tuple[TrustRequirement, ...] = ()
 
     def __post_init__(self):
         for group in (self.items, self.flags, self.quests, self.world_flags,
@@ -103,15 +107,22 @@ class Requirements:
             raise ValueError("invalid standing condition")
         if len({s.faction for s in self.standings}) != len(self.standings):
             raise ValueError("duplicate faction threshold")
+        if (not isinstance(self.trust, tuple) or len(self.trust) > 64
+                or any(not isinstance(r, TrustRequirement) for r in self.trust)
+                or len({r.resident for r in self.trust}) != len(self.trust)):
+            raise ValueError("invalid NPC trust thresholds")
 
     def payload(self):
-        return {
+        result = {
             "items": list(self.items), "flags": list(self.flags),
             "quests": list(self.quests), "world_flags": list(self.world_flags),
             "standings": [s.payload() for s in self.standings],
             "forbidden_flags": list(self.forbidden_flags),
             "forbidden_world_flags": list(self.forbidden_world_flags),
         }
+        if self.trust:
+            result["trust"] = [r.payload() for r in self.trust]
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +265,7 @@ class WorldDynamics:
     gates: tuple[Gate, ...] = ()
     passages: tuple[Passage, ...] = ()
     influences: tuple[Influence, ...] = ()
+    society: SocietyRules | None = None
 
     def __post_init__(self):
         checks = ((self.factions, Faction, MAX_FACTIONS),
@@ -271,6 +283,9 @@ class WorldDynamics:
         if len({(g.source, g.destination) for g in self.gates}) != len(self.gates):
             raise ValueError("duplicate authored link gate")
         known = {f.key for f in self.factions}
+        if self.society is not None and not isinstance(self.society, SocietyRules):
+            raise ValueError("society must be an approved original typed rule set")
+        residents = {n.key for n in self.society.residents} if self.society else set()
         for gate in self.gates:
             for standing in gate.requirements.standings:
                 if standing.faction not in known:
@@ -284,15 +299,27 @@ class WorldDynamics:
         for influence in self.influences:
             if influence.faction not in known:
                 raise ValueError("influence references non-existent faction")
+        if self.society is not None and any(
+                n.faction is not None and n.faction not in known
+                for n in self.society.residents):
+            raise ValueError("NPC references missing original faction")
+        for requirements in (
+                *(g.requirements for g in self.gates),
+                *(p.requirements for p in self.passages)):
+            if any(r.resident not in residents for r in requirements.trust):
+                raise ValueError("passage references a missing local NPC trust target")
 
     def payload(self):
-        return {
+        result = {
             "schema": "skeleton.game_builder.world_dynamics.v1",
             "factions": [x.payload() for x in self.factions],
             "gates": [x.payload() for x in self.gates],
             "passages": [x.payload() for x in self.passages],
             "influences": [x.payload() for x in self.influences],
         }
+        if self.society is not None:
+            result["society"] = self.society.payload()
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -301,10 +328,13 @@ class WorldState:
     world_flags: tuple[str, ...] = ()
     fired_influences: tuple[str, ...] = ()
     passage_uses: tuple[tuple[str, int], ...] = ()
+    society: SocietyState | None = None
 
     def __post_init__(self):
         _ids(self.world_flags, limit=4096)
         _ids(self.fired_influences, limit=4096)
+        if self.society is not None and not isinstance(self.society, SocietyState):
+            raise ValueError("world save contains untyped society state")
         if len(self.standings) > MAX_FACTIONS:
             raise ValueError("world contains excessive faction standing entries")
         if len({f for f, _ in self.standings}) != len(self.standings):
@@ -319,12 +349,15 @@ class WorldState:
             _number(value, 1, 100_000_000)
 
     def payload(self):
-        return {
+        result = {
             "standings": [[f, n] for f, n in self.standings],
             "world_flags": list(self.world_flags),
             "fired_influences": list(self.fired_influences),
             "passage_uses": [[p, n] for p, n in self.passage_uses],
         }
+        if self.society is not None:
+            result["society"] = self.society.payload()
+        return result
 
 
 def initial(dynamics: WorldDynamics) -> WorldState:
@@ -333,6 +366,8 @@ def initial(dynamics: WorldDynamics) -> WorldState:
     return WorldState(
         standings=tuple(sorted((f.key, f.starting_standing)
                                for f in dynamics.factions)),
+        society=society_initial(dynamics.society)
+                if dynamics.society is not None else None,
     )
 
 
@@ -348,6 +383,7 @@ def permits(requirements: Requirements, state: Any) -> bool:
     completed = set(state.complete)
     world_flags = set(status.world_flags)
     standing = dict(status.standings)
+    trust = dict(status.society.relationships) if status.society else {}
     return (
         set(requirements.items).issubset(inventory)
         and set(requirements.flags).issubset(flags)
@@ -357,6 +393,9 @@ def permits(requirements: Requirements, state: Any) -> bool:
         and not set(requirements.forbidden_world_flags).intersection(world_flags)
         and all(s.at_least <= standing[s.faction] <= s.at_most
                 for s in requirements.standings)
+        and all(r.resident in trust
+                and r.at_least <= trust[r.resident] <= r.at_most
+                for r in requirements.trust)
     )
 
 
@@ -399,6 +438,7 @@ def apply_changes(status: WorldState, effects: tuple[tuple[str, int], ...] = (),
         world_flags=tuple(sorted(set(status.world_flags) | set(add_flags))),
         fired_influences=tuple(sorted(set(status.fired_influences) | set(fired))),
         passage_uses=tuple(sorted(usage.items())),
+        society=status.society,
     )
 
 
@@ -445,14 +485,18 @@ def effects_for_results(dynamics: WorldDynamics, status: WorldState, *,
 
 def compile_dynamics(data: Any) -> WorldDynamics:
     """Reject ambiguous or executable JSON; never eval a permission expression."""
-    doc = _strict(data, {"schema", "factions", "gates", "passages", "influences"},
-                  "world-dynamics")
+    keys = {"schema", "factions", "gates", "passages", "influences"}
+    if type(data) is not dict or set(data) not in (keys, keys | {"society"}):
+        raise ValueError("unsupported original world-dynamics schema")
+    doc = data
     if doc["schema"] != "skeleton.game_builder.world_dynamics.v1":
         raise ValueError("unknown world-dynamics version")
     def requirements(entry: Any) -> Requirements:
-        row = _strict(entry, {"items", "flags", "quests", "world_flags",
-                              "standings", "forbidden_flags",
-                              "forbidden_world_flags"}, "passage condition")
+        keys = {"items", "flags", "quests", "world_flags",
+                "standings", "forbidden_flags", "forbidden_world_flags"}
+        if type(entry) is not dict or set(entry) not in (keys, keys | {"trust"}):
+            raise ValueError("unsupported typed passage condition")
+        row = entry
         standings = tuple(StandingRequirement(
             **_strict(x, {"faction", "at_least", "at_most"},
                       "reputation threshold")) for x in row["standings"])
@@ -462,6 +506,9 @@ def compile_dynamics(data: Any) -> WorldDynamics:
             forbidden_flags=_ids(row["forbidden_flags"]),
             forbidden_world_flags=_ids(row["forbidden_world_flags"]),
             standings=standings,
+            trust=tuple(TrustRequirement(**_strict(
+                x, {"resident", "at_least", "at_most"},
+                "NPC trust requirement")) for x in row.get("trust", ())),
         )
 
     factions = tuple(Faction(**_strict(f, {"key", "name", "starting_standing"},
@@ -489,4 +536,7 @@ def compile_dynamics(data: Any) -> WorldDynamics:
         entry, {"key", "trigger", "faction", "delta", "scene", "affordance",
                 "quest", "outcome_flag", "grant_world_flag", "once"},
         "reputation influence")) for entry in doc["influences"])
-    return WorldDynamics(factions, gates, passages, influences)
+    return WorldDynamics(
+        factions, gates, passages, influences,
+        compile_society(doc["society"]) if "society" in doc else None,
+    )
