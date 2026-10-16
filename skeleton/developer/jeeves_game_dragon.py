@@ -44,7 +44,7 @@ def _database(root: Path, *, create: bool) -> sqlite3.Connection:
         raise ValueError("no Dragon observations ingested for this project")
     if create:
         return sqlite3.connect(path)
-    return sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+    return sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
 
 
 def _packet(root: Path, source: str) -> tuple[dict[str, Any], str]:
