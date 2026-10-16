@@ -89,6 +89,10 @@ def direction(root: Path, *, action: str, source: str,
         }
         if gameplay_result is not None else None
     )
+    report["gameplay_dependency"] = (
+        {"path": data["gameplay_source"], "sha256": gameplay_result["dossier_sha256"]}
+        if gameplay_result is not None else None
+    )
     wants_payoff_alternatives = data.get("payoff_alternatives_required", False)
     if type(wants_payoff_alternatives) is not bool:
         raise DirectionError("payoff alternatives requirement must be an explicit boolean")
