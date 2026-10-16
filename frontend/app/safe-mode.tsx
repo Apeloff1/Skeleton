@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearMirror } from '../utils/safeStorage';
+import { clearMirror, pauseSafeStorageForWipe, resumeSafeStorageAfterWipe } from '../utils/safeStorage';
 import {
   getLastTrace, getCrashCount, getLastCleanBoot,
   resetBootState, TraceStep,
@@ -100,16 +100,49 @@ export default function SafeModeRoute() {
     if (busy) return;
     setBusy(true);
     setRecoveryError(null);
+    let releaseFence = true;
     try {
-      // Drain the trace writer before wiping. If storage is stuck, do not
-      // pretend the wipe completed or navigate away from recovery.
-      if (!(await resetBootState())) throw new Error('pending trace write');
-      await AsyncStorage.clear();
+      // Prevent any wrapper-owned project/settings writes from interleaving
+      // with deletion. A timed-out write still owns its key until native I/O
+      // finishes, so a wipe is refused when a safe drain is unavailable.
+      if (!(await pauseSafeStorageForWipe())) {
+        throw new Error('native mutations still pending');
+      }
+      if (!(await resetBootState())) throw new Error('boot trace still pending');
+
+      const clearOperation = AsyncStorage.clear();
+      const cleared = await new Promise<{ done: boolean; ok: boolean }>(resolve => {
+        let settled = false;
+        const finish = (done: boolean, ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve({ done, ok });
+        };
+        const timer = setTimeout(() => finish(false, false), 2_000);
+        void clearOperation.then(
+          () => finish(true, true),
+          () => finish(true, false),
+        );
+      });
+      if (!cleared.done) {
+        // The native clear operation cannot be cancelled by a JS deadline.
+        // Keep the mutation fence held until the true native completion, or
+        // a delayed clear could destroy newly saved state after a false reset.
+        releaseFence = false;
+        void clearOperation.then(
+          () => { clearMirror(); },
+          () => undefined,
+        ).finally(() => resumeSafeStorageAfterWipe());
+        throw new Error('native clear outcome unknown');
+      }
+      if (!cleared.ok) throw new Error('native clear rejected');
       clearMirror();
       router.replace('/welcome');
     } catch {
       setRecoveryError('Data wipe could not be confirmed. Remain in Safe Mode and check device storage.');
     } finally {
+      if (releaseFence) resumeSafeStorageAfterWipe();
       setBusy(false);
     }
   };
