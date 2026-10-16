@@ -74,7 +74,7 @@ def test_resumable_failure_retries_are_appended_without_total_cap(tmp_path, monk
     assert first.is_file()
 
 
-def test_identical_failed_gate_does_not_inflate_evidence_counter(tmp_path, monkeypatch):
+def test_identical_failed_gate_records_every_parse_without_claiming_novelty(tmp_path, monkeypatch):
     root = workspace(tmp_path)
     assert initialize(root)["ok"]
     const_digest = "a" * 64
@@ -83,11 +83,13 @@ def test_identical_failed_gate_does_not_inflate_evidence_counter(tmp_path, monke
     result = run_game_cli(["jeeves", "production-cycle", "--project", str(root),
                            "--gate", "source_integrity", "--passes", "8"])
     assert result["ok"]
-    assert result["recorded_events"] == 1
+    assert result["recorded_events"] == 8
+    assert result["observations"][0]["new_evidence"] is True
     assert result["observations"][-1]["new_evidence"] is False
     again = run_game_cli(["jeeves", "production-cycle", "--project", str(root),
                           "--gate", "source_integrity", "--passes", "2"])
-    assert again["recorded_events"] == 1
+    assert again["recorded_events"] == 10
+    assert all(not item["new_evidence"] for item in again["observations"])
     assert not again["project_complete"]
 
 
