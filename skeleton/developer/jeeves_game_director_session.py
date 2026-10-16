@@ -190,9 +190,61 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
             destination = (passage.destination if state.scene == passage.source
                            else passage.source)
             description = passage.mode + ": " + passage.name + " → " + destination
+        elif option.kind == "speak" and world.dynamics is not None:
+            person = next(n for n in world.dynamics.society.residents
+                          if n.key == option.key)
+            description = "Speak with " + person.name
+        elif option.kind in {"buy", "sell"} and world.dynamics is not None:
+            stock = next(
+                good for shop in world.dynamics.society.shops for good in shop.goods
+                if shop.key + "_" + good.key == option.key
+            )
+            price = stock.buy_price if option.kind == "buy" else stock.sell_price
+            description = option.kind.title() + " " + stock.name + " (" + str(price) + " coins)"
+        elif option.kind == "rest":
+            description = "Rest until the next scheduled period"
         actions.append({**option.payload(), "choice": option.kind + ":" + option.key,
                         "description": description})
     world_state = state.world_state.payload() if state.world_state is not None else None
+    society_status = None
+    if (world.dynamics is not None and world.dynamics.society is not None
+            and state.world_state.society is not None):
+        from skeleton.ai.game_builder.quest_society import phase, residents_here
+        rules = world.dynamics.society
+        economy = state.world_state.society
+        calendar = phase(rules, state.turn)
+        people = residents_here(rules, state.scene, state.turn)
+        relationships = dict(economy.relationships)
+        stock = {(sh, item): count for sh, item, count in economy.shop_stock}
+        merchants = []
+        for merchant in rules.shops:
+            if merchant.scene != state.scene or merchant.keeper not in {
+                    person.key for person in people}:
+                continue
+            merchants.append({
+                "key": merchant.key, "name": merchant.name,
+                "keeper": merchant.keeper, "products": [{
+                    "key": g.key, "name": g.name,
+                    "stock": stock[(merchant.key, g.key)],
+                    "buy_price": g.buy_price, "sell_price": g.sell_price,
+                    "owned": dict(economy.owned).get(g.key, 0),
+                } for g in merchant.goods],
+            })
+        society_status = {
+            "calendar": calendar,
+            "wallet": economy.balance,
+            "relationships": [list(x) for x in economy.relationships],
+            "owned_goods": [list(x) for x in economy.owned],
+            "present_residents": [{
+                "key": person.key, "name": person.name,
+                "faction": person.faction,
+                "trust": relationships[person.key],
+                "greeting": person.greeting,
+            } for person in people],
+            "open_merchants": merchants,
+            "total_merchant_transactions": sum(
+                count for _, _, _, count in economy.transactions),
+        }
     blocked = []
     available_passages = []
     if world.dynamics is not None:
@@ -236,6 +288,7 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
             "acquired": list(state.acquired),
             "conditional_walking_links_blocked": blocked,
             "transport_options": available_passages,
+            **({"society": society_status} if society_status is not None else {}),
         } if world_state is not None else {}),
         "real_player_or_hardware_test_verified": False,
         "actual_interactive_director_logic_executed": sequence > 0,
