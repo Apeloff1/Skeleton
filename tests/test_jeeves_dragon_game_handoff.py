@@ -12,7 +12,7 @@ import unittest
 
 from skeleton.developer.game_cli import SCHEMA as GAME_SCHEMA
 from skeleton.developer.jeeves_game_dragon import (
-    adopt, ingest, load_handoff, plan, review,
+    adopt, ingest, load_handoff, plan, portfolio, review,
 )
 
 
@@ -64,6 +64,20 @@ class DragonJeevesGameHandoffTest(unittest.TestCase):
         self.assertEqual(saved["reviewed_events"], 1)
         self.assertFalse(saved["raw_video_retained"])
         self.assertEqual(self._ingest()["session_sha256"], saved["session_sha256"])
+
+    def test_multi_game_portfolio_flags_contradictory_preferences(self) -> None:
+        self._ingest()
+        self.packet["game_label"] = "Second reviewed game"
+        self.packet["observations"][0]["preference"] = "disliked"
+        self.packet["observations"][0]["description"] = "Stopping response felt unclear"
+        self._write_packet()
+        self._ingest()
+        comparison = portfolio(self.root, source=self.source)
+        self.assertEqual(comparison["session_count"], 2)
+        self.assertEqual(len(comparison["studied_games"]), 2)
+        self.assertEqual(comparison["cross_game_preference_conflicts"][0]["mechanic"],
+                         "movement")
+        self.assertTrue(comparison["needs_human_review"])
 
     def test_original_forge_requires_handoff_approval(self) -> None:
         self._ingest()
