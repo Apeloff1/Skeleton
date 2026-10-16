@@ -128,3 +128,49 @@ def cinematic(root: Path, *, source: str, passes: int = 1) -> dict[str, Any]:
     result["source_review_only"] = True
     result["rendered_film_or_original_game_certified"] = False
     return result
+
+
+
+def gameplay(root: Path, *, source: str, passes: int = 1) -> dict[str, Any]:
+    """Source- and replay-bound original story-gameplay evidence; read only."""
+    from skeleton.developer.jeeves_game_quality import _read
+    from skeleton.developer.game_cli import _load
+    from skeleton.ai.game_builder.quest_scene_forge import compile_director_blueprint
+    from skeleton.ai.game_builder.story_gameplay_bridge import (
+        review_story_gameplay, StoryGameBridgeError,
+    )
+    if type(passes) is not int or not 1 <= passes <= 8:
+        raise StoryGameBridgeError("1..8 bounded replay scrutiny passes")
+    document, source_sha = _read(root, source, 16 * 1024 * 1024)
+    fields = {
+        "schema", "bible", "scenes", "director_world", "author_review_acknowledged",
+        "replays", "bindings", "require_distinct_choices",
+    }
+    if (not isinstance(document, dict) or set(document) != fields
+        or document.get("schema") != "skeleton.jeeves.story_gameplay_dossier.v1"):
+        raise StoryGameBridgeError("unrecognized signed story-to-gameplay dossier")
+    if document["author_review_acknowledged"] is not True:
+        raise StoryGameBridgeError("original Director blueprint needs explicit local author review acknowledgement")
+    project = _load(root)["name"].replace("-", "_")
+    if not isinstance(document["bible"], dict) or document["bible"].get("project") != project:
+        raise StoryGameBridgeError("story game replay belongs to another game project")
+    world = compile_director_blueprint(
+        document["director_world"], human_reviewed=True,
+    )
+    receipts = []
+    for iteration in range(passes):
+        checked = review_story_gameplay(
+            document["bible"], document["scenes"], world,
+            document["replays"], document["bindings"],
+            require_distinct_choices=document["require_distinct_choices"],
+        )
+        if receipts and receipts[0]["replay_evidence_sha256"] != checked["replay_evidence_sha256"]:
+            raise StoryGameBridgeError("replay results changed during scrutiny")
+        receipts.append({"pass": iteration + 1,
+                         "evidence_sha256": checked["replay_evidence_sha256"],
+                         "canonical_quest_actions_reexecuted": True})
+    checked["scrutiny_passes"] = receipts
+    checked["dossier_sha256"] = source_sha
+    checked["dossier_path"] = source
+    checked["creator_approval_externally_verified"] = False
+    return checked
