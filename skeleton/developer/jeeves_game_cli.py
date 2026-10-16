@@ -166,7 +166,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
                                             "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
                                             "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast", "director-dynamics-playthrough", "director-society-design", "director-society-publish",
-                                             "director-society-audit", "dragon-society-study", "dragon-society-contrast", "director-society-stress"))
+                                             "director-society-audit", "dragon-society-study", "dragon-society-contrast", "director-society-stress", "director-society-acceptance"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -264,6 +264,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-society-publish": {"action", "source", "intensity", "approve"},
             "director-society-audit": {"action", "source"},
             "director-society-stress": {"action", "source", "routes", "intensity"},
+            "director-society-acceptance": {"action", "source"},
             "dragon-society-study": {"action", "session", "approve"},
             "dragon-society-contrast": {"action", "session", "other_session"},
         }
@@ -271,6 +272,11 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             for key, value in vars(args).items():
                 if key not in live_actions[args.action] and value is not None and value is not False:
                     raise ValueError("unrelated Director runtime option --" + key.replace("_", "-"))
+            if args.action == "director-society-acceptance":
+                from skeleton.developer.jeeves_game_director_society_acceptance import prove
+                if not args.source:
+                    raise ValueError("NPC acceptance requires --source")
+                return prove(root, source=args.source)
             if args.action == "director-society-stress":
                 from skeleton.developer.jeeves_game_director_society_stress import stress
                 if not args.source:
