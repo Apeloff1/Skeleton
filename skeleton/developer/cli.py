@@ -46,6 +46,8 @@ def dev_help_text() -> str:
         jeeves fidelity-matrix
         jeeves display-plan --target CONSOLE --native-width PX --native-height PX --screen-width PX --screen-height PX [--pixel-aspect-num N --pixel-aspect-den N]
         jeeves upscale-verify --target CONSOLE --source assets/in.png --output assets/out.png [--mode nearest|scale2x] [--passes 1..8]
+        jeeves render-reference --target CONSOLE --source design/scene.json --output assets/frame.png
+        Only bounded painter/fixed/shader 3D render families; no native hardware claim
         jeeves upscale --target CONSOLE --source assets/input.png --output assets/hd.png [--factor 2|4|8] [--mode nearest|scale2x]
         jeeves production-init --target CONSOLE --genre GENRE --period YYYY-YYYY
         jeeves production-status [--project DIR]
