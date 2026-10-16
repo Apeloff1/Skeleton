@@ -20,6 +20,7 @@ from skeleton.developer.jeeves_game_director_atlas import (
 )
 from skeleton.developer.jeeves_game_dragon_session import enqueue
 from skeleton.developer.jeeves_game_director_bindings import preview, publish, check
+from skeleton.developer.jeeves_game_production_board import board
 
 
 class DirectorInteractiveTests(unittest.TestCase):
@@ -165,6 +166,20 @@ class DirectorInteractiveTests(unittest.TestCase):
         original.write_text(json.dumps(data))
         with self.assertRaises(ValueError):
             check(self.root, source=self.source, digest=packet["candidate_sha256"])
+
+    def test_production_board_reports_actual_integrated_source_artifacts(self):
+        begin(self.root, source=self.source, session="alpha")
+        choose(self.root, session="alpha", choice="wait:wait")
+        export(self.root, source=self.source)
+        binding = preview(self.root, source=self.source)
+        publish(self.root, source=self.source, approved_digest=binding["candidate_sha256"])
+        measured = board(self.root, source=self.source, routes=2)
+        evidence = measured["new_runtime_development_evidence"]
+        self.assertEqual(evidence["interactive_director_sessions"]["verified_sessions"], 1)
+        self.assertEqual(evidence["interactive_director_sessions"]["replayed_interactive_actions"], 1)
+        self.assertTrue(evidence["godot_scene_atlas"]["source_verified"])
+        self.assertEqual(evidence["engine_event_bindings"]["verified_contracts"], 1)
+        self.assertFalse(evidence["native_gameplay_certified_by_sources"])
 
     def test_game_cli_routes_new_actions_and_rejects_unrelated_flags(self):
         response = run_game_cli([
