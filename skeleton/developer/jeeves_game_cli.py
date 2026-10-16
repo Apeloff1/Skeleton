@@ -162,7 +162,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-atlas-export", "director-atlas-verify",
-                                            "dragon-session-lesson"))
+                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -221,6 +221,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-atlas-export": {"action", "source", "dry_run"},
             "director-atlas-verify": {"action", "source"},
             "dragon-session-lesson": {"action", "session", "approve"},
+            "director-bindings": {"action", "source"},
+            "director-bindings-publish": {"action", "source", "approve"},
+            "director-bindings-check": {"action", "source", "digest"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
@@ -250,6 +253,18 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 if args.action == "director-atlas-export":
                     return export(root, source=args.source, dry_run=args.dry_run)
                 return verify(root, source=args.source)
+            if args.action in {"director-bindings", "director-bindings-publish",
+                               "director-bindings-check"}:
+                from skeleton.developer.jeeves_game_director_bindings import preview, publish, check
+                if not args.source:
+                    raise ValueError("Director bindings require --source")
+                if args.action == "director-bindings":
+                    return preview(root, source=args.source)
+                if args.action == "director-bindings-publish":
+                    return publish(root, source=args.source, approved_digest=args.approve)
+                if not args.digest:
+                    raise ValueError("binding check needs --digest")
+                return check(root, source=args.source, digest=args.digest)
             from skeleton.developer.jeeves_game_dragon_session import enqueue
             if not args.session:
                 raise ValueError("Dragon session lesson requires --session")
