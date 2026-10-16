@@ -197,8 +197,19 @@ def delta(root: Path, *, session: str, before: dict[str, Any],
                         "player_prompt": option.prompt,
                         "line": option.response,
                     }
+            redeemed_before = dict(society_before.get("consumed_goods", []))
+            redeemed_after = dict(society_after.get("consumed_goods", []))
+            if any(good not in redeemed_after or count > redeemed_after[good]
+                   for good, count in redeemed_before.items()):
+                raise ValueError("cinematic evidence cannot erase a prior merchandise redemption")
+            newly_used = [
+                {"good": good, "quantity": count - redeemed_before.get(good, 0)}
+                for good, count in sorted(redeemed_after.items())
+                if count > redeemed_before.get(good, 0)
+            ]
             living_events["society"] = {
                 "authored_dialogue": authored_dialogue,
+                "actual_redeemed_merchandise": newly_used,
                 "wallet_before": society_before["balance"],
                 "wallet_after": society_after["balance"],
                 "wallet_delta": society_after["balance"] - society_before["balance"],
