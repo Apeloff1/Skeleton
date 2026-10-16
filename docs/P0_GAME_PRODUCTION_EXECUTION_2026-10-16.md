@@ -44,6 +44,45 @@ consumer-level experience, rights clearance or native platform release.
 - No release, training, P0 closure, or model improvement is claimed from
   an unexecuted plan, synthetic provider, source-only replay, or queued CI.
 
+## Additional whole-application P0 lanes (not included in the game 20)
+
+The original masterplan has **separate** binding requirements. The 20-area
+game atlas is only one P0 register and does not retire these gates:
+
+- **AI CHAT-01..07 and CHAT-10:** real in-app chat; actual local checkpoint
+  load/generate/stop; persistent recoverable branched conversations;
+  streaming, cancellation/retry and reconnection; Jeeves understands the
+  active project and editor; reviewable approve/reject/undo source mutation;
+  cited rights-governed retrieval; installed-app acceptance.
+- **Assembly and end-to-end:** full TypeScript compile, real checkpoint
+  inference, complete stub/truncation inventory, genuine first-install
+  operating state and playable whole-game run. Queued/skipped GitHub
+  actions are not passing evidence.
+- **Unified UI:** Academy, Galaxy Studio, Snowball Flow, Jeeves cockpit
+  and settings must surface the same authoritative project and model
+  capabilities rather than another parallel UI stack.
+- **Dragon governance/reproducibility:** the historical 22-gate program
+  and P0 reproducibility requirements continue independently of the
+  game atlas. Research acquisition flows via Dragon → reviewed almanac →
+  independent Wiki/adversarial check → shadow candidates → heldout test →
+  explicit approved promotion → rollback. Never promote unverified raw
+  crawler assets, training data or scraped third-party intellectual property.
+- **Native cross-era requirements:** the author-selected Game Boy,
+  Nintendo/Sega, PlayStation/Xbox, DOS/PC and other era targets require
+  actual legal original runtime binaries and appropriate controllers,
+  not just platform names and reference raster previews.
+
+The `p0-acceptance` report now exposes these extra mandatory lanes as
+`additional_noncompensable_app_p0`, clearly separate from the twenty
+game-specific release gates. No one can assert full application P0 from
+a 20/20 game-domain score alone.
+
+Current GitHub facts checked during this workpass: the advanced game
+builder PR #3642 is merged, the Dragon PR #3605 is **closed without
+merge**, and the continuing integrated Jeeves/game studio PR #4068 is
+still open. Other Dragon modules may exist on `main`; this fact
+alone does not prove the Dragon pipeline or its 22 gates functional.
+
 ## P0 baseline — authoritative 20 required release gates
 
 Run `python -m skeleton dev game jeeves p0-acceptance --project ./game`
