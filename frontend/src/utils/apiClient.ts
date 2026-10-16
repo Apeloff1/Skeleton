@@ -194,9 +194,8 @@ async function _doFetch<T>(
   // ── ANTI-BLIP RETRY POLICY ────────────────────────────────────────────
   // Transient gateway blips (Cloudflare/ingress 502/503/504), network drops
   // and brief backend unresponsiveness (our OWN timeout firing) are all
-  // RETRYABLE — they self-heal within a few seconds. Idempotent calls (GET /
-  // DELETE / anything with an Idempotency-Key) get a bigger retry budget;
-  // plain writes keep a single safety retry. Each attempt gets a FRESH abort
+  // RETRYABLE — they self-heal within a few seconds. Only safe reads and
+  // explicitly keyed writes are replayable. Each attempt gets a FRESH abort
   // timer so a hung retry can't outlive its budget, and back-off carries
   // jitter to avoid a thundering herd when the backend recovers.
   const GATEWAY = new Set([502, 503, 504]);
@@ -249,7 +248,7 @@ async function _doFetch<T>(
     };
 
     try {
-      const { res, text } = await Promise.race([
+      const { res, text, oversized } = await Promise.race([
         (async () => {
           const res = await fetch(url, {
             method, headers, signal,
@@ -263,8 +262,7 @@ async function _doFetch<T>(
         deadline,
       ]);
       cleanup();
-      if (res.headers?.get?.('content-length') && Number(res.headers.get('content-length')) > maxResponseChars ||
-          text.length > maxResponseChars) {
+      if (oversized) {
         _cbReleaseProbe(bucket, isProbe);
         return { ok: false, status: res.status, data: null, error: 'response_too_large', rid };
       }
