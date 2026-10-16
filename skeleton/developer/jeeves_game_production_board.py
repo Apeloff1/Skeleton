@@ -103,6 +103,53 @@ def _runtime_signal_bindings(root: Path, *, source: str) -> dict[str, Any]:
     return {"verified_contracts": good, "invalid_contracts": bad}
 
 
+def _runtime_signal_dragon_policy(root: Path, *, world_digest: str
+                                  ) -> dict[str, Any]:
+    """Re-fit local Dragon micro-model evidence; never qualify transformer weights."""
+    import re
+    from skeleton.developer.jeeves_game_dragon_policy import _load_checkpoint, fit
+    base = root / ".jeeves"
+    folder = base / "dragon_policy_checkpoints"
+    if (base.is_symlink() or folder.is_symlink()
+            or (folder.exists() and not folder.is_dir())):
+        return {"replay_verified_policies": 0, "invalid_policies": 1,
+                "warning": "unsafe policy checkpoint location"}
+    if not folder.exists():
+        return {"replay_verified_policies": 0, "invalid_policies": 0}
+    nodes = list(folder.iterdir())
+    if len(nodes) > 16:
+        return {"replay_verified_policies": 0, "invalid_policies": 0,
+                "warning": "specialized Dragon checkpoint audit required above 16 files"}
+    valid, invalid, held_out = 0, 0, []
+    for node in nodes:
+        digest = node.name.removesuffix(".json")
+        if (node.is_symlink() or not node.is_file()
+                or not re.fullmatch(r"[0-9a-f]{64}\\Z", digest)):
+            invalid += 1
+            continue
+        try:
+            model = _load_checkpoint(root, digest)
+            if model["world_sha256"] != world_digest:
+                continue
+            samples = [x["session"] for x in model["training_session_receipts"]]
+            samples.append(model["held_out_session_receipt"]["session"])
+            if fit(root, sessions=",".join(samples)) != model:
+                invalid += 1
+                continue
+            valid += 1
+            held_out.append({
+                "model_sha256": digest,
+                "trained_actions": model["train_action_count"],
+                "heldout_covered_actions": model["heldout_context_coverage_count"],
+                "heldout_top1_accuracy": model["heldout_top1_accuracy"],
+            })
+        except (OSError, ValueError, KeyError, TypeError):
+            invalid += 1
+    return {"replay_verified_policies": valid, "invalid_policies": invalid,
+            "empirical_policy_checks": held_out,
+            "production_transformer_training_verified": False}
+
+
 def board(root: Path, *, source: str, routes: int = 3,
           dragon_digest: str | None = None) -> dict[str, Any]:
     from skeleton.ai.game_builder.quest_campaign_completion import compare_campaign_branches
@@ -198,6 +245,8 @@ def board(root: Path, *, source: str, routes: int = 3,
                 root, source=source, world_digest=world.digest),
             "engine_event_bindings": _runtime_signal_bindings(
                 root, source=source),
+            "dragon_empirical_policy": _runtime_signal_dragon_policy(
+                root, world_digest=world.digest),
             "native_gameplay_certified_by_sources": False,
         },
         "remaining_milestones": [
