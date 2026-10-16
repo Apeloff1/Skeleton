@@ -97,7 +97,8 @@ def _review_provenance(rows:Any, *, scenes:int) -> dict[str,Any]:
 
 def evaluate_direction(bible:dict[str,Any], scenes:list[dict[str,Any]], *,
                        reviewers:Any=None, passes:int=1,
-                       enforce_chapter_standard:bool=True) -> dict[str,Any]:
+                       enforce_chapter_standard:bool=True,
+                       dramatic_threads:Any=None) -> dict[str,Any]:
     if type(passes) is not int or not 1<=passes<=8:
         raise DirectionError("use 1..8 scrutiny passes per resumable invocation")
     if not isinstance(scenes,list) or len(scenes)>9999:
@@ -204,6 +205,16 @@ def evaluate_direction(bible:dict[str,Any], scenes:list[dict[str,Any]], *,
     if not scenes:
         warnings.append({"priority":"P0","kind":"no_signed_scenes",
                          "why":"An original story bible is not yet a produced narrative"})
+    dramaturgy=None
+    if dramatic_threads is not None:
+        from skeleton.ai.game_builder.story_dramaturgy_graph import audit_threads
+        dramaturgy=audit_threads(bible, scenes, dramatic_threads)
+        for thread_id in dramaturgy["open_thread_ids"]:
+            warnings.append({
+                "priority":"P0","kind":"unresolved_dramatic_thread",
+                "thread_id":thread_id,
+                "why":"Signed dramatic promise lacks a later source-grounded consequence or red-herring reveal",
+            })
     review=_review_provenance(reviewers, scenes=len(scenes))
     checked_scenes=len(scenes)
     coverage={
@@ -232,6 +243,7 @@ def evaluate_direction(bible:dict[str,Any], scenes:list[dict[str,Any]], *,
         "observed_story_metrics":coverage,
         "speakers":speaker_metrics,"scene_coverage":per_scene,
         "revision_work":warnings,
+        "dramaturgy":dramaturgy,
         "expert_review_claims":review,
         "quality_bars":{
             "every_qualitative_dimension_at_least":PROFESSIONAL_FLOOR,
@@ -262,9 +274,11 @@ def revision_plan(review:dict[str,Any]) -> dict[str,Any]:
             "no_dialogue":"Stage a performed/interactive scene and seek real voice and editorial review",
             "no_interpersonal_scene":"Author conflicting character objectives and changing relationships",
             "no_signed_scenes":"Begin with an approved original story bible and first confirmed scene",
+            "unresolved_dramatic_thread":"Carry the named original dramatic setup into a later, causally linked and signed payoff or intentional red-herring reveal",
         }[kind]
         next_actions.append({
             "priority":item["priority"],"evidence_kind":kind,"rewrite_goal":method,
+            "thread_id":item.get("thread_id"),
             "must_reverify_canonical_story_history":True,
             "must_reverify_human_editor_and_film_direction":True,
             "automatic_source_overwrite":False,
