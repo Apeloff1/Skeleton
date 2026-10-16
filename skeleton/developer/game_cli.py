@@ -26,6 +26,20 @@ MAX_EVIDENCE_BYTES = 8 * 1024 * 1024
 MAX_ASSET_FILES = 4096
 MAX_ASSET_BYTES = 128 * 1024 * 1024
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
+# These are filesystem device names on Windows, even with extensions, and
+# cannot be safely moved between NTFS/FAT, archives and non-Windows hosts.
+_DEVICE_STEMS = {"con", "prn", "aux", "nul"} | {
+    f"{kind}{n}" for kind in ("com", "lpt") for n in range(1, 10)
+}
+
+
+def _portable_name(value: object) -> bool:
+    if not isinstance(value, str) or _NAME.fullmatch(value) is None:
+        return False
+    # Windows strips trailing dots and treats e.g. NUL.txt as a device.
+    if value.endswith(".") or value.split(".", 1)[0].casefold() in _DEVICE_STEMS:
+        return False
+    return True
 
 
 class GameCLIError(ValueError):
@@ -57,7 +71,7 @@ def _load(root: Path) -> dict[str, str]:
         _fail("unsupported game workspace manifest fields")
     if data.get("schema") != SCHEMA:
         _fail("unsupported game workspace schema")
-    if not isinstance(data["name"], str) or not _NAME.fullmatch(data["name"]) or data["name"] in {".", ".."}:
+    if not _portable_name(data["name"]):
         _fail("invalid game workspace name")
     for key in ("vision", "era", "archetype"):
         value = data[key]
@@ -72,8 +86,8 @@ def _load(root: Path) -> dict[str, str]:
 
 def _init(args: argparse.Namespace) -> dict[str, Any]:
     name = args.name
-    if name in {".", ".."} or not _NAME.fullmatch(name):
-        _fail("name must be one safe directory component (up to 100 characters)")
+    if not _portable_name(name):
+        _fail("name must be a portable non-device directory component (up to 100 characters)")
     vision = args.vision or name.replace("-", " ").replace("_", " ")
     if not vision.strip() or len(vision) > 4096 or any(ord(ch) < 32 for ch in vision):
         _fail("vision must be nonempty, at most 4096 characters, without control characters")
