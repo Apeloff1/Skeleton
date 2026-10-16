@@ -298,7 +298,8 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
         var route_list: Array = found.get("routes", [])
         if not route_list.is_empty():
             native_map.highlight(str(snapshot.get("scene", "")),
-                                 route_list[0].get("places", []))
+                                 route_list[0].get("places", []),
+                                 route_list[0].get("steps", []))
         status_text.text = "Director found replay-verified alternate routes (read-only)."
         _render_state()
         return
@@ -321,10 +322,13 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
             or last_navigation.get("session_head_sha256") != snapshot.get("last_receipt_sha256")):
         last_navigation = {}
     var route_nodes: Array = []
+    var route_steps: Array = []
     var shown_routes: Array = last_navigation.get("routes", [])
     if not shown_routes.is_empty():
         route_nodes = shown_routes[0].get("places", [])
-    native_map.highlight(str(snapshot.get("scene", "")), route_nodes)
+        route_steps = shown_routes[0].get("steps", [])
+    native_map.highlight(str(snapshot.get("scene", "")),
+                         route_nodes, route_steps)
     last_presentation = {}
     if parsed.get("presentation") is Dictionary:
         last_presentation = parsed["presentation"]
@@ -340,6 +344,7 @@ func _render_state() -> void:
     var here: String = str(snapshot.get("scene", ""))
     var region = scene_lookup.get(here, {})
     native_map.blocked_routes(snapshot.get("conditional_walking_links_blocked", []))
+    native_map.update_transport_options(snapshot.get("transport_options", []))
     if here != previous_scene:
         previous_scene = here
         stage.apply_scene(region)
