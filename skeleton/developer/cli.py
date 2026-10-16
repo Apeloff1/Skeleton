@@ -26,8 +26,9 @@ def dev_help_text() -> str:
 
   DEVELOPMENT COMMANDS
 
-    skeleton dev game <init|info|doctor|build|verify|playtest|assets|package>
+    skeleton dev game <catalog|init|info|doctor|build|verify|playtest|assets|package>
         Original game workspace and Godot build lifecycle
+        catalog lists supported eras, archetypes, and targets
         init NAME --vision TEXT [--era ID] [--archetype NAME] [--dir DIR]
         doctor --project DIR [--require-godot]
         build --project DIR [--playtest off|auto|require] [--overwrite]
