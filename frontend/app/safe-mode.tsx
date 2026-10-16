@@ -1,11 +1,11 @@
 /**
- * /safe-mode — Recovery screen shown after 2+ consecutive crashes.
+ * /safe-mode — Recovery screen shown after repeated unclean boots.
  *
  * Displays:
  *   • Last successful boot timestamp
  *   • The recorded boot trace (steps the app reached before crashing)
  *   • Crash count
- *   • Buttons: "Try Product again", "Reset welcome flag", "Wipe app state"
+ *   • Explicit retry, non-destructive startup reset, and confirmed data wipe
  *
  * This is the ultimate safety net: even if /hub crashes on every launch,
  * the user always has a way to recover without uninstall/reinstall.
@@ -35,14 +35,21 @@ export default function SafeModeRoute() {
   const [, setFlagsBump] = useState(0);
 
   useEffect(() => {
-    (async () => {
-      setTrace(await getLastTrace());
-      setCrashCount(await getCrashCount());
-      setLastClean(await getLastCleanBoot());
-      // Make sure flag values are hydrated for the diagnostic snapshot.
-      await loadFeatureFlags();
-      setFlagsBump(n => n + 1);
-    })();
+    let mounted = true;
+    // Diagnostic reads are independent and bounded by bootTracer. A stalled
+    // flag hydration must not hide the recovery screen or surface an
+    // unhandled rejection during an already degraded startup.
+    void Promise.all([getLastTrace(), getCrashCount(), getLastCleanBoot()])
+      .then(([history, count, clean]) => {
+        if (!mounted) return;
+        setTrace(history);
+        setCrashCount(count);
+        setLastClean(clean);
+      }).catch(() => {});
+    void Promise.resolve().then(() => loadFeatureFlags())
+      .then(() => { if (mounted) setFlagsBump(n => n + 1); })
+      .catch(() => {});
+    return () => { mounted = false; };
   }, []);
 
   const onResetFlags = async () => {
