@@ -76,6 +76,11 @@ class BranchAndDragonMicroWeightTests(unittest.TestCase):
         self.assertEqual(output["state_sha256"], first["current_state_sha256"])
         variant = inspect(self.root, session="variant")
         self.assertEqual(variant["sequence"], 1)
+        lineage = trace(self.root, session="variant")
+        self.assertEqual(lineage["fork_origin"]["parent_session"], "hero")
+        self.assertEqual(lineage["fork_origin"]["parent_head_sha256"],
+                         parent["last_receipt_sha256"])
+        self.assertEqual(lineage["fork_origin"]["fork_sequence"], 1)
         self.assertNotEqual(variant["last_receipt_sha256"], first["last_receipt_sha256"])
         self.assertEqual(variant["current_state_sha256"], first["current_state_sha256"])
         travel = next(x["choice"] for x in variant["actions"] if x["kind"] == "travel")
