@@ -139,6 +139,12 @@ def _read_forge(root: Path) -> tuple[Path, dict[str, str], dict[str, Any]]:
     expected = report.get("sha256") if isinstance(report, dict) else None
     if not isinstance(expected, dict) or not expected or len(expected) > MAX_SOURCE_FILES:
         _fail("invalid or oversized Forge file list")
+    # Validate ALL paths using the canonical Godot projector before file I/O,
+    # including Windows drive/device names and case-fold aliases.
+    try:
+        source_manifest({rel: "" for rel in expected})
+    except (TypeError, ValueError) as exc:
+        raise GameCLIError(f"unsafe Forge file list: {exc}") from exc
     files: dict[str, str] = {}
     total = 0
     for rel, digest in expected.items():
