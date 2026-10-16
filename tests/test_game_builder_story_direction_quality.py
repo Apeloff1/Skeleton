@@ -266,3 +266,93 @@ def test_production_cycle_checks_real_signed_story_and_never_invents_quality(tmp
     assert "independent" in quality["last_reason"]
     assert status["quality_floor"]==90
     assert not status["production_qualified"]
+
+
+
+def market_work(i:int, *, year:int=2018, count:int=21) -> dict:
+    return {
+        "id": f"original-fixture-{i}",
+        "release_year":year,
+        "commercial_quantity":(9-i)*100000,
+        "professional_score":97-i,
+        "professional_reviews":count,
+        "commercial_source":{
+            "url":f"https://studio.example.org/report/{i}",
+            "issuer":"Fixture audited publisher",
+            "kind":"publisher_or_studio_disclosure",
+            "published":"2026-10-01",
+        },
+        "review_source":{
+            "url":f"https://critics.example.com/film/{i}",
+            "issuer":"Fixture independent review archive",
+            "kind":"independent_critic_aggregate",
+            "published":"2026-10-02",
+        },
+    }
+
+
+def market_packet(*, medium="novel", unit="audited_print_copies",
+                  count=21) -> dict:
+    return {
+        "schema":"skeleton.jeeves.story_media_benchmark.v1",
+        "cohorts":[{
+            "medium":medium,
+            "genre":"Epic drama",
+            "period":"2015-2019",
+            "territory":"US",
+            "commercial_unit":unit,
+            "works":[market_work(i,count=count) for i in range(1,9)],
+        }],
+    }
+
+
+def test_cross_media_story_references_use_only_matching_units_and_critic_cohorts(tmp_path):
+    from skeleton.ai.game_builder.story_reference_benchmark import audit_story_references
+    good=audit_story_references(market_packet())
+    assert good["ok"]
+    assert good["cohorts"][0]["top_tier_inspiration_available"]
+    assert good["cohorts"][0]["qualified_reference_count"]==2
+    assert not good["external_sources_independently_fetched"]
+    assert not good["professional_story_quality_proven"]
+    film=audit_story_references(market_packet(medium="film",unit="ticket_admissions"))
+    assert film["cohorts"][0]["qualified_reference_count"]==2
+    assert film["cohorts"][0]["minimum_professional_reviews"]==15
+    wrong=market_packet(medium="film",unit="audited_print_copies")
+    with pytest.raises(ValueError,match="uncomparable commercial unit"):
+        audit_story_references(wrong)
+    too_few=market_packet(medium="film",unit="ticket_admissions",count=3)
+    with pytest.raises(ValueError,match="invalid comparable"):
+        audit_story_references(too_few)
+
+
+def test_literary_film_market_source_is_operator_data_not_external_proof(tmp_path):
+    root=tmp_path/"market-analysis"
+    init=run_game_cli(["init","market-analysis","--dir",str(tmp_path)])
+    assert init["ok"],init
+    path=root/"design"/"story_reference_cohorts.json"
+    path.write_text(json.dumps(market_packet()))
+    good=run_game_cli(["jeeves","direction-benchmark","--project",str(root),
+                       "--source","design/story_reference_cohorts.json"])
+    assert good["ok"],good
+    assert good["declared_cohorts"]==1
+    assert good["qualified_cohorts"]==1
+    assert not good["independent_commercial_data_verified"]
+    broken=market_packet()
+    broken["cohorts"][0]["works"][0]["professional_score"]=101
+    path.write_text(json.dumps(broken))
+    wrong=run_game_cli(["jeeves","direction-benchmark","--project",str(root),
+                        "--source","design/story_reference_cohorts.json"])
+    assert wrong["ok"] is False
+    bad_options=run_game_cli(["jeeves","direction-benchmark","--project",str(root),
+                              "--source","design/story_reference_cohorts.json",
+                              "--passes","3"])
+    assert not bad_options["ok"]
+
+
+def test_critic_and_commercial_sources_cannot_be_self_issued(tmp_path):
+    from skeleton.ai.game_builder.story_reference_benchmark import audit_story_references
+    data=market_packet()
+    row=data["cohorts"][0]["works"][0]
+    row["review_source"]["issuer"]=row["commercial_source"]["issuer"]
+    with pytest.raises(ValueError,match="independent"):
+        audit_story_references(data)
