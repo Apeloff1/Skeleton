@@ -415,6 +415,24 @@ func _render_state() -> void:
                       " | sampled " + str(option.get("observations", 0)) +
                       " | p ≈ " + str(option.get("estimated_probability", 0.0)))
     if not last_presentation.is_empty():
+        if last_presentation.get("living_world_events") is Dictionary:
+            var effects: Dictionary = last_presentation["living_world_events"]
+            _line("Actual persisted world consequences of the selected action:")
+            for changed in effects.get("standing_changes", []):
+                _line("  " + str(changed.get("faction", "")) + " reputation: " +
+                      str(changed.get("before", 0)) + " → " +
+                      str(changed.get("after", 0)) +
+                      " (" + str(changed.get("delta", 0)) + ")")
+            for flag in effects.get("new_world_flags", []):
+                _line("  World changed permanently: " + str(flag))
+            for item in effects.get("inventory_spent", []):
+                _line("  Item used or fare paid: " + str(item))
+            if effects.get("transport") is Dictionary:
+                var transport: Dictionary = effects["transport"]
+                _line("  Transit: " + str(transport.get("mode", "")) + " " +
+                      str(transport.get("source", "")) + " → " +
+                      str(transport.get("destination", "")) +
+                      " • " + str(transport.get("cost_turns", 0)) + " turns")
         _line("New canonical narrative and cinematic presentation cues:")
         for outcome in last_presentation.get("new_story_results", []):
             _line("  Outcome: " + str(outcome.get("quest", "")) + " / " +
