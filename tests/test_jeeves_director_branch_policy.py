@@ -6,6 +6,9 @@ These tests do not assert full native-playthrough or production LLM training.
 from __future__ import annotations
 
 import json
+import http.client
+from http.server import HTTPServer
+import threading
 from pathlib import Path
 import tempfile
 import unittest
@@ -16,6 +19,7 @@ from skeleton.developer.jeeves_game_director_session import begin, choose, inspe
 from skeleton.developer.jeeves_game_director_branch import fork, trace
 from skeleton.developer.jeeves_game_dragon_policy import preview, train, predict
 from skeleton.developer.jeeves_game_director_atlas import export, verify
+from skeleton.developer.jeeves_game_director_bridge import handler
 
 
 class BranchAndDragonMicroWeightTests(unittest.TestCase):
@@ -145,6 +149,46 @@ class BranchAndDragonMicroWeightTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             predict(self.root, session="new_game", digest=checked["model_sha256"])
 
+    def test_dragon_advice_endpoint_is_opt_in_and_never_executes_actions(self) -> None:
+        for name in ("train_one", "train_two", "holdout", "new_game"):
+            self._start(name)
+        for name in ("train_one", "train_two", "holdout"):
+            self._act(name)
+        sessions = "train_one,train_two,holdout"
+        model = preview(self.root, sessions=sessions)
+        train(self.root, sessions=sessions, approved_digest=model["model_sha256"])
+        with self.assertRaises(ValueError):
+            handler(self.root, "new_game", "x" * 40, 0,
+                    policy_digest="0" * 64)
+        server = HTTPServer(
+            ("127.0.0.1", 0),
+            handler(self.root, "new_game", "x" * 40, 0,
+                    policy_digest=model["model_sha256"]),
+        )
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            connection = http.client.HTTPConnection(
+                "127.0.0.1", server.server_port, timeout=5)
+            try:
+                connection.request("GET", "/v1/advice", headers={
+                    "Host": "127.0.0.1:" + str(server.server_port),
+                    "Authorization": "Bearer " + "x" * 40,
+                })
+                result = connection.getresponse()
+                body = json.loads(result.read())
+                self.assertEqual(result.status, 200)
+                self.assertTrue(body["advice"]["trained_context_observed"])
+                self.assertEqual(body["advice"]["advisory_choices"][0]["choice"],
+                                 "wait:wait")
+                self.assertEqual(inspect(self.root, session="new_game")["sequence"], 0)
+            finally:
+                connection.close()
+        finally:
+            server.shutdown()
+            worker.join(timeout=5)
+            server.server_close()
+
     def test_native_procedural_stage_and_controller_bindings_are_exported(self) -> None:
         result = export(self.root, source=self.source)
         generated = Path(result["path"])
@@ -157,6 +201,8 @@ class BranchAndDragonMicroWeightTests(unittest.TestCase):
         self.assertIn("JOY_BUTTON_A", player)
         self.assertIn("func _unhandled_input", player)
         self.assertIn("stage.enqueue_presentation", player)
+        self.assertIn("/v1/advice", player)
+        self.assertIn("Ask Dragon", player)
         self.assertTrue(verify(self.root, source=self.source)["source_manifest_verified"])
         self.assertTrue(result["manifest"]["procedural_2d_stage_in_source"])
         self.assertFalse(result["manifest"]["native_binary_executed"])
