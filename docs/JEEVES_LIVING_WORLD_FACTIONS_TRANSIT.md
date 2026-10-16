@@ -332,10 +332,53 @@ creating an insecure client-side shortcut. A character may arrive in an
 animated environment with a different ambient sound, but the vehicle or
 portal does not yet have a finished art-directed animated vehicle sequence.
 
-## 9. Special-purpose regressions without global CI congestion
+## 9. Complete authored campaign proofs, without static-gate cheating
+
+An opt-in, source-bound end-to-end simulation now executes **complete** authored
+quest campaigns through the actual dynamic world-state machine. Earlier
+campaign witness generation assumed every authored scene link was freely
+walkable. It can now find legal transport/faction-state routes, pay actual
+fares, earn real world flags and use only currently admitted travel actions.
+It never hands itself a key, fakes an earned event or bypasses a locked gate.
+
+```bash
+python -m skeleton dev game jeeves director-dynamics-playthrough \
+  --project ./original_game \
+  --source design/director_dynamic_<digest>.json \
+  --routes 4 --include-optional
+```
+
+The command runs each strategy and performs **another independent action-by-
+action replay**, verifying the initial and final state hashes, every 256-action
+segment receipt, full stage/quest completion, faction history, consumed
+resources, all transport entries, permanent events, and actual narrative
+outcomes. It also reports distinct end-state/outcome groups, quest-stage
+checkpoints, and bounded human-readable highlights while counting the full
+history.
+
+When an authored world cannot be completed under the chosen policy, the
+report names that attempted strategy and error instead of claiming a
+passing game. Bounded per-query search exhaustion is not treated as proof
+that a world is permanently impossible. **No live game save is created** by
+the pure witness verifier; this remains Python logic E2E, not a native Godot
+or user-played release certification.
+
+The native map distinguishes source-defined transport edges, visibly
+blocked walking exits and selected legal transit routes. Green route hints
+mean a transport is currently permitted by the live Director state; purple
+hints are declarations, not guaranteed current permissions. All actual
+controller choices still cross the canonical server.
+
+Engine-binding contract previews now include exact transit action IDs,
+directed source/destination, travel duration, fare and standing conditions,
+and conditional walking gates. Such declarations **never** bypass a
+per-action runtime permission check.
+
+## 10. Special-purpose regressions without global CI congestion
 
 ```bash
 python -m unittest tests.test_jeeves_director_dynamic_world
+python -m unittest tests.test_jeeves_director_labyrinth_causality
 python -m unittest tests.test_jeeves_director_labyrinth_causality
 python -m unittest tests.test_jeeves_director_branch_policy
 python -m unittest tests.test_jeeves_director_media_e2e
@@ -352,7 +395,7 @@ Actual Godot and complete Python test execution must still be run before
 production readiness can be certified. No new automatic GitHub workflow or
 compulsory merge-gate job is added by these milestones.
 
-## 10. Remaining production-standard gaps
+## 11. Remaining production-standard gaps
 
 A pioneering completed game builder still needs original high-fidelity
 assets, advanced NPC locomotion and conversation with original performance
