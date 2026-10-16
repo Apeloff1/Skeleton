@@ -604,3 +604,131 @@ test('aborted requests never initiate network activity', async () => {
     net.stopHeartbeat();
   }
 });
+
+test('scoped heartbeats stop after the last subscriber but preserve an explicit owner', () => {
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null, setItem: async () => {},
+    },
+    './apiBase': { API_BASE: '', API_FALLBACK_BASE: '' },
+  });
+  const previousSet = global.setTimeout;
+  const previousClear = global.clearTimeout;
+  const timers = [];
+  global.setTimeout = (fn, delay) => {
+    const entry = { fn, delay, cleared: false };
+    timers.push(entry);
+    return entry;
+  };
+  global.clearTimeout = handle => { handle.cleared = true; };
+  try {
+    const releaseA = net.retainHeartbeat();
+    const releaseB = net.retainHeartbeat();
+    assert.equal(timers.length, 1);
+    releaseA();
+    assert.equal(timers[0].cleared, false);
+    releaseB();
+    assert.equal(timers[0].cleared, true);
+    releaseB(); // double dispose must be harmless
+    net.startHeartbeat();
+    const manual = timers.at(-1);
+    const releaseC = net.retainHeartbeat();
+    releaseC();
+    assert.equal(manual.cleared, false, 'manual heartbeat owner remains');
+    net.stopHeartbeat();
+    assert.equal(manual.cleared, true);
+  } finally {
+    net.stopHeartbeat();
+    global.setTimeout = previousSet;
+    global.clearTimeout = previousClear;
+  }
+});
+
+test('push registration after unmount never sets state or retains native listeners', async () => {
+  const h = reactHarness();
+  let resolvePermission;
+  let removed = 0;
+  let tokensRequested = 0;
+  const notifications = {
+    AndroidNotificationPriority: { HIGH: 4 },
+    setNotificationHandler() {},
+    addNotificationReceivedListener: () => ({ remove() { removed++; } }),
+    addNotificationResponseReceivedListener: () => ({ remove() { removed++; } }),
+    getPermissionsAsync: () => new Promise(resolve => { resolvePermission = resolve; }),
+    requestPermissionsAsync: async () => ({ status: 'granted' }),
+    getExpoPushTokenAsync: async () => { tokensRequested++; return { data: 'token' }; },
+    setNotificationChannelAsync: async () => {},
+    AndroidImportance: { MAX: 5 },
+  };
+  const { usePushNotifications } = loadTS('hooks/usePushNotifications.ts', {
+    react: h.react,
+    'react-native': { Platform: { OS: 'ios' } },
+    'expo-device': { isDevice: true },
+    'expo-notifications': notifications,
+    'expo-constants': { easConfig: { projectId: 'configured-id' } },
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null, setItem: async () => {},
+    },
+  });
+  usePushNotifications();
+  h.mount();
+  h.unmount();
+  resolvePermission({ status: 'granted' });
+  await settle();
+  assert.equal(removed, 2);
+  assert.equal(tokensRequested, 1);
+  assert.equal(h.setters, 0);
+});
+
+test('rescheduling one reminder never cancels unrelated notifications', async () => {
+  const cancelIds = [];
+  let storedId = 'old-owned-id';
+  const notifications = {
+    AndroidNotificationPriority: { HIGH: 4 },
+    SchedulableTriggerInputTypes: { TIME_INTERVAL: 'timeInterval' },
+    setNotificationHandler() {},
+    scheduleNotificationAsync: async () => 'new-owned-id',
+    cancelScheduledNotificationAsync: async id => { cancelIds.push(id); },
+  };
+  const { scheduleDailyReminder } = loadTS('hooks/usePushNotifications.ts', {
+    react: reactHarness().react,
+    'react-native': { Platform: { OS: 'web' } },
+    'expo-device': { isDevice: false },
+    'expo-notifications': notifications,
+    'expo-constants': {},
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => storedId,
+      setItem: async (_key, id) => { storedId = id; },
+    },
+  });
+  await scheduleDailyReminder();
+  assert.equal(storedId, 'new-owned-id');
+  assert.deepEqual(cancelIds, ['old-owned-id']);
+});
+
+test('safe GET can retry a transient response without replaying mutations', async () => {
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null, setItem: async () => {},
+    },
+    './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
+  });
+  let attempts = 0;
+  const previous = global.fetch;
+  global.fetch = async () => {
+    attempts++;
+    if (attempts === 1) return { ok: false, status: 429, text: async () => '' };
+    return { ok: true, status: 200, headers: { get: () => null },
+      text: async () => '{"ok":true}' };
+  };
+  try {
+    const result = await net.resilientFetch('/retryable', {
+      retries: 1, cacheTtlMs: 0,
+    });
+    assert.deepEqual(result.data, { ok: true });
+    assert.equal(attempts, 2);
+  } finally {
+    net.stopHeartbeat();
+    global.fetch = previous;
+  }
+});
