@@ -270,6 +270,7 @@ class SocietyState:
     owned: tuple[tuple[str, int], ...] = ()
     transactions: tuple[tuple[str, str, int, int], ...] = ()
     dialogue_history: tuple[tuple[str, str, int], ...] = ()
+    consumed_goods: tuple[tuple[str, int], ...] = ()
 
     def __post_init__(self):
         _int(self.balance, 0, MAX_BALANCE)
@@ -324,6 +325,14 @@ class SocietyState:
             _id(topic)
             if type(count) is not int or count < 1:
                 raise ValueError("NPC dialogue count must remain positive")
+        if (len(self.consumed_goods) > MAX_GOODS
+                or len({good for good, _ in self.consumed_goods})
+                   != len(self.consumed_goods)):
+            raise ValueError("invalid NPC-economy consumption ledger")
+        for good, count in self.consumed_goods:
+            _id(good)
+            if type(count) is not int or count < 1:
+                raise ValueError("consumed market goods count must be positive")
 
     def payload(self):
         result = {
@@ -336,6 +345,8 @@ class SocietyState:
         }
         if self.dialogue_history:
             result["dialogue_history"] = [list(x) for x in self.dialogue_history]
+        if self.consumed_goods:
+            result["consumed_goods"] = [list(x) for x in self.consumed_goods]
         return result
 
 
@@ -429,11 +440,79 @@ def residents_here(rules: SocietyRules, scene: str, turn: int) -> tuple[Resident
     return tuple(n for n in rules.residents if n.schedule[position] == scene)
 
 
+def verify_inventory(rules: SocietyRules, items: tuple[str, ...],
+                     snapshot: SocietyState) -> None:
+    """Fail closed if distinct quest inventory and stacked shop goods diverge.
+
+    A purchased ticket is ONE physical good and can be consumed by a ferry
+    or an authored quest interaction. Its quantity must never resurrect in
+    the shop, allow resale after redemption, or silently vanish from evidence.
+    """
+    goods = {(shop.key, good.key): good for shop in rules.shops
+             for good in shop.goods}
+    product_names = {good.key for good in goods.values()}
+    stock = {(shop, item): count for shop, item, count in snapshot.shop_stock}
+    owned = dict(snapshot.owned)
+    spent = dict(snapshot.consumed_goods)
+    if (set(stock) != set(goods)
+            or not set(owned).issubset(product_names)
+            or not set(spent).issubset(product_names)):
+        raise ValueError("original market stock ledger references missing product")
+    actual = set(items)
+    if {good for good, quantity in owned.items() if quantity} != (actual & product_names):
+        raise ValueError("canonical inventory contradicts purchased goods ownership")
+    for (shop, good), source in goods.items():
+        if stock[(shop, good)] + owned.get(good, 0) + spent.get(good, 0) != source.starting_stock:
+            raise ValueError("finite merchandise conservation invariant failed")
+
+
+def consume_good(rules: SocietyRules, items: tuple[str, ...],
+                 snapshot: SocietyState, good: str
+                 ) -> tuple[tuple[str, ...], SocietyState]:
+    """Debit exactly one market-owned item, maintaining both ledgers.
+
+    Nonmarket original quest keys retain unchanged preexisting semantics.
+    This is called only AFTER Director confirmed the spend action is legal.
+    """
+    verify_inventory(rules, items, snapshot)
+    products = {g.key for s in rules.shops for g in s.goods}
+    inventory = set(items)
+    if good not in inventory:
+        raise ValueError("spend requires an actually owned original-game item")
+    if good not in products:
+        inventory.remove(good)
+        return tuple(sorted(inventory)), snapshot
+    owned = dict(snapshot.owned)
+    if owned.get(good, 0) < 1:
+        raise ValueError("spent fare is not owned in authoritative shop inventory")
+    if owned[good] == 1:
+        del owned[good]
+        inventory.remove(good)
+    else:
+        owned[good] -= 1
+    consumed = dict(snapshot.consumed_goods)
+    consumed[good] = consumed.get(good, 0) + 1
+    updated = SocietyState(
+        balance=snapshot.balance,
+        relationships=snapshot.relationships,
+        last_talk_cycle=snapshot.last_talk_cycle,
+        shop_stock=snapshot.shop_stock,
+        owned=tuple(sorted(owned.items())),
+        transactions=snapshot.transactions,
+        dialogue_history=snapshot.dialogue_history,
+        consumed_goods=tuple(sorted(consumed.items())),
+    )
+    output = tuple(sorted(inventory))
+    verify_inventory(rules, output, updated)
+    return output, updated
+
+
 def legal_actions(rules: SocietyRules, state: Any) -> tuple[tuple[str, str], ...]:
     """Every returned action is executable with current trusted player state."""
     society = state.world_state.society
     if society is None:
         raise ValueError("missing original NPC and shop state")
+    verify_inventory(rules, state.acquired, society)
     present = {n.key: n for n in residents_here(rules, state.scene, state.turn)}
     cooldown = dict(society.last_talk_cycle)
     played = {(npc, topic): count
@@ -480,7 +559,7 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
         raise ValueError("original resident/shop action not currently legal")
     old = state.world_state.society
     if kind == "rest":
-        return old, (), (), (), rules.phase_turns
+        return old, (), (), (), phase(rules, state.turn)["turns_until_next_phase"]
     if kind in {"speak", "discuss"}:
         history = {(n, topic): count
                    for n, topic, count in old.dialogue_history}
@@ -520,6 +599,7 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
             old.transactions,
             tuple(sorted((npc, topic, count)
                          for (npc, topic), count in history.items())),
+            old.consumed_goods,
         ), faction_effects, tuple(sorted(flags)), (), 1
     good_shop = next(
         (s for s in rules.shops for good in s.goods
@@ -558,6 +638,7 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
         transactions=tuple(sorted((shop, item, direction, count)
                                   for (shop, item, direction), count in counts.items())),
         dialogue_history=old.dialogue_history,
+        consumed_goods=old.consumed_goods,
     )
     return updated, (), (), acquired, time_cost
 
