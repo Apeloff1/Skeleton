@@ -136,6 +136,7 @@ def review_story_gameplay(
             "consequence": result.consequence,
             "score": result.score,
             "executed_in_canonical_director": True,
+            "semantic_equivalence_to_literary_scene_independently_reviewed": False,
             "native_game_engine_or_complete_playthrough_verified": False,
         })
     if require_distinct_choices and not any(
@@ -182,5 +183,6 @@ def review_story_gameplay(
         "commercial_game_install_or_native_export_verified": False,
         "actual_full_game_playthrough_verified": False,
         "professional_narrative_quality_verified": False,
+        "independent_story_to_quest_semantic_review_performed": False,
         "model_training_performed": False,
     }
