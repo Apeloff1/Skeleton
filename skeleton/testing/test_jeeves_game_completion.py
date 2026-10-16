@@ -273,7 +273,9 @@ def test_real_console_inventory_names_every_declared_target_and_gaps(tmp_path):
     by_id = {r["target_id"]: r for r in matrix["targets"]}
     assert "nes" in by_id and "ps1" in by_id
     assert by_id["nes"]["upscale_kind"] == "native_grid_integer_and_scale2x"
-    assert by_id["ps1"]["upscale_kind"] == "texture_pixel_resampling_only"
+    assert by_id["ps1"]["upscale_kind"] == "texture_plus_bounded_reference_raster"
+    assert by_id["ps1"]["historical_3d_reference_raster"] is True
+    assert by_id["ps5"]["modern_render_graph_evidence"] is True
     assert matrix["any_console_fully_certified_by_this_tool"] is False
     assert matrix["missing_native_production_qualifications"] == matrix["declared_console_targets"]
 
