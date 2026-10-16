@@ -145,7 +145,11 @@ def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPReq
                     self._answer(409, {"ok": False, "error": "stale game state",
                                        "snapshot": current})
                     return
-                result = choose(root, session=session, choice=payload["choice"])
+                result = choose(
+                    root, session=session, choice=payload["choice"],
+                    expected_sequence=payload["expected_sequence"],
+                    expected_state_sha256=payload["expected_state_sha256"],
+                )
                 self._answer(200, {"ok": True, "schema": SCHEMA, "snapshot": result})
             except (ValueError, OSError, KeyError, TypeError):
                 self._answer(409, {"ok": False, "error": "unavailable action or invalid game session"})
