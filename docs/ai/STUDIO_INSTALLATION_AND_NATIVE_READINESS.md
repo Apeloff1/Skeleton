@@ -127,6 +127,52 @@ Only current approved library/firmware identities can reach the existing isolate
 worker. Missing firmware and deferred candidate recipes remain unavailable.
 Installed approvals do not prove hardware accuracy or commercial-title support.
 
+Inspect every canonical target against the actual configured registry without
+loading any native library:
+
+```bash
+python scripts/audit_game_emulator_169_targets.py --registry /absolute/operator/cores/cores.json --output-dir /absolute/operator/reports/console-readiness
+```
+
+The JSON report and offline HTML dashboard distinguish an approved installation,
+an installed core requiring repair or approval, a pinned source recipe, a mapping
+without a recipe, and an absent adapter. Expand a core to read its exact
+readiness code, firmware and candidate limitations, accepted content hints and
+operator command templates. Commands are guidance and are never executed by the
+report. Source acquisition still requires an explicit `--fetch-sources` choice;
+firmware, licensed SDKs and game rights are not supplied by these commands.
+
+For an existing approved core, qualify your lawful original cartridge content:
+
+```bash
+python scripts/qualify_game_emulator.py --registry /absolute/operator/cores/cores.json --target game_boy --core gambatte --source /absolute/original/game.gb --action idle --action right --runs 2
+```
+
+Disc and computer cores can use their complete local data tree through the same
+isolated host and replay-qualification owner:
+
+```bash
+python scripts/qualify_game_emulator.py --registry /absolute/operator/cores/cores.json --target ps1 --core mednafen_psx --content-root /absolute/lawful/disc --entrypoint disc.cue --action idle --runs 2
+```
+
+Choose the exact canonical target and approved core from your report. The local
+tree admits at most 96 nonsymlink regular files, 2 GiB per file and 4 GiB total.
+Every file is streamed into its SHA-256 identity, then rechecked during private
+host materialization before native loading. Paths are relative to that explicit
+tree; a source manifest digest binds the entrypoint and all filenames, lengths
+and hashes. This operator path does not grant application upload, retention or
+training consent. It copies no existing application source rights.
+
+CUE/GDI/M3U dependencies must all be present. The bounded CloneCD version 2/3
+subset also requires its same-stem IMG with complete 2,352-byte sectors and, when
+supplied, a same-stem SUB with exactly 96 bytes per sector. CloneCD CD-text and
+TOC/MDS descriptor variants remain unsupported; parent-dependent CHD images are
+rejected because their complete parent identity is not yet admitted. Supply
+lawfully prepared supported complete content instead of renaming a descriptor.
+Suffix hints describe data admission only. The actual isolated core must still
+accept the content and controller configuration. A successful bounded replay
+does not establish hardware fidelity, commercial-title compatibility or AI gain.
+
 Source export, installed prerequisites, successful compilation, actual native
 play, game-policy learning and measured model improvement are distinct stages.
 Upload only material you are authorized to use and retain its current source

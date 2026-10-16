@@ -30,6 +30,10 @@ from .game_learning_parallel import GameEnvironmentRequest
 from .game_emulator_curriculum import ANGLES, EvidenceCurriculum
 
 SCHEMA = "skeleton.game.emulator_training_lab.v1"
+# A single authorized campaign remains finite, audited, and cancellable.
+# Full-game traversal uses the independent checkpointed playthrough runner.
+MAX_LAB_RUNS = 1024
+MAX_LAB_STEPS = 65_536
 TRAINING_PROJECTION_FIELDS = (
     "sequence", "observation", "action", "next_observation", "reward",
     "reward_components", "terminated", "truncated",
@@ -71,7 +75,7 @@ class EmulatorLabConfig:
 
     def __post_init__(self) -> None:
         for value, lo, hi, name in (
-            (self.max_runs, 1, 256, "max runs"),
+            (self.max_runs, 1, MAX_LAB_RUNS, "max runs"),
             (self.steps_per_run, 1, 128, "steps per run"),
             (self.stagnation_runs, 10, 32, "stagnation runs"),
             (self.checkpoint_stride, 1, 32, "checkpoint stride"),
@@ -82,7 +86,7 @@ class EmulatorLabConfig:
             (self.seed, 0, 2**63 - 1, "training seed"),
         ):
             _integer(value, lo, hi, name)
-        if self.steps_per_run > 128 or self.max_runs * self.steps_per_run > 8192:
+        if self.max_runs * self.steps_per_run > MAX_LAB_STEPS:
             raise EmulatorTrainingError("cumulative emulation work exceeds explicit bounds")
 
 
@@ -675,6 +679,10 @@ def run_emulator_training_lab(
         },
         "heldout_evaluation": evaluated,
         "limits": {
+            "configured_run_budget": config.max_runs,
+            "configured_step_budget": config.max_runs * config.steps_per_run,
+            "maximum_run_budget": MAX_LAB_RUNS,
+            "maximum_step_budget": MAX_LAB_STEPS,
             "seed_does_not_guarantee_native_rng_control": request.kind == "libretro",
             "visual_novelty_is_not_game_success": True,
             "hardware_compatibility_verified": False,

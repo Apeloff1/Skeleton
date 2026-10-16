@@ -8,7 +8,7 @@ on:
       - "packaging/windows/**"
       - "scripts/windows/**"
       - "skeleton/app/**"
-      # Installed UI and owned local-model execution must qualify with Setup.exe.
+      # Qualify app-facing product navigation and the owned transformer on PRs.
       - "frontend/src/product/productCatalog.ts"
       - "skeleton/ai/runtime/inference/native_transformer.py"
       - "skeleton/testing/test_windows_installer.py"
@@ -106,6 +106,7 @@ jobs:
           PYTHONPATH: "."
         run: |
           python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2.14.0,<3" "pydantic-settings>=2.15.0,<3"
+          python -m unittest scripts.windows.test_payload_zip
           python -m pytest -q skeleton/testing/test_windows_installer.py skeleton/testing/test_jeeves_multidomain.py skeleton/testing/test_jeeves_cinematic_simulation.py skeleton/testing/test_jeeves_adaptive_sim_training.py skeleton/testing/test_jeeves_capacity_growth.py skeleton/testing/test_jeeves_capability_replay.py skeleton/testing/test_jeeves_boomerang_queue.py
 
       - name: Build installer

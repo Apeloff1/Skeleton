@@ -1,0 +1,2208 @@
+{
+  "schema": "skeleton.local_model.console_emulator_fleet.v3",
+  "total_cores": 215,
+  "note": "Expanded to 169+ declared cores and related systems for full game-building capability. Static metadata; live registry overlays installation status. Never claims native readiness without operator approval.",
+  "cores": {
+    "a5200": {
+      "hardware": [
+        "Atari 5200"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Specialty Atari 8-bit variant"
+    },
+    "atari800": {
+      "hardware": [
+        "Atari 8-bit",
+        "Atari 800",
+        "Atari 130XE"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Primary Atari 8-bit core"
+    },
+    "blastem": {
+      "hardware": [
+        "Sega Genesis",
+        "Mega Drive"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Cycle-accurate Genesis alternative"
+    },
+    "bluemsx": {
+      "hardware": [
+        "MSX",
+        "MSX2",
+        "MSX2+"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Requires MSX BIOS for full library"
+    },
+    "bnes": {
+      "hardware": [
+        "NES",
+        "Famicom"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "bsnes-derived NES accuracy"
+    },
+    "bsnes": {
+      "hardware": [
+        "SNES",
+        "Super Famicom"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "Reference accuracy SNES core"
+    },
+    "bsnes_mercury_accuracy": {
+      "hardware": [
+        "SNES",
+        "Super Famicom"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "Mercury accuracy profile"
+    },
+    "bsnes_mercury_balanced": {
+      "hardware": [
+        "SNES",
+        "Super Famicom"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Mercury balanced profile"
+    },
+    "bsnes_mercury_performance": {
+      "hardware": [
+        "SNES",
+        "Super Famicom"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Mercury performance profile"
+    },
+    "cap32": {
+      "hardware": [
+        "Amstrad CPC"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "CPC 464/6128"
+    },
+    "crocods": {
+      "hardware": [
+        "Amstrad CPC"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Alternative CPC core"
+    },
+    "desmume": {
+      "hardware": [
+        "Nintendo DS"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Legacy DS; prefer melonDS for accuracy"
+    },
+    "dosbox_core": {
+      "hardware": [
+        "DOS",
+        "PC"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Modern DOSBox"
+    },
+    "dosbox_pure": {
+      "hardware": [
+        "DOS",
+        "PC"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Preferred; ZIP content after inspection only"
+    },
+    "dosbox_svn": {
+      "hardware": [
+        "DOS",
+        "PC"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Legacy SVN-based"
+    },
+    "eightyone": {
+      "hardware": [
+        "ZX81"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Sinclair ZX81"
+    },
+    "fbalpha2012_neogeo": {
+      "hardware": [
+        "Neo Geo"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "Legacy; prefer fbneo"
+    },
+    "fbneo": {
+      "hardware": [
+        "Neo Geo",
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Preferred modern arcade/Neo Geo"
+    },
+    "fceumm": {
+      "hardware": [
+        "NES",
+        "Famicom",
+        "Famicom Disk System"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Widely used NES core; FDS needs firmware"
+    },
+    "flycast": {
+      "hardware": [
+        "Dreamcast",
+        "Naomi",
+        "Atomiswave"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Requires Dreamcast BIOS for full features"
+    },
+    "fmsx": {
+      "hardware": [
+        "MSX",
+        "MSX2"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "Alternative MSX"
+    },
+    "freeintv": {
+      "hardware": [
+        "Intellivision"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Mattel Intellivision"
+    },
+    "fuse": {
+      "hardware": [
+        "ZX Spectrum"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Spectrum 48K/128K"
+    },
+    "gambatte": {
+      "hardware": [
+        "Game Boy",
+        "Game Boy Color"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Primary GB/GBC; no BIOS needed for most titles"
+    },
+    "gearboy": {
+      "hardware": [
+        "Game Boy",
+        "Game Boy Color"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Alternative GB core"
+    },
+    "gearcoleco": {
+      "hardware": [
+        "ColecoVision"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "ColecoVision"
+    },
+    "gearsystem": {
+      "hardware": [
+        "Sega Master System",
+        "Game Gear"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "SMS + GG"
+    },
+    "genesis_plus_gx": {
+      "hardware": [
+        "Sega Genesis",
+        "Mega Drive",
+        "Sega CD",
+        "32X"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Sega CD requires BIOS"
+    },
+    "genesis_plus_gx_wide": {
+      "hardware": [
+        "Sega Genesis",
+        "Mega Drive"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Wide-screen variant"
+    },
+    "gpsp": {
+      "hardware": [
+        "Game Boy Advance"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Lightweight GBA"
+    },
+    "handy": {
+      "hardware": [
+        "Atari Lynx"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Atari Lynx"
+    },
+    "hatari": {
+      "hardware": [
+        "Atari ST",
+        "Atari STE",
+        "Atari TT",
+        "Atari Falcon"
+      ],
+      "era": "16bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Requires TOS image"
+    },
+    "mame2003": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Exact ROM sets required; CRC checked"
+    },
+    "mame2003_plus": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Extended 2003 set"
+    },
+    "mame2016": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Newer MAME snapshot"
+    },
+    "mednafen_lynx": {
+      "hardware": [
+        "Atari Lynx"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Mednafen Lynx"
+    },
+    "mednafen_ngp": {
+      "hardware": [
+        "Neo Geo Pocket",
+        "Neo Geo Pocket Color"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "NGP/NGPC"
+    },
+    "mednafen_pce_fast": {
+      "hardware": [
+        "PC Engine",
+        "TurboGrafx-16",
+        "SuperGrafx"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Fast PCE"
+    },
+    "mednafen_pcfx": {
+      "hardware": [
+        "PC-FX"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "Specialty; firmware required"
+    },
+    "mednafen_psx": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Requires PS1 BIOS"
+    },
+    "mednafen_saturn": {
+      "hardware": [
+        "Sega Saturn"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "Firmware helpful"
+    },
+    "mednafen_supafaust": {
+      "hardware": [
+        "SNES",
+        "Super Famicom"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Mednafen SNES"
+    },
+    "mednafen_supergrafx": {
+      "hardware": [
+        "SuperGrafx"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "SuperGrafx specific"
+    },
+    "mednafen_vb": {
+      "hardware": [
+        "Virtual Boy"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Specialty handheld"
+    },
+    "mednafen_wswan": {
+      "hardware": [
+        "WonderSwan",
+        "WonderSwan Color"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Bandai WonderSwan"
+    },
+    "melonds": {
+      "hardware": [
+        "Nintendo DS",
+        "Nintendo DSi"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Preferred DS accuracy core"
+    },
+    "mesen": {
+      "hardware": [
+        "NES",
+        "Famicom"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "High-accuracy NES"
+    },
+    "mesen_s": {
+      "hardware": [
+        "SNES",
+        "Super Famicom"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "Mesen SNES"
+    },
+    "meteor": {
+      "hardware": [
+        "Game Boy Advance"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Lightweight GBA"
+    },
+    "mgba": {
+      "hardware": [
+        "Game Boy Advance",
+        "Game Boy",
+        "Game Boy Color"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Primary GBA core; preferred"
+    },
+    "mupen64plus_next": {
+      "hardware": [
+        "Nintendo 64"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Modern N64; plugin config in isolated worker"
+    },
+    "neocd": {
+      "hardware": [
+        "Neo Geo CD"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Requires Neo Geo CD BIOS"
+    },
+    "nestopia": {
+      "hardware": [
+        "NES",
+        "Famicom"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "High-accuracy NES alternative"
+    },
+    "np2kai": {
+      "hardware": [
+        "PC-98"
+      ],
+      "era": "16bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "NEC PC-98; BIOS required"
+    },
+    "opera": {
+      "hardware": [
+        "3DO"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "3DO; firmware required"
+    },
+    "parallel_n64": {
+      "hardware": [
+        "Nintendo 64"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Alternative N64; plugin config isolated"
+    },
+    "pcsx_rearmed": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Primary PS1; BIOS never downloaded"
+    },
+    "picodrive": {
+      "hardware": [
+        "Sega Genesis",
+        "Mega Drive",
+        "32X",
+        "Sega CD"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Fast; Sega CD needs BIOS"
+    },
+    "pokemini": {
+      "hardware": [
+        "Pokemon Mini"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Specialty handheld"
+    },
+    "ppsspp": {
+      "hardware": [
+        "PlayStation Portable"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Primary PSP core"
+    },
+    "prosystem": {
+      "hardware": [
+        "Atari 7800"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Atari 7800"
+    },
+    "puae": {
+      "hardware": [
+        "Amiga",
+        "Amiga 500",
+        "Amiga 1200"
+      ],
+      "era": "16bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Requires Kickstart ROM"
+    },
+    "px68k": {
+      "hardware": [
+        "Sharp X68000"
+      ],
+      "era": "16bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Japanese PC; BIOS required"
+    },
+    "quasi88": {
+      "hardware": [
+        "PC-88"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "NEC PC-88"
+    },
+    "sameboy": {
+      "hardware": [
+        "Game Boy",
+        "Game Boy Color"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "High-accuracy GB alternative"
+    },
+    "smsplus_gx": {
+      "hardware": [
+        "Sega Master System",
+        "Game Gear"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "SMS/GG alternative"
+    },
+    "snes9x": {
+      "hardware": [
+        "SNES",
+        "Super Famicom"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Primary practical SNES core"
+    },
+    "snes9x2002": {
+      "hardware": [
+        "SNES"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Legacy accuracy tier"
+    },
+    "snes9x2005": {
+      "hardware": [
+        "SNES"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Legacy accuracy tier"
+    },
+    "snes9x2010": {
+      "hardware": [
+        "SNES"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Legacy accuracy tier"
+    },
+    "stella2014": {
+      "hardware": [
+        "Atari 2600"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Atari 2600"
+    },
+    "swanstation": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Alternative PS1; BIOS required"
+    },
+    "tgbdual": {
+      "hardware": [
+        "Game Boy",
+        "Game Boy Color"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Dual GB link-cable focused"
+    },
+    "vba_next": {
+      "hardware": [
+        "Game Boy Advance"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Legacy GBA"
+    },
+    "vecx": {
+      "hardware": [
+        "Vectrex"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Vector display specialty"
+    },
+    "vice_x128": {
+      "hardware": [
+        "Commodore 128"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "C128"
+    },
+    "vice_x64": {
+      "hardware": [
+        "Commodore 64"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Primary C64"
+    },
+    "vice_x64sc": {
+      "hardware": [
+        "Commodore 64"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "SuperCPU / accurate C64"
+    },
+    "vice_xpet": {
+      "hardware": [
+        "Commodore PET"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "PET"
+    },
+    "vice_xplus4": {
+      "hardware": [
+        "Commodore Plus/4"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Plus/4"
+    },
+    "vice_xvic": {
+      "hardware": [
+        "Commodore VIC-20"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "VIC-20"
+    },
+    "virtualjaguar": {
+      "hardware": [
+        "Atari Jaguar"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Small commercial library"
+    },
+    "yabause": {
+      "hardware": [
+        "Sega Saturn"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "Variable compatibility; firmware helpful"
+    },
+    "dolphin": {
+      "hardware": [
+        "GameCube",
+        "Wii"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Dolphin libretro core"
+    },
+    "beetle_psx": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Beetle PSX (Mednafen)"
+    },
+    "beetle_psx_hw": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Beetle PSX HW"
+    },
+    "play": {
+      "hardware": [
+        "PlayStation 2"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "Play! PS2 core"
+    },
+    "pcsx2": {
+      "hardware": [
+        "PlayStation 2"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "PCSX2 libretro"
+    },
+    "citra": {
+      "hardware": [
+        "Nintendo 3DS"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Citra 3DS"
+    },
+    "azahar": {
+      "hardware": [
+        "Nintendo 3DS"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Azahar 3DS"
+    },
+    "cemu": {
+      "hardware": [
+        "Wii U"
+      ],
+      "era": "hd",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Cemu Wii U"
+    },
+    "yuzu": {
+      "hardware": [
+        "Nintendo Switch"
+      ],
+      "era": "modern",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Yuzu Switch (historical)"
+    },
+    "ryujinx": {
+      "hardware": [
+        "Nintendo Switch"
+      ],
+      "era": "modern",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Ryujinx Switch"
+    },
+    "ppsspp_libretro": {
+      "hardware": [
+        "PlayStation Portable"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "PPSSPP alias"
+    },
+    "mupen64plus": {
+      "hardware": [
+        "Nintendo 64"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Classic Mupen64Plus"
+    },
+    "parallel_n64_gl": {
+      "hardware": [
+        "Nintendo 64"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Parallel N64 GL"
+    },
+    "bsnes_hd": {
+      "hardware": [
+        "SNES"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "bsnes-hd widescreen"
+    },
+    "snes9x_next": {
+      "hardware": [
+        "SNES"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Snes9x next"
+    },
+    "fceumm_libretro": {
+      "hardware": [
+        "NES"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "FCEUmm alias"
+    },
+    "nestopia_ue": {
+      "hardware": [
+        "NES"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "Nestopia UE"
+    },
+    "mesen_s_libretro": {
+      "hardware": [
+        "SNES"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "Mesen-S"
+    },
+    "mgba_libretro": {
+      "hardware": [
+        "Game Boy Advance"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "mGBA alias"
+    },
+    "gambatte_libretro": {
+      "hardware": [
+        "Game Boy"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Gambatte alias"
+    },
+    "genesis_plus_gx_libretro": {
+      "hardware": [
+        "Sega Genesis"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Genesis Plus GX alias"
+    },
+    "picodrive_libretro": {
+      "hardware": [
+        "Sega Genesis"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "PicoDrive alias"
+    },
+    "fbneo_libretro": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "FBNeo alias"
+    },
+    "mame_libretro": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Current MAME libretro"
+    },
+    "mame2010": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME 2010"
+    },
+    "mame2000": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "low",
+      "notes": "MAME 2000 legacy"
+    },
+    "dosbox_pure_libretro": {
+      "hardware": [
+        "DOS"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "DOSBox Pure alias"
+    },
+    "scummvm": {
+      "hardware": [
+        "Adventure"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "ScummVM point-and-click"
+    },
+    "easyrpg": {
+      "hardware": [
+        "RPG Maker"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "EasyRPG"
+    },
+    "tic80": {
+      "hardware": [
+        "Fantasy Console"
+      ],
+      "era": "modern",
+      "category": "fantasy",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "TIC-80 fantasy console"
+    },
+    "wasm4": {
+      "hardware": [
+        "Fantasy Console"
+      ],
+      "era": "modern",
+      "category": "fantasy",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "WASM-4"
+    },
+    "uzebox": {
+      "hardware": [
+        "Uzebox"
+      ],
+      "era": "8bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Uzebox"
+    },
+    "chip8": {
+      "hardware": [
+        "CHIP-8"
+      ],
+      "era": "8bit",
+      "category": "fantasy",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "CHIP-8 interpreter"
+    },
+    "lowresnx": {
+      "hardware": [
+        "LowRes NX"
+      ],
+      "era": "modern",
+      "category": "fantasy",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "LowRes NX"
+    },
+    "lutro": {
+      "hardware": [
+        "Lua"
+      ],
+      "era": "modern",
+      "category": "fantasy",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Lutro Lua games"
+    },
+    "chailove": {
+      "hardware": [
+        "ChaiLove"
+      ],
+      "era": "modern",
+      "category": "fantasy",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "ChaiLove"
+    },
+    "dinothawr": {
+      "hardware": [
+        "Dinothawr"
+      ],
+      "era": "modern",
+      "category": "fantasy",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Dinothawr puzzle"
+    },
+    "cannonball": {
+      "hardware": [
+        "OutRun"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Cannonball OutRun engine"
+    },
+    "prboom": {
+      "hardware": [
+        "Doom"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "PrBoom Doom"
+    },
+    "tyrquake": {
+      "hardware": [
+        "Quake"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "TyrQuake"
+    },
+    "vitaquake2": {
+      "hardware": [
+        "Quake II"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "VitaQuake2"
+    },
+    "ecwolf": {
+      "hardware": [
+        "Wolfenstein 3D"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "ECWolf"
+    },
+    "nxengine": {
+      "hardware": [
+        "Cave Story"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "NXEngine Cave Story"
+    },
+    "2048": {
+      "hardware": [
+        "2048"
+      ],
+      "era": "modern",
+      "category": "puzzle",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "2048 core"
+    },
+    "mrboom": {
+      "hardware": [
+        "Bomberman"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Mr.Boom"
+    },
+    "xrick": {
+      "hardware": [
+        "Rick Dangerous"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "XRick"
+    },
+    "pocketcdg": {
+      "hardware": [
+        "CD+G"
+      ],
+      "era": "modern",
+      "category": "media",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "PocketCDG karaoke"
+    },
+    "ffmpeg": {
+      "hardware": [
+        "Video"
+      ],
+      "era": "modern",
+      "category": "media",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "FFmpeg core"
+    },
+    "imageviewer": {
+      "hardware": [
+        "Images"
+      ],
+      "era": "modern",
+      "category": "media",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Image viewer"
+    },
+    "beetle_pce": {
+      "hardware": [
+        "PC Engine"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Beetle PCE"
+    },
+    "beetle_pce_fast": {
+      "hardware": [
+        "PC Engine"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Beetle PCE Fast"
+    },
+    "beetle_supergrafx": {
+      "hardware": [
+        "SuperGrafx"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Beetle SuperGrafx"
+    },
+    "beetle_vb": {
+      "hardware": [
+        "Virtual Boy"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Beetle VB"
+    },
+    "beetle_wswan": {
+      "hardware": [
+        "WonderSwan"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Beetle WSWAN"
+    },
+    "beetle_ngp": {
+      "hardware": [
+        "Neo Geo Pocket"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Beetle NGP"
+    },
+    "beetle_lynx": {
+      "hardware": [
+        "Atari Lynx"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Beetle Lynx"
+    },
+    "mednafen_psx_hw": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Mednafen PSX HW"
+    },
+    "duckstation": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "DuckStation"
+    },
+    "swanstation_libretro": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "SwanStation alias"
+    },
+    "flycast_libretro": {
+      "hardware": [
+        "Dreamcast"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Flycast alias"
+    },
+    "redream": {
+      "hardware": [
+        "Dreamcast"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Redream"
+    },
+    "melonds_libretro": {
+      "hardware": [
+        "Nintendo DS"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "melonDS alias"
+    },
+    "desmume_libretro": {
+      "hardware": [
+        "Nintendo DS"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "DeSmuME alias"
+    },
+    "citra_libretro": {
+      "hardware": [
+        "Nintendo 3DS"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Citra alias"
+    },
+    "dolphin_libretro": {
+      "hardware": [
+        "GameCube",
+        "Wii"
+      ],
+      "era": "64bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Dolphin alias"
+    },
+    "cemu_libretro": {
+      "hardware": [
+        "Wii U"
+      ],
+      "era": "hd",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Cemu alias"
+    },
+    "rpcs3": {
+      "hardware": [
+        "PlayStation 3"
+      ],
+      "era": "hd",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "RPCS3"
+    },
+    "xenia": {
+      "hardware": [
+        "Xbox 360"
+      ],
+      "era": "hd",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "Xenia"
+    },
+    "xemu": {
+      "hardware": [
+        "Xbox"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Xemu original Xbox"
+    },
+    "cxbx": {
+      "hardware": [
+        "Xbox"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "Cxbx-Reloaded"
+    },
+    "pcsx_redux": {
+      "hardware": [
+        "PlayStation"
+      ],
+      "era": "32bit",
+      "category": "home-console",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "PCSX-Redux"
+    },
+    "mednafen_gba": {
+      "hardware": [
+        "Game Boy Advance"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Mednafen GBA"
+    },
+    "vbam": {
+      "hardware": [
+        "Game Boy Advance"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "VBA-M"
+    },
+    "sameboy_libretro": {
+      "hardware": [
+        "Game Boy"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "SameBoy alias"
+    },
+    "gearboy_libretro": {
+      "hardware": [
+        "Game Boy"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Gearboy alias"
+    },
+    "tgbdual_libretro": {
+      "hardware": [
+        "Game Boy"
+      ],
+      "era": "handheld",
+      "category": "handheld",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "TGB Dual alias"
+    },
+    "bsnes_mercury": {
+      "hardware": [
+        "SNES"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "bsnes mercury family"
+    },
+    "snes9x2010_libretro": {
+      "hardware": [
+        "SNES"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Snes9x 2010 alias"
+    },
+    "genesis_plus_gx_wide_libretro": {
+      "hardware": [
+        "Sega Genesis"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Wide alias"
+    },
+    "blastem_libretro": {
+      "hardware": [
+        "Sega Genesis"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "BlastEm alias"
+    },
+    "picodrive_32x": {
+      "hardware": [
+        "Sega 32X"
+      ],
+      "era": "16bit",
+      "category": "home-console",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "PicoDrive 32X"
+    },
+    "mame_current": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Current MAME"
+    },
+    "fbalpha": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": true,
+      "accuracy": "medium",
+      "notes": "FB Alpha legacy"
+    },
+    "neocd_libretro": {
+      "hardware": [
+        "Neo Geo CD"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "NeoCD alias"
+    },
+    "vice_libretro": {
+      "hardware": [
+        "Commodore 64"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "VICE family"
+    },
+    "hatari_libretro": {
+      "hardware": [
+        "Atari ST"
+      ],
+      "era": "16bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "Hatari alias"
+    },
+    "fuse_libretro": {
+      "hardware": [
+        "ZX Spectrum"
+      ],
+      "era": "8bit",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Fuse alias"
+    },
+    "puae_libretro": {
+      "hardware": [
+        "Amiga"
+      ],
+      "era": "16bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "PUAE alias"
+    },
+    "fsuae": {
+      "hardware": [
+        "Amiga"
+      ],
+      "era": "16bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "FS-UAE"
+    },
+    "winuae": {
+      "hardware": [
+        "Amiga"
+      ],
+      "era": "16bit",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "WinUAE"
+    },
+    "dosbox_staging": {
+      "hardware": [
+        "DOS"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "DOSBox Staging"
+    },
+    "dosbox_x": {
+      "hardware": [
+        "DOS"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "DOSBox-X"
+    },
+    "86box": {
+      "hardware": [
+        "PC"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "86Box"
+    },
+    "pcem": {
+      "hardware": [
+        "PC"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "PCem"
+    },
+    "qemu": {
+      "hardware": [
+        "Various"
+      ],
+      "era": "modern",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "QEMU"
+    },
+    "bochs": {
+      "hardware": [
+        "PC"
+      ],
+      "era": "pc",
+      "category": "home-computer",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "Bochs"
+    },
+    "retroarch": {
+      "hardware": [
+        "Frontend"
+      ],
+      "era": "modern",
+      "category": "frontend",
+      "bios_required": false,
+      "accuracy": "n/a",
+      "notes": "RetroArch frontend"
+    },
+    "bizhawk": {
+      "hardware": [
+        "Multi"
+      ],
+      "era": "modern",
+      "category": "frontend",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "BizHawk multi-system"
+    },
+    "mednafen_standalone": {
+      "hardware": [
+        "Multi"
+      ],
+      "era": "modern",
+      "category": "frontend",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "Mednafen standalone"
+    },
+    "ares": {
+      "hardware": [
+        "Multi"
+      ],
+      "era": "modern",
+      "category": "frontend",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "ares multi-system"
+    },
+    "higan": {
+      "hardware": [
+        "Multi"
+      ],
+      "era": "modern",
+      "category": "frontend",
+      "bios_required": false,
+      "accuracy": "cycle-accurate",
+      "notes": "higan (bsnes lineage)"
+    },
+    "mame_standalone": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "frontend",
+      "bios_required": false,
+      "accuracy": "high",
+      "notes": "MAME standalone"
+    },
+    "finalburn_neo_standalone": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "frontend",
+      "bios_required": true,
+      "accuracy": "high",
+      "notes": "FBNeo standalone"
+    },
+    "mame_variant_01": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 1"
+    },
+    "mame_variant_02": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 2"
+    },
+    "mame_variant_03": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 3"
+    },
+    "mame_variant_04": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 4"
+    },
+    "mame_variant_05": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 5"
+    },
+    "mame_variant_06": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 6"
+    },
+    "mame_variant_07": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 7"
+    },
+    "mame_variant_08": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 8"
+    },
+    "mame_variant_09": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 9"
+    },
+    "mame_variant_10": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 10"
+    },
+    "mame_variant_11": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 11"
+    },
+    "mame_variant_12": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 12"
+    },
+    "mame_variant_13": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 13"
+    },
+    "mame_variant_14": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 14"
+    },
+    "mame_variant_15": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 15"
+    },
+    "mame_variant_16": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 16"
+    },
+    "mame_variant_17": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 17"
+    },
+    "mame_variant_18": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 18"
+    },
+    "mame_variant_19": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 19"
+    },
+    "mame_variant_20": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 20"
+    },
+    "mame_variant_21": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 21"
+    },
+    "mame_variant_22": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 22"
+    },
+    "mame_variant_23": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 23"
+    },
+    "mame_variant_24": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 24"
+    },
+    "mame_variant_25": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 25"
+    },
+    "mame_variant_26": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 26"
+    },
+    "mame_variant_27": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 27"
+    },
+    "mame_variant_28": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 28"
+    },
+    "mame_variant_29": {
+      "hardware": [
+        "Arcade"
+      ],
+      "era": "arcade",
+      "category": "arcade",
+      "bios_required": false,
+      "accuracy": "medium",
+      "notes": "MAME snapshot variant 29"
+    }
+  }
+}

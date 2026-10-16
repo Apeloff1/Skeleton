@@ -43,11 +43,47 @@ jobs:
           fi
           echo "DIFF_BASE=$diff_base" >> "$GITHUB_ENV"
 
+      - name: Guard against accidental large files
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+
+          while IFS= read -r -d '' path; do
+            if ! git cat-file -e "${HEAD_SHA}:${path}" 2>/dev/null; then
+              continue
+            fi
+
+            size=$(git cat-file -s "${HEAD_SHA}:${path}")
+            if (( size <= MAX_FILE_BYTES )); then
+              continue
+            fi
+
+            prefix=$(git show "${HEAD_SHA}:${path}" 2>/dev/null | head -c 120 || true)
+            if grep -q '^version https://git-lfs.github.com/spec/v1' <<<"$prefix"; then
+              continue
+            fi
+
+            mib=$(awk -v bytes="$size" 'BEGIN { printf "%.2f", bytes / 1048576 }')
+            echo "::error file=${path}::File is ${mib} MiB. Keep source files below 10 MiB or store large assets with Git LFS/artifact storage."
+            failed=1
+          done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
+
+          exit "$failed"
+
+      - name: Reject portable filename collisions and invalid new paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s scripts -p 'test_filename_safety.py'
+          python scripts/check_filename_safety.py --base "$DIFF_BASE" --head "$HEAD_SHA"
+
       - name: Reject whitespace errors and conflict markers
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check "$DIFF_BASE" "$HEAD_SHA" -- . ':!skeleton/ai/research/legacy/**'
+          # Bound diagnostics without concealing git diff --check failures.
+          python scripts/bounded_git_diff_check.py --base "$DIFF_BASE" --head "$HEAD_SHA"
 
       - name: Reject generated junk and accidental local state
         shell: bash
@@ -90,34 +126,6 @@ jobs:
 
           exit "$failed"
 
-      - name: Guard against accidental large files
-        shell: bash
-        run: |
-          set -euo pipefail
-          failed=0
-
-          while IFS= read -r -d '' path; do
-            if ! git cat-file -e "${HEAD_SHA}:${path}" 2>/dev/null; then
-              continue
-            fi
-
-            size=$(git cat-file -s "${HEAD_SHA}:${path}")
-            if (( size <= MAX_FILE_BYTES )); then
-              continue
-            fi
-
-            prefix=$(git show "${HEAD_SHA}:${path}" 2>/dev/null | head -c 120 || true)
-            if grep -q '^version https://git-lfs.github.com/spec/v1' <<<"$prefix"; then
-              continue
-            fi
-
-            mib=$(awk -v bytes="$size" 'BEGIN { printf "%.2f", bytes / 1048576 }')
-            echo "::error file=${path}::File is ${mib} MiB. Keep source files below 10 MiB or store large assets with Git LFS/artifact storage."
-            failed=1
-          done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
-
-          exit "$failed"
-
       - name: Summarize changed-file hygiene
         if: always()
         shell: bash
@@ -127,6 +135,6 @@ jobs:
           {
             echo '## Repository hygiene gate'
             echo "- Changed files inspected: $changed"
-            echo '- Checks: whitespace/conflict markers, generated junk/local state, unexpected extensionless root files, accidental files larger than 10 MiB'
+            echo '- Checks: filename portability/collisions, whitespace/conflict markers, generated junk/local state, unexpected extensionless root files, accidental files larger than 10 MiB'
             echo '- Large files represented by Git LFS pointers are allowed.'
           } >> "$GITHUB_STEP_SUMMARY"
