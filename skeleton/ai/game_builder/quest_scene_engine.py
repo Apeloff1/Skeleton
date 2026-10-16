@@ -537,6 +537,18 @@ class DirectorWorld:
                     for person in self.dynamics.society.residents
                     if person.unlock_world_flag is not None
                 )
+                possible_world_flags.update(
+                    dialogue.grant_world_flag
+                    for person in self.dynamics.society.residents
+                    for dialogue in person.dialogue
+                    if dialogue.grant_world_flag is not None
+                )
+                for person in self.dynamics.society.residents:
+                    for dialogue in person.dialogue:
+                        if not set(dialogue.requires_flags).issubset(outcome_flags):
+                            raise DirectorError(
+                                "NPC dialogue references unknown actual story outcome"
+                            )
             for requirements in (
                     *(g.requirements for g in self.dynamics.gates),
                     *(p.requirements for p in self.dynamics.passages)):
@@ -575,7 +587,7 @@ class DirectorAction:
 
     def __post_init__(self):
         if self.kind not in {"travel", "use", "wait", "transit",
-                             "speak", "buy", "sell", "rest"}:
+                             "speak", "discuss", "buy", "sell", "rest"}:
             raise DirectorError("invalid action kind")
         _id(self.key)
         _id(self.scene)
@@ -731,7 +743,7 @@ def director_step(world: DirectorWorld, state: DirectorState, action: DirectorAc
             state, scene=destination, turn=state.turn + passage.cost_turns,
             acquired=tuple(sorted(inventory)), world_state=effect,
         )
-    if action.kind in {"speak", "buy", "sell", "rest"}:
+    if action.kind in {"speak", "discuss", "buy", "sell", "rest"}:
         if (world.dynamics is None or world.dynamics.society is None
                 or state.world_state is None):
             raise DirectorError("original NPC economy action has no reviewed rules")
