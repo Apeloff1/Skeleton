@@ -348,6 +348,14 @@ func _render_state() -> void:
     if here != previous_scene:
         previous_scene = here
         stage.apply_scene(region)
+    var society_info: Dictionary = snapshot.get("society", {})
+    if society_info.is_empty():
+        stage.update_scheduled_residents([], "")
+    else:
+        stage.update_scheduled_residents(
+            society_info.get("present_residents", []),
+            str(society_info.get("calendar", {}).get("phase", "")),
+        )
     _line("Location: " + str(snapshot.get("scene_title", here)))
     _line(str(region.get("setting", snapshot.get("scene_setting", ""))))
     _line("Cast: " + str(snapshot.get("cast", [])))
@@ -370,6 +378,26 @@ func _render_state() -> void:
                 _line("  " + str(passage.get("mode", "")) + " to " +
                       str(passage.get("destination", "")) + " : " +
                       ("AVAILABLE" if passage.get("available", false) else "LOCKED"))
+    if not society_info.is_empty():
+        var calendar: Dictionary = society_info.get("calendar", {})
+        _line("NPC world-time: " + str(calendar.get("phase", "")) +
+              " / cycle " + str(calendar.get("cycle", 0)) +
+              " | next phase in " + str(calendar.get("turns_until_next_phase", 0)) + " turns")
+        _line("Gold balance: " + str(society_info.get("wallet", 0)))
+        _line("Trade inventory: " + str(society_info.get("owned_goods", [])))
+        _line("Authenticated characters currently here:")
+        for resident in society_info.get("present_residents", []):
+            _line("  " + str(resident.get("name", "")) +
+                  " | trust " + str(resident.get("trust", 0)) +
+                  " | " + str(resident.get("greeting", "")))
+        for merchant in society_info.get("open_merchants", []):
+            _line("Market: " + str(merchant.get("name", "")))
+            for product in merchant.get("products", []):
+                _line("  " + str(product.get("name", "")) +
+                      " | buy " + str(product.get("buy_price", 0)) +
+                      " / sell " + str(product.get("sell_price", 0)) +
+                      " | stock " + str(product.get("stock", 0)) +
+                      " | owned " + str(product.get("owned", 0)))
     _line("Quest progress:")
     for quest in snapshot.get("quests", []):
         var qline: String = str(quest["title"]) + " (" + str(quest["stage_index"]) + "/" + str(quest["stage_total"]) + ")"
