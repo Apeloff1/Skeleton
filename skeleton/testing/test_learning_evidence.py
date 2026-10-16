@@ -346,6 +346,76 @@ def test_contradictory_hypotheses_fail_closed() -> None:
     assert caught.value.context["reason"] == "contradictory_signal"
 
 
+def test_independent_opposing_hypotheses_can_coexist() -> None:
+    """Denying a latency target cannot erase separate accuracy evidence."""
+    store = _store()
+    _seed_feature(store)
+    store.record_observation(
+        _observation(observation_id="obs-latency", payload={"latency": 2})
+    )
+    store.record_feature(
+        Feature(
+            feature_id="feat-latency",
+            subject_id=SUBJECT,
+            name="latency",
+            value=2,
+            observation_ids=("obs-latency",),
+            provenance=make_provenance(
+                _feature_payload("latency", 2),
+                parent_ids=("obs-latency",),
+            ),
+        )
+    )
+    store.record_hypothesis(_hypothesis())
+    store.record_hypothesis(
+        _hypothesis(
+            hypothesis_id="hyp-latency",
+            claim="the learner misses the latency target",
+            polarity="deny",
+            feature_ids=("feat-latency",),
+        )
+    )
+    assert {item.hypothesis_id for item in store.hypotheses()} == {
+        "hyp-1",
+        "hyp-latency",
+    }
+
+
+def test_opposite_polarity_on_identical_claim_fails_with_disjoint_evidence() -> None:
+    """Different citations cannot change the truth polarity of one claim."""
+    store = _store()
+    _seed_feature(store)
+    store.record_observation(
+        _observation(observation_id="obs-other", payload={"other": 1})
+    )
+    store.record_feature(
+        Feature(
+            feature_id="feat-other",
+            subject_id=SUBJECT,
+            name="other",
+            value=1,
+            observation_ids=("obs-other",),
+            provenance=make_provenance(
+                _feature_payload("other", 1),
+                parent_ids=("obs-other",),
+            ),
+        )
+    )
+    store.record_hypothesis(_hypothesis())
+    before = store.state_digest()
+    with pytest.raises(LearningEvidenceError) as caught:
+        store.record_hypothesis(
+            _hypothesis(
+                hypothesis_id="hyp-opposite-same-claim",
+                claim="the learner has basic python fluency",
+                polarity="deny",
+                feature_ids=("feat-other",),
+            )
+        )
+    assert caught.value.context["reason"] == "contradictory_signal"
+    assert store.state_digest() == before
+
+
 def test_rollback_restores_a_prior_version() -> None:
     store = _store()
     _seed_observation(store)
