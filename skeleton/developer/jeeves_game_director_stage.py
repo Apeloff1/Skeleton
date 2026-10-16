@@ -19,6 +19,7 @@ var active_cues: Array = []
 var pending_timelines: Array = []
 var cue_index: int = 0
 var elapsed_ms: float = 0.0
+var timeline_end_ms: float = 0.0
 var playback_speed: float = 1.0
 var is_paused: bool = false
 var playing: bool = false
@@ -133,6 +134,10 @@ func _next_timeline() -> void:
     active_cues = next.get("cues", []).duplicate(true)
     cue_index = 0
     elapsed_ms = 0.0
+    timeline_end_ms = 0.0
+    for cue in active_cues:
+        timeline_end_ms = max(timeline_end_ms,
+            float(cue.get("at", 0)) + float(cue.get("duration", 0)))
     playing = true
     is_paused = false
     last_completed_timeline = str(next.get("title", ""))
@@ -149,10 +154,12 @@ func _process(delta: float) -> void:
             break
         _execute_cue(cue)
         cue_index += 1
-    if cue_index >= active_cues.size():
+    if cue_index >= active_cues.size() and elapsed_ms >= timeline_end_ms:
         _next_timeline()
     else:
         _labels()
+    # Custom drawn environments need an explicit redraw during camera tweens.
+    queue_redraw()
 
 func _execute_cue(cue: Dictionary) -> void:
     var kind: String = str(cue.get("kind", ""))
