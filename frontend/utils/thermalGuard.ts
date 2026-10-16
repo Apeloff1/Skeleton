@@ -45,6 +45,9 @@ class StaggerQueue {
   private activeCount = 0;
   // Invalidates a request that has left the queue but is still in its delay.
   private generation = 0;
+  // Share the same promise for queued AND actively executing work.
+  private readonly pending = new Map<string, Promise<unknown>>();
+  private readonly MAX_QUEUE_LENGTH = 256;
   private maxConcurrent: number;
   private baseDelayMs: number;
   private currentDelayMs: number;
@@ -69,23 +72,30 @@ class StaggerQueue {
 
   /** Add a request to the stagger queue */
   enqueue<T>(id: string, fn: () => Promise<T>, priority = 5): Promise<T> {
-    // Dedup: if same ID is already queued, skip
-    const existing = this.queue.find(q => q.id === id);
-    if (existing) {
-      return new Promise((resolve, reject) => {
-        // Chain onto existing
-        const origResolve = existing.resolve;
-        const origReject = existing.reject;
-        existing.resolve = (val) => { origResolve(val); resolve(val); };
-        existing.reject = (err) => { origReject(err); reject(err); };
-      });
+    const existing = this.pending.get(id);
+    if (existing) return existing as Promise<T>;
+
+    // Refuse additional work at saturation instead of retaining an unbounded
+    // queue or growing a chain of duplicate .resolve callbacks in memory.
+    if (this.queue.length >= this.MAX_QUEUE_LENGTH) {
+      return Promise.reject(new Error('Thermal request queue saturated'));
     }
 
-    return new Promise<T>((resolve, reject) => {
-      this.queue.push({ id, fn, resolve, reject, priority, timestamp: Date.now() });
+    const promise = new Promise<T>((resolve, reject) => {
+      this.queue.push({
+        id, fn, resolve, reject,
+        priority: Number.isFinite(priority) ? priority : 5,
+        timestamp: Date.now(),
+      });
       this.queue.sort((a, b) => a.priority - b.priority);
-      this.process();
+      void this.process();
     });
+    this.pending.set(id, promise);
+    // No unhandled rejection from the cleanup observer; identity guards
+    // against a replacement with the same key after cancellation.
+    const release = () => { if (this.pending.get(id) === promise) this.pending.delete(id); };
+    void promise.then(release, release);
+    return promise;
   }
 
   /** Set thermal-aware delay multiplier */
@@ -99,7 +109,8 @@ class StaggerQueue {
   }
 
   setMaxConcurrent(n: number) {
-    this.maxConcurrent = Math.max(1, n);
+    if (!Number.isFinite(n)) return;
+    this.maxConcurrent = Math.max(1, Math.min(4, Math.trunc(n)));
   }
 
   private async process() {
@@ -128,6 +139,8 @@ class StaggerQueue {
 
         this.activeCount++;
         this.requestLog.push(Date.now());
+        if (this.requestLog.length > 512) this.getRequestsLastMinute();
+        if (this.requestLog.length > 512) this.requestLog.splice(0, this.requestLog.length - 512);
         // Schedule user-supplied callbacks on the promise chain: even a
         // synchronous throw must settle its caller and release the slot.
         void Promise.resolve().then(item.fn).then(item.resolve, item.reject).finally(() => {
@@ -222,10 +235,11 @@ class ActivityTracker {
 
   record() {
     this.events.push(Date.now());
-    // Keep only last 10 minutes of events
-    const cutoff = Date.now() - 600000;
-    if (this.events.length > 500) {
-      this.events = this.events.filter(t => t > cutoff);
+    // Bound memory even if a high-frequency input produces thousands of
+    // events inside the same ten-minute window.
+    if (this.events.length > 512) {
+      const cutoff = Date.now() - 600000;
+      this.events = this.events.filter(t => t > cutoff).slice(-2048);
     }
   }
 
@@ -340,16 +354,16 @@ export class ThermalGuard {
       if (cached !== null) return cached as T;
     }
 
-    // Enqueue with stagger
-    const result = await this.queue.enqueue(key, fetcher, priority);
-
-    // Cache result
-    if (cacheTtlMs > 0) {
-      this.cache.set(key, result, cacheTtlMs);
+    try {
+      const result = await this.queue.enqueue(key, fetcher, priority);
+      if (Number.isFinite(cacheTtlMs) && cacheTtlMs > 0) {
+        this.cache.set(key, result, Math.min(cacheTtlMs, 60_000));
+      }
+      return result;
+    } finally {
+      // Failed/cancelled requests still change resource pressure.
+      this._recalculate();
     }
-
-    this._recalculate();
-    return result;
   }
 
   /** Get current thermal state */
