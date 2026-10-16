@@ -178,15 +178,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                         args.screen_height, args.pixel_aspect_num, args.pixel_aspect_den)
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
         render_args = (args.target, args.source, args.output, args.mode, args.factor,
-                       args.dry_run, args.passes, args.gate, args.repair_generated)
+                       args.dry_run, args.passes, args.gate, args.repair_generated,
+                       *display_args)
         other_content = (args.kind, args.brief, args.digest, args.approve,
-                         args.include_notes, args.profile, args.evidence, *display_args)
+                         args.include_notes, args.profile, args.evidence)
         if args.action in {"production-init", "production-status", "production-cycle"}:
             from skeleton.developer.jeeves_game_production import init, status, cycle
             if args.action == "production-init":
                 if not args.target or not args.genre or not args.period or any((
                     *other_content, args.console, args.source, args.output, args.mode,
-                    args.factor, args.dry_run, args.passes, args.gate, args.repair_generated
+                    args.factor, args.dry_run, args.passes, args.gate, args.repair_generated,
+                    *display_args
                 )):
                     raise ValueError("production-init requires --target --genre --period only")
                 output = init(root, target=args.target, genre=args.genre, period=args.period)
@@ -196,7 +198,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 output = status(root)
             else:
                 if any((*other_content, *quality_args, args.target, args.source, args.output,
-                        args.mode, args.factor, args.dry_run)):
+                        args.mode, args.factor, args.dry_run, *display_args)):
                     raise ValueError("production-cycle accepts --passes and optional --gate only")
                 output = cycle(root, passes=args.passes or 1, gate=args.gate,
                                repair_generated=args.repair_generated)
@@ -211,7 +213,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                            args.gate, args.repair_generated)):
                     raise ValueError("fidelity commands require --target without unrelated options")
                 if args.action == "fidelity-plan":
-                    if any((args.source, args.output, args.mode, args.factor, args.dry_run)):
+                    if any((args.source, args.output, args.mode, args.factor, args.dry_run,
+                            *display_args)):
                         raise ValueError("fidelity-plan accepts --target only")
                     output = fidelity_plan(args.target)
                 elif args.action == "display-plan":
