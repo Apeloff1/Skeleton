@@ -303,11 +303,13 @@ def stage(root: Path, *, source: str, output: str, target: str,
             val = int(sha256(f"{seed}:{x}:{y}".encode()).hexdigest()[:8],16)
             if val % 10 < richness:
                 kind = palette[val % len(palette)]
-                if focus != "world":
-                    expected = {"environment":tuple(palette),"foliage":("foliage",),
-                                "clutter":("clutter",),"shadow":("shadow",)}[focus]
-                    if kind not in expected:
-                        continue
+                # Explicit authoring passes select one domain while preserving
+                # the biome style; no artificial empty passes when the
+                # scene's default mixed-palette lacks that exact domain.
+                if focus in ("foliage","clutter","shadow"):
+                    kind = focus
+                elif focus == "environment":
+                    kind = palette[val % len(palette)]
                 positions.append({"x":x, "y":y, "kind":kind,
                                   "collidable":False,"source":"procedural_original_stage_detail"})
     camera = camera_profile(spec["depth"], yaw=cam["yaw"], pitch=cam["pitch"],
@@ -504,6 +506,8 @@ def parallax(root: Path, *, source: str, output: str, target: str,
     distinct=set()
     assembled=bytearray(w*h*4)
     measured=[]
+    if any(not isinstance(item,dict) for item in layers):
+        raise WorldUpscaleError("parallax plane declaration is not an object")
     for item in sorted(layers,key=lambda a:a.get("depth",-1),reverse=True):
         if not isinstance(item,dict) or set(item)!={"path","depth"}:
             raise WorldUpscaleError("parallax layer contract invalid")
@@ -572,6 +576,12 @@ def vividness(root: Path, *, source: str, passes: int = 3) -> dict[str,Any]:
         enhanced=data["enhancement"]
         if not isinstance(enhanced,dict) or enhanced.get("schema")!=SCHEMA:
             raise WorldUpscaleError("invalid stage enhancement receipt")
+        if not isinstance(enhanced.get("source_path"),str) or not isinstance(
+            enhanced.get("source_sha256"),str
+        ) or not isinstance(enhanced.get("dressing"),list) or not isinstance(
+            enhanced.get("parallax"),list
+        ) or not isinstance(enhanced.get("start_to_goal_route"),list):
+            raise WorldUpscaleError("incomplete stage scrutiny authority")
         original, src_sha=_source_json(root,enhanced["source_path"])
         if src_sha!=enhanced.get("source_sha256"):
             raise WorldUpscaleError("original stage changed after enhancement")
