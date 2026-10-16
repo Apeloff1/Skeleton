@@ -71,6 +71,13 @@ jobs:
 
           exit "$failed"
 
+      - name: Reject portable filename collisions and invalid new paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s scripts -p 'test_filename_safety.py'
+          python scripts/check_filename_safety.py --base "$DIFF_BASE" --head "$HEAD_SHA"
+
       - name: Reject whitespace errors and conflict markers
         shell: bash
         run: |
@@ -143,6 +150,6 @@ jobs:
           {
             echo '## Repository hygiene gate'
             echo "- Changed files inspected: $changed"
-            echo '- Checks: whitespace/conflict markers, generated junk/local state, unexpected extensionless root files, accidental files larger than 10 MiB'
+            echo '- Checks: filename portability/collisions, whitespace/conflict markers, generated junk/local state, unexpected extensionless root files, accidental files larger than 10 MiB'
             echo '- Large files represented by Git LFS pointers are allowed.'
           } >> "$GITHUB_STEP_SUMMARY"
