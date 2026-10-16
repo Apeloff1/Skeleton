@@ -204,6 +204,9 @@ def run(root: Path, *, source: str, routes: int = 2) -> dict[str, Any]:
                 "final_state_sha256": final["current_state_sha256"],
                 "approx_http_round_trip_ms_total": round(milliseconds, 2),
             })
+    from skeleton.developer.jeeves_game_quality import _read
+    if _read(root, source, 16 * 1024 * 1024)[1] != original_sha:
+        raise ValueError("approved Director source changed during complete HTTP verification")
     return {
         "ok": True, "schema": SCHEMA, "action": "director-loopback-e2e",
         "project": world.project_id, "source_sha256": original_sha,
