@@ -107,7 +107,7 @@ def _init(args: argparse.Namespace) -> dict[str, Any]:
             "Package sources: python -m skeleton dev game package --project .\n",
             encoding="utf-8",
         )
-        (stage / ".gitignore").write_text("build/\ndist/\n.godot/\n", encoding="utf-8")
+        (stage / ".gitignore").write_text("build/\ndist/\n.godot/\n.jeeves/\n", encoding="utf-8")
         for folder in ("assets", "design", "tests"):
             (stage / folder).mkdir()
             (stage / folder / ".gitkeep").write_text("", encoding="utf-8")
