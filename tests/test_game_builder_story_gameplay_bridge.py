@@ -6,7 +6,6 @@ import json
 
 import pytest
 
-from skeleton.ai.game_builder.quest_scene_engine import DirectorAction
 from skeleton.ai.game_builder.quest_scene_forge import forge_director
 from skeleton.ai.game_builder.story_canon_fabric import BIBLE, sign
 from skeleton.ai.game_builder.story_gameplay_bridge import (
