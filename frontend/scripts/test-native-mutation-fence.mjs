@@ -79,3 +79,22 @@ test('native-stall admission has a fixed global ceiling', async () => {
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(await gate.run(['project:new'], async () => undefined), true);
 });
+
+test('destructive wipe pauses all new writes until old native operations truly settle', async () => {
+  const stalled = deferred();
+  const gate = new NativeMutationFence();
+  const old = gate.run(['project:1'], async () => stalled.promise);
+  const drain = gate.pauseAndDrain();
+  let drained = false;
+  void drain.then(() => { drained = true; });
+  assert.equal(await gate.run(['project:2'], async () => undefined), false);
+  await Promise.resolve();
+  assert.equal(drained, false);
+  stalled.resolve();
+  await old;
+  await drain;
+  assert.equal(drained, true);
+  assert.equal(await gate.run(['project:2'], async () => undefined), false);
+  gate.resume();
+  assert.equal(await gate.run(['project:2'], async () => undefined), true);
+});
