@@ -12,7 +12,7 @@ import type {DragonFamilyProjection} from './dragonFamilyProjection';
 import DragonQuestBoard from './DragonQuestBoard';
 import type{NativeAttempt,NativeTarget,NativeCurriculum}from './dragonNativeTargets';
 import {type DragonPracticeProgress,type DragonPracticeAttempt,type DragonPracticeSubscription,validateDragonProgress} from './dragonProgression';
-import { companionForConversation, companionFromCrawler, type DragonEventKind } from './dragonCompanion';
+import { companionForConversation, companionFromCrawler, type DragonEventKind } from './dragonCompanionState';
 
 export interface CompanionTelemetry {
   kind: DragonEventKind;

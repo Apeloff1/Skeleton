@@ -1,5 +1,5 @@
 /** Strict, replayable companion event reducer. No UI effect can invent acquisition. */
-import {companionFromCrawler,INITIAL_DRAGON_STATE,type DragonCompanionState,type DragonEventKind} from './dragonCompanion';
+import {companionFromCrawler,INITIAL_DRAGON_STATE,type DragonCompanionState,type DragonEventKind} from './dragonCompanionState';
 export interface WireDragonEvent {schema:'skeleton.ai.dragon_crawl.event.v1';event_id:string;sequence:number;kind:DragonEventKind;url:string;at:number;payload:Record<string,unknown>}
 export interface CompanionJournal {lastSequence:number;seenIds:readonly string[];accepted:readonly string[];burning:readonly string[];state:DragonCompanionState;rejected:number;indexed:number;warnings:readonly string[]}
 export const EMPTY_COMPANION_JOURNAL:CompanionJournal={lastSequence:0,seenIds:[],accepted:[],burning:[],state:INITIAL_DRAGON_STATE,rejected:0,indexed:0,warnings:[]};
