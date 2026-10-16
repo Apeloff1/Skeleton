@@ -152,6 +152,60 @@ def ingest(root: Path, *, source: str, approved_sha256: str | None) -> dict[str,
             "trained_model_weights": False}
 
 
+def portfolio(root: Path, *, source: str) -> dict[str, Any]:
+    """Compare actual stored gameplay studies without copying protected media."""
+    from skeleton.ai.webcrawler.dragon_game_mechanics import GameMechanicsMemory
+    doc, _ = _packet(root, source)
+    expected_session = _reviewed_session_identity(doc)
+    try:
+        with closing(_database(root, create=False)) as db:
+            memory = GameMechanicsMemory(db)
+            sessions = memory.sessions(doc["owner"], authorized=True, limit=100)
+            taste = memory.distill(doc["owner"], authorized=True, limit=100)
+    except sqlite3.DatabaseError as exc:
+        raise ValueError("Dragon observation database unavailable") from exc
+    if expected_session not in {session.session_id for session in sessions}:
+        raise ValueError("Dragon portfolio source has not been ingested")
+    games: dict[str, dict[str, Any]] = {}
+    contrasts: dict[str, dict[str, set[str]]] = {}
+    for session in sessions:
+        record = games.setdefault(session.game_label, {
+            "game_label": session.game_label, "sessions": 0,
+            "observations": 0, "mechanics": set(), "session_ids": [],
+        })
+        record["sessions"] += 1
+        record["observations"] += len(session.observations)
+        record["session_ids"].append(session.session_id)
+        for observation in session.observations:
+            mechanic = observation.mechanic.value
+            record["mechanics"].add(mechanic)
+            if observation.user_confirmed and observation.preference.value in {"enjoyed", "disliked"}:
+                contrasts.setdefault(mechanic, {}).setdefault(
+                    observation.preference.value, set()).add(session.game_label)
+    results = []
+    for name in sorted(games):
+        row = games[name]
+        row["mechanics"] = sorted(row["mechanics"])
+        row["session_ids"].sort()
+        results.append(row)
+    differences = [
+        {"mechanic": name, "enjoyed_games": sorted(signals.get("enjoyed", set())),
+         "disliked_games": sorted(signals.get("disliked", set()))}
+        for name, signals in sorted(contrasts.items())
+        if signals.get("enjoyed") and signals.get("disliked")
+    ]
+    return {
+        "ok": True, "action": "dragon-portfolio", "owner": doc["owner"],
+        "session_count": len(sessions), "studied_games": results,
+        "cross_game_preference_conflicts": differences,
+        "taste_sha256": taste.fingerprint,
+        "needs_human_review": taste.review_required or bool(differences),
+        "independent_experimental_replication": False,
+        "verified_originality": False,
+        "analysis_limit_sessions": 100,
+    }
+
+
 def _reviewed_session_identity(doc: dict[str, Any]) -> str:
     """Re-run canonical Dragon admission in volatile memory to derive exact session ID."""
     from skeleton.ai.webcrawler.dragon_game_builder_bridge import review_recording
