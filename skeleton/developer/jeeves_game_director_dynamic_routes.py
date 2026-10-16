@@ -58,12 +58,27 @@ def _state_identity(world: Any, state: Any) -> tuple[Any, ...]:
             recent_talk,
         )
     return (
-        state.scene, state.acquired, state.complete, state.narrative_flags,
+        state.scene, state.acquired, state.stage_index, state.records,
+        state.complete, state.narrative_flags, status.fired_influences,
         status.standings, status.world_flags, social,
     )
 
 
 def _transport_details(world: Any, state: Any, action: DirectorAction) -> dict:
+    if action.kind == "use":
+        here = next(scene for scene in world.scenes if scene.key == state.scene)
+        action_source = next(affordance for affordance in here.affordances
+                             if affordance.key == action.key)
+        return {
+            "kind": "use", "transport_key": None, "mode": "quest",
+            "from": state.scene, "to": state.scene,
+            "turns": action_source.effort,
+            "action_type": action_source.kind,
+            "target": action_source.target,
+            "consumes": action_source.consumes,
+            "produces": action_source.produces,
+            "may_advance_quest_or_world_events": True,
+        }
     if action.kind in {"speak", "discuss", "rest", "buy", "sell"}:
         rules = world.dynamics.society
         from skeleton.ai.game_builder.quest_society import phase
@@ -160,6 +175,12 @@ def _expand(world: Any, state: Any, goal: set[str], *,
                     x["choice"] for x in steps
                     if x["kind"] in {"speak", "discuss", "rest", "buy", "sell"}
                 ],
+                "real_quest_interactions": [
+                    x["choice"] for x in steps if x["kind"] == "use"
+                ],
+                "completed_quests_after": list(at.complete),
+                "newly_completed_quests": sorted(
+                    set(at.complete) - set(state.complete)),
                 "turn_cost": at.turn - state.turn,
                 "policy_cost": price,
                 "expected_arrival_state_sha256": at.digest,
@@ -183,7 +204,8 @@ def _expand(world: Any, state: Any, goal: set[str], *,
         best[signature] = price
         for action in available_director_actions(world, at):
             if action.kind not in {
-                    "travel", "transit", "speak", "discuss", "buy", "sell", "rest"}:
+                    "travel", "transit", "speak", "discuss",
+                    "buy", "sell", "rest", "use"}:
                 continue
             details = _transport_details(world, at, action)
             next_state = director_step(world, at, action)
