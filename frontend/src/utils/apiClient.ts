@@ -37,6 +37,8 @@ interface RequestOpts {
   cacheKey?: string;
   cacheTtlMs?: number;
   maxResponseChars?: number;
+  /** Explicit opt-in only when server-side idempotent replay is verified. */
+  serverDedupeVerified?: boolean;
 }
 
 function newRid(): string {
@@ -201,7 +203,7 @@ async function _doFetch<T>(
   const GATEWAY = new Set([502, 503, 504]);
   // Unkeyed writes, including DELETE, are never replayed automatically.
   // Do not let caller-supplied retries/timeout create an unbounded loop.
-  const maxAttempts = 1 + boundedRetries(opts.retries, method, !!opts.idempotencyKey);
+  const maxAttempts = 1 + boundedRetries(opts.retries, method, !!opts.idempotencyKey, opts.serverDedupeVerified === true);
   const perAttemptTimeout = boundedTimeoutMs(opts.timeoutMs ?? 15_000);
   const maxResponseChars = boundedResponseChars(opts.maxResponseChars);
 
