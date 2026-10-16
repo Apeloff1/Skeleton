@@ -272,3 +272,66 @@ actual soundtrack and voice acoustics, lip-sync, audience emotional
 impact, screenplay coverage quality, motion continuity and full
 interactive game playthrough. Deterministic shot metadata is pre-render
 production evidence, not a Hollywood-level final-film certificate.
+
+
+## Executed story-to-gameplay consequence bridge (new)
+
+The project can now demonstrate that a signed scene's authored event
+actually leads to an executable original quest result, not just an
+unimplemented story beat. Use the existing canonical quest-scene Director
+runtime; there is no second simulation or source signing authority.
+
+Create design/story_gameplay_dossier.json with exactly these fields:
+
+    {
+      "schema": "skeleton.jeeves.story_gameplay_dossier.v1",
+      "bible": "<actual signed original StoryCanon bible object>",
+      "scenes": ["<actual signed original StoryCanon scenes>"],
+      "director_world": "<actual original DirectorWorld.payload() object>",
+      "author_review_acknowledged": true,
+      "replays": [
+        {"name":"hero_takes_first_route",
+         "actions":[{"kind":"use","key":"action_00_00_0","scene":"scene_00"}]},
+        {"name":"hero_takes_other_route",
+         "actions":[{"kind":"use","key":"action_00_00_1","scene":"scene_00"}]}
+      ],
+      "bindings": [
+        {"scene_sequence":1,"source_anchor":"visit_1",
+         "replay":"hero_takes_first_route",
+         "quest":"quest_00","stage":"stage_00",
+         "approach":"method_0","consequence":"quest_00_outcome_example"},
+        {"scene_sequence":1,"source_anchor":"visit_1",
+         "replay":"hero_takes_other_route",
+         "quest":"quest_00","stage":"stage_00",
+         "approach":"method_1","consequence":"quest_00_outcome_other"}
+      ],
+      "require_distinct_choices": true
+    }
+
+The quoted object placeholders and example outcome flags are explanatory:
+use actual canonical signed source and DirectorWorld payloads. Actual
+outcome flags MUST come from replayed world stages and cannot be invented.
+
+    python -m skeleton dev game jeeves direction-gameplay --project . --source design/story_gameplay_dossier.json --passes 8
+
+The verifier replays every declared Director action through
+director_play/director_verify, rejects unavailable actions, enforces
+source/Director project identity, checks exact signed scene anchors, and
+requires the specified quest/stage, executed approach and material
+consequence to match its replay. A requested two-choice standard requires
+at least two distinct observed approach/consequence pairs for a stage;
+duplicating the same outcome cannot qualify. Each bound action gets a
+source and executed replay digest.
+
+The audit reports unbound signed scenes, never-played quest stages and
+played stages lacking story binding. Repeat passes re-execute the actual
+quest runtime, but only within a finite and resumable per-call budget,
+without imposing a lifetime limit on game development or scrutiny.
+
+Human review acknowledgement of the blueprint is **local input**, not
+externally authenticated copyright/licensing or high-impact approval.
+Neither a completed Director stage nor signed story source proves a
+fully installed commercial game, end-to-end story branch playthrough,
+professional actor direction or book/film audience reception.
+Canonical source approval and real platform/hardware validation remain
+separate mandatory acceptance requirements.
