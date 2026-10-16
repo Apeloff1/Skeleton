@@ -152,7 +152,20 @@ def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPReq
                     expected_sequence=payload["expected_sequence"],
                     expected_state_sha256=payload["expected_state_sha256"],
                 )
-                self._answer(200, {"ok": True, "schema": SCHEMA, "snapshot": result})
+                try:
+                    from skeleton.developer.jeeves_game_director_events import delta
+                    presentation = delta(root, session=session, before=current, after=result)
+                    presentation_error = None
+                except (ValueError, OSError, KeyError, TypeError):
+                    # The quest action was already committed. Never report that
+                    # it failed just because the optional presentation layer
+                    # could not generate/validate its cinematic cues.
+                    presentation = None
+                    presentation_error = "re-check presentation from authoritative session"
+                self._answer(200, {
+                    "ok": True, "schema": SCHEMA, "snapshot": result,
+                    "presentation": presentation, "presentation_warning": presentation_error,
+                })
             except (ValueError, OSError, KeyError, TypeError):
                 self._answer(409, {"ok": False, "error": "unavailable action or invalid game session"})
 
