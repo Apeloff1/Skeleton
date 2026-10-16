@@ -44,13 +44,14 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
     moved = 0
     visited: Counter[str] = Counter({start: 1})
     episodes = []
-    full_walk: list[str] = [start]
+    episode_count = 0
+    full_walk = deque([start], maxlen=32)
     total_hops = total_shortest = 0
     use_interactions = 0
     waits = 0
 
     def close(reason: str, index: int) -> None:
-        nonlocal start, moved, total_hops, total_shortest, full_walk
+        nonlocal start, moved, total_hops, total_shortest, full_walk, episode_count
         if not moved:
             start = state.scene
             return
@@ -60,15 +61,20 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
             raise ValueError("authored shortest path exceeds actual valid replayed journey")
         total_hops += moved
         total_shortest += shortest
+        episode_count += 1
         episodes.append({
             "end_sequence": index, "boundary": reason,
             "origin": start, "destination": state.scene,
             "actual_hops": moved, "shortest_hops": shortest,
             "extra_hops_vs_shortest": surplus,
-            "walk": full_walk[-min(len(full_walk), 32):],
+            "walk": list(full_walk),
             "not_evidence_of_bad_player_behavior": True,
         })
-        start, moved, full_walk = state.scene, 0, [state.scene]
+        if len(episodes) > 40:
+            episodes.sort(key=lambda x: (-x["extra_hops_vs_shortest"],
+                                         -x["actual_hops"], x["end_sequence"]))
+            del episodes[20:]
+        start, moved, full_walk = state.scene, 0, deque([state.scene], maxlen=32)
 
     for index in range(1, count + 1):
         item = _read_doc(folder / f"{index:08d}.json")
@@ -106,7 +112,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         "actions_verified": count, "travel_hops": total_hops,
         "reference_shortest_hops": total_shortest,
         "surplus_travel_hops_vs_reference": total_hops - total_shortest,
-        "travel_episode_count": len(episodes), "interaction_actions": use_interactions,
+        "travel_episode_count": episode_count, "interaction_actions": use_interactions,
         "wait_actions": waits,
         "scene_entrance_counts": dict(sorted(visited.items())),
         "largest_route_deviations": material,
