@@ -11,13 +11,13 @@
  * the user always has a way to recover without uninstall/reinstall.
  */
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearMirror } from '../utils/safeStorage';
 import {
   getLastTrace, getCrashCount, getLastCleanBoot,
-  clearCrashes, resetBootState, TraceStep,
+  resetBootState, TraceStep,
 } from '../utils/bootTracer';
 import {
   FEATURE_FLAGS, getFeatureFlag, loadFeatureFlags,
@@ -29,6 +29,8 @@ export default function SafeModeRoute() {
   const [trace, setTrace] = useState<TraceStep[]>([]);
   const [crashCount, setCrashCount] = useState(0);
   const [lastClean, setLastClean] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   /** Re-render trigger for flag changes so the diagnostic panel stays fresh. */
   const [, setFlagsBump] = useState(0);
 
@@ -48,27 +50,74 @@ export default function SafeModeRoute() {
     setFlagsBump(n => n + 1);
   };
 
-  const tryProduct = async () => {
-    await clearCrashes();
+  const tryProduct = () => {
+    // A manual retry is not proof of success. Product marks the boot clean
+    // after a committed render; a repeated crash retains the earlier count.
     router.replace('/product');
   };
 
   const resetWelcome = async () => {
-    try { await AsyncStorage.removeItem('@codedock:welcome_seen:v1'); } catch {}
-    await clearCrashes();
-    router.replace('/welcome');
+    if (busy) return;
+    setBusy(true);
+    setRecoveryError(null);
+    try {
+      await AsyncStorage.removeItem('@codedock:welcome_seen:v1');
+      clearMirror();
+      router.replace('/welcome');
+    } catch {
+      setRecoveryError('Could not reset the welcome state. Device storage may be unavailable.');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const wipeAll = async () => {
+  const resetStartup = async () => {
+    if (busy) return;
+    setBusy(true);
+    setRecoveryError(null);
     try {
-      const keys = await AsyncStorage.getAllKeys();
-      // Keep only the bootTracer keys cleared, plus welcome flag
-      await AsyncStorage.multiRemove(keys);
-    } catch {}
-    // A raw AsyncStorage wipe must invalidate the wrapper's in-memory cache.
-    clearMirror();
-    await resetBootState();
-    router.replace('/welcome');
+      const removed = await resetBootState();
+      if (!removed) throw new Error('storage not confirmed');
+      setCrashCount(0);
+      setTrace([]);
+      setLastClean(null);
+      setRecoveryError('Startup evidence reset. Your projects and settings were preserved.');
+    } catch {
+      setRecoveryError('Startup reset was not confirmed; no success has been assumed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const performWipe = async () => {
+    if (busy) return;
+    setBusy(true);
+    setRecoveryError(null);
+    try {
+      // Drain the trace writer before wiping. If storage is stuck, do not
+      // pretend the wipe completed or navigate away from recovery.
+      if (!(await resetBootState())) throw new Error('pending trace write');
+      await AsyncStorage.clear();
+      clearMirror();
+      router.replace('/welcome');
+    } catch {
+      setRecoveryError('Data wipe could not be confirmed. Remain in Safe Mode and check device storage.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmWipe = () => {
+    if (busy) return;
+    const warning = 'Permanently delete ALL locally stored projects, work, settings and recovery logs on this device? This cannot be undone.';
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(warning)) void performWipe();
+      return;
+    }
+    Alert.alert('Delete all local app data?', warning, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete all', style: 'destructive', onPress: () => { void performWipe(); } },
+    ]);
   };
 
   const lastCleanStr = lastClean
@@ -102,10 +151,19 @@ export default function SafeModeRoute() {
           ))
         )}
 
+        {recoveryError ? <Text accessibilityRole="alert" style={styles.recoveryMessage}>{recoveryError}</Text> : null}
+        <TouchableOpacity
+          onPress={resetStartup}
+          disabled={busy}
+          style={styles.inlineBtn}
+          accessibilityLabel="Reset only startup and crash recovery state"
+        >
+          <Text style={styles.inlineBtnText}>Reset startup only (keep projects)</Text>
+        </TouchableOpacity>
         <Text style={styles.sectionLabel}>Tip</Text>
         <Text style={styles.dim}>
           The trace above shows what step the app reached before crashing.
-          Share this list with the developer to help diagnose the failure.
+          Share this list with the developer to help diagnose the failure. Resetting startup evidence does not remove saved projects.
         </Text>
 
         {/* P4 — Feature-flag diagnostic snapshot. Read-only listing so the
@@ -148,13 +206,13 @@ export default function SafeModeRoute() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={[styles.btn, styles.btnAlt]} onPress={resetWelcome}>
+        <TouchableOpacity style={[styles.btn, styles.btnAlt]} onPress={resetWelcome} disabled={busy}>
           <Text style={styles.btnAltText}>Reset welcome</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={wipeAll}>
-          <Text style={styles.btnAltText}>Wipe all</Text>
+        <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={confirmWipe} disabled={busy}>
+          <Text style={styles.btnAltText}>Delete all…</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btn} onPress={tryProduct}>
+        <TouchableOpacity style={styles.btn} onPress={tryProduct} disabled={busy}>
           <Text style={styles.btnText}>Try Product</Text>
         </TouchableOpacity>
       </View>
@@ -183,4 +241,5 @@ const styles = StyleSheet.create({
   btnAltText:{ color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
   inlineBtn:{ marginTop: 14, alignSelf: 'flex-start', backgroundColor: '#262626', borderColor: '#a78bfa55', borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8 },
   inlineBtnText:{ color: '#a78bfa', fontSize: 12, fontWeight: '800', letterSpacing: 0.4 },
+  recoveryMessage: { color: '#fbbf24', fontSize: 13, marginTop: 12, lineHeight: 18 },
 });
