@@ -1,0 +1,61 @@
+name: Satellite Archive UI Portability Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "satellites/branch-snapshots/**"
+      - "scripts/audit_satellite_integrity.py"
+      - "tests/test_satellite_integrity_audit.py"
+      - ".github/workflows/satellite-ui-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: satellite-ui-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Verify archived UI checkout paths, references and classifications
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Compile the audit and run its regression cases
+        run: |
+          python -m py_compile scripts/audit_satellite_integrity.py tests/test_satellite_integrity_audit.py
+          python -m unittest tests.test_satellite_integrity_audit
+      - name: Audit entire tracked satellites tree, fail closed on stale imports
+        run: |
+          python scripts/audit_satellite_integrity.py --ref HEAD --fail-on-ui-refs --max-examples 200 > "${{ runner.temp }}/satellite-audit.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          data = json.loads((Path(os.environ["RUNNER_TEMP"]) / "satellite-audit.json").read_text(encoding="utf-8"))
+          assert data["tracked_files"] > 0
+          assert data["collision_count"] == 0, data["collisions"]
+          assert data["path_issue_count"] == 0, data["path_issues"]
+          assert data["content_counts"].get("stale_ui_reference", 0) == 0, data["content_counts"]
+          print("Satellite checkout paths and tracked frontend imports qualified:", data["tracked_files"], "files")
+          PY
+      - name: Upload evidence including stub and truncation marker counts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: satellite-ui-qualification-${{ github.sha }}
+          path: ${{ runner.temp }}/satellite-audit.json
+          if-no-files-found: warn
+          retention-days: 7
