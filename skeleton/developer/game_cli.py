@@ -397,7 +397,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--factor", options.factor), ("--passes", options.passes),
                                 ("--gate", options.gate)):
                 if value is not None:
-                    command.extend([flag, value])
+                    command.extend([flag, str(value)])
             if options.include_notes:
                 command.append("--include-notes")
             if options.dry_run:
