@@ -99,8 +99,7 @@ func _ready() -> void:
     native_map = load("res://director_minimap.gd").new()
     native_map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     native_map.set_world(world)
-    native_map.node_selected.connect(func(target: String):
-        _request("@navigation:" + target, false))
+    native_map.node_selected.connect(_target_route)
     layout.add_child(native_map)
     status_text = Label.new()
     status_text.text = "Start the Jeeves loopback server, then connect."
@@ -219,6 +218,10 @@ func _line(value: String) -> void:
     item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     view.add_child(item)
 
+func _target_route(target: String) -> void:
+    _request("@navigation:" + target, false)
+
+
 func _refresh() -> void:
     _request("", false)
 
@@ -317,9 +320,11 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
     if (last_navigation.get("state_sha256") != snapshot.get("current_state_sha256")
             or last_navigation.get("session_head_sha256") != snapshot.get("last_receipt_sha256")):
         last_navigation = {}
-    native_map.highlight(str(snapshot.get("scene", "")),
-                         last_navigation.get("routes", [{}])[0].get("places", []) if
-                         not last_navigation.get("routes", []).is_empty() else [])
+    var route_nodes: Array = []
+    var shown_routes: Array = last_navigation.get("routes", [])
+    if not shown_routes.is_empty():
+        route_nodes = shown_routes[0].get("places", [])
+    native_map.highlight(str(snapshot.get("scene", "")), route_nodes)
     last_presentation = {}
     if parsed.get("presentation") is Dictionary:
         last_presentation = parsed["presentation"]
