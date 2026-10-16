@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from skeleton.developer.jeeves_game_director_session import _load
+from skeleton.developer.jeeves_game_director_session import _load, _read_doc
 
 SCHEMA = "skeleton.jeeves.director_presentation_delta.v1"
 MAX_TIMELINES = 64
@@ -26,6 +26,15 @@ def delta(root: Path, *, session: str, before: dict[str, Any],
             or after.get("world_sha256") != world.digest
             or after.get("sequence") != index):
         raise ValueError("presentation would render noncanonical or stale gameplay")
+    if index < 1:
+        raise ValueError("cannot present an action that never occurred")
+    event = _read_doc(folder / f"{index:08d}.json")
+    if (event["receipt_sha256"] != receipt
+            or event["prior_sha256"] != before.get("last_receipt_sha256")
+            or event["before_sha256"] != before.get("current_state_sha256")
+            or event["after_sha256"] != after.get("current_state_sha256")
+            or before.get("sequence") != index - 1):
+        raise ValueError("cinematic presentation cannot fabricate a prior player action")
     incoming = {(r["quest"], r["stage"]) for r in before.get("quest_stage_results", [])}
     new_results = [r for r in after.get("quest_stage_results", [])
                    if (r["quest"], r["stage"]) not in incoming]
@@ -96,6 +105,43 @@ def delta(root: Path, *, session: str, before: dict[str, Any],
                     add(scene.key, cut.key, "reached_campaign_ending")
     flags_before = set(before.get("narrative_flags", []))
     new_flags = sorted(set(after.get("narrative_flags", [])) - flags_before)
+    living_events = {}
+    if world.dynamics is not None:
+        previous_state = before.get("world_state")
+        next_state = after.get("world_state")
+        if not isinstance(previous_state, dict) or not isinstance(next_state, dict):
+            raise ValueError("dynamic-world presentation lacks canonical standing evidence")
+        old = dict(previous_state.get("standings", []))
+        new = dict(next_state.get("standings", []))
+        effects = [
+            {"faction": faction, "before": old[faction],
+             "after": new[faction], "delta": new[faction] - old[faction]}
+            for faction in sorted(old)
+            if new.get(faction) != old[faction]
+        ]
+        transport = None
+        if event["action"]["kind"] == "transit":
+            route = next(
+                (p for p in world.dynamics.passages
+                 if p.key == event["action"]["key"]), None)
+            if route is None:
+                raise ValueError("native transport action missing from authored world")
+            transport = {
+                "key": route.key, "mode": route.mode, "name": route.name,
+                "source": before["scene"], "destination": after["scene"],
+                "cost_turns": route.cost_turns,
+                "author_direction_required": True,
+                "cinematic_performance_verified": False,
+            }
+        living_events = {
+            "new_world_flags": sorted(
+                set(next_state.get("world_flags", []))
+                - set(previous_state.get("world_flags", []))),
+            "standing_changes": effects,
+            "inventory_spent": sorted(
+                set(before.get("acquired", [])) - set(after.get("acquired", []))),
+            "transport": transport,
+        }
     return {
         "schema": SCHEMA, "source_sha256": manifest["source_sha256"],
         "director_world_sha256": world.digest,
@@ -106,6 +152,7 @@ def delta(root: Path, *, session: str, before: dict[str, Any],
         "newly_completed_quests": sorted(newly_completed),
         "presentation_timelines": triggered,
         "triggered_timelines": len(triggered),
+        **({"living_world_events": living_events} if world.dynamics is not None else {}),
         "native_cinematic_rendering_verified": False,
         "voice_or_music_playback_verified": False,
     }
