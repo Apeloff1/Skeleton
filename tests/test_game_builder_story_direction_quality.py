@@ -24,7 +24,8 @@ def scenes(n: int):
 
 def project_scenes(project: str, n: int):
     bible = canonical_bible()
-    bible["project"] = project
+    # Canonical story identities use underscores, while workspace folder names may use hyphens.
+    bible["project"] = project.replace("-", "_")
     bible = sign(bible, BIBLE)
     output = []
     for i in range(1, n+1):
