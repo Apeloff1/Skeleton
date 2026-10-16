@@ -144,7 +144,7 @@ func _draw() -> void:
         draw_rect(Rect2(px, ground_y - tower_h, 25.0, tower_h), Color(0.18, 0.25, 0.29))
         draw_rect(Rect2(px + 5.0, ground_y - tower_h + 12.0, 6.0, 7.0), Color(0.91, 0.67, 0.34))
     var weather_name: String = str(scene_data.get("weather", "")).to_lower()
-    if environment_quality > 0 and ("rain" in weather_name or "storm" in weather_name):
+    if environment_quality > 0 and (weather_name.contains("rain") or weather_name.contains("storm")):
         for index in range(environment_quality * 24):
             var rain_x: float = fposmod(float(index * 47 + 17) +
                 environment_seconds * (35.0 + float(index % 6) * 11.0), max(w, 1.0))
@@ -152,7 +152,7 @@ func _draw() -> void:
                 environment_seconds * 133.0, max(h, 1.0))
             draw_line(Vector2(rain_x, rain_y), Vector2(rain_x - 5.0, rain_y + 13.0),
                       Color(0.72, 0.81, 0.94, 0.56), 1.0)
-    elif environment_quality > 0 and "snow" in weather_name:
+    elif environment_quality > 0 and weather_name.contains("snow"):
         for index in range(environment_quality * 28):
             var snow_x: float = fposmod(float(index * 37 + 19) +
                 environment_seconds * 13.0, max(w, 1.0))
