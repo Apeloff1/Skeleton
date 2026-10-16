@@ -106,6 +106,12 @@ def _load(root: Path, *, name: str) -> tuple[Path, DirectorWorld, Any, dict, str
     if state.digest != manifest["genesis_sha256"]:
         raise ValueError("session genesis does not match canonical original world")
     entries = sorted(folder.iterdir(), key=lambda p: p.name)
+    # An exclusive writer owns .lock while validating prior receipts.
+    for lock_entry in entries:
+        if lock_entry.name == ".lock" and (
+                lock_entry.is_symlink() or not lock_entry.is_file()):
+            raise ValueError("unsafe or modified Director session lock")
+    entries = [p for p in entries if p.name != ".lock"]
     if len(entries) < 1 or entries[0].name != "00000000.json":
         raise ValueError("Director session genesis receipt absent")
     prior = genesis
