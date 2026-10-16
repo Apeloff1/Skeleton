@@ -40,6 +40,8 @@ def _safe_dir(path: Path, *, missing_ok: bool = False) -> None:
 def _folder(root: Path, name: str, *, create: bool = False) -> Path:
     from skeleton.developer.game_cli import _load
     _load(root)
+    if root.is_symlink():
+        raise ValueError("Director session project root must not be symlinked")
     if not isinstance(name, str) or not NAME.fullmatch(name):
         raise ValueError("session name must be a lowercase portable identifier")
     base = root / ".jeeves"
