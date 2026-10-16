@@ -1,0 +1,67 @@
+name: Game-builder and AI capability gap
+description: Capture a concrete missing Jeeves, Dragon, game production, engine, or training behavior.
+title: "[Game Builder] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A design request is not evidence of implementation or model training.
+        Distinguish authored code, actual playthrough evidence, and checkpoint improvement.
+        Never attach copyrighted ROMs, secrets, or unlicensed training data.
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Production domain
+      options:
+        - Narrative / canon / dialogue
+        - Director / quests / world navigation
+        - Character / NPC / simulation
+        - Assets / animation / rendering / upscale
+        - Music / voice / cinematic
+        - Emulation / controllers / game comparison
+        - Dragon / training / weights
+        - CLI / studio integration
+        - E2E / installation / runtime qualification
+    validations:
+      required: true
+  - type: input
+    id: plan
+    attributes:
+      label: Related backlog task or architecture reference
+      placeholder: FLGB-XX-TYY, issue, PR, or untracked
+  - type: textarea
+    id: gap
+    attributes:
+      label: Missing capability and current behavior
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Observable acceptance criteria
+      description: Include actual end-user behavior, negative paths, replay/recovery, and any native-engine proof.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and reproducible scenario
+      description: Exact commit, test/run, game project fixture, artifact identity, and where to inspect receipts.
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Rights, security, privacy, resource, and compatibility constraints
+      description: List known constraints or say none known. Do not claim permission from abandonment alone.
+    validations:
+      required: true
+  - type: dropdown
+    id: delivery
+    attributes:
+      label: Requested delivery level
+      options:
+        - Specification / design only
+        - Code and local test evidence
+        - Engine playthrough and E2E evidence
+        - Independently verified model training / checkpoint evidence
+    validations:
+      required: true
