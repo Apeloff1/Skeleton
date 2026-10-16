@@ -39,6 +39,7 @@ from skeleton.developer.jeeves_game_director_labyrinth import plan
 from skeleton.developer.jeeves_game_director_atlas import export, verify
 from skeleton.developer.jeeves_game_director_causality import audit as causal_audit
 from skeleton.developer.jeeves_game_director_events import delta
+from skeleton.developer.jeeves_game_director_society_stress import stress
 from skeleton.developer.jeeves_game_dragon_policy import _context
 
 
@@ -412,6 +413,28 @@ class OriginalSocietyTests(unittest.TestCase):
         self.assertIn("NPC world-time", client)
         self.assertIn("Market:", client)
         self.assertIn("Gold balance:", client)
+
+    def test_repeatable_adversarial_economy_and_character_stress(self):
+        previous = self.root / ".jeeves"
+        self.assertFalse(previous.exists())
+        report = stress(self.root, source=self.dynamic_file, routes=4, intensity=1)
+        self.assertTrue(report["ok"])
+        self.assertTrue(report["all_market_money_conserved"])
+        self.assertEqual(report["total_verified_actions"], 4 * 48)
+        self.assertEqual(len(report["scenario_reports"]), 4)
+        for scenario in report["scenario_reports"]:
+            self.assertTrue(scenario["independent_replay_matches"])
+            self.assertEqual(scenario["gameplay_receipt_count"], 48)
+            self.assertLessEqual(scenario["final_wallet"],
+                                 scenario["initial_wallet"])
+            self.assertTrue(scenario["shop_conservation_invariants_verified"])
+        self.assertFalse(previous.exists())
+        repeat = stress(self.root, source=self.dynamic_file, routes=4, intensity=1)
+        self.assertEqual(report, repeat)
+        with self.assertRaises(ValueError):
+            stress(self.root, source=self.dynamic_file, routes=0)
+        with self.assertRaises(ValueError):
+            stress(self.root, source=self.dynamic_file, intensity=6)
 
     def test_CLI_review_and_society_journal_routing(self):
         design = run_game_cli([
