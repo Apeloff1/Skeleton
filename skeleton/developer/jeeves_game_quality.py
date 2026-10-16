@@ -168,7 +168,7 @@ def _entry(value: Any, *, era: str, console: str, genre: str,
     reviews = _natural(value["critic_reviews"], "critic_reviews", minimum=1, maximum=100000)
     sale_cite = _source(value["sales_source"], "sales")
     rating_cite = _source(value["rating_source"], "rating")
-    if sale_cite["url"] == rating_cite["url"]:
+    if sale_cite["url"] == rating_cite["url"] or sale_cite["issuer"].casefold() == rating_cite["issuer"].casefold():
         _error("sales and ratings must be independently sourced")
     if (int(sale_cite["published"][:4]) < release
         or int(rating_cite["published"][:4]) < release):
