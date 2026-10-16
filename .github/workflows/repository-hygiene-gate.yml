@@ -43,6 +43,34 @@ jobs:
           fi
           echo "DIFF_BASE=$diff_base" >> "$GITHUB_ENV"
 
+      - name: Guard against accidental large files
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+
+          while IFS= read -r -d '' path; do
+            if ! git cat-file -e "${HEAD_SHA}:${path}" 2>/dev/null; then
+              continue
+            fi
+
+            size=$(git cat-file -s "${HEAD_SHA}:${path}")
+            if (( size <= MAX_FILE_BYTES )); then
+              continue
+            fi
+
+            prefix=$(git show "${HEAD_SHA}:${path}" 2>/dev/null | head -c 120 || true)
+            if grep -q '^version https://git-lfs.github.com/spec/v1' <<<"$prefix"; then
+              continue
+            fi
+
+            mib=$(awk -v bytes="$size" 'BEGIN { printf "%.2f", bytes / 1048576 }')
+            echo "::error file=${path}::File is ${mib} MiB. Keep source files below 10 MiB or store large assets with Git LFS/artifact storage."
+            failed=1
+          done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
+
+          exit "$failed"
+
       - name: Reject portable filename collisions and invalid new paths
         shell: bash
         run: |
@@ -54,7 +82,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check "$DIFF_BASE" "$HEAD_SHA" -- . ':!skeleton/ai/research/legacy/**'
+          # git diff --check can emit hundreds of MB for generated corpora.
+          # Keep its exit code authoritative; print only bounded diagnostics.
+          set +e
+          git diff --check "$DIFF_BASE" "$HEAD_SHA" -- . ':!skeleton/ai/research/legacy/**' 2>&1 | awk '
+            NR <= 60 { print substr($0, 1, 500) }
+            END {
+              if (NR > 60) {
+                printf "... %d additional git diff --check diagnostic lines omitted\n", NR - 60
+              }
+            }
+          '
+          diff_status=${PIPESTATUS[0]}
+          set -e
+          if (( diff_status != 0 )); then
+            echo "::error::Whitespace errors detected by git diff --check (exit ${diff_status})"
+            exit "$diff_status"
+          fi
 
       - name: Reject generated junk and accidental local state
         shell: bash
@@ -93,34 +137,6 @@ jobs:
                 esac
                 ;;
             esac
-          done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
-
-          exit "$failed"
-
-      - name: Guard against accidental large files
-        shell: bash
-        run: |
-          set -euo pipefail
-          failed=0
-
-          while IFS= read -r -d '' path; do
-            if ! git cat-file -e "${HEAD_SHA}:${path}" 2>/dev/null; then
-              continue
-            fi
-
-            size=$(git cat-file -s "${HEAD_SHA}:${path}")
-            if (( size <= MAX_FILE_BYTES )); then
-              continue
-            fi
-
-            prefix=$(git show "${HEAD_SHA}:${path}" 2>/dev/null | head -c 120 || true)
-            if grep -q '^version https://git-lfs.github.com/spec/v1' <<<"$prefix"; then
-              continue
-            fi
-
-            mib=$(awk -v bytes="$size" 'BEGIN { printf "%.2f", bytes / 1048576 }')
-            echo "::error file=${path}::File is ${mib} MiB. Keep source files below 10 MiB or store large assets with Git LFS/artifact storage."
-            failed=1
           done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
 
           exit "$failed"
