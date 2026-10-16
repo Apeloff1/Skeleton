@@ -242,7 +242,9 @@ def preview(root: Path, *, source: str, intensity: int = 3) -> dict[str, Any]:
     candidate = {
         "schema": "skeleton.jeeves.director_campaign_source.v1",
         "director_world": rewritten,
-        "author_review_acknowledged": True,
+        # Preview is not human-reviewed merely because its inputs were.
+        # This flag becomes true only at explicit digest-approved publish.
+        "author_review_acknowledged": False,
     }
     content = {
         "schema": SCHEMA, "source": source,
@@ -275,7 +277,8 @@ def publish(root: Path, *, source: str, intensity: int,
     again = preview(root, source=source, intensity=intensity)
     if again != design:
         raise ValueError("authored game changed during approved dynamic-world publication")
-    data = design["design"]["candidate"]
+    data = dict(design["design"]["candidate"])
+    data["author_review_acknowledged"] = True
     raw = (json.dumps(data, indent=2, sort_keys=True,
                       ensure_ascii=True, allow_nan=False) + "\n").encode()
     if len(raw) > 16 * 1024 * 1024:
