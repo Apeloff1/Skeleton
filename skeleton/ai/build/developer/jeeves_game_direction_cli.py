@@ -19,7 +19,7 @@ def direction(root: Path, *, action: str, source: str,
     )
     data, sha = _read(root,source,16*1024*1024)
     permitted={"schema","bible","scenes","expert_reviews"}
-    optional={"dramatic_threads","production_contract","shot_boards"}
+    optional={"dramatic_threads","production_contract","shot_boards","gameplay_source"}
     if not isinstance(data, dict) or data.get("schema")!=SCHEMA or not permitted.issubset(data) or not set(data).issubset(permitted|optional):
         raise DirectionError("signed story-direction dossier requires bible, scenes and independent review claims")
     from skeleton.developer.game_cli import _load
@@ -67,7 +67,47 @@ def direction(root: Path, *, action: str, source: str,
         }
         if shot_result is not None else None
     )
+    gameplay_result = None
+    if "gameplay_source" in data:
+        from skeleton.ai.game_builder.story_canon_fabric import verify_story_history
+        gameplay_result = gameplay(root, source=data["gameplay_source"], passes=passes)
+        matching_history = verify_story_history(data["bible"], data["scenes"])
+        if gameplay_result["canonical_story_digest"] != matching_history["digest"]:
+            raise DirectionError("playable quest evidence belongs to a different signed narrative history")
+    report["playable_story"] = (
+        {
+            "original_director_world_sha256": gameplay_result["director_world_digest"],
+            "replay_evidence_sha256": gameplay_result["replay_evidence_sha256"],
+            "replayed_quest_actions": gameplay_result["real_actions_executed"],
+            "bound_story_scenes": gameplay_result["source_scenes_bound"],
+            "total_original_scenes": gameplay_result["source_scenes_reparsed"],
+            "distinct_executed_consequences": gameplay_result["distinct_replayed_consequence_pairs"],
+            "unbound_story_scene_sequences": gameplay_result["unbound_source_scene_sequences"],
+            "unexecuted_quest_stage_count": len(gameplay_result["unexecuted_quest_stages"]),
+            "full_game_playthrough_verified": False,
+        }
+        if gameplay_result is not None else None
+    )
     result=report if action=="direction-audit" else revision_plan(report)
+    if action=="direction-revision":
+        result["playable_story"]=report["playable_story"]
+        if gameplay_result is not None:
+            for sequence in gameplay_result["unbound_source_scene_sequences"][:256]:
+                result["work_items"].append({
+                    "priority":"P0","evidence_kind":"unbound_story_gameplay_scene",
+                    "scene_sequence":sequence,
+                    "rewrite_goal":"Integrate signed scene into actual executable player choices and replay both story outcomes",
+                    "must_reverify_canonical_story_history":True,
+                    "automatic_source_overwrite":False,
+                })
+            if gameplay_result["unexecuted_quest_stages"]:
+                result["work_items"].append({
+                    "priority":"P0","evidence_kind":"unexecuted_gameplay_quest_stages",
+                    "stage_count":len(gameplay_result["unexecuted_quest_stages"]),
+                    "rewrite_goal":"Build or replay actual complete quest routes for every authored main story stage",
+                    "must_reverify_canonical_story_history":True,
+                    "automatic_source_overwrite":False,
+                })
     if action == "direction-revision":
         result["cinematic_direction"] = report["cinematic_direction"]
         if shot_result is not None:
