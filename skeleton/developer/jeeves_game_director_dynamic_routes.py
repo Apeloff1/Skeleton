@@ -53,6 +53,7 @@ def _state_identity(world: Any, state: Any) -> tuple[Any, ...]:
         social = (
             status.society.balance, status.society.relationships,
             status.society.shop_stock, status.society.owned,
+            status.society.dialogue_history,
             clock["phase_index"], state.turn % society.phase_turns,
             recent_talk,
         )
