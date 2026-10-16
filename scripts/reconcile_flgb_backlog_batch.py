@@ -23,7 +23,7 @@ def git_snapshot(root: Path) -> tuple[str, set[str]]:
         capture_output=True, text=True, check=True,
     ).stdout.strip()
     listing = subprocess.run(
-        ["git", "-C", str(root), "ls-tree", "-rz", "--name-only", "HEAD"],
+        ["git", "-C", str(root), "ls-tree", "-rz", "--name-only", head],
         capture_output=True, check=True,
     ).stdout
     return head, {p.decode("utf-8") for p in listing.split(b"\0") if p}
