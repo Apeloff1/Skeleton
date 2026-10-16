@@ -28,7 +28,7 @@ REQUIRED_GATES = (
     "accessibility", "market_quality", "source_integrity",
     "runtime_boot", "full_playthrough", "performance_and_release",
 )
-AUTOMATED_GATES = frozenset(("market_quality", "source_integrity", "runtime_boot"))
+AUTOMATED_GATES = frozenset(("market_quality", "source_integrity", "runtime_boot", "story_continuity"))
 # A terminal success requires a real domain verifier for every discipline.
 # Mere JSON receipts or an observed Godot boot are never enough.
 EXPECTED_EVIDENCE_OWNERS = {
@@ -284,6 +284,22 @@ def _probe(root: Path, policy: dict[str, Any], gate: str) -> tuple[str, str, str
                     "no dual-axis top-tier reference titles")
         except (ValueError, OSError) as exc:
             return "failed", _digest({"gate": gate, "error": str(exc)}), "market_operator_evidence", str(exc)[:2000]
+    if gate == "story_continuity":
+        from skeleton.developer.jeeves_game_direction_cli import direction
+        try:
+            report = direction(root, action="direction-audit",
+                               source="design/story_direction_packet.json", passes=1)
+            result = report["observed_story_metrics"]
+            if not result["canonical_scene_count"]:
+                return ("failed", report["dossier_sha256"], "operator_observation",
+                        "signed story bible exists but no finished dramatic scenes")
+            # Canonically signed text passed; independent professional
+            # novel/film assessment is a separate mandatory review authority.
+            return ("blocked", report["dossier_sha256"], "operator_observation",
+                    f"{result['canonical_scene_count']} signed story scenes checked; independent literary/film direction and gameplay review not yet verified")
+        except (ValueError, OSError) as exc:
+            return ("failed", _digest({"gate":gate,"error":str(exc)}),
+                    "operator_observation", str(exc)[:2000])
     if gate == "runtime_boot":
         from skeleton.developer.game_cli import _read_forge
         from skeleton.forge.playtest import playtest
