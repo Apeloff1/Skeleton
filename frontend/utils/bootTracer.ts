@@ -313,13 +313,10 @@ export async function bootGuard(): Promise<'safe-mode' | 'normal'> {
     try { await AsyncStorage.setItem(KEY_CRASH_COUNT, String(count + 1)); } catch {}
     return 'normal';
   }
-  // Crash-loop detected. ROOT-CAUSE FIX: clear the counter NOW so safe-mode is
-  // shown at most once and the very next launch attempts a normal boot again.
-  // Previously the counter was never reset on safe-mode entry, which
-  // permanently locked the device out of the Hub (it kept re-routing to
-  // safe-mode on every launch). The Hub's markBootClean() still resets on a
-  // healthy boot; this just guarantees we never get stuck.
-  try { await AsyncStorage.setItem(KEY_CRASH_COUNT, '0'); } catch {}
+  // A threshold crossing is NOT a clean boot. Keep the evidence until a
+  // product screen renders successfully or the operator explicitly resets
+  // startup state. Otherwise repeated crashes vanish from diagnostics.
+  // Safe Mode exposes manual recovery, so there is no automatic lockout.
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getFeatureFlag } = require('./featureFlags');
