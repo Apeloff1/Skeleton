@@ -23,6 +23,7 @@ var timeline_end_ms: float = 0.0
 var playback_speed: float = 1.0
 var is_paused: bool = false
 var playing: bool = false
+var timeline_skippable: bool = true
 var cue_label: Label
 var runtime_label: Label
 var motion_tweens: Array[Tween] = []
@@ -132,6 +133,7 @@ func _next_timeline() -> void:
         _labels()
         return
     var next: Dictionary = pending_timelines.pop_front()
+    timeline_skippable = next.get("skippable", false) == true
     active_cues = next.get("cues", []).duplicate(true)
     cue_index = 0
     elapsed_ms = 0.0
@@ -220,6 +222,10 @@ func toggle_pause() -> void:
 
 func skip_timeline() -> void:
     if not playing:
+        return
+    if not timeline_skippable:
+        cue_text = "This authored cinematic is not skippable"
+        _labels()
         return
     # Only the local presentation is skipped; no Director quest action is sent.
     active_cues.clear()
