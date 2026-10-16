@@ -379,3 +379,63 @@ def cycle(root: Path, *, passes: int = 1, gate: str | None = None,
             "repair_generated_requested": repair_generated,
             "repairs_attempted": sorted(repaired_gates),
             "next_step": "repair failed prerequisites, gather independent evidence and run another resumable cycle"}
+
+
+
+def training_candidates(root: Path, *, page: int = 0,
+                        page_size: int = 64) -> dict[str, Any]:
+    """Stream measured fail-to-pass transitions without inventing LM training.
+
+    Produces limited-size pages from the indefinitely retained ledger.
+    Every pair is an observed change in a real checker, NOT causal learning
+    evidence, quality of neural weights, a checkpoint update, or a model
+    promotion authorization.
+    """
+    if type(page) is not int or page < 0:
+        raise ProductionError("training-candidate page must be a nonnegative integer")
+    if type(page_size) is not int or not 1 <= page_size <= 256:
+        raise ProductionError("training-candidate page size must be 1..256")
+    policy = _read_policy(root)
+    previous_failures: dict[str, dict[str, Any]] = {}
+    examples: list[dict[str, Any]] = []
+    total = 0
+    start = page * page_size
+    for event in _events(root, _digest(policy)):
+        gate = event["gate"]
+        if event["outcome"] == "failed":
+            if event["novel_evidence"] or gate not in previous_failures:
+                previous_failures[gate] = event
+        elif event["outcome"] == "passed" and gate in previous_failures:
+            failure = previous_failures.pop(gate)
+            if (
+                event["evidence_sha256"] != failure["evidence_sha256"]
+                and event["novel_evidence"]
+                and event["evidence_kind"] in {"canonical_source", "godot_boot"}
+            ):
+                record = {
+                    "gate": gate,
+                    "source_policy_sha256": _digest(policy),
+                    "failed_event_sha256": failure["digest"],
+                    "recovered_event_sha256": event["digest"],
+                    "failed_evidence_sha256": failure["evidence_sha256"],
+                    "recovered_evidence_sha256": event["evidence_sha256"],
+                    "failure_reason": failure["reason"],
+                    "verified_recheck_reason": event["reason"],
+                    "interpretation": "observed technical failure then passing check; no causality proof",
+                    "model_weights_updated": False,
+                    "eligible_for_training_promotion": False,
+                }
+                record["example_sha256"] = _digest(record)
+                if start <= total < start + page_size:
+                    examples.append(record)
+                total += 1
+    return {
+        "ok": True, "action": "production-training", "page": page,
+        "page_size": page_size, "total_observed_transitions": total,
+        "examples": examples,
+        "next_page": page + 1 if (page + 1) * page_size < total else None,
+        "all_history_still_retained": True, "source_execution_evidence_only": True,
+        "neural_network_training_performed": False,
+        "model_checkpoint_promoted": False,
+        "rights_cleared_for_external_training": False,
+    }
