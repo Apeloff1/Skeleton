@@ -235,6 +235,9 @@ def choose(root: Path, *, session: str, choice: str) -> dict[str, Any]:
             "before_sha256": state.digest, "after_sha256": next_state.digest,
         }
         item["receipt_sha256"] = _hash(item)
+        from skeleton.developer.jeeves_game_quality import _read
+        if _read(root, manifest["source"], 16 * 1024 * 1024)[1] != manifest["source_sha256"]:
+            raise ValueError("Director authored source changed during interactive action")
         _create(folder / f"{index + 1:08d}.json", item)
         return {"action": "director-session-step", "executed": action.payload(),
                 **_view(world, next_state, name=session, sequence=index + 1,
