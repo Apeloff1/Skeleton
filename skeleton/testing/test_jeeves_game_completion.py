@@ -165,8 +165,8 @@ def test_upscale_png_really_scales_and_preserves_colors(tmp_path):
 
 def test_edge_aware_scale2x_uses_only_existing_palette(tmp_path):
     root = workspace(tmp_path)
-    pixels = bytes((x * 13 % 256, x * 29 % 256, x * 7 % 256, 255)
-                   for x in range(9) for _ in range(1))
+    pixels = b"".join(bytes((x * 13 % 256, x * 29 % 256,
+                             x * 7 % 256, 255)) for x in range(9))
     (root / "assets" / "small.png").write_bytes(png_rgba(pixels, 3, 3))
     value = run_game_cli(["jeeves", "upscale", "--project", str(root),
                           "--target", "sixteen_bit_raster_1989",
