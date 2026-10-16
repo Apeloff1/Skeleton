@@ -69,21 +69,30 @@ async function _clearFsCacheIfLarge(): Promise<boolean> {
     const dir: string | undefined = FS?.cacheDirectory;
     if (!dir || typeof FS.readDirectoryAsync !== 'function') return false;
 
-    const entries: string[] = await FS.readDirectoryAsync(dir).catch(() => []);
+    // The Expo cache directory is shared by downloads, previews and user
+    // work in progress. Never delete arbitrary entries on a size threshold.
+    // Only explicitly app-owned regenerable scratch families are eligible.
+    const scratch = (await FS.readDirectoryAsync(dir).catch(() => []))
+      .filter((name: string) => /^(?:skeleton-cache-|skeleton-scratch-)[A-Za-z0-9._-]+$/.test(name));
     let total = 0;
-    for (const name of entries) {
+    for (const name of scratch) {
       try {
         const info = await FS.getInfoAsync(dir + name, { size: true });
-        total += info?.size || 0;
+        if (!info?.isDirectory && Number.isFinite(info?.size)) total += Math.max(0, info.size);
       } catch { /* skip */ }
     }
     if (total <= FS_CACHE_LIMIT_BYTES) return false;
 
-    // Over the ceiling — delete cache entries (regenerable).
-    for (const name of entries) {
-      try { await FS.deleteAsync(dir + name, { idempotent: true }); } catch { /* skip */ }
+    let removed = false;
+    for (const name of scratch) {
+      try {
+        const info = await FS.getInfoAsync(dir + name, { size: true });
+        if (info?.isDirectory) continue;
+        await FS.deleteAsync(dir + name, { idempotent: true });
+        removed = true;
+      } catch { /* skip */ }
     }
-    return true;
+    return removed;
   } catch { return false; }
 }
 
