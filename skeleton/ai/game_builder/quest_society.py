@@ -69,6 +69,43 @@ class TrustRequirement:
 
 
 @dataclass(frozen=True, slots=True)
+class DialogueChoice:
+    """Original authored conversation option with non-fabricated consequences."""
+    key: str
+    prompt: str
+    response: str
+    trust_delta: int = 0
+    reputation_delta: int = 0
+    requires_flags: tuple[str, ...] = ()
+    grant_world_flag: str | None = None
+
+    def __post_init__(self):
+        _id(self.key)
+        _label(self.prompt, 300)
+        _label(self.response, 480)
+        _int(self.trust_delta, -40, 40)
+        _int(self.reputation_delta, -20, 20)
+        if (not isinstance(self.requires_flags, tuple)
+                or len(self.requires_flags) > 16 or
+                len(set(self.requires_flags)) != len(self.requires_flags)):
+            raise ValueError("invalid dialogue prerequisite list")
+        for flag in self.requires_flags:
+            _id(flag)
+        if self.grant_world_flag is not None:
+            _id(self.grant_world_flag)
+
+    def payload(self):
+        return {
+            "key": self.key, "prompt": self.prompt,
+            "response": self.response,
+            "trust_delta": self.trust_delta,
+            "reputation_delta": self.reputation_delta,
+            "requires_flags": list(self.requires_flags),
+            "grant_world_flag": self.grant_world_flag,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Resident:
     key: str
     name: str
@@ -80,6 +117,7 @@ class Resident:
     reputation_gain: int = 0
     unlock_at_trust: int = 60
     unlock_world_flag: str | None = None
+    dialogue: tuple[DialogueChoice, ...] = ()
 
     def __post_init__(self):
         _id(self.key)
@@ -99,15 +137,27 @@ class Resident:
             _id(self.unlock_world_flag)
         if self.reputation_gain and self.faction is None:
             raise ValueError("NPC cannot alter an unspecified faction")
+        if (not isinstance(self.dialogue, tuple) or len(self.dialogue) > 16
+                or any(not isinstance(c, DialogueChoice) for c in self.dialogue)
+                or len({c.key for c in self.dialogue}) != len(self.dialogue)):
+            raise ValueError("NPC dialogue choices must be unique and source-typed")
+        for option in self.dialogue:
+            if len(self.key + "_" + option.key) > 64:
+                raise ValueError("conversation action key exceeds the Director contract")
+            if option.reputation_delta and self.faction is None:
+                raise ValueError("dialogue has faction influence without a faction")
 
     def payload(self):
-        return {"key": self.key, "name": self.name,
-                "faction": self.faction, "schedule": list(self.schedule),
-                "greeting": self.greeting, "initial_trust": self.initial_trust,
-                "trust_gain": self.trust_gain,
-                "reputation_gain": self.reputation_gain,
-                "unlock_at_trust": self.unlock_at_trust,
-                "unlock_world_flag": self.unlock_world_flag}
+        result = {"key": self.key, "name": self.name,
+                  "faction": self.faction, "schedule": list(self.schedule),
+                  "greeting": self.greeting, "initial_trust": self.initial_trust,
+                  "trust_gain": self.trust_gain,
+                  "reputation_gain": self.reputation_gain,
+                  "unlock_at_trust": self.unlock_at_trust,
+                  "unlock_world_flag": self.unlock_world_flag}
+        if self.dialogue:
+            result["dialogue"] = [option.payload() for option in self.dialogue]
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,9 +331,31 @@ def compile_society(data: Any) -> SocietyRules:
         raise ValueError("society source exceeds per-world resource limits")
     residents = []
     for item in doc["residents"]:
-        row = _exact(item, {"key", "name", "faction", "schedule", "greeting",
-                            "initial_trust", "trust_gain", "reputation_gain",
-                            "unlock_at_trust", "unlock_world_flag"}, "resident")
+        fields = {"key", "name", "faction", "schedule", "greeting",
+                  "initial_trust", "trust_gain", "reputation_gain",
+                  "unlock_at_trust", "unlock_world_flag"}
+        if type(item) is not dict or set(item) not in (fields, fields | {"dialogue"}):
+            raise ValueError("invalid authored NPC dialogue schema")
+        row = item
+        dialogues = row.get("dialogue", [])
+        if not isinstance(dialogues, list) or len(dialogues) > 16:
+            raise ValueError("NPC dialogue options require bounded typed list")
+        choices = []
+        for option in dialogues:
+            choice = _exact(option, {"key", "prompt", "response",
+                                     "trust_delta", "reputation_delta",
+                                     "requires_flags", "grant_world_flag"},
+                            "original NPC conversation")
+            if type(choice["requires_flags"]) is not list:
+                raise ValueError("dialogue required flags must be an ordered array")
+            choices.append(DialogueChoice(
+                key=choice["key"], prompt=choice["prompt"],
+                response=choice["response"],
+                trust_delta=choice["trust_delta"],
+                reputation_delta=choice["reputation_delta"],
+                requires_flags=tuple(choice["requires_flags"]),
+                grant_world_flag=choice["grant_world_flag"],
+            ))
         if type(row["schedule"]) is not list:
             raise ValueError("NPC schedule must be a four-phase array")
         residents.append(Resident(
@@ -293,6 +365,7 @@ def compile_society(data: Any) -> SocietyRules:
             reputation_gain=row["reputation_gain"],
             unlock_at_trust=row["unlock_at_trust"],
             unlock_world_flag=row["unlock_world_flag"],
+            dialogue=tuple(choices),
         ))
     shops = []
     for item in doc["shops"]:
@@ -346,6 +419,9 @@ def legal_actions(rules: SocietyRules, state: Any) -> tuple[tuple[str, str], ...
     for npc in present.values():
         if cooldown.get(npc.key) != cycle:
             actions.append(("speak", npc.key))
+            for choice in npc.dialogue:
+                if set(choice.requires_flags).issubset(state.narrative_flags):
+                    actions.append(("discuss", npc.key + "_" + choice.key))
     stock = {(shop, good): count for shop, good, count in society.shop_stock}
     owned = dict(society.owned)
     for shop in rules.shops:
@@ -379,25 +455,39 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
     old = state.world_state.society
     if kind == "rest":
         return old, (), (), (), rules.phase_turns
-    if kind == "speak":
-        resident = next(n for n in rules.residents if n.key == key)
+    if kind in {"speak", "discuss"}:
+        if kind == "speak":
+            resident = next(n for n in rules.residents if n.key == key)
+            delta = resident.trust_gain
+            faction_delta = resident.reputation_gain
+            extra_flag = None
+        else:
+            resident, choice = next(
+                (n, option) for n in rules.residents for option in n.dialogue
+                if n.key + "_" + option.key == key
+            )
+            delta = choice.trust_delta
+            faction_delta = choice.reputation_delta
+            extra_flag = choice.grant_world_flag
         relationships = dict(old.relationships)
-        before = relationships[key]
-        relationships[key] = max(-100, min(100, before + resident.trust_gain))
+        before = relationships[resident.key]
+        relationships[resident.key] = max(-100, min(100, before + delta))
         touched = dict(old.last_talk_cycle)
-        touched[key] = phase(rules, state.turn)["cycle"]
-        flags = (resident.unlock_world_flag,) if (
-            resident.unlock_world_flag is not None
-            and relationships[key] >= resident.unlock_at_trust
-        ) else ()
-        faction_effects = ((resident.faction, resident.reputation_gain),) if (
-            resident.faction is not None and resident.reputation_gain
+        touched[resident.key] = phase(rules, state.turn)["cycle"]
+        flags = set()
+        if (resident.unlock_world_flag is not None
+                and relationships[resident.key] >= resident.unlock_at_trust):
+            flags.add(resident.unlock_world_flag)
+        if extra_flag is not None:
+            flags.add(extra_flag)
+        faction_effects = ((resident.faction, faction_delta),) if (
+            resident.faction is not None and faction_delta
         ) else ()
         return SocietyState(
             old.balance, tuple(sorted(relationships.items())),
             tuple(sorted(touched.items())), old.shop_stock, old.owned,
             old.transactions,
-        ), faction_effects, flags, (), 1
+        ), faction_effects, tuple(sorted(flags)), (), 1
     good_shop = next(
         (s for s in rules.shops for good in s.goods
          if s.key + "_" + good.key == key), None)
