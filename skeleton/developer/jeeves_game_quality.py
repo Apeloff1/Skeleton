@@ -221,6 +221,10 @@ def rank_cohort(root: Path, *, console: str, genre: str, period: str,
         _error(f"at least {MIN_COHORT} comparable games required for rankings")
     if len({r["sales_basis"] for r in records}) != 1 or len({r["sales_scope"] for r in records}) != 1:
         _error("cannot compare inconsistent unit-sales basis or geographic scope")
+    if any(r["critic_reviews"] < MIN_CRITIC_REVIEWS for r in records):
+        _error("each ranked game needs a credible critic review sample")
+    if len({r["sales_units"] for r in records}) < 3 or len({r["critic_score"] for r in records}) < 3:
+        _error("cohort lacks enough distinct sales and rating evidence to rank reliably")
     # Ordinal top quartile for BOTH axes; ties share rank rather than
     # arbitrarily excluding an equivalent result by alphabetical sort order.
     cutoff = max(1, math.ceil(len(records) * TOP_PERCENT))
