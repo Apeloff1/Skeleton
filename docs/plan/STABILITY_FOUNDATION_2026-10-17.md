@@ -122,3 +122,43 @@ not an attested crash-free release.
 safe mode, startup attempts, launcher controls and the canonical configuration
 authority. The stricter request policy should be validated against every
 mutating endpoint that expects a server-owned idempotency key.
+
+## Best-practice review — recovery data integrity (2026-10-17)
+
+This is a corrective review of the earlier stability changes, not an added
+supervisor or independent runtime. Existing frontend ownership is retained.
+
+- **No false acknowledgement:** `bootGuard` no longer clears the crash counter
+  just for choosing Safe Mode. Manual navigation to Product and resetting the
+  welcome preference likewise do not claim a successful boot. `markBootClean`
+  remains the acknowledgement path after the Product route renders.
+- **Bounded backpressure:** `LatestSnapshotWriter` permits at most one native
+  trace write in flight plus one latest pending snapshot. Even an indefinitely
+  hung AsyncStorage promise cannot build an unbounded chain of diagnostic
+  writes. Best-effort trace persistence may lose intermediate breadcrumbs
+  during an outage; the last memory snapshot and prior-session archive remain
+  diagnostic fallbacks, not evidence of guaranteed durable writes.
+- **Reset fencing:** startup-reset suspends trace writes, drops the pending
+  snapshot, waits for the in-flight write with a bounded budget, and returns
+  `false` rather than falsely claiming success if it cannot establish
+  safe removal. A storage adapter that hangs or misorders native writes remains
+  outside the JS-level guarantee.
+- **Data-preserving recovery:** a non-destructive startup reset is offered
+  before full wipe. The prior immediate wipe action now explicitly confirms
+  irreversible deletion, disables concurrent actions and reports failures.
+  Ordinary retry and welcome reset preserve projects and crash evidence.
+- **Protected diagnostics:** trace labels are bounded and redacted before
+  logging; unserializable metadata cannot break crash logging. Safe Mode
+  diagnostic reads run independently of optional feature flag hydration, and
+  async rejections are handled during unmount.
+- **Executable evidence:** the committed `test:stability` task now includes
+  four trace-writer fault-injection tests alongside the original ten pure
+  policy tests. All **14/14 passed locally** on Node 22.16 with source files
+  byte-identical to the Git blob hashes. This is focused policy/queue evidence
+  only—not proof that React Native, Windows, native storage, or the production
+  game studio have passed installation or end-to-end testing.
+
+Release blockers remain: exact-head TypeScript compilation, Expo export,
+Native Android restart/OOM/low-storage, full Python recovery tests, Windows
+first-install, and complete AI/game-playthrough operation. Do not merge based
+solely on focused tests, source completeness or mergeability.
