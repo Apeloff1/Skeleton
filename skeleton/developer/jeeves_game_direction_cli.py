@@ -19,7 +19,8 @@ def direction(root: Path, *, action: str, source: str,
     )
     data, sha = _read(root,source,16*1024*1024)
     permitted={"schema","bible","scenes","expert_reviews"}
-    if data.get("schema")!=SCHEMA or set(data) not in (permitted, permitted|{"dramatic_threads"}):
+    optional={"dramatic_threads","production_contract","shot_boards"}
+    if data.get("schema")!=SCHEMA or not permitted.issubset(data) or not set(data).issubset(permitted|optional):
         raise DirectionError("signed story-direction dossier requires bible, scenes and independent review claims")
     from skeleton.developer.game_cli import _load
     project = _load(root)["name"]
@@ -52,3 +53,34 @@ def benchmark(root: Path, *, source: str) -> dict[str,Any]:
     audit["source_sha256"]=digest
     audit["independent_commercial_data_verified"]=False
     return audit
+
+
+
+def cinematic(root: Path, *, source: str, passes: int = 1) -> dict[str, Any]:
+    """Review shotboards using the canonical production/cinematography contracts."""
+    from skeleton.developer.jeeves_game_quality import _read
+    from skeleton.developer.game_cli import _load
+    from skeleton.ai.game_builder.story_direction_quality import DirectionError
+    from skeleton.ai.game_builder.story_direction_shot_pipeline import audit_cinematic_direction
+
+    packet, digest = _read(root, source, 16 * 1024 * 1024)
+    expected = {"schema", "bible", "scenes", "expert_reviews",
+                "production_contract", "shot_boards"}
+    optional = {"dramatic_threads"}
+    if (not isinstance(packet, dict) or
+            not expected.issubset(packet) or not set(packet).issubset(expected | optional) or
+            packet.get("schema") != SCHEMA):
+        raise DirectionError("cinematic review needs signed story, production contract and shot boards")
+    project = _load(root)["name"].replace("-", "_")
+    bible = packet["bible"]
+    if not isinstance(bible, dict) or bible.get("project") != project:
+        raise DirectionError("cinematic direction belongs to a different story project")
+    result = audit_cinematic_direction(
+        bible, packet["production_contract"], packet["scenes"],
+        packet["shot_boards"], passes=passes,
+    )
+    result["dossier_path"] = source
+    result["dossier_sha256"] = digest
+    result["source_review_only"] = True
+    result["rendered_film_or_original_game_certified"] = False
+    return result
