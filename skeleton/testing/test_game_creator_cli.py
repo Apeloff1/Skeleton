@@ -84,6 +84,18 @@ def test_verify_detects_content_tampering_and_prevents_package(tmp_path: Path):
     assert run_game_cli(["package", "--project", str(root)])["ok"] is False
 
 
+def test_verify_rejects_unsafe_windows_path_before_file_io(tmp_path: Path):
+    root = workspace(tmp_path)
+    emit(root)
+    receipt_path = root / "build" / "godot" / "FORGE_MANIFEST.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["sha256"]["C:/escape.gd"] = "0" * 64
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    result = run_game_cli(["verify", "--project", str(root)])
+    assert result["ok"] is False
+    assert "unsafe Forge file list" in result["error"]
+
+
 def test_assets_inventory_is_content_addressed_and_symlink_safe(tmp_path: Path):
     root = workspace(tmp_path)
     (root / "assets" / "icon.png").write_bytes(b"\x89PNGexample")
