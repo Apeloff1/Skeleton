@@ -165,7 +165,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
                                             "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
                                             "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
-                                            "director-dynamics-audit"))
+                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -255,11 +255,22 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-dynamics-design": {"action", "source", "intensity"},
             "director-dynamics-publish": {"action", "source", "intensity", "approve"},
             "director-dynamics-audit": {"action", "source"},
+            "dragon-world-study": {"action", "session", "approve"},
+            "dragon-world-contrast": {"action", "session", "other_session"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
                 if key not in live_actions[args.action] and value is not None and value is not False:
                     raise ValueError("unrelated Director runtime option --" + key.replace("_", "-"))
+            if args.action in {"dragon-world-study", "dragon-world-contrast"}:
+                from skeleton.developer.jeeves_game_dragon_world import queue, compare
+                if not args.session:
+                    raise ValueError("Dragon world research requires --session")
+                if args.action == "dragon-world-contrast":
+                    if not args.other_session:
+                        raise ValueError("Dragon world contrast requires --other-session")
+                    return compare(root, first=args.session, second=args.other_session)
+                return queue(root, session=args.session, approved_sha256=args.approve)
             if args.action in {"director-dynamics-design",
                                "director-dynamics-publish", "director-dynamics-audit"}:
                 if not args.source:
