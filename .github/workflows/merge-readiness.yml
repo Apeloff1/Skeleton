@@ -27,6 +27,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -35,6 +36,32 @@ jobs:
         run: python -m compileall -q skeleton
       - name: Verify top-level application entrypoint syntax
         run: python -m py_compile skeleton/__main__.py
+      - name: Detect changed frontend
+        id: frontend
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
+            if git diff --name-only HEAD^1 HEAD^2 | grep -q '^frontend/'; then
+              echo 'run=true' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set up Node 24
+        if: steps.frontend.outputs.run == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Install isolated TypeScript syntax runner
+        if: steps.frontend.outputs.run == 'true'
+        run: npm install --prefix "$RUNNER_TEMP/stability-typescript" --ignore-scripts --no-audit --no-fund --no-save --no-package-lock typescript@5.9.3
+      - name: Execute reconciled startup safety regressions
+        if: steps.frontend.outputs.run == 'true'
+        working-directory: frontend
+        env:
+          NODE_PATH: ${{ runner.temp }}/stability-typescript/node_modules
+        run: node --test scripts/test-reconciled-stability.cjs
       - name: Record fast-gate policy
         run: |
           echo '## Fast Merge Readiness' >> "$GITHUB_STEP_SUMMARY"

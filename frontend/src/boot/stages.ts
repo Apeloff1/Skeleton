@@ -41,7 +41,12 @@ export async function readBootCache(): Promise<CachedBoot | null> {
     const raw = await safeGetItem(BOOT_CACHE_KEY, null, 500);
     if (!raw) return null;
     const parsed = JSON.parse(raw as string);
-    return parsed && typeof parsed === 'object' ? parsed as CachedBoot : null;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    if (!Number.isFinite(parsed.ts) || parsed.ts <= 0
+      || !Number.isFinite(parsed.score) || parsed.score < 0 || parsed.score > 100) return null;
+    if (parsed.runtimeOk !== undefined && typeof parsed.runtimeOk !== 'boolean') return null;
+    if (parsed.backendOk !== undefined && typeof parsed.backendOk !== 'boolean') return null;
+    return parsed as CachedBoot;
   } catch { return null; }
 }
 
@@ -160,24 +165,24 @@ export const STAGES: BootStageDef[] = [
     },
   },
   {
-    id: 'languages_prewarm', label: 'Workspace assets', deps: ['backend'],
+    id: 'languages_prewarm', label: 'Workspace assets', deps: ['finalize'],
     timeoutMs: 3_000, critical: false, weight: 15, phase: 1,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
       const result = await api.get('/api/languages', {
         timeoutMs: 2_500, retries: 0,
-        cacheKey: 'languages', cacheTtlMs: 60_000,
+        cacheKey: 'languages', cacheTtlMs: 60_000, signal,
       });
-      return result.ok ? { ok: true } : { ok: true, note: 'skipped' };
+      return result.ok ? { ok: true } : { ok: false, note: 'service unavailable' };
     },
   },
   {
-    id: 'tunnel_probe', label: 'Tunnel watchdog', deps: ['backend'],
+    id: 'tunnel_probe', label: 'Tunnel watchdog', deps: ['finalize'],
     timeoutMs: 3_000, critical: false, weight: 5, phase: 1,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
-      const result = await api.get('/api/health/tunnel', { timeoutMs: 2_500, retries: 0 });
-      return result.ok ? { ok: true } : { ok: true, note: 'skipped' };
+      const result = await api.get('/api/health/tunnel', { timeoutMs: 2_500, retries: 0, signal });
+      return result.ok ? { ok: true } : { ok: false, note: 'service unavailable' };
     },
   },
   {
@@ -194,7 +199,7 @@ export const STAGES: BootStageDef[] = [
             : `clean (${result.scanned} keys, ${result.elapsedMs}ms)`,
         };
       } catch (error: any) {
-        return { ok: true, note: `skipped: ${error?.message || 'error'}` };
+        return { ok: false, note: `pruning unavailable: ${error?.message || 'error'}` };
       }
     },
   },
