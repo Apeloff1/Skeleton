@@ -10,6 +10,11 @@ STAGE_SCRIPT = r'''extends Control
 
 # Original procedural stage. Never eval authored strings or load arbitrary paths.
 var scene_data: Dictionary = {}
+var media_catalog: Dictionary = {}
+var backdrop: Texture2D
+var score_player: AudioStreamPlayer
+var music_enabled: bool = true
+var current_score: String = ""
 var shift: float = 0.0
 var camera_scale: float = 1.0
 var actors: Array = []
@@ -43,6 +48,13 @@ var supported_cues: Dictionary = {
 }
 
 func _ready() -> void:
+    var source := FileAccess.get_file_as_string("res://media_catalog.json")
+    var parsed = JSON.parse_string(source)
+    if parsed is Dictionary and parsed.get("scenes") is Dictionary:
+        media_catalog = parsed["scenes"]
+    score_player = AudioStreamPlayer.new()
+    score_player.volume_db = -18.0
+    add_child(score_player)
     custom_minimum_size = Vector2(450, 310)
     clip_contents = true
     cue_label = Label.new()
@@ -62,6 +74,25 @@ func _ready() -> void:
 
 func apply_scene(data: Dictionary) -> void:
     scene_data = data
+    var binding: Dictionary = media_catalog.get(str(data.get("key", "")), {})
+    backdrop = null
+    var image_path: String = str(binding.get("backdrop", ""))
+    if image_path.begins_with("res://media/") and ResourceLoader.exists(image_path):
+        var image_resource = load(image_path)
+        if image_resource is Texture2D:
+            backdrop = image_resource
+    var music_path: String = str(binding.get("music", ""))
+    if music_path != current_score:
+        score_player.stop()
+        current_score = music_path
+        if music_path.begins_with("res://media/") and ResourceLoader.exists(music_path):
+            var soundtrack = load(music_path)
+            if soundtrack is AudioStream:
+                if soundtrack is AudioStreamWAV:
+                    soundtrack.loop_mode = AudioStreamWAV.LOOP_FORWARD
+                score_player.stream = soundtrack
+                if music_enabled:
+                    score_player.play()
     actors = data.get("cast", []).duplicate()
     cue_text = str(data.get("title", ""))
     environmental_tint = _scene_tint(str(data.get("weather", "")))
@@ -86,6 +117,8 @@ func _draw() -> void:
     if w <= 0.0 or h <= 0.0:
         return
     draw_rect(Rect2(Vector2.ZERO, size), environmental_tint)
+    if backdrop != null:
+        draw_texture_rect(backdrop, Rect2(Vector2.ZERO, size), false)
     draw_circle(Vector2(w * 0.80, h * 0.22), 22.0, Color(0.96, 0.87, 0.56))
     var camera_offset: float = shift
     var ground_y: float = h * 0.70
@@ -209,6 +242,16 @@ func _execute_cue(cue: Dictionary) -> void:
     cue_text = kind.replace("_", " ").capitalize() + ": " + value.left(160)
     queue_redraw()
     _labels()
+
+func toggle_music() -> void:
+    music_enabled = not music_enabled
+    if not music_enabled:
+        score_player.stop()
+    elif score_player.stream != null:
+        score_player.play()
+    cue_text = "Original generated score: " + ("playing" if music_enabled else "muted")
+    _labels()
+
 
 func toggle_pause() -> void:
     is_paused = not is_paused
