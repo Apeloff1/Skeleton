@@ -235,6 +235,9 @@ def _preview(root: Path, *, source: str, genre: str, target: str) -> dict[str, A
             constraints = GameDesignConstraint(
                 genre=genre, target_platform=target,
                 originality_notes=("Create new assets and original fictional content",))
+            current_taste = memory.distill(doc["owner"], authorized=True)
+            if current_taste.review_required:
+                raise ValueError("Dragon preferences contain unresolved review or cross-game disagreement; inspect dragon-portfolio")
             handoff = prepare_game_builder_handoff(
                 memory, DragonGameForge(), owner=doc["owner"],
                 constraints=constraints, authorized=True, human_approved=True)
