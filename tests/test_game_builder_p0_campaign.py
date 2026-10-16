@@ -136,6 +136,24 @@ def test_campaign_cli_runs_approved_local_world_and_rejects_forgery(tmp_path):
     assert report["route_count"] == 2
     assert report["source_dossier_sha256"]
     assert not report["qualified_for_release"]
+    saved = run_game_cli(command + ["--output", "original_campaign"])
+    assert saved["ok"], saved
+    assert len(saved["saved_campaigns"]) == 2
+    assert all(s["ok"] for s in saved["saved_campaigns"])
+    restored = run_game_cli([
+        "jeeves", "direction-campaign-reopen", "--project", str(root),
+        "--source", "design/director_campaign_source.json",
+        "--output", "original_campaign_0",
+    ])
+    assert restored["ok"], restored
+    assert len(restored["restored_completed_quests"]) == 3
+    assert restored["native_godot_savegame_verified"] is False
+    assert restored["actual_restored_state_sha256"] == (
+        saved["route_reports"][0]["final_director_state_sha256"]
+    )
+    no_overwrite = run_game_cli(command + ["--output", "original_campaign"])
+    assert not no_overwrite["ok"]
+    assert "already exists" in no_overwrite["error"]
     packet["author_review_acknowledged"] = False
     (root / "design" / "director_campaign_source.json").write_text(json.dumps(packet))
     refused = run_game_cli(command)
