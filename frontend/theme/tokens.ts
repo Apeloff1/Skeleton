@@ -70,8 +70,9 @@ export const colors = {
     textDisabled: palette.ink[500],
     textInverse: palette.ink[900],
     primary: palette.brand[500],
-    // Dark ink has AA body-text contrast on brand500; white does not.
-    onPrimary: palette.ink[900],
+    // Brand500 needs the darkest canonical ink for >= 4.5:1 normal text.
+    // White and ink900 both fall slightly below AA on this fill.
+    onPrimary: palette.ink[1000],
     primaryHover: palette.brand[400],
     primarySoft: 'rgba(139,92,246,0.16)',
     accent: palette.brand[500],

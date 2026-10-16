@@ -35,7 +35,11 @@ export function onPrimaryFor(hex: string): string {
   const white = (1.05) / (y + 0.05);
   const ink = luminance('#0B1120');
   const dark = (Math.max(y, ink) + 0.05) / (Math.min(y, ink) + 0.05);
-  return white >= dark ? '#FFFFFF' : '#0B1120';
+  if (Math.max(white, dark) >= 4.5) return white >= dark ? '#FFFFFF' : '#0B1120';
+  // Royal and lavender narrowly miss AA with either conventional ink. The
+  // existing ink1000 token is darker: rescue these labels without recoloring
+  // either skin's signature primary fill or changing its content hierarchy.
+  return '#04060D';
 }
 
 const mk = (
