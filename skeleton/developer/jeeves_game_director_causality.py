@@ -52,6 +52,8 @@ def audit(root: Path, *, session: str, page: int = 1,
     wallet_spent = 0
     wallet_received = 0
     trust_earned_at = {}
+    market_goods_redeemed = Counter()
+    market_goods_spend_causes = Counter()
     society_action_total = 0
     world_consequence_edges = []
     world_consequence_count = 0
@@ -101,6 +103,7 @@ def audit(root: Path, *, session: str, page: int = 1,
         reputation_deltas = []
         trust_deltas = []
         shop_wallet_delta = 0
+        redeemed_goods = []
         if state.world_state is not None:
             if previous.world_state is None:
                 raise ValueError("existing reputation history disappeared")
@@ -153,6 +156,20 @@ def audit(root: Path, *, session: str, page: int = 1,
                         })
                 shop_wallet_delta = (
                     after_society.balance - before_society.balance)
+                old_redeemed = dict(before_society.consumed_goods)
+                for good, count in after_society.consumed_goods:
+                    diff = count - old_redeemed.get(good, 0)
+                    if diff < 0:
+                        raise ValueError("original merchandise redemption history was erased")
+                    if diff:
+                        redeemed_goods.append({"good": good, "quantity": diff})
+                        market_goods_redeemed[good] += diff
+                        market_goods_spend_causes[action.kind + ":" + action.key] += diff
+                        record_world_consequence({
+                            "at_sequence": index, "kind": "market_good_redeemed",
+                            "good": good, "quantity": diff,
+                            "caused_by": action.kind + ":" + action.key,
+                        })
                 wallet_spent += max(0, -shop_wallet_delta)
                 wallet_received += max(0, shop_wallet_delta)
                 if action.kind == "speak":
@@ -222,6 +239,7 @@ def audit(root: Path, *, session: str, page: int = 1,
                 "faction_reputation_changes": reputation_deltas,
                 "npc_trust_changes": trust_deltas,
                 "shop_wallet_delta": shop_wallet_delta,
+                "original_merchandise_redeemed": redeemed_goods,
                 "cast_present_after_action": list(here.cast),
             })
     if state != final:
@@ -255,6 +273,8 @@ def audit(root: Path, *, session: str, page: int = 1,
         "society_actions_by_time_phase": dict(sorted(dialogue_periods.items())),
         "shop_currency_spent": wallet_spent,
         "shop_currency_received": wallet_received,
+        "irreversibly_redeemed_goods": dict(sorted(market_goods_redeemed.items())),
+        "redemption_action_causes": dict(sorted(market_goods_spend_causes.items())),
         "NPC_trust_last_change_at": dict(sorted(trust_earned_at.items())),
         "world_flags_created_at": dict(sorted(world_flag_created_at.items())),
         "world_consequence_edges": world_consequence_edges,
