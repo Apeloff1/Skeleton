@@ -65,8 +65,6 @@ def test_mismatched_main_sha_and_invalid_ranges_refuse(tmp_path):
         audit(root, expected_main=head, as_of=at, min_age_days=0)
     with pytest.raises(RetirementAuditError, match="audit limits"):
         audit(root, expected_main=head, as_of=at, max_branches=0)
-    with pytest.raises(RetirementAuditError, match="count exceeds"):
-        audit(root, expected_main=head, as_of=at, max_branches=0+0+0+0+0)  # same hard limit
 
 
 def test_young_branch_is_never_retirement_candidate(tmp_path):
