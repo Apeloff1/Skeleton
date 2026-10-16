@@ -107,8 +107,15 @@ def render_reference(root: Path, *, source: str, output: str,
                     for i in range(0, len(image.pixels), 3))
     encoded = png_rgba(rgba, width, height)
     destination = _path(root, output, must_exist=False)
+    candidate = None
     if not dry_run:
         _create_only(destination, encoded)
+        from skeleton.developer.jeeves_game_upscale_queue import record_output
+        candidate = record_output(
+            root, category="3d_reference", source=source, output=output,
+            input_sha256=source_sha, output_sha256=hashlib.sha256(encoded).hexdigest(),
+            target=policy["target_id"], quality="requires_review",
+        )
     return {
         "ok": True, "action": "render-reference", "target": target,
         "pipeline": pipeline.value, "scene_sha256": source_sha,
@@ -124,4 +131,5 @@ def render_reference(root: Path, *, source: str, output: str,
         "console_hardware_fidelity_qualified": False,
         "production_qualified": False,
         "dry_run": dry_run,
+        "training_candidate": candidate,
     }
