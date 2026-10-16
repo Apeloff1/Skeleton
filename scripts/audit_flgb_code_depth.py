@@ -36,14 +36,15 @@ def _relative_module_path(path: str, level: int, module: str) -> str | None:
     if level < 1 or level > len(parents):
         return None
     prefix = parents[:len(parents) - (level - 1)]
-    return "/".join(prefix + module.split("."))
+    return "/".join(prefix + (module.split(".") if module else []))
 
 
 def inspect_python(path: str, source: str, tracked: set[str], *, test: bool = False) -> dict[str, Any]:
     result: dict[str, Any] = {
         "path": path, "syntax_ok": False, "kind": "unknown",
         "declared_definitions": 0, "test_cases": 0, "assertion_sites": 0,
-        "unresolved_relative_modules": [], "warnings": [],
+        "unresolved_relative_modules": [], "relative_owner_imports": [],
+        "ambiguous_package_exports": [], "warnings": [],
     }
     try:
         tree = ast.parse(source, filename=path)
@@ -72,12 +73,48 @@ def inspect_python(path: str, source: str, tracked: set[str], *, test: bool = Fa
         "source-wiring-or-data" if statement_nodes else "empty-or-docstring-only"
     )
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.level and node.module:
-            location = _relative_module_path(path, node.level, node.module)
-            if location and (location + ".py" not in tracked
-                             and location + "/__init__.py" not in tracked):
+        if not isinstance(node, ast.ImportFrom) or not node.level:
+            continue
+        location = _relative_module_path(path, node.level, node.module or "")
+        if location is None:
+            result["warnings"].append("relative-import-escapes-package")
+            continue
+        if node.module:
+            module_file = (location + ".py" if location + ".py" in tracked else
+                           location + "/__init__.py")
+            if module_file not in tracked:
                 result["unresolved_relative_modules"].append(location)
+            else:
+                result["relative_owner_imports"].append({
+                    "path": module_file,
+                    "symbols": [alias.name for alias in node.names],
+                })
+        else:
+            # `from . import X` may refer to a sibling module or a symbol
+            # re-exported by the package __init__. Never infer failure merely
+            # because there is no X.py: package attributes may be intentional.
+            for alias in node.names:
+                if alias.name == "*":
+                    result["warnings"].append("wildcard-package-import-needs-review")
+                    continue
+                sibling = location + "/" + alias.name
+                module_file = (sibling + ".py" if sibling + ".py" in tracked else
+                               sibling + "/__init__.py")
+                if module_file in tracked:
+                    result["relative_owner_imports"].append({
+                        "path": module_file, "symbols": [],
+                    })
+                elif location + "/__init__.py" in tracked:
+                    result["ambiguous_package_exports"].append({
+                        "package": location, "symbol": alias.name,
+                    })
+                else:
+                    result["unresolved_relative_modules"].append(sibling)
     result["unresolved_relative_modules"] = sorted(set(result["unresolved_relative_modules"]))
+    result["relative_owner_imports"] = sorted(
+        result["relative_owner_imports"], key=lambda item: (item["path"], item["symbols"]))
+    result["ambiguous_package_exports"] = sorted(
+        result["ambiguous_package_exports"], key=lambda item: (item["package"], item["symbol"]))
     if result["unresolved_relative_modules"]:
         result["warnings"].append("missing-relative-import-module")
     if result["kind"] in ("forwarding-module", "empty-or-docstring-only"):
