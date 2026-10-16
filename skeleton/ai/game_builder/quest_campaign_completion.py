@@ -136,19 +136,16 @@ def _candidate(world: DirectorWorld, state: DirectorState, stage: Any,
                         world, state, scene.key, required_item=affordance.consumes)
                 except CampaignCompletionError:
                     continue
-                total = 0
+                probe = state
                 for leg in route:
-                    if leg.kind == "travel":
-                        total += 1
-                    elif leg.kind == "transit":
-                        total += next(p.cost_turns for p in world.dynamics.passages
-                                      if p.key == leg.key)
-                    elif leg.kind == "rest":
-                        total += world.dynamics.society.phase_turns
-                    elif leg.kind in {"buy", "sell"}:
-                        total += 2
-                    else:
-                        total += 1
+                    if leg not in available_director_actions(world, probe):
+                        raise CampaignCompletionError(
+                            "authoritative stage route contains unavailable action"
+                        )
+                    probe = director_step(world, probe, leg)
+                # Use exact in-game elapsed turns, not estimated action
+                # categories; rest costs depend on the current clock phase.
+                total = probe.turn - state.turn
                 candidates.append((total, scene.key, affordance.key, affordance))
     if not candidates:
         return None
