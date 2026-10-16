@@ -24,7 +24,7 @@ def _hash(value: object) -> str:
 
 def _packet(root: Path, source: str) -> dict[str, Any]:
     world, source_sha = _load_world(root, source)
-    stage_consumers: dict[str, list[dict[str, str]]] = {}
+    stage_consumers: dict[str, list[dict[str, Any]]] = {}
     for quest in world.quests:
         for stage in quest.stages:
             for sid in stage.scene_ids:
