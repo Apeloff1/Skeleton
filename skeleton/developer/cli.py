@@ -43,6 +43,15 @@ def dev_help_text() -> str:
         jeeves dragon-ingest --source design/dragon_study.json --approve SOURCE_SHA256
         jeeves dragon-plan --source design/dragon_study.json --genre GENRE --target CONSOLE
         jeeves dragon-adopt --source design/dragon_study.json --genre GENRE --target CONSOLE --approve HANDOFF_SHA256
+        jeeves director-draft --seed N --regions a,b,c,d --quest-types main_story,investigation [--stages N --goal TEXT --dragon-digest SHA256]
+        jeeves director-revise --source design/director_candidate_<digest>.json --revision design/director_revisions.json
+        jeeves director-examine --source design/director_candidate_<digest>.json [--routes 2..8]
+        jeeves director-promote --source design/director_candidate_<digest>.json --approve SHA256 [--routes 2..8]
+        jeeves direction-campaign --source design/director_campaign_source.json [--passes 2..8 --output SAVE_PREFIX]
+        jeeves director-board --source design/director_campaign_source.json [--routes 2..8 --dragon-digest SHA256]
+        jeeves director-prepare-training --source design/director_campaign_source.json [--routes 2..8 --approve SHA256]
+        Original story and cinematic changes recompile into actual typed Director scenes
+        Dragon replay research is recorded, but does not change checkpoint weights
         Dragon evidence flows to opt-in, create-only original-game design proposals
         jeeves queue [--project DIR]
         jeeves benchmark --console ID --genre ID --period YYYY-YYYY
