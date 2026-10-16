@@ -16,6 +16,7 @@
  */
 import { trail } from './breadcrumbs';
 import { API_BASE } from '../../utils/apiBase';
+import { boundedRetries, boundedTimeoutMs, retryableHttpStatus } from '../../utils/requestRecoveryPolicy';
 
 const BACKEND = API_BASE;
 
@@ -161,12 +162,6 @@ async function _doFetch<T>(
   const rid = newRid();
   const bucket = _cbBucket(path);
 
-  const gate = _cbCheck(bucket);
-  if (!gate.allowed) {
-    return { ok: false, status: 0, data: null, error: 'circuit_open', rid };
-  }
-  const isProbe = gate.isProbe;
-
   // Read sessionStorage cache (web only) — a hit needs no network/timer.
   if (method === 'GET' && opts.cacheKey && typeof sessionStorage !== 'undefined') {
     try {
@@ -179,6 +174,14 @@ async function _doFetch<T>(
       }
     } catch {}
   }
+
+  // Only a network operation may acquire the half-open probe lease.
+  // Cache hits must never strand the circuit in an un-releasable probe.
+  const gate = _cbCheck(bucket);
+  if (!gate.allowed) {
+    return { ok: false, status: 0, data: null, error: 'circuit_open', rid };
+  }
+  const isProbe = gate.isProbe;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -196,9 +199,10 @@ async function _doFetch<T>(
   // timer so a hung retry can't outlive its budget, and back-off carries
   // jitter to avoid a thundering herd when the backend recovers.
   const GATEWAY = new Set([502, 503, 504]);
-  const idempotent = method === 'GET' || method === 'DELETE' || !!opts.idempotencyKey;
-  const maxAttempts = (opts.retries ?? (idempotent ? 3 : 1)) + 1;
-  const perAttemptTimeout = opts.timeoutMs ?? 15_000;
+  // Unkeyed writes, including DELETE, are never replayed automatically.
+  // Do not let caller-supplied retries/timeout create an unbounded loop.
+  const maxAttempts = 1 + boundedRetries(opts.retries, method, !!opts.idempotencyKey);
+  const perAttemptTimeout = boundedTimeoutMs(opts.timeoutMs ?? 15_000);
 
   const backoff = (attempt: number, gateway: boolean) => {
     const base = gateway ? 400 : 200;
@@ -227,22 +231,41 @@ async function _doFetch<T>(
     if (opts.signal) opts.signal.addEventListener('abort', abortFromCaller, { once: true });
     const signal = ac?.signal || opts.signal;
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      try { ac?.abort(); } catch {}
-    }, perAttemptTimeout);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // The deadline races the entire headers+body operation; AbortController
+    // alone does not guarantee a bounded wait on all native fetch adapters.
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        try { ac?.abort(); } catch {}
+        reject(new Error('request_timeout'));
+      }, perAttemptTimeout);
+    });
     const cleanup = () => {
-      clearTimeout(timer);
+      if (timer !== null) clearTimeout(timer);
       if (opts.signal) opts.signal.removeEventListener('abort', abortFromCaller);
     };
 
     try {
-      const res = await fetch(url, {
-        method, headers, signal,
-        body: body == null ? undefined : JSON.stringify(body),
-      });
-      const text = await res.text();
+      const { res, text } = await Promise.race([
+        (async () => {
+          const res = await fetch(url, {
+            method, headers, signal,
+            body: body == null ? undefined : JSON.stringify(body),
+          });
+          const length = Number(res.headers?.get?.('content-length') || 0);
+          if (length > 1_048_576) return { res, text: '', oversized: true };
+          const text = await res.text();
+          return { res, text, oversized: text.length > 1_048_576 };
+        })(),
+        deadline,
+      ]);
       cleanup();
+      if (res.headers?.get?.('content-length') && Number(res.headers.get('content-length')) > 1_048_576 ||
+          text.length > 1_048_576) {
+        _cbReleaseProbe(bucket, isProbe);
+        return { ok: false, status: res.status, data: null, error: 'response_too_large', rid };
+      }
 
       // If cancellation raced a completed fetch/body read, cancellation wins:
       // callers that have left the screen should never receive stale success.
@@ -254,7 +277,7 @@ async function _doFetch<T>(
       let data: any = null;
       try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
-      const transient = res.status >= 500 || GATEWAY.has(res.status);
+      const transient = retryableHttpStatus(res.status);
       if (!res.ok && transient && attempt < maxAttempts - 1) {
         lastStatus = res.status;
         trail.add('api', `${method} ${path} → ${res.status} (retry ${attempt + 1}/${maxAttempts - 1})`,
@@ -268,8 +291,9 @@ async function _doFetch<T>(
       }
 
       if (!res.ok) {
-        _cbRecordFail(bucket, isProbe);
-        trail.add('api', `${method} ${path} → ${res.status}`,
+        if (transient) _cbRecordFail(bucket, isProbe);
+        else _cbRecordOk(bucket, isProbe); // 4xx proves the transport is reachable
+        trail.add('api', `${method} ${path.split('?', 1)[0]} → ${res.status}`,
           { rid, error: (typeof data === 'object' ? data?.error || data?.detail : String(data)) || `HTTP ${res.status}` },
           res.status >= 500 ? 'error' : 'warn',
         );
