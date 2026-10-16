@@ -19,7 +19,8 @@ def direction(root: Path, *, action: str, source: str,
     )
     data, sha = _read(root,source,16*1024*1024)
     permitted={"schema","bible","scenes","expert_reviews"}
-    if data.get("schema")!=SCHEMA or set(data) not in (permitted, permitted|{"dramatic_threads"}):
+    optional={"dramatic_threads","production_contract","shot_boards"}
+    if data.get("schema")!=SCHEMA or not permitted.issubset(data) or not set(data).issubset(permitted|optional):
         raise DirectionError("signed story-direction dossier requires bible, scenes and independent review claims")
     from skeleton.developer.game_cli import _load
     project = _load(root)["name"]
@@ -33,7 +34,51 @@ def direction(root: Path, *, action: str, source: str,
         data["bible"],data["scenes"],reviewers=data["expert_reviews"],
         passes=passes, dramatic_threads=data.get("dramatic_threads"),
     )
+    has_contract = "production_contract" in data
+    has_boards = "shot_boards" in data
+    if has_contract != has_boards:
+        raise DirectionError(
+            "film direction requires production_contract and shot_boards together"
+        )
+    shot_result = None
+    if has_contract:
+        from skeleton.ai.game_builder.story_direction_shot_pipeline import (
+            audit_cinematic_direction,
+        )
+        shot_result = audit_cinematic_direction(
+            data["bible"], data["production_contract"], data["scenes"],
+            data["shot_boards"], passes=passes,
+        )
+    report["cinematic_direction"] = (
+        {
+            "pre_render_source_verified": True,
+            "source_identity_sha256": shot_result["source_identity_sha256"],
+            "scenes": shot_result["original_canon_scenes"],
+            "shots": shot_result["total_shots"],
+            "timeline_ms": shot_result["total_timeline_ms"],
+            "source_dialogue_lines_covered": shot_result["source_spoken_lines_covered"],
+            "all_camera_and_actor_source_checks_passed": True,
+            "rendered_film_quality_verified": False,
+            "original_voice_performance_verified": False,
+        }
+        if shot_result is not None else None
+    )
     result=report if action=="direction-audit" else revision_plan(report)
+    if action == "direction-revision":
+        result["cinematic_direction"] = report["cinematic_direction"]
+        if shot_result is not None:
+            for scene in shot_result["per_scene"]:
+                for observation in scene["recommended_editor_review"]:
+                    result["work_items"].append({
+                        "priority": "P1",
+                        "evidence_kind": "cinematic_editorial_review",
+                        "scene_sequence": scene["scene_sequence"],
+                        "source_receipt_sha256": scene["pre_render_receipt_digest"],
+                        "rewrite_goal": observation,
+                        "must_reverify_canonical_story_history": True,
+                        "must_reverify_human_editor_and_film_direction": True,
+                        "automatic_source_overwrite": False,
+                    })
     result["dossier_path"]=source
     result["dossier_sha256"]=sha
     result["canonical_story_source_approved_by_this_command"]=False
@@ -52,3 +97,34 @@ def benchmark(root: Path, *, source: str) -> dict[str,Any]:
     audit["source_sha256"]=digest
     audit["independent_commercial_data_verified"]=False
     return audit
+
+
+
+def cinematic(root: Path, *, source: str, passes: int = 1) -> dict[str, Any]:
+    """Review shotboards using the canonical production/cinematography contracts."""
+    from skeleton.developer.jeeves_game_quality import _read
+    from skeleton.developer.game_cli import _load
+    from skeleton.ai.game_builder.story_direction_quality import DirectionError
+    from skeleton.ai.game_builder.story_direction_shot_pipeline import audit_cinematic_direction
+
+    packet, digest = _read(root, source, 16 * 1024 * 1024)
+    expected = {"schema", "bible", "scenes", "expert_reviews",
+                "production_contract", "shot_boards"}
+    optional = {"dramatic_threads"}
+    if (not isinstance(packet, dict) or
+            not expected.issubset(packet) or not set(packet).issubset(expected | optional) or
+            packet.get("schema") != SCHEMA):
+        raise DirectionError("cinematic review needs signed story, production contract and shot boards")
+    project = _load(root)["name"].replace("-", "_")
+    bible = packet["bible"]
+    if not isinstance(bible, dict) or bible.get("project") != project:
+        raise DirectionError("cinematic direction belongs to a different story project")
+    result = audit_cinematic_direction(
+        bible, packet["production_contract"], packet["scenes"],
+        packet["shot_boards"], passes=passes,
+    )
+    result["dossier_path"] = source
+    result["dossier_sha256"] = digest
+    result["source_review_only"] = True
+    result["rendered_film_or_original_game_certified"] = False
+    return result
