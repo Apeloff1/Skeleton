@@ -65,7 +65,8 @@ def _candidate(world: DirectorWorld, state: DirectorState, stage: Any,
 
 def _complete_stage(world: DirectorWorld, state: DirectorState, quest: Any,
                     stage: Any, preference: int, include_optional: bool,
-                    actions: list[DirectorAction], checkpoints: list[DirectorState]) -> DirectorState:
+                    actions: list[DirectorAction], checkpoints: list[str],
+                    segment_size: int) -> DirectorState:
     current_stage = dict(state.stage_index)[quest.key]
     solution_candidates = stage.solutions[preference % len(stage.solutions):] + (
         stage.solutions[:preference % len(stage.solutions)]
@@ -82,7 +83,10 @@ def _complete_stage(world: DirectorWorld, state: DirectorState, quest: Any,
             raise CampaignCompletionError("planner chose unavailable original action")
         state = director_step(world, state, action)
         actions.append(action)
-        checkpoints.append(state)
+        # Preserve only one hash per bounded segment, never a whole
+        # growing DirectorState snapshot for every lifetime action.
+        if len(actions) % segment_size == 0:
+            checkpoints.append(state.digest)
 
     def satisfy(parameter: Any) -> None:
         nonlocal state
@@ -123,7 +127,7 @@ def play_campaign(world: DirectorWorld, *, preference: int = 0,
         raise CampaignCompletionError("recording slice must be between 1 and 8192 actions")
     state = director_initial(world)
     actions: list[DirectorAction] = []
-    states: list[DirectorState] = []
+    checkpoint_digests: list[str] = []
     uncompleted = {q.key for q in world.quests}
     while uncompleted:
         progress = False
@@ -133,7 +137,8 @@ def play_campaign(world: DirectorWorld, *, preference: int = 0,
             while dict(state.stage_index)[quest.key] < len(quest.stages):
                 index = dict(state.stage_index)[quest.key]
                 state = _complete_stage(world, state, quest, quest.stages[index],
-                                        preference, include_optional, actions, states)
+                                        preference, include_optional, actions,
+                                        checkpoint_digests, segment_size)
             if quest.key not in state.complete:
                 raise CampaignCompletionError("final quest stage failed to close approved quest")
             uncompleted.remove(quest.key)
@@ -144,16 +149,17 @@ def play_campaign(world: DirectorWorld, *, preference: int = 0,
     if not actions or len(state.results) != sum(len(q.stages) for q in world.quests):
         raise CampaignCompletionError("campaign did not execute every authored quest stage")
     segments = []
-    start = director_initial(world)
-    for offset in range(0, len(actions), segment_size):
+    start_digest = director_initial(world).digest
+    for segment_index, offset in enumerate(range(0, len(actions), segment_size)):
         chunk = actions[offset:offset + segment_size]
-        end = states[min(offset + segment_size, len(states)) - 1]
+        end_digest = (checkpoint_digests[segment_index]
+                      if len(chunk) == segment_size else state.digest)
         segments.append({
             "actions": [action.payload() for action in chunk],
-            "start_digest": start.digest,
-            "end_digest": end.digest,
+            "start_digest": start_digest,
+            "end_digest": end_digest,
         })
-        start = end
+        start_digest = end_digest
     checked = replay_director_segments(world, segments)
     if checked.final != state or checked.action_count != len(actions):
         raise CampaignCompletionError("campaign and independent segment replay disagree")
