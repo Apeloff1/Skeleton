@@ -73,7 +73,7 @@ func _rebuild() -> void:
         var index: int = int(ordinal.get(region, 0))
         ordinal[region] = index + 1
         var col: int = int(region_index[region]) % columns
-        var row_group: int = int(region_index[region]) / columns
+        var row_group: int = int(int(region_index[region]) / columns)
         var column_count: int = int(population[region])
         var row_span: float = maxf(26.0, size.y / float(maxi(column_count, 1) + 1))
         var x: float = 10.0 + (float(col) + 0.5) * width_each
@@ -125,14 +125,15 @@ func _draw() -> void:
                         name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
 
 func _gui_input(event: InputEvent) -> void:
-    if not (event is InputEventMouseButton) or not event.pressed:
+    if not (event is InputEventMouseButton):
         return
-    if event.button_index != MOUSE_BUTTON_LEFT:
+    var click: InputEventMouseButton = event
+    if not click.pressed or click.button_index != MOUSE_BUTTON_LEFT:
         return
     var target: String = ""
     var distance: float = 22.0
     for key in ordered_nodes:
-        var measured: float = event.position.distance_to(graph.get(key, Vector2(-10000, -10000)))
+        var measured: float = click.position.distance_to(graph.get(key, Vector2(-10000, -10000)))
         if measured < distance:
             distance = measured
             target = key
