@@ -383,3 +383,31 @@ def test_2d_camera_renderer_rejects_fake_three_dimensional_camera(tmp_path):
                    "--output","assets/misleading.png")
     assert not result["ok"]
     assert not (root/"assets"/"misleading.png").exists()
+
+
+
+def test_queue_retains_candidate_but_marks_mutated_source_as_stale(tmp_path):
+    root=workspace(tmp_path)
+    sprite(root)
+    result=command(root,"upscale-shadow","--target","nes",
+                   "--source","assets/sprite.png","--output","assets/cast.png")
+    assert result["ok"],result
+    normal=command(root,"queue-upscaled-training")
+    assert normal["candidates"][0]["original_available_and_unchanged"]
+    assert normal["candidates"][0]["output_available_and_unchanged"]
+    sprite(root,"sprite.png",w=12,h=12)
+    stale=command(root,"queue-upscaled-training")
+    assert stale["total_candidates"]==1
+    assert not stale["candidates"][0]["original_available_and_unchanged"]
+    assert stale["candidates"][0]["output_available_and_unchanged"]
+    assert not stale["candidates"][0]["eligible_for_training_promotion"]
+
+
+def test_queue_rejects_invented_source_bytes(tmp_path):
+    root=workspace(tmp_path)
+    sprite(root)
+    with pytest.raises(ValueError,match="actual original/output"):
+        record_output(root,category="asset",source="assets/sprite.png",
+                      output="assets/sprite.png",
+                      input_sha256="a"*64,output_sha256="b"*64,
+                      target="nes",quality="requires_review")
