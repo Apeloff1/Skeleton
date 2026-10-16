@@ -372,7 +372,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
                                             "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
                                             "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
-                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast"))
+                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast", "director-dynamics-playthrough"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -403,6 +403,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--route-profile", choices=("fastest", "scenic", "quiet", "novel", "quest"))
     jeeves.add_argument("--alternatives", type=int)
     jeeves.add_argument("--intensity", type=int)
+    jeeves.add_argument("--include-optional", action="store_true")
     jeeves.add_argument("--sessions")
     jeeves.add_argument("--port", type=int)
     jeeves.add_argument("--timeout", type=float)
@@ -502,6 +503,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--pixel-aspect-den", options.pixel_aspect_den)):
                 if value is not None:
                     command.extend([flag, str(value)])
+            if options.include_optional:
+                command.append("--include-optional")
             if options.include_notes:
                 command.append("--include-notes")
             if options.dry_run:
