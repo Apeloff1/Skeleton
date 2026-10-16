@@ -461,6 +461,27 @@ export function getJeevesSystemPrefix(): string {
   return parts.join('\n\n');
 }
 
+/**
+ * Attach user-configured Jeeves preferences as ordinary request context.
+ *
+ * Neither chat transport exposes a privileged system-prompt override. Keeping
+ * directives within the supported context field preserves server governance.
+ * Refuse overflow rather than silently discarding the saved project context.
+ */
+export function getJeevesRequestContext(projectContext = '', maxChars = 4_000): string {
+  const instructions = getJeevesSystemPrefix().trim();
+  const context = instructions
+    ? [
+      `User-configured Jeeves preferences (request context):\\n${instructions}`,
+      ...(projectContext.trim() ? [`Project context:\\n${projectContext}`] : []),
+    ].join('\\n\\n')
+    : projectContext;
+  if (!Number.isSafeInteger(maxChars) || maxChars < 1 || context.length > maxChars) {
+    throw new RangeError(`Jeeves directives and project context exceed the ${maxChars}-character request limit.`);
+  }
+  return context;
+}
+
 export const BATCH_LABELS: Record<keyof GalaxyStudioSettings['phaseWeights'], { label: string; icon: string; color: string; hint: string }> = {
   foundation:        { label: 'Foundation',       icon: 'layers',       color: '#3B82F6', hint: 'Architecture, scaffolding, base systems' },
   core_mechanics:    { label: 'Core Mechanics',   icon: 'game-controller', color: '#10B981', hint: 'Gameplay loops, controls, progression' },
