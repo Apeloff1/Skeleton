@@ -171,6 +171,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--target")
     parser.add_argument("--source")
     parser.add_argument("--direction-source")
+    parser.add_argument("--dragon-digest")
     parser.add_argument("--output")
     parser.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     parser.add_argument("--factor", type=int)
@@ -263,6 +264,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         display_args = (args.native_width, args.native_height, args.screen_width,
                         args.screen_height, args.pixel_aspect_num, args.pixel_aspect_den)
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
+        if args.dragon_digest is not None and args.action != "propose":
+            raise ValueError("--dragon-digest only supports proposal authoring")
         if args.direction_source is not None and args.action != "propose":
             raise ValueError("--direction-source only supports proposal authoring")
         render_args = (args.target, args.source, args.output, args.mode, args.factor,
@@ -477,7 +480,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     root, kind=args.kind, brief=args.brief, include_notes=args.include_notes,
                     console=args.console, genre=args.genre, period=args.period,
                     profile=args.profile or "design/market_benchmarks.json",
-                    direction_source=args.direction_source,
+                    direction_source=args.direction_source, dragon_digest=args.dragon_digest,
                 )
             elif args.action == "review":
                 if not args.digest or any((args.kind, args.brief, args.approve, args.include_notes,
