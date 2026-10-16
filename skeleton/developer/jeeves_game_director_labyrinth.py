@@ -22,6 +22,7 @@ from skeleton.developer.jeeves_game_director_session import (
 SCHEMA = "skeleton.jeeves.director_labyrinth.v1"
 PROFILES = ("fastest", "scenic", "quiet", "novel", "quest")
 MAX_EXPANSIONS = 40000
+MAX_FRONTIER = 50000
 
 
 def _graph(world: Any) -> dict[str, tuple[str, ...]]:
@@ -70,7 +71,11 @@ def _search(graph: dict[str, tuple[str, ...]], lookup: dict[str, Any],
     queue: list[tuple[int, int, tuple[str, ...]]] = [(0, 0, (start,))]
     winners: list[tuple[int, tuple[str, ...]]] = []
     expanded = 0
+    frontier_overflow = False
     while queue and expanded < MAX_EXPANSIONS and len(winners) < limit:
+        if len(queue) > MAX_FRONTIER:
+            frontier_overflow = True
+            break
         cost, hops, path = heapq.heappop(queue)
         expanded += 1
         here = path[-1]
@@ -82,7 +87,24 @@ def _search(graph: dict[str, tuple[str, ...]], lookup: dict[str, Any],
                 continue
             edge_cost = _score(lookup[next_scene], profile, visits, active_sites)
             heapq.heappush(queue, (cost + edge_cost, hops + 1, path + (next_scene,)))
-    return winners, expanded, bool(queue and expanded >= MAX_EXPANSIONS)
+    return winners, expanded, bool(queue and (expanded >= MAX_EXPANSIONS or frontier_overflow))
+
+
+def _baseline_path(graph: dict[str, tuple[str, ...]], start: str,
+                   destinations: set[str]) -> tuple[str, ...] | None:
+    """Linear graph BFS guarantees at least a valid route if reachable."""
+    queue = deque([(start,)])
+    discovered = {start}
+    while queue:
+        path = queue.popleft()
+        node = path[-1]
+        if node in destinations:
+            return path
+        for neighbor in graph[node]:
+            if neighbor not in discovered:
+                discovered.add(neighbor)
+                queue.append(path + (neighbor,))
+    return None
 
 
 def _active_sites(world: Any, state: Any) -> tuple[set[str], list[dict[str, str]]]:
@@ -121,11 +143,19 @@ def plan(root: Path, *, session: str, destination: str | None = None,
             raise ValueError("no active quest stage to navigate toward")
         destinations = active_sites
     visits = _visits(folder, sequence)
+    baseline = _baseline_path(graph, state.scene, destinations)
+    if baseline is None:
+        raise ValueError("no navigable route to requested scene or active quest objective")
     winners, expanded, exhausted = _search(
         graph, lookup, state.scene, destinations, profile,
         visits, active_sites, alternatives)
     if not winners:
-        raise ValueError("no navigable route to requested scene or active quest objective")
+        # Resource-guard exhaustion is not evidence a path is impossible.
+        # Fall back to the proven minimal-hop path rather than claiming failure.
+        winners = [(
+            sum(_score(lookup[node], profile, visits, active_sites)
+                for node in baseline[1:]), baseline
+        )]
     paths = []
     for total, route in winners:
         checked = state
@@ -143,6 +173,8 @@ def plan(root: Path, *, session: str, destination: str | None = None,
         detail = {
             "places": list(route), "actions": actions,
             "destination": route[-1], "hops": len(actions),
+            "shortest_reference_hops": len(baseline) - 1,
+            "hops_above_reference": len(actions) - (len(baseline) - 1),
             "policy_cost": total,
             "expected_arrival_state_sha256": checked.digest,
             "distinct_regions": sorted({lookup[x].region for x in route}),
