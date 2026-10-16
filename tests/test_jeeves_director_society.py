@@ -38,6 +38,7 @@ from skeleton.developer.jeeves_game_director_session import begin, inspect, choo
 from skeleton.developer.jeeves_game_director_labyrinth import plan
 from skeleton.developer.jeeves_game_director_atlas import export, verify
 from skeleton.developer.jeeves_game_director_causality import audit as causal_audit
+from skeleton.developer.jeeves_game_director_events import delta
 from skeleton.developer.jeeves_game_dragon_policy import _context
 
 
@@ -177,6 +178,44 @@ class OriginalSocietyTests(unittest.TestCase):
                       state["world_state"]["world_flags"])
         self.assertNotEqual(_context(_load(self.root, name="hero")[2]), before)
         self.assertGreater(state["sequence"], 2)
+
+    def test_branching_dialogue_choices_affect_trust_and_authored_story_flags(self):
+        self._begin()
+        self.assertGreaterEqual(len(self.npc.dialogue), 2)
+        option = next(c for c in self.npc.dialogue if c.key == "offer_help")
+        rejected = next(c for c in self.npc.dialogue if c.key == "question_motives")
+        before = inspect(self.root, session="hero")
+        self.assertIn("discuss:" + self.npc.key + "_" + option.key,
+                      {a["choice"] for a in before["actions"]})
+        self.assertNotIn(option.response, str(before["society"]))
+        after = self._do("discuss:" + self.npc.key + "_" + option.key)
+        self.assertEqual(
+            dict(after["society"]["relationships"])[self.npc.key],
+            self.npc.initial_trust + option.trust_delta,
+        )
+        self.assertIn(option.grant_world_flag, after["world_state"]["world_flags"])
+        presentation = delta(self.root, session="hero", before=before, after=after)
+        spoken = presentation["living_world_events"]["society"]["authored_dialogue"]
+        self.assertEqual(spoken["line"], option.response)
+        self.assertEqual(spoken["player_prompt"], option.prompt)
+        self.assertEqual(spoken["resident"], self.npc.key)
+        with self.assertRaises(ValueError):
+            self._do("discuss:" + self.npc.key + "_" + rejected.key)
+        self._reach_next_conversation()
+        second = self._do("discuss:" + self.npc.key + "_" + rejected.key)
+        trust = dict(second["society"]["relationships"])[self.npc.key]
+        self.assertEqual(
+            trust, self.npc.initial_trust + option.trust_delta
+                   + rejected.trust_delta,
+        )
+        self.assertIn(option.grant_world_flag, second["world_state"]["world_flags"])
+        observed = study(self.root, session="hero")
+        self.assertEqual(observed["dialogue_topic_selection_counts"][
+            self.npc.key + ":" + option.key], 1)
+        self.assertEqual(observed["dialogue_topic_selection_counts"][
+            self.npc.key + ":" + rejected.key], 1)
+        causal = causal_audit(self.root, session="hero")
+        self.assertEqual(causal["summary"]["NPC_conversation_counts"][self.npc.key], 2)
 
     def test_real_buy_sell_changes_wallet_stock_and_canonical_inventory(self):
         beginning = self._begin()
