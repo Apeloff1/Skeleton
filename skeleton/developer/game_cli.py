@@ -21,6 +21,8 @@ MANIFEST = "skeleton.game.json"
 MAX_CONFIG_BYTES = 64 * 1024
 MAX_SOURCE_FILES = 2048
 MAX_SOURCE_BYTES = 64 * 1024 * 1024
+MAX_FORGE_MANIFEST_BYTES = 4 * 1024 * 1024
+MAX_EVIDENCE_BYTES = 8 * 1024 * 1024
 MAX_ASSET_FILES = 4096
 MAX_ASSET_BYTES = 128 * 1024 * 1024
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
@@ -128,7 +130,7 @@ def _read_forge(root: Path) -> tuple[Path, dict[str, str], dict[str, Any]]:
     manifest_file = build / "FORGE_MANIFEST.json"
     if manifest_file.is_symlink() or not manifest_file.is_file():
         _fail("no emitted Godot project: build the game first")
-    if manifest_file.stat().st_size > MAX_CONFIG_BYTES * 4:
+    if manifest_file.stat().st_size > MAX_FORGE_MANIFEST_BYTES:
         _fail("Forge manifest exceeds size limit")
     try:
         report = json.loads(manifest_file.read_text(encoding="utf-8"))
@@ -200,7 +202,11 @@ def _check_assets(root: Path) -> dict[str, Any]:
         total += size
         if total > MAX_ASSET_BYTES:
             _fail("asset inventory exceeds 128 MiB")
-        digests[node.relative_to(assets).as_posix()] = hashlib.sha256(node.read_bytes()).hexdigest()
+        hasher = hashlib.sha256()
+        with node.open("rb") as asset_stream:
+            for chunk in iter(lambda: asset_stream.read(1024 * 1024), b""):
+                hasher.update(chunk)
+        digests[node.relative_to(assets).as_posix()] = hasher.hexdigest()
     return {"count": len(digests), "bytes": total, "sha256": digests}
 
 
@@ -275,7 +281,7 @@ def _package(root: Path, args: argparse.Namespace) -> dict[str, Any]:
         if path.is_symlink():
             _fail("symlinked Forge receipt refused")
         if path.is_file():
-            if path.stat().st_size > MAX_CONFIG_BYTES * 4:
+            if path.stat().st_size > MAX_EVIDENCE_BYTES:
                 _fail("Forge receipt too large to package")
             extra[name] = path.read_bytes()
     destination_dir = root / "dist"
