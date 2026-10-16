@@ -56,13 +56,14 @@ export function postCrashReport(payload: Record<string, unknown>): boolean {
       body: serialized,
       signal: ctrl?.signal,
     })).then(() => undefined, () => undefined);
-    const deadline = new Promise<void>(resolve => {
-      timer = setTimeout(() => {
-        try { ctrl?.abort(); } catch {}
-        resolve();
-      }, TIMEOUT_MS);
-    });
-    void Promise.race([request, deadline]).finally(() => {
+    timer = setTimeout(() => {
+      try { ctrl?.abort(); } catch {}
+    }, TIMEOUT_MS);
+    // Do NOT free a concurrency slot just because an abort timer fired.
+    // Native fetch adapters may ignore abort and leave work unresolved.
+    // Keeping that slot occupied fails telemetry closed rather than creating
+    // an unbounded pile of zombie requests during a crash storm.
+    void request.finally(() => {
       if (timer !== null) clearTimeout(timer);
       inFlight = Math.max(0, inFlight - 1);
     });
