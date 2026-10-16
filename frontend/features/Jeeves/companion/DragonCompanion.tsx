@@ -1,7 +1,7 @@
 import React from 'react';
 import{Animated,Pressable,StyleSheet,Text,View}from'react-native';
 import{Ionicons}from'@expo/vector-icons';
-import type{DragonCompanionState}from'./dragonCompanion';
+import type{DragonCompanionState}from'./dragonCompanionState';
 import type{CompanionMotion}from'./dragonPreferences';
 import {useDragonLife} from './useDragonLife';
 import DragonAtmosphere from './DragonAtmosphere';

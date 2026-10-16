@@ -1,7 +1,7 @@
 import React,{useEffect,useRef} from 'react';
 import {Animated,StyleSheet,Text,View} from 'react-native';
 import DragonCompanion from './DragonCompanion';
-import {INITIAL_DRAGON_STATE,type DragonCompanionState} from './dragonCompanion';
+import {INITIAL_DRAGON_STATE,type DragonCompanionState} from './dragonCompanionState';
 import {watchPose,type WatchSignal} from './dragonWatch';
 import {useReducedMotion} from './useDragonMotion';
 

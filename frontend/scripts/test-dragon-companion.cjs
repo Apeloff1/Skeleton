@@ -1,5 +1,5 @@
 const fs=require('node:fs');const path=require('node:path');
-const model=fs.readFileSync(path.join(__dirname,'../features/Jeeves/companion/dragonCompanion.ts'),'utf8');
+const model=fs.readFileSync(path.join(__dirname,'../features/Jeeves/companion/dragonCompanionState.ts'),'utf8');
 const view=fs.readFileSync(path.join(__dirname,'../features/Jeeves/companion/DragonCompanion.tsx'),'utf8');
 const chat=fs.readFileSync(path.join(__dirname,'../features/Jeeves/ChatWorkspace.tsx'),'utf8');
 function ok(v,m){if(!v)throw new Error(m)}
