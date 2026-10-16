@@ -72,7 +72,7 @@ class DirectorMediaE2ETests(unittest.TestCase):
     def test_export_integrity_and_godot_import_sidecars(self):
         result = export(self.root, source=self.source)
         location = Path(result["path"])
-        self.assertTrue(location.name.endswith("-live-v7"))
+        self.assertTrue(location.name.endswith("-live-v8"))
         self.assertTrue((location / "media_catalog.json").is_file())
         self.assertTrue((location / "media").is_dir())
         self.assertTrue(result["manifest"]["native_original_audio_playback_in_source"])
