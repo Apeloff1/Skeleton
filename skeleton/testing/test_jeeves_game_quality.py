@@ -165,7 +165,11 @@ def test_render_gate_requires_actual_file_hash_and_distinct_reviewers(tmp_path):
     root = _workspace(tmp_path)
     _write(root)
     target = root / "assets" / "original-texture.png"
-    target.write_bytes(b"demo-fixture-pixel-data")
+    target.write_bytes(bytes.fromhex(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+        "0000000d49444154789c63f8cfc0f01f00050001ff89993d1d000000004945"
+        "4e44ae426082"
+    ))
     digest = hashlib.sha256(target.read_bytes()).hexdigest()
     scores = {
         "silhouette":94, "readability":94, "era_fidelity":93,
@@ -188,6 +192,8 @@ def test_render_gate_requires_actual_file_hash_and_distinct_reviewers(tmp_path):
     first = gate()
     assert first["ok"] and first["static_checks_passed"]
     assert first["peak_quality_proven"] is False
+    assert first["media_probe"]["container"] == "png"
+    assert first["media_probe"]["container_integrity_checked"] is True
     assert first["performance_measurement_independently_verified"] is False
     receipt["reviewers"] = ["Reviewer A", "Reviewer A"]
     path.write_text(json.dumps(receipt))
@@ -204,3 +210,32 @@ def test_render_gate_requires_actual_file_hash_and_distinct_reviewers(tmp_path):
     target.write_bytes(b"tampered")
     path.write_text(json.dumps(receipt))
     assert not gate()["ok"]
+
+
+def test_media_gate_rejects_fake_png_magic_and_corrupt_crc(tmp_path):
+    root = _workspace(tmp_path)
+    _write(root)
+    target = root / "assets" / "fixture.png"
+    receipt_path = root / "design" / "asset_qa.json"
+    rubric = {
+        "silhouette": 93, "readability": 94, "era_fidelity": 95,
+        "material_detail": 96, "art_direction": 94, "accessibility": 91,
+        "originality": 95,
+    }
+    evidence = {
+        "schema": ASSET_SCHEMA, "kind": "asset", "asset_path": "assets/fixture.png",
+        "originality": "original", "qa_scores": rubric,
+        "reviewers": ["QA Lead", "Artist"],
+        "performance": {"measured_ms":1.0,"budget_ms":3.0,"platform":"PC"},
+    }
+    for blob in (b"bad-signature" * 5, bytes.fromhex(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+        "0000000d49444154789c63f8cfc0f01f00050001ff89993d1d000000004945"
+        "4e44ae426083")):
+        target.write_bytes(blob)
+        evidence["sha256"] = hashlib.sha256(blob).hexdigest()
+        receipt_path.write_text(json.dumps(evidence))
+        result = run_game_cli(["jeeves", "asset-gate", "--project", str(root),
+                               "--console", "PC", "--genre", "RPG", "--period", "2015-2019",
+                               "--evidence", "design/asset_qa.json"])
+        assert not result["ok"]
