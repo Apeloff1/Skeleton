@@ -12,9 +12,16 @@ export function boundedTimeoutMs(value: number | undefined): number {
   return Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, Math.trunc(value)));
 }
 
-export function boundedRetries(value: number | undefined, method: string, hasIdempotencyKey: boolean): number {
+export function boundedRetries(
+  value: number | undefined,
+  method: string,
+  hasIdempotencyKey: boolean,
+  serverDedupeVerified = false,
+): number {
   const safeMethod = ['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
-  const max = safeMethod || hasIdempotencyKey ? MAX_RETRIES : 0;
+  // An idempotency *header* is not a server-side guarantee. Mutation replay
+  // requires verified server deduplication and a stable idempotency key.
+  const max = safeMethod || (hasIdempotencyKey && serverDedupeVerified) ? MAX_RETRIES : 0;
   const requested = value === undefined ? 2 : value;
   if (!Number.isFinite(requested)) return 0;
   return Math.max(0, Math.min(max, Math.trunc(requested)));
