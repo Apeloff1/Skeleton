@@ -46,6 +46,13 @@ def _split(value: str | None, *, name: str, min_count: int, max_count: int
     return result
 
 
+def _safe_design(root: Path) -> Path:
+    folder = root / "design"
+    if root.is_symlink() or folder.is_symlink() or not folder.is_dir():
+        raise ValueError("Director requires a non-symlinked existing design directory")
+    return folder
+
+
 def _candidate(root: Path, source: str) -> tuple[dict[str, Any], str, Any]:
     from skeleton.developer.jeeves_game_quality import _read
     from skeleton.ai.game_builder.quest_scene_forge import compile_director_blueprint
@@ -79,10 +86,11 @@ def _candidate(root: Path, source: str) -> tuple[dict[str, Any], str, Any]:
 def draft(root: Path, *, seed: int, regions: str, quest_types: str,
           stages: int = 3, goal: str | None = None,
           dragon_digest: str | None = None) -> dict[str, Any]:
-    from skeleton.ai.game_builder.quest_scene_forge import forge_director, METHODS
+    from skeleton.ai.game_builder.quest_scene_forge import forge_director
     from skeleton.ai.game_builder.quest_scene_engine import ARCHETYPES
     from skeleton.developer.jeeves_game_authoring import _create_only
     cfg, project, config_hash = _project(root)
+    _safe_design(root)
     sites = _split(regions, name="--regions", min_count=4, max_count=24)
     arcs = _split(quest_types, name="--quest-types", min_count=1, max_count=48)
     if arcs[0] != "main_story" or any(item not in ARCHETYPES for item in arcs):
@@ -113,9 +121,12 @@ def draft(root: Path, *, seed: int, regions: str, quest_types: str,
     packet["receipt_sha256"] = _digest(packet)
     from skeleton.developer.jeeves_game_quality import _read
     name = "design/director_candidate_" + packet["receipt_sha256"][:16] + ".json"
-    path = root / name
-    _create_only(path, (json.dumps(packet, ensure_ascii=True, sort_keys=True,
-                                   indent=2, allow_nan=False) + "\n").encode())
+    path = _safe_design(root) / name.split("/")[-1]
+    encoded = (json.dumps(packet, ensure_ascii=True, sort_keys=True,
+                          indent=2, allow_nan=False) + "\n").encode()
+    if len(encoded) > MAX_CANDIDATE_BYTES:
+        raise ValueError("Director campaign candidate exceeds local source inspection capacity")
+    _create_only(path, encoded)
     return {"ok": True, "action": "director-draft",
             "source": name, "source_sha256": sha256(path.read_bytes()).hexdigest(),
             "candidate_sha256": packet["receipt_sha256"],
@@ -167,7 +178,7 @@ def promote(root: Path, *, source: str, approved_digest: str | None,
     packet, source_sha, world = _candidate(root, source)
     if audit["source_sha256"] != source_sha:
         raise ValueError("Director candidate changed between inspection and approval")
-    dest = root / "design" / "director_campaign_source.json"
+    dest = _safe_design(root) / "director_campaign_source.json"
     payload = {
         "schema": PROMOTED_SCHEMA, "director_world": world.payload(),
         "author_review_acknowledged": True,
