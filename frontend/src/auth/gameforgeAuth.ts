@@ -16,6 +16,8 @@ const EMERGENT_AUTH = 'https://auth.emergentagent.com/';
 
 let _token = '';
 let _tokenLoaded = false;
+let _tokenEpoch = 0;
+let _tokenInitialization: Promise<void> | null = null;
 let _tenantIdentityCache: {
   token: string;
   identity: { tenantId: string; principalId: string };
@@ -30,6 +32,7 @@ export function authHeaders(extra: Record<string, string> = {}): Record<string, 
 }
 
 async function persist(token: string) {
+  _tokenEpoch += 1;
   _tokenLoaded = true;
   if (token !== _token) _tenantIdentityCache = null;
   _token = token;
@@ -51,6 +54,25 @@ async function loadStored(): Promise<string> {
     return (await SecureStore.getItemAsync(KEY)) || '';
   } catch {
     return '';
+  }
+}
+
+/** Share cold storage initialization without confusing it with an account change. */
+async function initializeStoredToken(): Promise<void> {
+  if (_tokenLoaded) return;
+  if (!_tokenInitialization) {
+    const epoch = _tokenEpoch;
+    _tokenInitialization = loadStored().then((stored) => {
+      if (_tokenEpoch !== epoch) throw new Error('Your account changed while loading storage.');
+      _token = stored;
+      _tokenLoaded = true;
+    });
+  }
+  const initialization = _tokenInitialization;
+  try {
+    await initialization;
+  } finally {
+    if (_tokenInitialization === initialization) _tokenInitialization = null;
   }
 }
 
@@ -87,12 +109,10 @@ function storageIdentityFromUser(user: any): StorageTenantIdentity {
  * storage merely because /auth/me was unreachable.
  */
 export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdentity> {
-  const initialToken = _token;
-  const initiallyLoaded = _tokenLoaded;
-  const stored = _tokenLoaded ? _token : await loadStored();
-  if (_token !== initialToken || _tokenLoaded !== initiallyLoaded) throw new Error('Your account changed while resolving storage.');
-  _token = stored;
-  _tokenLoaded = true;
+  const epoch = _tokenEpoch;
+  await initializeStoredToken();
+  if (_tokenEpoch !== epoch) throw new Error('Your account changed while resolving storage.');
+  const stored = _token;
 
   if (
     _tenantIdentityCache
@@ -105,7 +125,7 @@ export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdent
     '/api/auth/me',
     stored ? { headers: authHeaders() } : {},
   );
-  if (_token !== stored) throw new Error('Your account changed while verifying storage.');
+  if (_tokenEpoch !== epoch || _token !== stored) throw new Error('Your account changed while verifying storage.');
   if (r.status === 401) {
     await persist('');
     throw new Error('Tenant identity is no longer authenticated.');
@@ -138,14 +158,16 @@ export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdent
 /** Validate the current token against the backend. Clears it on 401. */
 export async function checkMe(): Promise<MeResult> {
   const unknown = (error: string): MeResult => ({ authenticated: false, enforced: true, role: 'anonymous', user: null, observed: false, error });
-  const initialToken = _token;
-  const initiallyLoaded = _tokenLoaded;
-  const stored = _tokenLoaded ? _token : await loadStored();
-  if (_token !== initialToken || _tokenLoaded !== initiallyLoaded) return unknown('Your account changed. Verify the current session again.');
-  _token = stored;
-  _tokenLoaded = true;
+  const epoch = _tokenEpoch;
+  try {
+    await initializeStoredToken();
+  } catch {
+    return unknown('Your account changed. Verify the current session again.');
+  }
+  if (_tokenEpoch !== epoch) return unknown('Your account changed. Verify the current session again.');
+  const stored = _token;
   const r = await api.get<any>('/api/auth/me', { headers: authHeaders(), timeoutMs: 12000, retries: 0 });
-  if (_token !== stored) return unknown('Your account changed. Verify the current session again.');
+  if (_tokenEpoch !== epoch || _token !== stored) return unknown('Your account changed. Verify the current session again.');
   if (r.status === 401) {
     await persist('');
     return { authenticated: false, enforced: true, role: 'anonymous', user: null, observed: true };

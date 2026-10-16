@@ -36,6 +36,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     href: capabilityHref('studio'),
     backendSurface: '/api/gameforge-studio',
     actions: [
+      { id: 'game-learning', title: 'Game learning studio', description: 'Create and edit original worlds, watch AI and human play, train policies and export desktop games.', navigationId: 'jeeves.games.learn', href: '/game-learning' },
       { id: 'new-project', title: 'New project', description: 'Start from a prompt, brief or template.', operation: 'project.create', legacyHref: '/ai-game-generator' },
       { id: 'build', title: 'Build', description: 'Compile a project into a runnable artifact.', operation: 'build.submit', legacyHref: '/apk-build' },
       { id: 'inspect', title: 'Inspect pipeline', description: 'Review build stages and generated artifacts.', operation: 'pipeline.inspect', legacyHref: '/ai-pipeline' },
