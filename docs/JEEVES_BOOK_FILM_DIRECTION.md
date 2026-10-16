@@ -381,3 +381,17 @@ professional literary/film creative review, real native game runtime
 execution, human playtest comprehension and actual platform release.
 A matched source node and replayed choice does NOT independently prove
 that the consequence's narrative meaning makes sense to an audience.
+
+### Transitive model-proposal source integrity
+
+When a direction packet references a gameplay_source, Jeeves' v3 model
+proposal now pins TWO separately measured source hashes: the direction
+packet SHA-256 and its linked playable quest replay dossier SHA-256.
+A change to either source while inference runs or between proposal,
+review and application blocks acceptance without lowering the quality
+floor. Existing v3 proposals with only an original direction dossier,
+and pre-direction v2 proposals, remain backward compatible. This is
+referential integrity, not an IP clearance or independent approval.
+The model receives only bounded original evidence metrics and statuses,
+including source-verified payoff/branch counts, never the full quest
+action history or authored manuscript text without explicit request.
