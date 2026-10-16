@@ -25,6 +25,7 @@
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
+    "test:canonical-theme": "node --test scripts/test-canonical-theme.cjs",
     "test:localization": "node --test scripts/test-localization-contract.mjs",
     "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
     "test:dragon-native-editor": "node --test scripts/test-dragon-native-puzzle-preview.mjs scripts/test-dragon-native-puzzle-history.mjs",
