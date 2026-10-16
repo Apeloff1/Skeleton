@@ -163,3 +163,57 @@ def test_no_model_inference_on_plan_or_audit(tmp_path, monkeypatch):
     monkeypatch.setattr(authoring, "_infer", unexpected)
     assert run_game_cli(["jeeves", "plan", "--project", str(root)])["ok"]
     assert run_game_cli(["jeeves", "audit", "--project", str(root)])["action"] == "audit"
+
+
+def test_proposal_queue_shows_pending_and_applied_drafts(tmp_path, monkeypatch):
+    root = workspace(tmp_path)
+    assert run_game_cli(["jeeves", "queue", "--project", str(root)])["proposals"] == []
+    fake_model(monkeypatch)
+    proposed = run_game_cli(["jeeves", "propose", "--project", str(root),
+                             "--kind", "quest", "--brief", "quest concept"])
+    digest = proposed["proposal_sha256"]
+    pending = run_game_cli(["jeeves", "queue", "--project", str(root)])
+    assert pending["count"] == 1 and not pending["proposals"][0]["target_exists"]
+    assert run_game_cli(["jeeves", "apply", "--project", str(root),
+                         "--digest", digest, "--approve", digest])["ok"]
+    published = run_game_cli(["jeeves", "queue", "--project", str(root)])
+    assert published["proposals"][0]["target_exists"]
+
+
+def test_real_provider_adapter_contract_is_used(monkeypatch):
+    from skeleton.provider_runtime import ProviderRegistry, ProviderRequest, ProviderResponse
+
+    observed = []
+    class FakeAdapter:
+        async def generate(self, request):
+            observed.append(request)
+            return ProviderResponse(text=model_response(), provider="test-provider",
+                                    model="test-model", request_id="req-1")
+    class FakeRegistry:
+        def require_active(self):
+            return FakeAdapter()
+    monkeypatch.setattr(ProviderRegistry, "from_env", classmethod(lambda cls: FakeRegistry()))
+    raw, receipt = __import__("asyncio").run(authoring._infer('{"brief":"original"}'))
+    assert raw == model_response()
+    assert receipt["provider"] == "test-provider"
+    assert len(observed) == 1
+    assert isinstance(observed[0], ProviderRequest)
+    assert observed[0].purpose == "jeeves-game-design-proposal"
+    assert observed[0].data_class == "internal"
+    assert not observed[0].tools
+
+
+def test_concurrent_context_change_during_model_call_rejects_commit(tmp_path, monkeypatch):
+    root = workspace(tmp_path)
+    manifest = root / "skeleton.game.json"
+    async def fake_mutating_model(prompt):
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        data["vision"] = "Different project after model started"
+        manifest.write_text(json.dumps(data), encoding="utf-8")
+        return model_response(), {"provider": "fixture", "model": "fixture", "request_id": None}
+    monkeypatch.setattr(authoring, "_infer", fake_mutating_model)
+    result = run_game_cli(["jeeves", "propose", "--project", str(root),
+                           "--kind", "quest", "--brief", "original"])
+    assert not result["ok"]
+    assert "changed while model was drafting" in result["error"]
+    assert not (root / ".jeeves").exists()
