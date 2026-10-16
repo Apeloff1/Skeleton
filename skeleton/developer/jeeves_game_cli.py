@@ -144,12 +144,34 @@ def _notes(root: Path) -> list[dict[str, str]]:
 
 
 def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
-    """Read-only Jeeves CLI surface; no implicit writes or privileged execution."""
+    """Game-authoring proposals require real model I/O and explicit local acceptance."""
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
-    parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff"))
+    parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
+                                            "propose", "review", "apply"))
+    parser.add_argument("--kind")
+    parser.add_argument("--brief")
+    parser.add_argument("--include-notes", action="store_true")
+    parser.add_argument("--digest")
+    parser.add_argument("--approve")
     args = parser.parse_args(argv)
     try:
-        if args.action == "plan":
+        if args.action in {"propose", "review", "apply"}:
+            from skeleton.developer.jeeves_game_authoring import propose, review, apply
+            if args.action == "propose":
+                if args.kind is None or args.brief is None or args.digest or args.approve:
+                    raise ValueError("propose requires --kind and --brief, without --digest/--approve")
+                output = propose(root, kind=args.kind, brief=args.brief, include_notes=args.include_notes)
+            elif args.action == "review":
+                if not args.digest or args.kind or args.brief or args.approve or args.include_notes:
+                    raise ValueError("review requires --digest only")
+                output = review(root, args.digest)
+            else:
+                if not args.digest or not args.approve or args.kind or args.brief or args.include_notes:
+                    raise ValueError("apply requires --digest and --approve only")
+                output = apply(root, digest=args.digest, approved_digest=args.approve)
+        elif args.action == "plan":
+            if any((args.kind, args.brief, args.digest, args.approve, args.include_notes)):
+                raise ValueError("unused Jeeves options")
             output = _plan(root)
         elif args.action == "audit":
             output = _audit(root)
