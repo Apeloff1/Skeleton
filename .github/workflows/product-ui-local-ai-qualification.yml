@@ -69,6 +69,9 @@ jobs:
           if ($env:FULL_TS_RESULT -ne 'success' -or $env:JEEVES_TS_RESULT -ne 'success') {
             throw "Both TypeScript projects must compile successfully."
           }
+      - name: Verify canonical token roles and skin foreground contrast
+        working-directory: frontend
+        run: yarn test:canonical-theme
       - name: Exercise existing Jeeves workspace contracts
         id: jeeves_contracts
         working-directory: frontend

@@ -14,7 +14,7 @@
  */
 import { Platform, TextStyle, ViewStyle } from 'react-native';
 
-const palette = {
+export const palette = {
   ink: {
     0: '#FFFFFF',
     50: '#F8FAFC',
@@ -43,7 +43,8 @@ const palette = {
     800: '#5B21B6',
     900: '#4C1D95',
   },
-  cyan: { 400: '#3B82F6', 500: '#2563EB', 600: '#1D4ED8' },
+  blue: { 400: '#3B82F6', 500: '#2563EB', 600: '#1D4ED8' },
+  cyan: { 400: '#22D3EE', 500: '#06B6D4', 600: '#0891B2' },
   pink: { 400: '#F472B6', 500: '#EC4899', 600: '#DB2777' },
   success: { 400: '#34D399', 500: '#10B981', 600: '#059669' },
   warning: { 400: '#FBBF24', 500: '#F59E0B', 600: '#D97706' },
@@ -51,7 +52,7 @@ const palette = {
   info: { 400: '#60A5FA', 500: '#3B82F6', 600: '#2563EB' },
 } as const;
 
-const colors = {
+export const colors = {
   dark: {
     bg: palette.ink[950],
     bgElevated: palette.ink[900],
@@ -69,6 +70,8 @@ const colors = {
     textDisabled: palette.ink[500],
     textInverse: palette.ink[900],
     primary: palette.brand[500],
+    // Dark ink has AA body-text contrast on brand500; white does not.
+    onPrimary: palette.ink[900],
     primaryHover: palette.brand[400],
     primarySoft: 'rgba(139,92,246,0.16)',
     accent: palette.brand[500],
@@ -101,6 +104,7 @@ const colors = {
     textDisabled: palette.ink[300],
     textInverse: palette.ink[50],
     primary: palette.brand[600],
+    onPrimary: palette.ink[0],
     primaryHover: palette.brand[500],
     primarySoft: 'rgba(139,92,246,0.10)',
     accent: palette.brand[600],
@@ -135,18 +139,20 @@ const gradients = {
   glassStrong: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'] as const,
 } as const;
 
-const spacing = { none: 0, xs: 4, sm: 8, md: 12, base: 16, lg: 20, xl: 24, '2xl': 32, '3xl': 40, '4xl': 56, '5xl': 72 } as const;
-const radii = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 28, '3xl': 36, full: 9999, pill: 9999 } as const;
+export const spacing = { none: 0, xs: 4, sm: 8, md: 12, base: 16, lg: 20, xl: 24, '2xl': 32, '3xl': 40, '4xl': 56, '5xl': 72 } as const;
+export const radii = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 28, '3xl': 36, full: 9999, pill: 9999 } as const;
 
 const FONT_UI = Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }) as string;
 const FONT_MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string;
-const typography = {
+export const typography = {
   fontFamily: { ui: FONT_UI, mono: FONT_MONO },
   display: { fontFamily: FONT_UI, fontSize: 34, lineHeight: 40, fontWeight: '800', letterSpacing: -0.5 } as TextStyle,
   h1: { fontFamily: FONT_UI, fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.4 } as TextStyle,
   h2: { fontFamily: FONT_UI, fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.3 } as TextStyle,
   h3: { fontFamily: FONT_UI, fontSize: 18, lineHeight: 24, fontWeight: '700', letterSpacing: -0.2 } as TextStyle,
   h4: { fontFamily: FONT_UI, fontSize: 16, lineHeight: 22, fontWeight: '700', letterSpacing: -0.1 } as TextStyle,
+  metric: { fontFamily: FONT_UI, fontSize: 24, lineHeight: 28, fontWeight: '800', letterSpacing: 0.5, fontVariant: ['tabular-nums'] } as TextStyle,
+  label: { fontFamily: FONT_UI, fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' } as TextStyle,
   body: { fontFamily: FONT_UI, fontSize: 14, lineHeight: 20, fontWeight: '500' } as TextStyle,
   bodyLg: { fontFamily: FONT_UI, fontSize: 16, lineHeight: 24, fontWeight: '500' } as TextStyle,
   caption: { fontFamily: FONT_UI, fontSize: 12, lineHeight: 16, fontWeight: '600' } as TextStyle,
@@ -179,7 +185,7 @@ const motion = {
   },
 } as const;
 
-const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
+export const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
 const hitSlop = { sm: { top: 6, left: 6, right: 6, bottom: 6 }, md: { top: 10, left: 10, right: 10, bottom: 10 }, lg: { top: 14, left: 14, right: 14, bottom: 14 } } as const;
 
 const theme = { colors: colors.dark, gradients, spacing, radii, typography, elevation, motion, hitSlop, breathing, palette } as const;
