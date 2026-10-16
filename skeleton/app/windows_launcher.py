@@ -571,11 +571,17 @@ class WindowsLauncher:
         with self._browser_lock:
             if self._launcher_closed:
                 raise RuntimeError("offline browser launcher has closed")
-            if self._browser_server is not None:
-                url = "http://127.0.0.1:" + str(
-                    self._browser_server.server_port
-                ) + "/"
+            existing = self._browser_server
+            worker = self._browser_worker
+            if existing is not None and worker is not None and worker.is_alive():
+                url = "http://127.0.0.1:" + str(existing.server_port) + "/"
                 return "Offline browser already running at " + url
+
+        # An old server reference is not evidence that its serving thread
+        # survived. Reclaim the bound port and ephemeral credential file
+        # before starting a new local service.
+        if existing is not None:
+            self._stop_browser_service()
 
         backend = (
             load_gguf_deployment(selected) if gguf
@@ -634,12 +640,15 @@ class WindowsLauncher:
         from tkinter import filedialog, messagebox
 
         with self._browser_lock:
-            if self._browser_server is not None:
+            if self._browser_server is not None and self._browser_worker is not None and self._browser_worker.is_alive():
                 url = "http://127.0.0.1:" + str(
                     self._browser_server.server_port
                 ) + "/"
-                webbrowser.open(url)
-                self.status.set("Opened existing offline browser.")
+                try:
+                    opened = webbrowser.open(url)
+                except (OSError, webbrowser.Error):
+                    opened = False
+                self.status.set("Opened existing offline browser." if opened else "Offline browser running; open the loopback URL manually.")
                 return
         gguf = messagebox.askyesno(
             "Choose local AI model",
@@ -675,9 +684,12 @@ class WindowsLauncher:
         if server is None:
             return "Offline browser service is not running."
         try:
-            server.shutdown()
+            # socketserver.shutdown() waits for serve_forever() to be running;
+            # calling it on an already-dead thread can block indefinitely.
+            if thread is not None and thread.is_alive():
+                server.shutdown()
             server.server_close()
-            if thread is not None:
+            if thread is not None and thread.is_alive() and thread is not threading.current_thread():
                 thread.join(timeout=10)
         finally:
             if app is not None:
@@ -694,7 +706,10 @@ class WindowsLauncher:
         )
 
     def open_docker(self) -> None:
-        webbrowser.open(DOCKER_DESKTOP_URL)
+        try:
+            webbrowser.open(DOCKER_DESKTOP_URL)
+        except (OSError, webbrowser.Error):
+            self.status.set("Browser unavailable; open Docker Desktop's website manually.")
 
     def run(self) -> int:
         try:

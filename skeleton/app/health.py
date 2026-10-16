@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from typing import Mapping
+import math
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -32,6 +33,8 @@ class ProbeResult:
 def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     """Probe one HTTP endpoint without external client dependencies."""
 
+    if not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
+        raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
     request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
     try:
         with urlopen(request, timeout=timeout) as response:
@@ -85,7 +88,7 @@ def probe_url(service: ServiceSpec, *, timeout: float = 3.0) -> ProbeResult:
         return ProbeResult(
             service=service.name,
             url=service.public_url,
-            ok=True,
+            ok=False,
             status=None,
             detail="no public HTTP health probe declared",
         )
@@ -136,12 +139,12 @@ def wait_for_application(
 ) -> tuple[ProbeResult, ...]:
     """Retry whole-application probes until healthy or the budget is exhausted."""
 
-    if attempts < 1:
-        raise ValueError("attempts must be at least one")
-    if timeout <= 0:
-        raise ValueError("timeout must be greater than zero")
-    if delay < 0:
-        raise ValueError("delay must not be negative")
+    if not isinstance(attempts, int) or isinstance(attempts, bool) or not 1 <= attempts <= 120:
+        raise ValueError("attempts must be an integer between 1 and 120")
+    if not math.isfinite(timeout) or not 0 < timeout <= 30:
+        raise ValueError("timeout must be finite and within (0, 30] seconds")
+    if not math.isfinite(delay) or not 0 <= delay <= 30:
+        raise ValueError("delay must be finite and within [0, 30] seconds")
 
     manifest = manifest or load_manifest()
     latest: tuple[ProbeResult, ...] = ()

@@ -1,22 +1,23 @@
 /**
- * /safe-mode — Recovery screen shown after 2+ consecutive crashes.
+ * /safe-mode — Recovery screen shown after repeated unclean boots.
  *
  * Displays:
  *   • Last successful boot timestamp
  *   • The recorded boot trace (steps the app reached before crashing)
  *   • Crash count
- *   • Buttons: "Try Product again", "Reset welcome flag", "Wipe app state"
+ *   • Explicit retry, non-destructive startup reset, and confirmed data wipe
  *
  * This is the ultimate safety net: even if /hub crashes on every launch,
  * the user always has a way to recover without uninstall/reinstall.
  */
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearMirror, pauseSafeStorageForWipe, resumeSafeStorageAfterWipe } from '../utils/safeStorage';
 import {
   getLastTrace, getCrashCount, getLastCleanBoot,
-  clearCrashes, resetBootState, TraceStep,
+  resetBootState, TraceStep,
 } from '../utils/bootTracer';
 import {
   FEATURE_FLAGS, getFeatureFlag, loadFeatureFlags,
@@ -28,18 +29,27 @@ export default function SafeModeRoute() {
   const [trace, setTrace] = useState<TraceStep[]>([]);
   const [crashCount, setCrashCount] = useState(0);
   const [lastClean, setLastClean] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   /** Re-render trigger for flag changes so the diagnostic panel stays fresh. */
   const [, setFlagsBump] = useState(0);
 
   useEffect(() => {
-    (async () => {
-      setTrace(await getLastTrace());
-      setCrashCount(await getCrashCount());
-      setLastClean(await getLastCleanBoot());
-      // Make sure flag values are hydrated for the diagnostic snapshot.
-      await loadFeatureFlags();
-      setFlagsBump(n => n + 1);
-    })();
+    let mounted = true;
+    // Diagnostic reads are independent and bounded by bootTracer. A stalled
+    // flag hydration must not hide the recovery screen or surface an
+    // unhandled rejection during an already degraded startup.
+    void Promise.all([getLastTrace(), getCrashCount(), getLastCleanBoot()])
+      .then(([history, count, clean]) => {
+        if (!mounted) return;
+        setTrace(history);
+        setCrashCount(count);
+        setLastClean(clean);
+      }).catch(() => {});
+    void Promise.resolve().then(() => loadFeatureFlags())
+      .then(() => { if (mounted) setFlagsBump(n => n + 1); })
+      .catch(() => {});
+    return () => { mounted = false; };
   }, []);
 
   const onResetFlags = async () => {
@@ -47,25 +57,107 @@ export default function SafeModeRoute() {
     setFlagsBump(n => n + 1);
   };
 
-  const tryProduct = async () => {
-    await clearCrashes();
+  const tryProduct = () => {
+    // A manual retry is not proof of success. Product marks the boot clean
+    // after a committed render; a repeated crash retains the earlier count.
     router.replace('/product');
   };
 
   const resetWelcome = async () => {
-    try { await AsyncStorage.removeItem('@codedock:welcome_seen:v1'); } catch {}
-    await clearCrashes();
-    router.replace('/welcome');
+    if (busy) return;
+    setBusy(true);
+    setRecoveryError(null);
+    try {
+      await AsyncStorage.removeItem('@codedock:welcome_seen:v1');
+      clearMirror();
+      router.replace('/welcome');
+    } catch {
+      setRecoveryError('Could not reset the welcome state. Device storage may be unavailable.');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const wipeAll = async () => {
+  const resetStartup = async () => {
+    if (busy) return;
+    setBusy(true);
+    setRecoveryError(null);
     try {
-      const keys = await AsyncStorage.getAllKeys();
-      // Keep only the bootTracer keys cleared, plus welcome flag
-      await AsyncStorage.multiRemove(keys);
-    } catch {}
-    await resetBootState();
-    router.replace('/welcome');
+      const removed = await resetBootState();
+      if (!removed) throw new Error('storage not confirmed');
+      setCrashCount(0);
+      setTrace([]);
+      setLastClean(null);
+      setRecoveryError('Startup evidence reset. Your projects and settings were preserved.');
+    } catch {
+      setRecoveryError('Startup reset was not confirmed; no success has been assumed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const performWipe = async () => {
+    if (busy) return;
+    setBusy(true);
+    setRecoveryError(null);
+    let releaseFence = true;
+    try {
+      // Prevent any wrapper-owned project/settings writes from interleaving
+      // with deletion. A timed-out write still owns its key until native I/O
+      // finishes, so a wipe is refused when a safe drain is unavailable.
+      if (!(await pauseSafeStorageForWipe())) {
+        throw new Error('native mutations still pending');
+      }
+      if (!(await resetBootState())) throw new Error('boot trace still pending');
+
+      const clearOperation = AsyncStorage.clear();
+      const cleared = await new Promise<{ done: boolean; ok: boolean }>(resolve => {
+        let settled = false;
+        const finish = (done: boolean, ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve({ done, ok });
+        };
+        const timer = setTimeout(() => finish(false, false), 2_000);
+        void clearOperation.then(
+          () => finish(true, true),
+          () => finish(true, false),
+        );
+      });
+      if (!cleared.done) {
+        // The native clear operation cannot be cancelled by a JS deadline.
+        // Keep the mutation fence held until the true native completion, or
+        // a delayed clear could destroy newly saved state after a false reset.
+        releaseFence = false;
+        void clearOperation.then(
+          () => { clearMirror(); },
+          () => undefined,
+        ).finally(() => resumeSafeStorageAfterWipe());
+        throw new Error('native clear outcome unknown');
+      }
+      if (!cleared.ok) throw new Error('native clear rejected');
+      clearMirror();
+      router.replace('/welcome');
+    } catch {
+      setRecoveryError('Data wipe could not be confirmed. Remain in Safe Mode and check device storage.');
+    } finally {
+      if (releaseFence) resumeSafeStorageAfterWipe();
+      setBusy(false);
+    }
+  };
+
+  const confirmWipe = () => {
+    if (busy) return;
+    const warning = 'Permanently delete ALL locally stored projects, work, settings and recovery logs on this device? This cannot be undone.';
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(warning)) void performWipe();
+      return;
+    }
+    Alert.alert('Delete all local app data?', warning, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete all', style: 'destructive', onPress: () => { void performWipe(); } },
+    ]);
   };
 
   const lastCleanStr = lastClean
@@ -99,10 +191,19 @@ export default function SafeModeRoute() {
           ))
         )}
 
+        {recoveryError ? <Text accessibilityRole="alert" style={styles.recoveryMessage}>{recoveryError}</Text> : null}
+        <TouchableOpacity
+          onPress={resetStartup}
+          disabled={busy}
+          style={styles.inlineBtn}
+          accessibilityLabel="Reset only startup and crash recovery state"
+        >
+          <Text style={styles.inlineBtnText}>Reset startup only (keep projects)</Text>
+        </TouchableOpacity>
         <Text style={styles.sectionLabel}>Tip</Text>
         <Text style={styles.dim}>
           The trace above shows what step the app reached before crashing.
-          Share this list with the developer to help diagnose the failure.
+          Share this list with the developer to help diagnose the failure. Resetting startup evidence does not remove saved projects.
         </Text>
 
         {/* P4 — Feature-flag diagnostic snapshot. Read-only listing so the
@@ -145,13 +246,13 @@ export default function SafeModeRoute() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={[styles.btn, styles.btnAlt]} onPress={resetWelcome}>
+        <TouchableOpacity style={[styles.btn, styles.btnAlt]} onPress={resetWelcome} disabled={busy}>
           <Text style={styles.btnAltText}>Reset welcome</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={wipeAll}>
-          <Text style={styles.btnAltText}>Wipe all</Text>
+        <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={confirmWipe} disabled={busy}>
+          <Text style={styles.btnAltText}>Delete all…</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btn} onPress={tryProduct}>
+        <TouchableOpacity style={styles.btn} onPress={tryProduct} disabled={busy}>
           <Text style={styles.btnText}>Try Product</Text>
         </TouchableOpacity>
       </View>
@@ -180,4 +281,5 @@ const styles = StyleSheet.create({
   btnAltText:{ color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
   inlineBtn:{ marginTop: 14, alignSelf: 'flex-start', backgroundColor: '#262626', borderColor: '#a78bfa55', borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8 },
   inlineBtnText:{ color: '#a78bfa', fontSize: 12, fontWeight: '800', letterSpacing: 0.4 },
+  recoveryMessage: { color: '#fbbf24', fontSize: 13, marginTop: 12, lineHeight: 18 },
 });

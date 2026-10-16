@@ -1,120 +1,178 @@
 /**
- * safeFetch — defensive wrapper around `fetch` with:
+ * Bounded, idempotency-aware JSON transport.
  *
- *   • A hard request timeout (AbortController) — default 12s.
- *   • Exponential-backoff retries on network errors and 5xx (default 2 retries).
- *   • Automatic JSON parsing with try/catch (no surprise SyntaxErrors).
- *   • Always returns an envelope: { ok, status, data?, error? } — never throws.
- *   • Emits trace steps so the boot tracer / safe-mode UI can show
- *     in-flight network failures.
- *
- * Usage:
- *   const res = await safeFetch<{items: Foo[]}>('/api/foo');
- *   if (res.ok) use(res.data); else showError(res.error);
+ * A retry cannot duplicate an unkeyed mutation. The deadline covers both
+ * headers AND body, including fetch adapters that ignore AbortController.
+ * Cancellation and excessive responses are reported as envelopes, not throws.
  */
 import { traceStep } from './bootTracer';
 import { API_BASE } from './apiBase';
+import { boundedResponseChars, boundedRetries, boundedTimeoutMs, retryDelayMs, retryableHttpStatus } from './requestRecoveryPolicy';
 
 const BACKEND = API_BASE;
 
-// ── Offline state (wired by OfflineBanner / useNetworkStatus) ───────
-// When set to true, in-flight retries bail early instead of running
-// the full exponential backoff against a dead network.
 let _offline = false;
 export function setOfflineState(offline: boolean) { _offline = offline; }
 export function isOffline(): boolean { return _offline; }
 
 export interface FetchEnvelope<T = any> {
-  ok:     boolean;
+  ok: boolean;
   status: number;
-  data?:  T;
+  data?: T;
   error?: string;
 }
 
 export interface FetchOpts {
-  method?:  string;
+  method?: string;
   headers?: Record<string, string>;
-  body?:    any;
-  /** Override default 12s timeout. */
+  body?: any;
   timeoutMs?: number;
-  /** Override default 2 retries. */
   retries?: number;
-  /** When true, log the failure to bootTracer (default true). */
   trace?: boolean;
-  /** Prepend EXPO_PUBLIC_BACKEND_URL if the path starts with /api. */
   absolute?: boolean;
+  signal?: AbortSignal;
+  maxResponseChars?: number;
+  /** Only true for endpoints proven to enforce server-side idempotency keys. */
+  serverDedupeVerified?: boolean;
 }
 
-function _backoff(attempt: number): number {
-  return Math.min(8000, 400 * Math.pow(2, attempt));
-}
-
-function _resolveUrl(path: string, absolute?: boolean): string {
-  if (absolute) return path;
-  if (path.startsWith('http')) return path;
+function resolveUrl(path: string, absolute?: boolean): string {
+  if (absolute || /^https?:\/\//i.test(path)) return path;
   if (path.startsWith('/api') && BACKEND) return `${BACKEND}${path}`;
   return path;
 }
 
-export async function safeFetch<T = any>(path: string, opts: FetchOpts = {}): Promise<FetchEnvelope<T>> {
-  const url      = _resolveUrl(path, opts.absolute);
-  const method   = opts.method ?? 'GET';
-  const timeout  = opts.timeoutMs ?? 12000;
-  const retries  = Math.max(0, opts.retries ?? 2);
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-    ...(opts.headers || {}),
+function redactedPath(path: string): string {
+  // Query strings can include auth tickets; never emit them into boot logs.
+  return path.split(/[?#]/, 1)[0].slice(0, 100);
+}
+
+function recordRetry(path: string, attempt: number, status: number): void {
+  try { void traceStep(`safeFetch_retry_${attempt}_status_${status}_${redactedPath(path)}`).catch(() => {}); } catch {}
+}
+
+function isAborted(signal?: AbortSignal): boolean {
+  return !!signal?.aborted;
+}
+
+async function backoff(ms: number, signal?: AbortSignal): Promise<boolean> {
+  if (isAborted(signal)) return false;
+  return new Promise(resolve => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) clearTimeout(timer);
+      signal?.removeEventListener?.('abort', onAbort);
+      resolve(ok);
+    };
+    const onAbort = () => finish(false);
+    signal?.addEventListener?.('abort', onAbort, { once: true });
+    timer = setTimeout(() => finish(true), ms);
+    if (isAborted(signal)) finish(false);
+  });
+}
+
+async function attemptRequest<T>(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: BodyInit | undefined,
+  timeoutMs: number,
+  signal?: AbortSignal,
+  maxResponseChars = boundedResponseChars(undefined),
+): Promise<FetchEnvelope<T>> {
+  if (isAborted(signal)) return { ok: false, status: 0, error: 'aborted' };
+  const ctrl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let didTimeout = false;
+  let abortResult: (result: FetchEnvelope<T>) => void = () => {};
+  const cancelled = new Promise<FetchEnvelope<T>>(resolve => { abortResult = resolve; });
+  const onAbort = () => {
+    ctrl.abort();
+    abortResult({ ok: false, status: 0, error: 'aborted' });
   };
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+  if (isAborted(signal)) onAbort();
+
+  try {
+    // Do not rely solely on AbortController: some React Native adapters may
+    // ignore an abort while response.text() is pending.
+    const request = (async (): Promise<FetchEnvelope<T>> => {
+      const res = await fetch(url, { method, headers, body, signal: ctrl.signal });
+      const length = Number(res.headers?.get?.('content-length') || 0);
+      if (length > maxResponseChars) return { ok: false, status: res.status, error: 'response_too_large' };
+      const raw = await res.text();
+      if (raw.length > maxResponseChars) return { ok: false, status: res.status, error: 'response_too_large' };
+      let parsed: any = undefined;
+      if (raw) {
+        try { parsed = JSON.parse(raw); } catch { parsed = raw; }
+      }
+      if (res.ok) return { ok: true, status: res.status, data: parsed as T };
+      const detail = typeof parsed === 'string' ? parsed : (parsed?.detail ?? `HTTP ${res.status}`);
+      return { ok: false, status: res.status, error: String(detail).slice(0, 250) };
+    })();
+    const deadline = new Promise<FetchEnvelope<T>>((_, reject) => {
+      timer = setTimeout(() => {
+        didTimeout = true;
+        ctrl.abort();
+        reject(new Error('request_timeout'));
+      }, timeoutMs);
+    });
+    // A caller navigating away receives cancellation immediately even if a
+    // native fetch adapter ignores AbortController while reading its body.
+    return await Promise.race([request, deadline, cancelled]);
+  } catch {
+    const error = didTimeout ? 'timeout' : isAborted(signal) ? 'aborted' : 'network_error';
+    return { ok: false, status: 0, error };
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    signal?.removeEventListener?.('abort', onAbort);
+  }
+}
+
+export async function safeFetch<T = any>(path: string, opts: FetchOpts = {}): Promise<FetchEnvelope<T>> {
+  const method = (opts.method || 'GET').toUpperCase();
+  const timeoutMs = boundedTimeoutMs(opts.timeoutMs);
+  const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers };
+  const keyed = Object.keys(headers).some(key => key.toLowerCase() === 'idempotency-key' && !!headers[key]);
+  const retries = boundedRetries(opts.retries, method, keyed, opts.serverDedupeVerified === true);
+  const url = resolveUrl(path, opts.absolute);
   let body: BodyInit | undefined;
-  if (opts.body !== undefined) {
-    if (typeof opts.body === 'string') body = opts.body;
-    else {
-      headers['Content-Type'] = headers['Content-Type'] || 'application/json';
-      body = JSON.stringify(opts.body);
+  try {
+    if (opts.body !== undefined) {
+      if (typeof opts.body === 'string') body = opts.body;
+      else {
+        if (!Object.keys(headers).some(key => key.toLowerCase() === 'content-type')) {
+          headers['Content-Type'] = 'application/json';
+        }
+        body = JSON.stringify(opts.body);
+      }
     }
+  } catch {
+    return { ok: false, status: 0, error: 'invalid_request_body' };
   }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    // Skip retries when we're known to be offline — the network call
-    // will fail in ~30s anyway, no point waiting.
-    if (_offline && attempt > 0) {
-      return { ok: false, status: 0, error: 'offline' };
-    }
-    const ctrl = new AbortController();
-    const t    = setTimeout(() => ctrl.abort(), timeout);
-    try {
-      const res = await fetch(url, { method, headers, body, signal: ctrl.signal });
-      clearTimeout(t);
-      let parsed: any = undefined;
-      const text = await res.text();
-      if (text) {
-        try { parsed = JSON.parse(text); }
-        catch { parsed = text; }
-      }
-      if (res.ok) return { ok: true, status: res.status, data: parsed as T };
-      // 5xx are retryable; 4xx are not.
-      if (res.status >= 500 && attempt < retries) {
-        if (opts.trace !== false) traceStep(`safeFetch retry ${attempt + 1}/${retries} ${res.status} ${path}`).catch(() => {});
-        await new Promise(r => setTimeout(r, _backoff(attempt)));
-        continue;
-      }
-      return { ok: false, status: res.status, error: typeof parsed === 'string' ? parsed : (parsed?.detail || `HTTP ${res.status}`) };
-    } catch (e: any) {
-      clearTimeout(t);
-      const msg = e?.message || String(e);
-      if (attempt < retries) {
-        if (opts.trace !== false) traceStep(`safeFetch retry ${attempt + 1}/${retries} err ${path}: ${msg.slice(0,40)}`).catch(() => {});
-        await new Promise(r => setTimeout(r, _backoff(attempt)));
-        continue;
-      }
-      return { ok: false, status: 0, error: msg };
+    if (isAborted(opts.signal)) return { ok: false, status: 0, error: 'aborted' };
+    if (_offline && attempt > 0) return { ok: false, status: 0, error: 'offline' };
+    const result = await attemptRequest<T>(url, method, headers, body, timeoutMs, opts.signal, boundedResponseChars(opts.maxResponseChars));
+    if (result.ok || result.error === 'aborted' || result.error === 'response_too_large') return result;
+
+    // Only replay safe methods or explicitly server-verified keyed writes.
+    if (attempt >= retries || (result.status !== 0 && !retryableHttpStatus(result.status))) return result;
+    if (opts.trace !== false) recordRetry(path, attempt + 1, result.status);
+    if (!(await backoff(retryDelayMs(attempt), opts.signal))) {
+      return { ok: false, status: 0, error: 'aborted' };
     }
   }
-  // Unreachable but TypeScript needs it.
   return { ok: false, status: 0, error: 'unreachable' };
 }
 
-/** Convenience GET. */
-export async function safeGetJson<T = any>(path: string, opts: Omit<FetchOpts, 'method' | 'body'> = {}): Promise<FetchEnvelope<T>> {
+export async function safeGetJson<T = any>(
+  path: string,
+  opts: Omit<FetchOpts, 'method' | 'body'> = {},
+): Promise<FetchEnvelope<T>> {
   return safeFetch<T>(path, { ...opts, method: 'GET' });
 }
