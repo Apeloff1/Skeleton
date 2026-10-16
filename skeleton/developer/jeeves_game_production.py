@@ -28,7 +28,7 @@ REQUIRED_GATES = (
     "accessibility", "market_quality", "source_integrity",
     "runtime_boot", "full_playthrough", "performance_and_release",
 )
-AUTOMATED_GATES = frozenset(("market_quality", "source_integrity", "runtime_boot", "story_continuity"))
+AUTOMATED_GATES = frozenset(("market_quality", "source_integrity", "runtime_boot", "story_continuity", "quests_and_dialogue"))
 # A terminal success requires a real domain verifier for every discipline.
 # Mere JSON receipts or an observed Godot boot are never enough.
 EXPECTED_EVIDENCE_OWNERS = {
@@ -300,6 +300,23 @@ def _probe(root: Path, policy: dict[str, Any], gate: str) -> tuple[str, str, str
         except (ValueError, OSError) as exc:
             return ("failed", _digest({"gate":gate,"error":str(exc)}),
                     "operator_observation", str(exc)[:2000])
+    if gate == "quests_and_dialogue":
+        from skeleton.developer.jeeves_game_direction_cli import gameplay
+        try:
+            report = gameplay(root, source="design/story_gameplay_dossier.json", passes=1)
+            covered = report["source_scenes_bound"]
+            executed = report["quest_stages_executed"]
+            pending = len(report["unexecuted_quest_stages"])
+            if not report["story_gameplay_coverage_complete"]:
+                return ("blocked", report["replay_evidence_sha256"], "canonical_quest_replay",
+                        f"{covered} signed story scenes bound and {executed} quest stages executed; "
+                        f"{pending} stages remain unexecuted; full-game QA required")
+            return ("blocked", report["replay_evidence_sha256"], "canonical_quest_replay",
+                    f"{covered} scenes and {executed} quest stages source-bound with real Director replays; "
+                    "independent whole-game playthrough, artistic review and runtime delivery still required")
+        except (ValueError, OSError) as exc:
+            return ("failed", _digest({"gate": gate, "error": str(exc)}),
+                    "canonical_quest_replay", str(exc)[:2000])
     if gate == "runtime_boot":
         from skeleton.developer.game_cli import _read_forge
         from skeleton.forge.playtest import playtest
