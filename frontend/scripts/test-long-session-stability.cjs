@@ -21,6 +21,7 @@ function loadTS(filename, mocks = {}) {
   const mod = { exports: {} };
   new Function('require', 'module', 'exports', output.outputText)(
     id => {
+      if (id === './requestRecoveryPolicy') return loadTS('utils/requestRecoveryPolicy.ts');
       assert.ok(Object.hasOwn(mocks, id), filename + ': unexpected import ' + id);
       return mocks[id];
     }, mod, mod.exports,
@@ -333,6 +334,7 @@ test('thermal queue coalesces active work and maintains a finite pending queue',
 
   const attempts = Array.from({ length: 260 }, (_, i) =>
     guard.queue.enqueue('unique-' + i, async () => i));
+  guard.queue.flush();
   const statuses = await Promise.allSettled(attempts);
   assert.ok(statuses.some(item => item.status === 'rejected' &&
     /saturated/.test(item.reason.message)), 'queue must refuse work at capacity');
@@ -498,4 +500,107 @@ test('ending a session waits for pending progress then sends final progress once
   await ending;
   assert.equal(h.states[0].active, false);
   h.unmount();
+});
+
+test('mutation requests have one attempt on one host even when retry options are high', async () => {
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null, setItem: async () => {},
+    },
+    './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: 'https://backup.test' },
+  });
+  const previous = global.fetch;
+  const calls = [];
+  global.fetch = async url => { calls.push(url); throw new Error('disconnected'); };
+  try {
+    await assert.rejects(net.resilientFetch('/make-game', {
+      method: 'POST', body: { prompt: 'test' },
+      retries: 500, hosts: ['https://backend.test', 'https://backup.test'],
+    }), /after 1 attempts across 1 host/);
+    assert.deepEqual(calls, ['https://backend.test/make-game']);
+  } finally {
+    global.fetch = previous;
+    net.stopHeartbeat();
+  }
+});
+
+test('authenticated read requests are not shared across credentials or cached', async () => {
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null, setItem: async () => {},
+    },
+    './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
+  });
+  const previous = global.fetch;
+  const calls = [];
+  global.fetch = async (_url, options) => {
+    const id = options.headers.Authorization;
+    calls.push(id);
+    return { ok: true, status: 200, headers: { get: () => null },
+      text: async () => JSON.stringify({ id }) };
+  };
+  try {
+    const [a, b] = await Promise.all([
+      net.resilientFetch('/me', { headers: { Authorization: 'User-A' } }),
+      net.resilientFetch('/me', { headers: { Authorization: 'User-B' } }),
+    ]);
+    assert.deepEqual([a.data.id, b.data.id], ['User-A', 'User-B']);
+    assert.deepEqual(calls, ['User-A', 'User-B']);
+    const repeated = await net.resilientFetch('/me', {
+      headers: { Authorization: 'User-A' },
+    });
+    assert.equal(repeated.fromCache, false);
+    assert.equal(calls.length, 3);
+  } finally {
+    global.fetch = previous;
+    net.stopHeartbeat();
+  }
+});
+
+test('oversized declared responses fail before reading or parsing', async () => {
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null, setItem: async () => {},
+    },
+    './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
+  });
+  const previous = global.fetch;
+  let bodyRead = false;
+  global.fetch = async () => ({
+    ok: true, status: 200,
+    headers: { get: () => String(100 * 1024 * 1024) },
+    text: async () => { bodyRead = true; return '{}'; },
+  });
+  try {
+    await assert.rejects(net.resilientFetch('/huge', {
+      retries: 0, cacheTtlMs: 0,
+    }), /Response exceeds size budget/);
+    assert.equal(bodyRead, false);
+  } finally {
+    global.fetch = previous;
+    net.stopHeartbeat();
+  }
+});
+
+test('aborted requests never initiate network activity', async () => {
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null, setItem: async () => {},
+    },
+    './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
+  });
+  const previous = global.fetch;
+  let called = false;
+  global.fetch = async () => { called = true; throw new Error('unexpected'); };
+  const controller = new AbortController();
+  controller.abort();
+  try {
+    await assert.rejects(net.resilientFetch('/cancelled', {
+      signal: controller.signal,
+    }), /Request cancelled/);
+    assert.equal(called, false);
+  } finally {
+    global.fetch = previous;
+    net.stopHeartbeat();
+  }
 });
