@@ -30,6 +30,7 @@ var view: VBoxContainer
 var snapshot: Dictionary = {}
 var last_presentation: Dictionary = {}
 var last_dragon_advice: Dictionary = {}
+var last_navigation: Dictionary = {}
 var world: Dictionary = {}
 var scene_lookup: Dictionary = {}
 var busy: bool = false
@@ -86,6 +87,10 @@ func _ready() -> void:
     dragon.text = "Ask Dragon"
     dragon.pressed.connect(func(): _request("@dragon", false))
     connection.add_child(dragon)
+    var navigate := Button.new()
+    navigate.text = "Find quest route"
+    navigate.pressed.connect(func(): _request("@navigation", false))
+    connection.add_child(navigate)
     var atlas := Button.new()
     atlas.text = "Scene atlas"
     atlas.pressed.connect(func(): get_tree().change_scene_to_file("res://main.tscn"))
@@ -238,7 +243,11 @@ func _request(choice: String, is_action: bool) -> void:
         error_code = client.request(url + "/v1/actions", headers,
                                    HTTPClient.METHOD_POST, request_body)
     else:
-        var route: String = "/v1/advice" if choice == "@dragon" else "/v1/status"
+        var route: String = "/v1/status"
+        if choice == "@dragon":
+            route = "/v1/advice"
+        elif choice == "@navigation":
+            route = "/v1/navigation?profile=quest&alternatives=3"
         error_code = client.request(url + route, headers, HTTPClient.METHOD_GET)
     if error_code != OK:
         status_text.text = "Unable to contact local Director: " + str(error_code)
@@ -262,6 +271,17 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
             snapshot = parsed["snapshot"]
             _render_state()
         return
+    if parsed.get("navigation") is Dictionary:
+        var found: Dictionary = parsed["navigation"]
+        if (snapshot.is_empty()
+                or found.get("state_sha256") != snapshot.get("current_state_sha256")
+                or found.get("session_head_sha256") != snapshot.get("last_receipt_sha256")):
+            status_text.text = "Game has advanced; refresh before using planned routes."
+            return
+        last_navigation = found
+        status_text.text = "Director found replay-verified alternate routes (read-only)."
+        _render_state()
+        return
     if parsed.get("advice") is Dictionary:
         var suggested: Dictionary = parsed["advice"]
         if snapshot.is_empty() or suggested.get("state_sha256") != snapshot.get("current_state_sha256"):
@@ -277,6 +297,9 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
     snapshot = parsed["snapshot"]
     if last_dragon_advice.get("state_sha256") != snapshot.get("current_state_sha256"):
         last_dragon_advice = {}
+    if (last_navigation.get("state_sha256") != snapshot.get("current_state_sha256")
+            or last_navigation.get("session_head_sha256") != snapshot.get("last_receipt_sha256")):
+        last_navigation = {}
     last_presentation = {}
     if parsed.get("presentation") is Dictionary:
         last_presentation = parsed["presentation"]
@@ -325,6 +348,21 @@ func _render_state() -> void:
               " — " + str(event.get("approach", "")) +
               " — " + str(event.get("consequence", "")))
     _line("Narrative outcomes: " + str(snapshot.get("narrative_flags", [])))
+    if not last_navigation.is_empty():
+        _line("Labyrinth route suggestions verified by canonical game actions:")
+        for route in last_navigation.get("routes", []):
+            _line("  " + str(route.get("hops", 0)) + " travel steps • " +
+                  str(route.get("distinct_regions", [])) +
+                  " • " + str(route.get("places", [])))
+            var actions_for_route: Array = route.get("actions", [])
+            if not actions_for_route.is_empty():
+                var next_action: String = str(actions_for_route[0])
+                var route_button := Button.new()
+                route_button.text = "Travel first step: " + next_action
+                route_button.pressed.connect(_choose.bind(next_action))
+                view.add_child(route_button)
+        if last_navigation.get("search_budget_exhausted", false):
+            _line("  Search budget reached: returned routes are not exhaustive.")
     if not last_dragon_advice.is_empty():
         _line("Dragon empirical micro-model (advice, never automatic game input):")
         if last_dragon_advice.get("abstained", true):
