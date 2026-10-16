@@ -262,3 +262,22 @@ upscale checks, but still needs professional art review, game integration,
 controller experience, cinematography and authentic end-to-end gameplay.
 
 Test: python -m pytest skeleton/testing/test_jeeves_game_render.py -q
+
+## Chained longform playable-quest recording
+
+Signed StoryCanon-to-Director replays can now use immutable, ordered
+`segments` instead of a single `actions` array. The verifier carries
+game state across each bounded segment, independently regenerates exact
+state checkpoints, builds a SHA-256 chain and exposes replay evidence to
+the combined Jeeves novel/film/gameplay direction audit. The prior
+Director lifetime turn cap is removed; the per-call 8,192-action
+resource guard remains. Focused tests prove consecutive multi-stage
+quest completion, >256 accumulated actions, branch compatibility and
+tamper rejection. These tests are not a real whole-game playthrough.
+
+A dossier still has a 16 MiB admission limit and at most 64 separately
+named replays, and model/runtime/environment resources remain finite.
+No checkpoint hash is treated as external authorship approval, a native
+savegame or full-game certification. The CLI replays the original
+actions from genesis for validation; independent exports, installed
+save/load, real playtesting and finished-game evidence remain outstanding.
