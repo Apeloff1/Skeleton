@@ -330,7 +330,7 @@ async function _doFetch<T>(
         error: res.ok ? null : (typeof data === 'object' ? data?.error || data?.detail : String(data)) || `HTTP ${res.status}`,
         rid: res.headers.get('x-request-id') || rid,
       };
-    } catch (e: any) {
+    } catch {
       cleanup();
       lastTimedOut = timedOut;
 
