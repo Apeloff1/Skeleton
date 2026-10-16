@@ -340,7 +340,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     subs.add_parser("catalog", help="List supported GameForge eras and archetypes")
     jeeves = subs.add_parser("jeeves", help="Jeeves design planning, source audit and developer handoff")
     jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
-                                                   "propose", "review", "apply", "queue")) 
+                                                   "propose", "review", "apply", "queue", "benchmark", "asset-gate")) 
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -348,6 +348,11 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--include-notes", action="store_true")
     jeeves.add_argument("--digest")
     jeeves.add_argument("--approve")
+    jeeves.add_argument("--console")
+    jeeves.add_argument("--genre")
+    jeeves.add_argument("--period")
+    jeeves.add_argument("--profile")
+    jeeves.add_argument("--evidence")
     for action in ("info", "doctor", "build", "verify", "playtest", "assets", "package"):
         child = subs.add_parser(action)
         child.add_argument("--project", default=".")
@@ -373,7 +378,10 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
             from skeleton.developer.jeeves_game_cli import run_jeeves_game_cli
             command = [options.jeeves_action]
             for flag, value in (("--kind", options.kind), ("--brief", options.brief),
-                                ("--digest", options.digest), ("--approve", options.approve)):
+                                ("--digest", options.digest), ("--approve", options.approve),
+                                ("--console", options.console), ("--genre", options.genre),
+                                ("--period", options.period), ("--profile", options.profile),
+                                ("--evidence", options.evidence)):
                 if value is not None:
                     command.extend([flag, value])
             if options.include_notes:
