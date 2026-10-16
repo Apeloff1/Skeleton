@@ -228,3 +228,49 @@ def test_unverified_shot_never_certifies_professional_performance_in_combined_re
                            "--source", "design/story_direction_packet.json"])
     assert not result["ok"]
     assert "voice or facial identity" in result["error"]
+
+
+
+def test_jeeves_model_gets_verified_shot_counts_without_unrequested_script_text(
+    tmp_path, monkeypatch,
+):
+    from skeleton.developer import jeeves_game_authoring as authoring
+    created = run_game_cli(["init", "film-room", "--dir", str(tmp_path)])
+    assert created["ok"]
+    root = tmp_path / "film-room"
+    bible, contract, scenes, boards = original_production("film_room", scenes=1)
+    packet = {
+        "schema": "skeleton.jeeves.direction_dossier.v1",
+        "bible": bible, "scenes": scenes, "expert_reviews": [],
+        "production_contract": contract, "shot_boards": boards,
+    }
+    (root / "design" / "story_direction_packet.json").write_text(
+        json.dumps(packet), encoding="utf-8",
+    )
+    observed = []
+    async def mock_inference(prompt):
+        observed.append(json.loads(prompt))
+        return json.dumps({
+            "kind": "scene", "slug": "cinematic-mystery",
+            "title": "An Original Cinematic Mystery",
+            "summary": "A choice of original cinematic consequence and revelation",
+            "body": "The heroine follows an original dramatic causal thread into a new playable scene",
+            "rationale": "Evidence-linked actor, camera and screenplay intent",
+        }), {"provider": "fixture", "model": "mock", "request_id": "director-check"}
+    monkeypatch.setattr(authoring, "_infer", mock_inference)
+    made = run_game_cli([
+        "jeeves", "propose", "--project", str(root), "--kind", "scene",
+        "--brief", "An original scene with motivated camera decisions",
+        "--direction-source", "design/story_direction_packet.json",
+    ])
+    assert made["ok"], made
+    assert len(observed) == 1
+    submitted = observed[0]["authored_story_direction"]
+    summary = submitted["cinematic_direction_summary"]
+    assert summary["signed_scene_count"] == 1
+    assert summary["shot_count"] == 1
+    assert summary["timeline_ms"] == 6000
+    assert summary["dialogue_lines_covered"] == 1
+    assert summary["rendered_film_quality_verified"] is False
+    assert scenes[0]["dialogue"][0]["text"] not in json.dumps(observed[0])
+    assert not made.get("model_weights_updated", False)
