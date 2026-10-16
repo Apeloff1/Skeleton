@@ -156,7 +156,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "upscale-parallax", "upscale-music", "asset-inventory",
                                             "upscale-review", "vividness-review", "queue-upscaled-training",
                                             "camera-plan", "camera-render",
-                                            "direction-audit", "direction-workorder", "production-gap-matrix"))
+                                            "direction-audit", "direction-workorder", "production-gap-matrix",
+                                            "dragon-ingest", "dragon-plan", "dragon-adopt"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -196,6 +197,25 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
+        if args.action in {"dragon-ingest", "dragon-plan", "dragon-adopt"}:
+            allowed = ({"action", "source", "approve"} if args.action == "dragon-ingest"
+                       else {"action", "source", "genre", "target", "approve"}
+                       if args.action == "dragon-adopt"
+                       else {"action", "source", "genre", "target"})
+            for key, value in vars(args).items():
+                if key not in allowed and value is not None and value is not False:
+                    raise ValueError("unrelated Dragon option --" + key.replace("_", "-"))
+            if not args.source:
+                raise ValueError("Dragon observation source requires --source design/<file>.json")
+            from skeleton.developer.jeeves_game_dragon import ingest, plan, adopt
+            if args.action == "dragon-ingest":
+                return ingest(root, source=args.source, approved_sha256=args.approve)
+            if not args.genre or not args.target:
+                raise ValueError("Dragon game forge needs --genre and --target")
+            if args.action == "dragon-plan":
+                return plan(root, source=args.source, genre=args.genre, target=args.target)
+            return adopt(root, source=args.source, genre=args.genre, target=args.target,
+                         approved_sha256=args.approve)
         from skeleton.developer.jeeves_game_world_cli import ACTIONS, dispatch
         if args.action in ACTIONS:
             output = dispatch(args, root)
