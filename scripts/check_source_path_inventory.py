@@ -90,6 +90,7 @@ CANONICAL_PREFIXES = (
 # Transitional/support roots remain first-party but cannot silently acquire
 # canonical runtime ownership. machine/architecture.json is authoritative.
 FIRST_PARTY_PREFIXES = (
+    "data/",  # repository-authored datasets; never a canonical runtime owner
     "apps/",
     "core/",
     "eval/",
@@ -97,6 +98,7 @@ FIRST_PARTY_PREFIXES = (
     "scripts/",
     "tests/",
     "docs/",
+    "data/conversational/",  # authored corpus and reports; not a canonical runtime owner
     "design/",  # first-party authored visual identity, not a canonical runtime root
     ".github/",
     ".cursor/",
@@ -107,7 +109,6 @@ FIRST_PARTY_PREFIXES = (
     "machine/",
     "packaging/",
     "volume_forge/",  # repository-owned volume assembly tooling, not canonical runtime
-    "data/conversational/",  # first-party authored model-training corpus, not runtime
     "complete/",
     "volume_forge/",
     "apps/",
