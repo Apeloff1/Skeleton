@@ -123,6 +123,20 @@ jobs:
       - name: Syntax check (full backend)
         if: steps.scope.outputs.full == 'true'
         run: python -m compileall -q .
+      - name: Jeeves game development, fidelity and continuous production contracts
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_jeeves_game_completion.py
+          skeleton/testing/test_jeeves_game_render.py
+          skeleton/testing/test_jeeves_game_quality.py
+          skeleton/testing/test_jeeves_game_authoring.py
+          skeleton/testing/test_jeeves_game_cli.py
+          skeleton/testing/test_game_creator_cli.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
