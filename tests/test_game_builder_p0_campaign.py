@@ -172,3 +172,43 @@ def test_p0_acceptance_diagnostic_never_confuses_source_with_release(tmp_path):
         "jeeves", "p0-acceptance", "--project", str(root), "--target", "ps5",
     ])
     assert not malicious["ok"]
+
+
+def test_campaign_save_restores_actual_story_state_and_rejects_tampering(tmp_path):
+    from skeleton.ai.game_builder.quest_campaign_save import (
+        CampaignSaveError, read_campaign_save, write_campaign_save,
+    )
+    assert run_game_cli(["init", "campaign-p0", "--dir", str(tmp_path)])["ok"]
+    root = tmp_path / "campaign-p0"
+    world = original_world()
+    witness = play_campaign(world, preference=1, segment_size=4)
+    saved = write_campaign_save(root, "chapter_finale", world, witness)
+    assert saved["ok"]
+    assert saved["native_or_godot_save_certified"] is False
+    state = read_campaign_save(root, "chapter_finale", world)
+    assert set(state.complete) == set(q.key for q in world.quests)
+    assert state.digest == witness.report["final_director_state_sha256"]
+    with pytest.raises(CampaignSaveError, match="already exists"):
+        write_campaign_save(root, "chapter_finale", world, witness)
+    path = root / "design" / "campaign_saves" / "chapter_finale.json"
+    packet = json.loads(path.read_text())
+    packet["replay"]["segments"][0]["actions"][0]["key"] = "forged_action"
+    path.write_text(json.dumps(packet))
+    with pytest.raises(CampaignSaveError, match="receipt mismatch"):
+        read_campaign_save(root, "chapter_finale", world)
+
+
+def test_campaign_save_refuses_cross_project_world_and_unsafe_name(tmp_path):
+    from skeleton.ai.game_builder.quest_campaign_save import (
+        CampaignSaveError, read_campaign_save, write_campaign_save,
+    )
+    assert run_game_cli(["init", "campaign-p0", "--dir", str(tmp_path)])["ok"]
+    root = tmp_path / "campaign-p0"
+    world = original_world()
+    witness = play_campaign(world)
+    with pytest.raises(CampaignSaveError, match="invalid original save identity"):
+        write_campaign_save(root, "../overwrite", world, witness)
+    write_campaign_save(root, "safe", world, witness)
+    foreign = original_world("foreign_project")
+    with pytest.raises(CampaignSaveError, match="different original game world"):
+        read_campaign_save(root, "safe", foreign)
