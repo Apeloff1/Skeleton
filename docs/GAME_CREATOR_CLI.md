@@ -14,6 +14,7 @@ skeleton.forge.playtest.
 Run from a local development checkout with Skeleton installed:
 
 ~~~bash
+python -m skeleton dev game catalog
 python -m skeleton dev game init my-adventure \
   --vision "An original exploration RPG with branching quests" \
   --era extraction_now --archetype auto
@@ -40,6 +41,7 @@ existing destinations are rejected.
 
 ## Iteration and qualification
 
+- **catalog**: reads the existing forge era and archetype catalogs; reports only the currently wired Godot source target and package format.
 - **info**: validated local project metadata and whether a Godot emission
   exists. It does not attest that emission is correct.
 - **doctor**: era/configuration validation and whether a Godot executable is
