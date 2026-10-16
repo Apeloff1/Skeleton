@@ -198,6 +198,15 @@ def plan(root: Path, *, session: str, destination: str | None = None,
         sites=sites, alternatives=alternatives,
     )
     if not routes:
+        # Even negative/incomplete results are tied to the EXACT journal head
+        # and source. Never serve a stale locked-passage claim to the client.
+        _, current_world, current_state, current_source, current_head, current_count = _load(
+            root, name=session)
+        if (current_world.digest != world.digest
+                or current_state.digest != state.digest or current_head != head
+                or current_count != count
+                or current_source["source_sha256"] != source["source_sha256"]):
+            raise ValueError("living game changed during negative route search")
         # No route found under the bounded search is not proof of topological
         # impossibility; future factions, keys or quests could unlock one.
         status = "search_exhausted" if exhausted else "unreachable_with_current_permissions"
