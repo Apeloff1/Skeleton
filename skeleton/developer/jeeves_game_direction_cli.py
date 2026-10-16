@@ -281,3 +281,32 @@ def gameplay(root: Path, *, source: str, passes: int = 1) -> dict[str, Any]:
     checked["dossier_path"] = source
     checked["creator_approval_externally_verified"] = False
     return checked
+
+
+def campaign(root: Path, *, source: str, routes: int = 2) -> dict[str, Any]:
+    """Read-only, original approved blueprint -> complete executable quest witnesses."""
+    from skeleton.developer.jeeves_game_quality import _read
+    from skeleton.developer.game_cli import _load
+    from skeleton.ai.game_builder.quest_scene_forge import compile_director_blueprint
+    from skeleton.ai.game_builder.quest_campaign_completion import (
+        compare_campaign_branches, CampaignCompletionError,
+    )
+    doc, identity = _read(root, source, 16 * 1024 * 1024)
+    if (not isinstance(doc, dict) or set(doc) != {
+            "schema", "director_world", "author_review_acknowledged",
+        } or doc.get("schema") != "skeleton.jeeves.director_campaign_source.v1"):
+        raise CampaignCompletionError("campaign source needs reviewed original DirectorWorld blueprint")
+    if doc["author_review_acknowledged"] is not True:
+        raise CampaignCompletionError("campaign requires explicit reviewed original blueprint")
+    project = _load(root)["name"].replace("-", "_")
+    world = compile_director_blueprint(doc["director_world"], human_reviewed=True)
+    if world.project_id != project:
+        raise CampaignCompletionError("campaign blueprint does not belong to active game project")
+    report = compare_campaign_branches(world, routes=routes)
+    _, checked_sha = _read(root, source, 16 * 1024 * 1024)
+    if identity != checked_sha:
+        raise CampaignCompletionError("campaign source changed during replay")
+    report["source_dossier_sha256"] = identity
+    report["source_dossier_path"] = source
+    report["author_approval_externally_verified"] = False
+    return report
