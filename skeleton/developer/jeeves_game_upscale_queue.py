@@ -77,12 +77,36 @@ def _check_value(value:dict[str,Any], *, digest:str) -> None:
         raise QueueError("tampered training candidate receipt")
 
 
+def _fingerprint(root: Path, relative: str) -> str:
+    """Read the actual current project bytes without following symlinks."""
+    if not isinstance(relative, str) or not relative or "\\" in relative:
+        raise QueueError("unsafe upscale training source")
+    pieces = relative.split("/")
+    if (pieces[0] not in ("assets", "design") or len(pieces) < 2
+        or any(piece in ("", ".", "..") for piece in pieces)):
+        raise QueueError("training evidence must stay inside project assets/ or design/")
+    file = root
+    for piece in pieces:
+        file = file / piece
+        if file.is_symlink():
+            raise QueueError("upscale evidence contains symlink")
+    if not file.is_file() or file.stat().st_size > 128*1024*1024:
+        raise QueueError("upscale evidence source is missing or over size")
+    h = sha256()
+    with file.open("rb") as stream:
+        for block in iter(lambda: stream.read(1<<20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
 def record_output(root:Path, *, category:str, source:str, output:str,
                   input_sha256:str, output_sha256:str, target:str,
                   quality:str="requires_review") -> dict[str,Any]:
     from skeleton.developer.jeeves_game_authoring import _create_only
     from skeleton.developer.game_cli import _load
     _load(root)
+    if _fingerprint(root, source) != input_sha256 or _fingerprint(root, output) != output_sha256:
+        raise QueueError("upscale training evidence does not match actual original/output files")
     payload={
         "schema":SCHEMA,"category":category,"source":source,"output":output,
         "input_sha256":input_sha256,"output_sha256":output_sha256,
@@ -133,7 +157,17 @@ def training_queue(root:Path, *, page:int=0, page_size:int=64) -> dict[str,Any]:
             values.append(_load_candidate(file,digest))
     values.sort(key=lambda v:(PRIORITIES.index(v["priority"]),v["digest"]))
     start=page*page_size
-    output=values[start:start+page_size]
+    output=[]
+    for value in values[start:start+page_size]:
+        item=dict(value)
+        try:
+            item["original_available_and_unchanged"]=_fingerprint(root,item["source"])==item["input_sha256"]
+            item["output_available_and_unchanged"]=_fingerprint(root,item["output"])==item["output_sha256"]
+        except (OSError,ValueError):
+            item["original_available_and_unchanged"]=False
+            item["output_available_and_unchanged"]=False
+        item["eligible_for_training_promotion"]=False
+        output.append(item)
     return {
         "ok":True,"action":"queue-upscaled-training","schema":SCHEMA,
         "page":page,"page_size":page_size,"total_candidates":len(values),
