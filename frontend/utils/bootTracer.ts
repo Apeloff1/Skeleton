@@ -278,36 +278,56 @@ async function rotateSessionsOnce(): Promise<void> {
 // Kick rotation immediately on module load (queues the read before writes).
 const _rotationReady = rotateSessionsOnce();
 
+// All writes to the crash counter share one sequencer. A native write that
+// timed out at the entry route can still complete after the product renders;
+// serializing acknowledgement behind admission prevents that late increment
+// from overwriting a clean-boot marker.
+let _crashWriteTail: Promise<void> = Promise.resolve();
+function writeCrashCount(value: number): Promise<void> {
+  const operation = _crashWriteTail.catch(() => {}).then(() =>
+    AsyncStorage.setItem(KEY_CRASH_COUNT, String(value))
+  );
+  _crashWriteTail = operation.catch(() => {});
+  return operation;
+}
+
 export async function getCrashCount(): Promise<number> {
   try {
     const v = await readStorageBounded(KEY_CRASH_COUNT);
-    return v ? parseInt(v, 10) || 0 : 0;
+    if (!v) return 0;
+    const parsed = Number(v);
+    return Number.isSafeInteger(parsed) && parsed >= 0 ? Math.min(parsed, 999) : 0;
   } catch { return 0; }
 }
 
 export async function markCrash(): Promise<number> {
   const n = (await getCrashCount()) + 1;
-  try { await AsyncStorage.setItem(KEY_CRASH_COUNT, String(n)); } catch { /* swallow */ }
+  if (_resetInProgress) return n;
+  try { await writeCrashCount(n); } catch { /* swallow */ }
   return n;
 }
 
 export async function clearCrashes(): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY_CRASH_COUNT, '0');
+    if (_resetInProgress) return;
+    await writeCrashCount(0);
     await AsyncStorage.setItem(KEY_LAST_CLEAN, String(Date.now()));
   } catch { /* swallow */ }
 }
 
 /**
  * bootGuard — call at app entry. Returns:
- *   'safe-mode'  if crash_count >= 2 (route to /safe-mode recovery screen)
+ *   'safe-mode'  if crash_count >= 3 (route to /safe-mode recovery screen)
  *   'normal'     otherwise
  *
  * Side effect: pre-increments crash_count so that if THIS boot crashes
  * before reaching `markBootClean()`, the next launch will see the new count.
  */
-export async function bootGuard(): Promise<'safe-mode' | 'normal'> {
+export async function bootGuard(signal?: AbortSignal): Promise<'safe-mode' | 'normal'> {
   const count = await getCrashCount();
+  // The entry deadline can expire while native storage is locked. In that
+  // case we must not enqueue a late crash increment after recovery begins.
+  if (signal?.aborted || _resetInProgress) return 'normal';
   // 2026-06-24: threshold restored to 3 (was an aggressive 1). Now that the
   // root-cause OOM is fixed (lazy modals), a single transient crash — or a
   // stale counter left over from the pre-fix builds, or the user impatiently
@@ -318,7 +338,7 @@ export async function bootGuard(): Promise<'safe-mode' | 'normal'> {
   if (count < 3) {
     // Healthy range — pre-mark this boot as "in progress" so that if we crash
     // before reaching markBootClean(), the next launch sees the higher count.
-    try { await AsyncStorage.setItem(KEY_CRASH_COUNT, String(count + 1)); } catch {}
+    try { await writeCrashCount(count + 1); } catch {}
     return 'normal';
   }
   // A threshold crossing is NOT a clean boot. Keep the evidence until a
@@ -361,6 +381,9 @@ export async function resetBootState(): Promise<boolean> {
   try {
     const idle = _traceWriter.pauseAndDiscard();
     if (!(await boundedOperation(idle, STORAGE_READ_BUDGET_MS))) return false;
+    // Wait for pending attempt/clean acknowledgements before removing the
+    // counter. Never delete it while an older native writer may restore it.
+    if (!(await boundedOperation(_crashWriteTail, STORAGE_READ_BUDGET_MS))) return false;
 
     // A timeout cannot cancel an AsyncStorage mutation. If the underlying
     // removal has not settled, keep the writer fenced so a *late* native
