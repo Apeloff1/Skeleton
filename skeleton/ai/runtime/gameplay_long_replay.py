@@ -52,7 +52,13 @@ def replay_long_controller(arguments: dict[str, Any]) -> dict[str, Any]:
     if start_frame == 0 and previous is not None:
         raise GameplayError("new replay must not claim a previous receipt")
 
-    initial_avatar = dict(avatar) if isinstance(avatar, dict) else avatar
+    # Run the first real segment before hashing or allocating receipts.
+    # This validates map dimensions, avatar state and controller shape using
+    # the same engine that will execute the rest of the replay.
+    validated_first = platformer_replay({
+        "tiles": tiles, "avatar": avatar, "controls": controls[:MAX_FRAMES],
+    })
+    initial_avatar = dict(avatar)
     source_digest = _digest(tiles)
     chain = _digest({
         "schema": "skeleton.gameplay.long_replay.v1",
@@ -66,7 +72,9 @@ def replay_long_controller(arguments: dict[str, Any]) -> dict[str, Any]:
     current_avatar = avatar
     for index, offset in enumerate(range(0, len(controls), MAX_FRAMES)):
         batch = controls[offset:offset + MAX_FRAMES]
-        result = platformer_replay({"tiles": tiles, "avatar": current_avatar, "controls": batch})
+        result = validated_first if index == 0 else platformer_replay({
+            "tiles": tiles, "avatar": current_avatar, "controls": batch,
+        })
         global_start = start_frame + offset
         if goal_first_reached_frame is None and result["goal_first_reached_frame"] is not None:
             goal_first_reached_frame = global_start + result["goal_first_reached_frame"]
