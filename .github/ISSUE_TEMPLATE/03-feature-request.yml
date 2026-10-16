@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a scoped improvement with acceptance criteria and dependency awareness.
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the current backlog and related PRs before proposing duplicate work.
+        Security and release protections must be preserved; avoid extra CI triggers.
+  - type: input
+    id: area
+    attributes:
+      label: Component or user workflow
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem and desired outcome
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed behavior and integration boundary
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Definition of done and validation
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies, duplicates, and prior work
+      placeholder: Related issues / PRs / exact refs / none known
+  - type: textarea
+    id: risk
+    attributes:
+      label: Security, privacy, rights, performance, rollback, and test scope
