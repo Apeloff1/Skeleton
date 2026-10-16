@@ -357,7 +357,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                                    "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                                    "production-status", "production-cycle", "production-training",
-                                                   "direction-audit", "direction-revision", "direction-benchmark",
+                                                   "direction-audit", "direction-revision", "direction-benchmark", "direction-shots",
                                                    "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                                    "upscale-foliage", "upscale-animation", "upscale-shadow",
                                                    "upscale-parallax", "upscale-music", "asset-inventory",
