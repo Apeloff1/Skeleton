@@ -35,6 +35,8 @@ from skeleton.developer.jeeves_game_director_dynamic_audit import audit, analyze
 from skeleton.developer.jeeves_game_director_dynamic_author import (
     preview, publish,
 )
+from skeleton.developer.jeeves_game_director_dynamic_playthrough import prove
+from skeleton.ai.game_builder.quest_campaign_completion import play_campaign
 from skeleton.developer.jeeves_game_dragon_world import study, queue, compare
 from skeleton.developer.jeeves_game_director_bridge import handler
 from skeleton.developer.jeeves_game_director_events import delta
@@ -295,6 +297,38 @@ class OriginalLivingWorldTests(unittest.TestCase):
         self.assertEqual(compared["world_flags_unique_to_first"], ["charter"])
         self.assertTrue(compared["faction_standing_differences"])
 
+    def test_full_story_replays_through_real_dynamic_transit_rules(self):
+        # The campaign solver may NOT use a statically visible but locked
+        # foot link as a shortcut. Every chosen move is genuinely legal.
+        witness = play_campaign(
+            self.status, preference=0, include_optional=False, segment_size=7)
+        self.assertTrue(witness.report["all_authored_stages_executed"])
+        self.assertTrue(witness.report["all_authored_quests_executed"])
+        all_steps = [
+            DirectorAction(**raw) for segment in witness.replay["segments"]
+            for raw in segment["actions"]
+        ]
+        state = director_initial(self.status)
+        for action in all_steps:
+            self.assertIn(action, available_director_actions(self.status, state))
+            state = director_step(self.status, state, action)
+        self.assertEqual(state.digest,
+                         witness.report["final_director_state_sha256"])
+        report = prove(self.root, source=self.dynamic_file, routes=1)
+        self.assertTrue(report["ok"], report.get("failed_or_unproven_strategies"))
+        self.assertEqual(report["complete_playthroughs_verified"], 1)
+        self.assertEqual(report["reports"][0]["final_state_sha256"], state.digest)
+        self.assertFalse(report["native_godot_full_campaign_verified"])
+        self.assertFalse((self.root / ".jeeves" / "director_sessions").exists())
+
+    def test_dynamic_playthrough_rejects_invalid_routes_and_legacy_source(self):
+        with self.assertRaises(ValueError):
+            prove(self.root, source=self.dynamic_file, routes=0)
+        with self.assertRaises(ValueError):
+            prove(self.root, source=self.legacy_file, routes=1)
+        with self.assertRaises(ValueError):
+            prove(self.root, source=self.dynamic_file, optional=1)
+
     def test_explicit_dynamics_consistency_assurance(self):
         self._start()
         report = audit(self.root, source=self.dynamic_file)
@@ -341,6 +375,7 @@ class OriginalLivingWorldTests(unittest.TestCase):
         drafted = preview(self.root, source=self.legacy_file, intensity=4)
         self.assertTrue(drafted["ok"])
         self.assertFalse(drafted["published"])
+        self.assertFalse(drafted["design"]["candidate"]["author_review_acknowledged"])
         self.assertEqual(drafted["writes"], 0)
         self.assertGreaterEqual(
             drafted["design"]["world_assurance"]["transport_count"], 2
@@ -354,6 +389,8 @@ class OriginalLivingWorldTests(unittest.TestCase):
         )
         self.assertTrue(accepted["published"])
         self.assertTrue((self.root / accepted["source"]).is_file())
+        self.assertTrue(json.loads((self.root / accepted["source"]).read_text())
+                        ["author_review_acknowledged"])
         self.assertTrue(accepted["original_source_preserved"])
         self.assertEqual(
             json.loads((self.root / self.legacy_file).read_text())["director_world"],
@@ -427,6 +464,11 @@ class OriginalLivingWorldTests(unittest.TestCase):
             "--source", self.dynamic_file, "--session", "operator",
         ])
         self.assertTrue(start["ok"])
+        verified = run_game_cli([
+            "jeeves", "director-dynamics-playthrough", "--project", str(self.root),
+            "--source", self.dynamic_file, "--routes", "1",
+        ])
+        self.assertTrue(verified["ok"], verified)
         advised = run_game_cli([
             "jeeves", "director-route", "--project", str(self.root),
             "--session", "operator", "--destination", self.neighbor,
