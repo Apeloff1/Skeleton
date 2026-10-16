@@ -73,6 +73,7 @@ def dev_help_text() -> str:
         jeeves director-dynamics-design --source design/director_campaign_source.json [--intensity 1..5]
         jeeves director-dynamics-publish --source design/director_campaign_source.json --intensity N --approve DESIGN_SHA256
         jeeves director-dynamics-audit --source design/director_dynamic_SOURCE_SHA.json
+        jeeves director-dynamics-playthrough --source design/director_dynamic_SOURCE_SHA.json --routes 4 [--include-optional]
         jeeves director-route --session NAME --route-profile fastest|scenic|quiet|novel|quest
         jeeves dragon-world-study --session NAME [--approve STUDY_SHA256]
         jeeves dragon-world-contrast --session NAME --other-session OTHER
