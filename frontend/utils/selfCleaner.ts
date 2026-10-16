@@ -9,9 +9,8 @@
  *  What it cleans:
  *    1. Triple-buffer response cache rows  (`tb_cache_*`)   — TTL + count cap
  *    2. Predictive pattern store rows      (`qb_pattern_*`) — TTL + count cap
- *    3. Boot trace                          (`@boot/trace`) — hard size cap
- *    4. Orphaned/oversized misc keys                        — best effort
- *    5. expo-file-system cache directory                    — best effort (native)
+ *    3. Boot trace is owned exclusively by bootTracer (never rewritten here)
+ *    4. expo-file-system cache directory                    — best effort (native)
  *
  *  Everything is wrapped in try/catch — cleaning must NEVER block or crash boot.
  */
@@ -21,12 +20,10 @@ import { traceStep } from './bootTracer';
 
 const CACHE_PREFIX        = 'tb_cache_';
 const PATTERN_PREFIX      = 'qb_pattern_';
-const TRACE_KEY           = '@boot/trace';
 
 const CACHE_TTL_MS        = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MAX_CACHE_ROWS      = 40;
 const MAX_PATTERN_ROWS    = 40;
-const MAX_TRACE_BYTES      = 32 * 1024;              // ~32 KB hard cap
 const MIN_INTERVAL_MS     = 60 * 1000;               // throttle re-runs
 const FS_CACHE_LIMIT_BYTES = 25 * 1024 * 1024;       // 25 MB FS cache ceiling
 
@@ -118,21 +115,10 @@ export async function runSelfCleaner(reason = 'boot', force = false): Promise<Cl
       result.removedKeys = toRemove.length;
     }
 
-    // 3: hard-cap the boot trace size.
-    try {
-      const raw = await AsyncStorage.getItem(TRACE_KEY);
-      if (raw && raw.length > MAX_TRACE_BYTES) {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr) && arr.length > 1) {
-          // Keep the most recent half — that's where crashes live.
-          const trimmed = arr.slice(-Math.floor(arr.length / 2));
-          await AsyncStorage.setItem(TRACE_KEY, JSON.stringify(trimmed));
-          result.trimmedTrace = true;
-        }
-      }
-    } catch { /* swallow */ }
+    // The trace writer has its own bounded queue and last-150-entry cap.
+    // Rewriting @boot/trace here would race with the authoritative writer.
 
-    // 5: filesystem cache (native, best-effort).
+    // 3: filesystem cache (native, best-effort).
     result.fsCleared = await _clearFsCacheIfLarge();
 
     result.ms = Date.now() - t0;
