@@ -649,3 +649,101 @@ def vividness(root: Path, *, source: str, passes: int = 3) -> dict[str,Any]:
         "professional_quality_certified":False,
         "production_qualified":False,
     }
+
+
+
+def camera_render(root:Path, *, source:str, output:str, target:str,
+                  dry_run:bool=False) -> dict[str,Any]:
+    """Actual stylized 2.5D/2.9D billboard-plane projection preview.
+
+    Bounded perspective-like pixel resampling, NEVER equivalent to true
+    3D mesh rotation, GPU depth-buffer occlusion or a full console renderer.
+    """
+    policy=_policy(target)
+    doc,source_sha=_source_json(root,source)
+    if doc.get("schema")!=STAGE_SCHEMA or set(doc) != {
+        "schema","grid","depth","biome","layers","camera"
+    }:
+        raise WorldUpscaleError("camera render requires original typed stage with layers")
+    depth=doc["depth"]
+    if depth not in ("2_5d","2_9d"):
+        raise WorldUpscaleError("billboard camera projection requires 2.5D or 2.9D")
+    cam=doc["camera"]
+    if not isinstance(cam,dict) or set(cam)!={"yaw","pitch"}:
+        raise WorldUpscaleError("invalid scene camera")
+    yaw,pitch=cam["yaw"],cam["pitch"]
+    camera=camera_profile(depth,yaw=yaw,pitch=pitch,
+                          parallax_planes=len(doc["layers"]))
+    layers=doc["layers"]
+    if not isinstance(layers,list) or not 2<=len(layers)<=16:
+        raise WorldUpscaleError("rotatable stage requires 2..16 parallax planes")
+    loaded=[]
+    w=h=None
+    for layer in layers:
+        if not isinstance(layer,dict) or set(layer)!={"path","depth"}:
+            raise WorldUpscaleError("unrecognized camera plane")
+        z=layer["depth"]
+        if type(z) not in (int,float) or not math.isfinite(z) or not 0<=z<=1:
+            raise WorldUpscaleError("invalid plane depth")
+        raw=_path(root,layer["path"],must_exist=True).read_bytes()
+        sw,sh,rgba=decode_png(raw)
+        if w is None:
+            w,h=sw,sh
+        if (w,h)!=(sw,sh):
+            raise WorldUpscaleError("camera preview planes must share authored dimensions")
+        loaded.append((float(z),layer["path"],sha256(raw).hexdigest(),rgba))
+    if w*h>1024*1024:
+        raise WorldUpscaleError("camera preview exceeds canonical pixel budget")
+    output_pixels=bytearray(w*h*4)
+    metrics=[]
+    for z,path,digest,rgba in sorted(loaded,reverse=True):
+        plane_yaw=math.radians(yaw*(1-z))
+        plane_pitch=math.radians(pitch*(1-z))
+        sx=math.cos(plane_yaw)
+        sy=math.cos(plane_pitch)
+        if abs(sx)<0.08 or abs(sy)<0.08:
+            raise WorldUpscaleError("camera edge-on projection requires real 3D geometry")
+        offset_x=round(math.sin(plane_yaw)*(1-z)*w*0.08)
+        offset_y=round(math.sin(plane_pitch)*(1-z)*h*0.08)
+        samples=0
+        for y in range(h):
+            for x in range(w):
+                u=round((x - (w-1)/2)/sx+(w-1)/2+offset_x)
+                v=round((y - (h-1)/2)/sy+(h-1)/2+offset_y)
+                if not 0<=u<w or not 0<=v<h:
+                    continue
+                r,g,b,a=_frame_at(rgba,w,h,u,v)
+                if a==0:
+                    continue
+                i=(y*w+x)*4
+                dr,dg,db,da=output_pixels[i:i+4]
+                final=a+da*(255-a)//255
+                if final:
+                    rgb=tuple((foreground*a+background*da*(255-a)//255)//final
+                              for foreground,background in ((r,dr),(g,dg),(b,db)))
+                    output_pixels[i:i+4]=bytes((*rgb,final))
+                    samples+=1
+        metrics.append({"layer":path,"source_sha256":digest,"depth":z,
+                        "projected_yaw_deg":math.degrees(plane_yaw),
+                        "projected_pitch_deg":math.degrees(plane_pitch),
+                        "rendered_fragments":samples})
+    blob=png_rgba(bytes(output_pixels),w,h)
+    dest=_path(root,output,must_exist=False)
+    result={
+        "ok":True,"action":"camera-render","source":source,"output":output,
+        "target":policy["target_id"],"source_sha256":source_sha,
+        "output_sha256":sha256(blob).hexdigest(),
+        "resolution":[w,h],"camera":camera,"layers":metrics,
+        "actual_pixels_projected":sum(m["rendered_fragments"] for m in metrics),
+        "billboard_plane_rotation_preview":True,
+        "actual_mesh_geometry_rotated":False,"native_gpu_qualified":False,
+        "occlusion_physics_qualified":False,"dry_run":dry_run,
+    }
+    if not dry_run:
+        _create_only(dest,blob)
+        from skeleton.developer.jeeves_game_upscale_queue import record_output
+        result["training_candidate"]=record_output(
+            root,category="parallax",source=source,output=output,
+            input_sha256=source_sha,output_sha256=result["output_sha256"],
+            target=policy["target_id"],quality="requires_review")
+    return result
