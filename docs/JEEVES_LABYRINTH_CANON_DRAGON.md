@@ -52,6 +52,21 @@ regions, return-to-start reachability, and quest stages inaccessible from
 the opening location. The Jeeves production board surfaces the same structural
 risks without asserting a creative-quality pass.
 
+### Native Godot overview and route selection
+
+The latest media-backed Godot export uses a new `-live-v5` path and preserves
+earlier v1/v2/v3/v4 projects rather than overwriting them. It includes an
+original directed-world minimap: nodes represent actual authored scenes,
+arrowed links represent actual permitted navigation edges, the current scene
+is highlighted, and the selected route is drawn over the graph.
+
+Selecting a node with the pointer requests a route from the local authenticated
+`GET /v1/navigation?destination=<scene>&profile=scenic` endpoint. No gameplay
+action is executed until the player explicitly selects the next route step.
+Source, journal-head and game-state identities are checked before displaying
+a route. This is a UI overview for an authored graph—not terrain collision,
+NPC movement, procedural 3D geometry, or native automatic traversal.
+
 ## 2. Replay the causal history of a long-form story
 
 ```bash
