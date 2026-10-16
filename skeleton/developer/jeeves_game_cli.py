@@ -157,7 +157,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "upscale-review", "vividness-review", "queue-upscaled-training",
                                             "camera-plan", "camera-render",
                                             "direction-audit", "direction-workorder", "production-gap-matrix",
-                                            "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt"))
+                                            "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt",
+                                            "director-draft", "director-examine", "director-promote",
+                                            "director-board", "director-prepare-training"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -172,6 +174,12 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--source")
     parser.add_argument("--direction-source")
     parser.add_argument("--dragon-digest")
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--regions")
+    parser.add_argument("--quest-types")
+    parser.add_argument("--stages", type=int)
+    parser.add_argument("--goal")
+    parser.add_argument("--routes", type=int)
     parser.add_argument("--output")
     parser.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     parser.add_argument("--factor", type=int)
@@ -198,6 +206,48 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
+        director_actions = {"director-draft", "director-examine", "director-promote",
+                            "director-board", "director-prepare-training"}
+        if args.action in director_actions:
+            allowed = {
+                "director-draft": {"action", "seed", "regions", "quest_types", "stages", "goal", "dragon_digest"},
+                "director-examine": {"action", "source", "routes"},
+                "director-promote": {"action", "source", "routes", "approve"},
+                "director-board": {"action", "source", "routes", "dragon_digest"},
+                "director-prepare-training": {"action", "source", "routes", "dragon_digest", "approve"},
+            }[args.action]
+            for key, value in vars(args).items():
+                if key not in allowed and value is not None and value is not False:
+                    raise ValueError("unrelated Director production option --" + key.replace("_", "-"))
+            if args.action == "director-draft":
+                from skeleton.developer.jeeves_game_director_factory import draft
+                if args.seed is None:
+                    raise ValueError("director-draft requires --seed")
+                return draft(root, seed=args.seed, regions=args.regions,
+                             quest_types=args.quest_types,
+                             stages=args.stages if args.stages is not None else 3,
+                             goal=args.goal, dragon_digest=args.dragon_digest)
+            if not args.source:
+                raise ValueError("Director production commands require --source")
+            if args.action in {"director-examine", "director-promote"}:
+                from skeleton.developer.jeeves_game_director_factory import examine, promote
+                if args.action == "director-examine":
+                    return examine(root, source=args.source,
+                                   routes=args.routes if args.routes is not None else 3)
+                return promote(root, source=args.source, approved_digest=args.approve,
+                               routes=args.routes if args.routes is not None else 3)
+            from skeleton.developer.jeeves_game_production_board import board, prepare_dragon_research
+            if args.action == "director-board":
+                return board(root, source=args.source,
+                             routes=args.routes if args.routes is not None else 3,
+                             dragon_digest=args.dragon_digest)
+            return prepare_dragon_research(
+                root, source=args.source,
+                routes=args.routes if args.routes is not None else 3,
+                dragon_digest=args.dragon_digest, approve=args.approve)
+        if any(value is not None for value in (
+                args.seed, args.regions, args.quest_types, args.stages, args.goal, args.routes)):
+            raise ValueError("Director forge options require a director-* action")
         if args.dragon_digest is not None and args.action != "propose":
             raise ValueError("--dragon-digest only supports proposal authoring")
         if args.action in {"dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt"}:
