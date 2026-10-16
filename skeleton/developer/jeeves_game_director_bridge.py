@@ -41,7 +41,8 @@ def _valid_port(port: int) -> int:
     return port
 
 
-def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPRequestHandler]:
+def handler(root: Path, session: str, token: str, port: int,
+            policy_digest: str | None = None) -> type[BaseHTTPRequestHandler]:
     """Create isolated request handler with no shared mutable game-state cache."""
     if port != 0:
         _valid_port(port)
@@ -49,6 +50,9 @@ def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPReq
         raise ValueError("invalid Director bridge authorization token")
     # Session replay is the authority; refuse to serve a corrupt or foreign game.
     inspect(root, session=session)
+    if policy_digest is not None:
+        from skeleton.developer.jeeves_game_dragon_policy import predict
+        predict(root, session=session, digest=policy_digest)
 
     class DirectorHandler(BaseHTTPRequestHandler):
         server_version = "JeevesDirector"
@@ -103,6 +107,17 @@ def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPReq
                 self._answer(200, {"ok": True, "schema": SCHEMA,
                                    "authoritative_runtime": "Python Director",
                                    "native_engine_e2e_verified": False})
+                return
+            if self.path == "/v1/advice":
+                if policy_digest is None:
+                    self._answer(404, {"ok": False, "error": "Dragon micro-model not enabled"})
+                    return
+                try:
+                    from skeleton.developer.jeeves_game_dragon_policy import predict
+                    advice = predict(root, session=session, digest=policy_digest)
+                    self._answer(200, {"ok": True, "schema": SCHEMA, "advice": advice})
+                except (OSError, ValueError, KeyError, TypeError):
+                    self._answer(409, {"ok": False, "error": "Dragon model evidence is stale or invalid"})
                 return
             if self.path != "/v1/status":
                 self._answer(404, {"ok": False, "error": "unknown endpoint"})
@@ -198,16 +213,18 @@ class _LoopbackServer(HTTPServer):
         return sock, addr
 
 
-def serve(root: Path, *, session: str, port: int = 8765) -> dict[str, Any]:
+def serve(root: Path, *, session: str, port: int = 8765,
+          policy_digest: str | None = None) -> dict[str, Any]:
     """Foreground, single-threaded, local-only gameplay for an existing session."""
     port = _valid_port(port)
     token = _secret_from_env()
     endpoint = f"http://127.0.0.1:{port}"
-    listener = handler(root, session, token, port)
+    listener = handler(root, session, token, port, policy_digest=policy_digest)
     with _LoopbackServer(("127.0.0.1", port), listener) as service:
         print(json.dumps({
             "ok": True, "action": "director-serve", "endpoint": endpoint,
             "session": session, "transport": SCHEMA,
+            "optional_dragon_policy_enabled": policy_digest is not None,
             "bearer_token_from_env": ENV,
             "token_logged": False, "native_engine_run_verified": False,
             "note": "Foreground service; stop with Ctrl+C",
