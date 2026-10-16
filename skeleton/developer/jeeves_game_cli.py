@@ -157,7 +157,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "upscale-review", "vividness-review", "queue-upscaled-training",
                                             "camera-plan", "camera-render",
                                             "direction-audit", "direction-workorder", "production-gap-matrix",
-                                            "dragon-ingest", "dragon-plan", "dragon-adopt"))
+                                            "dragon-review", "dragon-ingest", "dragon-plan", "dragon-adopt"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -198,17 +198,20 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
-        if args.action in {"dragon-ingest", "dragon-plan", "dragon-adopt"}:
+        if args.action in {"dragon-review", "dragon-ingest", "dragon-plan", "dragon-adopt"}:
             allowed = ({"action", "source", "approve"} if args.action == "dragon-ingest"
                        else {"action", "source", "genre", "target", "approve"}
                        if args.action == "dragon-adopt"
-                       else {"action", "source", "genre", "target"})
+                       else {"action", "source", "genre", "target"} if args.action == "dragon-plan"
+                       else {"action", "source"})
             for key, value in vars(args).items():
                 if key not in allowed and value is not None and value is not False:
                     raise ValueError("unrelated Dragon option --" + key.replace("_", "-"))
             if not args.source:
                 raise ValueError("Dragon observation source requires --source design/<file>.json")
-            from skeleton.developer.jeeves_game_dragon import ingest, plan, adopt
+            from skeleton.developer.jeeves_game_dragon import review, ingest, plan, adopt
+            if args.action == "dragon-review":
+                return review(root, source=args.source)
             if args.action == "dragon-ingest":
                 return ingest(root, source=args.source, approved_sha256=args.approve)
             if not args.genre or not args.target:
