@@ -366,7 +366,10 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "direction-audit", "direction-workorder", "production-gap-matrix",
                                                    "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt",
                                                    "director-draft", "director-revise", "director-examine", "director-promote",
-                                                   "director-board", "director-prepare-training"))
+                                                   "director-board", "director-prepare-training",
+                                            "director-session-begin", "director-session-status", "director-session-step",
+                                            "director-session-compare", "director-atlas-export", "director-atlas-verify",
+                                            "dragon-session-lesson"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -390,6 +393,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--stages", type=int)
     jeeves.add_argument("--goal")
     jeeves.add_argument("--routes", type=int)
+    jeeves.add_argument("--session")
+    jeeves.add_argument("--other-session")
+    jeeves.add_argument("--choice")
     jeeves.add_argument("--output")
     jeeves.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     jeeves.add_argument("--factor", type=int)
@@ -450,6 +456,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--revision", options.revision),
                                 ("--quest-types", options.quest_types), ("--stages", options.stages),
                                 ("--goal", options.goal), ("--routes", options.routes),
+                                ("--session", options.session), ("--other-session", options.other_session),
+                                ("--choice", options.choice),
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
                                 ("--gate", options.gate),
