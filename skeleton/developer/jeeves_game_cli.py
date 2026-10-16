@@ -150,7 +150,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                             "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                             "production-status", "production-cycle", "production-training",
-                                                   "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "p0-acceptance",
+                                                   "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "direction-campaign-reopen", "p0-acceptance",
                                             "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                             "upscale-foliage", "upscale-animation", "upscale-shadow",
                                             "upscale-parallax", "upscale-music", "asset-inventory",
@@ -265,13 +265,23 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             if not args.source:
                 raise ValueError("direction-campaign requires --source design/director_campaign_source.json")
             if any((args.kind, args.brief, args.include_notes, args.digest, args.approve,
-                    *quality_args, args.target, args.output, args.mode, args.factor,
+                    *quality_args, args.target, args.mode, args.factor,
                     args.dry_run, args.gate, args.repair_generated, args.page,
                     args.page_size, *display_args)):
-                raise ValueError("direction-campaign accepts --source and --passes (routes) only")
+                raise ValueError("direction-campaign accepts --source, --passes and optional --output save prefix")
             from skeleton.developer.jeeves_game_direction_cli import campaign
             output = campaign(root, source=args.source,
-                              routes=args.passes if args.passes is not None else 2)
+                              routes=args.passes if args.passes is not None else 2,
+                              save_prefix=args.output)
+        elif args.action == "direction-campaign-reopen":
+            if not args.source or not args.output or any((
+                    args.kind, args.brief, args.include_notes, args.digest, args.approve,
+                    *quality_args, args.target, args.mode, args.factor,
+                    args.dry_run, args.passes, args.gate, args.repair_generated,
+                    args.page, args.page_size, *display_args)):
+                raise ValueError("direction-campaign-reopen requires --source and --output save identity only")
+            from skeleton.developer.jeeves_game_direction_cli import reopen_campaign
+            output = reopen_campaign(root, source=args.source, save_name=args.output)
         elif args.action == "p0-acceptance":
             if any((args.source, args.passes, args.kind, args.brief, args.include_notes,
                     args.digest, args.approve, *quality_args, args.target, args.output,
