@@ -1273,7 +1273,13 @@ class LearningEvidenceStore:
         for existing in self._hypotheses.values():
             if existing.subject_id != hypothesis.subject_id:
                 continue
-            if existing.polarity != hypothesis.polarity:
+            # Polarity alone is not a contradiction: independent claims about
+            # different evidence (e.g. accuracy and latency) may coexist.
+            # Shared feature custody or the same normalized claim is a
+            # conflict, and must still fail closed without averaging.
+            same_claim = existing.claim.strip().casefold() == hypothesis.claim.strip().casefold()
+            shared_evidence = bool(set(existing.feature_ids).intersection(hypothesis.feature_ids))
+            if existing.polarity != hypothesis.polarity and (same_claim or shared_evidence):
                 raise LearningEvidenceError(
                     "contradictory hypotheses; signals are not averaged",
                     context={
