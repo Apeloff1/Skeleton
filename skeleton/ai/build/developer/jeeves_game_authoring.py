@@ -274,6 +274,18 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
                  "source_identity": checked["dramaturgy"]["source_identity_sha256"]}
                 if checked.get("dramaturgy") is not None else None
             ),
+            "cinematic_direction_summary": (
+                {
+                    "source_identity": checked["cinematic_direction"]["source_identity_sha256"],
+                    "signed_scene_count": checked["cinematic_direction"]["scenes"],
+                    "shot_count": checked["cinematic_direction"]["shots"],
+                    "timeline_ms": checked["cinematic_direction"]["timeline_ms"],
+                    "dialogue_lines_covered": checked["cinematic_direction"]["source_dialogue_lines_covered"],
+                    "rendered_film_quality_verified": False,
+                    "original_voice_performance_verified": False,
+                }
+                if checked.get("cinematic_direction") is not None else None
+            ),
             "dialogue_repetition_fraction": metrics["exact_dialogue_repeat_fraction"],
             "revision_targets": [r["kind"] for r in checked["revision_work"][:10]],
             "qualitative_dimensions": list(checked["quality_bars"].keys()),
