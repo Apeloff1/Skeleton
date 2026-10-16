@@ -149,7 +149,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                             "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "production-init",
-                                            "production-status", "production-cycle"))
+                                            "production-status", "production-cycle", "production-training"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -168,6 +168,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--passes", type=int)
     parser.add_argument("--gate")
+    parser.add_argument("--page", type=int)
+    parser.add_argument("--page-size", type=int)
     parser.add_argument("--repair-generated", action="store_true")
     for dimension in ("native-width", "native-height", "screen-width",
                       "screen-height", "pixel-aspect-num", "pixel-aspect-den"):
@@ -179,16 +181,18 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
         render_args = (args.target, args.source, args.output, args.mode, args.factor,
                        args.dry_run, args.passes, args.gate, args.repair_generated,
+                       args.page, args.page_size,
                        *display_args)
         other_content = (args.kind, args.brief, args.digest, args.approve,
                          args.include_notes, args.profile, args.evidence)
-        if args.action in {"production-init", "production-status", "production-cycle"}:
-            from skeleton.developer.jeeves_game_production import init, status, cycle
+        if args.action in {"production-init", "production-status", "production-cycle",
+                           "production-training"}:
+            from skeleton.developer.jeeves_game_production import init, status, cycle, training_candidates
             if args.action == "production-init":
                 if not args.target or not args.genre or not args.period or any((
                     *other_content, args.console, args.source, args.output, args.mode,
                     args.factor, args.dry_run, args.passes, args.gate, args.repair_generated,
-                    *display_args
+                    args.page, args.page_size, *display_args
                 )):
                     raise ValueError("production-init requires --target --genre --period only")
                 output = init(root, target=args.target, genre=args.genre, period=args.period)
@@ -196,9 +200,18 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 if any((*other_content, *quality_args, *render_args)):
                     raise ValueError("production-status accepts --project only")
                 output = status(root)
+            elif args.action == "production-training":
+                if any((*other_content, *quality_args, args.target, args.source,
+                        args.output, args.mode, args.factor, args.dry_run, args.passes,
+                        args.gate, args.repair_generated, *display_args)):
+                    raise ValueError("production-training accepts --page and --page-size only")
+                output = training_candidates(
+                    root, page=args.page if args.page is not None else 0,
+                    page_size=args.page_size if args.page_size is not None else 64)
             else:
                 if any((*other_content, *quality_args, args.target, args.source, args.output,
-                        args.mode, args.factor, args.dry_run, *display_args)):
+                        args.mode, args.factor, args.dry_run, args.page, args.page_size,
+                        *display_args)):
                     raise ValueError("production-cycle accepts --passes and optional --gate only")
                 output = cycle(root, passes=args.passes if args.passes is not None else 1, gate=args.gate,
                                repair_generated=args.repair_generated)
@@ -210,7 +223,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 output = fidelity_matrix()
             else:
                 if not args.target or any((*other_content, *quality_args,
-                                           args.gate, args.repair_generated)) or (
+                                           args.gate, args.repair_generated, args.page,
+                                           args.page_size)) or (
                     args.passes is not None and args.action != "upscale-verify"
                 ):
                     raise ValueError("fidelity commands require --target without unrelated options")
