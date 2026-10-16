@@ -338,6 +338,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     init.add_argument("--archetype", default="auto")
     init.add_argument("--dry-run", action="store_true")
     subs.add_parser("catalog", help="List supported GameForge eras and archetypes")
+    jeeves = subs.add_parser("jeeves", help="Jeeves design planning, source audit and developer handoff")
+    jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff"))
+    jeeves.add_argument("--project", default=".")
     for action in ("info", "doctor", "build", "verify", "playtest", "assets", "package"):
         child = subs.add_parser(action)
         child.add_argument("--project", default=".")
@@ -359,6 +362,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     try:
         if options.action == "init":
             return _init(options)
+        if options.action == "jeeves":
+            from skeleton.developer.jeeves_game_cli import run_jeeves_game_cli
+            return run_jeeves_game_cli([options.jeeves_action], _project(options.project))
         if options.action == "catalog":
             from skeleton.forge.eras import list_eras
             from skeleton.forge.archetypes import default_library
