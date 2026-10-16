@@ -157,6 +157,8 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         "trust_changed_by_resident": dict(sorted(trust_changed.items())),
         "initial_relationships": dict(base.relationships),
         "final_relationships": dict(state.world_state.society.relationships),
+        "actual_persisted_dialogue_choice_history": [
+            list(x) for x in state.world_state.society.dialogue_history],
         "interaction_turns": social_time,
         "trade_turns": trade_time, "rest_turns": rest_time,
         "world_flag_unlock_sequence": dict(sorted(unlocked_flags.items())),
