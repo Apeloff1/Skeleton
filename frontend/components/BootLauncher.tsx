@@ -24,6 +24,7 @@ const requestIdleTask = (callback: () => void) => {
 };import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 import { traceStep, getMemoryTrace } from '../utils/bootTracer';
 import { STAGES, BootRunner, RunnerSnapshot, readBootCache, writeBootCache } from '../src/boot';
+import { shouldAcceptLocalBoot } from '../src/boot/recoveryPolicy';
 import api from '../src/utils/apiClient';
 import { onMemoryPressure, getMemTier } from '../utils/memoryGuard';
 import { useReduceMotion } from '../src/hooks/useReduceMotion';
@@ -208,7 +209,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
       durable('boot_mem_pressure_shed', { phase0: phase0DoneRef.current });
       // Memory pressure may shed optional background work, not bypass an
       // unverified critical local stage or erase crash-loop evidence.
-      if (phase0DoneRef.current && runnerRef.current?.snapshot().criticalOk && !phaseLockedRef.current) {
+      if (phase0DoneRef.current && runnerRef.current && shouldAcceptLocalBoot(phase0DoneRef.current, runnerRef.current.snapshot().criticalOk) && !phaseLockedRef.current) {
         commitPhase('ready');
       }
     });
@@ -311,7 +312,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
           elapsed: localSnapshot.elapsedMs,
         });
 
-        if (!localSnapshot.criticalOk) {
+        if (!shouldAcceptLocalBoot(localSnapshot.phaseDone[0], localSnapshot.criticalOk)) {
           if (cancelled) return;
           commitPhase('failed');
           await traceStep('bootlauncher_critical_fail');
@@ -378,7 +379,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
       if (cancelled || phaseLockedRef.current) return;
       const snapshot = runner.snapshot();
       durable('watchdog_fired', { criticalOk: snapshot.criticalOk, phase0Done: snapshot.phaseDone[0] });
-      if (snapshot.phaseDone[0] && snapshot.criticalOk) {
+      if (shouldAcceptLocalBoot(snapshot.phaseDone[0], snapshot.criticalOk)) {
         commitPhase('ready');
       } else {
         // Use the independent static launcher instead of pretending boot
