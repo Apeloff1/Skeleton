@@ -165,7 +165,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
                                             "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
                                             "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
-                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast", "director-dynamics-playthrough"))
+                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast", "director-dynamics-playthrough", "director-society-design", "director-society-publish",
+                                             "director-society-audit", "dragon-society-study", "dragon-society-contrast"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -259,11 +260,38 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-dynamics-playthrough": {"action", "source", "routes", "include_optional"},
             "dragon-world-study": {"action", "session", "approve"},
             "dragon-world-contrast": {"action", "session", "other_session"},
+            "director-society-design": {"action", "source", "intensity"},
+            "director-society-publish": {"action", "source", "intensity", "approve"},
+            "director-society-audit": {"action", "source"},
+            "dragon-society-study": {"action", "session", "approve"},
+            "dragon-society-contrast": {"action", "session", "other_session"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
                 if key not in live_actions[args.action] and value is not None and value is not False:
                     raise ValueError("unrelated Director runtime option --" + key.replace("_", "-"))
+            if args.action in {"director-society-design",
+                               "director-society-publish", "director-society-audit"}:
+                if not args.source:
+                    raise ValueError("original NPC society requires --source")
+                if args.action == "director-society-audit":
+                    from skeleton.developer.jeeves_game_director_society_audit import audit
+                    return audit(root, source=args.source)
+                from skeleton.developer.jeeves_game_director_society_author import preview, publish
+                level = args.intensity if args.intensity is not None else 3
+                if args.action == "director-society-design":
+                    return preview(root, source=args.source, intensity=level)
+                return publish(root, source=args.source, intensity=level,
+                               approved_sha256=args.approve)
+            if args.action in {"dragon-society-study", "dragon-society-contrast"}:
+                from skeleton.developer.jeeves_game_dragon_society import queue, compare
+                if not args.session:
+                    raise ValueError("Dragon NPC study requires --session")
+                if args.action == "dragon-society-contrast":
+                    if not args.other_session:
+                        raise ValueError("Dragon society comparison requires --other-session")
+                    return compare(root, first=args.session, second=args.other_session)
+                return queue(root, session=args.session, approved_sha256=args.approve)
             if args.action == "director-dynamics-playthrough":
                 from skeleton.developer.jeeves_game_director_dynamic_playthrough import prove
                 if not args.source:
