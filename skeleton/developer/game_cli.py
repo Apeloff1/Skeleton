@@ -339,8 +339,15 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     init.add_argument("--dry-run", action="store_true")
     subs.add_parser("catalog", help="List supported GameForge eras and archetypes")
     jeeves = subs.add_parser("jeeves", help="Jeeves design planning, source audit and developer handoff")
-    jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff"))
+    jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
+                                                   "propose", "review", "apply")) 
     jeeves.add_argument("--project", default=".")
+    jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
+                                           "scene", "animation", "cutscene", "asset", "music"))
+    jeeves.add_argument("--brief")
+    jeeves.add_argument("--include-notes", action="store_true")
+    jeeves.add_argument("--digest")
+    jeeves.add_argument("--approve")
     for action in ("info", "doctor", "build", "verify", "playtest", "assets", "package"):
         child = subs.add_parser(action)
         child.add_argument("--project", default=".")
@@ -364,7 +371,14 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
             return _init(options)
         if options.action == "jeeves":
             from skeleton.developer.jeeves_game_cli import run_jeeves_game_cli
-            return run_jeeves_game_cli([options.jeeves_action], _project(options.project))
+            command = [options.jeeves_action]
+            for flag, value in (("--kind", options.kind), ("--brief", options.brief),
+                                ("--digest", options.digest), ("--approve", options.approve)):
+                if value is not None:
+                    command.extend([flag, value])
+            if options.include_notes:
+                command.append("--include-notes")
+            return run_jeeves_game_cli(command, _project(options.project))
         if options.action == "catalog":
             from skeleton.forge.eras import list_eras
             from skeleton.forge.archetypes import default_library
