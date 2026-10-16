@@ -78,7 +78,8 @@ def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPReq
         def _admit(self) -> bool:
             # Resist DNS rebinding, ambient browser credentials and cross-origin
             # requests. Godot HTTPRequest does not require browser CORS headers.
-            host = self.headers.get("Host")
+            host_values = self.headers.get_all("Host", [])
+            host = host_values[0] if len(host_values) == 1 else None
             actual_port = self.server.server_port
             if host not in {f"127.0.0.1:{actual_port}", f"localhost:{actual_port}"}:
                 self._answer(403, {"ok": False, "error": "loopback Host only"})
@@ -88,8 +89,9 @@ def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPReq
             ):
                 self._answer(403, {"ok": False, "error": "browser origins not supported"})
                 return False
-            provided = self.headers.get("Authorization", "")
-            if not hmac.compare_digest(provided, "Bearer " + token):
+            credentials = self.headers.get_all("Authorization", [])
+            provided = credentials[0] if len(credentials) == 1 else ""
+            if not provided.isascii() or not hmac.compare_digest(provided, "Bearer " + token):
                 self._answer(401, {"ok": False, "error": "unauthorized"})
                 return False
             return True
@@ -120,8 +122,11 @@ def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPReq
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
                 self._answer(415, {"ok": False, "error": "JSON content type required"})
                 return
-            size = self.headers.get("Content-Length", "")
-            if not size.isdecimal() or not 1 <= int(size) <= MAX_REQUEST:
+            size_values = self.headers.get_all("Content-Length", [])
+            size = size_values[0] if len(size_values) == 1 else ""
+            if (self.headers.get("Transfer-Encoding") is not None
+                    or len(size) > 5 or not size.isascii() or not size.isdecimal()
+                    or not 1 <= int(size) <= MAX_REQUEST):
                 self._answer(413, {"ok": False, "error": "invalid action request size"})
                 return
             try:
