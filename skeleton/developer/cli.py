@@ -53,7 +53,12 @@ def dev_help_text() -> str:
         jeeves director-session-status --session NAME
         jeeves director-session-step --session NAME --choice travel:scene_01
         jeeves director-session-compare --session NAME --other-session OTHER
-        jeeves director-serve --session NAME [--port 8765]
+        jeeves director-session-trace --session NAME [--tail 64]
+        jeeves director-session-fork --session NAME --other-session NEW --at TURN --approve CURRENT_HEAD_SHA256
+        jeeves dragon-policy-preview --sessions TRAIN1,TRAIN2,HOLDOUT
+        jeeves dragon-policy-train --sessions TRAIN1,TRAIN2,HOLDOUT --approve MODEL_SHA256
+        jeeves dragon-policy-predict --session NAME --digest MODEL_SHA256
+        jeeves director-serve --session NAME [--port 8765 --digest MODEL_SHA256]
         jeeves director-godot-smoke --source design/director_campaign_source.json [--timeout 90]
         jeeves director-coverage --source design/director_campaign_source.json [--routes 2..8]
         jeeves dragon-lab --sessions hero_a,hero_b [--approve RESEARCH_SHA256]
