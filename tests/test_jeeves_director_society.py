@@ -278,6 +278,78 @@ class OriginalSocietyTests(unittest.TestCase):
             [[self.ticket_passage.key, 1]],
         )
 
+    def test_multiple_tickets_pay_exactly_one_and_preserve_owned_stock(self):
+        from skeleton.ai.game_builder.quest_society import (
+            consume_good, verify_inventory,
+        )
+        self._begin()
+        key = self.shop.key + "_" + self.item.key
+        self._do("buy:" + key)
+        twice = self._do("buy:" + key)
+        self.assertEqual(
+            dict(twice["society"]["owned_goods"])[self.item.key], 2)
+        self.assertIn(self.item.key, twice["acquired"])
+        ferried = self._do("transit:" + self.ticket_passage.key)
+        status = _load(self.root, name="hero")[2]
+        market = status.world_state.society
+        self.assertEqual(dict(market.owned)[self.item.key], 1)
+        self.assertEqual(dict(market.consumed_goods)[self.item.key], 1)
+        self.assertIn(self.item.key, status.acquired)
+        verify_inventory(self.society, status.acquired, market)
+        self.assertEqual(ferried["society"]["owned_goods"], [[self.item.key, 1]])
+        self.assertEqual(
+            ferried["society"]["redeemed_or_used_goods"],
+            [[self.item.key, 1]],
+        )
+        remaining, debited = consume_good(
+            self.society, status.acquired, market, self.item.key)
+        self.assertNotIn(self.item.key, remaining)
+        self.assertEqual(debited.owned, ())
+        self.assertEqual(debited.consumed_goods, ((self.item.key, 2),))
+        verify_inventory(self.society, remaining, debited)
+        with self.assertRaises(ValueError):
+            consume_good(self.society, remaining, debited, self.item.key)
+        study_report = study(self.root, session="hero")
+        self.assertEqual(study_report["redeemed_goods_by_id"][self.item.key], 1)
+        self.assertEqual(
+            study_report["redeemed_goods_by_real_action"][
+                "transit:" + self.ticket_passage.key], 1)
+        self.assertTrue(
+            study_report["finite_shop_merchandise_conservation_verified"])
+
+    def test_market_ledger_rejects_minted_and_missing_inventory_items(self):
+        from skeleton.ai.game_builder.quest_society import verify_inventory
+        from skeleton.ai.game_builder.quest_scene_engine import director_initial
+        self._begin()
+        state = director_initial(self.social_world)
+        market = state.world_state.society
+        with self.assertRaises(ValueError):
+            verify_inventory(self.society, (self.item.key,), market)
+        with self.assertRaises(ValueError):
+            verify_inventory(self.society, (), replace(
+                market, owned=((self.item.key, 1),)))
+        with self.assertRaises(ValueError):
+            verify_inventory(self.society, (), replace(
+                market, consumed_goods=((self.item.key, 1),)))
+        forged = replace(state, acquired=(self.item.key,))
+        with self.assertRaises(ValueError):
+            available_director_actions(self.social_world, forged)
+        self.assertEqual(inspect(self.root, session="hero")["sequence"], 0)
+
+    def test_rest_reaches_next_actual_period_boundary(self):
+        self._begin()
+        starting_period = self.society.phase_turns
+        self._do("wait:wait")
+        before = inspect(self.root, session="hero")
+        self.assertEqual(before["turn"], 1)
+        resting = self._do("rest:rest")
+        self.assertEqual(resting["turn"], starting_period)
+        self.assertEqual(resting["society"]["calendar"]["phase"], "day")
+        self.assertEqual(resting["sequence"], 2)
+        self.assertEqual(
+            _load(self.root, name="hero")[2].world_state.society.balance,
+            self.society.starting_balance)
+
     def test_social_planner_finds_source_legally_locked_market_ticket(self):
         from skeleton.ai.game_builder.quest_world_dynamics import Gate
         requirements = Requirements(
