@@ -298,3 +298,15 @@ Proposed order (separate engineering PRs; nothing changes here):
 6. Lint guard (later): forbid hex literals outside `frontend/theme/`.
 
 Tracking issue: "UI tokens: consolidate theme sources into a single token module".
+
+## Migration implementation checkpoint — October 16, 2026
+
+The current source-level migration is in `fix/canonical-ui-tokens-accessibility-20261016`:
+
+- `frontend/theme/tokens.ts` exports canonical palettes, spacing, radii and type roles; adds true cyan, `onPrimary`, `metric`, and `label`. The former blue shade is now available as `palette.blue`.
+- `frontend/theme/skins.ts` computes explicit skin-specific `onPrimary` values and valid `rgba(..., 0.16)` soft fills instead of concatenating hex suffixes. All 30 default skin identities and their original primary/background hues are retained.
+- Legacy `constants/themes.ts` is a semantic adapter over canonical dark/light role sets. `useTheme` subscribes to active skin changes; existing `themes.dark` and `darkTheme` imports remain available.
+- Deluxe and cockpit role/color/type scales now point to the canonical tokens, preserving their existing exported names and tone glyphs. The default skin is still `hyperwave`.
+- Run `cd frontend && yarn test:canonical-theme && yarn typecheck && yarn typecheck:jeeves`. The manually dispatched Product UI + Local AI Qualification workflow includes the focused theme regression without creating another per-PR workflow.
+
+**Important acceptance limits:** source-level calculations predict standard body text contrast >= 4.5:1 for 28 of the 30 skin primary fill/foreground pairs. `lavender` and `royal` remain slightly below 4.5:1 with either white or dark ink (4.45/4.47); do not place normal-size body text on those fills, use large bold labels or improve the colors in a separately visually approved patch. This migration has not yet completed device screenshots of Home, Forge cockpit, or Deluxe flow, nor has its full Expo TypeScript/E2E qualification passed. Do not mark issue #2464 entirely accepted until that evidence is attached.
