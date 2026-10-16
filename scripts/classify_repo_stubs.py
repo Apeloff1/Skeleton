@@ -16,14 +16,24 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-SOURCE_EXTENSIONS = (".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
-TEXT_EXTENSIONS = SOURCE_EXTENSIONS + (".json", ".md", ".rst", ".toml", ".yml", ".yaml")
+SOURCE_EXTENSIONS = (
+    ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".rs", ".go",
+    ".java", ".kt", ".kts", ".cs", ".c", ".cc", ".cpp", ".h", ".hpp",
+    ".gd", ".lua", ".swift", ".sh", ".ps1", ".rb",
+)
+TEXT_EXTENSIONS = SOURCE_EXTENSIONS + (".json", ".md", ".rst", ".toml", ".yml", ".yaml", ".xml")
 TRUNCATION = re.compile(r"\[truncated\]|<truncated>|(?:content|output)\s+truncated", re.I)
 TODO = re.compile(r"\b(?:TODO|FIXME|XXX)\b", re.I)
 TS_UNIMPLEMENTED = re.compile(
     r"\bthrow\s+new\s+(?:Error|TypeError)\s*\(\s*['\"](?:not implemented|unimplemented|todo)\b", re.I
 )
 TS_PLACEHOLDER = re.compile(r"^\s*(?:\.\.\.|throw\s+['\"]TODO['\"])\s*;?\s*$", re.M)
+GENERIC_UNIMPLEMENTED = re.compile(
+    r"(?:\bunimplemented!\s*\(|\btodo!\s*\(|"
+    r"\bthrow\s+new\s+UnsupportedOperationException\s*\(|"
+    r"\bpanic!\s*\(\s*['\"]not implemented)",
+    re.I,
+)
 MAX_SOURCE_BYTES = 4 * 1024 * 1024
 
 
@@ -44,7 +54,7 @@ def owner(path: str) -> str:
 def severity(category: str, kind: str) -> str:
     if category in {"historical_snapshot", "documentation", "test_or_fixture"}:
         return "context_only"
-    if kind in {"python_syntax_error", "raise_not_implemented", "throw_not_implemented"}:
+    if kind in {"python_syntax_error", "raise_not_implemented", "throw_not_implemented", "unsupported_operation_candidate"}:
         return "implementation_review"
     if kind in {"truncation_marker", "empty_statement"}:
         return "manual_review"
@@ -73,8 +83,12 @@ def markers(path: str, text: str) -> list[tuple[int, str]]:
                     expr = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
                     if isinstance(expr, ast.Name) and expr.id == "NotImplementedError":
                         found.append((node.lineno, "raise_not_implemented"))
-    elif path.endswith((".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")):
-        for regex, kind in ((TS_UNIMPLEMENTED, "throw_not_implemented"), (TS_PLACEHOLDER, "empty_statement")):
+    elif path.endswith(SOURCE_EXTENSIONS):
+        for regex, kind in (
+            (TS_UNIMPLEMENTED, "throw_not_implemented"),
+            (TS_PLACEHOLDER, "empty_statement"),
+            (GENERIC_UNIMPLEMENTED, "unsupported_operation_candidate"),
+        ):
             for match in regex.finditer(text):
                 locate(match, kind)
     return sorted(set(found))
@@ -125,7 +139,7 @@ def classify(ref: str, output: Path, summary_file: Path, max_bytes: int = MAX_SO
                     stream.write(json.dumps({
                         "path": path, "blob": sha, "kind": "source_too_large_to_inspect",
                         "bytes": size, "category": owner(path), "severity": "manual_review"
-                    }, ensure_ascii=False) + "\n")
+                    }, ensure_ascii=True) + "\n")
                     continue
                 cache_key = (sha, Path(path).suffix.lower())
                 if cache_key not in seen_markers:
@@ -164,7 +178,7 @@ def classify(ref: str, output: Path, summary_file: Path, max_bytes: int = MAX_SO
                         "kind": kind, "category": category,
                         "severity": severity(category, kind),
                     }
-                    stream.write(json.dumps(item, ensure_ascii=False) + "\n")
+                    stream.write(json.dumps(item, ensure_ascii=True) + "\n")
                     counters["findings_total"] += 1
                     counters["kind:" + kind] += 1
                     counters["severity:" + item["severity"]] += 1
