@@ -231,3 +231,44 @@ This returns qualified original reference lists and sources but
 **does not train Jeeves, import scripts or license their characters**.
 Literary/film grade work remains an original production objective
 requiring independently witnessed read-throughs and audience/film reviews.
+
+
+## Measured cinematic production direction (implemented shot pipeline)
+
+A signed source dossier may also contain BOTH production_contract and
+shot_boards. Supplying only one fails closed; the literary audit no longer
+silently ignores submitted film-source evidence. Each board is:
+
+    {"scene_sequence": 1, "shots": [ ... approved original cinematic shots ... ]}
+
+The canonical production contract is the existing signed
+story_continuity_assurance object, with original actors/voice IDs,
+face geometry and regional color/lighting authority. The shots list
+uses the existing story_cinematic_review.verify_cinematic_shots grammar,
+not an invented parallel camera engine.
+
+    python -m skeleton dev game jeeves direction-shots --project . --source design/story_direction_packet.json --passes 8
+    python -m skeleton dev game jeeves direction-audit --project . --source design/story_direction_packet.json --passes 8
+    python -m skeleton dev game jeeves direction-revision --project . --source design/story_direction_packet.json --passes 8
+
+The cinematic evaluator measures each signed scene's source-validated
+shot count, timeline duration, individual shot duration distribution,
+camera angles and movements, editing cuts, actor screen time and exact
+once-in-order coverage of authored dialogue. Source identities,
+eye-line/screen-axis changes, cut chronology, voice and face IDs,
+original palette and regional lighting remain governed by the existing
+canonical film verifier.
+
+Multiple scrutiny passes rerun source and contract checks; they do NOT
+create independent production reviews or assert that actors performed
+the scene. The unified direction audit now reports a bounded
+cinematic_direction summary; revision work orders include individual
+shot-level editorial prompts, each linked to its canonical receipt
+digest. Missing/altered source, forged actor face or voice, unmotivated
+axis flips and uncovered dialogue fail closed.
+
+**Still unverified:** rendered cinema pixels, actor performance,
+actual soundtrack and voice acoustics, lip-sync, audience emotional
+impact, screenplay coverage quality, motion continuity and full
+interactive game playthrough. Deterministic shot metadata is pre-render
+production evidence, not a Hollywood-level final-film certificate.
