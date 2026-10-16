@@ -194,6 +194,12 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
             person = next(n for n in world.dynamics.society.residents
                           if n.key == option.key)
             description = "Speak with " + person.name
+        elif option.kind == "discuss" and world.dynamics is not None:
+            person, topic = next(
+                (n, c) for n in world.dynamics.society.residents
+                for c in n.dialogue if n.key + "_" + c.key == option.key
+            )
+            description = person.name + ": " + topic.prompt
         elif option.kind in {"buy", "sell"} and world.dynamics is not None:
             stock = next(
                 good for shop in world.dynamics.society.shops for good in shop.goods
@@ -240,6 +246,12 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
                 "faction": person.faction,
                 "trust": relationships[person.key],
                 "greeting": person.greeting,
+                "available_dialogue_topics": [{
+                    "key": person.key + "_" + option.key,
+                    "prompt": option.prompt,
+                    "response_in_locked_content_hidden": True,
+                } for option in person.dialogue
+                    if set(option.requires_flags).issubset(state.narrative_flags)],
             } for person in people],
             "open_merchants": merchants,
             "total_merchant_transactions": sum(
