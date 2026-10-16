@@ -341,7 +341,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves = subs.add_parser("jeeves", help="Jeeves design planning, source audit and developer handoff")
     jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
-                                                   "fidelity-plan", "upscale", "production-init",
+                                                   "fidelity-plan", "fidelity-matrix", "upscale", "production-init",
                                                    "production-status", "production-cycle"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
@@ -363,6 +363,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--dry-run", action="store_true")
     jeeves.add_argument("--passes", type=int)
     jeeves.add_argument("--gate")
+    jeeves.add_argument("--repair-generated", action="store_true")
     for action in ("info", "doctor", "build", "verify", "playtest", "assets", "package"):
         child = subs.add_parser(action)
         child.add_argument("--project", default=".")
@@ -402,6 +403,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                 command.append("--include-notes")
             if options.dry_run:
                 command.append("--dry-run")
+            if options.repair_generated:
+                command.append("--repair-generated")
             return run_jeeves_game_cli(command, _project(options.project))
         if options.action == "catalog":
             from skeleton.forge.eras import list_eras
