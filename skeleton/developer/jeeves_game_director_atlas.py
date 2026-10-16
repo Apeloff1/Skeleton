@@ -74,8 +74,8 @@ func _render() -> void:
     _line(str(scene["setting"]))
     _line("Lighting: " + str(scene["lighting"]) + " | Weather: " + str(scene["weather"]))
     _line("Camera: " + str(scene["camera"]) + " | Audio cue: " + str(scene["music"]))
-    _line("Cast: " + ", ".join(scene.get("cast", [])))
-    _line("Props: " + ", ".join(scene.get("props", [])))
+    _line("Cast: " + str(scene.get("cast", [])))
+    _line("Props: " + str(scene.get("props", [])))
     _line("Connections:")
     for target in scene.get("links", []):
         var b := Button.new()
@@ -203,8 +203,13 @@ def verify(root: Path, *, source: str) -> dict[str, Any]:
     if location.is_symlink() or not location.is_dir():
         raise ValueError("Director atlas missing or unsafe")
     entries = sorted(location.iterdir())
+    # Godot creates its own regular local .godot cache after opening a project.
+    cache = location / ".godot"
+    if cache.exists() and (cache.is_symlink() or not cache.is_dir()):
+        raise ValueError("unsafe Godot atlas cache")
+    entries = [p for p in entries if p.name != ".godot"]
     if set(x.name for x in entries) != {*FILES, "ATLAS_MANIFEST.json"}:
-        raise ValueError("Director atlas has unexpected files")
+        raise ValueError("Director atlas has unexpected source files")
     for entry in entries:
         if entry.is_symlink() or not entry.is_file():
             raise ValueError("unsafe Director atlas entry")
