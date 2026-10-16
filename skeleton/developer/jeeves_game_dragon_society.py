@@ -16,7 +16,7 @@ from typing import Any
 from skeleton.ai.game_builder.quest_scene_engine import (
     DirectorAction, director_initial, director_step, available_director_actions,
 )
-from skeleton.ai.game_builder.quest_society import phase, residents_here
+from skeleton.ai.game_builder.quest_society import phase, residents_here, verify_inventory
 from skeleton.developer.jeeves_game_director_session import _load, _read_doc
 
 SCHEMA = "skeleton.dragon.original_society_study.v1"
@@ -48,6 +48,8 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
     first_meet: dict[str, int] = {}
     shop_out_of_stock = Counter()
     trust_changed = Counter()
+    real_goods_consumed = Counter()
+    consumption_actions = Counter()
     event_count = 0
     examples: list[dict[str, Any]] = []
     for sequence in range(1, count + 1):
@@ -65,6 +67,16 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         next_society = state.world_state.society
         if old is None or next_society is None:
             raise ValueError("NPC economy disappeared during canonical action")
+        verify_inventory(rules, before.acquired, old)
+        verify_inventory(rules, state.acquired, next_society)
+        before_consumed = dict(old.consumed_goods)
+        for good, count in next_society.consumed_goods:
+            delta = count - before_consumed.get(good, 0)
+            if delta < 0:
+                raise ValueError("NPC good redemption history was erased")
+            if delta > 0:
+                real_goods_consumed[good] += delta
+                consumption_actions[action.kind + ":" + action.key] += delta
         calendar = phase(rules, before.turn)
         interactions_by_period[calendar["phase"]] += 1
         interactions_by_location[before.scene] += 1
@@ -168,6 +180,10 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         "society_evidence_sample_complete": event_count <= 100,
         "real_shop_stock": [list(x) for x in state.world_state.society.shop_stock],
         "real_purchased_inventory": [list(x) for x in state.world_state.society.owned],
+        "actual_used_market_goods": [list(x) for x in state.world_state.society.consumed_goods],
+        "redeemed_goods_by_id": dict(sorted(real_goods_consumed.items())),
+        "redeemed_goods_by_real_action": dict(sorted(consumption_actions.items())),
+        "finite_shop_merchandise_conservation_verified": True,
         "gameplay_evidence_replayed": True,
         "player_satisfaction_inferred": False,
         "NPC_dialogue_emotional_quality_certified": False,
