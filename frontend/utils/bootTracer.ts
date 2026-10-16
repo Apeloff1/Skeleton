@@ -21,6 +21,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LatestSnapshotWriter } from './LatestSnapshotWriter';
+import { OrderedCommitQueue } from './OrderedCommitQueue';
 import { redactSecrets } from './safeError';
 
 const KEY_TRACE       = '@boot/trace';
@@ -282,13 +283,9 @@ const _rotationReady = rotateSessionsOnce();
 // timed out at the entry route can still complete after the product renders;
 // serializing acknowledgement behind admission prevents that late increment
 // from overwriting a clean-boot marker.
-let _crashWriteTail: Promise<void> = Promise.resolve();
+const _crashWrites = new OrderedCommitQueue();
 function writeCrashCount(value: number): Promise<void> {
-  const operation = _crashWriteTail.catch(() => {}).then(() =>
-    AsyncStorage.setItem(KEY_CRASH_COUNT, String(value))
-  );
-  _crashWriteTail = operation.catch(() => {});
-  return operation;
+  return _crashWrites.enqueue(() => AsyncStorage.setItem(KEY_CRASH_COUNT, String(value)));
 }
 
 export async function getCrashCount(): Promise<number> {
@@ -383,7 +380,7 @@ export async function resetBootState(): Promise<boolean> {
     if (!(await boundedOperation(idle, STORAGE_READ_BUDGET_MS))) return false;
     // Wait for pending attempt/clean acknowledgements before removing the
     // counter. Never delete it while an older native writer may restore it.
-    if (!(await boundedOperation(_crashWriteTail, STORAGE_READ_BUDGET_MS))) return false;
+    if (!(await boundedOperation(_crashWrites.drain(), STORAGE_READ_BUDGET_MS))) return false;
 
     // A timeout cannot cancel an AsyncStorage mutation. If the underlying
     // removal has not settled, keep the writer fenced so a *late* native
