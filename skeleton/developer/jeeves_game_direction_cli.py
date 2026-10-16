@@ -20,6 +20,10 @@ def direction(root: Path, *, action: str, source: str,
     data, sha = _read(root,source,16*1024*1024)
     if data.get("schema")!=SCHEMA or set(data)!={"schema","bible","scenes","expert_reviews"}:
         raise DirectionError("signed story-direction dossier requires bible, scenes and independent review claims")
+    from skeleton.developer.game_cli import _load
+    project = _load(root)["name"]
+    if not isinstance(data["bible"], dict) or data["bible"].get("project") != project:
+        raise DirectionError("story direction bible belongs to a different active game project")
     report = evaluate_direction(
         data["bible"],data["scenes"],reviewers=data["expert_reviews"],
         passes=passes,
