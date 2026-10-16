@@ -154,6 +154,8 @@ renderer/rendering_method.mobile="gl_compatibility"
         "director_atlas.gd": GDSCRIPT.encode("utf-8"),
         "director_world.json": data,
     }
+    if any(len(content) > 2 * 1024 * 1024 for content in contents.values()):
+        raise ValueError("Director atlas export file exceeds its supported size")
     manifest = {
         "schema": SCHEMA, "project": world.project_id,
         "source": source, "source_sha256": source_sha,
