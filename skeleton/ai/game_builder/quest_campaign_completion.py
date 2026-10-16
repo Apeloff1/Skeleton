@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .quest_scene_engine import (
-    MAX_EVENTS, DirectorAction, DirectorError, DirectorWorld, DirectorState,
+    MAX_EVENTS, DirectorAction, DirectorWorld, DirectorState,
     director_initial, director_step, available_director_actions,
 )
 from .quest_playthrough_journal import replay_director_segments
