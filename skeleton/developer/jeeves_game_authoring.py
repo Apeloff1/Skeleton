@@ -228,6 +228,8 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
     selected = (console, genre, period)
     if any(x is not None for x in selected) and not all(x is not None for x in selected):
         raise AuthoringError("quality benchmark needs --console, --genre and --period together")
+    if not all(x is not None for x in selected) and profile != "design/market_benchmarks.json":
+        raise AuthoringError("custom benchmark profile requires an exact console/genre/period cohort")
     if kind in {"asset", "animation", "cutscene", "music"} and not all(x is not None for x in selected):
         raise AuthoringError("media designs require a qualifying era/console/genre/period benchmark")
     market = None
