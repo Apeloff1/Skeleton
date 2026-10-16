@@ -31,6 +31,7 @@ var snapshot: Dictionary = {}
 var last_presentation: Dictionary = {}
 var last_dragon_advice: Dictionary = {}
 var last_navigation: Dictionary = {}
+var native_map
 var world: Dictionary = {}
 var scene_lookup: Dictionary = {}
 var busy: bool = false
@@ -95,6 +96,12 @@ func _ready() -> void:
     atlas.text = "Scene atlas"
     atlas.pressed.connect(func(): get_tree().change_scene_to_file("res://main.tscn"))
     connection.add_child(atlas)
+    native_map = load("res://director_minimap.gd").new()
+    native_map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    native_map.set_world(world)
+    native_map.node_selected.connect(func(target: String):
+        _request("@navigation:" + target, false))
+    layout.add_child(native_map)
     status_text = Label.new()
     status_text.text = "Start the Jeeves loopback server, then connect."
     layout.add_child(status_text)
@@ -248,6 +255,12 @@ func _request(choice: String, is_action: bool) -> void:
             route = "/v1/advice"
         elif choice == "@navigation":
             route = "/v1/navigation?profile=quest&alternatives=3"
+        elif choice.begins_with("@navigation:"):
+            var target: String = choice.substr("@navigation:".length())
+            if not scene_lookup.has(target):
+                status_text.text = "Map target absent from original authored world"
+                return
+            route = "/v1/navigation?destination=" + target + "&profile=scenic&alternatives=3"
         error_code = client.request(url + route, headers, HTTPClient.METHOD_GET)
     if error_code != OK:
         status_text.text = "Unable to contact local Director: " + str(error_code)
@@ -279,6 +292,10 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
             status_text.text = "Game has advanced; refresh before using planned routes."
             return
         last_navigation = found
+        var route_list: Array = found.get("routes", [])
+        if not route_list.is_empty():
+            native_map.highlight(str(snapshot.get("scene", "")),
+                                 route_list[0].get("places", []))
         status_text.text = "Director found replay-verified alternate routes (read-only)."
         _render_state()
         return
@@ -300,6 +317,9 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
     if (last_navigation.get("state_sha256") != snapshot.get("current_state_sha256")
             or last_navigation.get("session_head_sha256") != snapshot.get("last_receipt_sha256")):
         last_navigation = {}
+    native_map.highlight(str(snapshot.get("scene", "")),
+                         last_navigation.get("routes", [{}])[0].get("places", []) if
+                         not last_navigation.get("routes", []).is_empty() else [])
     last_presentation = {}
     if parsed.get("presentation") is Dictionary:
         last_presentation = parsed["presentation"]
