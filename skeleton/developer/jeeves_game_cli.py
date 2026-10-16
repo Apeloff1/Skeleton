@@ -148,7 +148,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
-                                            "fidelity-plan", "upscale", "production-init",
+                                            "fidelity-plan", "fidelity-matrix", "upscale", "production-init",
                                             "production-status", "production-cycle"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
@@ -168,11 +168,12 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--passes", type=int)
     parser.add_argument("--gate")
+    parser.add_argument("--repair-generated", action="store_true")
     args = parser.parse_args(argv)
     try:
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
         render_args = (args.target, args.source, args.output, args.mode, args.factor,
-                       args.dry_run, args.passes, args.gate)
+                       args.dry_run, args.passes, args.gate, args.repair_generated)
         other_content = (args.kind, args.brief, args.digest, args.approve,
                          args.include_notes, args.profile, args.evidence)
         if args.action in {"production-init", "production-status", "production-cycle"}:
@@ -180,7 +181,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             if args.action == "production-init":
                 if not args.target or not args.genre or not args.period or any((
                     *other_content, args.console, args.source, args.output, args.mode,
-                    args.factor, args.dry_run, args.passes, args.gate
+                    args.factor, args.dry_run, args.passes, args.gate, args.repair_generated
                 )):
                     raise ValueError("production-init requires --target --genre --period only")
                 output = init(root, target=args.target, genre=args.genre, period=args.period)
@@ -192,22 +193,29 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 if any((*other_content, *quality_args, args.target, args.source, args.output,
                         args.mode, args.factor, args.dry_run)):
                     raise ValueError("production-cycle accepts --passes and optional --gate only")
-                output = cycle(root, passes=args.passes or 1, gate=args.gate)
-        elif args.action in {"fidelity-plan", "upscale"}:
-            from skeleton.developer.jeeves_game_upscale import fidelity_plan, upscale
-            if not args.target or any((*other_content, *quality_args, args.passes, args.gate)):
-                raise ValueError("fidelity commands require --target without unrelated options")
-            if args.action == "fidelity-plan":
-                if any((args.source, args.output, args.mode, args.factor, args.dry_run)):
-                    raise ValueError("fidelity-plan accepts --target only")
-                output = fidelity_plan(args.target)
+                output = cycle(root, passes=args.passes or 1, gate=args.gate,
+                               repair_generated=args.repair_generated)
+        elif args.action in {"fidelity-plan", "fidelity-matrix", "upscale"}:
+            from skeleton.developer.jeeves_game_upscale import fidelity_plan, fidelity_matrix, upscale
+            if args.action == "fidelity-matrix":
+                if any((*other_content, *quality_args, *render_args)):
+                    raise ValueError("fidelity-matrix accepts --project only")
+                output = fidelity_matrix()
             else:
-                if not args.source or not args.output:
-                    raise ValueError("upscale requires --source --output under assets/")
-                output = upscale(root, source=args.source, output=args.output,
-                                 target=args.target, mode=args.mode or "nearest",
-                                 factor=args.factor if args.factor is not None else 2,
-                                 dry_run=args.dry_run)
+                if not args.target or any((*other_content, *quality_args, args.passes,
+                                           args.gate, args.repair_generated)):
+                    raise ValueError("fidelity commands require --target without unrelated options")
+                if args.action == "fidelity-plan":
+                    if any((args.source, args.output, args.mode, args.factor, args.dry_run)):
+                        raise ValueError("fidelity-plan accepts --target only")
+                    output = fidelity_plan(args.target)
+                else:
+                    if not args.source or not args.output:
+                        raise ValueError("upscale requires --source --output under assets/")
+                    output = upscale(root, source=args.source, output=args.output,
+                                     target=args.target, mode=args.mode or "nearest",
+                                     factor=args.factor if args.factor is not None else 2,
+                                     dry_run=args.dry_run)
         elif args.action == "benchmark-matrix":
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
                     args.console, args.genre, args.period, args.evidence, *render_args)):
