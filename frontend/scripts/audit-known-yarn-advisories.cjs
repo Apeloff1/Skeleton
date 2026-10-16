@@ -43,6 +43,7 @@ function parseYarnV1(source) {
   if (typeof source !== 'string' || !source.split('\n').slice(0, 5).includes('# yarn lockfile v1'))
     throw new Error('expected Yarn classic lockfile v1');
   const rows = [];
+  const seenSelectors = new Set();
   for (const raw of source.split(/\n\s*\n/)) {
     const lines = raw.split('\n');
     if (!lines[0] || lines[0].startsWith('#')) continue;
@@ -50,6 +51,10 @@ function parseYarnV1(source) {
       throw new Error('unrecognized Yarn lock stanza');
     const header = lines[0].replace(/:\s*$/, '');
     const selectors = header.match(/"[^"]+"|[^,\s]+/g) || [];
+    for (const selector of selectors) {
+      if (seenSelectors.has(selector)) throw new Error('duplicate Yarn selector: ' + selector);
+      seenSelectors.add(selector);
+    }
     const names = [...new Set(selectors.map(packageName))];
     if (names.length !== 1) throw new Error('mixed dependency identities in one Yarn lock stanza');
     const match = lines.find(row => /^  version "/.test(row));
