@@ -267,6 +267,13 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
             "canonical_scene_count": metrics["canonical_scene_count"],
             "causal_references": metrics["causal_source_references"],
             "state_transitions": metrics["character_state_transitions"],
+            "dramatic_thread_summary": (
+                {"declared": checked["dramaturgy"]["declared_thread_count"],
+                 "resolved": checked["dramaturgy"]["declared_resolved_count"],
+                 "open": checked["dramaturgy"]["open_thread_ids"][:20],
+                 "source_identity": checked["dramaturgy"]["source_identity_sha256"]}
+                if checked.get("dramaturgy") is not None else None
+            ),
             "dialogue_repetition_fraction": metrics["exact_dialogue_repeat_fraction"],
             "revision_targets": [r["kind"] for r in checked["revision_work"][:10]],
             "qualitative_dimensions": list(checked["quality_bars"].keys()),
