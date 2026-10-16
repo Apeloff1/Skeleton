@@ -430,3 +430,58 @@ def gate_render_asset(root: Path, *, console: str, genre: str, period: str,
             "human_scores_independently_verified": False,
             "performance_measurement_independently_verified": False,
             "peak_quality_proven": False, "production_qualified": False}
+
+
+def benchmark_matrix(root: Path, *,
+                     profile: str = "design/market_benchmarks.json") -> dict[str, Any]:
+    """Coverage review across all operator-declared eras/consoles/genres/periods.
+
+    Only declarations in the supplied file are scanned; this is never a claim
+    that every world platform or historical title has been documented.
+    """
+    payload, identity = _read(root, profile, MAX_DATA_BYTES)
+    if payload.get("schema") != SCHEMA or set(payload) != {"schema", "cohorts"}:
+        _error("unsupported benchmark evidence envelope")
+    cohorts = payload["cohorts"]
+    if not isinstance(cohorts, list) or len(cohorts) > MAX_COHORTS:
+        _error("invalid declared benchmark cohort count")
+    found: set[tuple[str, str, str, str]] = set()
+    matrix = []
+    for row in cohorts:
+        if not isinstance(row, dict) or set(row) != {"era", "console", "genre", "period", "records"}:
+            _error("malformed benchmark cohort declaration")
+        key = tuple(_ident(row[field], field) for field in ("era", "console", "genre")) + (row["period"],)
+        _period(key[3])
+        folded = tuple(v.casefold() for v in key)
+        if folded in found:
+            _error("duplicate benchmark cohort identity")
+        found.add(folded)
+        info: dict[str, Any] = {"era":key[0], "console":key[1], "genre":key[2],
+                                "period":key[3]}
+        try:
+            from skeleton.developer.game_cli import _load
+            active = _load(root)["era"]
+            if active != key[0]:
+                # Every workspace is configured for one canonical era; other
+                # eras are catalogued here but cannot inherit that validation.
+                info.update({"ready":False, "status":"other_era_not_validated_in_workspace",
+                             "qualifying_count":0})
+            else:
+                rank = rank_cohort(root, console=key[1], genre=key[2],
+                                   period=key[3], profile=profile)
+                info.update({"ready":rank["eligible_for_inspiration"],
+                             "status":"eligible" if rank["eligible_for_inspiration"]
+                             else "no_dual_top_tier",
+                             "cohort_size":rank["cohort_size"],
+                             "qualifying_count":rank["qualifying_count"]})
+        except QualityError as exc:
+            info.update({"ready":False, "status":"invalid_evidence",
+                         "error":str(exc), "qualifying_count":0})
+        matrix.append(info)
+    ready = sum(bool(item["ready"]) for item in matrix)
+    return {"ok":bool(matrix) and ready == len(matrix),
+            "action":"benchmark-matrix", "profile_sha256":identity,
+            "declared_cohorts":len(matrix), "qualifying_cohorts":ready,
+            "gapped_cohorts":len(matrix)-ready, "coverage":matrix,
+            "global_platform_coverage_proven":False,
+            "market_values_independently_verified":False}
