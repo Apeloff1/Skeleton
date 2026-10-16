@@ -24,6 +24,8 @@ from .quest_world_dynamics import (
 from .quest_society import (
     legal_actions as society_legal_actions,
     perform as society_perform, verify_world as society_verify_world,
+    consume_good as society_consume_good,
+    verify_inventory as society_verify_inventory,
 )
 
 MAX_SCENES = 128
@@ -729,12 +731,20 @@ def director_step(world: DirectorWorld, state: DirectorState, action: DirectorAc
         destination = (passage.destination if state.scene == passage.source
                        else passage.source)
         inventory = set(state.acquired)
+        before_effect = state.world_state
         if passage.consume_item is not None:
-            if passage.consume_item not in inventory:
-                raise DirectorError("transit fare not in actual inventory")
-            inventory.remove(passage.consume_item)
+            if world.dynamics.society is not None:
+                owned_items, social = society_consume_good(
+                    world.dynamics.society, state.acquired,
+                    before_effect.society, passage.consume_item)
+                inventory = set(owned_items)
+                before_effect = replace(before_effect, society=social)
+            else:
+                if passage.consume_item not in inventory:
+                    raise DirectorError("transit fare not in actual inventory")
+                inventory.remove(passage.consume_item)
         effect = apply_changes(
-            state.world_state, passage.reputation_change,
+            before_effect, passage.reputation_change,
             add_flags=(passage.grant_world_flag,)
             if passage.grant_world_flag is not None else (),
             passage=passage.key,
@@ -760,6 +770,8 @@ def director_step(world: DirectorWorld, state: DirectorState, action: DirectorAc
                 items.discard(item[1:])
             else:
                 items.add(item)
+        society_verify_inventory(
+            world.dynamics.society, tuple(sorted(items)), new_world.society)
         return replace(state, turn=state.turn + cost,
                        acquired=tuple(sorted(items)), world_state=new_world)
     affordance = next(a for a in here.affordances if a.key == action.key)
@@ -820,12 +832,19 @@ def director_step(world: DirectorWorld, state: DirectorState, action: DirectorAc
             updated[quest.key] = index + 1
             if updated[quest.key] == len(quest.stages):
                 completed.add(quest.key)
+    dynamics_state = state.world_state
     if affordance.consumes:
-        inventory.remove(affordance.consumes)
+        if world.dynamics is not None and world.dynamics.society is not None:
+            updated_inventory, updated_society = society_consume_good(
+                world.dynamics.society, tuple(sorted(inventory)),
+                dynamics_state.society, affordance.consumes)
+            inventory = set(updated_inventory)
+            dynamics_state = replace(dynamics_state, society=updated_society)
+        else:
+            inventory.remove(affordance.consumes)
     if affordance.produces:
         inventory.add(affordance.produces)
     # At most one action per scene per step; all satisfied quests may progress.
-    dynamics_state = state.world_state
     if world.dynamics is not None:
         if dynamics_state is None:
             raise DirectorError("world reputation snapshot missing")
