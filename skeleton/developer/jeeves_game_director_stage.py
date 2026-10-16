@@ -15,6 +15,9 @@ var backdrop: Texture2D
 var score_player: AudioStreamPlayer
 var music_enabled: bool = true
 var current_score: String = ""
+var environment_seconds: float = 0.0
+var environment_redraw_accumulator: float = 0.0
+var environment_quality: int = 2
 var shift: float = 0.0
 var camera_scale: float = 1.0
 var actors: Array = []
@@ -119,6 +122,13 @@ func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, size), environmental_tint)
     if backdrop != null:
         draw_texture_rect(backdrop, Rect2(Vector2.ZERO, size), false)
+    if environment_quality > 0:
+        var wind: float = sin(environment_seconds * 0.85) * 7.0
+        for i in range(environment_quality * 14):
+            var px: float = fposmod(float(i * 67 + 13) + environment_seconds * 11.0, max(w, 1.0))
+            var py: float = h * 0.50 + float((i * 29) % 53)
+            draw_line(Vector2(px, py), Vector2(px + wind, py - 3.0),
+                      Color(0.34, 0.63, 0.41, 0.48), 1.6)
     draw_circle(Vector2(w * 0.80, h * 0.22), 22.0, Color(0.96, 0.87, 0.56))
     var camera_offset: float = shift
     var ground_y: float = h * 0.70
@@ -133,6 +143,22 @@ func _draw() -> void:
         var tower_h: float = 45.0 + float((i * 13) % 4) * 19.0
         draw_rect(Rect2(px, ground_y - tower_h, 25.0, tower_h), Color(0.18, 0.25, 0.29))
         draw_rect(Rect2(px + 5.0, ground_y - tower_h + 12.0, 6.0, 7.0), Color(0.91, 0.67, 0.34))
+    var weather_name: String = str(scene_data.get("weather", "")).to_lower()
+    if environment_quality > 0 and ("rain" in weather_name or "storm" in weather_name):
+        for index in range(environment_quality * 24):
+            var rain_x: float = fposmod(float(index * 47 + 17) +
+                environment_seconds * (35.0 + float(index % 6) * 11.0), max(w, 1.0))
+            var rain_y: float = fposmod(float(index * 31) +
+                environment_seconds * 133.0, max(h, 1.0))
+            draw_line(Vector2(rain_x, rain_y), Vector2(rain_x - 5.0, rain_y + 13.0),
+                      Color(0.72, 0.81, 0.94, 0.56), 1.0)
+    elif environment_quality > 0 and "snow" in weather_name:
+        for index in range(environment_quality * 28):
+            var snow_x: float = fposmod(float(index * 37 + 19) +
+                environment_seconds * 13.0, max(w, 1.0))
+            var snow_y: float = fposmod(float(index * 17 + 3) +
+                environment_seconds * 23.0, max(h, 1.0))
+            draw_circle(Vector2(snow_x, snow_y), 1.5, Color(0.93, 0.96, 0.99, 0.7))
     var spacing: float = min(95.0, max(52.0, w / float(max(actors.size() + 1, 2))))
     var origin_x: float = (w - spacing * float(max(actors.size() - 1, 0))) * 0.5
     for i in range(actors.size()):
@@ -181,6 +207,11 @@ func _next_timeline() -> void:
     _labels()
 
 func _process(delta: float) -> void:
+    environment_seconds += min(delta, 0.15)
+    environment_redraw_accumulator += min(delta, 0.15)
+    if environment_quality > 0 and environment_redraw_accumulator >= 1.0 / 24.0:
+        environment_redraw_accumulator = 0.0
+        queue_redraw()
     if not playing or is_paused:
         return
     elapsed_ms += min(delta, 0.15) * 1000.0 * playback_speed
@@ -242,6 +273,11 @@ func _execute_cue(cue: Dictionary) -> void:
     cue_text = kind.replace("_", " ").capitalize() + ": " + value.left(160)
     queue_redraw()
     _labels()
+
+func set_environment_quality(value: int) -> void:
+    environment_quality = clampi(value, 0, 3)
+    queue_redraw()
+
 
 func toggle_music() -> void:
     music_enabled = not music_enabled
