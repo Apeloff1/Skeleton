@@ -50,7 +50,7 @@ def _pick(choices: tuple[DirectorAction, ...], *, profile: int,
             }
         elif profile == 2:
             preference = {
-                "speak": 0, "discuss": 1, "rest": 2, "sell": 3,
+                "discuss": 0, "speak": 1, "rest": 2, "sell": 3,
                 "travel": 4, "transit": 5, "buy": 6, "use": 7, "wait": 8,
             }
         elif profile == 3:
@@ -77,6 +77,12 @@ def _pick(choices: tuple[DirectorAction, ...], *, profile: int,
             # Uniformly deterministic selection by hashed action identity,
             # without depending on global RNG, web APIs or machine clock.
             return int(seed[:12], 16), category, action.key
+        if profile == 2 and category == "discuss":
+            # Critically examine negative dialogue consequences, not only
+            # the positive-rapport branch selected by ordinary sorting.
+            return (preference[category],
+                    "0" if "question_motives" in action.key else "1",
+                    action.key)
         return preference.get(category, 99), category, action.key
 
     return min(choices, key=score)
