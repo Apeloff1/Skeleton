@@ -86,6 +86,8 @@ class DragonJeevesGameHandoffTest(unittest.TestCase):
         preview = plan(self.root, source=self.source,
                        genre="platformer", target="gameboy")
         self.assertTrue(preview["handoff"]["original_assets_required"])
+        self.assertEqual(preview["workorders"][0]["mechanic"], "movement")
+        self.assertFalse(preview["workorders"][0]["tested_in_game"])
         self.assertFalse(preview["handoff"]["game_implementation_verified"])
         self.assertFalse(preview["approved_for_model_context"])
         self.assertEqual(preview["handoff"]["prototype"]["mechanics"][0]["mechanic"],
