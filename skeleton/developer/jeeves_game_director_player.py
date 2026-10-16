@@ -246,7 +246,7 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
         status_text.text = "Director rejected input (" + str(status_code) + "): " + str(parsed.get("error", "unknown"))
         if parsed.has("snapshot"):
             snapshot = parsed["snapshot"]
-            _draw()
+            _render_state()
         return
     if parsed.get("advice") is Dictionary:
         var suggested: Dictionary = parsed["advice"]
@@ -255,7 +255,7 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
             return
         last_dragon_advice = suggested
         status_text.text = "Dragon action predictions loaded for current game state (advisory only)."
-        _draw()
+        _render_state()
         return
     if not parsed.has("snapshot") or not (parsed["snapshot"] is Dictionary):
         status_text.text = "Director did not provide a canonical state"
@@ -267,11 +267,11 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
     if parsed.get("presentation") is Dictionary:
         last_presentation = parsed["presentation"]
     status_text.text = "Canonical turn " + str(snapshot.get("turn", 0)) + " | actions " + str(snapshot.get("sequence", 0))
-    _draw()
+    _render_state()
     if not last_presentation.is_empty():
         stage.enqueue_presentation(last_presentation)
 
-func _draw() -> void:
+func _render_state() -> void:
     for item in view.get_children():
         item.queue_free()
         view.remove_child(item)
