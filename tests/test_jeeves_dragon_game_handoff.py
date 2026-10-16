@@ -78,6 +78,8 @@ class DragonJeevesGameHandoffTest(unittest.TestCase):
         self.assertEqual(comparison["cross_game_preference_conflicts"][0]["mechanic"],
                          "movement")
         self.assertTrue(comparison["needs_human_review"])
+        with self.assertRaises(ValueError):
+            plan(self.root, source=self.source, genre="platformer", target="gameboy")
 
     def test_original_forge_requires_handoff_approval(self) -> None:
         self._ingest()
