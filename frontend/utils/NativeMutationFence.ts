@@ -12,9 +12,21 @@ export const MAX_NATIVE_MUTATION_KEYS = 256;
 
 export class NativeMutationFence {
   private readonly pending = new Map<string, Promise<void>>();
+  private paused = false;
+
+  /** Fence new operations and await the actual completion of all old writes. */
+  pauseAndDrain(): Promise<void> {
+    this.paused = true;
+    return Promise.all([...new Set(this.pending.values())]).then(() => undefined);
+  }
+
+  resume(): void {
+    this.paused = false;
+  }
 
   run(keys: readonly string[], operation: () => Promise<void>): Promise<boolean> {
     const unique = [...new Set(keys)];
+    if (this.paused) return Promise.resolve(false);
     if (unique.length === 0) return Promise.resolve(true);
     // Global bound protects low-RAM devices if many independent storage
     // writes hang. Oversized bulk deletes are denied, never partially applied.
