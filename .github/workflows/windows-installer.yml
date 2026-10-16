@@ -8,6 +8,9 @@ on:
       - "packaging/windows/**"
       - "scripts/windows/**"
       - "skeleton/app/**"
+      # Installed UI and owned local-model execution must qualify with Setup.exe.
+      - "frontend/src/product/productCatalog.ts"
+      - "skeleton/ai/runtime/inference/native_transformer.py"
       - "skeleton/testing/test_windows_installer.py"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
