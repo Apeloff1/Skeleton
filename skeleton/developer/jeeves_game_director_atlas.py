@@ -17,6 +17,7 @@ from skeleton.developer.jeeves_game_production_board import _load_world
 from skeleton.developer.jeeves_game_director_player import PLAYER_SCRIPT, PLAYER_SCENE
 from skeleton.developer.jeeves_game_director_stage import STAGE_SCRIPT
 from skeleton.developer.jeeves_game_director_media import generate as generate_media
+from skeleton.developer.jeeves_game_director_native_probe import PROBE_SCRIPT
 
 SCHEMA = "skeleton.jeeves.director_atlas_export.v1"
 FILES = ("project.godot", "main.tscn", "director_atlas.gd", "director_world.json",
@@ -164,6 +165,7 @@ renderer/rendering_method.mobile="gl_compatibility"
         "director_player.gd": PLAYER_SCRIPT.encode("utf-8"),
         "director_player.tscn": PLAYER_SCENE.encode("utf-8"),
         "director_stage.gd": STAGE_SCRIPT.encode("utf-8"),
+        "director_probe.gd": PROBE_SCRIPT.encode("utf-8"),
     }
     authored_media, media_catalog = generate_media(world)
     contents.update(authored_media)
@@ -184,6 +186,7 @@ renderer/rendering_method.mobile="gl_compatibility"
         "generated_original_png_backdrops": media_catalog["original_exported_scene_image_count"],
         "generated_original_wav_scores": media_catalog["original_exported_audio_music_count"],
         "native_original_audio_playback_in_source": True,
+        "native_http_gameplay_probe_in_source": True,
         "native_asset_or_voice_quality_independently_verified": False,
         "quest_logic_implemented_in_native_preview": False,
         "native_binary_executed": False,
