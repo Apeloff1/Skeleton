@@ -340,7 +340,7 @@ def test_vividness_replays_every_stage_asset_and_preserved_path(tmp_path):
     assert all(row["authoring_assets_checked"]==2 for row in review["passes"])
     assert review["every_stage_dressing_item_scrutinized"]
     assert not review["professional_quality_certified"]
-    sprite(root,"background.png",w=8,h=8)  # overwrite source reference after upscale
+    sprite(root,"background.png",w=12,h=12)  # mutate exact linked texture after approval
     after=command(root,"vividness-review","--source","design/vivid.json")
     assert not after["ok"]
     assert "texture changed" in after["error"]
