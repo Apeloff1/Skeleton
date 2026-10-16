@@ -161,7 +161,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-draft", "director-revise", "director-examine", "director-promote",
                                             "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
-                                            "director-session-compare", "director-serve", "director-atlas-export", "director-atlas-verify",
+                                            "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage", "director-godot-smoke"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
@@ -185,6 +185,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--goal")
     parser.add_argument("--routes", type=int)
     parser.add_argument("--session")
+    parser.add_argument("--at", type=int)
+    parser.add_argument("--tail", type=int)
     parser.add_argument("--sessions")
     parser.add_argument("--port", type=int)
     parser.add_argument("--timeout", type=float)
@@ -221,6 +223,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-session-status": {"action", "session"},
             "director-session-step": {"action", "session", "choice"},
             "director-session-compare": {"action", "session", "other_session"},
+            "director-session-fork": {"action", "session", "other_session", "at", "approve"},
+            "director-session-trace": {"action", "session", "tail"},
             "director-serve": {"action", "session", "port"},
             "director-atlas-export": {"action", "source", "dry_run"},
             "director-atlas-verify": {"action", "source"},
@@ -259,6 +263,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     raise ValueError("director-coverage requires --source")
                 return coverage(root, source=args.source,
                                 routes=args.routes if args.routes is not None else 3)
+            if args.action in {"director-session-fork", "director-session-trace"}:
+                from skeleton.developer.jeeves_game_director_branch import fork, trace
+                if not args.session:
+                    raise ValueError("Director history requires --session")
+                if args.action == "director-session-trace":
+                    return trace(root, session=args.session, tail=(
+                        args.tail if args.tail is not None else 64))
+                if args.at is None or not args.other_session:
+                    raise ValueError("Director fork requires --at and --other-session")
+                return fork(root, session=args.session, new_session=args.other_session,
+                            at=args.at, approved_head=args.approve)
             if args.action.startswith("director-session-"):
                 from skeleton.developer.jeeves_game_director_session import begin, inspect, choose, compare
                 if not args.session:
@@ -299,7 +314,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             if not args.session:
                 raise ValueError("Dragon session lesson requires --session")
             return enqueue(root, session=args.session, approved_digest=args.approve)
-        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout)):
+        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout, args.at, args.tail)):
             raise ValueError("runtime options require a director-session or dragon-session action")
         director_actions = {"director-draft", "director-revise", "director-examine", "director-promote",
                             "director-board", "director-prepare-training"}
