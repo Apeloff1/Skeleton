@@ -147,7 +147,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     """Game-authoring proposals require real model I/O and explicit local acceptance."""
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
-                                            "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate"))
+                                            "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
+                                            "fidelity-plan", "upscale", "production-init",
+                                            "production-status", "production-cycle"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -158,16 +160,63 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--period")
     parser.add_argument("--profile")
     parser.add_argument("--evidence")
+    parser.add_argument("--target")
+    parser.add_argument("--source")
+    parser.add_argument("--output")
+    parser.add_argument("--mode", choices=("nearest", "scale2x"))
+    parser.add_argument("--factor", type=int)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--passes", type=int)
+    parser.add_argument("--gate")
     args = parser.parse_args(argv)
     try:
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
-        if args.action == "benchmark-matrix":
+        render_args = (args.target, args.source, args.output, args.mode, args.factor,
+                       args.dry_run, args.passes, args.gate)
+        other_content = (args.kind, args.brief, args.digest, args.approve,
+                         args.include_notes, args.profile, args.evidence)
+        if args.action in {"production-init", "production-status", "production-cycle"}:
+            from skeleton.developer.jeeves_game_production import init, status, cycle
+            if args.action == "production-init":
+                if not args.target or not args.genre or not args.period or any((
+                    *other_content, args.console, args.source, args.output, args.mode,
+                    args.factor, args.dry_run, args.passes, args.gate
+                )):
+                    raise ValueError("production-init requires --target --genre --period only")
+                output = init(root, target=args.target, genre=args.genre, period=args.period)
+            elif args.action == "production-status":
+                if any((*other_content, *quality_args, *render_args)):
+                    raise ValueError("production-status accepts --project only")
+                output = status(root)
+            else:
+                if any((*other_content, *quality_args, args.target, args.source, args.output,
+                        args.mode, args.factor, args.dry_run)):
+                    raise ValueError("production-cycle accepts --passes and optional --gate only")
+                output = cycle(root, passes=args.passes or 1, gate=args.gate)
+        elif args.action in {"fidelity-plan", "upscale"}:
+            from skeleton.developer.jeeves_game_upscale import fidelity_plan, upscale
+            if not args.target or any((*other_content, *quality_args, args.passes, args.gate)):
+                raise ValueError("fidelity commands require --target without unrelated options")
+            if args.action == "fidelity-plan":
+                if any((args.source, args.output, args.mode, args.factor, args.dry_run)):
+                    raise ValueError("fidelity-plan accepts --target only")
+                output = fidelity_plan(args.target)
+            else:
+                if not args.source or not args.output:
+                    raise ValueError("upscale requires --source --output under assets/")
+                output = upscale(root, source=args.source, output=args.output,
+                                 target=args.target, mode=args.mode or "nearest",
+                                 factor=args.factor if args.factor is not None else 2,
+                                 dry_run=args.dry_run)
+        elif args.action == "benchmark-matrix":
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
-                    args.console, args.genre, args.period, args.evidence)):
+                    args.console, args.genre, args.period, args.evidence, *render_args)):
                 raise ValueError("benchmark-matrix accepts --profile only")
             from skeleton.developer.jeeves_game_quality import benchmark_matrix
             output = benchmark_matrix(root, profile=args.profile or "design/market_benchmarks.json")
         elif args.action in {"benchmark", "asset-gate"}:
+            if any(render_args):
+                raise ValueError("quality evidence checks do not use production/fidelity options")
             if not all((args.console, args.genre, args.period)):
                 raise ValueError("benchmark needs --console, --genre, --period")
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes)):
@@ -190,10 +239,12 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     evidence=args.evidence,
                 )
         elif args.action in {"propose", "review", "apply", "queue"}:
+            if any(render_args):
+                raise ValueError("model draft actions do not use production/fidelity options")
             from skeleton.developer.jeeves_game_authoring import propose, review, apply, queue
             if args.action == "queue":
                 if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
-                        *quality_args)):
+                        *quality_args, *render_args)):
                     raise ValueError("queue takes no proposal selection options")
                 output = queue(root)
             elif args.action == "propose":
@@ -206,12 +257,12 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 )
             elif args.action == "review":
                 if not args.digest or any((args.kind, args.brief, args.approve, args.include_notes,
-                                           *quality_args)):
+                                           *quality_args, *render_args)):
                     raise ValueError("review requires --digest only")
                 output = review(root, args.digest)
             else:
                 if not args.digest or not args.approve or any((args.kind, args.brief,
-                                                               args.include_notes, *quality_args)):
+                                                               args.include_notes, *quality_args, *render_args)):
                     raise ValueError("apply requires --digest and --approve only")
                 output = apply(root, digest=args.digest, approved_digest=args.approve)
         elif args.action == "plan":
