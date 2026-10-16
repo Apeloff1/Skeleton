@@ -108,12 +108,18 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
         value = json.loads(location.read_text(encoding="utf-8"), object_pairs_hook=_object_unique)
     except (UnicodeError, ValueError) as exc:
         raise AuthoringError("invalid proposal JSON") from exc
-    if not isinstance(value, dict) or set(value) != {
+    if not isinstance(value, dict):
+        raise AuthoringError("unsupported proposal envelope")
+    v3 = value.get("schema") == "skeleton.jeeves.game_proposal.v3"
+    expected_fields = {
         "schema", "project", "config_sha256", "draft", "provider", "model",
         "request_id", "design_context_sha256", "market_benchmark", "digest"
-    }:
+    }
+    if v3:
+        expected_fields.add("direction_dossier")
+    if set(value) != expected_fields:
         raise AuthoringError("unsupported proposal envelope")
-    if value["schema"] != SCHEMA or value["project"] != root.name or value["digest"] != digest:
+    if value["schema"] not in {SCHEMA, "skeleton.jeeves.game_proposal.v3"} or value["project"] != root.name or value["digest"] != digest:
         raise AuthoringError("proposal identity mismatch")
     draft = _valid_draft(value["draft"])
     if draft != value["draft"]:
@@ -152,6 +158,14 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
             raise AuthoringError("market quality cohort no longer qualifies")
     elif draft["kind"] in {"asset", "animation", "cutscene", "music"}:
         raise AuthoringError("media design proposal requires verified market benchmark binding")
+    if v3:
+        direction = value["direction_dossier"]
+        if not isinstance(direction, dict) or set(direction) != {"path", "sha256"}:
+            raise AuthoringError("malformed direction review identity")
+        from skeleton.developer.jeeves_game_quality import _read
+        _, current_sha = _read(root, direction["path"], 16*1024*1024)
+        if direction["sha256"] != current_sha:
+            raise AuthoringError("direction dossier changed since model proposal")
     return value
 
 
@@ -218,7 +232,8 @@ def _create_only(location: Path, content: bytes) -> None:
 def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
             console: str | None = None, genre: str | None = None,
             period: str | None = None,
-            profile: str = "design/market_benchmarks.json") -> dict[str, Any]:
+            profile: str = "design/market_benchmarks.json",
+            direction_source: str | None = None) -> dict[str, Any]:
     from skeleton.developer.jeeves_game_cli import _context, _notes
     from skeleton.developer.game_cli import GameCLIError
     if kind not in KINDS:
@@ -240,6 +255,27 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         market_prompt = prompt_profile(ranking)
         market = {"profile": profile, "profile_sha256": ranking["profile_sha256"],
                   "console": console, "genre": genre, "period": period}
+    literary = None
+    direction_binding = None
+    if direction_source is not None:
+        from skeleton.developer.jeeves_game_direction_cli import direction
+        checked = direction(root, action="direction-audit",
+                            source=direction_source, passes=1)
+        metrics = checked["observed_story_metrics"]
+        literary = {
+            "canonical_source_sha256": checked["source_identity"],
+            "canonical_scene_count": metrics["canonical_scene_count"],
+            "causal_references": metrics["causal_source_references"],
+            "state_transitions": metrics["character_state_transitions"],
+            "dialogue_repetition_fraction": metrics["exact_dialogue_repeat_fraction"],
+            "revision_targets": [r["kind"] for r in checked["revision_work"][:10]],
+            "qualitative_dimensions": list(checked["quality_bars"].keys()),
+            "quality_floor": 90,
+            "instructions": "Deliver original novel-quality narrative and film-level direction; make each scene causal, playable, character-changing, cinematic and source-faithful. These are targets, not verified artistic achievement.",
+        }
+        direction_binding = {
+            "path": direction_source, "sha256": checked["dossier_sha256"],
+        }
     notes = _notes(root) if include_notes else []
     context_sha = _notes_digest(notes) if include_notes else None
     # Small, explicitly opted-in context. No credentials or model state.
@@ -249,6 +285,7 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         "archetype": cfg["archetype"], "requested_kind": kind, "brief": brief,
         "untrusted_design_notes": context,
         "quality_cohort": market_prompt,
+        "authored_story_direction": literary,
     }, ensure_ascii=True)
     try:
         raw, provenance = asyncio.run(_infer(user_prompt))
@@ -266,6 +303,11 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         from skeleton.developer.jeeves_game_quality import rank_cohort
         if rank_cohort(root, console=console, genre=genre, period=period, profile=profile)["profile_sha256"] != market["profile_sha256"]:
             raise AuthoringError("market benchmark changed while model was drafting")
+    if direction_binding is not None:
+        from skeleton.developer.jeeves_game_quality import _read
+        _, now_sha = _read(root, direction_binding["path"], 16*1024*1024)
+        if now_sha != direction_binding["sha256"]:
+            raise AuthoringError("direction source changed while model was drafting")
     _valid_text(provenance.get("provider"), "provider", 128)
     _valid_text(provenance.get("model"), "model", 128)
     if provenance.get("request_id") is not None:
@@ -274,7 +316,7 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
     if draft["kind"] != kind:
         raise AuthoringError("model returned different design kind")
     envelope = {
-        "schema": SCHEMA,
+        "schema": "skeleton.jeeves.game_proposal.v3" if direction_binding else SCHEMA,
         "project": cfg["name"],
         "config_sha256": _config_identity(cfg),
         "draft": draft,
@@ -284,6 +326,8 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
         "design_context_sha256": context_sha,
         "market_benchmark": market,
     }
+    if direction_binding is not None:
+        envelope["direction_dossier"] = direction_binding
     digest = _sha(_encode(envelope))
     envelope["digest"] = digest
     encoded = json.dumps(envelope, sort_keys=True, indent=2, ensure_ascii=True).encode("utf-8") + b"\n"
