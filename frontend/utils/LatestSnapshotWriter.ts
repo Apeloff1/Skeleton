@@ -14,7 +14,11 @@ export class LatestSnapshotWriter {
   private active: Promise<void> | null = null;
   private paused = false;
 
-  constructor(private readonly write: (snapshot: string) => Promise<void>) {}
+  private readonly write: (snapshot: string) => Promise<void>;
+
+  constructor(write: (snapshot: string) => Promise<void>) {
+    this.write = write;
+  }
 
   enqueue(snapshot: string): void {
     if (this.paused) return;
