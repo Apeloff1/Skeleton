@@ -285,11 +285,13 @@ export default function Snowball() {
             <Text style={{ fontSize: 40, marginBottom: 12 }}>🫥</Text>
             <Text style={{ color: '#E2E8F0', fontSize: 16, fontWeight: '800', textAlign: 'center' }}>Build not found</Text>
             <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 19 }}>{loadErr}</Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <TouchableOpacity testID="snow-err-retry" onPress={() => { setLoadErr(null); load(); }}
-                style={[s.mBtn, s.mBtnRoll]} activeOpacity={0.9}>
-                <Text style={s.mBtnTxt}>↻ Retry</Text>
-              </TouchableOpacity>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
+              {gameId ? (
+                <TouchableOpacity testID="snow-err-retry" onPress={() => { setLoadErr(null); void load(); }}
+                  style={[s.mBtn, s.mBtnRoll]} activeOpacity={0.9}>
+                  <Text style={s.mBtnTxt}>↻ Retry</Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity testID="snow-select-build" onPress={() => router.push('/my-builds' as any)}
                 style={[s.mBtn, s.mBtnExport]} activeOpacity={0.9}>
                 <Text style={s.mBtnExportTxt}>Choose build</Text>
