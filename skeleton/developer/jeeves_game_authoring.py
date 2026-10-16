@@ -15,7 +15,7 @@ import tempfile
 from typing import Any
 from uuid import uuid4
 
-SCHEMA = "skeleton.jeeves.game_proposal.v1"
+SCHEMA = "skeleton.jeeves.game_proposal.v2"
 KINDS = ("character", "dialogue", "quest", "world", "mechanic", "scene",
          "animation", "cutscene", "asset", "music")
 SLUG_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
@@ -110,7 +110,7 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
         raise AuthoringError("invalid proposal JSON") from exc
     if not isinstance(value, dict) or set(value) != {
         "schema", "project", "config_sha256", "draft", "provider", "model",
-        "request_id", "design_context_sha256", "digest"
+        "request_id", "design_context_sha256", "market_benchmark", "digest"
     }:
         raise AuthoringError("unsupported proposal envelope")
     if value["schema"] != SCHEMA or value["project"] != root.name or value["digest"] != digest:
@@ -139,6 +139,19 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
         from skeleton.developer.jeeves_game_cli import _notes
         if _notes_digest(_notes(root)) != value["design_context_sha256"]:
             raise AuthoringError("design context changed since proposal")
+    market = value["market_benchmark"]
+    if market is not None:
+        if not isinstance(market, dict) or set(market) != {"profile", "profile_sha256", "console", "genre", "period"}:
+            raise AuthoringError("invalid market benchmark binding")
+        from skeleton.developer.jeeves_game_quality import rank_cohort
+        current = rank_cohort(root, console=market["console"], genre=market["genre"],
+                              period=market["period"], profile=market["profile"])
+        if current["profile_sha256"] != market["profile_sha256"]:
+            raise AuthoringError("market benchmark changed since proposal")
+        if not current["eligible_for_inspiration"]:
+            raise AuthoringError("market quality cohort no longer qualifies")
+    elif draft["kind"] in {"asset", "animation", "cutscene", "music"}:
+        raise AuthoringError("media design proposal requires verified market benchmark binding")
     return value
 
 
@@ -202,13 +215,29 @@ def _create_only(location: Path, content: bytes) -> None:
         Path(temp).unlink(missing_ok=True)
 
 
-def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False) -> dict[str, Any]:
+def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False,
+            console: str | None = None, genre: str | None = None,
+            period: str | None = None,
+            profile: str = "design/market_benchmarks.json") -> dict[str, Any]:
     from skeleton.developer.jeeves_game_cli import _context, _notes
     from skeleton.developer.game_cli import GameCLIError
     if kind not in KINDS:
         raise AuthoringError("unsupported design kind")
     brief = _valid_text(brief, "brief", MAX_BRIEF_CHARS, multiline=True)
     cfg, _ = _context(root)
+    selected = (console, genre, period)
+    if any(x is not None for x in selected) and not all(x is not None for x in selected):
+        raise AuthoringError("quality benchmark needs --console, --genre and --period together")
+    if kind in {"asset", "animation", "cutscene", "music"} and not all(x is not None for x in selected):
+        raise AuthoringError("media designs require a qualifying era/console/genre/period benchmark")
+    market = None
+    market_prompt = None
+    if all(x is not None for x in selected):
+        from skeleton.developer.jeeves_game_quality import rank_cohort, prompt_profile
+        ranking = rank_cohort(root, console=console, genre=genre, period=period, profile=profile)
+        market_prompt = prompt_profile(ranking)
+        market = {"profile": profile, "profile_sha256": ranking["profile_sha256"],
+                  "console": console, "genre": genre, "period": period}
     notes = _notes(root) if include_notes else []
     context_sha = _notes_digest(notes) if include_notes else None
     # Small, explicitly opted-in context. No credentials or model state.
@@ -217,6 +246,7 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False) -
         "project": cfg["name"], "vision": cfg["vision"], "era": cfg["era"],
         "archetype": cfg["archetype"], "requested_kind": kind, "brief": brief,
         "untrusted_design_notes": context,
+        "quality_cohort": market_prompt,
     }, ensure_ascii=True)
     try:
         raw, provenance = asyncio.run(_infer(user_prompt))
@@ -230,6 +260,10 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False) -
         raise AuthoringError("project configuration changed while model was drafting")
     if include_notes and _notes_digest(_notes(root)) != context_sha:
         raise AuthoringError("design context changed while model was drafting")
+    if market is not None:
+        from skeleton.developer.jeeves_game_quality import rank_cohort
+        if rank_cohort(root, console=console, genre=genre, period=period, profile=profile)["profile_sha256"] != market["profile_sha256"]:
+            raise AuthoringError("market benchmark changed while model was drafting")
     _valid_text(provenance.get("provider"), "provider", 128)
     _valid_text(provenance.get("model"), "model", 128)
     if provenance.get("request_id") is not None:
@@ -246,6 +280,7 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False) -
         "model": provenance["model"],
         "request_id": provenance.get("request_id"),
         "design_context_sha256": context_sha,
+        "market_benchmark": market,
     }
     digest = _sha(_encode(envelope))
     envelope["digest"] = digest
@@ -257,7 +292,7 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False) -
     return {"ok": True, "action": "propose", "proposal_sha256": digest,
             "path": str(location), "draft": draft,
             "provider": provenance["provider"], "model": provenance["model"],
-            "model_inference": True, "applied": False}
+            "model_inference": True, "market_benchmark": market, "applied": False}
 
 
 def review(root: Path, digest: str) -> dict[str, Any]:
@@ -268,7 +303,7 @@ def review(root: Path, digest: str) -> dict[str, Any]:
         "ok": True, "action": "review", "proposal_sha256": digest,
         "draft": draft, "target": str(target), "would_create": not target.exists(),
         "approved": False, "applied": False, "provider": value["provider"],
-        "model": value["model"],
+        "model": value["model"], "market_benchmark": value["market_benchmark"],
     }
 
 
