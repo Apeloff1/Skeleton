@@ -309,7 +309,7 @@ API_ROUTES: List[Dict[str, Any]] = [
 # Developer CLI command registry
 CLI_COMMANDS: List[Dict[str, Any]] = [
     {"command": "scaffold", "args": "<name> [--template] [--dir] [--dry-run]", "description": "Generate project from template"},
-    {"command": "game", "args": "<catalog|init|info|doctor|build|verify|playtest|assets|package> [--project]", "description": "Local GameForge creation/build/verification workflow"},
+    {"command": "game", "args": "<catalog|init|info|doctor|build|verify|playtest|assets|package> [--project]", "description": "Local GameForge creation/build/verification and Jeeves assistance workflow"},
     {"command": "wizard", "args": "[--answers] [--non-interactive]", "description": "Interactive project builder"},
     {"command": "health", "args": "[--json] [--watch] [--interval]", "description": "Subsystem health dashboard"},
     {"command": "visualize", "args": "[--blueprint] [--topology] [--compact] [--save]", "description": "Blueprint visualization"},
