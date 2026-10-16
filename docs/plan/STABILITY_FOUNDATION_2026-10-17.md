@@ -247,3 +247,59 @@ database, model and project state. Do not clear user state to pass health
 checks or mark a boot clean before a user-visible product render. Keep the
 minimal existing security/hygiene checks; do not reintroduce redundant CI
 workflows merely to increase the reported number of passing checks.
+
+
+## SOTA phase: ordered boot admission and native mutation isolation
+
+This pass closes two additional correctness hazards discovered by adversarial
+source review. It does not equate source-level checks with a working installer.
+
+- **Process-singleton admission and deadline:** `frontend/app/index.tsx`
+  shares one guard result across route remounts, aborts admission on timeout,
+  and removes the racing second entry watchdog. A read that completes after
+  deadline cannot enqueue a fresh crash-count increment.
+- **Ordered crash/clean receipts:** `frontend/utils/OrderedCommitQueue.ts`
+  serializes native crash-counter updates so a delayed increment never
+  commits *after* the later clean acknowledgement. `bootGuard` uses the
+  entry abort signal; explicit startup reset drains pending counter writes
+  before removing the keys.
+- **Truthful boot success:** `clearCrashes` returns whether crash count and
+  clean timestamp received native acknowledgements. `markBootClean` only
+  records `boot_clean` on success and is idempotent per process. Explicit
+  operator reset permits a new acknowledgement.
+- **Native storage ownership:** `NativeMutationFence` disallows overlapping
+  native saves/removes for the same key. Even if the JS caller times out, the
+  affected keys remain busy until the actual native promise settles; a
+  later save cannot race behind the old write. Distinct keys stay parallel.
+  Admission has a 256-key global ceiling to bound stuck native operations.
+  `safeStorage` caches values only after confirmed native saves, and hides
+  old cached reads while an unacknowledged write remains in flight.
+- **Bulk removal integrity:** Multi-key deletes reserve every key before
+  running; conflicts or excessive sizes return failure rather than partial
+  or unordered deletion. Large bulk cleanup should be chunked only by an
+  explicit canonical owner with failure/rollback receipts.
+
+**Focused execution evidence:** Before this phase, 18/18 pure startup,
+retention, retry and latest-snapshot regressions had passed. This phase adds
+seven new executable tests covering delayed crash writes, failed native
+acknowledgements, pending-drain fencing, 10,000 overlapping writer attempts
+without a backlog, independent-key concurrency, native rejection, and a
+fixed concurrent-key limit. The seven new tests passed on exact SHA-matching
+test/module copies (Node 22.16 with TypeScript stripping). Both new TypeScript
+modules also passed a strict local `tsc --noEmit` check. The combined
+focused policy evidence is **25/25**, not a claim of full-app qualification.
+
+**Remaining risk:** Native AsyncStorage is not a transactional state store and
+does not provide strong cross-process persistence guarantees merely because
+a JS wrapper is serialized. Failure of unacknowledged writes returns a
+failure and requires operator/owner retry or reconciliation. A system
+crash, power loss or native adapter bug can still affect persistence;
+production project/AI checkpoint state requires transactional durable
+owners, verified restore paths and real fault injection on installed devices.
+
+**Required before merging:** full frontend `yarn typecheck` and
+`yarn export:web`, Android offline/low-storage/OOM and force-stop tests,
+Windows installer and offline AI browser restart, real database
+backup/restore, required architecture validators, Python failure-injection
+suite, full game creation and playthrough with the actual model checkpoint,
+and exact-head sign-off. No new CI workflow was created in this pass.
