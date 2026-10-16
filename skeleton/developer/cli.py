@@ -39,6 +39,9 @@ def dev_help_text() -> str:
         jeeves plan|audit|next|context|handoff [--project DIR]
         jeeves propose --kind quest --brief "Original branching quest" [--include-notes]
         jeeves queue [--project DIR]
+        jeeves benchmark --console ID --genre ID --period YYYY-YYYY
+        jeeves benchmark-matrix [--profile design/market_benchmarks.json]
+        jeeves asset-gate --console ID --genre ID --period YYYY-YYYY --evidence design/asset_qa.json
         jeeves review --digest SHA256 [--project DIR]
         jeeves apply --digest SHA256 --approve SHA256 [--project DIR]
 
