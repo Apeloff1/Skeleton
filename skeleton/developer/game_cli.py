@@ -380,6 +380,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--target")
     jeeves.add_argument("--source")
     jeeves.add_argument("--direction-source")
+    jeeves.add_argument("--dragon-digest")
     jeeves.add_argument("--output")
     jeeves.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     jeeves.add_argument("--factor", type=int)
@@ -435,6 +436,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--evidence", options.evidence),
                                 ("--target", options.target), ("--source", options.source),
                                 ("--direction-source", options.direction_source),
+                                ("--dragon-digest", options.dragon_digest),
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
                                 ("--gate", options.gate),
