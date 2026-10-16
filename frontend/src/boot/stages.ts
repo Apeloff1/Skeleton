@@ -6,6 +6,7 @@
  * backend. Network work lives in phase 1 and housekeeping in phase 2.
  */
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { safeGetItem, safeSetItem, pruneExpired } from '../../utils/safeStorage';
 import api from '../utils/apiClient';
 import { getAppBootstrap, getAppRuntimeStatus } from '../product/appBootstrapClient';
@@ -78,10 +79,20 @@ export const STAGES: BootStageDef[] = [
     retries: 1, backoffMs: 200,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
-      const key = `__boot_probe_${Date.now() % 1e6}`;
-      await safeSetItem(key, '1', 600);
-      const value = await safeGetItem(key, null, 600);
-      return value === '1' ? { ok: true } : { ok: false, note: 'read-back failed' };
+      // Verify *physical* persistence, not safeStorage's optimistic mirror:
+      // a failed/hung native write must never pass this critical boot gate.
+      const key = `__boot_probe_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+      try {
+        await AsyncStorage.setItem(key, '1');
+        if (signal?.aborted) return { ok: false, note: 'aborted' };
+        const value = await AsyncStorage.getItem(key);
+        return value === '1' ? { ok: true } : { ok: false, note: 'read-back failed' };
+      } catch {
+        return { ok: false, note: 'storage unavailable' };
+      } finally {
+        // A probe is not user state; keep every boot from accumulating keys.
+        void AsyncStorage.removeItem(key).catch(() => {});
+      }
     },
   },
   {
