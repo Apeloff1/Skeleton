@@ -64,6 +64,7 @@ def dev_help_text() -> str:
         jeeves direction-workorder [--source design/direction_manifest.json]
         jeeves production-gap-matrix
         Literary/film director review uses canonical signed story and storyboard receipts
+        jeeves direction-benchmark --source design/story_reference_cohorts.json
         jeeves direction-audit --source design/story_direction_packet.json [--passes 1..8]
         jeeves direction-revision --source design/story_direction_packet.json [--passes 1..8]
         jeeves propose --kind scene --brief "Original scene" --direction-source design/story_direction_packet.json
