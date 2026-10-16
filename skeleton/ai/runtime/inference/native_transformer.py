@@ -63,6 +63,12 @@ class NativeTransformerModel:
         if self._compute_runtime_digest() != self._runtime_digest:
             raise RuntimeContractError("native transformer runtime identity drift")
 
+    @staticmethod
+    def _first_stop_index(text: str, stops: tuple[str, ...]) -> int | None:
+        """Use the first stop occurrence in generated text, not marker-list order."""
+        indices = (text.find(marker) for marker in stops if marker)
+        return min((index for index in indices if index >= 0), default=None)
+
     def infer(self, request: LocalInferenceRequest, cancel: threading.Event) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
@@ -103,16 +109,14 @@ class NativeTransformerModel:
             if result.finish_reason in {"completed", "length"}
             else "completed"
         )
-        for marker in request.stop:
-            index = text.find(marker)
-            if index >= 0:
-                text = text[:index]
-                # String stops are a compatibility surface above token generation.
-                # Re-tokenize the published prefix so usage and response identity
-                # describe exactly the content returned to the caller.
-                output_tokens = 0 if not text else len(self.runtime.tokenizer.encode_ids(text))
-                finish_reason = "completed"
-                break
+        stop_index = self._first_stop_index(text, request.stop)
+        if stop_index is not None:
+            text = text[:stop_index]
+            # String stops are a compatibility surface above token generation.
+            # Re-tokenize the published prefix so usage and response identity
+            # describe exactly the content returned to the caller.
+            output_tokens = 0 if not text else len(self.runtime.tokenizer.encode_ids(text))
+            finish_reason = "completed"
 
         published_digest = hashlib.sha256(
             json.dumps(
