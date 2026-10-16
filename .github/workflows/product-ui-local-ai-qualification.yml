@@ -13,6 +13,7 @@ on:
       - "skeleton/ai/runtime/inference/native_transformer.py"
       - "skeleton/ai/runtime/inference/neural.py"
       - "scripts/check_product_surfaces.py"
+      - "scripts/classify_repo_stubs.py"
       - "tests/test_product_surface_navigation.py"
       - "tests/test_native_transformer_stops.py"
       - "tests/test_neural_stop_handling.py"
@@ -113,3 +114,44 @@ jobs:
           skeleton/testing/test_game_playability.py
           skeleton/testing/test_game_replay.py
           tests/test_product_surface_navigation.py
+
+  stub-inventory:
+    name: Full tracked stub / truncation evidence inventory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Compile and sanity-check scanner
+        run: |
+          python -m py_compile scripts/classify_repo_stubs.py
+          python - <<'PY'
+          from scripts.classify_repo_stubs import markers, owner
+          assert (1, "raise_not_implemented") in markers("app.py", "raise NotImplementedError()")
+          assert (1, "throw_not_implemented") in markers("app.ts", "throw new Error('Not implemented');")
+          assert owner("satellites/branch-snapshots/old/foo.py") == "historical_snapshot"
+          assert owner("frontend/app/foo.tsx") == "production_candidate"
+          PY
+      - name: Inventory every tracked source without truncating findings
+        run: >-
+          python scripts/classify_repo_stubs.py
+          --ref HEAD
+          --output "${{ runner.temp }}/stub-classification.jsonl"
+          --summary "${{ runner.temp }}/stub-classification-summary.json"
+      - name: Upload full classified inventory and summary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tracked-stub-classification-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/stub-classification.jsonl
+            ${{ runner.temp }}/stub-classification-summary.json
+          if-no-files-found: warn
+          retention-days: 7
