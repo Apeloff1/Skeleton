@@ -39,7 +39,7 @@ def _load_world(root: Path, source: str):
 def _runtime_signal_atlas(root: Path, *, source: str, world_digest: str) -> dict[str, Any]:
     """Read-only local source evidence; failures remain diagnostics, never P0 signoff."""
     from skeleton.developer.jeeves_game_director_atlas import verify
-    target = root / "build" / "director_atlases" / (world_digest[:20] + "-live-v7")
+    target = root / "build" / "director_atlases" / (world_digest[:20] + "-live-v8")
     if not target.exists() and not target.is_symlink():
         return {"present": False, "source_verified": False}
     try:
