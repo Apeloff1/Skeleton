@@ -233,6 +233,7 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
         "narrative_flags": list(state.narrative_flags),
         **({
             "world_state": world_state,
+            "acquired": list(state.acquired),
             "conditional_walking_links_blocked": blocked,
             "transport_options": available_passages,
         } if world_state is not None else {}),
