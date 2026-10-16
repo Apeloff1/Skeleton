@@ -6,7 +6,7 @@ cross-process **Godot 4 HTTP input** qualification.
 
 Every source file is create-only on export; no game user's session or existing
 Godot atlas is deleted or overwritten. New exports are versioned
-`build/director_atlases/<world-id>-live-v6/`, preserving v1/v2/v3.
+`build/director_atlases/<world-id>-live-v7/`, preserving v1/v2/v3.
 
 ## 1. Original procedural art and score files, not just scene descriptions
 
