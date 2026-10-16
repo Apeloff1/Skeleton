@@ -72,6 +72,12 @@ jobs:
       - name: Verify canonical token roles and skin foreground contrast
         working-directory: frontend
         run: yarn test:canonical-theme
+      - name: Verify known Yarn advisory lockfile parser
+        working-directory: frontend
+        run: yarn test:known-advisories
+      - name: Report outstanding unpatched Yarn advisories without dismissal
+        working-directory: frontend
+        run: yarn audit:known-advisories:report
       - name: Exercise existing Jeeves workspace contracts
         id: jeeves_contracts
         working-directory: frontend
