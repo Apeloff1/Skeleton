@@ -15,10 +15,11 @@ from typing import Any
 
 from skeleton.developer.jeeves_game_production_board import _load_world
 from skeleton.developer.jeeves_game_director_player import PLAYER_SCRIPT, PLAYER_SCENE
+from skeleton.developer.jeeves_game_director_stage import STAGE_SCRIPT
 
 SCHEMA = "skeleton.jeeves.director_atlas_export.v1"
 FILES = ("project.godot", "main.tscn", "director_atlas.gd", "director_world.json",
-         "director_player.gd", "director_player.tscn")
+         "director_player.gd", "director_player.tscn", "director_stage.gd")
 GDSCRIPT = r'''extends Control
 
 var world: Dictionary = {}
@@ -161,6 +162,7 @@ renderer/rendering_method.mobile="gl_compatibility"
         "director_world.json": data,
         "director_player.gd": PLAYER_SCRIPT.encode("utf-8"),
         "director_player.tscn": PLAYER_SCENE.encode("utf-8"),
+        "director_stage.gd": STAGE_SCRIPT.encode("utf-8"),
     }
     if any(len(content) > 2 * 1024 * 1024 for content in contents.values()):
         raise ValueError("Director atlas export file exceeds its supported size")
@@ -173,6 +175,10 @@ renderer/rendering_method.mobile="gl_compatibility"
         "scope": "navigable-atlas-and-loopback-authoritative-quest-ui",
         "godot_quest_ui_implemented_in_source": True,
         "live_quest_authority": "separate-local-Python-Director-server",
+        "controller_action_selection_in_source": True,
+        "procedural_2d_stage_in_source": True,
+        "authored_cinematic_clock_in_source": True,
+        "native_asset_or_voice_quality_independently_verified": False,
         "quest_logic_implemented_in_native_preview": False,
         "native_binary_executed": False,
         "real_game_playthrough_verified": False,
