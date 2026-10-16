@@ -449,7 +449,10 @@ export async function resilientFetch<T = any>(
 
   if (isGet && cfg.dedupe) {
     inflight.set(key, job);
-    job.finally(() => inflight.delete(key));
+    // A bare finally() creates a second rejected promise on network failure.
+    // Also protect a replacement request installed after resetCircuit().
+    const release = () => { if (inflight.get(key) === job) inflight.delete(key); };
+    void job.then(release, release);
   }
   return job;
 }
@@ -464,28 +467,36 @@ export async function rpost<T = any>(path: string, body: any, opts: ResilientOpt
 }
 
 // ── Tunnel health heartbeat (adaptive cadence) ────────────────────────
-let heartbeatTimer: any = null;
-let heartbeatStopped = false;
+let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+let heartbeatStopped = true;
+let heartbeatEpoch = 0;
+let heartbeatController: AbortController | null = null;
 
 function _nextHeartbeatDelay(): number {
-  // Adaptive: gentle when healthy, aggressive when degraded/offline.
   const status = _health.status;
-  if (status === 'offline') return 5_000;      // 5 s  — hunt for recovery
-  if (status === 'degraded') return 10_000;    // 10 s — probe more often
-  return 30_000;                               // 30 s — healthy, be gentle
+  if (status === 'offline') return 5_000;
+  if (status === 'degraded') return 10_000;
+  return 30_000;
 }
 
-async function heartbeat() {
-  if (heartbeatStopped) return;
+function scheduleHeartbeat(epoch: number, delayMs: number) {
+  if (heartbeatStopped || epoch !== heartbeatEpoch) return;
+  heartbeatTimer = setTimeout(() => { void heartbeat(epoch); }, delayMs);
+}
+
+async function heartbeat(epoch: number) {
+  heartbeatTimer = null;
+  if (heartbeatStopped || epoch !== heartbeatEpoch) return;
   if (BACKEND_URLS.length === 0) {
-    // No backend configured — nothing to probe
-    heartbeatTimer = setTimeout(heartbeat, 30_000);
+    scheduleHeartbeat(epoch, 30_000);
     return;
   }
+
+  const controller = new AbortController();
+  heartbeatController = controller;
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  const t0 = Date.now();
   try {
-    const t0 = Date.now();
-    const controller = new AbortController();
-    const h = setTimeout(() => { try { controller.abort(); } catch {} }, 10_000);
     const res = await fetch(resolveUrl('/api/health'), {
       method: 'GET',
       signal: controller.signal,
@@ -494,7 +505,8 @@ async function heartbeat() {
       credentials: 'omit',
       headers: { Accept: 'application/json', 'Cache-Control': 'no-cache, no-store' },
     });
-    clearTimeout(h);
+    // An aborted previous generation cannot modify a restarted health loop.
+    if (heartbeatStopped || epoch !== heartbeatEpoch) return;
     if (res.ok) {
       BREAKER.failures = 0;
       BREAKER.openUntil = 0;
@@ -507,23 +519,33 @@ async function heartbeat() {
       BREAKER.lastFailTs = Date.now();
     }
   } catch {
+    if (heartbeatStopped || epoch !== heartbeatEpoch) return;
     BREAKER.failures = Math.min(BREAKER.failures + 1, 10);
     BREAKER.lastFailTs = Date.now();
+  } finally {
+    // The timeout must be cleared even when fetch throws/rejects.
+    clearTimeout(timeout);
+    if (heartbeatController === controller) heartbeatController = null;
   }
+
+  if (heartbeatStopped || epoch !== heartbeatEpoch) return;
   _publishHealth();
-  if (!heartbeatStopped) {
-    heartbeatTimer = setTimeout(heartbeat, _nextHeartbeatDelay());
-  }
+  scheduleHeartbeat(epoch, _nextHeartbeatDelay());
 }
 
 export function startHeartbeat() {
-  if (heartbeatTimer) return;
+  if (!heartbeatStopped) return;
   heartbeatStopped = false;
-  heartbeatTimer = setTimeout(heartbeat, 500);
+  scheduleHeartbeat(++heartbeatEpoch, 500);
 }
+
 export function stopHeartbeat() {
   heartbeatStopped = true;
-  if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null; }
+  heartbeatEpoch++;
+  if (heartbeatTimer) clearTimeout(heartbeatTimer);
+  heartbeatTimer = null;
+  heartbeatController?.abort();
+  heartbeatController = null;
 }
 
 // ── Cache management (debug / manual) ────────────────────────────────

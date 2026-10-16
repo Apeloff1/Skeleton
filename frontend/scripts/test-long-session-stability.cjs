@@ -225,3 +225,95 @@ test('stability recovery refuses future-dated or malformed storage receipts', as
     assert.deepEqual(await hook.loadRecoveryState(), { ok: true });
   } finally { h.unmount(); }
 });
+
+test('failed deduplicated GET does not leak an unhandled rejection', async () => {
+  const storage = { getItem: async () => null, setItem: async () => {} };
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': storage,
+    './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
+  });
+  const originalFetch = global.fetch;
+  const unhandled = [];
+  const onUnhandled = error => unhandled.push(error);
+  process.on('unhandledRejection', onUnhandled);
+  global.fetch = async () => { throw new Error('backend offline'); };
+  try {
+    await assert.rejects(net.resilientFetch('/unstable', {
+      retries: 1, cacheTtlMs: 0, persist: false,
+    }), /backend offline/);
+    await settle();
+    assert.deepEqual(unhandled, []);
+  } finally {
+    net.stopHeartbeat();
+    global.fetch = originalFetch;
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
+
+test('circuit reset cannot let an old request delete its replacement', async () => {
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} },
+    './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
+  });
+  const originalFetch = global.fetch;
+  const resolvers = [];
+  global.fetch = () => new Promise(resolve => { resolvers.push(resolve); });
+  const reply = id => ({ ok: true, status: 200, text: async () => JSON.stringify({ id }) });
+  try {
+    const first = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
+    net.resetCircuit();
+    const second = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
+    assert.equal(resolvers.length, 2);
+    resolvers[0](reply('first'));
+    await first;
+    await settle();
+    const third = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
+    assert.equal(resolvers.length, 2, 'the second request should still be coalesced');
+    resolvers[1](reply('second'));
+    assert.deepEqual((await second).data, { id: 'second' });
+    assert.deepEqual((await third).data, { id: 'second' });
+  } finally {
+    net.stopHeartbeat();
+    global.fetch = originalFetch;
+  }
+});
+
+test('heartbeat stop/restart fences in-flight probes and their timers', async () => {
+  const net = loadTS('utils/resilientNet.ts', {
+    '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} },
+    './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
+  });
+  const originalFetch = global.fetch;
+  const originalSet = global.setTimeout;
+  const originalClear = global.clearTimeout;
+  const timers = [];
+  let resolveFetch;
+  global.setTimeout = (fn, delay) => {
+    const timer = { fn, delay, cleared: false };
+    timers.push(timer);
+    return timer;
+  };
+  global.clearTimeout = timer => { timer.cleared = true; };
+  global.fetch = () => new Promise(resolve => { resolveFetch = resolve; });
+  try {
+    net.startHeartbeat();
+    net.startHeartbeat();
+    assert.equal(timers.length, 1, 'only one heartbeat timer scheduled');
+    timers[0].fn();
+    assert.equal(timers.length, 2, 'in-flight probe has one timeout');
+    net.stopHeartbeat();
+    assert.equal(timers[1].cleared, false, 'timeout clears on settlement');
+    net.startHeartbeat();
+    assert.equal(timers.length, 3, 'restart schedules exactly one new generation');
+    resolveFetch({ ok: true });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(timers[1].cleared, true, 'old probe timeout was cleared');
+    assert.equal(timers.length, 3, 'stale probe did not schedule another heartbeat');
+  } finally {
+    net.stopHeartbeat();
+    global.fetch = originalFetch;
+    global.setTimeout = originalSet;
+    global.clearTimeout = originalClear;
+  }
+});
