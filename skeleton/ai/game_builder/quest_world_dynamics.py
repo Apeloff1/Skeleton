@@ -346,7 +346,8 @@ class WorldState:
             raise ValueError("duplicate passage-use counter")
         for key, value in self.passage_uses:
             _id(key)
-            _number(value, 1, 100_000_000)
+            if type(value) is not int or value < 1:
+                raise ValueError("authoritative passage usage must be a positive integer")
 
     def payload(self):
         result = {
@@ -430,9 +431,9 @@ def apply_changes(status: WorldState, effects: tuple[tuple[str, int], ...] = (),
             MAX_REPUTATION, standing[faction] + delta))
     usage = dict(status.passage_uses)
     if passage is not None:
+        # Keep the complete authenticated lifetime history; 100M journeys
+        # must never become a reason that a still-open original game breaks.
         usage[passage] = usage.get(passage, 0) + 1
-        if usage[passage] > 100_000_000:
-            raise ValueError("passage counter would exceed validated range")
     return WorldState(
         standings=tuple(sorted(standing.items())),
         world_flags=tuple(sorted(set(status.world_flags) | set(add_flags))),
