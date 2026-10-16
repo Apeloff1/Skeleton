@@ -33,17 +33,32 @@ traceStepSync('entry_module_eval');
 // the field). Decide ONCE per process; re-mounts reuse it.
 let _entryDecision: Decision = null;
 
-/** Run bootGuard with a hard timeout so a hung AsyncStorage never freezes us. */
+// One admission attempt per JS process, even across React strict-mode
+// remounts. A second overlapping guard would count one boot twice.
+let _entryGuardPromise: Promise<'safe-mode' | 'normal'> | null = null;
+
+/** Run bootGuard with an abortable deadline; expired reads cannot mutate later. */
 function bootGuardWithTimeout(ms: number): Promise<'safe-mode' | 'normal'> {
-  return new Promise(resolve => {
+  if (_entryGuardPromise) return _entryGuardPromise;
+  _entryGuardPromise = new Promise(resolve => {
     let settled = false;
+    const controller = new AbortController();
+    const finish = (result: 'safe-mode' | 'normal') => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(t);
+      resolve(result);
+    };
     const t = setTimeout(() => {
-      if (!settled) { settled = true; resolve('normal'); }
+      controller.abort();
+      finish('normal');
     }, ms);
-    bootGuard()
-      .then(v => { if (!settled) { settled = true; clearTimeout(t); resolve(v); } })
-      .catch(() => { if (!settled) { settled = true; clearTimeout(t); resolve('normal'); } });
+    void bootGuard(controller.signal).then(
+      mode => finish(mode),
+      () => { controller.abort(); finish('normal'); },
+    );
   });
+  return _entryGuardPromise;
 }
 
 export default function Entry() {
@@ -78,12 +93,9 @@ export default function Entry() {
       }
     })();
 
-    // A blocked native storage call cannot freeze the launcher indefinitely.
-    const safety = setTimeout(() => decideOnce('cascade'), 2000);
-    return () => {
-      cancelled = true;
-      clearTimeout(safety);
-    };
+    // Admission already has a single process-scoped bounded deadline; an
+    // independent second watchdog could race it and publish a false verdict.
+    return () => { cancelled = true; };
   }, []);
 
   if (decision === null) {
