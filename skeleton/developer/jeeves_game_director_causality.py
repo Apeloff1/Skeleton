@@ -42,6 +42,10 @@ def audit(root: Path, *, session: str, page: int = 1,
     causal_edges = []
     invariant_warnings = []
     action_totals = Counter()
+    transport_modes = Counter()
+    world_flag_created_at = {}
+    faction_standing_moves = Counter()
+    world_consequence_edges = []
     for index in range(1, count + 1):
         recorded = _read_doc(folder / f"{index:08d}.json")
         action = DirectorAction(**recorded["action"])
@@ -66,10 +70,51 @@ def audit(root: Path, *, session: str, page: int = 1,
         new_complete = sorted(set(state.complete) - set(previous.complete))
         if action.kind == "travel":
             scene_visits[state.scene] += 1
+        elif action.kind == "transit":
+            scene_visits[state.scene] += 1
+            passage = next((p for p in world.dynamics.passages
+                            if p.key == action.key), None) if world.dynamics else None
+            if passage is None:
+                raise ValueError("canonical story uses a missing transport route")
+            transport_modes[passage.mode] += 1
         here = scenes[state.scene]
         for actor in here.cast:
             actors[actor] += 1
         action_totals[action.kind] += 1
+        new_world_flags = []
+        reputation_deltas = []
+        if state.world_state is not None:
+            if previous.world_state is None:
+                raise ValueError("existing reputation history disappeared")
+            prior = dict(previous.world_state.standings)
+            current = dict(state.world_state.standings)
+            if set(prior) != set(current):
+                raise ValueError("historical faction identities changed during game")
+            reputation_deltas = [
+                {"faction": faction, "before": prior[faction],
+                 "after": current[faction], "delta": current[faction] - prior[faction]}
+                for faction in sorted(prior) if prior[faction] != current[faction]
+            ]
+            for delta in reputation_deltas:
+                faction_standing_moves[delta["faction"]] += 1
+                world_consequence_edges.append({
+                    "at_sequence": index, "kind": "faction_reputation",
+                    "faction": delta["faction"], "delta": delta["delta"],
+                    "caused_by": action.kind + ":" + action.key,
+                })
+            new_world_flags = sorted(
+                set(state.world_state.world_flags)
+                - set(previous.world_state.world_flags)
+            )
+            if not set(previous.world_state.world_flags).issubset(
+                    state.world_state.world_flags):
+                raise ValueError("permanent world-history flag disappeared")
+            for flag in new_world_flags:
+                world_flag_created_at[flag] = index
+                world_consequence_edges.append({
+                    "at_sequence": index, "kind": "world_flag",
+                    "flag": flag, "caused_by": action.kind + ":" + action.key,
+                })
         for result in fresh:
             quest = quest_lookup[result.quest]
             stage = next((item for item in quest.stages if item.key == result.stage), None)
@@ -108,6 +153,8 @@ def audit(root: Path, *, session: str, page: int = 1,
                 "new_consequence_flags": new_flags, "newly_completed_quests": new_complete,
                 "inventory_gained": sorted(set(state.acquired) - set(previous.acquired)),
                 "inventory_consumed": sorted(set(previous.acquired) - set(state.acquired)),
+                "world_flags_earned": new_world_flags,
+                "faction_reputation_changes": reputation_deltas,
                 "cast_present_after_action": list(here.cast),
             })
     if state != final:
@@ -132,6 +179,13 @@ def audit(root: Path, *, session: str, page: int = 1,
         "quest_completion_count": len(state.complete),
         "consequence_flags_created_at": dict(sorted(flags_created_at.items())),
         "action_kinds": dict(sorted(action_totals.items())),
+        "transport_modes": dict(sorted(transport_modes.items())),
+        "faction_standing_changes": dict(sorted(faction_standing_moves.items())),
+        "world_flags_created_at": dict(sorted(world_flag_created_at.items())),
+        "world_consequence_edges": world_consequence_edges[:512],
+        "world_consequence_edge_count": len(world_consequence_edges),
+        "final_world_state": state.world_state.payload()
+                             if state.world_state is not None else None,
         "approach_counts": dict(sorted(methods.items())),
         "visited_scene_counts": dict(sorted(scene_visits.items())),
         "cast_encounter_counts": dict(sorted(actors.items())),
@@ -188,6 +242,21 @@ def contrast(root: Path, *, first: str, second: str) -> dict[str, Any]:
     b_flags = set(b["consequence_flags_created_at"])
     a_quests = {(x["quest"], x["next_stage"]) for x in a["unresolved_quest_stages"]}
     b_quests = {(x["quest"], x["next_stage"]) for x in b["unresolved_quest_stages"]}
+    world_left = a["final_world_state"] or {}
+    world_right = b["final_world_state"] or {}
+    faction_left = dict(world_left.get("standings", []))
+    faction_right = dict(world_right.get("standings", []))
+    if set(faction_left) != set(faction_right):
+        raise ValueError("story branches have inconsistent faction roster")
+    standing_delta = [
+        {"faction": faction, "first": faction_left[faction],
+         "second": faction_right[faction],
+         "delta": faction_right[faction] - faction_left[faction]}
+        for faction in sorted(faction_left)
+        if faction_left[faction] != faction_right[faction]
+    ]
+    world_flags_left = set(world_left.get("world_flags", []))
+    world_flags_right = set(world_right.get("world_flags", []))
     return {
         "ok": True, "action": "director-story-contrast", "schema": SCHEMA,
         "first": first, "second": second, "world_sha256": a["world_sha256"],
@@ -196,6 +265,9 @@ def contrast(root: Path, *, first: str, second: str) -> dict[str, Any]:
         "first_different_action_sequence": first_different,
         "flags_unique_to_first": sorted(a_flags - b_flags),
         "flags_unique_to_second": sorted(b_flags - a_flags),
+        "faction_standing_differences": standing_delta,
+        "world_flags_unique_to_first": sorted(world_flags_left - world_flags_right),
+        "world_flags_unique_to_second": sorted(world_flags_right - world_flags_left),
         "unresolved_stages_unique_to_first": sorted([list(x) for x in a_quests - b_quests]),
         "unresolved_stages_unique_to_second": sorted([list(x) for x in b_quests - a_quests]),
         "causal_evidence_sha256": _hash({
@@ -203,6 +275,9 @@ def contrast(root: Path, *, first: str, second: str) -> dict[str, Any]:
             "left_summary": first_report["summary_sha256"],
             "right_summary": second_report["summary_sha256"],
         }),
-        "canon_story_differences_observed": bool(a_flags != b_flags or a_quests != b_quests),
+        "canon_story_differences_observed": bool(
+            a_flags != b_flags or a_quests != b_quests or standing_delta
+            or world_flags_left != world_flags_right
+        ),
         "visual_engine_ending_verified": False,
     }
