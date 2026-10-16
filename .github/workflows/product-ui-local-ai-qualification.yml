@@ -1,0 +1,194 @@
+name: Product UI + Local AI Qualification
+
+on:
+  # Operator-triggered to avoid multiplying the existing congested PR queue.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-ui-local-ai-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typescript:
+    name: Full frontend TypeScript + Jeeves typechecks
+    # Windows runner capacity is independently observed from Setup.exe CI.
+    # Avoid historical satellite checkout case collisions with an exact-head
+    # sparse checkout containing only the standalone Expo application.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact PR head (frontend only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /frontend/
+      - name: Verify source provenance
+        shell: pwsh
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne $env:EXPECTED_HEAD) {
+            throw "TypeScript checkout mismatch: $actual != $env:EXPECTED_HEAD"
+          }
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+          cache: "yarn"
+          cache-dependency-path: "frontend/yarn.lock"
+      - name: Install locked dependencies without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Typecheck complete Expo TypeScript project
+        id: full_typescript
+        working-directory: frontend
+        continue-on-error: true
+        run: yarn typecheck
+      - name: Typecheck Jeeves-specific TypeScript project
+        id: jeeves_typescript
+        working-directory: frontend
+        if: always() && steps.full_typescript.outcome != 'skipped'
+        continue-on-error: true
+        run: yarn typecheck:jeeves
+      - name: Verify both TypeScript compiler verdicts
+        if: always()
+        shell: pwsh
+        env:
+          FULL_TS_RESULT: ${{ steps.full_typescript.outcome }}
+          JEEVES_TS_RESULT: ${{ steps.jeeves_typescript.outcome }}
+        run: |
+          Write-Host "Full Expo TypeScript: $env:FULL_TS_RESULT"
+          Write-Host "Jeeves TypeScript: $env:JEEVES_TS_RESULT"
+          if ($env:FULL_TS_RESULT -ne 'success' -or $env:JEEVES_TS_RESULT -ne 'success') {
+            throw "Both TypeScript projects must compile successfully."
+          }
+      - name: Exercise existing Jeeves workspace contracts
+        id: jeeves_contracts
+        working-directory: frontend
+        continue-on-error: true
+        run: yarn test:jeeves
+      - name: Exercise existing product journey contracts
+        id: product_journeys
+        working-directory: frontend
+        if: always() && steps.jeeves_contracts.outcome != 'skipped'
+        continue-on-error: true
+        run: yarn test:product-journeys
+      - name: Verify both test suites without masking failures
+        if: always()
+        shell: pwsh
+        env:
+          JEEVES_TEST_RESULT: ${{ steps.jeeves_contracts.outcome }}
+          JOURNEY_TEST_RESULT: ${{ steps.product_journeys.outcome }}
+        run: |
+          Write-Host "Jeeves regression suite: $env:JEEVES_TEST_RESULT"
+          Write-Host "Product journey suite: $env:JOURNEY_TEST_RESULT"
+          if ($env:JEEVES_TEST_RESULT -ne 'success' -or $env:JOURNEY_TEST_RESULT -ne 'success') {
+            throw "Both Jeeves and product journey suites must pass."
+          }
+
+  python-runtime:
+    name: Checkpoint inference, route imports and controller game replay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused runtime dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=1.4,<2"
+          "numpy>=2,<3"
+          "pydantic>=2.13,<3"
+          "pydantic-settings>=2.15,<3"
+          "fastapi>=0.136,<1"
+      - name: Compile newly affected Python sources
+        run: >-
+          python -m py_compile
+          scripts/check_product_surfaces.py
+          skeleton/ai/runtime/inference/native_transformer.py
+          skeleton/ai/runtime/inference/neural.py
+          skeleton/ai/runtime/gameplay_long_replay.py
+          tests/test_product_surface_navigation.py
+          tests/test_native_transformer_stops.py
+          tests/test_neural_stop_handling.py
+      - name: Validate full product routes and selected imports
+        run: python scripts/check_product_surfaces.py
+      - name: Execute real checkpoint round-trip and native-model inference
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          tests/test_native_transformer_stops.py
+          tests/test_neural_stop_handling.py
+          skeleton/testing/test_native_transformer_local_inference.py
+          skeleton/testing/test_native_neural_lm.py
+          skeleton/testing/test_native_runtime_local_provider.py
+      - name: Execute controller-driven winning-game replay and UI contract tests
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_game_playability.py
+          skeleton/testing/test_game_replay.py
+          tests/test_gameplay_long_replay.py
+          tests/test_product_surface_navigation.py
+
+  stub-inventory:
+    name: Full tracked stub / truncation evidence inventory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Compile and sanity-check scanner
+        run: |
+          python -m py_compile scripts/classify_repo_stubs.py
+          python - <<'PY'
+          from scripts.classify_repo_stubs import markers, owner
+          assert (1, "raise_not_implemented") in markers("app.py", "raise NotImplementedError()")
+          assert (1, "throw_not_implemented") in markers("app.ts", "throw new Error('Not implemented');")
+          assert owner("satellites/branch-snapshots/old/foo.py") == "historical_snapshot"
+          assert owner("frontend/app/foo.tsx") == "production_candidate"
+          PY
+      - name: Run classifier Git-object regression cases
+        run: python -m unittest tests.test_classify_repo_stubs
+      - name: Inventory every tracked source without truncating findings
+        run: >-
+          python scripts/classify_repo_stubs.py
+          --ref HEAD
+          --output "${{ runner.temp }}/stub-classification.jsonl"
+          --summary "${{ runner.temp }}/stub-classification-summary.json"
+      - name: Upload full classified inventory and summary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tracked-stub-classification-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/stub-classification.jsonl
+            ${{ runner.temp }}/stub-classification-summary.json
+          if-no-files-found: warn
+          retention-days: 7
