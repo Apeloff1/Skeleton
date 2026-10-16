@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import theme from '../theme/tokens';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { NonCriticalHostBoundary } from '../components/NonCriticalHostBoundary';
 import ScreenGuard from '../components/withScreenGuard';
 import { ToastHost } from '../components/Toast';
 import { ActionSheetHost } from '../components/ActionSheet';
@@ -28,9 +29,10 @@ import { startTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
 import { LocaleProvider } from '../src/i18n';
 
-installCrashTrace();
-installMemoryGuard();
-traceStepSync('layout_module_eval');
+// Auxiliary diagnostics may not make importing the app itself fatal.
+try { installCrashTrace(); } catch {}
+try { installMemoryGuard(); } catch {}
+try { traceStepSync('layout_module_eval'); } catch {}
 
 const SHOW_DEV_LOG_OVERLAY = __DEV__ || process.env.EXPO_PUBLIC_DEV_LOG_OVERLAY === '1';
 const HEARTBEAT_START_DELAY_MS = 1_500;
@@ -52,9 +54,11 @@ export default function RootLayout() {
       LogBox.ignoreLogs(['props.pointerEvents is deprecated. Use style.pointerEvents']);
     }
 
-    installGlobalGuards();
-    installAppStateGuard();
-    installGlobalErrorHandlers();
+    // These observers are independent: failure to install one must not
+    // prevent the others or crash the initial React commit.
+    try { installGlobalGuards(); } catch {}
+    try { installAppStateGuard(); } catch {}
+    try { installGlobalErrorHandlers(); } catch {}
 
     // Device connectivity is observed immediately by StabilityBanner. Delay
     // server polling so it does not compete with the launcher for cold-start
@@ -76,7 +80,10 @@ export default function RootLayout() {
   }, [pathname]);
 
   return (
-    <SafeAreaProvider>
+    // Last resort: protects even locale and flag providers. The inner error
+    // boundary below continues to handle errors scoped to an active route.
+    <ErrorBoundary>
+      <SafeAreaProvider>
       <Head>
         <title>Skeleton — Jeeves AI Game Studio</title>
         <meta
@@ -93,14 +100,23 @@ export default function RootLayout() {
               <Slot />
             </ScreenGuard>
           </ErrorBoundary>
-          <StabilityBanner />
-          <ToastHost />
-          <ActionSheetHost />
-          <DiagnosticsOverlay />
+          <NonCriticalHostBoundary name="connectivity">
+            <StabilityBanner />
+          </NonCriticalHostBoundary>
+          <NonCriticalHostBoundary name="toast">
+            <ToastHost />
+          </NonCriticalHostBoundary>
+          <NonCriticalHostBoundary name="action_sheet">
+            <ActionSheetHost />
+          </NonCriticalHostBoundary>
+          <NonCriticalHostBoundary name="dev_overlay">
+            <DiagnosticsOverlay />
+          </NonCriticalHostBoundary>
           </View>
         </FeatureFlagProvider>
       </LocaleProvider>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 
