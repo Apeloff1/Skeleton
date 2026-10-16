@@ -32,6 +32,11 @@ var last_presentation: Dictionary = {}
 var world: Dictionary = {}
 var scene_lookup: Dictionary = {}
 var busy: bool = false
+var stage
+var previous_scene: String = ""
+var action_choices: Array = []
+var action_index: int = 0
+var selection_label: Label
 
 func _ready() -> void:
     var raw: String = FileAccess.get_file_as_string("res://director_world.json")
@@ -83,12 +88,86 @@ func _ready() -> void:
     status_text = Label.new()
     status_text.text = "Start the Jeeves loopback server, then connect."
     layout.add_child(status_text)
+    stage = load("res://director_stage.gd").new()
+    stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    layout.add_child(stage)
+    var gamepad_bar := HBoxContainer.new()
+    layout.add_child(gamepad_bar)
+    var previous := Button.new()
+    previous.text = "◀ Previous action"
+    previous.pressed.connect(func(): _select_action(-1))
+    gamepad_bar.add_child(previous)
+    selection_label = Label.new()
+    selection_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    selection_label.text = "Controller: choose a legal action below"
+    gamepad_bar.add_child(selection_label)
+    var next := Button.new()
+    next.text = "Next action ▶"
+    next.pressed.connect(func(): _select_action(1))
+    gamepad_bar.add_child(next)
+    var activate := Button.new()
+    activate.text = "Act / A"
+    activate.pressed.connect(_activate_selected)
+    gamepad_bar.add_child(activate)
+    var playback := HBoxContainer.new()
+    layout.add_child(playback)
+    for speed in [0.25, 1.0, 2.0, 4.0]:
+        var speed_button := Button.new()
+        speed_button.text = "Cue x" + str(speed)
+        speed_button.pressed.connect(stage.set_playback_speed.bind(speed))
+        playback.add_child(speed_button)
+    var pause_cues := Button.new()
+    pause_cues.text = "Pause / resume cues"
+    pause_cues.pressed.connect(stage.toggle_pause)
+    playback.add_child(pause_cues)
+    var skip := Button.new()
+    skip.text = "Skip presentation"
+    skip.pressed.connect(stage.skip_timeline)
+    playback.add_child(skip)
     var scroll := ScrollContainer.new()
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     layout.add_child(scroll)
     view = VBoxContainer.new()
     view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     scroll.add_child(view)
+
+func _unhandled_input(event: InputEvent) -> void:
+    # Controller/keyboard navigation does not consume input from credentials.
+    if token_input.has_focus() or port_input.has_focus() or busy:
+        return
+    if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_left"):
+        _select_action(-1)
+        get_viewport().set_input_as_handled()
+    elif event.is_action_pressed("ui_down") or event.is_action_pressed("ui_right"):
+        _select_action(1)
+        get_viewport().set_input_as_handled()
+    elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_A:
+        _activate_selected()
+        get_viewport().set_input_as_handled()
+
+
+func _select_action(step: int) -> void:
+    if action_choices.is_empty():
+        return
+    action_index = posmod(action_index + step, action_choices.size())
+    _selection_text()
+
+
+func _selection_text() -> void:
+    if selection_label == null:
+        return
+    if action_choices.is_empty():
+        selection_label.text = "No legal actions loaded"
+    else:
+        var selected: Dictionary = action_choices[action_index]
+        selection_label.text = str(action_index + 1) + "/" + str(action_choices.size()) + " • " + str(selected.get("description", selected.get("choice", "")))
+
+
+func _activate_selected() -> void:
+    if busy or action_choices.is_empty():
+        return
+    _choose(str(action_choices[action_index].get("choice", "")))
+
 
 func _line(value: String) -> void:
     var item := Label.new()
@@ -159,6 +238,8 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
         last_presentation = parsed["presentation"]
     status_text.text = "Canonical turn " + str(snapshot.get("turn", 0)) + " | actions " + str(snapshot.get("sequence", 0))
     _draw()
+    if not last_presentation.is_empty():
+        stage.enqueue_presentation(last_presentation)
 
 func _draw() -> void:
     for item in view.get_children():
@@ -166,6 +247,9 @@ func _draw() -> void:
         view.remove_child(item)
     var here: String = str(snapshot.get("scene", ""))
     var region = scene_lookup.get(here, {})
+    if here != previous_scene:
+        previous_scene = here
+        stage.apply_scene(region)
     _line("Location: " + str(snapshot.get("scene_title", here)))
     _line(str(region.get("setting", snapshot.get("scene_setting", ""))))
     _line("Cast: " + str(snapshot.get("cast", [])))
@@ -183,7 +267,10 @@ func _draw() -> void:
     _line("Authorized gameplay actions:")
     if snapshot.get("complete", false):
         _line("Campaign logic completed. Continue reviewing endings and replay evidence.")
-    for action in snapshot.get("actions", []):
+    action_choices = snapshot.get("actions", []).duplicate(true)
+    action_index = clampi(action_index, 0, max(action_choices.size() - 1, 0))
+    _selection_text()
+    for action in action_choices:
         var button := Button.new()
         button.text = str(action.get("description", action.get("choice", "")))
         button.pressed.connect(_choose.bind(str(action.get("choice", ""))))
