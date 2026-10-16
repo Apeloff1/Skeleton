@@ -1,0 +1,122 @@
+{
+  "schema_version": "skeleton.reference_corpus_manifest.v1",
+  "source_repository": "Apeloff1/Skeleton",
+  "source_pr": 3948,
+  "source_commit": "51ba74f51ad9f63ab09e1805b8ee886b9e6ab436",
+  "license": "MIT; see repository LICENSE",
+  "content_class": "generated design-reference text; not measured gameplay evidence",
+  "automatic_training_authorized": false,
+  "unique_idea_count_claimed": false,
+  "entries": [
+    {
+      "path": "data/game_building/math_physics/game_math_physics_corpus.txt.gz",
+      "original_path": "data/game_building/math_physics/game_math_physics_corpus.txt",
+      "compressed_sha256": "a33862bb139b5bc658d17d3becf155fb5a625b69257c6cdcd924f51457169275",
+      "compressed_bytes": 513294,
+      "decoded_sha256": "8d2efe8f539bb36e9f3aa3b86add8fb3ef931ab6dd356ced21611335e1ce3c5f",
+      "decoded_bytes": 20796390,
+      "newline_count": 150000,
+      "already_compressed_in_source": false
+    },
+    {
+      "path": "data/game_building/math_physics/math_part_aa.gz",
+      "original_path": "data/game_building/math_physics/math_part_aa",
+      "compressed_sha256": "ee9dc98bbd043862adb7025bf8ac460f0d29d328726efdff617ae6f95b1cf62c",
+      "compressed_bytes": 475195,
+      "decoded_sha256": "a7c5d96c08fa0d6560d9743fdcc0f92d71557407fdce7b0ee984b408a4f37180",
+      "decoded_bytes": 41943040,
+      "newline_count": 131214,
+      "already_compressed_in_source": false
+    },
+    {
+      "path": "data/game_building/math_physics/math_part_ab.gz",
+      "original_path": "data/game_building/math_physics/math_part_ab",
+      "compressed_sha256": "bbb79ad7ed1058d19ef225f32fe22b6b029cedb9e218749f1b80a1d87a2ee1b0",
+      "compressed_bytes": 474791,
+      "decoded_sha256": "6e7c214bf6001922d90715cde6e35e8e58dffb739b791448b057ead9da23913c",
+      "decoded_bytes": 41943040,
+      "newline_count": 130867,
+      "already_compressed_in_source": false
+    },
+    {
+      "path": "data/game_building/math_physics/math_part_ac.gz",
+      "original_path": "data/game_building/math_physics/math_part_ac",
+      "compressed_sha256": "6cd344bc6891a66149907d3291b0d9bc56ef24af6e60f9eaf34977847962596d",
+      "compressed_bytes": 474793,
+      "decoded_sha256": "ebcc7e15e61ad836214439285315b9e91dd7682a825c007eb20131a5fe1c7e7e",
+      "decoded_bytes": 41943040,
+      "newline_count": 130868,
+      "already_compressed_in_source": false
+    },
+    {
+      "path": "data/game_building/math_physics/math_part_ad.gz",
+      "original_path": "data/game_building/math_physics/math_part_ad",
+      "compressed_sha256": "cd1646c56d3c1700a0134b2de7dac56a61cf34ac9ea6a855a62c556d1b6d1bb3",
+      "compressed_bytes": 27138,
+      "decoded_sha256": "e3a965f6035b8814191d672e182f6bc5f853bb89aad5f69ace0f816352100916",
+      "decoded_bytes": 2259770,
+      "newline_count": 7051,
+      "already_compressed_in_source": false
+    },
+    {
+      "path": "data/game_building/math_physics/math_physics_expanded.txt.gz",
+      "original_path": "data/game_building/math_physics/math_physics_expanded.txt",
+      "compressed_sha256": "d0203d860cbb0279b5952e6c2b2950a76fb7a409b9802143f198e030948221c0",
+      "compressed_bytes": 1450198,
+      "decoded_sha256": "435132f527ebc708ba19bbb3b5563c09decbbb4ca40a04c230921a2fa4c29a90",
+      "decoded_bytes": 128088890,
+      "newline_count": 400000,
+      "already_compressed_in_source": true
+    },
+    {
+      "path": "data/game_building/pareto/game_design_pareto_corpus.txt.gz",
+      "original_path": "data/game_building/pareto/game_design_pareto_corpus.txt",
+      "compressed_sha256": "e97d5da8c087ab07b19254d46c6cc720ac1645ddbb84656c91cf5b6cdfffb1cf",
+      "compressed_bytes": 588383,
+      "decoded_sha256": "c26bcc164c09989f76d6e69cbfd4afb4987644f298752c7020bd0b04700a45b1",
+      "decoded_bytes": 26342223,
+      "newline_count": 200000,
+      "already_compressed_in_source": false
+    },
+    {
+      "path": "data/game_building/pareto/pareto_expanded.txt.gz",
+      "original_path": "data/game_building/pareto/pareto_expanded.txt",
+      "compressed_sha256": "a1e8e5cf9d3c16b3f7e677bd9c8be4a6ec70407727c87cc968bf2d93908b8992",
+      "compressed_bytes": 1653396,
+      "decoded_sha256": "2c11726f6d6263d0f29c3678f100020b7e1e6b68b8dfbd7c71b18d67366470a8",
+      "decoded_bytes": 113601390,
+      "newline_count": 500000,
+      "already_compressed_in_source": true
+    },
+    {
+      "path": "data/game_building/pareto/pareto_part_aa.gz",
+      "original_path": "data/game_building/pareto/pareto_part_aa",
+      "compressed_sha256": "944664fe7631e9baa56a9c983062ee6f8ebf2ae04194273a5c2a5ea2dd91750a",
+      "compressed_bytes": 609444,
+      "decoded_sha256": "ce8b8891c8338c6ba20e9f7e70366deba723c08f9fd19ef3d71cde7b6c12da9f",
+      "decoded_bytes": 41943040,
+      "newline_count": 184914,
+      "already_compressed_in_source": false
+    },
+    {
+      "path": "data/game_building/pareto/pareto_part_ab.gz",
+      "original_path": "data/game_building/pareto/pareto_part_ab",
+      "compressed_sha256": "4f2f5158e2b0ff54c0dd6931523efcc91e3bc1f291ef2a70d873ee077c0dd654",
+      "compressed_bytes": 609379,
+      "decoded_sha256": "250c2ac06500f484d1221d49b2369117cabefd527420069808a349be72fab596",
+      "decoded_bytes": 41943040,
+      "newline_count": 184426,
+      "already_compressed_in_source": false
+    },
+    {
+      "path": "data/game_building/pareto/pareto_part_ac.gz",
+      "original_path": "data/game_building/pareto/pareto_part_ac",
+      "compressed_sha256": "6806d42d917ffe155a02925cfab191fb1eaec7b354d368500cfe619c61be31a9",
+      "compressed_bytes": 431912,
+      "decoded_sha256": "d7e0d94d9179f598d40a48578b10ca386866a765fcf095a09484755ce9ae0e34",
+      "decoded_bytes": 29715310,
+      "newline_count": 130660,
+      "already_compressed_in_source": false
+    }
+  ]
+}
