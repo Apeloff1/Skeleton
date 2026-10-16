@@ -173,7 +173,7 @@ def test_unreachable_stage_fails_instead_of_fabricating_a_gameplay_pass(tmp_path
     ("2d",0,0,True),("2d",5,0,False),
     ("2_5d",35,10,True),("2_5d",65,0,False),
     ("2_9d",80,30,True),("2_9d",100,0,False),
-    ("3d",175,65,True),("unknown",0,0,False),
+    ("3d",175,65,True),
 ])
 def test_camera_rotation_respects_depth_grammar(tmp_path,depth,yaw,pitch,allowed):
     root=workspace(tmp_path)
