@@ -25,7 +25,7 @@ import { loadFeatureFlags } from '../utils/featureFlags';
 import { FeatureFlagProvider } from '../src/feature-flags';
 import { StabilityBanner } from '../src/components/StabilityBanner';
 import { installGlobalErrorHandlers } from '../src/utils/globalErrors';
-import { startTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
+import { startTunnelHeartbeat, stopTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
 import { LocaleProvider } from '../src/i18n';
 
@@ -71,7 +71,10 @@ export default function RootLayout() {
     initSkin().catch(() => {});
     traceStep('layout_mounted').catch(() => {});
 
-    return () => clearTimeout(heartbeatTimer);
+    return () => {
+      clearTimeout(heartbeatTimer);
+      stopTunnelHeartbeat();
+    };
   }, []);
 
   useEffect(() => {
