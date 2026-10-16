@@ -870,6 +870,10 @@ class LearningEvidenceStore:
         self._snapshots: dict[int, _Snapshot] = {}
         self._version = 0
         self._lock = threading.RLock()
+        # Version zero is the only valid initial rollback target. Capture it
+        # before the first mutation; retire it with the oldest journal entry
+        # when bounded history advances beyond the first commit.
+        self._snapshots[0] = self._capture()
 
     @property
     def version(self) -> int:
@@ -1449,6 +1453,9 @@ class LearningEvidenceStore:
         self._history = self._history[overflow:]
         for record in evicted:
             self._snapshots.pop(record.version, None)
+        if any(record.version == 1 for record in evicted):
+            # Version zero no longer has a recoverable bounded-history lane.
+            self._snapshots.pop(0, None)
 
 
 def make_provenance(
