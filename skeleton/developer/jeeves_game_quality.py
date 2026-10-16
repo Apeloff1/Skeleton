@@ -11,6 +11,8 @@ import json
 import math
 from pathlib import Path, PurePosixPath
 import re
+import struct
+import zlib
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -283,6 +285,76 @@ def prompt_profile(ranking: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _probe_artifact(path: Path, kind: str) -> dict[str, Any]:
+    """Static container checks only; not visual/artistic or decoding proof."""
+    ext = path.suffix.lower()
+    size = path.stat().st_size
+    if not 32 <= size <= 128 * 1024 * 1024:
+        _error("asset container is empty, truncated or oversized")
+    with path.open("rb") as stream:
+        head = stream.read(32)
+        if kind in ("asset", "animation") and ext == ".png":
+            if head[:8] != b"\x89PNG\r\n\x1a\n":
+                _error("invalid PNG file signature")
+            stream.seek(8)
+            seen_idat = False
+            width = height = None
+            for idx in range(16000):
+                header = stream.read(8)
+                if len(header) != 8:
+                    _error("truncated PNG chunk header")
+                length, tag = struct.unpack(">I4s", header)
+                if length > 64 * 1024 * 1024:
+                    _error("PNG chunk exceeds bounded limit")
+                if idx == 0 and (tag != b"IHDR" or length != 13):
+                    _error("missing first PNG IHDR chunk")
+                crc = zlib.crc32(tag)
+                remaining = length
+                first = b""
+                while remaining:
+                    portion = stream.read(min(1 << 20, remaining))
+                    if not portion:
+                        _error("truncated PNG chunk payload")
+                    if idx == 0:
+                        first += portion
+                    crc = zlib.crc32(portion, crc)
+                    remaining -= len(portion)
+                expected = stream.read(4)
+                if len(expected) != 4 or (crc & 0xffffffff) != struct.unpack(">I", expected)[0]:
+                    _error("PNG chunk CRC mismatch")
+                if idx == 0:
+                    width, height = struct.unpack(">II", first[:8])
+                    if not 1 <= width <= 16384 or not 1 <= height <= 16384:
+                        _error("PNG render dimensions invalid")
+                if tag == b"IDAT":
+                    seen_idat = True
+                if tag == b"IEND":
+                    if length != 0 or not seen_idat or stream.read(1):
+                        _error("PNG missing image payload or contains trailing data")
+                    return {"container": "png", "width": width, "height": height,
+                            "container_integrity_checked": True}
+            _error("PNG exceeds chunk count limit")
+        elif kind == "animation" and ext == ".gif":
+            if head[:6] not in (b"GIF87a", b"GIF89a"):
+                _error("GIF signature invalid")
+            width, height = struct.unpack("<HH", head[6:10])
+            if not 1 <= width <= 16384 or not 1 <= height <= 16384:
+                _error("GIF dimensions invalid")
+            return {"container": "gif", "width": width, "height": height,
+                    "container_integrity_checked": False}
+        elif kind == "cutscene" and ext == ".mp4":
+            if head[4:8] != b"ftyp" or struct.unpack(">I", head[:4])[0] < 16:
+                _error("MP4 brand header invalid")
+            return {"container": "mp4", "container_integrity_checked": False}
+        elif kind == "music" and ext == ".wav":
+            if head[:4] != b"RIFF" or head[8:12] != b"WAVE":
+                _error("WAV RIFF signature invalid")
+            return {"container": "wav", "container_integrity_checked": False}
+        else:
+            _error("unsupported or mismatched render media format")
+    _error("could not inspect media container")
+
+
 def gate_render_asset(root: Path, *, console: str, genre: str, period: str,
                       evidence: str, profile: str = "design/market_benchmarks.json") -> dict[str, Any]:
     """Require original content, real file identity, visual QA and performance QA.
@@ -324,6 +396,7 @@ def gate_render_asset(root: Path, *, console: str, genre: str, period: str,
             h.update(chunk)
     if h.hexdigest() != digest:
         _error("rendered asset SHA-256 mismatch")
+    probe = _probe_artifact(dest, kind)
     if data["originality"] != "original":
         _error("rendered asset must declare original provenance")
     rubric = data["qa_scores"]
@@ -353,6 +426,7 @@ def gate_render_asset(root: Path, *, console: str, genre: str, period: str,
             "quality_dimensions": sorted(rubric), "quality_score_floor": min(rubric.values()),
             "reviewer_count": len(reviewers), "benchmarked_reference_count": ranking["qualifying_count"],
             "static_checks_passed": True,
+            "media_probe": probe,
             "human_scores_independently_verified": False,
             "performance_measurement_independently_verified": False,
             "peak_quality_proven": False, "production_qualified": False}
