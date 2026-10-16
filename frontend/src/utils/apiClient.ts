@@ -16,7 +16,7 @@
  */
 import { trail } from './breadcrumbs';
 import { API_BASE } from '../../utils/apiBase';
-import { boundedRetries, boundedTimeoutMs, retryableHttpStatus } from '../../utils/requestRecoveryPolicy';
+import { boundedResponseChars, boundedRetries, boundedTimeoutMs, retryableHttpStatus } from '../../utils/requestRecoveryPolicy';
 
 const BACKEND = API_BASE;
 
@@ -36,6 +36,7 @@ interface RequestOpts {
   idempotencyKey?: string;
   cacheKey?: string;
   cacheTtlMs?: number;
+  maxResponseChars?: number;
 }
 
 function newRid(): string {
@@ -203,6 +204,7 @@ async function _doFetch<T>(
   // Do not let caller-supplied retries/timeout create an unbounded loop.
   const maxAttempts = 1 + boundedRetries(opts.retries, method, !!opts.idempotencyKey);
   const perAttemptTimeout = boundedTimeoutMs(opts.timeoutMs ?? 15_000);
+  const maxResponseChars = boundedResponseChars(opts.maxResponseChars);
 
   const backoff = (attempt: number, gateway: boolean) => {
     const base = gateway ? 400 : 200;
@@ -254,15 +256,15 @@ async function _doFetch<T>(
             body: body == null ? undefined : JSON.stringify(body),
           });
           const length = Number(res.headers?.get?.('content-length') || 0);
-          if (length > 1_048_576) return { res, text: '', oversized: true };
+          if (length > maxResponseChars) return { res, text: '', oversized: true };
           const text = await res.text();
-          return { res, text, oversized: text.length > 1_048_576 };
+          return { res, text, oversized: text.length > maxResponseChars };
         })(),
         deadline,
       ]);
       cleanup();
-      if (res.headers?.get?.('content-length') && Number(res.headers.get('content-length')) > 1_048_576 ||
-          text.length > 1_048_576) {
+      if (res.headers?.get?.('content-length') && Number(res.headers.get('content-length')) > maxResponseChars ||
+          text.length > maxResponseChars) {
         _cbReleaseProbe(bucket, isProbe);
         return { ok: false, status: res.status, data: null, error: 'response_too_large', rid };
       }
