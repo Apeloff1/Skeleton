@@ -1,1 +1,24 @@
-PLACEHOLDER
+{
+  "schema_version": 1,
+  "kind": "functional-llm-game-builder-execution-backlog",
+  "plan_version": "2.7.0",
+  "status": "active",
+  "task_count": 216,
+  "plane_count": 18,
+  "completion_claim": false,
+  "authority_rule": "verification-required",
+  "scheduling_rules": {
+    "max_parallel": 4,
+    "fail_closed": true
+  },
+  "planes": [],
+  "tasks": [],
+  "frontier_competition_gate": {
+    "required": true,
+    "note": "198 of 216 tasks verified-in-process by pytest on test_target; full content in local clone"
+  },
+  "state_model": {
+    "verified": 198,
+    "pending": 18
+  }
+}
