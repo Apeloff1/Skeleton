@@ -43,7 +43,8 @@ def _valid_port(port: int) -> int:
 
 def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPRequestHandler]:
     """Create isolated request handler with no shared mutable game-state cache."""
-    _valid_port(port)
+    if port != 0:
+        _valid_port(port)
     if not isinstance(token, str) or not 32 <= len(token) <= 256:
         raise ValueError("invalid Director bridge authorization token")
     # Session replay is the authority; refuse to serve a corrupt or foreign game.
@@ -78,7 +79,8 @@ def handler(root: Path, session: str, token: str, port: int) -> type[BaseHTTPReq
             # Resist DNS rebinding, ambient browser credentials and cross-origin
             # requests. Godot HTTPRequest does not require browser CORS headers.
             host = self.headers.get("Host")
-            if host not in {f"127.0.0.1:{port}", f"localhost:{port}"}:
+            actual_port = self.server.server_port
+            if host not in {f"127.0.0.1:{actual_port}", f"localhost:{actual_port}"}:
                 self._answer(403, {"ok": False, "error": "loopback Host only"})
                 return False
             if self.headers.get("Origin") is not None or (
