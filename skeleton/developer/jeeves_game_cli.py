@@ -148,7 +148,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
-                                            "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "production-init",
+                                            "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "production-init",
                                             "production-status", "production-cycle"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
@@ -202,15 +202,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     raise ValueError("production-cycle accepts --passes and optional --gate only")
                 output = cycle(root, passes=args.passes if args.passes is not None else 1, gate=args.gate,
                                repair_generated=args.repair_generated)
-        elif args.action in {"fidelity-plan", "fidelity-matrix", "display-plan", "upscale"}:
-            from skeleton.developer.jeeves_game_upscale import fidelity_plan, fidelity_matrix, display_plan, upscale
+        elif args.action in {"fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify"}:
+            from skeleton.developer.jeeves_game_upscale import fidelity_plan, fidelity_matrix, display_plan, upscale, verify_upscale
             if args.action == "fidelity-matrix":
                 if any((*other_content, *quality_args, *render_args)):
                     raise ValueError("fidelity-matrix accepts --project only")
                 output = fidelity_matrix()
             else:
-                if not args.target or any((*other_content, *quality_args, args.passes,
-                                           args.gate, args.repair_generated)):
+                if not args.target or any((*other_content, *quality_args,
+                                           args.gate, args.repair_generated)) or (
+                    args.passes is not None and args.action != "upscale-verify"
+                ):
                     raise ValueError("fidelity commands require --target without unrelated options")
                 if args.action == "fidelity-plan":
                     if any((args.source, args.output, args.mode, args.factor, args.dry_run,
@@ -234,10 +236,18 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                         raise ValueError("upscale accepts source/output rather than display geometry")
                     if not args.source or not args.output:
                         raise ValueError("upscale requires --source --output under assets/")
-                    output = upscale(root, source=args.source, output=args.output,
-                                     target=args.target, mode=args.mode or "nearest",
-                                     factor=args.factor if args.factor is not None else 2,
-                                     dry_run=args.dry_run)
+                    if args.action == "upscale-verify":
+                        if args.dry_run:
+                            raise ValueError("upscale-verify is read-only and does not need --dry-run")
+                        output = verify_upscale(root, source=args.source, output=args.output,
+                                                target=args.target, mode=args.mode or "nearest",
+                                                factor=args.factor if args.factor is not None else 2,
+                                                passes=args.passes if args.passes is not None else 3)
+                    else:
+                        output = upscale(root, source=args.source, output=args.output,
+                                         target=args.target, mode=args.mode or "nearest",
+                                         factor=args.factor if args.factor is not None else 2,
+                                         dry_run=args.dry_run)
         elif args.action == "benchmark-matrix":
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
                     args.console, args.genre, args.period, args.evidence, *render_args)):
