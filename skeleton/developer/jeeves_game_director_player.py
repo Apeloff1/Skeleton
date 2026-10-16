@@ -29,6 +29,7 @@ var status_text: Label
 var view: VBoxContainer
 var snapshot: Dictionary = {}
 var last_presentation: Dictionary = {}
+var last_dragon_advice: Dictionary = {}
 var world: Dictionary = {}
 var scene_lookup: Dictionary = {}
 var busy: bool = false
@@ -81,6 +82,10 @@ func _ready() -> void:
     connect.text = "Connect / refresh"
     connect.pressed.connect(_refresh)
     connection.add_child(connect)
+    var dragon := Button.new()
+    dragon.text = "Ask Dragon"
+    dragon.pressed.connect(func(): _request("@dragon", false))
+    connection.add_child(dragon)
     var atlas := Button.new()
     atlas.text = "Scene atlas"
     atlas.pressed.connect(func(): get_tree().change_scene_to_file("res://main.tscn"))
@@ -219,7 +224,8 @@ func _request(choice: String, is_action: bool) -> void:
         error_code = client.request(url + "/v1/actions", headers,
                                    HTTPClient.METHOD_POST, request_body)
     else:
-        error_code = client.request(url + "/v1/status", headers, HTTPClient.METHOD_GET)
+        var route: String = "/v1/advice" if choice == "@dragon" else "/v1/status"
+        error_code = client.request(url + route, headers, HTTPClient.METHOD_GET)
     if error_code != OK:
         status_text.text = "Unable to contact local Director: " + str(error_code)
         return
@@ -242,10 +248,21 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
             snapshot = parsed["snapshot"]
             _draw()
         return
+    if parsed.get("advice") is Dictionary:
+        var suggested: Dictionary = parsed["advice"]
+        if snapshot.is_empty() or suggested.get("state_sha256") != snapshot.get("current_state_sha256"):
+            status_text.text = "Dragon advisory state changed; refresh your game first."
+            return
+        last_dragon_advice = suggested
+        status_text.text = "Dragon action predictions loaded for current game state (advisory only)."
+        _draw()
+        return
     if not parsed.has("snapshot") or not (parsed["snapshot"] is Dictionary):
         status_text.text = "Director did not provide a canonical state"
         return
     snapshot = parsed["snapshot"]
+    if last_dragon_advice.get("state_sha256") != snapshot.get("current_state_sha256"):
+        last_dragon_advice = {}
     last_presentation = {}
     if parsed.get("presentation") is Dictionary:
         last_presentation = parsed["presentation"]
@@ -294,6 +311,15 @@ func _draw() -> void:
               " — " + str(event.get("approach", "")) +
               " — " + str(event.get("consequence", "")))
     _line("Narrative outcomes: " + str(snapshot.get("narrative_flags", [])))
+    if not last_dragon_advice.is_empty():
+        _line("Dragon empirical micro-model (advice, never automatic game input):")
+        if last_dragon_advice.get("abstained", true):
+            _line("  No verified policy context; Dragon abstained.")
+        else:
+            for option in last_dragon_advice.get("advisory_choices", []).slice(0, 5):
+                _line("  " + str(option.get("choice", "")) +
+                      " | sampled " + str(option.get("observations", 0)) +
+                      " | p ≈ " + str(option.get("estimated_probability", 0.0)))
     if not last_presentation.is_empty():
         _line("New canonical narrative and cinematic presentation cues:")
         for outcome in last_presentation.get("new_story_results", []):
