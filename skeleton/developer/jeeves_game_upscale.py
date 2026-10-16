@@ -180,3 +180,73 @@ def fidelity_plan(target: str) -> dict[str, Any]:
             "preserve_original_aesthetics": True,
             "HD_upgrade_without_source_replacement": True,
             "full_era_console_rendering": False}
+
+
+
+def fidelity_matrix() -> dict[str, Any]:
+    """Inspect ALL currently declared canonical console targets, no invented cores.
+
+    Source adaptation is not a native executable renderer. If a target is
+    absent, not runnable or unqualified, emit its gap rather than substitute
+    another console's renderer or call a reference simulator a hardware test.
+    """
+    from skeleton.jeeves.game_console_catalog import console_catalog
+    from skeleton.jeeves.game_engine_lab import ERA_PROFILES, EngineEra
+    targets = console_catalog()
+    records = []
+    ids: set[str] = set()
+    by_era: dict[str, dict[str, int]] = {}
+    for target in targets:
+        ident = target["target_id"]
+        if not isinstance(ident, str) or ident in ids:
+            raise UpscaleError("duplicate or malformed console registry identity")
+        ids.add(ident)
+        era = target["engine_era"]
+        try:
+            profile = ERA_PROFILES[EngineEra(era)]
+        except (KeyError, ValueError) as exc:
+            raise UpscaleError("unknown canonical render-era identity") from exc
+        pixel = era in {"pong_discrete_1972", "vector_sprite_1977",
+                        "eight_bit_tile_1983", "sixteen_bit_raster_1989"}
+        kind = str(target.get("runtime_kind") or "unspecified")
+        caps = target.get("capabilities") or {}
+        ready = target.get("readiness") or {}
+        row = {
+            "target_id": ident, "era": era,
+            "generation": target.get("generation_id"),
+            "render_path": profile.render_path,
+            "runtime_kind": kind,
+            "reference_simulator": bool(target.get("reference_supported")),
+            "native_source_or_emulator_status": (
+                ready.get("status") if isinstance(ready, dict) else "unknown"
+            ),
+            "declared_hardware_emulation": bool(target.get("full_hardware_emulation")),
+            "actual_framebuffer_supported": (
+                caps.get("actual_framebuffer") is True if isinstance(caps, dict) else False
+            ),
+            "implemented_pixel_upscale": True,
+            "upscale_kind": "native_grid_integer_and_scale2x" if pixel else "texture_pixel_resampling_only",
+            "original_game_native_rendering_qualified": False,
+            "cross_console_visual_parity_verified": False,
+            "upscaling_quality_verified": False,
+            "missing_qualifications": [
+                "original_game_full_renderer",
+                "native_target_export_and_install",
+                "console_specific_pixel_aspect_and_display_tests",
+                "quality_against_independently_sourced_period_references",
+                "sustained_playthrough_and_frame_timings",
+            ],
+        }
+        by_era.setdefault(era, {"declared": 0, "production_qualified": 0})
+        by_era[era]["declared"] += 1
+        records.append(row)
+    return {
+        "ok": True, "action": "fidelity-matrix", "schema": SCHEMA,
+        "declared_console_targets": len(records),
+        "engine_eras": len(by_era), "by_era": by_era,
+        "targets": records,
+        "missing_native_production_qualifications": len(records),
+        "any_console_fully_certified_by_this_tool": False,
+        "catalogue_complete_for_all_historical_hardware": False,
+        "reason": "A console registration, editor or emulation candidate is not full native game creation/rendering capability",
+    }
