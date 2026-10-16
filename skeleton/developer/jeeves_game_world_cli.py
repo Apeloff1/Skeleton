@@ -40,7 +40,7 @@ ALLOWED = {
     "upscale-music":COMMON | {"mode","ambience"},
     "asset-inventory":{"page","page_size"},
     "upscale-review":{"passes"},
-    "vividness-review":{"passes"},
+    "vividness-review":{"passes","source"},
     "queue-upscaled-training":{"page","page_size"},
     "camera-plan":{"depth","yaw","pitch","parallax_planes"},
 }
@@ -76,13 +76,14 @@ def dispatch(args: Any, root: Path) -> dict[str,Any]:
     if name=="asset-inventory":
         from skeleton.developer.jeeves_game_world_upscale import inventory
         return inventory(root,page=arg("page"),page_size=arg("page_size"))
-    if name in ("upscale-review","vividness-review"):
+    if name=="upscale-review":
         from skeleton.developer.jeeves_game_world_upscale import scrutiny
-        result=scrutiny(root,passes=arg("passes"))
-        if name=="vividness-review":
-            result["action"]="vividness-review"
-            result["world_vividness_independently_graded"]=False
-        return result
+        return scrutiny(root,passes=arg("passes"))
+    if name=="vividness-review":
+        from skeleton.developer.jeeves_game_world_upscale import vividness
+        if not args.source:
+            raise ValueError("vividness-review requires --source design/enhanced-stage.json")
+        return vividness(root,source=args.source,passes=arg("passes"))
     if name=="queue-upscaled-training":
         from skeleton.developer.jeeves_game_upscale_queue import training_queue
         return training_queue(root,page=arg("page"),page_size=arg("page_size"))
