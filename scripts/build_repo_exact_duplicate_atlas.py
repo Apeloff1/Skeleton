@@ -6,9 +6,13 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 import tempfile
 
+REPO = Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
 from skeleton.repo_intelligence import GitIndex, build_exact_duplicate_atlas
 
 
