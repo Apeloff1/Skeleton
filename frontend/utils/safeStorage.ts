@@ -23,9 +23,26 @@ import { isPrunableStorageKey } from './storageRetentionPolicy';
 
 const _mirror = new Map<string, string | null>();
 const _keyVersions = new Map<string, number>();
+const MAX_MIRROR_ENTRIES = 2_048;
+const MAX_VERSION_ENTRIES = 4_096;
 let _mirrorGeneration = 0;
 
+function remember(key: string, value: string | null): void {
+  if (!_mirror.has(key) && _mirror.size >= MAX_MIRROR_ENTRIES) {
+    const oldest = _mirror.keys().next().value;
+    if (oldest !== undefined) _mirror.delete(oldest);
+  }
+  _mirror.set(key, value);
+}
+
 function bumpVersion(key: string): number {
+  if (!_keyVersions.has(key) && _keyVersions.size >= MAX_VERSION_ENTRIES) {
+    // A new generation fences late native read results even if we drop old
+    // key-version bookkeeping under very large studio workloads.
+    _mirrorGeneration += 1;
+    _keyVersions.clear();
+    _mirror.clear();
+  }
   const next = (_keyVersions.get(key) || 0) + 1;
   _keyVersions.set(key, next);
   return next;
@@ -109,7 +126,7 @@ export async function safeGetItem(key: string, fallback: string | null = null, m
     // A native read that began before a newer write/reset is stale. Never
     // let its late completion replace the newer in-process state.
     if (!isCurrent(key, version, generation)) return _mirror.get(key) ?? fallback;
-    _mirror.set(key, result.value);
+    remember(key, result.value);
     return result.value;
   } catch { return fallback; }
 }
@@ -117,7 +134,7 @@ export async function safeGetItem(key: string, fallback: string | null = null, m
 export async function safeSetItem(key: string, value: string, ms = 800): Promise<boolean> {
   const version = bumpVersion(key);
   const generation = _mirrorGeneration;
-  _mirror.set(key, value); // provisional until native write is verified
+  remember(key, value); // provisional until native write is verified
   try {
     const saved = await timeout(AsyncStorage.setItem(key, value).then(() => true), ms, false);
     if (!saved) {
@@ -246,7 +263,7 @@ export async function pruneExpired(opts: {
     ).catch(() => false);
     // A failed prune must not declare authoritative state deleted. Preserve
     // metadata for the next attempt; prevent a stale mirror in either case.
-    for (const k of prunedKeys) _mirror.delete(k);
+    for (const k of prunedKeys) { bumpVersion(k); _mirror.delete(k); }
     if (removed) {
       for (const k of prunedKeys) delete meta[k];
       _metaDirty = true;
