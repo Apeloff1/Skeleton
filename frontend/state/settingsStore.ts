@@ -472,9 +472,9 @@ export function getJeevesRequestContext(projectContext = '', maxChars = 4_000): 
   const instructions = getJeevesSystemPrefix().trim();
   const context = instructions
     ? [
-      `User-configured Jeeves preferences (request context):\\n${instructions}`,
-      ...(projectContext.trim() ? [`Project context:\\n${projectContext}`] : []),
-    ].join('\\n\\n')
+      `User-configured Jeeves preferences (request context):\n${instructions}`,
+      ...(projectContext.trim() ? [`Project context:\n${projectContext}`] : []),
+    ].join('\n\n')
     : projectContext;
   if (!Number.isSafeInteger(maxChars) || maxChars < 1 || context.length > maxChars) {
     throw new RangeError(`Jeeves directives and project context exceed the ${maxChars}-character request limit.`);
