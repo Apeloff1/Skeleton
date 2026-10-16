@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFeatureFlag } from '../utils/featureFlags';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
+import JeevesRuntimeStatus from '../features/Jeeves/JeevesRuntimeStatus';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';
@@ -232,6 +233,7 @@ function JeevesHubScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [showModelReadiness, setShowModelReadiness] = useState(false);
 
   const visibleServices = useMemo(
     () => SERVICES.filter(service => !service.voiceOnly || flagVoice),
@@ -473,6 +475,19 @@ function JeevesHubScreen() {
           )}
         </View>
 
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={showModelReadiness ? 'Hide model and transformer readiness' : 'Inspect model and transformer readiness'}
+          onPress={() => setShowModelReadiness(value => !value)}
+          style={styles.modelReadinessToggle}
+        >
+          <Ionicons name="hardware-chip-outline" size={17} color="#C4B5FD" />
+          <Text style={styles.modelReadinessText}>
+            {showModelReadiness ? 'Hide model readiness' : 'Inspect actual model readiness'}
+          </Text>
+        </TouchableOpacity>
+        {showModelReadiness ? <JeevesRuntimeStatus /> : null}
+
         <View style={styles.filterRow}>
           <FilterChip label={`All ${stats.total}`} active={filter === 'all'} onPress={() => setFilter('all')} />
           <FilterChip label={`Healthy ${stats.healthy}`} active={filter === 'healthy'} onPress={() => setFilter('healthy')} />
@@ -703,6 +718,8 @@ const styles = StyleSheet.create({
   slowText: { color: '#FBBF24', fontSize: 10, fontWeight: '700' },
   downText: { color: '#F87171', fontSize: 10, fontWeight: '700' },
   quickActions: { flexDirection: 'row', gap: 7, marginBottom: 10, flexWrap: 'wrap' },
+  modelReadinessToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, paddingVertical: 11, backgroundColor: '#151927', borderRadius: 12, borderWidth: 1, borderColor: '#373052', marginBottom: 9 },
+  modelReadinessText: { fontSize: 12, fontWeight: '800', color: '#DDD6FE' },
   quickAction: {
     minWidth: 74,
     flexGrow: 1,
