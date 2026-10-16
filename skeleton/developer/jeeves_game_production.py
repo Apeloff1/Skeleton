@@ -207,7 +207,8 @@ def _events(root: Path, policy_sha: str):
             raise ProductionError("invalid event identity")
         if item["evidence_kind"] not in (
             "canonical_source", "market_operator_evidence", "godot_boot",
-            "operator_observation", *EXPECTED_EVIDENCE_OWNERS.values()
+            "operator_observation", "canonical_quest_replay",
+            *EXPECTED_EVIDENCE_OWNERS.values()
         ):
             raise ProductionError("unsupported evidence owner")
         calculated = _digest({k: v for k, v in item.items() if k != "digest"})

@@ -208,7 +208,7 @@ def gameplay(root: Path, *, source: str, passes: int = 1) -> dict[str, Any]:
             document["replays"], document["bindings"],
             require_distinct_choices=document["require_distinct_choices"],
         )
-        if receipts and receipts[0]["replay_evidence_sha256"] != checked["replay_evidence_sha256"]:
+        if receipts and receipts[0]["evidence_sha256"] != checked["replay_evidence_sha256"]:
             raise StoryGameBridgeError("replay results changed during scrutiny")
         receipts.append({"pass": iteration + 1,
                          "evidence_sha256": checked["replay_evidence_sha256"],
