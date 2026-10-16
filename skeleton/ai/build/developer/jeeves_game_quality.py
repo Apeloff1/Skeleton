@@ -7,6 +7,7 @@ unverified until independently audited.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 from datetime import date
 import math
@@ -130,8 +131,30 @@ def _source(src: Any, role: str) -> dict[str, str]:
         parts = urlsplit(uri)
         if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.fragment:
             _error("evidence URL must be public HTTPS without credentials or fragment")
-        if parts.hostname.lower() in {"localhost", "metadata.google.internal"}:
-            _error("local URLs are not acceptable evidence")
+        # A URL-shaped string is never proof that a citation was fetched.
+        # Reject local, private, numeric and internal origins even if someone
+        # presents them as a purportedly independent market publication.
+        host = parts.hostname.lower()
+        if host.endswith(".") or "%" in host or "\\" in host:
+            _error("non-public or ambiguous evidence hostname")
+        if parts.port is not None and not 1 <= parts.port <= 65535:
+            _error("invalid evidence port")
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            pass
+        else:
+            _error("literal IP addresses cannot qualify as public citations")
+        if (not re.fullmatch(r"[a-z0-9-]+(?:\\.[a-z0-9-]+)+", host)
+                or any(label.startswith("-") or label.endswith("-")
+                       for label in host.split("."))
+                or re.fullmatch(r"[a-z]{2,63}|xn--[a-z0-9-]+", host.rsplit(".", 1)[-1]) is None
+                or host.endswith((".localhost", ".local", ".localdomain",
+                                  ".internal", ".lan", ".home.arpa",
+                                  ".onion", ".invalid", ".test", ".example"))
+                or host in {"localhost", "localdomain"}
+                or all(part.isdigit() for part in host.split("."))):
+            _error("local, reserved or malformed evidence hostname")
     except ValueError as exc:
         raise QualityError("invalid evidence URL") from exc
     published = src["published"]
