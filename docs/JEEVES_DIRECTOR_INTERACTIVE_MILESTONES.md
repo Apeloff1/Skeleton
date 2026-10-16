@@ -1,5 +1,13 @@
 # Jeeves Director Interactive Runtime + Dragon Training Inputs
 
+> **October 16 live-runtime extension:** The scene atlas now also exports a
+> source-bound Godot quest UI that can execute canonical Director logic through
+> an explicit local Python server. New exports use a `-live-v2` directory
+> suffix without replacing older atlas files. See
+> [Live Godot + Dragon research lab](JEEVES_GODOT_LIVE_DRAGON_LAB.md).
+> This still does not establish native engine acceptance or released assets.
+
+
 This milestone slice closes part of the gap between scripted Director
 campaigns and game-development production. The canonical Python Director
 runtime (not a simulated chat response) now accepts **individual operator
