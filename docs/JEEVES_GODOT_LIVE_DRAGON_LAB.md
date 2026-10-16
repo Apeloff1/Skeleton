@@ -139,7 +139,28 @@ unique cast and audio cues. Workorders identify underexplored gameplay methods.
 This is **bounded sample coverage**, not a proof every imaginable ending is
 reachable or that a rendered installation has been tested.
 
-## 5. Regression suites and realistic acceptance
+## 5. Actual native Godot 4 import/startup smoke (opt-in)
+
+After exporting the versioned live atlas, the CLI can invoke an **actual**
+locally resolved Godot 4 executable for a headless source import plus a
+headless atlas scene start and live quest UI start:
+
+```bash
+python -m skeleton dev game jeeves director-godot-smoke \
+  --project ./original_game \
+  --source design/director_campaign_source.json --timeout 90
+```
+
+The runner first verifies every exported source file, then checks the Godot
+version. It runs `--headless --import` and separately starts
+`res://main.tscn` and `res://director_player.tscn` for a small smoke frame
+window. Every process has its own bounded timeout, and the server bearer token
+is removed from its environment. A successful run is **genuine local Godot
+source execution evidence**, but not an automated completed native game,
+connected HTTP integration acceptance, quality certification or first install.
+If no Godot binary exists, it reports an explicit incomplete diagnostic.
+
+## 6. Regression suites and realistic acceptance
 
 ```bash
 python -m unittest tests.test_jeeves_director_local_http
