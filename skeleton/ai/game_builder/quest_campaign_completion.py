@@ -100,7 +100,7 @@ def _dynamic_path(world: DirectorWorld, state: DirectorState,
         best[key] = cost
         for action in available_director_actions(world, here):
             if action.kind not in {
-                    "travel", "transit", "speak", "buy", "sell", "rest"}:
+                    "travel", "transit", "speak", "discuss", "buy", "sell", "rest"}:
                 continue
             after = director_step(world, here, action)
             next_status = after.world_state
