@@ -53,11 +53,16 @@ def dev_help_text() -> str:
         jeeves director-session-status --session NAME
         jeeves director-session-step --session NAME --choice travel:scene_01
         jeeves director-session-compare --session NAME --other-session OTHER
+        jeeves director-serve --session NAME [--port 8765]
+        jeeves director-coverage --source design/director_campaign_source.json [--routes 2..8]
+        jeeves dragon-lab --sessions hero_a,hero_b [--approve RESEARCH_SHA256]
         jeeves director-atlas-export --source design/director_campaign_source.json [--dry-run]
         jeeves director-atlas-verify --source design/director_campaign_source.json
         jeeves dragon-session-lesson --session NAME [--approve CANDIDATE_SHA256]
         Interactive Director play journals are replayed against the canonical game world
-        Godot atlas is a navigable scene preview, not an executable quest-complete game
+        Godot atlas also includes a local-bridge UI that executes canonical Director quest actions
+        The native UI requires a foreground authenticated Python loopback server
+        Original 2D/3D assets, cinematic playback and real Godot runtime verification remain separate
         jeeves director-prepare-training --source design/director_campaign_source.json [--routes 2..8 --approve SHA256]
         Original story and cinematic changes recompile into actual typed Director scenes
         Dragon replay research is recorded, but does not change checkpoint weights
