@@ -239,3 +239,59 @@ def test_media_gate_rejects_fake_png_magic_and_corrupt_crc(tmp_path):
                                "--console", "PC", "--genre", "RPG", "--period", "2015-2019",
                                "--evidence", "design/asset_qa.json"])
         assert not result["ok"]
+
+
+def test_cross_era_coverage_matrix_reports_qualification_and_gaps(tmp_path):
+    root = _workspace(tmp_path)
+    path = _write(root)
+    value = json.loads(path.read_text())
+    value["cohorts"].append({
+        "era": "another_historical_era",
+        "console": "SuperConsole", "genre": "Platformer",
+        "period": "1990-1994", "records": [],
+    })
+    path.write_text(json.dumps(value))
+    matrix = run_game_cli(["jeeves", "benchmark-matrix", "--project", str(root)])
+    assert matrix["declared_cohorts"] == 2
+    assert matrix["qualifying_cohorts"] == 1
+    assert matrix["gapped_cohorts"] == 1
+    assert matrix["ok"] is False
+    assert matrix["global_platform_coverage_proven"] is False
+    assert matrix["coverage"][0]["status"] == "eligible"
+    assert matrix["coverage"][1]["status"] == "other_era_not_validated_in_workspace"
+
+
+def test_homogeneous_scores_do_not_prove_top_quartile(tmp_path):
+    root = _workspace(tmp_path)
+    rows = [_benchmark_row(i) for i in range(1,9)]
+    for item in rows:
+        item["critic_score"] = 95
+    _write(root, rows)
+    ranked = _rank(root)
+    assert ranked["ok"] is False
+    assert "distinct" in ranked["error"]
+
+
+def test_history_citations_accept_period_correct_archives(tmp_path):
+    root = _workspace(tmp_path)
+    rows = [_benchmark_row(i) for i in range(1,9)]
+    for i, item in enumerate(rows):
+        item["release_year"] = 1990+i%5
+        item["sales_source"]["published"] = "1997-05-14"
+        item["rating_source"]["published"] = "1998-03-03"
+    _write(root, rows, period="1990-1994")
+    ranked = _rank(root, period="1990-1994")
+    assert ranked["ok"], ranked
+
+
+def test_asset_cannot_claim_commercial_top_tier_without_qualifying_reference(tmp_path):
+    root = _workspace(tmp_path)
+    rows = [_benchmark_row(i) for i in range(1,9)]
+    for i, rec in enumerate(rows):
+        rec["critic_score"] = 89+i
+    _write(root, rows)
+    assert not _rank(root)["ok"]
+    rejected = run_game_cli(["jeeves", "asset-gate", "--project", str(root),
+                             "--console", "PC", "--genre", "RPG", "--period", "2015-2019",
+                             "--evidence", "design/asset_qa.json"])
+    assert not rejected["ok"] and "qualifying" in rejected["error"]
