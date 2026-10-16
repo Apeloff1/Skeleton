@@ -159,7 +159,10 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "direction-audit", "direction-workorder", "production-gap-matrix",
                                             "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt",
                                             "director-draft", "director-revise", "director-examine", "director-promote",
-                                            "director-board", "director-prepare-training"))
+                                            "director-board", "director-prepare-training",
+                                            "director-session-begin", "director-session-status", "director-session-step",
+                                            "director-session-compare", "director-atlas-export", "director-atlas-verify",
+                                            "dragon-session-lesson"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -181,6 +184,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--stages", type=int)
     parser.add_argument("--goal")
     parser.add_argument("--routes", type=int)
+    parser.add_argument("--session")
+    parser.add_argument("--other-session")
+    parser.add_argument("--choice")
     parser.add_argument("--output")
     parser.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     parser.add_argument("--factor", type=int)
@@ -207,6 +213,49 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
+        live_actions = {
+            "director-session-begin": {"action", "source", "session"},
+            "director-session-status": {"action", "session"},
+            "director-session-step": {"action", "session", "choice"},
+            "director-session-compare": {"action", "session", "other_session"},
+            "director-atlas-export": {"action", "source", "dry_run"},
+            "director-atlas-verify": {"action", "source"},
+            "dragon-session-lesson": {"action", "session", "approve"},
+        }
+        if args.action in live_actions:
+            for key, value in vars(args).items():
+                if key not in live_actions[args.action] and value is not None and value is not False:
+                    raise ValueError("unrelated Director runtime option --" + key.replace("_", "-"))
+            if args.action.startswith("director-session-"):
+                from skeleton.developer.jeeves_game_director_session import begin, inspect, choose, compare
+                if not args.session:
+                    raise ValueError("interactive Director session requires --session")
+                if args.action == "director-session-begin":
+                    if not args.source:
+                        raise ValueError("new Director session needs --source")
+                    return begin(root, source=args.source, session=args.session)
+                if args.action == "director-session-status":
+                    return inspect(root, session=args.session)
+                if args.action == "director-session-step":
+                    if not args.choice:
+                        raise ValueError("Director move needs --choice kind:key")
+                    return choose(root, session=args.session, choice=args.choice)
+                if not args.other_session:
+                    raise ValueError("compare needs --other-session")
+                return compare(root, first=args.session, second=args.other_session)
+            if args.action in {"director-atlas-export", "director-atlas-verify"}:
+                from skeleton.developer.jeeves_game_director_atlas import export, verify
+                if not args.source:
+                    raise ValueError("Godot scene atlas requires --source")
+                if args.action == "director-atlas-export":
+                    return export(root, source=args.source, dry_run=args.dry_run)
+                return verify(root, source=args.source)
+            from skeleton.developer.jeeves_game_dragon_session import enqueue
+            if not args.session:
+                raise ValueError("Dragon session lesson requires --session")
+            return enqueue(root, session=args.session, approved_digest=args.approve)
+        if any(value is not None for value in (args.session, args.other_session, args.choice)):
+            raise ValueError("runtime options require a director-session or dragon-session action")
         director_actions = {"director-draft", "director-revise", "director-examine", "director-promote",
                             "director-board", "director-prepare-training"}
         if args.action in director_actions:
