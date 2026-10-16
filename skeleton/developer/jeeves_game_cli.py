@@ -147,7 +147,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     """Game-authoring proposals require real model I/O and explicit local acceptance."""
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
-                                            "propose", "review", "apply"))
+                                            "propose", "review", "apply", "queue"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -155,9 +155,13 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--approve")
     args = parser.parse_args(argv)
     try:
-        if args.action in {"propose", "review", "apply"}:
-            from skeleton.developer.jeeves_game_authoring import propose, review, apply
-            if args.action == "propose":
+        if args.action in {"propose", "review", "apply", "queue"}:
+            from skeleton.developer.jeeves_game_authoring import propose, review, apply, queue
+            if args.action == "queue":
+                if any((args.kind, args.brief, args.digest, args.approve, args.include_notes)):
+                    raise ValueError("queue takes no proposal selection options")
+                output = queue(root)
+            elif args.action == "propose":
                 if args.kind is None or args.brief is None or args.digest or args.approve:
                     raise ValueError("propose requires --kind and --brief, without --digest/--approve")
                 output = propose(root, kind=args.kind, brief=args.brief, include_notes=args.include_notes)
