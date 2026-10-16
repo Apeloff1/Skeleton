@@ -25,6 +25,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE, API_FALLBACK_BASE } from './apiBase';
+import { boundedRetries, boundedTimeoutMs, boundedResponseChars, retryableHttpStatus } from './requestRecoveryPolicy';
 
 // ── Backend URL ladder ────────────────────────────────────────────────
 // Endpoint ownership lives in apiBase.ts. This layer only adds transport
@@ -144,7 +145,21 @@ export function getTunnelHealth(): HealthSnapshot {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new Error('Request cancelled'));
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(new Error('Request cancelled'));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
 
 function fullJitter(attempt: number, baseMs = 600, capMs = 8000): number {
   const expo = Math.min(capMs, baseMs * 2 ** (attempt - 1));
@@ -191,6 +206,7 @@ export interface ResilientOptions {
   hosts?: string[];             // override backend host ladder
   signal?: AbortSignal;         // external abort
   rawText?: boolean;            // return raw text, skip JSON parse
+  maxResponseChars?: number;   // upper bound before JSON parsing
 }
 
 export interface ResilientResult<T = any> {
@@ -226,17 +242,27 @@ export async function resilientFetch<T = any>(
   options: ResilientOptions = {},
 ): Promise<ResilientResult<T>> {
   const method = (options.method || 'GET').toUpperCase();
-  const hosts = options.hosts || BACKEND_URLS;
+  const isGet = method === 'GET' || method === 'HEAD';
+  // A write is never replayed or redirected to a fallback host without a
+  // verified server-side idempotency contract (none is declared here).
+  const configuredHosts = options.hosts || BACKEND_URLS;
+  const hosts = isGet ? configuredHosts : configuredHosts.slice(0, 1);
   const primaryUrl = resolveUrl(path, hosts[0]);
   const key = cacheKey(method, primaryUrl, options.body);
   const cfg = { ...DEFAULTS, ...options };
   const start = Date.now();
-
-  const isGet = method === 'GET' || method === 'HEAD';
-  const wantsCache = isGet && cfg.cacheTtlMs > 0;
+  const sensitive = Object.keys(options.headers || {}).some(
+    name => /^(authorization|cookie|x-api-key|proxy-authorization)$/i.test(name),
+  );
+  const dedupe = isGet && cfg.dedupe && !sensitive && !options.signal;
+  const wantsCache = isGet && cfg.cacheTtlMs > 0 && !sensitive;
+  const maxResponseChars = boundedResponseChars(options.maxResponseChars);
+  const attemptsPerHost = 1 + boundedRetries(options.retries, method, false);
+  let ownsProbe = false;
+  if (options.signal?.aborted) throw new Error('Request cancelled');
 
   // ── (1) In-flight dedupe (GET only) ──
-  if (isGet && cfg.dedupe) {
+  if (dedupe) {
     const existing = inflight.get(key);
     if (existing) return existing as Promise<ResilientResult<T>>;
   }
@@ -284,6 +310,7 @@ export async function resilientFetch<T = any>(
     if (circuitOpen && !BREAKER.halfOpenProbeInflight) {
       // Enter half-open mode — only ONE caller probes, others serve stale/fail
       BREAKER.halfOpenProbeInflight = true;
+      ownsProbe = true;
     } else if (circuitOpen) {
       // Another probe in flight — serve stale if possible
       if (wantsCache) {
@@ -304,12 +331,13 @@ export async function resilientFetch<T = any>(
       const url = resolveUrl(path, host);
       triedHosts.push(host);
 
-      for (let attempt = 1; attempt <= cfg.retries; attempt++) {
+      for (let attempt = 1; attempt <= attemptsPerHost; attempt++) {
+        if (options.signal?.aborted) throw new Error('Request cancelled');
         attempts++;
         const controller = new AbortController();
         const onExternalAbort = () => controller.abort();
         options.signal?.addEventListener?.('abort', onExternalAbort);
-        const perAttemptTimeout = cfg.timeoutMs + (attempt - 1) * 5000;
+        const perAttemptTimeout = boundedTimeoutMs(cfg.timeoutMs + (attempt - 1) * 5000);
         const tHandle = setTimeout(() => { try { controller.abort(); } catch {} }, perAttemptTimeout);
 
         try {
@@ -348,11 +376,15 @@ export async function resilientFetch<T = any>(
           });
           lastStatus = res.status;
 
-          // 4xx — deterministic client error, do NOT retry
+          // A transient 408/429 may retry for safe reads; all other 4xx
+          // responses are terminal. Never replay a mutation.
           if (res.status >= 400 && res.status < 500) {
             const txt = await res.text().catch(() => '');
             const err = `${res.status}: ${txt.slice(0, 200)}`;
-            throw Object.assign(new Error(err), { _isClient: true, _status: res.status });
+            throw Object.assign(new Error(err), {
+              _isClient: !isGet || !retryableHttpStatus(res.status),
+              _status: res.status,
+            });
           }
           // 5xx — retryable
           if (!res.ok) {
@@ -360,9 +392,17 @@ export async function resilientFetch<T = any>(
             throw new Error(`${res.status}: ${txt.slice(0, 100)}`);
           }
 
-          // Success
+          // Refuse a declared oversized payload before reading it, and
+          // always enforce a finite parsing boundary.
+          const declaredSize = Number(res.headers?.get?.('content-length'));
+          if (Number.isFinite(declaredSize) && declaredSize > maxResponseChars) {
+            throw Object.assign(new Error('Response exceeds size budget'), { _isClient: true });
+          }
           const rtt = Date.now() - t0;
           const text = await res.text();
+          if (text.length > maxResponseChars) {
+            throw Object.assign(new Error('Response exceeds size budget'), { _isClient: true });
+          }
           let parsed: any = text;
           if (!options.rawText) {
             try { parsed = JSON.parse(text); } catch { /* keep as text */ }
@@ -398,12 +438,11 @@ export async function resilientFetch<T = any>(
         } catch (err: any) {
           const isClient = err?._isClient === true;
           lastError = String(err?.message || err);
-          if (isClient) {
-            // Immediate — client error propagates
+          if (isClient || options.signal?.aborted) {
             throw err;
           }
-          if (attempt < cfg.retries) {
-            await sleep(fullJitter(attempt));
+          if (attempt < attemptsPerHost) {
+            await sleep(fullJitter(attempt), options.signal);
           }
         } finally {
           clearTimeout(tHandle);
@@ -413,6 +452,7 @@ export async function resilientFetch<T = any>(
       // Host exhausted — try next host
     }
 
+    if (options.signal?.aborted) throw new Error('Request cancelled');
     // ── (5) All hosts failed → fall back to cache if available ──
     BREAKER.failures++;
     BREAKER.lastFailTs = Date.now();
@@ -447,13 +487,19 @@ export async function resilientFetch<T = any>(
     );
   })();
 
-  if (isGet && cfg.dedupe) {
+  if (dedupe) {
     inflight.set(key, job);
     // A bare finally() creates a second rejected promise on network failure.
     // Also protect a replacement request installed after resetCircuit().
     const release = () => { if (inflight.get(key) === job) inflight.delete(key); };
     void job.then(release, release);
   }
+  // Client errors, aborts and rejected probes must not leave the circuit
+  // stuck in half-open mode indefinitely.
+  const releaseProbe = () => {
+    if (ownsProbe) BREAKER.halfOpenProbeInflight = false;
+  };
+  void job.then(releaseProbe, releaseProbe);
   return job;
 }
 
