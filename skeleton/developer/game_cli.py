@@ -371,7 +371,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
                                             "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
-                                            "director-causality", "director-story-contrast", "dragon-navigation-study"))
+                                            "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
+                                            "director-dynamics-audit"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -401,6 +402,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--destination")
     jeeves.add_argument("--route-profile", choices=("fastest", "scenic", "quiet", "novel", "quest"))
     jeeves.add_argument("--alternatives", type=int)
+    jeeves.add_argument("--intensity", type=int)
     jeeves.add_argument("--sessions")
     jeeves.add_argument("--port", type=int)
     jeeves.add_argument("--timeout", type=float)
@@ -470,6 +472,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--at", options.at), ("--tail", options.tail),
                                 ("--destination", options.destination), ("--route-profile", options.route_profile),
                                 ("--alternatives", options.alternatives),
+                                ("--intensity", options.intensity),
                                 ("--sessions", options.sessions),
                                 ("--port", options.port),
                                 ("--timeout", options.timeout),
