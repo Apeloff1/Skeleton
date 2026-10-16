@@ -1,0 +1,195 @@
+"""Godot 4 front-end for live, canonical Python Director sessions.
+
+The viewport is deliberately data-only. Every quest and travel action uses the
+authenticated loopback service; no client-supplied quest-completion state is
+ever trusted and no bearer token is serialized in source or preferences.
+"""
+from __future__ import annotations
+
+PLAYER_SCENE = '''[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://director_player.gd" id="1_player"]
+
+[node name="DirectorPlayer" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_player")
+'''
+
+PLAYER_SCRIPT = r'''extends Control
+
+var client: HTTPRequest
+var port_input: SpinBox
+var token_input: LineEdit
+var status_text: Label
+var view: VBoxContainer
+var snapshot: Dictionary = {}
+var world: Dictionary = {}
+var scene_lookup: Dictionary = {}
+var busy: bool = false
+
+func _ready() -> void:
+    var raw: String = FileAccess.get_file_as_string("res://director_world.json")
+    var decoded = JSON.parse_string(raw)
+    if not (decoded is Dictionary):
+        push_error("Original Director scene data missing or malformed")
+        return
+    world = decoded
+    for location in world.get("scenes", []):
+        scene_lookup[str(location.get("key", ""))] = location
+    client = HTTPRequest.new()
+    add_child(client)
+    client.request_completed.connect(_on_response)
+
+    var layout := VBoxContainer.new()
+    layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    add_child(layout)
+    var title := Label.new()
+    title.text = "Jeeves Director — live original-game quest session"
+    title.add_theme_font_size_override("font_size", 22)
+    layout.add_child(title)
+    var connection := HBoxContainer.new()
+    layout.add_child(connection)
+    var port_title := Label.new()
+    port_title.text = "Loopback port"
+    connection.add_child(port_title)
+    port_input = SpinBox.new()
+    port_input.min_value = 1024
+    port_input.max_value = 65535
+    port_input.step = 1
+    port_input.value = 8765
+    connection.add_child(port_input)
+    var token_title := Label.new()
+    token_title.text = "Session token"
+    connection.add_child(token_title)
+    token_input = LineEdit.new()
+    token_input.secret = true
+    token_input.placeholder_text = "Paste the token set in the local server environment"
+    token_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    connection.add_child(token_input)
+    var connect := Button.new()
+    connect.text = "Connect / refresh"
+    connect.pressed.connect(_refresh)
+    connection.add_child(connect)
+    var atlas := Button.new()
+    atlas.text = "Scene atlas"
+    atlas.pressed.connect(func(): get_tree().change_scene_to_file("res://main.tscn"))
+    connection.add_child(atlas)
+    status_text = Label.new()
+    status_text.text = "Start the Jeeves loopback server, then connect."
+    layout.add_child(status_text)
+    var scroll := ScrollContainer.new()
+    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    layout.add_child(scroll)
+    view = VBoxContainer.new()
+    view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    scroll.add_child(view)
+
+func _line(value: String) -> void:
+    var item := Label.new()
+    item.text = value
+    item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    view.add_child(item)
+
+func _refresh() -> void:
+    _request("", false)
+
+func _choose(choice: String) -> void:
+    _request(choice, true)
+
+func _request(choice: String, is_action: bool) -> void:
+    if busy:
+        return
+    var token: String = token_input.text
+    if token.length() < 32:
+        status_text.text = "Missing local bearer token (at least 32 characters)."
+        return
+    var port: int = int(port_input.value)
+    var url: String = "http://127.0.0.1:" + str(port)
+    var headers := PackedStringArray([
+        "Authorization: Bearer " + token, "Content-Type: application/json"
+    ])
+    var error_code: int = 0
+    if is_action:
+        if snapshot.is_empty():
+            status_text.text = "Connect and load the live session before acting."
+            return
+        var request_body := JSON.stringify({
+            "choice": choice,
+            "expected_sequence": snapshot["sequence"],
+            "expected_state_sha256": snapshot["current_state_sha256"],
+        })
+        error_code = client.request(url + "/v1/actions", headers,
+                                   HTTPClient.METHOD_POST, request_body)
+    else:
+        error_code = client.request(url + "/v1/status", headers, HTTPClient.METHOD_GET)
+    if error_code != OK:
+        status_text.text = "Unable to contact local Director: " + str(error_code)
+        return
+    busy = true
+    status_text.text = "Awaiting canonical Director response..."
+
+func _on_response(result: int, status_code: int, _headers: PackedStringArray,
+                  data: PackedByteArray) -> void:
+    busy = false
+    if result != HTTPRequest.RESULT_SUCCESS:
+        status_text.text = "Loopback transport unavailable: " + str(result)
+        return
+    var parsed = JSON.parse_string(data.get_string_from_utf8())
+    if not (parsed is Dictionary):
+        status_text.text = "Local Director returned invalid JSON"
+        return
+    if not parsed.get("ok", false):
+        status_text.text = "Director rejected input (" + str(status_code) + "): " + str(parsed.get("error", "unknown"))
+        if parsed.has("snapshot"):
+            snapshot = parsed["snapshot"]
+            _draw()
+        return
+    if not parsed.has("snapshot") or not (parsed["snapshot"] is Dictionary):
+        status_text.text = "Director did not provide a canonical state"
+        return
+    snapshot = parsed["snapshot"]
+    status_text.text = "Canonical turn " + str(snapshot.get("turn", 0)) + " | actions " + str(snapshot.get("sequence", 0))
+    _draw()
+
+func _draw() -> void:
+    for item in view.get_children():
+        item.queue_free()
+        view.remove_child(item)
+    var here: String = str(snapshot.get("scene", ""))
+    var region = scene_lookup.get(here, {})
+    _line("Location: " + str(snapshot.get("scene_title", here)))
+    _line(str(region.get("setting", snapshot.get("scene_setting", ""))))
+    _line("Cast: " + str(snapshot.get("cast", [])))
+    _line("Weather: " + str(snapshot.get("weather", "")) +
+          " | Lighting: " + str(snapshot.get("lighting", "")) +
+          " | Score cue: " + str(snapshot.get("music_cue", "")))
+    _line("Quest progress:")
+    for quest in snapshot.get("quests", []):
+        var qline: String = str(quest["title"]) + " (" + str(quest["stage_index"]) + "/" + str(quest["stage_total"]) + ")"
+        if quest.get("completed", false):
+            qline += " COMPLETE"
+        elif not quest.get("blocked_by", []).is_empty():
+            qline += " — awaiting " + str(quest["blocked_by"])
+        _line(qline)
+    _line("Authorized gameplay actions:")
+    if snapshot.get("complete", false):
+        _line("Campaign logic completed. Continue reviewing endings and replay evidence.")
+    for action in snapshot.get("actions", []):
+        var button := Button.new()
+        button.text = str(action.get("description", action.get("choice", "")))
+        button.pressed.connect(_choose.bind(str(action.get("choice", ""))))
+        view.add_child(button)
+    _line("Completed story events:")
+    for event in snapshot.get("quest_stage_results", []):
+        _line(str(event.get("quest", "")) + " / " + str(event.get("stage", "")) +
+              " — " + str(event.get("approach", "")) +
+              " — " + str(event.get("consequence", "")))
+    _line("Narrative outcomes: " + str(snapshot.get("narrative_flags", [])))
+    _line("State digest: " + str(snapshot.get("current_state_sha256", "")))
+    _line("These are authoritative Python Director actions through a local server. Rendered world/asset quality is not certified.")
+'''
