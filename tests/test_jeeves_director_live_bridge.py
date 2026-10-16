@@ -15,6 +15,9 @@ from skeleton.developer.jeeves_game_director_session import begin, choose, inspe
 from skeleton.developer.jeeves_game_director_atlas import export, verify
 from skeleton.developer.jeeves_game_dragon_lab import queue as dragon_lab
 from skeleton.developer.jeeves_game_director_coverage import coverage
+from skeleton.developer.jeeves_game_director_events import delta
+from skeleton.developer.jeeves_game_production_board import _load_world
+from skeleton.ai.game_builder.quest_campaign_completion import play_campaign
 
 
 class DirectorBridgeIntegrationTests(unittest.TestCase):
@@ -63,6 +66,35 @@ class DirectorBridgeIntegrationTests(unittest.TestCase):
         self.assertTrue((folder / "director_player.tscn").is_file())
         self.assertTrue(verify(self.root, source=self.source)["source_manifest_verified"])
         self.assertFalse(result["manifest"]["native_binary_executed"])
+
+    def test_complete_director_logic_replay_emits_signed_stage_events(self):
+        world, _ = _load_world(self.root, self.source)
+        witness = play_campaign(world, preference=0)
+        emitted = 0
+        timeline_count = 0
+        for segment in witness.replay["segments"]:
+            for action in segment["actions"]:
+                before = inspect(self.root, session="primary")
+                after = choose(
+                    self.root, session="primary",
+                    choice=action["kind"] + ":" + action["key"],
+                    expected_sequence=before["sequence"],
+                    expected_state_sha256=before["current_state_sha256"],
+                )
+                presentation = delta(self.root, session="primary",
+                                     before=before, after=after)
+                self.assertEqual(presentation["state_sha256"],
+                                 after["current_state_sha256"])
+                emitted += len(presentation["new_story_results"])
+                timeline_count += presentation["triggered_timelines"]
+        final = inspect(self.root, session="primary")
+        self.assertTrue(final["complete"])
+        self.assertEqual(emitted, 4)
+        self.assertGreater(timeline_count, 0)
+        self.assertEqual(len(final["quest_stage_results"]), 4)
+        self.assertFalse(presentation["native_cinematic_rendering_verified"])
+        with self.assertRaises(ValueError):
+            delta(self.root, session="primary", before=before, after=before)
 
     def test_comparative_learning_requires_same_verified_world(self):
         begin(self.root, source=self.source, session="alternate")
