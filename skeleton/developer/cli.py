@@ -78,6 +78,7 @@ def dev_help_text() -> str:
         jeeves director-society-publish --source design/director_campaign_source.json --intensity N --approve DESIGN_SHA256
         jeeves director-society-audit --source design/director_society_SOURCE_SHA.json
         jeeves director-society-stress --source design/director_society_SOURCE_SHA.json [--routes 1..8 --intensity 1..5]
+        jeeves director-society-acceptance --source design/director_society_SOURCE_SHA.json
         jeeves dragon-society-study --session NAME [--approve STUDY_SHA256]
         jeeves dragon-society-contrast --session NAME --other-session OTHER
         Original NPCs now have source-authored branching dialogues, clock-bound schedules and actual economy transactions
