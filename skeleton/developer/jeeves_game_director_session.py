@@ -96,10 +96,24 @@ def _load(root: Path, *, name: str) -> tuple[Path, DirectorWorld, Any, dict, str
     from skeleton.developer.jeeves_game_quality import _read
     folder = _folder(root, name)
     manifest = _read_doc(folder / "00000000.json")
-    if set(manifest) != {"schema", "name", "source", "source_sha256",
-                         "director_world_sha256", "genesis_sha256", "receipt_sha256"
-                        } or manifest["schema"] != SCHEMA or manifest["name"] != name:
+    expected = {"schema", "name", "source", "source_sha256",
+                "director_world_sha256", "genesis_sha256", "receipt_sha256"}
+    if "fork_origin" in manifest:
+        expected.add("fork_origin")
+    if set(manifest) != expected or manifest["schema"] != SCHEMA or manifest["name"] != name:
         raise ValueError("unsupported Director session manifest")
+    if "fork_origin" in manifest:
+        origin = manifest["fork_origin"]
+        if (not isinstance(origin, dict)
+                or set(origin) != {"parent_session", "parent_head_sha256", "fork_sequence"}
+                or not isinstance(origin["parent_session"], str)
+                or NAME.fullmatch(origin["parent_session"]) is None
+                or origin["parent_session"] == name
+                or not isinstance(origin["parent_head_sha256"], str)
+                or re.fullmatch(r"[0-9a-f]{64}", origin["parent_head_sha256"]) is None
+                or type(origin["fork_sequence"]) is not int
+                or not 0 <= origin["fork_sequence"] <= 99999999):
+            raise ValueError("Director branch contains invalid durable origin reference")
     genesis = manifest["receipt_sha256"]
     if not isinstance(genesis, str) or _hash({k: v for k, v in manifest.items()
                                              if k != "receipt_sha256"}) != genesis:
