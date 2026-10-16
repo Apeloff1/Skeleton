@@ -148,7 +148,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
-                                            "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "production-init",
+                                            "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                             "production-status", "production-cycle", "production-training"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
@@ -215,6 +215,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     raise ValueError("production-cycle accepts --passes and optional --gate only")
                 output = cycle(root, passes=args.passes if args.passes is not None else 1, gate=args.gate,
                                repair_generated=args.repair_generated)
+        elif args.action == "render-reference":
+            if not args.target or not args.source or not args.output:
+                raise ValueError("render-reference requires --target --source --output")
+            if any((*other_content, *quality_args, args.mode, args.factor, args.passes,
+                    args.gate, args.repair_generated, args.page, args.page_size,
+                    *display_args)):
+                raise ValueError("render-reference accepts --target, --source, --output and --dry-run only")
+            from skeleton.developer.jeeves_game_render import render_reference
+            output = render_reference(
+                root, source=args.source, output=args.output,
+                target=args.target, dry_run=args.dry_run)
         elif args.action in {"fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify"}:
             from skeleton.developer.jeeves_game_upscale import fidelity_plan, fidelity_matrix, display_plan, upscale, verify_upscale
             if args.action == "fidelity-matrix":
