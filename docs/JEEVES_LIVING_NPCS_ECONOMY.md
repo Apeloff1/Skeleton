@@ -176,7 +176,7 @@ python -m skeleton dev game jeeves director-atlas-export \
   --source design/director_society_<digest>.json
 ```
 
-The new, separate `-live-v7` export preserves all earlier v1–v6 source
+The new, separate `-live-v8` export preserves all earlier v1–v6 source
 projects. The native client displays:
 
 - The authoritative current dawn/day/dusk/night period.
