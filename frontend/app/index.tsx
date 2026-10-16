@@ -51,36 +51,39 @@ export default function Entry() {
   const { t } = useI18n();
 
   useEffect(() => {
-    // Re-mount fast-path: reuse the decision already made this process.
-    if (_entryDecision) { setDecision(_entryDecision); return; }
-    (async () => {
+    let cancelled = false;
+    // Only the first completed decision wins, including the timeout path.
+    // A late storage read may never flip an already shown launcher to safe mode.
+    const decideOnce = (next: Exclude<Decision, null>) => {
+      if (cancelled || _entryDecision) return;
+      _entryDecision = next;
+      setDecision(next);
+    };
+
+    if (_entryDecision) {
+      setDecision(_entryDecision);
+      return () => { cancelled = true; };
+    }
+
+    void (async () => {
       try {
-        await traceStep('entry_mounted');
-        // 1500ms (was 350ms) — on a near-full disk (seen at 98%) the single
-        // AsyncStorage read can be slow; bootGuardWithTimeout still defaults
-        // to 'normal' on timeout so we never block, but the wider budget lets
-        // a genuine crash-loop be detected reliably before we give up.
+        // Tracing is advisory and must not delay crash-loop admission.
+        void traceStep('entry_mounted').catch(() => {});
         const mode = await bootGuardWithTimeout(1500);
-        if (mode === 'safe-mode') {
-          _entryDecision = 'safe-mode';
-          await traceStep('entry_→safe_mode');
-          setDecision('safe-mode');
-          return;
-        }
-        _entryDecision = 'cascade';
-        await traceStep('entry_→cascade');
-        setDecision('cascade');
+        const target = mode === 'safe-mode' ? 'safe-mode' : 'cascade';
+        decideOnce(target);
+        void traceStep(target === 'safe-mode' ? 'entry_→safe_mode' : 'entry_→cascade').catch(() => {});
       } catch {
-        // Any failure → still try cascade (never blank-screen).
-        _entryDecision = 'cascade';
-        setDecision('cascade');
+        decideOnce('cascade');
       }
     })();
 
-    // Belt-and-braces: if useEffect itself somehow doesn't fire, force the
-    // cascade after a generous timeout (idempotent with the decision above).
-    const safety = setTimeout(() => setDecision(d => d || 'cascade'), 2000);
-    return () => clearTimeout(safety);
+    // A blocked native storage call cannot freeze the launcher indefinitely.
+    const safety = setTimeout(() => decideOnce('cascade'), 2000);
+    return () => {
+      cancelled = true;
+      clearTimeout(safety);
+    };
   }, []);
 
   if (decision === null) {
