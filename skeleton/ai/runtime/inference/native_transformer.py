@@ -17,6 +17,19 @@ from .local import (
 )
 
 
+def _truncate_at_first_stop(text: str, stops: tuple[str, ...]) -> tuple[str, bool]:
+    """Honor the earliest stop in generated text, not user-provided stop order.
+
+    This mirrors provider-neutral stop semantics and avoids publishing tokens
+    past an earlier stop merely because a later one was listed first.
+    """
+    indices = [index for marker in stops if (index := text.find(marker)) >= 0]
+    if not indices:
+        return text, False
+    return text[: min(indices)], True
+
+
+
 class NativeTransformerModel:
     """Expose NativeLLMRuntime through the canonical LocalModelBackend contract."""
 
@@ -91,6 +104,8 @@ class NativeTransformerModel:
         for _event in stream:
             if cancel.is_set():
                 raise LocalInferenceCancelled("local generation cancelled")
+        if cancel.is_set():
+            raise LocalInferenceCancelled("local generation cancelled")
         result = stream.result
         if result is None:
             raise RuntimeError("native transformer completed without a terminal result")
@@ -103,16 +118,12 @@ class NativeTransformerModel:
             if result.finish_reason in {"completed", "length"}
             else "completed"
         )
-        for marker in request.stop:
-            index = text.find(marker)
-            if index >= 0:
-                text = text[:index]
-                # String stops are a compatibility surface above token generation.
-                # Re-tokenize the published prefix so usage and response identity
-                # describe exactly the content returned to the caller.
-                output_tokens = 0 if not text else len(self.runtime.tokenizer.encode_ids(text))
-                finish_reason = "completed"
-                break
+        text, stopped = _truncate_at_first_stop(text, tuple(request.stop))
+        if stopped:
+            # The returned text, usage and response digest must agree even
+            # when more than one stop marker matches the generation.
+            output_tokens = 0 if not text else len(self.runtime.tokenizer.encode_ids(text))
+            finish_reason = "completed"
 
         published_digest = hashlib.sha256(
             json.dumps(
