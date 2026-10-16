@@ -8,6 +8,7 @@
 import { useEffect } from 'react';
 import { View, StyleSheet, LogBox } from 'react-native';
 import { Slot, usePathname } from 'expo-router';
+import Head from 'expo-router/head';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import theme from '../theme/tokens';
@@ -75,6 +76,13 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <Head>
+        <title>Skeleton — Jeeves AI Game Studio</title>
+        <meta
+          name="description"
+          content="A local-first game studio with Jeeves AI chat, Dragon source review, world editing, human and AI play, and bounded training."
+        />
+      </Head>
       <LocaleProvider>
         <FeatureFlagProvider>
           <View style={[styles.root, { backgroundColor: theme.colors.bg }]} key={`skin-${skinVersion}`}>
