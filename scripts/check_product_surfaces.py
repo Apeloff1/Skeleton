@@ -26,6 +26,7 @@ SURFACES = (
     "frontend/app/studio.tsx",
     "frontend/app/snowball.tsx",
     "frontend/app/settings/index.tsx",
+    "frontend/app/settings/jeeves.tsx",
     "frontend/features/Jeeves/ChatWorkspace.tsx",
     "frontend/features/Jeeves/GovernedChatWorkspace.tsx",
     "frontend/features/Jeeves/WorkspaceController.ts",
