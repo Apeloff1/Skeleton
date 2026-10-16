@@ -203,3 +203,62 @@ project task execution, independent market evidence verification, model
 checkpoint training with held-out gains, continuity proofs and customer-level
 release acceptance. The present code proves only the explicit capabilities
 above until tests and run evidence are observed.
+
+
+## Actual bounded 3D frame rendering milestone
+
+The existing historical reference rasterizer in
+skeleton/jeeves/game_engine_rendering.py can be driven through a declared
+original 3D source document. This is **real pixel rendering** with
+perspective, clipping, depth/coverage and typed triangle materials, not a
+drawn mockup or future-only plan.
+
+Create design/scene3d.json with the following original scene:
+
+    {
+      "schema":"skeleton.game.reference_scene.v1",
+      "width":160, "height":120,
+      "near":0.1, "far":100.0, "fov_y_deg":70,
+      "triangles":[{
+        "object_id":"original-player",
+        "material":7,
+        "shader":"fixed",
+        "shader_phase":0,
+        "vertices":[[-0.8,-0.7,2.0],[0.8,-0.7,2.0],[0.0,0.9,2.0]]
+      }]
+    }
+
+Then run:
+
+    python -m skeleton dev game jeeves render-reference --project . --target ps1 --source design/scene3d.json --output assets/frame.png
+    python -m skeleton dev game jeeves upscale --project . --target ps1 --source assets/frame.png --output assets/frame-2x.png --mode nearest --factor 2
+    python -m skeleton dev game jeeves upscale-verify --project . --target ps1 --source assets/frame.png --output assets/frame-2x.png --mode nearest --factor 2 --passes 8
+
+The selected registered target chooses its canonical historical 3D
+renderer:
+- early-3D DOS PC: painter-order software raster;
+- PS1/N64/Saturn-style fixed-function reference: z-tested Lambert-style
+  material lighting;
+- PS2/Xbox/GameCube-style shader-era reference: programmable tint/fog path.
+
+The renderer refuses unsupported modern GPU/hardware console targets
+rather than emulating them through the wrong renderer. A source scene may
+contain 1..4096 bounded typed triangles and up to the reference rasterizer
+limit of 320x240 pixels. It does not parse proprietary game data or create
+native console binaries. Materials are deterministic synthetic colors, not
+commercial assets or full texture/mipmap support.
+
+A successful render has a real frame/color digest, actual covered pixels,
+and an immutable PNG source artifact. The reference frame is still NOT a
+reproduction of a genuine PS1 GPU, modern-console raytracing, the intended
+creative art quality, hardware performance, or a full playable game.
+The modern engine render graph in
+skeleton/jeeves/game_engine_render_graph.py provides dependency evidence,
+not arbitrary-screen-resolution GPU pixels.
+
+Source and output stay inside the original project and are never
+overwritten implicitly. The converter's output can pass algorithmic
+upscale checks, but still needs professional art review, game integration,
+controller experience, cinematography and authentic end-to-end gameplay.
+
+Test: python -m pytest skeleton/testing/test_jeeves_game_render.py -q
