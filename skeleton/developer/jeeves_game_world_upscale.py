@@ -248,11 +248,14 @@ def camera_profile(depth: str, *, yaw: float = 0, pitch: float = 0,
 
 
 def stage(root: Path, *, source: str, output: str, target: str,
-          richness: int = 3, dry_run: bool = False) -> dict[str, Any]:
+          richness: int = 3, focus: str = "world",
+          dry_run: bool = False) -> dict[str, Any]:
     """Real decorated stage JSON, authored collision map and route unchanged."""
     policy = _policy(target)
     if type(richness) is not int or not 1 <= richness <= 5:
         raise WorldUpscaleError("richness requires ordinal 1..5")
+    if focus not in ("world", "foliage", "clutter", "shadow", "environment"):
+        raise WorldUpscaleError("unsupported world scale focus")
     spec, src_sha = _source_json(root, source)
     if set(spec) != {"schema", "grid", "depth", "biome", "layers", "camera"} or spec["schema"] != STAGE_SCHEMA:
         raise WorldUpscaleError("invalid authored stage schema")
@@ -300,6 +303,11 @@ def stage(root: Path, *, source: str, output: str, target: str,
             val = int(sha256(f"{seed}:{x}:{y}".encode()).hexdigest()[:8],16)
             if val % 10 < richness:
                 kind = palette[val % len(palette)]
+                if focus != "world":
+                    expected = {"environment":tuple(palette),"foliage":("foliage",),
+                                "clutter":("clutter",),"shadow":("shadow",)}[focus]
+                    if kind not in expected:
+                        continue
                 positions.append({"x":x, "y":y, "kind":kind,
                                   "collidable":False,"source":"procedural_original_stage_detail"})
     camera = camera_profile(spec["depth"], yaw=cam["yaw"], pitch=cam["pitch"],
@@ -307,7 +315,7 @@ def stage(root: Path, *, source: str, output: str, target: str,
     out = {
         **spec, "enhancement": {
             "schema": SCHEMA, "source_sha256":src_sha, "target":policy["target_id"],
-            "richness":richness, "dressing":positions,
+            "richness":richness, "focus":focus, "dressing":positions,
             "parallax":bound_layers, "camera":camera,
             "route_verified":True, "start_to_goal_route":path,
             "collision_map_unchanged":True,
@@ -319,7 +327,8 @@ def stage(root: Path, *, source: str, output: str, target: str,
     result = {
         "ok":True, "action":"upscale-stage", "source":source, "output":output,
         "source_sha256":src_sha, "output_sha256":digest,
-        "dressing_count":len(positions), "assets_considered":len(bound_layers),
+        "dressing_count":len(positions), "focus":focus,
+        "assets_considered":len(bound_layers),
         "navigable_route_steps":len(path), "collision_map_unchanged":True,
         "camera":camera, "biome":spec["biome"], "dry_run":dry_run,
         "gameplay_test_performed":False, "production_qualified":False,
@@ -327,7 +336,7 @@ def stage(root: Path, *, source: str, output: str, target: str,
     if not dry_run:
         from skeleton.developer.jeeves_game_upscale_queue import record_output
         result["training_candidate"] = record_output(
-            root,category="stage",source=source,output=output,
+            root,category="stage" if focus=="world" else focus,source=source,output=output,
             input_sha256=src_sha,output_sha256=digest,target=policy["target_id"],
             quality="requires_review")
     return result
@@ -429,3 +438,116 @@ def scrutiny(root:Path, *, passes:int=3) -> dict[str,Any]:
         "gameplay_playthrough_verified":False,
         "production_qualified":False,
     }
+
+
+
+def shadow(root: Path, *, source: str, output: str, target: str,
+           distance: int = 2, dry_run: bool = False) -> dict[str,Any]:
+    """Pixel-exact dark grounding offset behind original RGBA silhouette."""
+    policy=_policy(target)
+    if type(distance) is not int or not 1<=distance<=8:
+        raise WorldUpscaleError("contact shadow offset must be 1..8 pixels")
+    src=_path(root,source,must_exist=True)
+    dest=_path(root,output,must_exist=False)
+    old=src.read_bytes()
+    w,h,pixels=decode_png(old)
+    rendered=_layer_frame(pixels,w,h,0,0,shadow=True,detail=False,light=0)
+    # Build a visibly offset shadow from source alpha and composite behind.
+    out=bytearray(rendered)
+    for sy in range(h):
+        for sx in range(w):
+            source_px=_frame_at(pixels,w,h,sx,sy)
+            if not source_px[3]:
+                continue
+            dx,dy=sx+distance,sy+distance
+            if dx>=w or dy>=h:
+                continue
+            p=(dy*w+dx)*4
+            if out[p+3]==0:
+                out[p:p+4]=bytes((0,0,0,min(110,source_px[3]*110//255)))
+    blob=png_rgba(bytes(out),w,h)
+    result={
+        "ok":True,"action":"upscale-shadow","target":policy["target_id"],
+        "source":source,"output":output,
+        "source_sha256":sha256(old).hexdigest(),
+        "output_sha256":sha256(blob).hexdigest(),
+        "contact_shadow_offset":distance,"original_shape_preserved":True,
+        "rendered_dimensions":[w,h],"dry_run":dry_run,
+        "independent_lighting_evaluation":False,
+    }
+    if not dry_run:
+        _create_only(dest,blob)
+        from skeleton.developer.jeeves_game_upscale_queue import record_output
+        result["training_candidate"]=record_output(
+            root,category="shadow",source=source,output=output,
+            input_sha256=result["source_sha256"],output_sha256=result["output_sha256"],
+            target=policy["target_id"])
+    return result
+
+
+def parallax(root: Path, *, source: str, output: str, target: str,
+             pan: int = 8, dry_run: bool = False) -> dict[str,Any]:
+    """Composite actual authored PNG planes with distinct camera motion."""
+    _policy(target)
+    if type(pan) is not int or not -256<=pan<=256:
+        raise WorldUpscaleError("parallax pan must remain within one bounded render slice")
+    spec,sha=_source_json(root,source)
+    if set(spec)!={"schema","width","height","layers"} or spec["schema"]!="skeleton.jeeves.parallax.v1":
+        raise WorldUpscaleError("unsupported parallax source")
+    w,h=spec["width"],spec["height"]
+    if type(w) is not int or type(h) is not int or not 1<=w<=1024 or not 1<=h<=1024 or w*h>1024*1024:
+        raise WorldUpscaleError("parallax canvas exceeds canonical PNG capacity")
+    layers=spec["layers"]
+    if not isinstance(layers,list) or not 2<=len(layers)<=16:
+        raise WorldUpscaleError("parallax needs 2..16 depth-separated original art planes")
+    distinct=set()
+    assembled=bytearray(w*h*4)
+    measured=[]
+    for item in sorted(layers,key=lambda a:a.get("depth",-1),reverse=True):
+        if not isinstance(item,dict) or set(item)!={"path","depth"}:
+            raise WorldUpscaleError("parallax layer contract invalid")
+        depth=item["depth"]
+        if type(depth) not in (float,int) or not math.isfinite(depth) or not 0<=depth<=1:
+            raise WorldUpscaleError("invalid parallax plane depth")
+        if depth in distinct:
+            raise WorldUpscaleError("duplicate parallax depth; no visual separation")
+        distinct.add(depth)
+        original=_path(root,item["path"],must_exist=True).read_bytes()
+        sw,sh,rgba=decode_png(original)
+        if (sw,sh)!=(w,h):
+            raise WorldUpscaleError("parallax planes must be authored at canvas resolution")
+        shift=round(pan*(1-depth))
+        for y in range(h):
+            for x in range(w):
+                sx=x+shift
+                if not 0<=sx<w:
+                    continue
+                r,g,b,a=_frame_at(rgba,w,h,sx,y)
+                if not a:
+                    continue
+                p=(y*w+x)*4
+                dr,dg,db,da=assembled[p:p+4]
+                final=a+da*(255-a)//255
+                if final:
+                    out_rgb=[
+                        (foreground*a + background*da*(255-a)//255)//final
+                        for foreground,background in ((r,dr),(g,dg),(b,db))
+                    ]
+                    assembled[p:p+4]=bytes((*out_rgb,final))
+        measured.append({"path":item["path"],"sha256":sha256(original).hexdigest(),
+                         "depth":depth,"camera_shift_px":shift})
+    blob=png_rgba(bytes(assembled),w,h)
+    dest=_path(root,output,must_exist=False)
+    result={"ok":True,"action":"upscale-parallax",
+            "source":source,"source_sha256":sha,"output":output,
+            "output_sha256":sha256(blob).hexdigest(),
+            "pan":pan,"planes":measured,"dimensions":[w,h],
+            "composited_original_pixels":True,"dry_run":dry_run,
+            "native_gpu_rendering_proven":False}
+    if not dry_run:
+        _create_only(dest,blob)
+        from skeleton.developer.jeeves_game_upscale_queue import record_output
+        result["training_candidate"]=record_output(
+            root,category="parallax",source=source,output=output,
+            input_sha256=sha,output_sha256=result["output_sha256"],target=target)
+    return result
