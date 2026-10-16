@@ -136,6 +136,16 @@ func _ready() -> void:
     music.text = "Mute / play original score"
     music.pressed.connect(stage.toggle_music)
     playback.add_child(music)
+    var atmosphere := HBoxContainer.new()
+    layout.add_child(atmosphere)
+    var atmosphere_label := Label.new()
+    atmosphere_label.text = "Animated weather / foliage density"
+    atmosphere.add_child(atmosphere_label)
+    for quality in [0, 1, 2, 3]:
+        var density_button := Button.new()
+        density_button.text = str(quality)
+        density_button.pressed.connect(stage.set_environment_quality.bind(quality))
+        atmosphere.add_child(density_button)
     var scroll := ScrollContainer.new()
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     layout.add_child(scroll)
