@@ -162,8 +162,15 @@ def upscale(root: Path, *, source: str, output: str, target: str,
     encoded = png_rgba(scaled, w * factor, h * factor)
     sha_in = hashlib.sha256(raw).hexdigest()
     sha_out = hashlib.sha256(encoded).hexdigest()
+    candidate = None
     if not dry_run:
         _create_only(dest, encoded)
+        from skeleton.developer.jeeves_game_upscale_queue import record_output
+        candidate = record_output(
+            root, category="asset", source=source, output=output,
+            input_sha256=sha_in, output_sha256=sha_out,
+            target=policy["target_id"], quality="requires_review",
+        )
     return {
         "ok": True, "action": "upscale", "schema": SCHEMA,
         "source": source, "output": output, "input_sha256": sha_in,
@@ -179,6 +186,7 @@ def upscale(root: Path, *, source: str, output: str, target: str,
         "native_console_quality_verified": False,
         "subjective_fidelity_verified": False,
         "production_qualified": False,
+        "training_candidate": candidate,
     }
 
 
