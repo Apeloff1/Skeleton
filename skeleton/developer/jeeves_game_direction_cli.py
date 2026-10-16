@@ -35,3 +35,15 @@ def direction(root: Path, *, action: str, source: str,
     result["operator_review_scores_external_verified"]=False
     result["next_canonical_owner"]="skeleton.ai.game_builder.story_workspace"
     return result
+
+
+
+def benchmark(root: Path, *, source: str) -> dict[str,Any]:
+    from skeleton.developer.jeeves_game_quality import _read
+    from skeleton.ai.game_builder.story_reference_benchmark import audit_story_references
+    packet,digest=_read(root,source,2*1024*1024)
+    audit=audit_story_references(packet)
+    audit["source"]=source
+    audit["source_sha256"]=digest
+    audit["independent_commercial_data_verified"]=False
+    return audit
