@@ -39,6 +39,7 @@ def dev_help_text() -> str:
         jeeves plan|audit|next|context|handoff [--project DIR]
         jeeves propose --kind quest --brief "Original branching quest" [--include-notes] [--dragon-digest SHA256]
         jeeves dragon-review --source design/dragon_study.json
+        jeeves dragon-portfolio --source design/dragon_study.json
         jeeves dragon-ingest --source design/dragon_study.json --approve SOURCE_SHA256
         jeeves dragon-plan --source design/dragon_study.json --genre GENRE --target CONSOLE
         jeeves dragon-adopt --source design/dragon_study.json --genre GENRE --target CONSOLE --approve HANDOFF_SHA256
