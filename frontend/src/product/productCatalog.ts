@@ -36,6 +36,11 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     href: capabilityHref('studio'),
     backendSurface: '/api/gameforge-studio',
     actions: [
+      { id: 'unified-galaxy', title: 'Galaxy Studio · unified', description: 'Open the existing idea-to-build workflow with Snowball and export handoffs.', navigationId: 'studio.galaxy.unified', href: '/studio' },
+      { id: 'classic-galaxy', title: 'Galaxy Studio Factory', description: 'Use the classic questionnaire and 100-phase builder.', navigationId: 'studio.galaxy.classic', href: '/galaxy' },
+      { id: 'snowball-flow', title: 'Snowball Flow', description: 'Review, refine and lock forge stages with the growing game design document.', navigationId: 'studio.snowball', href: '/snowball' },
+      { id: 'world-workbench', title: 'World Workbench', description: 'Inspect and author persistent world systems for the current build.', navigationId: 'studio.world.workbench', href: '/world-workbench' },
+      { id: 'studio-settings', title: 'Galaxy Studio settings', description: 'Configure existing build emphases and phase preferences.', navigationId: 'studio.settings', href: '/settings/galaxy-studio' },
       { id: 'new-project', title: 'New project', description: 'Start from a prompt, brief or template.', operation: 'project.create', legacyHref: '/ai-game-generator' },
       { id: 'build', title: 'Build', description: 'Compile a project into a runnable artifact.', operation: 'build.submit', legacyHref: '/apk-build' },
       { id: 'inspect', title: 'Inspect pipeline', description: 'Review build stages and generated artifacts.', operation: 'pipeline.inspect', legacyHref: '/ai-pipeline' },
@@ -91,6 +96,12 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/jeeves',
     actions: [
       { id: 'reason-execute', title: 'Reason with Jeeves', description: 'Execute an admitted reason operation through the canonical Jeeves provider.', operation: 'jeeves.reason' },
+      { id: 'jeeves-cockpit', title: 'Jeeves Cockpit', description: 'Inspect persona, services, service health and operator controls.', navigationId: 'jeeves.cockpit', href: '/jeeves-hub' },
+      { id: 'jeeves-workbench', title: 'Jeeves Workbench', description: 'Open the existing agent workbench and orchestration workspace.', navigationId: 'jeeves.workbench', href: '/jeeves-workbench' },
+      { id: 'jeeves-settings', title: 'Jeeves settings', description: 'Edit persona, directives, DNA controls and model-facing preferences.', navigationId: 'jeeves.settings', href: '/settings/jeeves' },
+      { id: 'jeeves-runtime', title: 'AI runtime and readiness', description: 'Inspect setup, local inference readiness and model service status.', navigationId: 'jeeves.runtime.setup', href: '/setup' },
+      { id: 'model-chat', title: 'Governed model workspace', description: 'Inspect model inventory and use server-authorized conversation and replay.', navigationId: 'jeeves.models.workspace', href: '/ai-chat' },
+      { id: 'mirror-simulation', title: 'Mirror Room', description: 'Open the existing training, review and adversarial mirror UI.', navigationId: 'jeeves.mirrors', href: '/mirror-room' },
       { id: 'reason', title: 'AI chat', description: 'Work through a problem with the configured engine and durable conversation history.', navigationId: 'jeeves.chat.canonical', href: '/jeeves-chat' },
       { id: 'governed-chat', title: 'Conversation workspace', description: 'Use governed attachments, message editing and regeneration with canonical conversation history.', navigationId: 'jeeves.chat.governed', href: '/ai-chat' },
       { id: 'capture-web', title: 'Capture web knowledge', description: 'Authorize a bounded crawl and inspect captured sources.', navigationId: 'jeeves.crawler', href: '/crawler' },
@@ -107,6 +118,13 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     href: capabilityHref('academy'),
     backendSurface: '/api/academy',
     actions: [
+      { id: 'academy-home', title: 'Mega Academy', description: 'Open the cross-discipline Academy and curriculum hub.', navigationId: 'academy.mega', href: '/mega-academy' },
+      { id: 'academy-learning', title: 'Learning Hub', description: 'Explore training paths, lessons and learning resources.', navigationId: 'academy.learning', href: '/learning-hub' },
+      { id: 'academy-classes', title: 'My Classes', description: 'Resume enrolled classes, quizzes and progression.', navigationId: 'academy.classes', href: '/my-classes' },
+      { id: 'academy-cs', title: 'Computer Science Academy', description: 'Study programming and computer-science curricula.', navigationId: 'academy.cs', href: '/cs-academy' },
+      { id: 'academy-math', title: 'Math Academy', description: 'Open mathematics lessons and exercises.', navigationId: 'academy.math', href: '/math-academy' },
+      { id: 'academy-physics', title: 'Physics Academy', description: 'Open physics lessons and simulations.', navigationId: 'academy.physics', href: '/physics-academy' },
+      { id: 'academy-settings', title: 'Academy settings', description: 'Adjust narration, reading and study preferences.', navigationId: 'academy.settings', href: '/settings/academy' },
       { id: 'continue', title: 'Continue learning', description: 'Resume the current learning path.', operation: 'academy.continue' },
       { id: 'practice', title: 'Practice', description: 'Open adaptive exercises and challenges.', operation: 'academy.practice' },
       { id: 'progress', title: 'Learning progress', description: 'Inspect mastery, streaks and completed work.', operation: 'academy.progress' },
@@ -120,6 +138,9 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     href: capabilityHref('operations'),
     backendSurface: '/api/ops',
     actions: [
+      { id: 'jeeves-console', title: 'Jeeves service cockpit', description: 'Review service reachability and health before running workflows.', navigationId: 'ops.jeeves.cockpit', href: '/jeeves-hub' },
+      { id: 'control-dashboard', title: 'Governed control plane', description: 'Inspect execution receipts, policy gates and runtime readiness.', navigationId: 'ops.control', href: '/control-plane' },
+      { id: 'preferences', title: 'All settings', description: 'Open the existing settings hub without duplicating preferences.', navigationId: 'ops.settings', href: '/settings' },
       { id: 'agents', title: 'Agents', description: 'Inspect active workers, tasks and health.', operation: 'ops.agents', legacyHref: '/agents' },
       { id: 'setup', title: 'Setup & readiness', description: 'Check first-install services, model availability and capture readiness.', navigationId: 'operations.setup', href: '/setup' },
       { id: 'runtime', title: 'Runtime health', description: 'Inspect governed queues, policy, audit and resource pressure.', operation: 'ops.runtime', href: '/control-plane' },
@@ -140,6 +161,40 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     ],
   },
 ] as const;
+
+/**
+ * Existing product surfaces are exposed directly on the consolidated home.
+ * Resolve from canonical navigation actions so deep links cannot drift away
+ * from the capability catalog. These links NEVER admit backend operations.
+ */
+export const PRODUCT_HOME_SHORTCUT_IDS = [
+  'studio.galaxy.unified',
+  'studio.snowball',
+  'academy.mega',
+  'jeeves.cockpit',
+  'jeeves.workbench',
+  'jeeves.chat.governed',
+  'jeeves.runtime.setup',
+  'ops.settings',
+] as const;
+
+export const PRODUCT_HOME_SHORTCUTS: readonly {
+  id: string;
+  title: string;
+  href: string;
+  pillar: ProductPillar;
+}[] = PRODUCT_CAPABILITIES.flatMap((capability) =>
+  capability.actions
+    .filter((action) =>
+      typeof action.navigationId === 'string' &&
+      (PRODUCT_HOME_SHORTCUT_IDS as readonly string[]).includes(action.navigationId))
+    .map((action) => ({
+      id: action.id,
+      title: action.title,
+      href: action.href as string,
+      pillar: capability.pillar,
+    })),
+);
 
 export function capabilitiesFor(pillar: ProductPillar): readonly ProductCapability[] {
   return PRODUCT_CAPABILITIES.filter((capability) => capability.pillar === pillar);

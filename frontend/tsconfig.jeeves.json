@@ -13,6 +13,15 @@
     "app/story-index.tsx",
     "features/Jeeves/ChatStoryActions.tsx",
     "features/Jeeves/storyContext.ts",
+    "features/Jeeves/GovernedChatWorkspace.tsx",
+    "features/Jeeves/JeevesRuntimeStatus.tsx",
+    "app/jeeves-hub.tsx",
+    "app/ai-chat.tsx",
+    "app/settings/jeeves.tsx",
+    "state/settingsStore.ts",
+    "src/product/productCatalog.ts",
+    "app/product.tsx",
+    "app/snowball.tsx",
     "expo-env.d.ts"
   ]
 }
