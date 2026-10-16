@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 
 import {
   PRODUCT_CAPABILITIES,
+  PRODUCT_WORKSPACES,
   ProductPillar,
   capabilitiesFor,
 } from '../src/product/productCatalog';
@@ -151,8 +152,28 @@ export default function ProductShellRoute() {
           </View>
         </TouchableOpacity>
 
-        <View style={styles.metricsRow}>
-          {[['Setup & readiness', '/setup'], ['AI chat', '/jeeves-chat'], ['Web capture', '/crawler']].map(([title, href]) => <TouchableOpacity key={href} accessibilityRole="button" onPress={() => router.push(href as never)} style={styles.healthRefresh}><Text style={styles.healthRefreshText}>{title} →</Text></TouchableOpacity>)}
+        <View style={styles.workspacesPanel}>
+          <Text style={styles.healthTitle}>Your production workspaces</Text>
+          <Text style={styles.healthSubtitle}>One navigation surface over the existing Academy, Studio, Snowball, Jeeves and learning routes. A link does not imply service readiness.</Text>
+          <View style={styles.workspacesGrid}>
+            {PRODUCT_WORKSPACES.map((workspace) => (
+              <TouchableOpacity
+                key={workspace.id}
+                testID={`product-workspace-${workspace.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${workspace.title}`}
+                accessibilityHint={workspace.subtitle}
+                onPress={() => router.push(workspace.href as never)}
+                style={[styles.workspaceCard, isWide ? styles.workspaceWide : styles.workspaceNarrow]}
+              >
+                <Text style={styles.workspaceTitle}>{workspace.title} →</Text>
+                <Text style={styles.workspaceSubtitle}>{workspace.subtitle}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+        <View style={[styles.metricsRow, styles.quickLinks]}>
+          {[['Setup & readiness', '/setup'], ['Web capture', '/crawler']].map(([title, href]) => <TouchableOpacity key={href} accessibilityRole="button" onPress={() => router.push(href as never)} style={styles.healthRefresh}><Text style={styles.healthRefreshText}>{title} →</Text></TouchableOpacity>)}
         </View>
 
         <View style={styles.healthPanel}>
@@ -345,6 +366,14 @@ const styles = StyleSheet.create({
   journeysCopy: { gap: 6 },
   journeysTitle: { color: '#F8FAFC', fontSize: 17, fontWeight: '800' },
   journeysText: { color: '#CBD0EE', fontSize: 12, lineHeight: 19 },
+  workspacesPanel: { borderRadius: 18, borderWidth: 1, borderColor: '#303E65', backgroundColor: '#101728', padding: 16, gap: 12 },
+  workspacesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  workspaceCard: { minHeight: 72, backgroundColor: '#1B2440', borderRadius: 12, borderWidth: 1, borderColor: '#39476C', padding: 12, justifyContent: 'center' },
+  workspaceNarrow: { width: '100%' },
+  workspaceWide: { width: '30%', flexGrow: 1 },
+  workspaceTitle: { color: '#F1F5F9', fontSize: 14, fontWeight: '800' },
+  workspaceSubtitle: { color: '#AAB7D7', fontSize: 11, lineHeight: 17, marginTop: 5 },
+  quickLinks: { flexWrap: 'wrap', marginTop: 0 },
   healthPanel: { borderRadius: 18, borderWidth: 1, borderColor: '#202737', backgroundColor: '#0F141F', padding: 16, gap: 12 },
   healthHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   healthCopy: { flex: 1 },
