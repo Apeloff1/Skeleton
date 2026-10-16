@@ -20,7 +20,10 @@ export const C = {
 } as const;
 
 export const TONE_COLOR: Record<Tone, string> = {
-  ok: C.green, warn: C.amber, bad: C.red, idle: C.dim,
+  get ok() { return C.green; },
+  get warn() { return C.amber; },
+  get bad() { return C.red; },
+  get idle() { return C.dim; },
 };
 
 export const TONE_GLYPH: Record<Tone, string> = {

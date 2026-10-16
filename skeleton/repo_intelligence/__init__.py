@@ -11,6 +11,7 @@ from .batch_plan import (
     snapshot_b001,
 )
 from .git_index import GitIndex, GitIndexError, GitIndexSnapshot, TrackedFile
+from .exact_duplicate_atlas import ExactDuplicateAtlas, ExactDuplicateCluster, build_exact_duplicate_atlas
 
 __all__ = [
     "BATCH_COUNT",
@@ -19,6 +20,9 @@ __all__ = [
     "BatchPlan",
     "BatchPlanError",
     "BatchSpec",
+    "ExactDuplicateAtlas",
+    "ExactDuplicateCluster",
+    "build_exact_duplicate_atlas",
     "GitIndex",
     "GitIndexError",
     "GitIndexSnapshot",

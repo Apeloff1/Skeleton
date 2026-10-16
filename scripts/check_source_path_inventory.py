@@ -89,10 +89,16 @@ CANONICAL_PREFIXES = (
 
 # Transitional/support roots remain first-party but cannot silently acquire
 # canonical runtime ownership. machine/architecture.json is authoritative.
+# Corpus roots are explicitly source-reviewed. A new data/ subtree does
+# NOT inherit first-party admission (even if its suffix looks binary/fixture).
+APPROVED_DATA_PREFIXES = (
+    "data/conversational/",
+    "data/game_building/",
+    "data/game_data_v2/",
+)
+
 FIRST_PARTY_PREFIXES = (
-    "data/conversational/",  # explicitly admitted authored conversational corpus
-    "data/game_building/",  # approved authored game-design reference data
-    "data/game_data_v2/",  # approved versioned game metadata
+    *APPROVED_DATA_PREFIXES,
     "apps/",
     "core/",
     "eval/",
@@ -189,6 +195,12 @@ def classify_path(path: object) -> str:
     try:
         normalized = normalize_repo_path(path)
     except ValueError:
+        return "unknown"
+
+    # Gate root ownership before extension-based binary/generated/fixture rules.
+    # Otherwise data/unreviewed/malicious.png would bypass the curated root
+    # inventory merely because it has a permitted binary suffix.
+    if normalized.startswith("data/") and not _has_prefix(normalized, APPROVED_DATA_PREFIXES):
         return "unknown"
 
     parts = _parts(normalized)

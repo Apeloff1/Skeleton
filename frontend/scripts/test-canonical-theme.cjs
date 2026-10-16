@@ -90,6 +90,25 @@ test('legacy light and dark roles read canonical and active skin values', () => 
   assert.equal(roles.themes.light.primary, tokens.colors.light.primary);
 });
 
+test('Deluxe cards and Forge status colors follow skin transitions without stale captures', () => {
+  const deluxe = transpile('src/theme/deluxe.ts', {
+    '../../theme/tokens': tokens,
+  });
+  const forge = transpile('src/skeletonForge/components/theme.ts', {
+    '../../../theme/tokens': tokens,
+  });
+  for (const id of ['hyperwave', 'oceanic', 'ember', 'lavender']) {
+    const c = skins.SKIN_BY_ID[id].colors;
+    Object.assign(tokens.default.colors, c);
+    assert.equal(deluxe.C.brand, c.primary, id);
+    assert.equal(deluxe.card.backgroundColor, c.bgElevated, id);
+    assert.equal(deluxe.cardActive.borderColor, c.primary, id);
+    assert.equal(forge.TONE_COLOR.warn, tokens.default.colors.warning, id);
+    assert.equal(forge.TONE_COLOR.bad, tokens.default.colors.danger, id);
+    assert.equal(forge.C.accent, c.primaryHover, id);
+  }
+});
+
 test('Deluxe and cockpit contain no independent hexadecimal color palettes', () => {
   for (const relative of ['src/theme/deluxe.ts',
     'src/skeletonForge/components/theme.ts', 'constants/themes.ts']) {
