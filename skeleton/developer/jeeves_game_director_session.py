@@ -220,6 +220,10 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
         economy = state.world_state.society
         calendar = phase(rules, state.turn)
         people = residents_here(rules, state.scene, state.turn)
+        allowed_dialogues = {
+            option.key for option in available_director_actions(world, state)
+            if option.kind == "discuss"
+        }
         relationships = dict(economy.relationships)
         stock = {(sh, item): count for sh, item, count in economy.shop_stock}
         merchants = []
@@ -241,6 +245,8 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
             "wallet": economy.balance,
             "relationships": [list(x) for x in economy.relationships],
             "owned_goods": [list(x) for x in economy.owned],
+            "canonical_dialogue_history": [list(x)
+                                           for x in economy.dialogue_history],
             "present_residents": [{
                 "key": person.key, "name": person.name,
                 "faction": person.faction,
@@ -251,7 +257,7 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
                     "prompt": option.prompt,
                     "response_in_locked_content_hidden": True,
                 } for option in person.dialogue
-                    if set(option.requires_flags).issubset(state.narrative_flags)],
+                    if person.key + "_" + option.key in allowed_dialogues],
             } for person in people],
             "open_merchants": merchants,
             "total_merchant_transactions": sum(
