@@ -136,6 +136,7 @@ jobs:
           tests/test_game_builder_story_direction_quality.py
           tests/test_game_builder_story_dramaturgy_graph.py
           tests/test_game_builder_story_direction_shots.py
+          tests/test_game_builder_story_gameplay_bridge.py
           skeleton/testing/test_jeeves_game_direction.py
           skeleton/testing/test_jeeves_game_render.py
           skeleton/testing/test_jeeves_game_quality.py
