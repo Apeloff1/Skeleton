@@ -48,6 +48,10 @@ def analyze(world: Any) -> dict[str, Any]:
             "region_coverage": sorted({
                 region_by_scene[scene] for scene in person.schedule
             }),
+            "authored_dialogue_branch_count": len(person.dialogue),
+            "once_only_dialogue_topics": [c.key for c in person.dialogue if c.once],
+            "quest_locked_dialogue_topics": [c.key for c in person.dialogue
+                                             if c.requires_flags],
             "initial_trust": person.initial_trust,
             "trust_gain_per_conversation": person.trust_gain,
             "min_trust_for_flag": person.unlock_at_trust,
