@@ -369,7 +369,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-serve", "director-atlas-export", "director-atlas-verify",
-                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check"))
+                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -394,6 +394,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--goal")
     jeeves.add_argument("--routes", type=int)
     jeeves.add_argument("--session")
+    jeeves.add_argument("--sessions")
     jeeves.add_argument("--port", type=int)
     jeeves.add_argument("--other-session")
     jeeves.add_argument("--choice")
@@ -458,6 +459,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--quest-types", options.quest_types), ("--stages", options.stages),
                                 ("--goal", options.goal), ("--routes", options.routes),
                                 ("--session", options.session), ("--other-session", options.other_session),
+                                ("--sessions", options.sessions),
                                 ("--port", options.port),
                                 ("--choice", options.choice),
                                 ("--output", options.output), ("--mode", options.mode),
