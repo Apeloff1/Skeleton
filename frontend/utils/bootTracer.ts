@@ -415,6 +415,7 @@ export async function resetBootState(): Promise<boolean> {
       return false; // unknown or failed; never claim durable success
     }
     _memoryTrace = [];
+    _cleanBootAcknowledged = false; // operator reset permits a fresh clean receipt
     _notify();
     return true;
   } catch {
