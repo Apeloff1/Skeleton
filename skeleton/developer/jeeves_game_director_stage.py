@@ -25,6 +25,7 @@ var is_paused: bool = false
 var playing: bool = false
 var cue_label: Label
 var runtime_label: Label
+var motion_tweens: Array[Tween] = []
 var last_completed_timeline: String = ""
 var supported_cues: Dictionary = {
     "camera_cut": true, "camera_pan": true, "camera_track": true,
@@ -162,6 +163,7 @@ func _process(delta: float) -> void:
     queue_redraw()
 
 func _execute_cue(cue: Dictionary) -> void:
+    motion_tweens = motion_tweens.filter(func(t): return t != null and t.is_valid())
     var kind: String = str(cue.get("kind", ""))
     var value: String = str(cue.get("value", ""))
     var duration_ms: float = clamp(float(cue.get("duration", 0)), 0.0, 120000.0)
@@ -175,13 +177,17 @@ func _execute_cue(cue: Dictionary) -> void:
         "camera_pan", "camera_track", "camera_dolly", "camera_shake":
             # Native camera presentation, not a fabricated 3D camera path.
             var tween := create_tween()
+            motion_tweens.append(tween)
+            tween.set_speed_scale(playback_speed)
             tween.tween_property(self, "shift", min(90.0, size.x * 0.12),
-                                 max(0.1, duration_ms / 1000.0 / playback_speed))
+                                 max(0.1, duration_ms / 1000.0))
             tween.tween_property(self, "shift", 0.0, 0.3)
         "camera_zoom":
             var tween := create_tween()
+            motion_tweens.append(tween)
+            tween.set_speed_scale(playback_speed)
             tween.tween_property(self, "camera_scale", 1.08,
-                                 max(0.1, duration_ms / 1000.0 / playback_speed))
+                                 max(0.1, duration_ms / 1000.0))
             tween.tween_property(self, "camera_scale", 1.0, 0.3)
         "lighting", "color_grade", "weather":
             if kind == "weather":
@@ -204,6 +210,12 @@ func _execute_cue(cue: Dictionary) -> void:
 
 func toggle_pause() -> void:
     is_paused = not is_paused
+    for tween in motion_tweens:
+        if tween != null and tween.is_valid():
+            if is_paused:
+                tween.pause()
+            else:
+                tween.play()
     _labels()
 
 func skip_timeline() -> void:
@@ -211,10 +223,17 @@ func skip_timeline() -> void:
         return
     # Only the local presentation is skipped; no Director quest action is sent.
     active_cues.clear()
+    for tween in motion_tweens:
+        if tween != null and tween.is_valid():
+            tween.kill()
+    motion_tweens.clear()
     _next_timeline()
 
 func set_playback_speed(value: float) -> void:
     playback_speed = clamp(value, 0.1, 8.0)
+    for tween in motion_tweens:
+        if tween != null and tween.is_valid():
+            tween.set_speed_scale(playback_speed)
     _labels()
 
 func _labels() -> void:
