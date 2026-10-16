@@ -36,6 +36,71 @@ def _load_world(root: Path, source: str):
     return world, identity
 
 
+def _runtime_signal_atlas(root: Path, *, source: str, world_digest: str) -> dict[str, Any]:
+    """Read-only local source evidence; failures remain diagnostics, never P0 signoff."""
+    from skeleton.developer.jeeves_game_director_atlas import verify
+    target = root / "build" / "director_atlases" / world_digest[:20]
+    if not target.exists() and not target.is_symlink():
+        return {"present": False, "source_verified": False}
+    try:
+        checked = verify(root, source=source)
+        return {"present": True, "source_verified": checked["source_manifest_verified"]}
+    except (OSError, ValueError, KeyError) as exc:
+        return {"present": True, "source_verified": False, "error": str(exc)}
+
+
+def _runtime_signal_sessions(root: Path, *, world_digest: str) -> dict[str, Any]:
+    """Count fully replay-verified, exact-world sessions without mutating evidence."""
+    from skeleton.developer.jeeves_game_director_session import inspect
+    folder = root / ".jeeves" / "director_sessions"
+    if folder.is_symlink() or (folder.exists() and not folder.is_dir()):
+        return {"verified_sessions": 0, "invalid_sessions": 1, "warning": "unsafe session inventory"}
+    if not folder.exists():
+        return {"verified_sessions": 0, "invalid_sessions": 0}
+    names = sorted(folder.iterdir(), key=lambda p: p.name)
+    if len(names) > 32:
+        return {"verified_sessions": 0, "invalid_sessions": 0,
+                "warning": "specialized session audit required above 32 entries"}
+    verified, invalid, steps = 0, 0, 0
+    for node in names:
+        if node.is_symlink() or not node.is_dir():
+            invalid += 1
+            continue
+        try:
+            report = inspect(root, session=node.name)
+            if report["world_sha256"] == world_digest:
+                verified += 1
+                steps += report["sequence"]
+        except (OSError, ValueError, KeyError, TypeError):
+            invalid += 1
+    return {"verified_sessions": verified, "invalid_sessions": invalid,
+            "replayed_interactive_actions": steps}
+
+
+def _runtime_signal_bindings(root: Path, *, source: str) -> dict[str, Any]:
+    from skeleton.developer.jeeves_game_director_bindings import check
+    import re
+    base = root / "design"
+    if base.is_symlink() or not base.is_dir():
+        return {"verified_contracts": 0, "invalid_contracts": 1}
+    paths = list(base.glob("director_bindings_*.json"))
+    if len(paths) > 32:
+        return {"verified_contracts": 0, "invalid_contracts": 0,
+                "warning": "specialized binding audit required above 32 files"}
+    good, bad = 0, 0
+    for node in paths:
+        digest = node.name[len("director_bindings_"):-len(".json")]
+        if not re.fullmatch(r"[0-9a-f]{64}", digest) or node.is_symlink():
+            bad += 1
+            continue
+        try:
+            if check(root, source=source, digest=digest)["binding_source_verified"]:
+                good += 1
+        except (OSError, ValueError, TypeError, KeyError):
+            bad += 1
+    return {"verified_contracts": good, "invalid_contracts": bad}
+
+
 def board(root: Path, *, source: str, routes: int = 3,
           dragon_digest: str | None = None) -> dict[str, Any]:
     from skeleton.ai.game_builder.quest_campaign_completion import compare_campaign_branches
@@ -124,6 +189,15 @@ def board(root: Path, *, source: str, routes: int = 3,
         "scene_workorders": scenes, "quest_stage_workorders": stages,
         "dragon_mechanic_workorders": dragon_work,
         "gameforge_engine": engine,
+        "new_runtime_development_evidence": {
+            "interactive_director_sessions": _runtime_signal_sessions(
+                root, world_digest=world.digest),
+            "godot_scene_atlas": _runtime_signal_atlas(
+                root, source=source, world_digest=world.digest),
+            "engine_event_bindings": _runtime_signal_bindings(
+                root, source=source),
+            "native_gameplay_certified_by_sources": False,
+        },
         "remaining_milestones": [
             {"id": "GAME-SCENES", "required": "Render and inspect every scene and asset", "verified": False},
             {"id": "GAME-INTERACTION", "required": "Wire simulated quest actions into a playable engine", "verified": False},
