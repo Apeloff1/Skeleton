@@ -14,9 +14,11 @@ import tempfile
 from typing import Any
 
 from skeleton.developer.jeeves_game_production_board import _load_world
+from skeleton.developer.jeeves_game_director_player import PLAYER_SCRIPT, PLAYER_SCENE
 
 SCHEMA = "skeleton.jeeves.director_atlas_export.v1"
-FILES = ("project.godot", "main.tscn", "director_atlas.gd", "director_world.json")
+FILES = ("project.godot", "main.tscn", "director_atlas.gd", "director_world.json",
+         "director_player.gd", "director_player.tscn")
 GDSCRIPT = r'''extends Control
 
 var world: Dictionary = {}
@@ -41,6 +43,10 @@ func _ready() -> void:
     heading.text = "Original-game Director scene atlas"
     heading.add_theme_font_size_override("font_size", 25)
     layout.add_child(heading)
+    var play := Button.new()
+    play.text = "Play live Director quests (requires local Python bridge)"
+    play.pressed.connect(func(): get_tree().change_scene_to_file("res://director_player.tscn"))
+    layout.add_child(play)
     var scroll := ScrollContainer.new()
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     layout.add_child(scroll)
@@ -153,6 +159,8 @@ renderer/rendering_method.mobile="gl_compatibility"
         "project.godot": project, "main.tscn": SCENE.encode("utf-8"),
         "director_atlas.gd": GDSCRIPT.encode("utf-8"),
         "director_world.json": data,
+        "director_player.gd": PLAYER_SCRIPT.encode("utf-8"),
+        "director_player.tscn": PLAYER_SCENE.encode("utf-8"),
     }
     if any(len(content) > 2 * 1024 * 1024 for content in contents.values()):
         raise ValueError("Director atlas export file exceeds its supported size")
@@ -162,7 +170,9 @@ renderer/rendering_method.mobile="gl_compatibility"
         "director_world_sha256": world.digest,
         "files_sha256": {path: _hash(content) for path, content in sorted(contents.items())},
         "engine": "Godot 4 gl_compatibility",
-        "scope": "interactive-scene-atlas-only",
+        "scope": "navigable-atlas-and-loopback-authoritative-quest-ui",
+        "godot_quest_ui_implemented_in_source": True,
+        "live_quest_authority": "separate-local-Python-Director-server",
         "quest_logic_implemented_in_native_preview": False,
         "native_binary_executed": False,
         "real_game_playthrough_verified": False,
