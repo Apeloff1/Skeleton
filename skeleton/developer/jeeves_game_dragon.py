@@ -146,6 +146,19 @@ def ingest(root: Path, *, source: str, approved_sha256: str | None) -> dict[str,
             "trained_model_weights": False}
 
 
+def _reviewed_session_identity(doc: dict[str, Any]) -> str:
+    """Re-run canonical Dragon admission in volatile memory to derive exact session ID."""
+    from skeleton.ai.webcrawler.dragon_game_builder_bridge import review_recording
+    from skeleton.ai.webcrawler.dragon_game_mechanics import GameMechanicsMemory
+    with closing(sqlite3.connect(":memory:")) as db:
+        memory = GameMechanicsMemory(db)
+        return review_recording(
+            memory, owner=doc["owner"], game_label=doc["game_label"],
+            duration_ms=doc["duration_ms"], observations=_observations(doc),
+            capture_consent=True, analysis_consent=True, authorized=True,
+        ).session_id
+
+
 def _preview(root: Path, *, source: str, genre: str, target: str) -> dict[str, Any]:
     from skeleton.developer.game_cli import _load
     from skeleton.developer.jeeves_game_authoring import _config_identity
@@ -153,6 +166,7 @@ def _preview(root: Path, *, source: str, genre: str, target: str) -> dict[str, A
     from skeleton.ai.webcrawler.dragon_game_forge import DragonGameForge, GameDesignConstraint
     from skeleton.ai.webcrawler.dragon_game_builder_bridge import prepare_game_builder_handoff
     doc, source_sha = _packet(root, source)
+    exact_session = _reviewed_session_identity(doc)
     if not isinstance(genre, str) or not isinstance(target, str):
         raise ValueError("Dragon game forge needs --genre and --target")
     try:
@@ -167,8 +181,8 @@ def _preview(root: Path, *, source: str, genre: str, target: str) -> dict[str, A
             session_ids = {s.session_id for s in memory.sessions(doc["owner"], authorized=True)}
     except sqlite3.DatabaseError as exc:
         raise ValueError("Dragon observation database unavailable") from exc
-    if not session_ids:
-        raise ValueError("no Dragon sessions for the requested project owner")
+    if exact_session not in session_ids:
+        raise ValueError("Dragon study source has not been ingested or session evidence differs")
     # Handoff belongs to the current project configuration and source evidence.
     data = {
         "schema": HANDOFF_SCHEMA, "project": doc["project"],
