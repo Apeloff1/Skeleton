@@ -18,7 +18,8 @@ def direction(root: Path, *, action: str, source: str,
         evaluate_direction,revision_plan,DirectionError
     )
     data, sha = _read(root,source,16*1024*1024)
-    if data.get("schema")!=SCHEMA or set(data)!={"schema","bible","scenes","expert_reviews"}:
+    permitted={"schema","bible","scenes","expert_reviews"}
+    if data.get("schema")!=SCHEMA or set(data) not in (permitted, permitted|{"dramatic_threads"}):
         raise DirectionError("signed story-direction dossier requires bible, scenes and independent review claims")
     from skeleton.developer.game_cli import _load
     project = _load(root)["name"]
@@ -30,7 +31,7 @@ def direction(root: Path, *, action: str, source: str,
         raise DirectionError("story direction bible belongs to a different active game project")
     report = evaluate_direction(
         data["bible"],data["scenes"],reviewers=data["expert_reviews"],
-        passes=passes,
+        passes=passes, dramatic_threads=data.get("dramatic_threads"),
     )
     result=report if action=="direction-audit" else revision_plan(report)
     result["dossier_path"]=source
