@@ -390,6 +390,8 @@ func _render_state() -> void:
             _line("  " + str(resident.get("name", "")) +
                   " | trust " + str(resident.get("trust", 0)) +
                   " | " + str(resident.get("greeting", "")))
+            for topic in resident.get("available_dialogue_topics", []):
+                _line("    Available conversation: " + str(topic.get("prompt", "")))
         for merchant in society_info.get("open_merchants", []):
             _line("Market: " + str(merchant.get("name", "")))
             for product in merchant.get("products", []):
@@ -460,6 +462,20 @@ func _render_state() -> void:
                 _line("  World changed permanently: " + str(flag))
             for item in effects.get("inventory_spent", []):
                 _line("  Item used or fare paid: " + str(item))
+            if effects.get("society") is Dictionary:
+                var local: Dictionary = effects["society"]
+                if local.get("authored_dialogue") is Dictionary:
+                    var dialogue: Dictionary = local["authored_dialogue"]
+                    _line("  " + str(dialogue.get("speaker", "")) +
+                          " (" + str(dialogue.get("topic", "")) + "): " +
+                          str(dialogue.get("line", "")))
+                var wallet_delta: int = int(local.get("wallet_delta", 0))
+                if wallet_delta != 0:
+                    _line("  Actual wallet change: " + str(wallet_delta))
+                for bond in local.get("NPC_trust_changes", []):
+                    _line("  NPC relationship: " + str(bond.get("resident", "")) +
+                          " " + str(bond.get("before", 0)) + " → " +
+                          str(bond.get("after", 0)))
             if effects.get("transport") is Dictionary:
                 var transport: Dictionary = effects["transport"]
                 _line("  Transit: " + str(transport.get("mode", "")) + " " +
