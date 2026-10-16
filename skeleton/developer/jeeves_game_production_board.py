@@ -124,7 +124,7 @@ def _runtime_signal_dragon_policy(root: Path, *, world_digest: str
     for node in nodes:
         digest = node.name.removesuffix(".json")
         if (node.is_symlink() or not node.is_file()
-                or not re.fullmatch(r"[0-9a-f]{64}\\Z", digest)):
+                or not re.fullmatch(r"[0-9a-f]{64}\Z", digest)):
             invalid += 1
             continue
         try:
