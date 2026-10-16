@@ -40,6 +40,12 @@ async function _poll() {
     const r = await api.get<{ status?: string }>(
       '/api/health', { timeoutMs: 6_000, retries: 1 },
     );
+    // Ignore an obsolete result *before* touching the published status.
+    // A stopped observer must never revive itself after a slow request.
+    if (generation !== _generation) {
+      _inFlight = false;
+      return;
+    }
     if (r.ok && r.data) {
       _fails = 0;                                   // any success clears the streak
       // Passive tunnel inactivity does not establish current reachability.
