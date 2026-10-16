@@ -61,5 +61,15 @@ The changes are compatible with legacy receipts. Rollback means revert this bran
 ## L12 — Operator controls
 Expose manual retry, continue-anyway, safe mode and the existing boot log. None is removed. If the critical probe is unavailable, avoid silently clearing diagnostics; operators can still choose the product shell through the static fallback.
 
+## Supplemental hardening — same source-compatible release slice
+- `frontend/app/index.tsx` latches a single entry decision: a late native storage result cannot flip an already displayed cascade into Safe Mode.
+- `frontend/components/NonCriticalHostBoundary.tsx` isolates each auxiliary host (network status, toast, action sheets and development overlay). An outer root error boundary catches provider failures independently of the route boundary.
+- `frontend/utils/safeStorage.ts` treats timed-out writes, deletes and prunes as **unverified failures** rather than successful mutations. It does not cache fallback reads from an unresponsive native storage call. Crash counter and trace archive are exempt from cache pruning.
+- `frontend/app/safe-mode.tsx` clears the in-process storage mirror after a raw storage wipe.
+- The LaunchCascade no longer blocks initial hydration on durable diagnostic writes or silently renews the timestamp of an already persisted fallback just because the app restarted.
+- All changes stay inside the declared frontend recovery owner and use the existing operator controls.
+
+Additional regression cases needed at platform level: simulate failed `AsyncStorage.setItem`, delayed completion after timeout, a read timed out before underlying success, and auxiliary-host render exceptions. Verify storage rollback/read-after-write behavior and preserve the trace archive after seven days.
+
 ## L13 — Closure and residual risk
 This slice closes source-level **false-readiness**, **fallback timer**, **skin remount**, and **physical probe** defects. It does **not** establish that the reported production/native crash is fixed. Unresolved: device crash logs, runtime resource exhaustion, API/process supervision, first-install recovery drills, full TypeScript build, and complete end-to-end application playthrough. These require exact-head checks and platform evidence before signing them closed.
