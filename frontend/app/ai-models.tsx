@@ -66,7 +66,7 @@ function ModelInventory() {
             {model.available ? 'Available' : 'Unavailable'} · {model.active ? 'Active' : 'Inactive'} · {model.selectable ? 'Selectable' : 'Not selectable'}
           </Text>
           <Text style={styles.detail}>Context {model.context_window} · Max output {model.max_output_tokens} tokens</Text>
-          <Text style={styles.detail}>Credential-free: {model.credential_free ? 'yes' : 'no'} · Capabilities: {model.capabilities.join(', ') || 'not declared'}</Text>
+          <Text style={styles.detail}>Credential-free: {model.credential_free ? 'yes' : 'no'} · Capabilities: {(Array.isArray(model.capabilities) ? model.capabilities.join(', ') : '') || 'not declared'}</Text>
           <Text style={styles.muted}>{model.readiness.message}</Text>
         </View>)}
       </> : null}
