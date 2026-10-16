@@ -40,6 +40,7 @@ from skeleton.developer.jeeves_game_director_atlas import export, verify
 from skeleton.developer.jeeves_game_director_causality import audit as causal_audit
 from skeleton.developer.jeeves_game_director_events import delta
 from skeleton.developer.jeeves_game_director_society_stress import stress
+from skeleton.developer.jeeves_game_director_society_acceptance import prove as accept_society
 from skeleton.developer.jeeves_game_dragon_policy import _context
 
 
@@ -514,6 +515,38 @@ class OriginalSocietyTests(unittest.TestCase):
             stress(self.root, source=self.dynamic_file, routes=0)
         with self.assertRaises(ValueError):
             stress(self.root, source=self.dynamic_file, intensity=6)
+
+    def test_independent_ticket_and_NPC_trust_acceptance_are_real(self):
+        root = self.root
+        self.assertFalse((root / ".jeeves").exists())
+        report = accept_society(root, source=self.dynamic_file)
+        self.assertEqual(report["authored_witness_scenarios"], 2)
+        self.assertTrue(report["ok"], report["scenario_results"])
+        self.assertEqual(report["accepted_scenarios"], 2)
+        tickets = next(x for x in report["verified_witnesses"]
+                       if x["scenario"] == "source_verified_ticket_transport")
+        self.assertEqual(tickets["fare_quantity_spent"], 1)
+        self.assertEqual(tickets["goods_redeemed"][self.item.key], 1)
+        self.assertEqual(tickets["destination"], self.ticket_passage.destination)
+        self.assertTrue(tickets["source_legal_actions_replayed_twice"])
+        trust = next(x for x in report["verified_witnesses"]
+                     if x["scenario"] == "source_verified_trust_transport")
+        self.assertGreaterEqual(trust["actual_final_trust"], 40)
+        self.assertGreater(trust["NPC_trust_gained"][self.npc.key], 0)
+        self.assertEqual(trust["destination"], self.trusted_passage.destination)
+        self.assertEqual(trust["transport_routes_taken"][self.trusted_passage.key], 1)
+        self.assertFalse((root / ".jeeves").exists())
+        self.assertEqual(report, accept_society(root, source=self.dynamic_file))
+
+    def test_CLI_can_request_an_actual_NPC_acceptance_witness(self):
+        report = run_game_cli([
+            "jeeves", "director-society-acceptance", "--project", str(self.root),
+            "--source", self.dynamic_file,
+        ])
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["accepted_scenarios"], 2)
+        self.assertFalse(report["first_install_behavior_unverified"] is False)
+        self.assertTrue(report["no_gameplay_sessions_or_files_mutated"])
 
     def test_CLI_review_and_society_journal_routing(self):
         design = run_game_cli([
