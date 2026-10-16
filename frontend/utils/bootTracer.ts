@@ -13,13 +13,15 @@
  *   @boot/last_clean_boot — ts              (timestamp of last successful full boot)
  *
  * Crash-loop protection:
- *   - bootGuard() reads crash_count on app start. If >= 2, returns 'safe-mode'
- *     so /app/index.tsx can redirect there instead of /hub.
- *   - traceStep('app_ready') resets crash_count to 0.
+ *   - bootGuard() reads crash_count on app start. At >= 3, it retains
+ *     the counter and sends the user to Safe Mode (unless opted out).
+ *   - markBootClean() resets the counter after the product has rendered.
  *
  * NOTE: All AsyncStorage calls are best-effort. Never throws.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LatestSnapshotWriter } from './LatestSnapshotWriter';
+import { redactSecrets } from './safeError';
 
 const KEY_TRACE       = '@boot/trace';
 const KEY_SESSIONS    = '@boot/sessions';   // ring of previous sessions (crash-durable)
@@ -52,33 +54,57 @@ export interface TraceStep {
   ts:   number;
 }
 
-let _memoryTrace: TraceStep[] = [];  // mirror so synchronous reads work
+let _memoryTrace: TraceStep[] = [];  // bounded in-process mirror
 const TRACE_COALESCE_MS = 125;
 let _flushTimer: ReturnType<typeof setTimeout> | null = null;
-let _traceWriteTail: Promise<void> = Promise.resolve();
+let _resetInProgress = false;
 
-function flushTrace(): Promise<void> {
+// Unlike a chained write promise, this never accumulates unbounded work
+// when AsyncStorage stalls. Only one in-flight write and one latest snapshot
+// are retained; session rotation precedes the first write.
+const _traceWriter = new LatestSnapshotWriter(async serialized => {
+  await _rotationReady;
+  await AsyncStorage.setItem(KEY_TRACE, serialized);
+});
+
+function flushTrace(): void {
   if (_flushTimer !== null) {
     clearTimeout(_flushTimer);
     _flushTimer = null;
   }
-  const serialized = JSON.stringify(_memoryTrace);
-  // Serialize writes so a delayed native adapter cannot overwrite a newer
-  // snapshot with an older one. A failed write never stops later attempts.
-  _traceWriteTail = _traceWriteTail.catch(() => {}).then(async () => {
-    await _rotationReady;
-    await AsyncStorage.setItem(KEY_TRACE, serialized);
-  }).catch(() => {});
-  return _traceWriteTail;
+  if (_resetInProgress) return;
+  try { _traceWriter.enqueue(JSON.stringify(_memoryTrace)); } catch {}
 }
 
-function queueTraceFlush(step: string): Promise<void> {
-  const crashCritical = /^(GLOBAL_ERROR|NAV_SAFE_MODE|UNHANDLED_REJECTION|boot_clean|crash:)/.test(step);
-  if (crashCritical) return flushTrace();
+function queueTraceFlush(step: string): void {
+  if (_resetInProgress) return;
+  const critical = /^(GLOBAL_ERROR|NAV_SAFE_MODE|UNHANDLED_REJECTION|boot_clean|crash:)/.test(step);
+  if (critical) { flushTrace(); return; }
   if (_flushTimer === null) {
-    _flushTimer = setTimeout(() => { _flushTimer = null; void flushTrace(); }, TRACE_COALESCE_MS);
+    _flushTimer = setTimeout(flushTrace, TRACE_COALESCE_MS);
   }
-  return Promise.resolve();
+}
+
+function boundedOperation(promise: Promise<unknown>, timeoutMs: number): Promise<boolean> {
+  return new Promise(resolve => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; resolve(false); }
+    }, timeoutMs);
+    promise.then(
+      () => { if (!settled) { settled = true; clearTimeout(timer); resolve(true); } },
+      () => { if (!settled) { settled = true; clearTimeout(timer); resolve(false); } },
+    );
+  });
+}
+
+function traceLabel(step: string, extra?: Record<string, any>): string {
+  try {
+    const tail = extra ? ` ${JSON.stringify(extra).slice(0, 120)}` : '';
+    return redactSecrets(`${step}${tail}`).slice(0, 240);
+  } catch {
+    return redactSecrets(String(step)).slice(0, 240);
+  }
 }
 
 // ── Live trace pub/sub (drives the on-screen DevLogOverlay) ─────────────
@@ -132,7 +158,7 @@ export function navToSafeMode(reason: string): void {
 }
 
 export async function traceStep(step: string, extra?: Record<string, any>): Promise<void> {
-  const label = extra ? `${step} ${JSON.stringify(extra).slice(0, 120)}` : step;
+  const label = traceLabel(step, extra);
   const row: TraceStep = { step: label, ts: Date.now() };
   _memoryTrace.push(row);
   if (_memoryTrace.length > MAX_TRACE_LEN) _memoryTrace = _memoryTrace.slice(-MAX_TRACE_LEN);
@@ -140,7 +166,7 @@ export async function traceStep(step: string, extra?: Record<string, any>): Prom
   // crash, the single most reliable trail for diagnosing device force-close.
   try { console.log(`[BOOTTRACE +${row.ts - _T0}ms] ${label}`); } catch {}
   _notify();
-  try { await queueTraceFlush(step); } catch { /* swallow */ }
+  try { queueTraceFlush(step); } catch { /* swallow */ }
 }
 
 /**
@@ -150,13 +176,13 @@ export async function traceStep(step: string, extra?: Record<string, any>): Prom
  * captured before a potential synchronous native crash.
  */
 export function traceStepSync(step: string, extra?: Record<string, any>): void {
-  const label = extra ? `${step} ${JSON.stringify(extra).slice(0, 120)}` : step;
+  const label = traceLabel(step, extra);
   const row: TraceStep = { step: label, ts: Date.now() };
   _memoryTrace.push(row);
   if (_memoryTrace.length > MAX_TRACE_LEN) _memoryTrace = _memoryTrace.slice(-MAX_TRACE_LEN);
   try { console.log(`[BOOTTRACE +${row.ts - _T0}ms] ${label}`); } catch {}
   _notify();
-  try { void queueTraceFlush(step).catch(() => {}); } catch {}
+  try { queueTraceFlush(step); } catch {}
 }
 
 let _crashTraceInstalled = false;
@@ -322,21 +348,29 @@ export async function markBootClean(): Promise<void> {
 }
 
 /** Wipes boot state (for "Reset & retry" buttons). */
-export async function resetBootState(): Promise<void> {
+export async function resetBootState(): Promise<boolean> {
+  if (_resetInProgress) return false;
+  _resetInProgress = true;
   if (_flushTimer !== null) { clearTimeout(_flushTimer); _flushTimer = null; }
-  // Drain queued snapshots BEFORE removal: a delayed old write must never
-  // restore the previous crash trace after an explicit operator reset.
-  try { await Promise.race([
-    _traceWriteTail,
-    new Promise<void>(resolve => setTimeout(resolve, STORAGE_READ_BUDGET_MS)),
-  ]); } catch {}
   try {
-    await Promise.race([
+    // Do not delete storage while an older trace write is unresolved:
+    // it could finish after removal and silently restore stale evidence.
+    const idle = _traceWriter.pauseAndDiscard();
+    if (!(await boundedOperation(idle, STORAGE_READ_BUDGET_MS))) return false;
+    const removed = await boundedOperation(
       AsyncStorage.multiRemove([KEY_TRACE, KEY_CRASH_COUNT, KEY_LAST_CLEAN]),
-      new Promise<void>(resolve => setTimeout(resolve, STORAGE_READ_BUDGET_MS)),
-    ]);
-  } catch { /* swallow */ }
-  _memoryTrace = [];
+      STORAGE_READ_BUDGET_MS,
+    );
+    if (!removed) return false;
+    _memoryTrace = [];
+    _notify();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    _traceWriter.resume();
+    _resetInProgress = false;
+  }
 }
 
 /** Read-only synchronous mirror of the in-process trace (since boot). */
