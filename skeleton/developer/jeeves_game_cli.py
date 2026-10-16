@@ -150,6 +150,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                             "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                             "production-status", "production-cycle", "production-training",
+                                                   "direction-audit", "direction-revision",
                                             "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                             "upscale-foliage", "upscale-animation", "upscale-shadow",
                                             "upscale-parallax", "upscale-music", "asset-inventory",
@@ -224,7 +225,18 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                        *display_args)
         other_content = (args.kind, args.brief, args.digest, args.approve,
                          args.include_notes, args.profile, args.evidence)
-        if args.action in {"production-init", "production-status", "production-cycle",
+        if args.action in {"direction-audit", "direction-revision"}:
+            if not args.source:
+                raise ValueError("direction-audit/revision require --source design/story_direction_packet.json")
+            if any((args.kind, args.brief, args.include_notes, args.digest, args.approve,
+                    *quality_args, args.target, args.output, args.mode, args.factor,
+                    args.dry_run, args.gate, args.repair_generated, args.page,
+                    args.page_size, *display_args)):
+                raise ValueError("direction review accepts --source and --passes only")
+            from skeleton.developer.jeeves_game_direction_cli import direction
+            output = direction(root, action=args.action, source=args.source,
+                               passes=args.passes if args.passes is not None else 3)
+        elif args.action in {"production-init", "production-status", "production-cycle",
                            "production-training"}:
             from skeleton.developer.jeeves_game_production import init, status, cycle, training_candidates
             if args.action == "production-init":
