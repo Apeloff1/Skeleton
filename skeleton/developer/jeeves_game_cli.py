@@ -163,7 +163,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
-                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e"))
+                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
+                                            "director-causality", "director-story-contrast"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -188,6 +189,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--session")
     parser.add_argument("--at", type=int)
     parser.add_argument("--tail", type=int)
+    parser.add_argument("--destination")
+    parser.add_argument("--route-profile", choices=("fastest", "scenic", "quiet", "novel", "quest"))
+    parser.add_argument("--alternatives", type=int)
     parser.add_argument("--sessions")
     parser.add_argument("--port", type=int)
     parser.add_argument("--timeout", type=float)
@@ -241,11 +245,37 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-godot-smoke": {"action", "source", "timeout"},
             "director-loopback-e2e": {"action", "source", "routes"},
             "director-native-http-e2e": {"action", "source", "timeout"},
+            "director-route": {"action", "session", "destination", "route_profile", "alternatives"},
+            "director-topology": {"action", "source"},
+            "director-causality": {"action", "session", "page", "page_size"},
+            "director-story-contrast": {"action", "session", "other_session"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
                 if key not in live_actions[args.action] and value is not None and value is not False:
                     raise ValueError("unrelated Director runtime option --" + key.replace("_", "-"))
+            if args.action in {"director-route", "director-topology"}:
+                from skeleton.developer.jeeves_game_director_labyrinth import plan, topology
+                if args.action == "director-topology":
+                    if not args.source:
+                        raise ValueError("director-topology requires --source")
+                    return topology(root, source=args.source)
+                if not args.session:
+                    raise ValueError("director-route requires --session")
+                return plan(root, session=args.session, destination=args.destination,
+                            profile=args.route_profile or "fastest",
+                            alternatives=args.alternatives if args.alternatives is not None else 3)
+            if args.action in {"director-causality", "director-story-contrast"}:
+                from skeleton.developer.jeeves_game_director_causality import audit, contrast
+                if not args.session:
+                    raise ValueError("causal study requires --session")
+                if args.action == "director-story-contrast":
+                    if not args.other_session:
+                        raise ValueError("story contrast needs --other-session")
+                    return contrast(root, first=args.session, second=args.other_session)
+                return audit(root, session=args.session,
+                             page=args.page if args.page is not None else 1,
+                             page_size=args.page_size if args.page_size is not None else 100)
             if args.action == "director-serve":
                 from skeleton.developer.jeeves_game_director_bridge import serve
                 if not args.session:
@@ -345,7 +375,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             if not args.session:
                 raise ValueError("Dragon session lesson requires --session")
             return enqueue(root, session=args.session, approved_digest=args.approve)
-        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout, args.at, args.tail)):
+        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout, args.at, args.tail, args.destination, args.route_profile, args.alternatives)):
             raise ValueError("runtime options require a director-session or dragon-session action")
         director_actions = {"director-draft", "director-revise", "director-examine", "director-promote",
                             "director-board", "director-prepare-training"}
