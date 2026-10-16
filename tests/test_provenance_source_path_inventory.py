@@ -179,6 +179,15 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("memory/PRD.md"), "first-party")
         self.assertEqual(policy.classify_path("core/runtime.py"), "first-party")
 
+    def test_authored_data_root_is_first_party_not_canonical(self) -> None:
+        for path in (
+            "data/conversational/10X_CONVERSATIONAL_REPORT.md",
+            "data/conversational/conversations_20k.jsonl",
+            "data/game_building/README.md",
+        ):
+            self.assertEqual(policy.classify_path(path), "first-party")
+        self.assertEqual(policy.classify_path("unknown_corpus/report.md"), "unknown")
+
     def test_invalid_paths_are_unknown_not_canonical(self) -> None:
         for path in (
             "",
