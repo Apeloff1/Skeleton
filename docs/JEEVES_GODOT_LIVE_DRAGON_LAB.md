@@ -49,7 +49,7 @@ python -m skeleton dev game jeeves director-atlas-verify \
   --source design/director_campaign_source.json
 ```
 
-Open the generated `build/director_atlases/<world-identity>-live-v2/project.godot`
+Open the generated `build/director_atlases/<world-identity>-live-v3/project.godot`
 in Godot 4. The versioned live project can coexist with an older scene-only export; the original preview now has a **Play live Director quests**
 button opening `director_player.tscn`. Enter the local port and bearer token,
 press Connect, inspect live quest availability and choose an allowed action.
