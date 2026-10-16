@@ -368,7 +368,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "director-draft", "director-revise", "director-examine", "director-promote",
                                                    "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
-                                            "director-session-compare", "director-serve", "director-atlas-export", "director-atlas-verify",
+                                            "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage", "director-godot-smoke"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
@@ -394,6 +394,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--goal")
     jeeves.add_argument("--routes", type=int)
     jeeves.add_argument("--session")
+    jeeves.add_argument("--at", type=int)
+    jeeves.add_argument("--tail", type=int)
     jeeves.add_argument("--sessions")
     jeeves.add_argument("--port", type=int)
     jeeves.add_argument("--timeout", type=float)
@@ -460,6 +462,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--quest-types", options.quest_types), ("--stages", options.stages),
                                 ("--goal", options.goal), ("--routes", options.routes),
                                 ("--session", options.session), ("--other-session", options.other_session),
+                                ("--at", options.at), ("--tail", options.tail),
                                 ("--sessions", options.sessions),
                                 ("--port", options.port),
                                 ("--timeout", options.timeout),
