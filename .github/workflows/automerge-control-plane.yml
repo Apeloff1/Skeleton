@@ -12,10 +12,6 @@ on:
       # Only PR-source completions may wake automatic merging.
       # Validate only successful source conclusions before allocating runners.
       - "!main"
-  schedule:
-    # Successful PR checks still wake immediately. The recovery sweep is
-    # every two hours to reduce no-demand controller runs.
-    - cron: "8 */2 * * *"
 
 concurrency:
   group: automerge-control-plane-${{ github.repository }}

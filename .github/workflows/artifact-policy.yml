@@ -4,10 +4,6 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [main, develop]
-    paths-ignore:
-      - '.github/workflows/branch-clean.yml'
   workflow_dispatch:
   schedule:
     - cron: '41 4 * * 0'
@@ -17,7 +13,7 @@ on:
 # Manual and scheduled audits remain independent of normal push churn.
 concurrency:
   group: artifact-policy-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

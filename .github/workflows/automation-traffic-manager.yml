@@ -2,9 +2,8 @@ name: Automation Traffic Manager
 
 on:
   schedule:
-    # Preserve explicit admission and hard queue-pressure checks while
-    # halving no-demand periodic supervisor admission runs.
-    - cron: "17 */2 * * *"
+    # Six-hour admission cadence; manual override remains available.
+    - cron: '17 */6 * * *'
   workflow_dispatch:
     inputs:
       force:
