@@ -174,6 +174,14 @@ def contrast(root: Path, *, first: str, second: str) -> dict[str, Any]:
         if left["action"] != right["action"]:
             first_different = i
             break
+    # Re-check both immutable heads after comparing the whole action stream.
+    # This rejects an added player action during cross-branch review.
+    for name, expected, expected_count in (
+            (first, a["journal_head_sha256"], left_count),
+            (second, b["journal_head_sha256"], right_count)):
+        _, _, _, _, head, count = _load(root, name=name)
+        if head != expected or count != expected_count:
+            raise ValueError("Director session changed during story branch comparison")
     # End receipts differ for forked sessions even with identical actions;
     # compare *story causality* and replayed states, not session IDs.
     a_flags = set(a["consequence_flags_created_at"])
