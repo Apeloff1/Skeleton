@@ -36,6 +36,7 @@ def dev_help_text() -> str:
         playtest --project DIR [--frames N] [--timeout SEC]
         assets --project DIR
         package --project DIR [--dry-run] [--overwrite]
+        jeeves plan|audit|next|context|handoff [--project DIR]
 
     skeleton dev scaffold <name> [options]
         Generate a new project from a template
