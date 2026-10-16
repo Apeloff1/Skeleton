@@ -63,7 +63,7 @@ def _state_identity(world: Any, state: Any) -> tuple[Any, ...]:
 
 
 def _transport_details(world: Any, state: Any, action: DirectorAction) -> dict:
-    if action.kind in {"speak", "rest", "buy", "sell"}:
+    if action.kind in {"speak", "discuss", "rest", "buy", "sell"}:
         rules = world.dynamics.society
         duration = rules.phase_turns if action.kind == "rest" else (
             2 if action.kind in {"buy", "sell"} else 1
@@ -156,7 +156,7 @@ def _expand(world: Any, state: Any, goal: set[str], *,
                 "travel_hops": sum(x["kind"] in {"walk", "transit"} for x in steps),
                 "social_and_market_actions": [
                     x["choice"] for x in steps
-                    if x["kind"] in {"speak", "rest", "buy", "sell"}
+                    if x["kind"] in {"speak", "discuss", "rest", "buy", "sell"}
                 ],
                 "turn_cost": at.turn - state.turn,
                 "policy_cost": price,
@@ -181,7 +181,7 @@ def _expand(world: Any, state: Any, goal: set[str], *,
         best[signature] = price
         for action in available_director_actions(world, at):
             if action.kind not in {
-                    "travel", "transit", "speak", "buy", "sell", "rest"}:
+                    "travel", "transit", "speak", "discuss", "buy", "sell", "rest"}:
                 continue
             details = _transport_details(world, at, action)
             next_state = director_step(world, at, action)
