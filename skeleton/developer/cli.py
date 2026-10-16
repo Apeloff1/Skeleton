@@ -42,6 +42,12 @@ def dev_help_text() -> str:
         jeeves benchmark --console ID --genre ID --period YYYY-YYYY
         jeeves benchmark-matrix [--profile design/market_benchmarks.json]
         jeeves asset-gate --console ID --genre ID --period YYYY-YYYY --evidence design/asset_qa.json
+        jeeves fidelity-plan --target CONSOLE
+        jeeves upscale --target CONSOLE --source assets/input.png --output assets/hd.png [--factor 2|4|8] [--mode nearest|scale2x]
+        jeeves production-init --target CONSOLE --genre GENRE --period YYYY-YYYY
+        jeeves production-status [--project DIR]
+        jeeves production-cycle [--passes 1..8] [--gate IMMUTABLE_GATE]
+        Production retries resume indefinitely across bounded, recorded passes
         jeeves review --digest SHA256 [--project DIR]
         jeeves apply --digest SHA256 --approve SHA256 [--project DIR]
 
