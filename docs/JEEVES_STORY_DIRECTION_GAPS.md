@@ -105,7 +105,7 @@ threshold when scenes or ratings fail.
 The code-owned production-gap matrix is in
 skeleton/developer/jeeves_game_production_gaps.py.
 
-It enumerates **69 release-evidence gaps in 12 workstreams**. These are
+It enumerates **69 release-evidence gaps in 11 workstreams**. These are
 *missing end-to-end release qualifications*, not an unsupported claim that
 all 69 features are absent as code. Some have functioning source tools,
 others are plans or reference simulations. Actual native app and game
