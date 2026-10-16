@@ -1,4 +1,3 @@
-import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 /**
  * globalGuards — JS-runtime safety nets installed once at app boot.
  *
@@ -19,7 +18,6 @@ import { getSessionId } from './modalLogger';
 import { crashTelemetryFields } from './safeError';
 import { postCrashReport } from './crashTelemetry';
 
-const BACKEND = CANONICAL_API_BASE;
 let _installed = false;
 const _seenHashes = new Set<string>();
 const _MAX_SEEN = 50;
