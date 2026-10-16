@@ -117,6 +117,44 @@ def test_required_playtest_uses_existing_playtest_gate(tmp_path: Path, monkeypat
     assert run_game_cli(["playtest", "--project", str(root)])["ok"] is True
 
 
+
+def test_build_delegates_to_canonical_gameforge_without_replacement(tmp_path: Path, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    root = workspace(tmp_path)
+    captured: dict[str, object] = {}
+
+    class FakeForge:
+        @staticmethod
+        def live():
+            return FakeForge()
+
+        def execute(self, vision, **kwargs):
+            captured["vision"] = vision
+            captured.update(kwargs)
+            return {
+                "succeeded": True,
+                "source_manifest": {"sha256": "a" * 64},
+                "run": {"stages": []},
+                "playtest": {"status": "unavailable", "passed": False},
+            }
+
+    monkeypatch.setitem(sys.modules, "skeleton.context.pipeline",
+                        SimpleNamespace(GameForgeRun=FakeForge))
+    result = run_game_cli(["build", "--project", str(root), "--overwrite",
+                           "--playtest", "auto", "--repair-mode", "suggest"])
+    assert result["ok"]
+    assert captured["vision"] == "Original forest exploration"
+    assert captured["era"] == "extraction_now"
+    assert captured["archetype"] == "auto"
+    assert captured["target"] == "godot"
+    assert captured["overwrite"] is True
+    assert captured["playtest"] == "auto"
+    assert captured["repair_mode"] == "suggest"
+    assert captured["project_root"] == str(root / "build" / "godot")
+
+
 def test_cli_integration_and_exit_codes(tmp_path: Path, capsys):
     from skeleton.developer.cli import main
     assert main(["game", "init", "playground", "--dir", str(tmp_path)]) == 0
