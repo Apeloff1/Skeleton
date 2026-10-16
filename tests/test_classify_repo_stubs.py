@@ -23,6 +23,16 @@ class ClassifyRepositoryStubsTests(unittest.TestCase):
             markers("app.ts", "throw new Error('Not implemented');"),
         )
 
+    def test_rust_and_java_unimplemented_constructs(self) -> None:
+        self.assertIn(
+            (1, "unsupported_operation_candidate"),
+            markers("engine.rs", "fn play() { unimplemented!() }"),
+        )
+        self.assertIn(
+            (1, "unsupported_operation_candidate"),
+            markers("Runtime.java", 'throw new UnsupportedOperationException("pending");'),
+        )
+
     def test_historical_and_fixture_markers_are_not_automatic_blockers(self) -> None:
         self.assertEqual(owner("satellites/branch-snapshots/old/a.py"), "historical_snapshot")
         self.assertEqual(owner("skeleton/testing/test_stub.py"), "test_or_fixture")
