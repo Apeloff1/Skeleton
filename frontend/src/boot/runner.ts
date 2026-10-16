@@ -239,12 +239,23 @@ export class BootRunner {
       state.status = 'running';
       this.emit();
       trail.add('boot', `stage_started ${def.id}`, { attempt, max: maxAttempts }, 'info');
-      // Def.run can throw before returning a Promise. The wrapper ensures
-      // that both synchronous and asynchronous faults become terminal stage
-      // receipts instead of leaving the phase permanently 'running'.
-      const invoked = Promise.resolve().then(() => def.run(signal));
+      // Each attempt owns a child cancellation signal. A timed-out critical
+      // probe must not continue launching later stages in the background.
+      // Native I/O that ignores abort still cannot be forcibly stopped, but
+      // its eventual result cannot make a completed stage healthy.
+      const attemptController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const abortAttempt = () => { try { attemptController?.abort(); } catch {} };
+      signal?.addEventListener?.('abort', abortAttempt, { once: true });
+      // Def.run can throw before returning a Promise. Normalize sync and async
+      // errors into a failed stage receipt instead of a permanent 'running'.
+      const invoked = Promise.resolve().then(() => def.run(attemptController?.signal || signal));
       const timeoutMs = Math.min(30_000, Math.max(100, def.timeoutMs));
-      lastResult = await withTimeout<StageRun>(invoked, timeoutMs, signal);
+      try {
+        lastResult = await withTimeout<StageRun>(invoked, timeoutMs, signal);
+        if (!lastResult.ok || !lastResult.v?.ok) abortAttempt();
+      } finally {
+        signal?.removeEventListener?.('abort', abortAttempt);
+      }
 
       if (lastResult.ok && lastResult.v?.ok) {
         state.endedAt = Date.now();
