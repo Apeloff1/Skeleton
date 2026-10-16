@@ -47,6 +47,8 @@ from skeleton.developer.jeeves_game_dragon_navigation import study as navigation
 from skeleton.developer.jeeves_game_dragon_policy import _context
 
 from skeleton.developer.jeeves_game_director_atlas import export, verify
+from skeleton.developer.jeeves_game_director_bindings import preview as binding_preview
+from skeleton.developer.jeeves_game_dragon_policy import _context as model_context
 
 
 class OriginalLivingWorldTests(unittest.TestCase):
@@ -440,6 +442,85 @@ class OriginalLivingWorldTests(unittest.TestCase):
         forged = dict(before, last_receipt_sha256="0" * 64)
         with self.assertRaises(ValueError):
             delta(self.root, session="hero", before=forged, after=after)
+
+    def test_binding_contract_exposes_conditional_controller_permissions(self):
+        packet = binding_preview(self.root, source=self.dynamic_file)
+        self.assertTrue(packet["ok"])
+        source = packet["bindings"]
+        self.assertTrue(source["living_world_bindings_present"])
+        self.assertGreaterEqual(source["authored_transport_routes"], 2)
+        scene = next(row for row in source["scene_bindings"]
+                     if row["key"] == self.start)
+        foot = next(row for row in scene["transitions"]
+                    if row["action"] == {
+                        "kind": "travel", "key": self.neighbor, "scene": self.start})
+        self.assertTrue(foot["requires_current_world_state"])
+        self.assertTrue(foot["permission_checked_at_runtime"])
+        ferry = next(row for row in scene["transitions"]
+                     if row["action"]["kind"] == "transit"
+                     and row["action"]["key"] == "ferry")
+        self.assertEqual(ferry["transport_mode"], "ferry")
+        self.assertEqual(ferry["turn_cost"], 4)
+        self.assertTrue(ferry["permission_checked_at_runtime"])
+        legacy = binding_preview(self.root, source=self.legacy_file)
+        self.assertNotIn("living_world_bindings_present", legacy["bindings"])
+
+    def test_dragon_action_context_changes_when_unlocking_same_scene(self):
+        initial = director_initial(self.status)
+        ferried = director_step(
+            self.status, initial, DirectorAction("transit", "ferry", self.start))
+        back = director_step(self.status, ferried,
+                             DirectorAction("transit", "ferry", self.neighbor))
+        self.assertEqual(initial.scene, back.scene)
+        self.assertNotEqual(model_context(initial), model_context(back))
+        self.assertIn("transit", {
+            action.kind for action in available_director_actions(self.status, back)
+        })
+
+    def test_authenticated_live_http_replays_real_faction_unlock(self):
+        self._start()
+        token = "r" * 40
+        server = HTTPServer(("127.0.0.1", 0),
+                            handler(self.root, "hero", token, 0))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+        headers = {
+            "Host": "127.0.0.1:" + str(server.server_port),
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json",
+        }
+        try:
+            connection.request("GET", "/v1/status", headers=headers)
+            response = connection.getresponse()
+            before = json.loads(response.read())["snapshot"]
+            self.assertEqual(response.status, 200)
+            self.assertFalse(any(x["choice"] == "travel:" + self.neighbor
+                                 for x in before["actions"]))
+            request = json.dumps({
+                "choice": "transit:ferry",
+                "expected_sequence": before["sequence"],
+                "expected_state_sha256": before["current_state_sha256"],
+            })
+            connection.request("POST", "/v1/actions", body=request, headers=headers)
+            response = connection.getresponse()
+            body = json.loads(response.read())
+            self.assertEqual(response.status, 200, body)
+            self.assertEqual(body["snapshot"]["scene"], self.neighbor)
+            self.assertEqual(body["snapshot"]["world_state"]["world_flags"],
+                             ["charter"])
+            self.assertEqual(body["snapshot"]["world_state"]["standings"],
+                             [["council", 30]])
+            connection.request("POST", "/v1/actions", body=request, headers=headers)
+            response = connection.getresponse()
+            response.read()
+            self.assertEqual(response.status, 409)
+            self.assertEqual(inspect(self.root, session="hero")["sequence"], 1)
+        finally:
+            connection.close()
+            server.shutdown()
+            thread.join(timeout=5)
+            server.server_close()
 
     def test_native_atlas_exposes_factions_and_transport_map(self):
         exported = export(self.root, source=self.dynamic_file)
