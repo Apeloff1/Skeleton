@@ -27,9 +27,13 @@ includes `media_catalog.json`, individual `media/scene_*.png` and
 
 The Godot stage actually loads these backdrops and uses an
 `AudioStreamPlayer` to play the original generated score upon scene arrival;
-the UI includes a **Mute / play original score** control. The animated actor
-and foreground silhouettes remain stylistic scaffolds—not professional
-animation assets. Generated tones are **not** mastered orchestral music.
+the UI includes a **Mute / play original score** control. A separate
+**animated weather / foliage density** selector (0–3) lets low-resource
+devices disable extra environmental drawing or enable more dynamic rain, snow
+and wind-driven leaves without altering authoritative quest state.
+The animated actor and foreground silhouettes remain stylistic
+scaffolds—not professional animation assets. Generated tones are **not**
+mastered orchestral music.
 
 Verification recomputes original media bytes, hashes them and all Godot
 scripts, allows Godot's expected import cache and asset `.import` sidecars,
