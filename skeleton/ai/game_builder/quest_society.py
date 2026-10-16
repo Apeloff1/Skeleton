@@ -229,7 +229,8 @@ class SocietyState:
             raise ValueError("invalid NPC conversation cooldown ledger")
         for key, count in self.last_talk_cycle:
             _id(key)
-            _int(count, 0, 100_000_000)
+            if type(count) is not int or count < 0:
+                raise ValueError("NPC cooldown cycle must be a valid nonnegative integer")
         if len(self.shop_stock) > MAX_GOODS or len({
                 (shop, good) for shop, good, _ in self.shop_stock
         }) != len(self.shop_stock):
@@ -255,7 +256,8 @@ class SocietyState:
             _id(good)
             if direction not in (0, 1):
                 raise ValueError("transaction direction must be buy(0)/sell(1)")
-            _int(count, 1, 100_000_000)
+            if type(count) is not int or count < 1:
+                raise ValueError("shop transaction counter must be a positive integer")
 
     def payload(self):
         return {
@@ -316,7 +318,8 @@ def initial(rules: SocietyRules) -> SocietyState:
 
 
 def phase(rules: SocietyRules, turn: int) -> dict[str, Any]:
-    _int(turn, 0, 100_000_000)
+    if type(turn) is not int or turn < 0:
+        raise ValueError("authored world time must be a nonnegative integer")
     return {
         "phase": PHASES[(turn // rules.phase_turns) % 4],
         "phase_index": (turn // rules.phase_turns) % 4,
@@ -407,8 +410,6 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
               for shop, item, direction, count in old.transactions}
     owned_before = inventory.get(product.key, 0)
     transaction = (good_shop.key, product.key, 0 if kind == "buy" else 1)
-    if counts.get(transaction, 0) >= 100_000_000:
-        raise ValueError("merchant transaction count exhausted")
     if kind == "buy":
         balance = old.balance - product.buy_price
         stock[(good_shop.key, product.key)] -= 1
