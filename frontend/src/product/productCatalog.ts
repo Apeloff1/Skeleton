@@ -37,6 +37,10 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/gameforge-studio',
     actions: [
       { id: 'new-project', title: 'New project', description: 'Start from a prompt, brief or template.', operation: 'project.create', legacyHref: '/ai-game-generator' },
+      { id: 'galaxy-studio', title: 'Galaxy Studio', description: 'Open the unified design, build, snowball and export workspace.', navigationId: 'studio.unified', href: '/studio' },
+      { id: 'galaxy-factory', title: 'Galaxy Factory', description: 'Open the original questionnaire and phased design editor.', navigationId: 'studio.factory', href: '/galaxy' },
+      { id: 'snowball-flow', title: 'Snowball quality flow', description: 'Select your game in Studio, then inspect and refine its Snowball stages.', navigationId: 'studio.snowball', href: '/studio' },
+      { id: 'design-review', title: 'Design and quality review', description: 'Inspect design evidence and improvement proposals.', navigationId: 'studio.design.review', href: '/design-review' },
       { id: 'build', title: 'Build', description: 'Compile a project into a runnable artifact.', operation: 'build.submit', legacyHref: '/apk-build' },
       { id: 'inspect', title: 'Inspect pipeline', description: 'Review build stages and generated artifacts.', operation: 'pipeline.inspect', legacyHref: '/ai-pipeline' },
       { id: 'native-homebrew', title: 'Native homebrew', description: 'Generate original console and PC source archives with explicit rights approval.', navigationId: 'dragon.native.sources', href: '/dragon-native-production' },
@@ -78,6 +82,8 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/playable',
     actions: [
       { id: 'launch', title: 'Launch playable', description: 'Start the current generated runtime.', operation: 'playable.launch' },
+      { id: 'open-library', title: 'Playable library', description: 'Choose an existing playable build and open its game controls.', navigationId: 'playables.library', href: '/my-builds' },
+      { id: 'learning-simulation', title: 'Emulation and game learning', description: 'Inspect registered emulator targets and replayable game-learning sessions.', navigationId: 'playables.learn', href: '/game-learning' },
       { id: 'sessions', title: 'Runtime sessions', description: 'Inspect active and recent game sessions.', operation: 'runtime.sessions' },
       { id: 'progress', title: 'Progression', description: 'Review saves, unlocks, achievements and player state.', operation: 'progress.inspect', legacyHref: '/achievements' },
     ],
@@ -92,6 +98,10 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     actions: [
       { id: 'reason-execute', title: 'Reason with Jeeves', description: 'Execute an admitted reason operation through the canonical Jeeves provider.', operation: 'jeeves.reason' },
       { id: 'reason', title: 'AI chat', description: 'Work through a problem with the configured engine and durable conversation history.', navigationId: 'jeeves.chat.canonical', href: '/jeeves-chat' },
+      { id: 'cockpit', title: 'Jeeves cockpit', description: 'Observe Jeeves service availability and diagnose individual services.', navigationId: 'jeeves.cockpit', href: '/jeeves-hub' },
+      { id: 'workbench', title: 'Jeeves workbench', description: 'Review and transfer proposed chat work into governed workbench tasks.', navigationId: 'jeeves.workbench', href: '/jeeves-workbench' },
+      { id: 'jeeves-settings', title: 'Jeeves settings and persona', description: 'Configure persona, directives, DNA and voice preferences.', navigationId: 'jeeves.settings', href: '/settings/jeeves' },
+      { id: 'mirror-room', title: 'Mirror room', description: 'Inspect available review and adversarial simulation surfaces.', navigationId: 'jeeves.mirror', href: '/mirror-room' },
       { id: 'governed-chat', title: 'Conversation workspace', description: 'Use governed attachments, message editing and regeneration with canonical conversation history.', navigationId: 'jeeves.chat.governed', href: '/ai-chat' },
       { id: 'capture-web', title: 'Capture web knowledge', description: 'Authorize a bounded crawl and inspect captured sources.', navigationId: 'jeeves.crawler', href: '/crawler' },
       { id: 'learn-games', title: 'Game learning studio', description: 'Edit, simulate and train original games across registered engine and console targets.', navigationId: 'jeeves.games.learn', href: '/game-learning' },
@@ -108,6 +118,10 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/academy',
     actions: [
       { id: 'continue', title: 'Continue learning', description: 'Resume the current learning path.', operation: 'academy.continue' },
+      { id: 'academy-hub', title: 'Mega Academy', description: 'Browse multidisciplinary curricula, lessons and training materials.', navigationId: 'academy.hub', href: '/mega-academy' },
+      { id: 'my-classes', title: 'My classes', description: 'Resume enrolled lessons and review progress.', navigationId: 'academy.classes', href: '/my-classes' },
+      { id: 'learning-hub', title: 'Learning hub', description: 'Find exercises and tutorials in the learning library.', navigationId: 'academy.learning', href: '/learning-hub' },
+      { id: 'academy-settings', title: 'Academy settings', description: 'Adjust speech, accessibility and Academy behavior.', navigationId: 'academy.settings', href: '/settings/academy' },
       { id: 'practice', title: 'Practice', description: 'Open adaptive exercises and challenges.', operation: 'academy.practice' },
       { id: 'progress', title: 'Learning progress', description: 'Inspect mastery, streaks and completed work.', operation: 'academy.progress' },
     ],
@@ -122,6 +136,9 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     actions: [
       { id: 'agents', title: 'Agents', description: 'Inspect active workers, tasks and health.', operation: 'ops.agents', legacyHref: '/agents' },
       { id: 'setup', title: 'Setup & readiness', description: 'Check first-install services, model availability and capture readiness.', navigationId: 'operations.setup', href: '/setup' },
+      { id: 'operator-settings', title: 'Application settings', description: 'Manage UI appearance, APIs, Academy, Galaxy Studio and Jeeves.', navigationId: 'operations.settings', href: '/settings' },
+      { id: 'controller', title: 'Jeeves services', description: 'View live Jeeves service readiness without pretending an offline model is active.', navigationId: 'operations.jeeves.services', href: '/jeeves-hub' },
+      { id: 'ai-readiness', title: 'Neural model readiness', description: 'Observe actual registered models and readiness through governed AI chat.', navigationId: 'operations.ai.readiness', href: '/ai-chat' },
       { id: 'runtime', title: 'Runtime health', description: 'Inspect governed queues, policy, audit and resource pressure.', operation: 'ops.runtime', href: '/control-plane' },
       { id: 'deployments', title: 'Deployments', description: 'Review build and deployment state.', operation: 'ops.deployments' },
     ],
