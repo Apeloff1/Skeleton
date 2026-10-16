@@ -20,7 +20,8 @@ import { speakCinematic, stopCinematic } from '../src/utils/cinematicVoice';
 export default function Snowball() {
   const router = useRouter();
   const params = useLocalSearchParams<{ game?: string }>();
-  const gameId = params?.game ? String(params.game) : '';
+  const requestedGame = params?.game ? String(params.game) : '';
+  const [gameId, setGameId] = React.useState(requestedGame);
 
   const [snow, setSnow] = React.useState<any>(null);
   const [loadErr, setLoadErr] = React.useState<string | null>(null);
@@ -39,6 +40,33 @@ export default function Snowball() {
   const [phaseEra, setPhaseEra] = React.useState('modern');
   const [phasesBusy, setPhasesBusy] = React.useState(false);
   const [phasesOpen, setPhasesOpen] = React.useState(true);
+
+  // A direct /snowball deep link from the product shell has no game query.
+  // Resolve the last real build, just as /studio does. Do not invent a game.
+  React.useEffect(() => {
+    if (requestedGame) {
+      setGameId(requestedGame);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      try {
+        const result = await api.get<any>('/api/playable/list?limit=1', { timeoutMs: 12000 });
+        if (!active) return;
+        const items = result.data?.items || result.data?.playables || result.data?.games || [];
+        const latest = items[0]?.playable_id;
+        if (result.ok && typeof latest === 'string' && latest.trim()) {
+          setGameId(latest);
+        } else {
+          setLoadErr('No existing build selected. Choose a build or create one in Galaxy Studio.');
+        }
+      } catch {
+        if (active) setLoadErr('Build selection is unavailable. Open My Builds or Galaxy Studio.');
+      }
+    })();
+    return () => { active = false; };
+  }, [requestedGame]);
+
 
   const loadPhases = React.useCallback(async (eraKey: string) => {
     if (!gameId) return;
@@ -85,7 +113,7 @@ export default function Snowball() {
   }, [gameId]);
 
   const load = React.useCallback(async () => {
-    if (!gameId) { setLoadErr('No build selected — open a build from Galaxy Studio first.'); return; }
+    if (!gameId) return; // The dedicated build picker resolves empty deep links.
     const r = await api.get<any>(`/api/snowball/${gameId}`, { timeoutMs: 12000 });
     if (r.ok && r.data && !r.data.error) { setSnow(r.data); setLoadErr(null); }
     else setLoadErr(r.data?.error || 'Could not load this build.');
@@ -257,14 +285,20 @@ export default function Snowball() {
             <Text style={{ fontSize: 40, marginBottom: 12 }}>🫥</Text>
             <Text style={{ color: '#E2E8F0', fontSize: 16, fontWeight: '800', textAlign: 'center' }}>Build not found</Text>
             <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 19 }}>{loadErr}</Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <TouchableOpacity testID="snow-err-retry" onPress={() => { setLoadErr(null); load(); }}
-                style={[s.mBtn, s.mBtnRoll]} activeOpacity={0.9}>
-                <Text style={s.mBtnTxt}>↻ Retry</Text>
-              </TouchableOpacity>
-              <TouchableOpacity testID="snow-err-back" onPress={() => router.back()}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
+              {gameId ? (
+                <TouchableOpacity testID="snow-err-retry" onPress={() => { setLoadErr(null); void load(); }}
+                  style={[s.mBtn, s.mBtnRoll]} activeOpacity={0.9}>
+                  <Text style={s.mBtnTxt}>↻ Retry</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity testID="snow-select-build" onPress={() => router.push('/my-builds' as any)}
                 style={[s.mBtn, s.mBtnExport]} activeOpacity={0.9}>
-                <Text style={s.mBtnExportTxt}>‹ Go back</Text>
+                <Text style={s.mBtnExportTxt}>Choose build</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="snow-open-studio" onPress={() => router.push('/studio' as any)}
+                style={[s.mBtn, s.mBtnExport]} activeOpacity={0.9}>
+                <Text style={s.mBtnExportTxt}>Galaxy Studio</Text>
               </TouchableOpacity>
             </View>
           </View>
