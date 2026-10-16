@@ -79,6 +79,7 @@ def _draft(world: Any, intensity: int) -> tuple[Any, dict[str, Any]]:
                 reputation_delta=2 if faction is not None else 0,
                 requires_flags=(),
                 grant_world_flag="aided_" + key,
+                once=True,
             ),
             DialogueChoice(
                 key="question_motives",
@@ -101,6 +102,7 @@ def _draft(world: Any, intensity: int) -> tuple[Any, dict[str, Any]]:
                 reputation_delta=1 if faction is not None else 0,
                 requires_flags=(canon_choice,),
                 grant_world_flag="witness_" + key,
+                once=True,
             ))
         people.append(Resident(
             key=key,
