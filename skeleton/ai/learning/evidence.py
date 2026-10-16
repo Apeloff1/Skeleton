@@ -23,7 +23,9 @@ operation.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import re
 import math
 import threading
 from collections.abc import Callable, Iterable, Mapping
@@ -253,6 +255,10 @@ class EvidenceProvenance:
     fingerprint: str
     parent_ids: tuple[str, ...] = ()
     uri: str | None = None
+    # The source's wire-format SHA-256 is not the store's canonical fingerprint.
+    source_digest: str | None = None
+    retrieved_at: float | None = None
+    revision: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_id", _text("source_id", self.source_id, MAX_SOURCE_CHARS))
@@ -269,6 +275,15 @@ class EvidenceProvenance:
         object.__setattr__(self, "parent_ids", _ids("parent_id", self.parent_ids))
         if self.uri is not None:
             object.__setattr__(self, "uri", _text("uri", self.uri, MAX_SOURCE_CHARS))
+        if self.source_digest is not None:
+            value = _text("source_digest", self.source_digest, 64)
+            if re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise LearningEvidenceError("source_digest must be a SHA-256 hex digest", context={"reason": "invalid_digest"})
+            object.__setattr__(self, "source_digest", value)
+        if self.retrieved_at is not None:
+            object.__setattr__(self, "retrieved_at", _non_negative("retrieved_at", self.retrieved_at))
+        if self.revision is not None:
+            object.__setattr__(self, "revision", _text("revision", self.revision, MAX_SOURCE_CHARS))
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -279,6 +294,9 @@ class EvidenceProvenance:
             "fingerprint": self.fingerprint,
             "parent_ids": list(self.parent_ids),
             "uri": self.uri,
+            "source_digest": self.source_digest,
+            "retrieved_at": self.retrieved_at,
+            "revision": self.revision,
         }
 
     @property
@@ -816,6 +834,7 @@ class LearningEvidenceStore:
         clock: Callable[[], float],
         clock_version: int = 1,
         max_age_seconds: float = DEFAULT_MAX_AGE_SECONDS,
+        future_skew_seconds: float = 0.0,
         max_history: int = DEFAULT_MAX_HISTORY,
     ) -> None:
         if not callable(clock):
@@ -831,6 +850,9 @@ class LearningEvidenceStore:
                 "max_age_seconds must be positive",
                 context={"reason": "invalid_number"},
             )
+        self._future_skew_seconds = _non_negative("future_skew_seconds", future_skew_seconds)
+        if self._future_skew_seconds > 60.0:
+            raise LearningEvidenceError("future_skew_seconds exceeds 60", context={"reason": "invalid_number"})
         self._max_history = _positive_int("max_history", max_history)
         self._observations: dict[str, Observation] = {}
         self._features: dict[str, Feature] = {}
@@ -1194,7 +1216,7 @@ class LearningEvidenceStore:
                     "now": now,
                 },
             )
-        if provenance.observed_at > now:
+        if provenance.observed_at > now + self._future_skew_seconds:
             raise LearningEvidenceError(
                 "evidence timestamp is ahead of the explicit clock",
                 context={"reason": "stale_evidence", "observed_at": provenance.observed_at, "now": now},
@@ -1444,4 +1466,49 @@ def make_provenance(
         fingerprint=canonical_fingerprint(payload),
         parent_ids=parent_ids,
         uri=uri,
+    )
+
+
+def make_provenance_from_evidence_envelope(
+    payload: Mapping[str, object] | object,
+    envelope: Mapping[str, object],
+    *,
+    clock_version: int = 1,
+    parent_ids: tuple[str, ...] = (),
+) -> EvidenceProvenance:
+    """Import registered read-only Jeeves evidence without digest substitution.
+
+    The upstream evidence tool computes `sha256` over canonical JSON with
+    ASCII escaping. The learning store fingerprints payloads using a different
+    Unicode-preserving canonicalization. Validate the *source* digest using
+    its own wire format; retain both independent SHA-256 identities.
+    """
+    if not isinstance(envelope, Mapping):
+        raise LearningEvidenceError("evidence envelope must be a mapping", context={"reason": "invalid_provenance"})
+    source_id = _text("source_id", envelope.get("source_id"), MAX_SOURCE_CHARS)
+    supplied = _text("source sha256", envelope.get("sha256"), 64)
+    if re.fullmatch(r"[0-9a-f]{64}", supplied) is None:
+        raise LearningEvidenceError("invalid source sha256", context={"reason": "invalid_digest"})
+    normalized = _canonical_json_value(payload)
+    encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+    calculated = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    if not hmac.compare_digest(calculated, supplied):
+        raise LearningEvidenceError("source payload digest mismatch", context={"reason": "fingerprint_mismatch"})
+    retrieved = _non_negative("retrieved_at", envelope.get("retrieved_at"))
+    observed = _non_negative("observed_at", envelope.get("observed_at", retrieved))
+    if observed > retrieved + 60.0:
+        raise LearningEvidenceError("source observation is too far in the future", context={"reason": "stale_evidence"})
+    revision = envelope.get("revision")
+    if revision is not None:
+        revision = _text("revision", revision, MAX_SOURCE_CHARS)
+    return EvidenceProvenance(
+        source_id=source_id,
+        source_kind="evidence_tool",
+        observed_at=observed,
+        clock_version=clock_version,
+        fingerprint=canonical_fingerprint(normalized),
+        parent_ids=parent_ids,
+        source_digest=supplied,
+        retrieved_at=retrieved,
+        revision=revision,
     )
