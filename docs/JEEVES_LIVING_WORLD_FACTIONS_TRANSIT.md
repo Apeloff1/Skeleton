@@ -310,7 +310,7 @@ independent human playtesting.
 
 ## 8. Godot source and user-facing gameplay
 
-The native export advances to `-live-v6`, preserving all earlier generated
+The native export advances to `-live-v7`, preserving all earlier generated
 `-live-v1` through `-live-v5` preview projects.
 
 ```bash
