@@ -76,6 +76,7 @@ def _dynamic_path(world: DirectorWorld, state: DirectorState,
             social = (
                 society.balance, society.relationships,
                 society.shop_stock, society.owned,
+                society.dialogue_history,
                 clock["phase_index"], at.turn % rules.phase_turns,
                 tuple(sorted(npc for npc, cycle in society.last_talk_cycle
                              if cycle == clock["cycle"])),
