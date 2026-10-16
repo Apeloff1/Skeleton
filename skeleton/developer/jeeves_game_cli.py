@@ -148,7 +148,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
-                                            "fidelity-plan", "fidelity-matrix", "upscale", "production-init",
+                                            "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "production-init",
                                             "production-status", "production-cycle"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
@@ -169,13 +169,18 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--passes", type=int)
     parser.add_argument("--gate")
     parser.add_argument("--repair-generated", action="store_true")
+    for dimension in ("native-width", "native-height", "screen-width",
+                      "screen-height", "pixel-aspect-num", "pixel-aspect-den"):
+        parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
+        display_args = (args.native_width, args.native_height, args.screen_width,
+                        args.screen_height, args.pixel_aspect_num, args.pixel_aspect_den)
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
         render_args = (args.target, args.source, args.output, args.mode, args.factor,
                        args.dry_run, args.passes, args.gate, args.repair_generated)
         other_content = (args.kind, args.brief, args.digest, args.approve,
-                         args.include_notes, args.profile, args.evidence)
+                         args.include_notes, args.profile, args.evidence, *display_args)
         if args.action in {"production-init", "production-status", "production-cycle"}:
             from skeleton.developer.jeeves_game_production import init, status, cycle
             if args.action == "production-init":
@@ -195,8 +200,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     raise ValueError("production-cycle accepts --passes and optional --gate only")
                 output = cycle(root, passes=args.passes or 1, gate=args.gate,
                                repair_generated=args.repair_generated)
-        elif args.action in {"fidelity-plan", "fidelity-matrix", "upscale"}:
-            from skeleton.developer.jeeves_game_upscale import fidelity_plan, fidelity_matrix, upscale
+        elif args.action in {"fidelity-plan", "fidelity-matrix", "display-plan", "upscale"}:
+            from skeleton.developer.jeeves_game_upscale import fidelity_plan, fidelity_matrix, display_plan, upscale
             if args.action == "fidelity-matrix":
                 if any((*other_content, *quality_args, *render_args)):
                     raise ValueError("fidelity-matrix accepts --project only")
@@ -209,7 +214,21 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     if any((args.source, args.output, args.mode, args.factor, args.dry_run)):
                         raise ValueError("fidelity-plan accepts --target only")
                     output = fidelity_plan(args.target)
+                elif args.action == "display-plan":
+                    if any((args.source, args.output, args.mode, args.factor, args.dry_run)):
+                        raise ValueError("display-plan does not emit any render file")
+                    if any(x is None for x in display_args[:4]):
+                        raise ValueError("display-plan requires native and screen width/height")
+                    output = display_plan(
+                        target=args.target, native_width=args.native_width,
+                        native_height=args.native_height, screen_width=args.screen_width,
+                        screen_height=args.screen_height,
+                        pixel_aspect_num=args.pixel_aspect_num if args.pixel_aspect_num is not None else 1,
+                        pixel_aspect_den=args.pixel_aspect_den if args.pixel_aspect_den is not None else 1,
+                    )
                 else:
+                    if any(display_args):
+                        raise ValueError("upscale accepts source/output rather than display geometry")
                     if not args.source or not args.output:
                         raise ValueError("upscale requires --source --output under assets/")
                     output = upscale(root, source=args.source, output=args.output,
