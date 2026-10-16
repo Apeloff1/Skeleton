@@ -87,8 +87,14 @@ async function attemptRequest<T>(
   const ctrl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let didTimeout = false;
-  const onAbort = () => ctrl.abort();
+  let abortResult: (result: FetchEnvelope<T>) => void = () => {};
+  const cancelled = new Promise<FetchEnvelope<T>>(resolve => { abortResult = resolve; });
+  const onAbort = () => {
+    ctrl.abort();
+    abortResult({ ok: false, status: 0, error: 'aborted' });
+  };
   signal?.addEventListener?.('abort', onAbort, { once: true });
+  if (isAborted(signal)) onAbort();
 
   try {
     // Do not rely solely on AbortController: some React Native adapters may
@@ -114,7 +120,9 @@ async function attemptRequest<T>(
         reject(new Error('request_timeout'));
       }, timeoutMs);
     });
-    return await Promise.race([request, deadline]);
+    // A caller navigating away receives cancellation immediately even if a
+    // native fetch adapter ignores AbortController while reading its body.
+    return await Promise.race([request, deadline, cancelled]);
   } catch {
     const error = didTimeout ? 'timeout' : isAborted(signal) ? 'aborted' : 'network_error';
     return { ok: false, status: 0, error };
@@ -152,7 +160,7 @@ export async function safeFetch<T = any>(path: string, opts: FetchOpts = {}): Pr
     const result = await attemptRequest<T>(url, method, headers, body, timeoutMs, opts.signal, boundedResponseChars(opts.maxResponseChars));
     if (result.ok || result.error === 'aborted' || result.error === 'response_too_large') return result;
 
-    // Only replay safe/idempotency-keyed methods, and only transient errors.
+    // Only replay safe methods or explicitly server-verified keyed writes.
     if (attempt >= retries || (result.status !== 0 && !retryableHttpStatus(result.status))) return result;
     if (opts.trace !== false) recordRetry(path, attempt + 1, result.status);
     if (!(await backoff(retryDelayMs(attempt), opts.signal))) {
