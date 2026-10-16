@@ -39,6 +39,10 @@ const DEFAULT_PRUNE_PREFIXES = [
   '@telemetry/',
 ];
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+// Crash-loop and archived evidence are operator recovery state, not cache.
+const RECOVERY_EVIDENCE_KEYS = new Set([
+  '@boot/crash_count', '@boot/last_clean_boot', '@boot/trace', '@boot/sessions',
+]);
 
 let _metaCache: Record<string, number> | null = null;
 let _metaDirty = false;
@@ -58,12 +62,15 @@ async function _flushMeta() {
   if (!_metaDirty || !_metaCache) return;
   _metaDirty = false;
   try {
-    await timeout(AsyncStorage.setItem(META_KEY, JSON.stringify(_metaCache)).then(() => null), 800, null);
-  } catch { /* best-effort */ }
+    const ok = await timeout(AsyncStorage.setItem(META_KEY, JSON.stringify(_metaCache)).then(() => true), 800, false);
+    if (!ok) _metaDirty = true; // a failed metadata flush must remain retryable
+  } catch {
+    _metaDirty = true;
+  }
 }
 
 function _shouldTrack(key: string, prefixes: string[]): boolean {
-  return prefixes.some(p => key.startsWith(p));
+  return !RECOVERY_EVIDENCE_KEYS.has(key) && prefixes.some(p => key.startsWith(p));
 }
 
 function timeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -83,16 +90,27 @@ function timeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 export async function safeGetItem(key: string, fallback: string | null = null, ms = 800): Promise<string | null> {
   if (_mirror.has(key)) return _mirror.get(key) ?? fallback;
   try {
-    const v = await timeout(AsyncStorage.getItem(key), ms, fallback);
-    _mirror.set(key, v);
-    return v;
+    const result = await timeout(
+      AsyncStorage.getItem(key).then(value => ({ ok: true, value })),
+      ms,
+      { ok: false, value: fallback },
+    );
+    // Do not permanently cache a timeout as a real stored value.
+    if (!result.ok) return fallback;
+    _mirror.set(key, result.value);
+    return result.value;
   } catch { return fallback; }
 }
 
 export async function safeSetItem(key: string, value: string, ms = 800): Promise<boolean> {
   _mirror.set(key, value); // optimistic mirror — read-after-write is always consistent
   try {
-    await timeout(AsyncStorage.setItem(key, value).then(() => null), ms, null);
+    const saved = await timeout(AsyncStorage.setItem(key, value).then(() => true), ms, false);
+    if (!saved) {
+      // A timed-out write is unverified: invalidate the optimistic mirror.
+      if (_mirror.get(key) === value) _mirror.delete(key);
+      return false;
+    }
     // Update sidecar metadata for prune-eligible keys.
     if (_shouldTrack(key, DEFAULT_PRUNE_PREFIXES)) {
       const meta = await _loadMeta();
@@ -102,13 +120,17 @@ export async function safeSetItem(key: string, value: string, ms = 800): Promise
       void _flushMeta();
     }
     return true;
-  } catch { return false; }
+  } catch {
+    if (_mirror.get(key) === value) _mirror.delete(key);
+    return false;
+  }
 }
 
 export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
   _mirror.delete(key);
   try {
-    await timeout(AsyncStorage.removeItem(key).then(() => null), ms, null);
+    const removed = await timeout(AsyncStorage.removeItem(key).then(() => true), ms, false);
+    if (!removed) return false;
     if (_metaCache && key in _metaCache) {
       delete _metaCache[key];
       _metaDirty = true;
@@ -121,7 +143,8 @@ export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
 export async function safeMultiRemove(keys: string[], ms = 1500): Promise<boolean> {
   for (const k of keys) _mirror.delete(k);
   try {
-    await timeout(AsyncStorage.multiRemove(keys).then(() => null), ms, null);
+    const removed = await timeout(AsyncStorage.multiRemove(keys).then(() => true), ms, false);
+    if (!removed) return false;
     if (_metaCache) {
       let touched = false;
       for (const k of keys) {
@@ -195,14 +218,20 @@ export async function pruneExpired(opts: {
   // 3. Remove expired keys + their meta entries.
   const prunedKeys = Array.from(expired);
   if (prunedKeys.length) {
-    try {
-      await timeout(AsyncStorage.multiRemove(prunedKeys).then(() => null), timeoutMs, null);
-    } catch { /* best-effort */ }
-    for (const k of prunedKeys) {
-      _mirror.delete(k);
-      delete meta[k];
+    const removed = await timeout(
+      AsyncStorage.multiRemove(prunedKeys).then(() => true),
+      timeoutMs,
+      false,
+    ).catch(() => false);
+    // A failed prune must not declare authoritative state deleted. Preserve
+    // metadata for the next attempt; prevent a stale mirror in either case.
+    for (const k of prunedKeys) _mirror.delete(k);
+    if (removed) {
+      for (const k of prunedKeys) delete meta[k];
+      _metaDirty = true;
+    } else {
+      prunedKeys.length = 0;
     }
-    _metaDirty = true;
   }
 
   await _flushMeta();
