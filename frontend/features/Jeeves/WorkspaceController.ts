@@ -441,7 +441,7 @@ export class WorkspaceController {
     })));
   }
 
-  async send(attachment?: Attachment, preferences: Pick<ChatBody, 'provider_id' | 'model_id' | 'max_output_tokens' | 'crawler_context' | 'context'> = {}): Promise<void> {
+  async send(attachment?: Attachment, preferences: Partial<Pick<ChatBody, 'provider_id' | 'model_id' | 'max_output_tokens' | 'crawler_context' | 'context'>> = {}): Promise<void> {
     if (!this.snapshot.ready || this.running) return;
     const conversation = this.active;
     if (conversation.archived) { this.notify('Restore this canonical conversation before sending another turn.'); return; }
