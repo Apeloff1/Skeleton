@@ -40,6 +40,7 @@ def _independent_trace(world: Any, witness: Any,
     earned = Counter()
     passage_by_key = {p.key: p for p in world.dynamics.passages}
     total_transport_turns = 0
+    physical_merchandise_used = Counter()
     society_wallet_spent = society_wallet_received = 0
     society_relationship_changes = Counter()
     stage_checkpoints = []
@@ -86,6 +87,18 @@ def _independent_trace(world: Any, witness: Any,
                         society_relationship_changes[npc] += 1
             else:
                 effect_count["wait"] += 1
+            if world.dynamics.society is not None:
+                from skeleton.ai.game_builder.quest_society import verify_inventory
+                if old.society is None or current.society is None:
+                    raise ValueError("campaign discarded original market state")
+                verify_inventory(world.dynamics.society, before.acquired, old.society)
+                verify_inventory(world.dynamics.society, state.acquired, current.society)
+                spent_previous = dict(old.society.consumed_goods)
+                for good, quantity in current.society.consumed_goods:
+                    redeemed = quantity - spent_previous.get(good, 0)
+                    if redeemed < 0:
+                        raise ValueError("gameplay restored a previously spent original shop good")
+                    physical_merchandise_used[good] += redeemed
             if not set(old.world_flags).issubset(current.world_flags):
                 raise ValueError("dynamic campaign erased a permanent authored world event")
             if not set(before.complete).issubset(state.complete):
@@ -157,6 +170,10 @@ def _independent_trace(world: Any, witness: Any,
             society_relationship_changes.items())),
         "society_final": state.world_state.society.payload()
                          if state.world_state.society is not None else None,
+        "source_verified_merchandise_redemption": dict(sorted(
+            physical_merchandise_used.items())),
+        "original_economy_inventory_conservation_verified": (
+            world.dynamics.society is not None),
         "transport_counts_by_key": dict(state.world_state.passage_uses),
         "scene_entrance_counts": dict(sorted(visited.items())),
         "permanent_world_events": dict(sorted(earned_flags.items())),
