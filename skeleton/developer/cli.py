@@ -65,6 +65,13 @@ def dev_help_text() -> str:
         Godot export includes original source-generated PNG backdrops and ambient WAV scores
         Real HTTP full-quest playback and actual native Godot->Python probe are separate tests
         jeeves director-coverage --source design/director_campaign_source.json [--routes 2..8]
+        jeeves director-topology --source design/director_campaign_source.json
+        jeeves director-route --session NAME [--destination scene_02 --route-profile fastest|scenic|quiet|novel|quest --alternatives 3]
+        jeeves director-causality --session NAME [--page N --page-size 100]
+        jeeves director-story-contrast --session NAME --other-session OTHER
+        jeeves dragon-navigation-study --session NAME [--approve STUDY_SHA256]
+        Native Godot v5 includes an interactive directed-world map with verified route highlights
+        Navigation plans never execute player decisions without explicit input
         jeeves dragon-lab --sessions hero_a,hero_b [--approve RESEARCH_SHA256]
         jeeves director-atlas-export --source design/director_campaign_source.json [--dry-run]
         jeeves director-atlas-verify --source design/director_campaign_source.json

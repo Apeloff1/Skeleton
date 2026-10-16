@@ -56,10 +56,12 @@ def audit(root: Path, *, session: str, page: int = 1,
             raise ValueError("time reversal or erased completed canonical quest")
         if not set(previous.narrative_flags).issubset(state.narrative_flags):
             raise ValueError("authoritative consequences disappeared from story history")
-        if not set(previous.results).issubset(state.results):
+        # Appended results are an immutable prefix. Avoid repeatedly
+        # materializing O(N)-sized result sets for every long-form action.
+        # This keeps replay auditing linear in actions plus new results.
+        if state.results[:len(previous.results)] != previous.results:
             raise ValueError("previous narrative result disappeared")
-        before_results = {(r.quest, r.stage) for r in previous.results}
-        fresh = [r for r in state.results if (r.quest, r.stage) not in before_results]
+        fresh = state.results[len(previous.results):]
         new_flags = sorted(set(state.narrative_flags) - set(previous.narrative_flags))
         new_complete = sorted(set(state.complete) - set(previous.complete))
         if action.kind == "travel":
@@ -87,7 +89,7 @@ def audit(root: Path, *, session: str, page: int = 1,
             completed_at[label] = index
             methods[result.approach] += 1
             for predecessor in quest.requires_quests:
-                if predecessor not in completed_at and predecessor not in previous.complete:
+                if predecessor not in previous.complete:
                     raise ValueError("unverified prerequisite at narrative transition")
                 causal_edges.append({
                     "from_quest": predecessor, "to_quest": quest.key,
@@ -172,6 +174,14 @@ def contrast(root: Path, *, first: str, second: str) -> dict[str, Any]:
         if left["action"] != right["action"]:
             first_different = i
             break
+    # Re-check both immutable heads after comparing the whole action stream.
+    # This rejects an added player action during cross-branch review.
+    for name, expected, expected_count in (
+            (first, a["journal_head_sha256"], left_count),
+            (second, b["journal_head_sha256"], right_count)):
+        _, _, _, _, head, count = _load(root, name=name)
+        if head != expected or count != expected_count:
+            raise ValueError("Director session changed during story branch comparison")
     # End receipts differ for forked sessions even with identical actions;
     # compare *story causality* and replayed states, not session IDs.
     a_flags = set(a["consequence_flags_created_at"])

@@ -19,6 +19,7 @@ from skeleton.developer.game_cli import SCHEMA as GAME_SCHEMA, run_game_cli
 from skeleton.developer.jeeves_game_director_session import begin, choose, inspect
 from skeleton.developer.jeeves_game_director_labyrinth import plan, topology
 from skeleton.developer.jeeves_game_director_causality import audit, contrast
+from skeleton.developer.jeeves_game_dragon_navigation import study, queue as navigation_queue
 from skeleton.developer.jeeves_game_director_bridge import handler
 from skeleton.developer.jeeves_game_director_atlas import export, verify
 
@@ -117,6 +118,35 @@ class LabyrinthCausalityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit(self.root, session="hero", page_size=0)
 
+    def test_dragon_measures_maze_deviation_without_guessing_preferences(self):
+        initial = inspect(self.root, session="hero")
+        travel = next(x["choice"] for x in initial["actions"] if x["kind"] == "travel")
+        traveled = self._move("hero", travel)
+        self._move("hero", "wait:wait")
+        review = navigation_queue(self.root, session="hero")
+        study_result = review["study"]
+        self.assertEqual(study_result["actions_verified"], 2)
+        self.assertEqual(study_result["travel_hops"], 1)
+        self.assertEqual(study_result["interaction_actions"], 0)
+        self.assertFalse(study_result["player_exploration_preference_inferred"])
+        self.assertEqual(study_result["journal_head_sha256"],
+                         inspect(self.root, session="hero")["last_receipt_sha256"])
+        self.assertFalse(review["model_weights_updated"])
+        with self.assertRaises(ValueError):
+            navigation_queue(self.root, session="hero",
+                             approved_digest="0" * 64)
+        admitted = navigation_queue(self.root, session="hero",
+                                    approved_digest=review["study_sha256"])
+        self.assertTrue(admitted["admitted_to_research"])
+        self.assertTrue(Path(admitted["path"]).is_file())
+        with self.assertRaises(ValueError):
+            navigation_queue(self.root, session="hero",
+                             approved_digest=review["study_sha256"])
+        self._move("hero", "wait:wait")
+        with self.assertRaises(ValueError):
+            navigation_queue(self.root, session="hero",
+                             approved_digest=review["study_sha256"])
+
     def test_compare_story_branches_with_distinct_actions(self):
         begin(self.root, source=self.source, session="alternate")
         self._move("hero", "wait:wait")
@@ -162,6 +192,14 @@ class LabyrinthCausalityTests(unittest.TestCase):
         self.assertIn("/v1/navigation", native)
         self.assertIn("session_head_sha256", native)
         self.assertIn("Travel first step", native)
+        self.assertIn("res://director_minimap.gd", native)
+        self.assertIn("native_map.node_selected.connect", native)
+        map_source = (project / "director_minimap.gd").read_text()
+        self.assertIn("signal node_selected", map_source)
+        self.assertIn("selected_path", map_source)
+        self.assertIn("graph[name]", map_source)
+        self.assertIn("node_selected.emit", map_source)
+        self.assertTrue(exported["manifest"]["directed_world_minimap_in_source"])
         self.assertTrue(verify(self.root, source=self.source)["source_manifest_verified"])
 
     def test_cli_wiring_rejects_irrelevant_options(self):

@@ -39,7 +39,7 @@ def _load_world(root: Path, source: str):
 def _runtime_signal_atlas(root: Path, *, source: str, world_digest: str) -> dict[str, Any]:
     """Read-only local source evidence; failures remain diagnostics, never P0 signoff."""
     from skeleton.developer.jeeves_game_director_atlas import verify
-    target = root / "build" / "director_atlases" / (world_digest[:20] + "-live-v4")
+    target = root / "build" / "director_atlases" / (world_digest[:20] + "-live-v5")
     if not target.exists() and not target.is_symlink():
         return {"present": False, "source_verified": False}
     try:
@@ -151,6 +151,21 @@ def _runtime_signal_dragon_policy(root: Path, *, world_digest: str
             "production_transformer_training_verified": False}
 
 
+def _labyrinth_signal(root: Path, *, source: str) -> dict[str, Any]:
+    """Surface topology risks as evidence, never conflate with artistic signoff."""
+    from skeleton.developer.jeeves_game_director_labyrinth import topology
+    report = topology(root, source=source)
+    return {
+        "all_scenes_accessible": report["all_scenes_accessible_from_start"],
+        "strongly_connected": report["fully_strongly_connected"],
+        "one_way_exit_count": len(report["one_way_links"]),
+        "cannot_return_to_start_count": len(report["cannot_return_to_start"]),
+        "unreachable_quest_stage_count": len(report["quest_placement_gaps"]),
+        "scene_count": report["scene_count"],
+        "artistic_path_quality_approved": False,
+    }
+
+
 def board(root: Path, *, source: str, routes: int = 3,
           dragon_digest: str | None = None) -> dict[str, Any]:
     from skeleton.ai.game_builder.quest_campaign_completion import compare_campaign_branches
@@ -240,6 +255,7 @@ def board(root: Path, *, source: str, routes: int = 3,
         "dragon_mechanic_workorders": dragon_work,
         "gameforge_engine": engine,
         "new_runtime_development_evidence": {
+            "labyrinth_topology": _labyrinth_signal(root, source=source),
             "interactive_director_sessions": _runtime_signal_sessions(
                 root, world_digest=world.digest),
             "godot_scene_atlas": _runtime_signal_atlas(

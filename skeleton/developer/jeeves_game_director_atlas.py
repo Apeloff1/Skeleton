@@ -18,6 +18,7 @@ from skeleton.developer.jeeves_game_director_player import PLAYER_SCRIPT, PLAYER
 from skeleton.developer.jeeves_game_director_stage import STAGE_SCRIPT
 from skeleton.developer.jeeves_game_director_media import generate as generate_media
 from skeleton.developer.jeeves_game_director_native_probe import PROBE_SCRIPT
+from skeleton.developer.jeeves_game_director_minimap import MAP_SCRIPT
 
 SCHEMA = "skeleton.jeeves.director_atlas_export.v1"
 FILES = ("project.godot", "main.tscn", "director_atlas.gd", "director_world.json",
@@ -166,6 +167,7 @@ renderer/rendering_method.mobile="gl_compatibility"
         "director_player.tscn": PLAYER_SCENE.encode("utf-8"),
         "director_stage.gd": STAGE_SCRIPT.encode("utf-8"),
         "director_probe.gd": PROBE_SCRIPT.encode("utf-8"),
+        "director_minimap.gd": MAP_SCRIPT.encode("utf-8"),
     }
     authored_media, media_catalog = generate_media(world)
     contents.update(authored_media)
@@ -187,6 +189,8 @@ renderer/rendering_method.mobile="gl_compatibility"
         "generated_original_wav_scores": media_catalog["original_exported_audio_music_count"],
         "native_original_audio_playback_in_source": True,
         "native_http_gameplay_probe_in_source": True,
+        "directed_world_minimap_in_source": True,
+        "minimap_navigation_requires_explicit_player_action": True,
         "native_asset_or_voice_quality_independently_verified": False,
         "quest_logic_implemented_in_native_preview": False,
         "native_binary_executed": False,
@@ -199,7 +203,7 @@ renderer/rendering_method.mobile="gl_compatibility"
 def export(root: Path, *, source: str, dry_run: bool = False) -> dict[str, Any]:
     contents, manifest = _payload(root, source)
     identity = manifest["source_sha256"]
-    dirname = manifest["director_world_sha256"][:20] + "-live-v4"
+    dirname = manifest["director_world_sha256"][:20] + "-live-v5"
     directory = _parent(root)
     destination = directory / dirname
     if destination.is_symlink() or destination.exists():
@@ -228,7 +232,7 @@ def export(root: Path, *, source: str, dry_run: bool = False) -> dict[str, Any]:
 
 def verify(root: Path, *, source: str) -> dict[str, Any]:
     contents, manifest = _payload(root, source)
-    location = _parent(root) / (manifest["director_world_sha256"][:20] + "-live-v4")
+    location = _parent(root) / (manifest["director_world_sha256"][:20] + "-live-v5")
     if location.is_symlink() or not location.is_dir():
         raise ValueError("Director atlas missing or unsafe")
     # Godot generates nested .godot caches and resource .import sidecars.

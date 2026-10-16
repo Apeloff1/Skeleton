@@ -164,7 +164,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
                                             "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
-                                            "director-causality", "director-story-contrast"))
+                                            "director-causality", "director-story-contrast", "dragon-navigation-study"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -249,11 +249,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-topology": {"action", "source"},
             "director-causality": {"action", "session", "page", "page_size"},
             "director-story-contrast": {"action", "session", "other_session"},
+            "dragon-navigation-study": {"action", "session", "approve"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
                 if key not in live_actions[args.action] and value is not None and value is not False:
                     raise ValueError("unrelated Director runtime option --" + key.replace("_", "-"))
+            if args.action == "dragon-navigation-study":
+                from skeleton.developer.jeeves_game_dragon_navigation import queue
+                if not args.session:
+                    raise ValueError("Dragon navigation review requires --session")
+                return queue(root, session=args.session, approved_digest=args.approve)
             if args.action in {"director-route", "director-topology"}:
                 from skeleton.developer.jeeves_game_director_labyrinth import plan, topology
                 if args.action == "director-topology":
