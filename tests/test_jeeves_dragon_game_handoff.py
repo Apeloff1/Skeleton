@@ -97,6 +97,23 @@ class DragonJeevesGameHandoffTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_handoff(self.root, saved["handoff_sha256"])
 
+    def test_uningested_source_cannot_borrow_owner_evidence(self) -> None:
+        self._ingest()
+        self.packet["observations"][0]["description"] = "Different, never ingested evidence"
+        self._write_packet()
+        with self.assertRaises(ValueError):
+            plan(self.root, source=self.source, genre="platformer", target="gameboy")
+
+    def test_source_drift_invalidates_published_handoff(self) -> None:
+        self._ingest()
+        preview = plan(self.root, source=self.source, genre="platformer", target="gameboy")
+        adopt(self.root, source=self.source, genre="platformer", target="gameboy",
+              approved_sha256=preview["handoff_sha256"])
+        self.packet["game_label"] = "Altered evidence label"
+        self._write_packet()
+        with self.assertRaises(ValueError):
+            load_handoff(self.root, preview["handoff_sha256"])
+
     def test_reject_unconfirmed_preference_and_rights(self) -> None:
         self.packet["observations"][0]["user_confirmed"] = False
         self._write_packet()
