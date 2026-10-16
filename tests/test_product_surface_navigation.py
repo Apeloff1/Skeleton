@@ -5,10 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.check_product_surfaces import SURFACES, module_exists, page_exists, validate
+from scripts.check_product_surfaces import ROOT, SURFACES, module_exists, page_exists, validate
 
 
 class ProductSurfaceNavigationTests(unittest.TestCase):
+    def test_checked_in_catalog_and_home_routes_resolve(self) -> None:
+        self.assertEqual(validate(ROOT), [])
+
     def test_route_file_and_nested_index(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
