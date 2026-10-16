@@ -369,7 +369,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-atlas-export", "director-atlas-verify",
-                                            "dragon-session-lesson"))
+                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
