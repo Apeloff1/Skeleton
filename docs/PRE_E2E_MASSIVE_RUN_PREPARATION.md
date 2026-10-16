@@ -7,6 +7,40 @@ golden journeys, local-inference chat integration, Node-side browser stream
 contracts, and frontend product journey contracts. Runtime tracing itself
 continues to use the canonical system in [OBSERVABILITY.md](OBSERVABILITY.md).
 
+## Disposable live E2E opt-in (2026-10-16)
+
+The previously hazardous Galaxy Studio and playable-async test modules now
+**skip at import time unless explicit approval is present**. Their target is
+`SKELETON_DISPOSABLE_E2E_URL`, not the production, Expo or checked-in .env
+backend URL. Only loopback http(s) with an explicit port is accepted. Keep a
+separate disposable backend, database, dedicated provider/test account and
+cleanup receipts. These controls do not make a production backend safe.
+
+```bash
+# Explicitly inspect a disposable local backend, read-only where possible:
+SKELETON_DISPOSABLE_E2E_APPROVED=1 \
+SKELETON_DISPOSABLE_E2E_URL=http://127.0.0.1:8001 \
+python -m pytest -q backend/tests/test_iteration_79_galaxy_studio_full_e2e.py
+
+# A missing completed Galaxy build is SKIPPED rather than silently
+# creating a 48,000-file background build. That path additionally needs:
+SKELETON_DESTRUCTIVE_E2E_APPROVED=1
+
+# Live playable async creation may incur provider billing; it requires:
+SKELETON_BILLED_E2E_APPROVED=1
+```
+
+The two extra approval variables are independent and must equal literal `1`.
+Without them, the corresponding destructive/paid test is skipped. Normal
+pytest collection will not make these calls, and even an Expo URL configured
+elsewhere is insufficient authorization. Hermetic gate regressions live in
+`skeleton/testing/test_live_service_gate.py`.
+
+**These are safety controls, not completion evidence:** real deployed
+browser/device, installed local checkpoint and full Stage-7 receipts remain
+unverified. Record source SHA, target, budget, isolation and disposal before
+approving any expensive tests.
+
 ## Execution boundaries
 
 The PR workflow always runs **preflight only**:
