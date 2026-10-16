@@ -164,7 +164,41 @@ def delta(root: Path, *, session: str, before: dict[str, Any],
                 "before": old_stock[(shop, item)], "after": amount,
             } for shop, item, amount in society_after.get("shop_stock", [])
                 if old_stock[(shop, item)] != amount]
+            authored_dialogue = None
+            if event["action"]["kind"] in {"speak", "discuss"}:
+                if world.dynamics.society is None:
+                    raise ValueError("cinematic NPC line has no authored society")
+                if event["action"]["kind"] == "speak":
+                    resident = next(
+                        (n for n in world.dynamics.society.residents
+                         if n.key == event["action"]["key"]), None
+                    )
+                    if resident is None:
+                        raise ValueError("unknown NPC greeting in saved journal")
+                    authored_dialogue = {
+                        "resident": resident.key,
+                        "speaker": resident.name,
+                        "topic": "greeting",
+                        "line": resident.greeting,
+                    }
+                else:
+                    found = next(
+                        ((n, c) for n in world.dynamics.society.residents
+                         for c in n.dialogue
+                         if n.key + "_" + c.key == event["action"]["key"]), None
+                    )
+                    if found is None:
+                        raise ValueError("NPC's dialogue was never authored in canon")
+                    resident, option = found
+                    authored_dialogue = {
+                        "resident": resident.key,
+                        "speaker": resident.name,
+                        "topic": option.key,
+                        "player_prompt": option.prompt,
+                        "line": option.response,
+                    }
             living_events["society"] = {
+                "authored_dialogue": authored_dialogue,
                 "wallet_before": society_before["balance"],
                 "wallet_after": society_after["balance"],
                 "wallet_delta": society_after["balance"] - society_before["balance"],
