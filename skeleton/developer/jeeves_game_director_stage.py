@@ -21,6 +21,8 @@ var environment_quality: int = 2
 var shift: float = 0.0
 var camera_scale: float = 1.0
 var actors: Array = []
+var scheduled_residents: Array = []
+var society_phase: String = ""
 var cue_text: String = ""
 var environmental_tint: Color = Color(0.13, 0.25, 0.40)
 var active_cues: Array = []
@@ -104,6 +106,14 @@ func apply_scene(data: Dictionary) -> void:
     _labels()
     queue_redraw()
 
+func update_scheduled_residents(people: Array, period: String) -> void:
+    # Only render characters confirmed present by canonical Director status,
+    # never infer availability from original scene cast or cached project data.
+    scheduled_residents = people.duplicate(true)
+    society_phase = period
+    queue_redraw()
+
+
 func _scene_tint(weather: String) -> Color:
     var normalized := weather.to_lower()
     if normalized.contains("rain") or normalized.contains("storm"):
@@ -174,10 +184,35 @@ func _draw() -> void:
         if get_theme_default_font() != null:
             draw_string(get_theme_default_font(), Vector2(px - 23.0, py - 45.0),
                         str(actors[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
+    # A visibly different, bounded group of schedule-authoritative NPCs.
+    # Small procedural actor markers are honest scaffolds, not produced
+    # motion-captured character animations.
+    var population: int = mini(scheduled_residents.size(), 12)
+    for i in range(population):
+        var npc: Dictionary = scheduled_residents[i]
+        var px: float = w * 0.09 + float(i) * minf(42.0, w * 0.81 / float(maxi(population, 1)))
+        var wander: float = sin(environment_seconds * (0.6 + float(i % 3) * 0.2)
+                                 + float(i)) * 3.0
+        var py: float = ground_y - 4.0 + wander
+        var trust: int = int(npc.get("trust", 0))
+        var coat = Color(0.25, 0.72, 0.60) if trust >= 40 else (
+            Color(0.71, 0.35, 0.36) if trust < 0 else Color(0.41, 0.54, 0.85))
+        draw_rect(Rect2(Vector2(px - 5.0, py - 18.0), Vector2(11.0, 22.0)), coat)
+        draw_circle(Vector2(px, py - 25.0), 6.0, Color(0.91, 0.75, 0.60))
+        draw_arc(Vector2(px, py - 18.0), 15.0, 0.0, TAU, 16,
+                 Color(0.99, 0.82, 0.30, 0.5), 0.8)
+        if get_theme_default_font() != null:
+            draw_string(get_theme_default_font(), Vector2(px - 10.0, py - 38.0),
+                        str(npc.get("name", "")), HORIZONTAL_ALIGNMENT_LEFT,
+                        95.0, 10, Color.WHITE)
     if get_theme_default_font() != null:
         draw_string(get_theme_default_font(), Vector2(12.0, 22.0),
                     str(scene_data.get("region", "Original world")),
                     HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
+        if not society_phase.is_empty():
+            draw_string(get_theme_default_font(), Vector2(12.0, 43.0),
+                        "Original-world period: " + society_phase,
+                        HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 
 func enqueue_presentation(receipt: Dictionary) -> void:
     for item in receipt.get("presentation_timelines", []):
