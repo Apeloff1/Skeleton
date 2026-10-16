@@ -369,7 +369,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-serve", "director-atlas-export", "director-atlas-verify",
-                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage"))
+                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage", "director-godot-smoke"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -396,6 +396,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--session")
     jeeves.add_argument("--sessions")
     jeeves.add_argument("--port", type=int)
+    jeeves.add_argument("--timeout", type=float)
     jeeves.add_argument("--other-session")
     jeeves.add_argument("--choice")
     jeeves.add_argument("--output")
@@ -461,6 +462,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--session", options.session), ("--other-session", options.other_session),
                                 ("--sessions", options.sessions),
                                 ("--port", options.port),
+                                ("--timeout", options.timeout),
                                 ("--choice", options.choice),
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
