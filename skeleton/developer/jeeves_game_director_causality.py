@@ -46,6 +46,14 @@ def audit(root: Path, *, session: str, page: int = 1,
     world_flag_created_at = {}
     faction_standing_moves = Counter()
     world_consequence_edges = []
+    world_consequence_count = 0
+
+    def record_world_consequence(event: dict[str, Any]) -> None:
+        nonlocal world_consequence_count
+        world_consequence_count += 1
+        if len(world_consequence_edges) < 512:
+            world_consequence_edges.append(event)
+
     for index in range(1, count + 1):
         recorded = _read_doc(folder / f"{index:08d}.json")
         action = DirectorAction(**recorded["action"])
@@ -97,7 +105,7 @@ def audit(root: Path, *, session: str, page: int = 1,
             ]
             for delta in reputation_deltas:
                 faction_standing_moves[delta["faction"]] += 1
-                world_consequence_edges.append({
+                record_world_consequence({
                     "at_sequence": index, "kind": "faction_reputation",
                     "faction": delta["faction"], "delta": delta["delta"],
                     "caused_by": action.kind + ":" + action.key,
@@ -111,7 +119,7 @@ def audit(root: Path, *, session: str, page: int = 1,
                 raise ValueError("permanent world-history flag disappeared")
             for flag in new_world_flags:
                 world_flag_created_at[flag] = index
-                world_consequence_edges.append({
+                record_world_consequence({
                     "at_sequence": index, "kind": "world_flag",
                     "flag": flag, "caused_by": action.kind + ":" + action.key,
                 })
@@ -182,8 +190,9 @@ def audit(root: Path, *, session: str, page: int = 1,
         "transport_modes": dict(sorted(transport_modes.items())),
         "faction_standing_changes": dict(sorted(faction_standing_moves.items())),
         "world_flags_created_at": dict(sorted(world_flag_created_at.items())),
-        "world_consequence_edges": world_consequence_edges[:512],
-        "world_consequence_edge_count": len(world_consequence_edges),
+        "world_consequence_edges": world_consequence_edges,
+        "world_consequence_edge_count": world_consequence_count,
+        "world_consequence_sample_complete": world_consequence_count <= 512,
         "final_world_state": state.world_state.payload()
                              if state.world_state is not None else None,
         "approach_counts": dict(sorted(methods.items())),
