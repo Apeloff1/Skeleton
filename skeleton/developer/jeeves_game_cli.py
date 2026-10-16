@@ -162,7 +162,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
-                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage", "director-godot-smoke"))
+                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
+                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -233,6 +234,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-bindings-publish": {"action", "source", "approve"},
             "director-bindings-check": {"action", "source", "digest"},
             "dragon-lab": {"action", "sessions", "approve"},
+            "dragon-policy-preview": {"action", "sessions"},
+            "dragon-policy-train": {"action", "sessions", "approve"},
+            "dragon-policy-predict": {"action", "session", "digest"},
             "director-coverage": {"action", "source", "routes"},
             "director-godot-smoke": {"action", "source", "timeout"},
         }
@@ -246,6 +250,18 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     raise ValueError("director-serve requires --session")
                 return serve(root, session=args.session,
                              port=args.port if args.port is not None else 8765)
+            if args.action in {"dragon-policy-preview", "dragon-policy-train",
+                               "dragon-policy-predict"}:
+                from skeleton.developer.jeeves_game_dragon_policy import preview, train, predict
+                if args.action == "dragon-policy-predict":
+                    if not args.session or not args.digest:
+                        raise ValueError("policy prediction needs --session and --digest")
+                    return predict(root, session=args.session, digest=args.digest)
+                if not args.sessions:
+                    raise ValueError("Dragon policy fitting needs --sessions a,b,c")
+                if args.action == "dragon-policy-preview":
+                    return preview(root, sessions=args.sessions)
+                return train(root, sessions=args.sessions, approved_digest=args.approve)
             if args.action == "dragon-lab":
                 from skeleton.developer.jeeves_game_dragon_lab import queue
                 if not args.sessions:
