@@ -103,8 +103,14 @@ def review(root: Path, *, source: str) -> dict[str, Any]:
     observations = _observations(doc)
     from skeleton.ai.webcrawler.dragon_game_builder_bridge import _event
     from skeleton.ai.webcrawler.dragon_game_mechanics import Mechanic, PreferenceSignal
+    previous_timestamp = -1
     for item in observations:
         _event(item.event, doc["duration_ms"])
+        if item.event.timestamp_ms < previous_timestamp:
+            raise ValueError("Dragon events must be in chronological recording order")
+        previous_timestamp = item.event.timestamp_ms
+        if not isinstance(item.reviewer_note, str) or len(item.reviewer_note) > 500:
+            raise ValueError("invalid Dragon review note")
         if item.event.label == "unclassified_visual_change":
             raise ValueError("classify visual movement before Dragon ingestion")
         if item.preference is not PreferenceSignal.UNKNOWN and not item.user_confirmed:
