@@ -12,8 +12,8 @@ from urllib.parse import urlsplit
 
 
 _DISALLOWED_SUFFIXES = (
-    ".localhost", ".local", ".internal", ".test",
-    ".invalid", ".example", ".onion", ".home.arpa",
+    ".localhost", ".localdomain", ".local", ".internal", ".lan",
+    ".corp", ".test", ".invalid", ".example", ".onion", ".home.arpa",
 )
 _LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 
