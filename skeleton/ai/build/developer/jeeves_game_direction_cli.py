@@ -20,7 +20,7 @@ def direction(root: Path, *, action: str, source: str,
     data, sha = _read(root,source,16*1024*1024)
     permitted={"schema","bible","scenes","expert_reviews"}
     optional={"dramatic_threads","production_contract","shot_boards"}
-    if data.get("schema")!=SCHEMA or not permitted.issubset(data) or not set(data).issubset(permitted|optional):
+    if not isinstance(data, dict) or data.get("schema")!=SCHEMA or not permitted.issubset(data) or not set(data).issubset(permitted|optional):
         raise DirectionError("signed story-direction dossier requires bible, scenes and independent review claims")
     from skeleton.developer.game_cli import _load
     project = _load(root)["name"]
@@ -57,6 +57,10 @@ def direction(root: Path, *, action: str, source: str,
             "shots": shot_result["total_shots"],
             "timeline_ms": shot_result["total_timeline_ms"],
             "source_dialogue_lines_covered": shot_result["source_spoken_lines_covered"],
+            "approximate_authored_dialogue_words": shot_result["approximate_authored_dialogue_words"],
+            "dense_dialogue_shots": shot_result["dense_dialogue_shots"],
+            "rapid_shots_under_750ms": shot_result["rapid_shots_under_750ms"],
+            "actual_spoken_pacing_verified": False,
             "all_camera_and_actor_source_checks_passed": True,
             "rendered_film_quality_verified": False,
             "original_voice_performance_verified": False,

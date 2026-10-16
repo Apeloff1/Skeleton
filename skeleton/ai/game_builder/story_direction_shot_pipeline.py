@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import Counter
 from hashlib import sha256
 import json
+import re
 from statistics import median
 from typing import Any
 
@@ -61,6 +62,7 @@ def audit_cinematic_direction(
     passes_seen = []
     latest = []
     whole_count = whole_duration = whole_dialogue = movement_count = 0
+    total_words = total_dense = total_rapid = 0
     for attempt in range(1, passes + 1):
         receipts = []
         for scene in scenes:
@@ -81,7 +83,30 @@ def audit_cinematic_direction(
                 shot["camera"] in ("fixed", "medium") and shot["duration_ms"] > 10000
                 for shot in shots
             )
+            # Minimum source-text pace only; film/audio delivery is not tested.
+            original_dialogue = {row["id"]: row["text"] for row in scene["dialogue"]}
+            spoken_words = 0
+            dense_ids = []
+            rapid_ids = []
+            estimated_paces = []
+            for shot in shots:
+                words = sum(
+                    len(re.findall(r"\b[\w\u0027]+\b", original_dialogue[line_id]))
+                    for line_id in shot["dialogue_ids"]
+                )
+                spoken_words += words
+                if words:
+                    minimum_wpm = round(60000 * words / shot["duration_ms"], 2)
+                    estimated_paces.append(minimum_wpm)
+                    if minimum_wpm > 210:
+                        dense_ids.append(shot["id"])
+                if shot["duration_ms"] < 750:
+                    rapid_ids.append(shot["id"])
             items = []
+            if dense_ids:
+                items.append("Review dialogue allotted too little shot time for plausible delivery and pauses")
+            if len(rapid_ids) >= 3:
+                items.append("Review rapid-cut rhythm for intentional dramatic or accessibility impact")
             if len(shots) >= 4 and len(cameras) == 1:
                 items.append("Review unvaried shot grammar; repetition may be intentional")
             if len(shots) >= 3 and sum(edits.values()) > 2*len(scene["dialogue"])+6:
@@ -103,6 +128,19 @@ def audit_cinematic_direction(
                 "cameras": dict(sorted(cameras.items())),
                 "cuts": dict(sorted(edits.items())),
                 "moving_camera_shots": moving,
+                "camera_change_count": sum(
+                    a["camera"] != b["camera"] for a, b in zip(shots, shots[1:])
+                ),
+                "non_dialogue_shot_time_ms": sum(
+                    shot["duration_ms"] for shot in shots if not shot["dialogue_ids"]
+                ),
+                "approximate_authored_dialogue_word_count": spoken_words,
+                "maximum_estimated_minimum_speaking_pace_wpm": (
+                    max(estimated_paces) if estimated_paces else None
+                ),
+                "dense_dialogue_shot_ids": dense_ids,
+                "rapid_shot_ids": rapid_ids,
+                "actual_spoken_pacing_verified": False,
                 "original_actor_screen_time_ms": dict(sorted(actors.items())),
                 "recommended_editor_review": items,
                 "actor_performance_video_evaluated": False,
@@ -113,6 +151,9 @@ def audit_cinematic_direction(
             whole_duration += receipt["duration_ms"]
             whole_dialogue += receipt["spoken_lines_verified"]
             movement_count += moving
+            total_words += spoken_words
+            total_dense += len(dense_ids)
+            total_rapid += len(rapid_ids)
         passes_seen.append({
             "pass": attempt, "verified_scenes": len(receipts),
             "shot_receipt_digest": _digest(receipts),
@@ -132,6 +173,10 @@ def audit_cinematic_direction(
         "total_timeline_ms": whole_duration,
         "source_spoken_lines_covered": whole_dialogue,
         "moving_camera_shots": movement_count,
+        "approximate_authored_dialogue_words": total_words,
+        "dense_dialogue_shots": total_dense,
+        "rapid_shots_under_750ms": total_rapid,
+        "actual_spoken_pacing_verified": False,
         "per_scene": latest,
         "every_scene_exact_dialogue_source_covered": True,
         "actor_face_voice_and_grade_source_locked": True,

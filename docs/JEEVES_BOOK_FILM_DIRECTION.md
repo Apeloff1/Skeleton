@@ -335,3 +335,14 @@ fully installed commercial game, end-to-end story branch playthrough,
 professional actor direction or book/film audience reception.
 Canonical source approval and real platform/hardware validation remain
 separate mandatory acceptance requirements.
+
+### Signed story pacing and edit-rhythm diagnostics
+
+The cinematic review now counts approximate source-dialogue words and identifies
+shots whose signed dialogue requires more than 210 words/minute even when all
+shot duration is assumed to be speaking. Shots below 750 ms are listed for
+editorial rhythm inspection, with motivated rapid-cut sequences flagged.
+These are advisory heuristics, not downgraded quality gates. No recorded
+acting, acoustics, lip-sync, accessibility or actual film is certified.
+Jeeves model prompts receive only aggregate verified counts and warnings;
+unrequested original dialogue text is never added to the cinematic brief.

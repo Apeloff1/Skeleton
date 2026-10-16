@@ -46,6 +46,9 @@ def test_actual_canon_shots_measured_without_claiming_film_performance():
     assert all(x["canonical_owning_film_verifier_used"] for x in
                verified["repeatable_pre_render_receipts"])
     assert verified["per_scene"][0]["median_shot_duration_ms"] == 6000
+    assert verified["approximate_authored_dialogue_words"] > 0
+    assert verified["dense_dialogue_shots"] == 0
+    assert not verified["actual_spoken_pacing_verified"]
     assert not verified["actual_rendered_video_screened"]
     assert not verified["actual_voice_and_lip_sync_verified"]
     assert not verified["book_or_hollywood_professional_quality_proven"]
@@ -180,6 +183,9 @@ def test_one_direction_audit_joins_signed_book_story_and_cinematic_evidence(tmp_
     assert cinematic["scenes"] == 2
     assert cinematic["shots"] == 2
     assert cinematic["timeline_ms"] == 12000
+    assert cinematic["approximate_authored_dialogue_words"] > 0
+    assert cinematic["dense_dialogue_shots"] == 0
+    assert not cinematic["actual_spoken_pacing_verified"]
     assert not cinematic["rendered_film_quality_verified"]
     assert not result["hollywood_level_film_quality_proven"]
     revision = run_game_cli(["jeeves", "direction-revision", "--project", str(root),
@@ -271,6 +277,30 @@ def test_jeeves_model_gets_verified_shot_counts_without_unrequested_script_text(
     assert summary["shot_count"] == 1
     assert summary["timeline_ms"] == 6000
     assert summary["dialogue_lines_covered"] == 1
+    assert summary["approximate_dialogue_words"] > 0
+    assert summary["dense_dialogue_shots_to_revise"] == 0
+    assert summary["actual_spoken_pacing_verified"] is False
     assert summary["rendered_film_quality_verified"] is False
     assert scenes[0]["dialogue"][0]["text"] not in json.dumps(observed[0])
     assert not made.get("model_weights_updated", False)
+
+def test_cinematic_pacing_hotspot_requires_editor_review_not_acoustic_certification():
+    bible, contract, scenes, boards = original_production(scenes=1)
+    shot = deepcopy(boards[0]["shots"][0])
+    shot["duration_ms"] = 200
+    boards[0]["shots"] = [shot]
+    original_scene = deepcopy(scenes[0])
+    report = audit_cinematic_direction(bible, contract, scenes, boards, passes=2)
+    observed = report["per_scene"][0]
+    assert observed["dense_dialogue_shot_ids"] == [shot["id"]]
+    assert observed["rapid_shot_ids"] == [shot["id"]]
+    assert report["dense_dialogue_shots"] == 1
+    assert report["rapid_shots_under_750ms"] == 1
+    assert observed["maximum_estimated_minimum_speaking_pace_wpm"] > 210
+    assert "plausible delivery" in observed["recommended_editor_review"][0]
+    assert scenes[0] == original_scene
+    assert not observed["actual_spoken_pacing_verified"]
+    assert not report["actual_voice_and_lip_sync_verified"]
+    boards[0]["shots"][0]["dialogue_ids"] = []
+    with pytest.raises(ValueError, match="every original line"):
+        audit_cinematic_direction(bible, contract, scenes, boards)
