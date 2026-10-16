@@ -12,12 +12,14 @@ on:
       - "frontend/state/settingsStore.ts"
       - "skeleton/ai/runtime/inference/native_transformer.py"
       - "skeleton/ai/runtime/inference/neural.py"
+      - "skeleton/ai/runtime/gameplay_long_replay.py"
       - "scripts/check_product_surfaces.py"
       - "scripts/classify_repo_stubs.py"
       - "tests/test_classify_repo_stubs.py"
       - "tests/test_product_surface_navigation.py"
       - "tests/test_native_transformer_stops.py"
       - "tests/test_neural_stop_handling.py"
+      - "tests/test_gameplay_long_replay.py"
       - ".github/workflows/product-ui-local-ai-qualification.yml"
   workflow_dispatch:
 
@@ -96,6 +98,7 @@ jobs:
           scripts/check_product_surfaces.py
           skeleton/ai/runtime/inference/native_transformer.py
           skeleton/ai/runtime/inference/neural.py
+          skeleton/ai/runtime/gameplay_long_replay.py
           tests/test_product_surface_navigation.py
           tests/test_native_transformer_stops.py
           tests/test_neural_stop_handling.py
@@ -114,6 +117,7 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_game_playability.py
           skeleton/testing/test_game_replay.py
+          tests/test_gameplay_long_replay.py
           tests/test_product_surface_navigation.py
 
   stub-inventory:
