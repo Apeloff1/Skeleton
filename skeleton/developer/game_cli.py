@@ -331,6 +331,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     init.add_argument("--era", default="extraction_now")
     init.add_argument("--archetype", default="auto")
     init.add_argument("--dry-run", action="store_true")
+    subs.add_parser("catalog", help="List supported GameForge eras and archetypes")
     for action in ("info", "doctor", "build", "verify", "playtest", "assets", "package"):
         child = subs.add_parser(action)
         child.add_argument("--project", default=".")
@@ -352,6 +353,12 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     try:
         if options.action == "init":
             return _init(options)
+        if options.action == "catalog":
+            from skeleton.forge.eras import list_eras
+            from skeleton.forge.archetypes import default_library
+            return {"ok": True, "action": "catalog", "eras": list_eras(),
+                    "archetypes": sorted({"auto", "vision", *default_library().names()}),
+                    "build_targets": ["godot"], "package_formats": ["godot-source-zip"]}
         root = _project(options.project)
         if options.action == "info":
             data = _load(root)
