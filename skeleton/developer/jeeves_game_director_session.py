@@ -245,6 +245,7 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
             "wallet": economy.balance,
             "relationships": [list(x) for x in economy.relationships],
             "owned_goods": [list(x) for x in economy.owned],
+            "redeemed_or_used_goods": [list(x) for x in economy.consumed_goods],
             "canonical_dialogue_history": [list(x)
                                            for x in economy.dialogue_history],
             "present_residents": [{
