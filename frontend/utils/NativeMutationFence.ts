@@ -8,12 +8,18 @@
  * No queues or growing retry backlog: a stalled key owns at most one
  * underlying native request. Independent keys remain concurrent.
  */
+export const MAX_NATIVE_MUTATION_KEYS = 256;
+
 export class NativeMutationFence {
   private readonly pending = new Map<string, Promise<void>>();
 
   run(keys: readonly string[], operation: () => Promise<void>): Promise<boolean> {
     const unique = [...new Set(keys)];
     if (unique.length === 0) return Promise.resolve(true);
+    // Global bound protects low-RAM devices if many independent storage
+    // writes hang. Oversized bulk deletes are denied, never partially applied.
+    if (unique.length > MAX_NATIVE_MUTATION_KEYS ||
+        this.pending.size + unique.length > MAX_NATIVE_MUTATION_KEYS) return Promise.resolve(false);
     if (unique.some(key => this.pending.has(key))) return Promise.resolve(false);
 
     const executed = Promise.resolve().then(operation);
