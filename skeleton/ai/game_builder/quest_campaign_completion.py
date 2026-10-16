@@ -8,6 +8,7 @@ remain governed by the existing approved Director blueprint compiler.
 from __future__ import annotations
 
 from collections import deque, defaultdict
+import heapq
 from dataclasses import dataclass
 from typing import Any
 
@@ -45,6 +46,58 @@ def _path(world: DirectorWorld, current: str, destination: str) -> tuple[Directo
     raise CampaignCompletionError("approved authored quest scene is unreachable")
 
 
+def _dynamic_path(world: DirectorWorld, state: DirectorState,
+                  destination: str) -> tuple[DirectorAction, ...]:
+    """Minimum canonical turn-cost route over the changing *actual* world state.
+
+    A fixed graph path cannot model earning standing on a ferry, spending a
+    unique ticket, or an irreversible charter flag. Search expands only
+    currently legal travel/transit actions and applies director_step. It never
+    creates inventory, mutates the live game or guesses access permissions.
+    """
+    if state.scene == destination:
+        return ()
+    if world.dynamics is None:
+        return _path(world, state.scene, destination)
+    frontier = [(0, 0, state, ())]
+    serial = 0
+    best: dict[tuple, int] = {}
+    expansions = 0
+    while frontier and expansions < 30000:
+        cost, _, here, actions = heapq.heappop(frontier)
+        status = here.world_state
+        if status is None:
+            raise CampaignCompletionError("dynamic campaign has no persistent world state")
+        key = (here.scene, here.acquired, status.standings,
+               status.world_flags, here.narrative_flags, here.complete)
+        if cost > best.get(key, cost):
+            continue
+        if here.scene == destination:
+            return actions
+        expansions += 1
+        if len(frontier) >= 60000 or len(actions) >= 512:
+            continue
+        best[key] = cost
+        for action in available_director_actions(world, here):
+            if action.kind not in {"travel", "transit"}:
+                continue
+            after = director_step(world, here, action)
+            next_status = after.world_state
+            if next_status is None:
+                raise CampaignCompletionError("transport lost persistent world state")
+            next_key = (after.scene, after.acquired, next_status.standings,
+                        next_status.world_flags, after.narrative_flags, after.complete)
+            updated = cost + after.turn - here.turn
+            if updated >= best.get(next_key, updated + 1):
+                continue
+            serial += 1
+            heapq.heappush(frontier, (updated, serial, after, actions + (action,)))
+    raise CampaignCompletionError(
+        "no proven canonical route to required quest scene under current permissions "
+        "(or bounded route search exhausted)"
+    )
+
+
 def _candidate(world: DirectorWorld, state: DirectorState, stage: Any,
                parameter: Any) -> tuple[str, Any] | None:
     """Choose a reachable legal affordance, never assume a missing resource."""
@@ -55,8 +108,15 @@ def _candidate(world: DirectorWorld, state: DirectorState, stage: Any,
         for affordance in scene.affordances:
             if ((affordance.kind, affordance.target) == (parameter.kind, parameter.target)
                     and (affordance.consumes is None or affordance.consumes in state.acquired)):
-                candidates.append((len(_path(world, state.scene, scene.key)), scene.key,
-                                   affordance.key, affordance))
+                try:
+                    route = _dynamic_path(world, state, scene.key)
+                except CampaignCompletionError:
+                    continue
+                candidates.append((sum(1 if a.kind == "travel" else
+                                        next(p.cost_turns for p in world.dynamics.passages
+                                             if p.key == a.key)
+                                        for a in route) if world.dynamics is not None
+                                   else len(route), scene.key, affordance.key, affordance))
     if not candidates:
         return None
     _, site, _, affordance = min(candidates, key=lambda row: row[:3])
@@ -95,7 +155,7 @@ def _complete_stage(world: DirectorWorld, state: DirectorState, quest: Any,
             if picked is None:
                 raise CampaignCompletionError("missing original scene resource for quest objective")
             site, affordance = picked
-            for step in _path(world, state.scene, site):
+            for step in _dynamic_path(world, state, site):
                 apply(step)
             apply(DirectorAction("use", affordance.key, site))
 
