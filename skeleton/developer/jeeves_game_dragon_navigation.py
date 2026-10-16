@@ -49,6 +49,7 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
     total_hops = total_shortest = 0
     use_interactions = 0
     waits = 0
+    society_actions: Counter[str] = Counter()
     transports: Counter[str] = Counter()
     transport_turns = 0
 
@@ -95,6 +96,11 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         elif step.kind == "use":
             use_interactions += 1
             close("interaction", index)
+        elif step.kind in {"speak", "discuss", "buy", "sell", "rest"}:
+            # Conversations and local trade are neither poor walking
+            # navigation nor idle player avoidance of the original quest.
+            society_actions[step.kind] += 1
+            close("society_interaction", index)
         elif step.kind == "transit":
             # A ferry/portal is not a walking detour. Static walking paths
             # cannot serve as a fair distance baseline for a paid vehicle.
@@ -134,6 +140,8 @@ def study(root: Path, *, session: str) -> dict[str, Any]:
         "wait_actions": waits,
         "transport_uses": dict(sorted(transports.items())),
         "transport_turns": transport_turns,
+        "NPC_and_commerce_actions": dict(sorted(society_actions.items())),
+        "NPC_dialogue_not_classified_as_idle_time": True,
         "walking_vs_multimodal_savings_conflated": False,
         "scene_entrance_counts": dict(sorted(visited.items())),
         "largest_route_deviations": material,
