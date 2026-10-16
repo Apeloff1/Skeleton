@@ -26,7 +26,7 @@ def _number(value: Any, name: str) -> float:
     return float(value)
 
 
-def _scene_path(root: Path, relative: str) -> Path:
+def _scene_path(root: Path, relative: str) -> tuple[dict[str, Any], str]:
     from skeleton.developer.jeeves_game_quality import _read
     data, sha256 = _read(root, relative, 256 * 1024)
     return data, sha256
@@ -91,7 +91,7 @@ def render_reference(root: Path, *, source: str, output: str,
         if not isinstance(object_id, str) or not 1 <= len(object_id) <= 64:
             raise ReferenceSceneError("invalid renderer object id")
         shader = row["shader"]
-        if shader not in {"fixed", "skinned"}:
+        if not isinstance(shader, str) or shader not in {"fixed", "skinned"}:
             raise ReferenceSceneError("unsupported historical shader mode")
         triangles.append(RenderTriangle(
             object_id=object_id, material=material, vertices=tuple(sampled),
