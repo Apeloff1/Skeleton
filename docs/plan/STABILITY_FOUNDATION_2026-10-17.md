@@ -162,3 +162,88 @@ Release blockers remain: exact-head TypeScript compilation, Expo export,
 Native Android restart/OOM/low-storage, full Python recovery tests, Windows
 first-install, and complete AI/game-playthrough operation. Do not merge based
 solely on focused tests, source completeness or mergeability.
+
+
+## SOTA reliability audit — durable state and failure amplification
+
+This is a **corrective P0 risk-reduction pass**, not an attested production
+release. Its acceptance model is no acknowledged authoritative-state loss,
+correct failure classification, bounded auxiliary resource use, zero hidden
+mutation replay, and a recovery UI that works when optional systems fail.
+
+### Highest-severity defects corrected
+
+1. **Severe data retention fault (P0):** Generic `safeStorage.pruneExpired`
+   previously admitted the broad `@codedock/`, `@boot/`, `@feature-flags/`
+   and `@telemetry/` namespaces for automatic seven-day removal. Keys under
+   these families can represent projects, preferences, settings, and crash
+   evidence. `storageRetentionPolicy.ts` now explicitly admits only the
+   advisory `@boot/last_ok:v1` key and `@telemetry/cache/` derived rows.
+   Caller-supplied prefixes cannot expand that admission. Background full
+   key scans are opt-in, and old metadata records for disallowed keys cannot
+   trigger deletion. The mirror/epoch book-keeping is bounded and stale
+   native read results cannot overwrite newer in-process state.
+2. **Competing write authority:** Opportunistic `selfCleaner.ts` no longer
+   truncates and rewrites `@boot/trace` behind the dedicated boot-tracer
+   writer. It also no longer deletes arbitrary entries from Expo's shared
+   cache directory when total size exceeds a threshold. It only considers
+   named, regenerable Skeleton scratch entries, and skips directories.
+3. **Timed-out reset / late write races:** `resetBootState` keeps the trace
+   writer fenced if the underlying native removal is unresolved. A timeout
+   is not proof that a native mutation was cancelled. Diagnostic session
+   rotation now uses bounded reads, so a hung native adapter cannot block
+   every later boot trace flush.
+4. **Duplicate-write admission:** Automatic write replay now requires both
+   a stable idempotency key *and* explicit verification that the particular
+   server endpoint implements deduplication; a client header alone is
+   insufficient. Safe reads retain bounded retries.
+5. **Crash and API failure amplification:** A telemetry operation retains
+   its concurrency slot until the native fetch actually settles, even if
+   AbortController is ignored. The primary API transport has abortable
+   retry sleeps and excludes raw URLs, query strings and untrusted transport
+   exception text from breadcrumbs and fallback errors. The secondary
+   transport resolves caller cancellation promptly without waiting for a
+   misbehaving native adapter's timeout.
+
+### Verified in this pass
+
+- **18/18 deterministic Node tests passed** (startup receipts, bounded write
+  queue and reset fence, retry/idempotency/response budgets, storage deletion
+  allowlist). Tests were executed on Node 22.16 with `--experimental-strip-types`.
+  The seven tested source/test files each matched their actual Git blob hash.
+- The three pure TypeScript policy/queue modules passed a separate strict
+  `tsc --noEmit` check with ES2022/ESNext settings.
+- No new top-level runtime service, provider boundary, persistent database or
+  CI workflow was introduced.
+
+### Non-compensable remaining release qualifications
+
+- Exact-head full `frontend` TypeScript build, Metro/Expo native bundle and
+  browser export (a pure-module strict compile is **not** this).
+- Real Android cold-start, repeated force-stop, memory pressure/OOM, offline,
+  locked/slow storage, interrupted update, corrupt cache and rotation of
+  inactive/foreground states.
+- Windows frozen installer: first install, dead serving thread, port reuse,
+  native model checkpoint inference, and bounded shutdown under failure.
+- Docker backing-store outage, health and recovery transitions, durable
+  database snapshots, restore/reconciliation, and unacknowledged write replay.
+- End-to-end creator project persistence, scene saves, checkpoint restoration,
+  Jeeves runtime, and full game playthrough with model access.
+- Failure-injection tests for slow/late native storage writes and app-authored
+  state authority migrations, and release rollback on a real installed build.
+
+**Residual semantic risk:** A JavaScript timeout cannot cancel all underlying
+native writes; physical persistence sequencing for authoritative user records
+requires a server/SQLite transaction or explicit native acknowledgement,
+rather than optimistic AsyncStorage mirrors. React error boundaries do not
+catch kernel/OS OOM kills or all native exceptions. Large response caps on
+React Native adapters that only provide `response.text()` are best effort
+after buffering; asset streaming needs a dedicated production data path.
+These limitations are release blockers, not claims of solved behavior.
+
+**Operational rollback:** Keep PR #4085 isolated until exact-head
+qualification. Revert the PR for any durable-state regression; preserve
+database, model and project state. Do not clear user state to pass health
+checks or mark a boot clean before a user-visible product render. Keep the
+minimal existing security/hygiene checks; do not reintroduce redundant CI
+workflows merely to increase the reported number of passing checks.
