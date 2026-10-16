@@ -6,6 +6,7 @@ The canonical Dragon review/memory/forge contracts own all interpretation.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from dataclasses import asdict
 from hashlib import sha256
 import json
@@ -96,6 +97,27 @@ def _observations(doc: dict[str, Any]) -> tuple[Any, ...]:
     return tuple(rows)
 
 
+def review(root: Path, *, source: str) -> dict[str, Any]:
+    """Read-only, pre-approval schema check and exact input digest."""
+    doc, identity = _packet(root, source)
+    observations = _observations(doc)
+    from skeleton.ai.webcrawler.dragon_game_builder_bridge import _event
+    from skeleton.ai.webcrawler.dragon_game_mechanics import Mechanic, PreferenceSignal
+    for item in observations:
+        _event(item.event, doc["duration_ms"])
+        if item.event.label == "unclassified_visual_change":
+            raise ValueError("classify visual movement before Dragon ingestion")
+        if item.preference is not PreferenceSignal.UNKNOWN and not item.user_confirmed:
+            raise PermissionError("user-confirmed preference required")
+        if not isinstance(item.mechanic, Mechanic):
+            raise ValueError("unsupported Dragon mechanic")
+    return {"ok": True, "action": "dragon-review", "source": source,
+            "source_sha256": identity, "project": doc["project"],
+            "game_label": doc["game_label"], "reviewed_events": len(observations),
+            "ingested": False, "rights_independently_verified": False,
+            "next": "dragon-ingest --source " + source + " --approve " + identity}
+
+
 def ingest(root: Path, *, source: str, approved_sha256: str | None) -> dict[str, Any]:
     """Validate before opening the database; ingest is idempotent and consent-gated."""
     doc, identity = _packet(root, source)
@@ -108,7 +130,7 @@ def ingest(root: Path, *, source: str, approved_sha256: str | None) -> dict[str,
     if _packet(root, source)[1] != identity:
         raise ValueError("Dragon source changed during ingestion")
     try:
-        with _database(root, create=True) as db:
+        with closing(_database(root, create=True)) as db:
             memory = GameMechanicsMemory(db)
             session = review_recording(
                 memory, owner=doc["owner"], game_label=doc["game_label"],
@@ -134,7 +156,7 @@ def _preview(root: Path, *, source: str, genre: str, target: str) -> dict[str, A
     if not isinstance(genre, str) or not isinstance(target, str):
         raise ValueError("Dragon game forge needs --genre and --target")
     try:
-        with _database(root, create=False) as db:
+        with closing(_database(root, create=False)) as db:
             memory = GameMechanicsMemory(db)
             constraints = GameDesignConstraint(
                 genre=genre, target_platform=target,
