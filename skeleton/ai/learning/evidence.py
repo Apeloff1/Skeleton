@@ -286,7 +286,7 @@ class EvidenceProvenance:
             object.__setattr__(self, "revision", _text("revision", self.revision, MAX_SOURCE_CHARS))
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        record: dict[str, object] = {
             "source_id": self.source_id,
             "source_kind": self.source_kind,
             "observed_at": self.observed_at,
@@ -294,10 +294,15 @@ class EvidenceProvenance:
             "fingerprint": self.fingerprint,
             "parent_ids": list(self.parent_ids),
             "uri": self.uri,
-            "source_digest": self.source_digest,
-            "retrieved_at": self.retrieved_at,
-            "revision": self.revision,
         }
+        # Preserve v1 custody digests for callers not importing envelopes.
+        if self.source_digest is not None:
+            record["source_digest"] = self.source_digest
+        if self.retrieved_at is not None:
+            record["retrieved_at"] = self.retrieved_at
+        if self.revision is not None:
+            record["revision"] = self.revision
+        return record
 
     @property
     def digest(self) -> str:
