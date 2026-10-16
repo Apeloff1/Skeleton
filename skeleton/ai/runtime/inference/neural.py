@@ -30,6 +30,14 @@ EOS = 257
 VOCAB_SIZE = 258
 
 
+def _stop_suffix_start(text: str, markers: Sequence[str]) -> int | None:
+    """Locate the earliest suffix stop, even when multiple stop markers overlap."""
+    return min(
+        (len(text) - len(marker) for marker in markers if marker and text.endswith(marker)),
+        default=None,
+    )
+
+
 class NeuralLMError(RuntimeError):
     """Native neural language-model state is invalid or non-reproducible."""
 
@@ -406,6 +414,7 @@ class NumpyRecurrentLM:
         rng = np.random.default_rng((request.seed ^ int(self.model_digest[:16], 16)) & ((1 << 63) - 1))
         output_tokens: list[int] = []
         finish = "length"
+        stop_cut: int | None = None
 
         for _ in range(request.max_output_tokens):
             if cancel.is_set():
@@ -419,12 +428,18 @@ class NumpyRecurrentLM:
                 output_tokens.append(token)
             hidden = np.tanh(self.embedding[token] + hidden @ self.recurrent + self.hidden_bias)
             text = _decode(output_tokens)
-            if any(text.endswith(marker) for marker in request.stop):
+            stop_cut = _stop_suffix_start(text, request.stop)
+            if stop_cut is not None:
                 finish = "completed"
                 break
 
         text = _decode(output_tokens)
-        if not text:
+        if stop_cut is not None:
+            # Do not publish stop delimiters as assistant text or bill the
+            # caller for the delimiters. Publish the exact UTF-8 prefix.
+            text = text[:stop_cut]
+            output_tokens = list(_encode(text))
+        elif not text:
             text = " "
         response_id = (
             "local-neural:"
