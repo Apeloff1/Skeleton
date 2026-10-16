@@ -19,6 +19,7 @@ from skeleton.developer.jeeves_game_director_atlas import (
     export, verify,
 )
 from skeleton.developer.jeeves_game_dragon_session import enqueue
+from skeleton.developer.jeeves_game_director_bindings import preview, publish, check
 
 
 class DirectorInteractiveTests(unittest.TestCase):
@@ -140,6 +141,30 @@ class DirectorInteractiveTests(unittest.TestCase):
         (path / "director_atlas.gd").write_text("tampered")
         with self.assertRaises(ValueError):
             verify(self.root, source=self.source)
+
+    def test_engine_controller_binding_contracts_are_pinned_to_original_world(self):
+        packet = preview(self.root, source=self.source)
+        self.assertEqual(packet["bindings"]["scene_count"], 4)
+        self.assertFalse(packet["persisted"])
+        self.assertFalse(packet["bindings"]["runtime_ui_wired_to_director"])
+        scene = packet["bindings"]["scene_bindings"][0]
+        self.assertIn("travel", {x["action"]["kind"] for x in scene["transitions"]})
+        with self.assertRaises(ValueError):
+            publish(self.root, source=self.source, approved_digest="0" * 64)
+        admitted = publish(self.root, source=self.source,
+                           approved_digest=packet["candidate_sha256"])
+        self.assertFalse(admitted["native_gameplay_verified"])
+        self.assertTrue(check(self.root, source=self.source,
+                              digest=packet["candidate_sha256"])["binding_source_verified"])
+        with self.assertRaises(ValueError):
+            publish(self.root, source=self.source,
+                    approved_digest=packet["candidate_sha256"])
+        original = self.root / self.source
+        data = json.loads(original.read_text())
+        data["director_world"]["scenes"][0]["setting"] = "A different original setting"
+        original.write_text(json.dumps(data))
+        with self.assertRaises(ValueError):
+            check(self.root, source=self.source, digest=packet["candidate_sha256"])
 
     def test_game_cli_routes_new_actions_and_rejects_unrelated_flags(self):
         response = run_game_cli([
