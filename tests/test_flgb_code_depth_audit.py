@@ -91,3 +91,56 @@ def test_pinned_reader_and_no_completion_claim():
     assert report["files_present_in_all_reviewed_tasks"] == 1
     assert report["static_counts"]["implementation_forwarding-module"] == 1
     assert "missing-relative-import-module" in report["items"][0]["implementation"]["warnings"]
+
+
+def test_relative_module_owner_is_tracked_without_importing_it():
+    tracked = {"skeleton/inference/wrapper.py", "skeleton/inference/flgb_runtime.py"}
+    result = inspect_python(
+        "skeleton/inference/wrapper.py",
+        "from .flgb_runtime import OperationEnvelope, FLGBInferenceError\n",
+        tracked,
+    )
+    assert result["unresolved_relative_modules"] == []
+    assert result["relative_owner_imports"] == [{
+        "path": "skeleton/inference/flgb_runtime.py",
+        "symbols": ["OperationEnvelope", "FLGBInferenceError"],
+    }]
+
+
+def test_from_dot_import_sibling_module_is_not_silently_skipped():
+    result = inspect_python(
+        "skeleton/inference/wrapper.py", "from . import flgb_runtime\n",
+        {"skeleton/inference/wrapper.py", "skeleton/inference/flgb_runtime.py"},
+    )
+    assert result["relative_owner_imports"] == [{
+        "path": "skeleton/inference/flgb_runtime.py", "symbols": [],
+    }]
+    assert result["unresolved_relative_modules"] == []
+
+
+def test_package_export_is_ambiguous_not_falsely_called_missing():
+    result = inspect_python(
+        "skeleton/inference/wrapper.py", "from . import OperationEnvelope\n",
+        {"skeleton/inference/wrapper.py", "skeleton/inference/__init__.py"},
+    )
+    assert result["unresolved_relative_modules"] == []
+    assert result["ambiguous_package_exports"] == [{
+        "package": "skeleton/inference", "symbol": "OperationEnvelope",
+    }]
+
+
+def test_from_dot_import_truly_missing_name_without_package_owner_is_reported():
+    result = inspect_python(
+        "skeleton/inference/wrapper.py", "from . import lost\n",
+        {"skeleton/inference/wrapper.py"},
+    )
+    assert result["unresolved_relative_modules"] == ["skeleton/inference/lost"]
+    assert "missing-relative-import-module" in result["warnings"]
+
+
+def test_relative_import_cannot_escape_root_package():
+    result = inspect_python(
+        "skeleton/inference/wrapper.py", "from ...outside import Invalid\n",
+        {"skeleton/inference/wrapper.py"},
+    )
+    assert "relative-import-escapes-package" in result["warnings"]
