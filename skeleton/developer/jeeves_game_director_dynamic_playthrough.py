@@ -40,6 +40,8 @@ def _independent_trace(world: Any, witness: Any,
     earned = Counter()
     passage_by_key = {p.key: p for p in world.dynamics.passages}
     total_transport_turns = 0
+    society_wallet_spent = society_wallet_received = 0
+    society_relationship_changes = Counter()
     stage_checkpoints = []
     noteworthy_total = 0
 
@@ -70,6 +72,18 @@ def _independent_trace(world: Any, witness: Any,
                 effect_count["transport_route"] += 1
             elif action.kind == "use":
                 effect_count["legal_scene_interaction"] += 1
+            elif action.kind in {"speak", "discuss", "buy", "sell", "rest"}:
+                effect_count["society_" + action.kind] += 1
+                before_social, after_social = old.society, current.society
+                if before_social is None or after_social is None:
+                    raise ValueError("social action without authoritative economy ledger")
+                coins = after_social.balance - before_social.balance
+                society_wallet_spent += max(0, -coins)
+                society_wallet_received += max(0, coins)
+                previous_trust = dict(before_social.relationships)
+                for npc, value in after_social.relationships:
+                    if previous_trust[npc] != value:
+                        society_relationship_changes[npc] += 1
             else:
                 effect_count["wait"] += 1
             if not set(old.world_flags).issubset(current.world_flags):
@@ -97,7 +111,7 @@ def _independent_trace(world: Any, witness: Any,
                     "standing": dict(current.standings),
                     "world_flags": list(current.world_flags),
                 })
-            if (action.kind == "transit"
+            if (action.kind in {"transit", "speak", "discuss", "buy", "sell"}
                     or len(state.results) != len(before.results)
                     or current.world_flags != old.world_flags
                     or current.standings != old.standings):
@@ -137,6 +151,12 @@ def _independent_trace(world: Any, witness: Any,
         "reputation_final": dict(state.world_state.standings),
         "mode_counts": dict(sorted(mode_count.items())),
         "transport_turns": total_transport_turns,
+        "society_wallet_spent": society_wallet_spent,
+        "society_wallet_received": society_wallet_received,
+        "society_relationship_changes": dict(sorted(
+            society_relationship_changes.items())),
+        "society_final": state.world_state.society.payload()
+                         if state.world_state.society is not None else None,
         "transport_counts_by_key": dict(state.world_state.passage_uses),
         "scene_entrance_counts": dict(sorted(visited.items())),
         "permanent_world_events": dict(sorted(earned_flags.items())),
