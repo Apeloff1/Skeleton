@@ -19,6 +19,7 @@
  *   await safeSetItem('@codedock:welcome_seen:v1', '1');
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isPrunableStorageKey } from './storageRetentionPolicy';
 
 const _mirror = new Map<string, string | null>();
 
@@ -30,19 +31,11 @@ const _mirror = new Map<string, string | null>();
 // pruner O(1) on cold boots (one read + at most one write).
 // ─────────────────────────────────────────────────────────────────────
 const META_KEY = '@safeStorage:meta:v1';
-const DEFAULT_PRUNE_PREFIXES = [
-  '@boot/',
-  '@codedock/',
-  // ★ Feb 2026: also prune feature-flag + telemetry caches so they age out
-  // naturally instead of growing forever on the dev box.
-  '@feature-flags/',
-  '@telemetry/',
-];
-const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-// Crash-loop and archived evidence are operator recovery state, not cache.
-const RECOVERY_EVIDENCE_KEYS = new Set([
-  '@boot/crash_count', '@boot/last_clean_boot', '@boot/trace', '@boot/sessions',
-]);
+// The retention policy is an explicit allowlist. Never prune a full
+// @codedock/, @boot/ or @feature/ namespace: these contain durable state.
+const DEFAULT_PRUNE_PREFIXES = ['@boot/last_ok:v1', '@telemetry/cache/'];
+const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 
 let _metaCache: Record<string, number> | null = null;
 let _metaDirty = false;
@@ -70,7 +63,9 @@ async function _flushMeta() {
 }
 
 function _shouldTrack(key: string, prefixes: string[]): boolean {
-  return !RECOVERY_EVIDENCE_KEYS.has(key) && prefixes.some(p => key.startsWith(p));
+  // Caller-supplied prefixes can only narrow the allowlist, never authorize
+  // deletion of a project, flag, preference, credential or crash receipt.
+  return isPrunableStorageKey(key) && prefixes.some(p => key.startsWith(p));
 }
 
 function timeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
