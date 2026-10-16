@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import tempfile
 from typing import Any
+from uuid import uuid4
 
 SCHEMA = "skeleton.jeeves.game_proposal.v1"
 KINDS = ("character", "dialogue", "quest", "world", "mechanic", "scene",
@@ -126,8 +127,8 @@ def _read_proposal(root: Path, digest: str) -> dict[str, Any]:
         raise AuthoringError("invalid design context identity")
     for field in ("provider", "model"):
         _valid_text(value[field], field, 128)
-    if value["request_id"] is not None and not isinstance(value["request_id"], str):
-        raise AuthoringError("invalid request identity")
+    if value["request_id"] is not None:
+        _valid_text(value["request_id"], "request_id", 256)
     expected = _sha(_encode({k: v for k, v in value.items() if k != "digest"}))
     if expected != digest:
         raise AuthoringError("tampered model proposal")
@@ -149,6 +150,7 @@ async def _infer(prompt: str) -> tuple[str, dict[str, Any]]:
     # The provider registry enforces architecture acknowledgment, provider
     # admission and data governance. No SDK/network fallback is permitted here.
     from skeleton.provider_runtime import ProviderRegistry, ProviderRequest
+    from skeleton.intelligence.admission import ResourceBudget
     registry = ProviderRegistry.from_env()
     adapter = registry.require_active()
     response = await adapter.generate(ProviderRequest(
@@ -165,6 +167,14 @@ async def _infer(prompt: str) -> tuple[str, dict[str, Any]]:
         max_output_tokens=1800,
         data_class="internal",
         purpose="jeeves-game-design-proposal",
+        operation_id=str(uuid4()),
+        resource_budget=ResourceBudget(
+            max_input_tokens=4_000, max_output_tokens=1_800,
+            max_cost_usd=1.0, max_wall_seconds=90.0,
+            max_provider_attempts=3, max_tool_calls=0,
+            max_artifact_bytes=0, max_storage_bytes=0,
+            max_concurrency=1, max_queue_depth=4,
+        ),
     ))
     if response.tool_calls:
         raise AuthoringError("model returned tool calls instead of game design JSON")
@@ -220,6 +230,10 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False) -
         raise AuthoringError("project configuration changed while model was drafting")
     if include_notes and _notes_digest(_notes(root)) != context_sha:
         raise AuthoringError("design context changed while model was drafting")
+    _valid_text(provenance.get("provider"), "provider", 128)
+    _valid_text(provenance.get("model"), "model", 128)
+    if provenance.get("request_id") is not None:
+        _valid_text(provenance["request_id"], "request_id", 256)
     draft = _parse_model(raw)
     if draft["kind"] != kind:
         raise AuthoringError("model returned different design kind")
