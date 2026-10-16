@@ -1,75 +1,168 @@
 # Tutolage Skeleton v16
 
-AI game engine and agent orchestration framework.
+A local-first game studio with Jeeves AI chat, Dragon web capture and reviewed
+knowledge, original-world editing, human/AI play, and bounded policy training.
+The application runs as a frontend, application API, canonical AI engine and MongoDB.
 
-Start with the [Repository Atlas](docs/architecture/REPOSITORY_ATLAS.md) for the
-file tree, canonical owners, and compatibility imports. The
-[integration guide](docs/architecture/REPOSITORY_INTEGRATION.md) explains the
-combined namespace migrations and how to validate changes to them.
+## First install
 
-## Quick Start
+Install **Git**, **Python 3.11+**, and **Docker Desktop or Docker Engine with Compose v2**.
+Start Docker before running the installer. Host Node/Yarn are optional; the
+container build supplies frontend dependencies. Initial dependency/image builds
+need internet access. Models, compiler SDKs, cores and firmware have separate setup.
 
-Install Python 3.11+ and Docker Desktop (or Docker Engine with Compose v2),
-then start Docker. Host Node and Yarn are only needed for host Expo development;
-the Compose frontend image supplies them.
+### Linux and macOS
 
 ```bash
-# From a fresh clone, create an isolated Python environment:
+git clone https://github.com/Apeloff1/Skeleton.git
+cd Skeleton
 python3 -m venv .venv
-.venv/bin/python scripts/install_app.py --start
-# Windows PowerShell: .\.venv\Scripts\python.exe scripts/install_app.py --start
-
-# Open http://localhost:3000/product after service readiness succeeds.
-# Activate that Python environment for subsequent operator commands:
-# Linux/macOS: source .venv/bin/activate
-# Windows PowerShell: .\.venv\Scripts\Activate.ps1
-python -m skeleton app doctor --live
-python -m skeleton app status
-python -m skeleton app status --live
-
-# Validate the repository-wide application assembly
-python -m skeleton app check
-
-# Before any release compilation: validate canonical contracts without building
-make precompile
-
-# Later launches retain the existing private .env and durable Docker volumes:
-python -m skeleton app up
-
-# Verify the assembled public surfaces
-python -m skeleton app smoke
-
-# Optional operating modes
-python -m skeleton app up --hot
-python -m skeleton app up --production
-
-# Boot only the in-process Skeleton engine runtime
-python -m skeleton run
-
-# Developer CLI
-python -m skeleton dev scaffold my-agent --template minimal-agent
-python -m skeleton dev wizard
-python -m skeleton dev health
-
-# Run tests
-python -m skeleton test
+source .venv/bin/activate
+python scripts/install_app.py --production --start
+python -m skeleton app doctor --live --studio --json
 ```
 
-The installer generates a private `.env` with stable Mongo, JWT and
-backend-to-engine credentials. Retain it across restarts. A fresh install starts
-in **local AI mode without weights**: service health does not imply AI
-availability. Configure a trained artifact or a real hosted-provider key using
-the [AI setup instructions](docs/APP_ASSEMBLY.md#configure-real-ai), then rerun
-`app doctor --live`. No model, crawl workload, emulator core or firmware is
-silently downloaded or approved.
+### Windows PowerShell
 
-For the explicit model provisioning, activation and authenticated crawler
-workflow, see [first-install AI and crawler setup](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md).
+```powershell
+git clone https://github.com/Apeloff1/Skeleton.git
+cd Skeleton
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe scripts/install_app.py --production --start
+.\.venv\Scripts\python.exe -m skeleton app doctor --live --studio --json
+```
 
-The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
-Canonical ownership, topology, change lanes, and migration boundaries are mapped in [`docs/ARCHITECTURE_MAP.md`](docs/ARCHITECTURE_MAP.md).
-The complete AI build sequence, provider rules, capability planes, acceptance gates, and open construction gaps are the mandatory manual in [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](docs/AI_APP_CONSTRUCTION_MANUAL.md).
-The whole-system production target—HA topology, tenancy, security, SLOs, disaster recovery, capacity, observability, incident operations, progressive delivery, and enterprise acceptance—is governed by [`docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md`](docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md) and `machine/enterprise_system_architecture.json`.
+Open **http://localhost:3000/setup** first, then **http://localhost:3000/product**.
+The production flag serves the built web app through Nginx. Later commands must
+use the same Python environment. On PowerShell, invoking its Python executable
+directly works without changing execution policy.
+
+The installer installs Python dependencies, creates a private `.env`, and starts
+the four application services. Preserve `.env` and Docker data volumes across
+restarts. A healthy install starts **without AI weights**; configure a model before
+expecting chat or autonomous studio decisions. Web capture also needs a signed-in
+operator, explicit source rights and a bounded run grant.
+
+### Set up the owner account
+
+Public registration creates a viewer. To manage captures, build projects and
+administer the studio, explicitly bootstrap your own account using a private
+password file outside the repository:
+
+```bash
+python -m skeleton app setup --admin-email owner@example.com \
+  --admin-password-file /absolute/private/owner-password.txt
+python -m skeleton app up --production --no-build
+```
+
+Choose your own password: at least 16 characters, at most 72 UTF-8 bytes. On Unix,
+restrict the file to `0600`. Do not commit the file or put the password in a command
+argument. You can pass the same two account flags to the initial installer instead.
+There is no shared administrator password or automatic first-user elevation.
+
+### Enable AI
+
+For the optional pinned **Linux x86-64 glibc** CPU model/runtime, explicitly provision
+artifacts, select the deployment in private `.env`, and recreate the engine:
+
+```bash
+python scripts/provision_local_ai.py --target linux-x86_64-glibc \
+  --download --context-size 12288 --output ./data/local-ai
+```
+
+```dotenv
+AI_PROVIDER=local
+AI_LOCAL_MODEL_PATH=
+AI_LOCAL_DEPLOYMENT_PATH=/app/local-ai/deployment.json
+SKELETON_LOCAL_MODEL_DIR=./data/local-ai
+```
+
+```bash
+python -m skeleton app up --production --no-build
+python -m skeleton app doctor --live --studio --json
+```
+
+This explicitly acquires about 657 MB of pinned artifacts. The script's default
+context remains 8,192 tokens; the larger studio example requests 12,288. Context
+and inference remain subject to actual model/host capacity. Existing installations
+are verified and never silently reconfigured. Other CPU/OS targets need a compatible
+runtime; preparing Linux files on another host does not prove native execution.
+Hosted providers and already installed GGUF models are alternatives. Follow the
+[complete AI and crawler setup](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md) for activation,
+platform details, offline inputs and private configuration.
+
+## Use the studio
+
+| Task | Open | What it does |
+| --- | --- | --- |
+| First-run readiness | `/setup` | Distinguishes service health, configured AI and optional native dependencies. |
+| Application hub | `/product` | Opens Studio, Jeeves, crawler and operations surfaces. |
+| AI conversation | `/jeeves-chat` | Durable chat through the configured canonical engine. |
+| Game creation and learning | `/game-learning` | Edit original worlds, observe human/AI play, run bounded learning and prepare exports. |
+| Dragon web capture | `/crawler` | Capture authorized pages, inspect source text, review references and withdraw/erase sources. |
+
+From **Product → Studio → Game learning studio**, create or select a project.
+Original-world completion tracks saved edits, positive simulation, measured review,
+a compiled desktop package, and source/package export preparation. The console
+editor reports approved cores, content and toolchain readiness separately.
+
+See [crawler, builder and training operations](docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md)
+and [native prerequisites](docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).
+The [creation capability index](docs/creation/CAPABILITY_INDEX.md) covers design
+helpers and optional reference corpora; planning templates do not execute a game.
+
+## Restart, diagnose and recover
+
+```bash
+python -m skeleton app status --live
+python -m skeleton app logs
+python -m skeleton app up --production --no-build
+python -m skeleton app doctor --live --studio --json
+```
+
+`--no-build` is for restarting existing images. After updating application source,
+run `python -m skeleton app up --production` to rebuild changed services. Use
+`--hot` for frontend/source development instead of the production profile.
+
+Change occupied ports in private `.env` before rebuilding:
+
+```dotenv
+FRONTEND_PORT=3000
+BACKEND_PORT=8001
+SKELETON_PORT=8010
+```
+
+Both production browser build arguments and development environment defaults
+follow these published ports. Explicit `EXPO_PUBLIC_*` URLs override them; use
+browser-reachable HTTPS endpoints for a remote deployment. Keep engine/provider
+credentials out of public frontend variables.
+
+Back up the private `.env` and durable state using the documented recovery owner.
+Do not delete Docker volumes, replace live SQLite files, or rotate secrets as a
+routine repair. The [assembly guide](docs/APP_ASSEMBLY.md) describes operating modes,
+service readiness and recovery boundaries.
+
+## Current capability boundaries
+
+- The studio has a working bounded creation/build/export workflow. Desktop packages
+  are browser-rendered launchers; cross-compilation does not prove execution on every OS.
+- Native emulation and builds require approved cores, suitable content/firmware,
+  compiler SDKs and the sandbox. The default Alpine backend does not make every
+  host native tool executable. The recorded inventory still has 70 unmapped targets.
+- Learning updates game policies and records compatible lessons. It does not
+  automatically change Jeeves's transformer weights or guarantee creative quality.
+- Compressed design corpora are optional reference text, not measured gameplay
+  evidence or automatically admitted training data. Their manifests preserve hashes.
+- Docker service health, AI availability, native target readiness and production
+  acceptance are separate states. This repository does not certify every console,
+  arbitrary-ROM semantic understanding, or superiority over commercial games.
+
+Exact historical observations are in the
+[creation qualification](docs/ai/STUDIO_CREATION_QUALIFICATION_2026-10-15.md).
+Canonical ownership and architecture are mapped in the
+[Repository Atlas](docs/architecture/REPOSITORY_ATLAS.md),
+[integration guide](docs/architecture/REPOSITORY_INTEGRATION.md), and
+[AI construction manual](docs/AI_APP_CONSTRUCTION_MANUAL.md).
 
 ### Standalone local AI
 

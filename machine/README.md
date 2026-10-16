@@ -4,7 +4,22 @@ Stable machine-facing index for Skeleton.
 
 ## Assembly model
 
-Target: **one coherent application** for human maintenance and automated machine/agent operation. Active assembly branch: `integration/app-consolidation`.
+Target: **one coherent application** for human maintenance and automated machine/agent operation. The supported install entrypoint is `main`; canonical runtime owners remain declared in `machine/architecture.json`.
+
+## Current application information
+
+- [First install and operation](../README.md#first-install): four-service application,
+  explicit owner bootstrap, model activation and restart/recovery.
+- `ai_first_install.json` and `ai_first_install_product.json`: installer/setup contract.
+- `ai_local_model_provisioning.json`: pinned optional model/runtime and explicit context choices.
+- `ai_game_studio_continuation.json`: bounded native/original creation completion.
+- `ai_studio_installation.json`: optional toolchain/core readiness.
+- `ai_studio_creation_session_evidence_2026-10-15.json`: historical source-scoped observations.
+- [Capability/data index](../docs/creation/CAPABILITY_INDEX.md): runtime versus planning/reference surfaces.
+
+The ledger below records historical staging observations, not today's open PR queue.
+GitHub and exact commit ancestry determine merge state. Historical evidence does not
+become a new execution claim when a document or source file is merged.
 
 ## Discovery order
 
@@ -27,7 +42,7 @@ Target: **one coherent application** for human maintenance and automated machine
 - Preserve unique-commit branches until reviewed.
 - Non-mergeable PRs are reconciliation source material, not blind merge targets.
 
-## Integration ledger
+## Historical integration ledger (preserved)
 
 - **#1701 merged:** bot-manager runtime dependency repair.
 - **#1702–#1778 staged:** automation, supervisor, security, Jeeves, physics, PR automation and merge-readiness waves.
