@@ -7,10 +7,9 @@
  */
 import { traceStep } from './bootTracer';
 import { API_BASE } from './apiBase';
-import { boundedRetries, boundedTimeoutMs, retryDelayMs, retryableHttpStatus } from './requestRecoveryPolicy';
+import { boundedResponseChars, boundedRetries, boundedTimeoutMs, retryDelayMs, retryableHttpStatus } from './requestRecoveryPolicy';
 
 const BACKEND = API_BASE;
-const MAX_RESPONSE_CHARS = 1_048_576;
 
 let _offline = false;
 export function setOfflineState(offline: boolean) { _offline = offline; }
@@ -32,6 +31,7 @@ export interface FetchOpts {
   trace?: boolean;
   absolute?: boolean;
   signal?: AbortSignal;
+  maxResponseChars?: number;
 }
 
 function resolveUrl(path: string, absolute?: boolean): string {
@@ -79,6 +79,7 @@ async function attemptRequest<T>(
   body: BodyInit | undefined,
   timeoutMs: number,
   signal?: AbortSignal,
+  maxResponseChars = boundedResponseChars(undefined),
 ): Promise<FetchEnvelope<T>> {
   if (isAborted(signal)) return { ok: false, status: 0, error: 'aborted' };
   const ctrl = new AbortController();
@@ -93,9 +94,9 @@ async function attemptRequest<T>(
     const request = (async (): Promise<FetchEnvelope<T>> => {
       const res = await fetch(url, { method, headers, body, signal: ctrl.signal });
       const length = Number(res.headers?.get?.('content-length') || 0);
-      if (length > MAX_RESPONSE_CHARS) return { ok: false, status: res.status, error: 'response_too_large' };
+      if (length > maxResponseChars) return { ok: false, status: res.status, error: 'response_too_large' };
       const raw = await res.text();
-      if (raw.length > MAX_RESPONSE_CHARS) return { ok: false, status: res.status, error: 'response_too_large' };
+      if (raw.length > maxResponseChars) return { ok: false, status: res.status, error: 'response_too_large' };
       let parsed: any = undefined;
       if (raw) {
         try { parsed = JSON.parse(raw); } catch { parsed = raw; }
@@ -146,7 +147,7 @@ export async function safeFetch<T = any>(path: string, opts: FetchOpts = {}): Pr
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (isAborted(opts.signal)) return { ok: false, status: 0, error: 'aborted' };
     if (_offline && attempt > 0) return { ok: false, status: 0, error: 'offline' };
-    const result = await attemptRequest<T>(url, method, headers, body, timeoutMs, opts.signal);
+    const result = await attemptRequest<T>(url, method, headers, body, timeoutMs, opts.signal, boundedResponseChars(opts.maxResponseChars));
     if (result.ok || result.error === 'aborted' || result.error === 'response_too_large') return result;
 
     // Only replay safe/idempotency-keyed methods, and only transient errors.
