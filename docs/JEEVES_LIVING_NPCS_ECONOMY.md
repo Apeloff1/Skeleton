@@ -267,7 +267,62 @@ diagnostics and safe use on low-resource hardware.
 
 No automatic or recurring GitHub CI workflow has been created.
 
-## 8. Specialized verification and unresolved production gaps
+## 8. Exact inventory conservation and targeted game acceptance
+
+All market-owned goods now obey a strict physical inventory invariant after
+**every** gameplay state transition:
+
+`starting_stock = merchant_stock + owned_quantity + irrevocably_consumed_quantity`
+
+Buying two original tickets and redeeming only one leaves exactly one
+market-owned ticket. Redeeming the last ticket makes it unavailable for
+resale, even after walking back to the original merchant. This applies both
+to transit fares and to legitimately authored quest affordances that consume
+a market-acquired resource. The canonical save tracks the consumption ledger,
+and source-bound replay rejects a client that tries to mint or erase goods.
+Dragon and the story continuity ledger identify the exact action and quantity
+that irreversibly used each original resource.
+
+The previous `rest` action advanced an entire phase length from wherever
+the character happened to be within that period. It now advances **to the
+next phase boundary**, which aligns actual NPC schedules, displayed turn
+costs and source-verified route witnesses.
+
+### Actual gameplay acceptance
+
+```bash
+python -m skeleton dev game jeeves director-society-acceptance \
+  --project ./original_game \
+  --source design/director_society_<digest>.json
+```
+
+The acceptance command starts from a clean *in-memory* original player. It
+attempts an actual legal merchant purchase followed by a source-authorized
+ticketed transport. Separately, it attempts to meet the correct NPC on
+their original schedule, take lawful conversations over multiple cycles,
+earn the threshold trust and then board the authorized trust-gated shuttle.
+
+Both witnesses are **independently replayed from the world genesis**, with
+every exact prior/action/after state SHA-256 checked. The report gives the
+actual fare and redemptions, trust earned, calendar periods, accepted route,
+destination, source identity, and any specific failed or unproven goal.
+A missing authored feature is marked not authored, not falsely passed.
+Search budgeting is only per acceptance invocation.
+
+The acceptance command does not alter saves, create fake sessions or train
+the Jeeves/Dragon production checkpoint. It does not prove a Godot executable
+launched successfully or that authored dialogue reaches Hollywood quality.
+
+### Story route unlocks
+
+The living-world route explorer and full-game witness generator can now
+consider actual **quest-use actions**, not merely walking, NPC conversation,
+and purchases. Earning a charter in a quest can unlock a gate within a route
+witness. Search identity includes stage indexes, action records and fired
+one-time influences, so two superficially identical scenes with different
+quest progress are not incorrectly treated as the same game state.
+
+## 9. Specialized verification and unresolved production gaps
 
 ```bash
 python -m unittest tests.test_jeeves_director_society
