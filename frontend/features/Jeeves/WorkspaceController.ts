@@ -465,6 +465,11 @@ export class WorkspaceController {
     }
     const content = conversation.draft.trim() || (attachment ? `Analyze this ${attachment.modality}` : '');
     if (!content) return;
+    // Reject invalid preference snapshots before mutating attachments or draft.
+    if (preferences.context !== undefined && preferences.context.length > MAX_CONTEXT) {
+      this.notify(`Jeeves request context exceeds the ${MAX_CONTEXT}-character bound.`);
+      return;
+    }
     const message: Message = {
       id: newId(), role: 'user', text: content, createdAt: Date.now(), status: 'pending', attachmentName: attachment?.name,
     };
@@ -478,12 +483,6 @@ export class WorkspaceController {
       Date.now(),
       message.id,
     );
-    // Settings are sent as ordinary user context, never as a privileged
-    // system override. Reject oversize snapshots before persisting a retry.
-    if (preferences.context !== undefined && preferences.context.length > MAX_CONTEXT) {
-      this.notify(`Jeeves request context exceeds the ${MAX_CONTEXT}-character bound.`);
-      return;
-    }
     Object.assign(body, preferences);
     const { message: _message, client_message_id: _client, image_base64: _image, pdf_base64: _pdf, ...retryRequest } = body;
     message.retryRequest = retryRequest;
