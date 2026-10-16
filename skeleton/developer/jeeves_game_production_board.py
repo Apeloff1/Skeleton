@@ -1,0 +1,195 @@
+"""Measured scene/quest production workboard and Dragon replay research intake.
+
+No game-frame, model-weight, independent-review or release claims are inferred
+from a completed deterministic Director simulation.
+"""
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+from pathlib import Path
+from typing import Any
+
+BOARD_SCHEMA = "skeleton.jeeves.director_production_board.v1"
+RESEARCH_SCHEMA = "skeleton.dragon.director_replay_candidate.v1"
+MAX_SOURCE_BYTES = 16 * 1024 * 1024
+
+
+def _digest(value: object) -> str:
+    return sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=True, allow_nan=False).encode()).hexdigest()
+
+
+def _load_world(root: Path, source: str):
+    from skeleton.developer.jeeves_game_quality import _read
+    from skeleton.developer.game_cli import _load
+    from skeleton.ai.game_builder.quest_scene_forge import compile_director_blueprint
+    document, identity = _read(root, source, MAX_SOURCE_BYTES)
+    if (set(document) != {"schema", "director_world", "author_review_acknowledged"}
+            or document.get("schema") != "skeleton.jeeves.director_campaign_source.v1"
+            or document.get("author_review_acknowledged") is not True):
+        raise ValueError("Director board requires explicit reviewed campaign source")
+    world = compile_director_blueprint(document["director_world"], human_reviewed=True)
+    project = _load(root)["name"].lower().replace("-", "_")
+    if world.project_id != project:
+        raise ValueError("Director campaign does not belong to this game workspace")
+    return world, identity
+
+
+def board(root: Path, *, source: str, routes: int = 3,
+          dragon_digest: str | None = None) -> dict[str, Any]:
+    from skeleton.ai.game_builder.quest_campaign_completion import compare_campaign_branches
+    from skeleton.developer.jeeves_game_quality import _read
+    from skeleton.developer.game_cli import _read_forge
+    if type(routes) is not int or not 2 <= routes <= 8:
+        raise ValueError("Director board needs 2..8 replayed campaign branches")
+    world, source_sha = _load_world(root, source)
+    learning = None
+    if dragon_digest is not None:
+        from skeleton.developer.jeeves_game_dragon import load_handoff
+        learning = load_handoff(root, dragon_digest)
+        if learning["project"].lower().replace("-", "_") != world.project_id:
+            raise ValueError("Dragon handoff belongs to another game project")
+    result = compare_campaign_branches(world, routes=routes)
+    if not result["ok"] or not result["all_routes_completed"]:
+        raise ValueError("campaign replay cannot support the Director production board")
+    seen = set()
+    for report in result["route_reports"]:
+        for item in report["results"]:
+            seen.add((item["quest"], item["stage"]))
+    scenes = [
+        {
+            "scene": item.key, "region": item.region,
+            "cast": list(item.cast), "props": list(item.props),
+            "affordances": len(item.affordances),
+            "cutscene_timelines": len(item.cutscenes),
+            "links": list(item.links), "logic_admitted": True,
+            "rendered_scene_verified": False, "interactive_engine_tested": False,
+        }
+        for item in world.scenes
+    ]
+    stages = [
+        {
+            "quest": quest.key, "stage": stage.key, "scene_ids": list(stage.scene_ids),
+            "solution_methods": len(stage.solutions),
+            "optional_objectives": len(stage.optional),
+            "director_replay_verified": (quest.key, stage.key) in seen,
+            "native_engine_played": False,
+        }
+        for quest in world.quests for stage in quest.stages
+    ]
+    dragon_work = []
+    if learning is not None:
+        dragon_work = [
+            {
+                "mechanic": spec["mechanic"],
+                "objective": spec["objective"],
+                "system_response": spec["system_response"],
+                "acceptance": spec["validation"],
+                "implemented_in_native_engine": False,
+                "player_review_pending": True,
+            }
+            for spec in learning["prototype"]["mechanics"]
+        ]
+    engine = {"manifest_verified": False, "source_sha256": None,
+              "interactive_playtest_verified": False}
+    try:
+        _, files, receipt = _read_forge(root)
+        engine["manifest_verified"] = bool(files and receipt["sha256"])
+        engine["source_sha256"] = receipt["sha256"]
+    except (OSError, ValueError, KeyError):
+        pass
+    from skeleton.developer.jeeves_game_quality import _read
+    if _read(root, source, MAX_SOURCE_BYTES)[1] != source_sha:
+        raise ValueError("Director source changed while computing production board")
+    output = {
+        "schema": BOARD_SCHEMA, "project": world.project_id,
+        "source": source, "source_sha256": source_sha,
+        "director_world_sha256": world.digest,
+        "dragon_handoff_sha256": dragon_digest,
+        "logic_campaign": {
+            "routes": result["route_count"],
+            "all_routes_completed": result["all_routes_completed"],
+            "branch_outcomes_materially_distinct": result["branch_outcomes_materially_distinct"],
+            "divergent_stages": result["divergent_quest_stages"],
+            "states": [
+                row["final_director_state_sha256"] for row in result["route_reports"]
+            ],
+            "action_counts": [row["action_count"] for row in result["route_reports"]],
+            "replay_receipts": [
+                row["replay_receipt_sha256"] for row in result["route_reports"]
+            ],
+            "all_stages_replayed": all(s["director_replay_verified"] for s in stages),
+        },
+        "scene_workorders": scenes, "quest_stage_workorders": stages,
+        "dragon_mechanic_workorders": dragon_work,
+        "gameforge_engine": engine,
+        "remaining_milestones": [
+            {"id": "GAME-SCENES", "required": "Render and inspect every scene and asset", "verified": False},
+            {"id": "GAME-INTERACTION", "required": "Wire simulated quest actions into a playable engine", "verified": False},
+            {"id": "GAME-PATHS", "required": "Perform installed real-player end-to-end multi-ending playthrough", "verified": False},
+            {"id": "GAME-CANON", "required": "Independent continuity and literary direction review", "verified": False},
+            {"id": "GAME-DRAGON", "required": "Review real feedback and demonstrate checkpoint weight improvement", "verified": False},
+            {"id": "GAME-RELEASE", "required": "License audit, packaging, first installation and recovery", "verified": False},
+        ],
+        "source_only": True,
+        "independent_game_completion_verified": False,
+    }
+    output["board_sha256"] = _digest(output)
+    return {"ok": True, "action": "director-board", **output}
+
+
+def prepare_dragon_research(root: Path, *, source: str, routes: int = 3,
+                            dragon_digest: str | None = None,
+                            approve: str | None = None) -> dict[str, Any]:
+    """Build an evidence-linked replay lesson; no fake preference or weight update."""
+    from skeleton.developer.jeeves_game_authoring import _create_only
+    from skeleton.developer.jeeves_game_quality import _read
+    result = board(root, source=source, routes=routes, dragon_digest=dragon_digest)
+    receipt = result["board_sha256"]
+    features = result["logic_campaign"]
+    payload = {
+        "schema": RESEARCH_SCHEMA, "project": result["project"],
+        "source": source, "source_sha256": result["source_sha256"],
+        "board_sha256": receipt,
+        "director_world_sha256": result["director_world_sha256"],
+        "dragon_handoff_sha256": dragon_digest,
+        "route_count": features["routes"],
+        "executed_action_counts": features["action_counts"],
+        "verified_replay_receipts": features["replay_receipts"],
+        "stage_outcome_divergence": features["divergent_stages"],
+        "questions_for_future_real_gameplay": [
+            "Do actual player choices produce the same consequences as these Director transitions?",
+            "Do scene assets and audio communicate the intended gameplay feedback?",
+            "Do real navigation, save/load and accessibility audits reproduce this campaign?",
+        ],
+        "recorded_player_preference": None,
+        "captured_human_gameplay": False,
+        "independent_research_review": False,
+        "model_weights_modified": False,
+        "native_game_playthrough": False,
+    }
+    digest = _digest(payload)
+    preview = {
+        "ok": True, "action": "director-prepare-training",
+        "candidate_sha256": digest, "candidate": payload,
+        "persisted": False, "training_performed": False,
+    }
+    if approve is None:
+        return preview
+    if approve != digest:
+        raise ValueError("--approve must match the reviewed Dragon replay candidate digest")
+    directory = root / ".jeeves"
+    folder = directory / "dragon_replay_candidates"
+    if directory.is_symlink() or folder.is_symlink() or (
+        directory.exists() and not directory.is_dir()
+    ) or (folder.exists() and not folder.is_dir()):
+        raise ValueError("unsafe Dragon replay candidate location")
+    if _read(root, source, MAX_SOURCE_BYTES)[1] != payload["source_sha256"]:
+        raise ValueError("Director campaign source changed during Dragon feedback creation")
+    destination = folder / (digest + ".json")
+    _create_only(destination, (json.dumps(payload, sort_keys=True, indent=2,
+                                          ensure_ascii=True, allow_nan=False) + "\n").encode())
+    preview["persisted"] = True
+    preview["path"] = str(destination)
+    return preview
