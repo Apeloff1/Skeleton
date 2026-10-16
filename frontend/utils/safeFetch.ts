@@ -32,6 +32,8 @@ export interface FetchOpts {
   absolute?: boolean;
   signal?: AbortSignal;
   maxResponseChars?: number;
+  /** Only true for endpoints proven to enforce server-side idempotency keys. */
+  serverDedupeVerified?: boolean;
 }
 
 function resolveUrl(path: string, absolute?: boolean): string {
@@ -127,7 +129,7 @@ export async function safeFetch<T = any>(path: string, opts: FetchOpts = {}): Pr
   const timeoutMs = boundedTimeoutMs(opts.timeoutMs);
   const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers };
   const keyed = Object.keys(headers).some(key => key.toLowerCase() === 'idempotency-key' && !!headers[key]);
-  const retries = boundedRetries(opts.retries, method, keyed);
+  const retries = boundedRetries(opts.retries, method, keyed, opts.serverDedupeVerified === true);
   const url = resolveUrl(path, opts.absolute);
   let body: BodyInit | undefined;
   try {
