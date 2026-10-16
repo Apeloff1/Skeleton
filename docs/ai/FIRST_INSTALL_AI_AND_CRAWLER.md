@@ -14,7 +14,7 @@ From the repository root, with Python and Docker Compose installed and the
 Docker daemon running:
 
 ```bash
-python scripts/install_app.py --start
+python scripts/install_app.py --production --start
 python -m skeleton app doctor --live --json
 ```
 
@@ -42,7 +42,7 @@ through the existing bootstrap before starting or recreating the backend:
 ```bash
 python -m skeleton app setup --admin-email owner@example.com \
   --admin-password-file /absolute/private/owner-password.txt
-python -m skeleton app up --no-build
+python -m skeleton app up --production --no-build
 ```
 
 The UTF-8 password file must be private (Unix mode `0600`), contain at least
@@ -75,7 +75,7 @@ depends on model capability and measured results.
 Explicitly download and prepare approximately 657 MB of artifacts:
 
 ```bash
-python scripts/provision_local_ai.py --target linux-x86_64-glibc --download --output ./data/local-ai
+python scripts/provision_local_ai.py --target linux-x86_64-glibc --download --context-size 12288 --output ./data/local-ai
 ```
 
 Alternatively, reuse the exact pinned files already acquired by the operator:
@@ -111,11 +111,16 @@ Leave external secondary provider and verification model settings empty in local
 mode. Then recreate the engine through the existing app command:
 
 ```bash
-python -m skeleton app up --no-build
+python -m skeleton app up --production --no-build
 python -m skeleton app doctor --live --json
 ```
 
-The generated deployment uses an 8,192-token context, two CPU threads, no GPU,
+Without `--context-size`, the generated deployment uses an 8,192-token context.
+The studio example above explicitly requests 12,288 tokens; supported choices are
+4,096, 8,192, 12,288 and 16,384. Larger contexts need more memory, and canonical
+activation/capacity checks still apply. Existing installations must match the
+requested context and are never rewritten; use a fresh destination when changing it.
+The deployment uses two CPU threads, no GPU,
 finite execution deadlines and the explicit completion-chat profile. The model
 and executable are rehashed by the canonical activation/inference owner. The
 provisioning receipt additionally records acquired library digests. The current
