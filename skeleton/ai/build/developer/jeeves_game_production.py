@@ -294,6 +294,12 @@ def _probe(root: Path, policy: dict[str, Any], gate: str) -> tuple[str, str, str
             if not result["canonical_scene_count"]:
                 return ("failed", report["dossier_sha256"], "operator_observation",
                         "signed story bible exists but no finished dramatic scenes")
+            payoff = report.get("playable_payoffs")
+            if payoff is not None and not payoff["all_declared_story_payoffs_executed"]:
+                count = len(payoff["unresolved_or_unplayed_threads"])
+                return ("blocked", payoff["source_replay_join_sha256"], "operator_observation",
+                        f"{count} authored dramatic threads still lack executed player payoffs; "
+                        "preserve the quality floor and replay repaired quest stages")
             # Canonically signed text passed; independent professional
             # novel/film assessment is a separate mandatory review authority.
             return ("blocked", report["dossier_sha256"], "operator_observation",

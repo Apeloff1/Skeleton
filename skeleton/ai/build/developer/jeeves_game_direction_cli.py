@@ -19,7 +19,8 @@ def direction(root: Path, *, action: str, source: str,
     )
     data, sha = _read(root,source,16*1024*1024)
     permitted={"schema","bible","scenes","expert_reviews"}
-    optional={"dramatic_threads","production_contract","shot_boards","gameplay_source"}
+    optional={"dramatic_threads","production_contract","shot_boards","gameplay_source",
+              "payoff_alternatives_required"}
     if not isinstance(data, dict) or data.get("schema")!=SCHEMA or not permitted.issubset(data) or not set(data).issubset(permitted|optional):
         raise DirectionError("signed story-direction dossier requires bible, scenes and independent review claims")
     from skeleton.developer.game_cli import _load
@@ -88,8 +89,54 @@ def direction(root: Path, *, action: str, source: str,
         }
         if gameplay_result is not None else None
     )
+    wants_payoff_alternatives = data.get("payoff_alternatives_required", False)
+    if type(wants_payoff_alternatives) is not bool:
+        raise DirectionError("payoff alternatives requirement must be an explicit boolean")
+    if "payoff_alternatives_required" in data and (
+        report.get("dramaturgy") is None or gameplay_result is None
+    ):
+        raise DirectionError("payoff branch scrutiny requires both signed dramatic threads and real gameplay replays")
+    payoff_result = None
+    if report.get("dramaturgy") is not None and gameplay_result is not None:
+        from skeleton.ai.game_builder.story_playable_payoffs import audit_playable_payoffs
+        payoff_result = audit_playable_payoffs(
+            report["dramaturgy"], gameplay_result,
+            demand_alternative_outcomes=wants_payoff_alternatives,
+        )
+    report["playable_payoffs"] = (
+        {
+            "source_replay_join_sha256": payoff_result["source_replay_join_sha256"],
+            "declared_dramatic_threads": payoff_result["declared_dramatic_threads"],
+            "dramatic_threads_with_played_payoff": payoff_result["dramatic_threads_with_played_payoff"],
+            "unresolved_or_unplayed_threads": payoff_result["unresolved_or_unplayed_threads"],
+            "all_declared_story_payoffs_executed": payoff_result["all_declared_story_payoffs_executed"],
+            "requires_alternative_outcomes": payoff_result["requires_alternative_outcomes"],
+            "professional_emotional_impact_verified": False,
+            "full_game_runtime_verified": False,
+        }
+        if payoff_result is not None else None
+    )
     result=report if action=="direction-audit" else revision_plan(report)
     if action=="direction-revision":
+        result["playable_payoffs"] = report["playable_payoffs"]
+        if payoff_result is not None:
+            for missing in payoff_result["unresolved_or_unplayed_threads"]:
+                result["work_items"].append({
+                    "priority": "P0",
+                    "evidence_kind": "unplayed_story_payoff",
+                    "thread_id": missing["thread_id"],
+                    "missing_evidence": missing["issue"],
+                    "rewrite_goal": "Connect this signed dramatic setup/payoff to an actually replayed, distinct game consequence without changing the original canon",
+                    "canonical_story_and_gameplay_recheck_required": True,
+                    "automatic_source_overwrite": False,
+                })
+        elif report.get("dramaturgy") is not None and gameplay_result is None:
+            result["work_items"].append({
+                "priority": "P0",
+                "evidence_kind": "missing_playable_story_replays",
+                "rewrite_goal": "Supply an actual signed-story-matched, original Director replay dossier; do not infer player agency from narrative text",
+                "automatic_source_overwrite": False,
+            })
         result["playable_story"]=report["playable_story"]
         if gameplay_result is not None:
             for sequence in gameplay_result["unbound_source_scene_sequences"][:256]:
