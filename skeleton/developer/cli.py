@@ -26,6 +26,16 @@ def dev_help_text() -> str:
 
   DEVELOPMENT COMMANDS
 
+    skeleton dev game <init|info|doctor|build|verify|playtest|assets|package>
+        Original game workspace and Godot build lifecycle
+        init NAME --vision TEXT [--era ID] [--archetype NAME] [--dir DIR]
+        doctor --project DIR [--require-godot]
+        build --project DIR [--playtest off|auto|require] [--overwrite]
+        verify --project DIR [--playtest off|auto|require]
+        playtest --project DIR [--frames N] [--timeout SEC]
+        assets --project DIR
+        package --project DIR [--dry-run] [--overwrite]
+
     skeleton dev scaffold <name> [options]
         Generate a new project from a template
         --template, -t    minimal-agent, game-forge, swarm-orchestrator, api-gateway
