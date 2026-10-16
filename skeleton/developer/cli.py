@@ -54,6 +54,7 @@ def dev_help_text() -> str:
         jeeves director-session-step --session NAME --choice travel:scene_01
         jeeves director-session-compare --session NAME --other-session OTHER
         jeeves director-serve --session NAME [--port 8765]
+        jeeves director-godot-smoke --source design/director_campaign_source.json [--timeout 90]
         jeeves director-coverage --source design/director_campaign_source.json [--routes 2..8]
         jeeves dragon-lab --sessions hero_a,hero_b [--approve RESEARCH_SHA256]
         jeeves director-atlas-export --source design/director_campaign_source.json [--dry-run]
