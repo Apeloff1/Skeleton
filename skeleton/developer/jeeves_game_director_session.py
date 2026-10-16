@@ -52,7 +52,10 @@ def _folder(root: Path, name: str, *, create: bool = False) -> Path:
     if create:
         base.mkdir(exist_ok=True)
         parent.mkdir(exist_ok=True)
-        selected.mkdir(exist_ok=False)
+        try:
+            selected.mkdir(exist_ok=False)
+        except FileExistsError as exc:
+            raise ValueError("Director session already exists; resume or select a new name") from exc
     return selected
 
 
