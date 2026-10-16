@@ -21,6 +21,10 @@ from .quest_world_dynamics import (
     allowed_foot_travel, offered_passages, apply_changes,
     effects_for_use, effects_for_results,
 )
+from .quest_society import (
+    legal_actions as society_legal_actions,
+    perform as society_perform, verify_world as society_verify_world,
+)
 
 MAX_SCENES = 128
 MAX_QUESTS = 256
@@ -502,10 +506,22 @@ class DirectorWorld:
                             method.outcome_flag == record.outcome_flag
                             for stage in quest.stages for method in stage.solutions):
                         raise DirectorError("faction outcome does not occur in authored story")
-            known_items = {
+            source_items = {
                 action.produces for scene in self.scenes
                 for action in scene.affordances if action.produces
             }
+            known_items = set(source_items)
+            if self.dynamics.society is not None:
+                society_verify_world(
+                    self.dynamics.society,
+                    scene_ids=set(scene_map),
+                    faction_ids={f.key for f in self.dynamics.factions},
+                    quest_items=source_items,
+                )
+                known_items.update(
+                    good.key for merchant in self.dynamics.society.shops
+                    for good in merchant.goods
+                )
             outcome_flags = {
                 method.outcome_flag for quest in self.quests
                 for stage in quest.stages for method in stage.solutions
@@ -515,6 +531,12 @@ class DirectorWorld:
                 (*self.dynamics.passages, *self.dynamics.influences)
                 if item.grant_world_flag is not None
             }
+            if self.dynamics.society is not None:
+                possible_world_flags.update(
+                    person.unlock_world_flag
+                    for person in self.dynamics.society.residents
+                    if person.unlock_world_flag is not None
+                )
             for requirements in (
                     *(g.requirements for g in self.dynamics.gates),
                     *(p.requirements for p in self.dynamics.passages)):
@@ -552,7 +574,8 @@ class DirectorAction:
     scene: str
 
     def __post_init__(self):
-        if self.kind not in {"travel", "use", "wait", "transit"}:
+        if self.kind not in {"travel", "use", "wait", "transit",
+                             "speak", "buy", "sell", "rest"}:
             raise DirectorError("invalid action kind")
         _id(self.key)
         _id(self.scene)
@@ -664,6 +687,11 @@ def available_director_actions(world: DirectorWorld, state: DirectorState) -> tu
             a.consumes is None or a.consumes in state.acquired
         ):
             actions.append(DirectorAction("use", a.key, here.key))
+    if world.dynamics is not None and world.dynamics.society is not None:
+        actions.extend(
+            DirectorAction(kind, key, here.key)
+            for kind, key in society_legal_actions(world.dynamics.society, state)
+        )
     actions.append(DirectorAction("wait", "wait", here.key))
     return tuple(actions)
 
@@ -703,6 +731,25 @@ def director_step(world: DirectorWorld, state: DirectorState, action: DirectorAc
             state, scene=destination, turn=state.turn + passage.cost_turns,
             acquired=tuple(sorted(inventory)), world_state=effect,
         )
+    if action.kind in {"speak", "buy", "sell", "rest"}:
+        if (world.dynamics is None or world.dynamics.society is None
+                or state.world_state is None):
+            raise DirectorError("original NPC economy action has no reviewed rules")
+        society, faction_effects, flags, stock_items, cost = society_perform(
+            world.dynamics.society, state, action.kind, action.key
+        )
+        new_world = replace(state.world_state, society=society)
+        new_world = apply_changes(
+            new_world, faction_effects, add_flags=flags,
+        )
+        items = set(state.acquired)
+        for item in stock_items:
+            if item.startswith("-"):
+                items.discard(item[1:])
+            else:
+                items.add(item)
+        return replace(state, turn=state.turn + cost,
+                       acquired=tuple(sorted(items)), world_state=new_world)
     affordance = next(a for a in here.affordances if a.key == action.key)
     records = {(q, st, obj): n for q, st, obj, n in state.records}
     inventory = set(state.acquired)
