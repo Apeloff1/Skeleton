@@ -49,6 +49,15 @@ def dev_help_text() -> str:
         jeeves director-promote --source design/director_candidate_<digest>.json --approve SHA256 [--routes 2..8]
         jeeves direction-campaign --source design/director_campaign_source.json [--passes 2..8 --output SAVE_PREFIX]
         jeeves director-board --source design/director_campaign_source.json [--routes 2..8 --dragon-digest SHA256]
+        jeeves director-session-begin --source design/director_campaign_source.json --session NAME
+        jeeves director-session-status --session NAME
+        jeeves director-session-step --session NAME --choice travel:scene_01
+        jeeves director-session-compare --session NAME --other-session OTHER
+        jeeves director-atlas-export --source design/director_campaign_source.json [--dry-run]
+        jeeves director-atlas-verify --source design/director_campaign_source.json
+        jeeves dragon-session-lesson --session NAME [--approve CANDIDATE_SHA256]
+        Interactive Director play journals are replayed against the canonical game world
+        Godot atlas is a navigable scene preview, not an executable quest-complete game
         jeeves director-prepare-training --source design/director_campaign_source.json [--routes 2..8 --approve SHA256]
         Original story and cinematic changes recompile into actual typed Director scenes
         Dragon replay research is recorded, but does not change checkpoint weights
