@@ -213,3 +213,55 @@ def test_continuous_production_gate_replays_actual_story_not_merely_declared_sce
     assert audit["no_lifetime_attempt_limit"] is True
     assert audit["recorded_events"] == 5
     assert audit["project_complete"] is False
+
+
+
+def test_combined_story_direction_displays_actual_gameplay_consequences_and_missing_quests(tmp_path):
+    created = run_game_cli(["init", "story-player-game", "--dir", str(tmp_path)])
+    assert created["ok"]
+    root = tmp_path / "story-player-game"
+    bible, scenes, world, replays, bindings = fixture()
+    playable = {
+        "schema": "skeleton.jeeves.story_gameplay_dossier.v1",
+        "bible": bible, "scenes": scenes,
+        "director_world": world.payload(), "author_review_acknowledged": True,
+        "replays": replays, "bindings": bindings,
+        "require_distinct_choices": True,
+    }
+    playing_path = root / "design" / "story_gameplay_dossier.json"
+    playing_path.write_text(json.dumps(playable))
+    story = {
+        "schema": "skeleton.jeeves.direction_dossier.v1",
+        "bible": bible, "scenes": scenes, "expert_reviews": [],
+        "gameplay_source": "design/story_gameplay_dossier.json",
+    }
+    narrative_path = root / "design" / "story_direction_packet.json"
+    narrative_path.write_text(json.dumps(story))
+    audit_args = [
+        "jeeves", "direction-audit", "--project", str(root),
+        "--source", "design/story_direction_packet.json",
+    ]
+    audit = run_game_cli(audit_args)
+    assert audit["ok"], audit
+    proof = audit["playable_story"]
+    assert proof["bound_story_scenes"] == 1
+    assert proof["replayed_quest_actions"] == 2
+    assert proof["distinct_executed_consequences"] == 2
+    assert proof["unexecuted_quest_stage_count"] == 1
+    assert not proof["full_game_playthrough_verified"]
+    revision = run_game_cli([
+        "jeeves", "direction-revision", "--project", str(root),
+        "--source", "design/story_direction_packet.json",
+    ])
+    assert revision["ok"], revision
+    assert any(r["evidence_kind"] == "unexecuted_gameplay_quest_stages"
+               for r in revision["work_items"])
+    assert revision["source_files_modified"] is False
+    # A valid other signed continuation cannot borrow play evidence
+    # from an earlier one-scene gameplay source dossier.
+    second = scene_source(bible, sequence=2, previous=scenes[0])
+    story["scenes"].append(second)
+    narrative_path.write_text(json.dumps(story))
+    stale = run_game_cli(audit_args)
+    assert not stale["ok"]
+    assert "different signed narrative history" in stale["error"]
