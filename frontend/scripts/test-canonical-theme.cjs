@@ -68,9 +68,11 @@ test('30 skins have RGBA soft fill and contrast-aware primary foreground', () =>
     assert.equal(c.onPrimary, skins.onPrimaryFor(c.primary));
     const ratio = contrast(c.onPrimary, c.primary);
     if (ratio < 4.5) exceptions.push(skin.id);
-    assert.ok(ratio >= 4.4, skin.id + ' contrast ' + ratio);
+    assert.ok(ratio >= 4.5, skin.id + ' AA contrast ' + ratio);
   }
-  assert.deepEqual(exceptions.sort(), ['lavender', 'royal']);
+  assert.deepEqual(exceptions, []);
+  assert.equal(skins.SKIN_BY_ID.lavender.colors.onPrimary, '#04060D');
+  assert.equal(skins.SKIN_BY_ID.royal.colors.onPrimary, '#04060D');
   const d = skins.SKIN_BY_ID.hyperwave.colors;
   assert.ok(contrast(d.onPrimary, d.primary) >= 4.5);
 });
