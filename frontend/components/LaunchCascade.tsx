@@ -151,7 +151,8 @@ export default function LaunchCascade() {
   React.useEffect(() => {
     (async () => {
       try {
-        await traceStep('cascade_mounted');
+        // A stuck trace write must never prevent the recovery UI from mounting.
+        void traceStep('cascade_mounted').catch(() => {});
         let urlOverride: number | null = null;
         try {
           if (typeof window !== 'undefined' && window.location?.search) {
@@ -174,7 +175,7 @@ export default function LaunchCascade() {
           await safeSetItem(ATTEMPT_KEY, writeLaunchAttempt(urlOverride));
         }
         setLayer(start);
-        await traceStep(`cascade_layer_${start}`);
+        void traceStep(`cascade_layer_${start}`).catch(() => {});
       } catch {
         setLayer(0);
       } finally {
@@ -191,9 +192,12 @@ export default function LaunchCascade() {
   // of writing the complete trace to AsyncStorage on every React render.
   React.useEffect(() => {
     if (!ready || tracedLayerRef.current === layer) return;
+    const isHydration = tracedLayerRef.current === null;
     tracedLayerRef.current = layer;
     traceStepSync(`cascade_render_layer_${layer}`);
-    void safeSetItem(ATTEMPT_KEY, writeLaunchAttempt(layer)).catch(() => {});
+    // Do not refresh the receipt's expiration on every relaunch: only an
+    // actual layer transition constitutes a new recovery attempt.
+    if (!isHydration) void safeSetItem(ATTEMPT_KEY, writeLaunchAttempt(layer)).catch(() => {});
   }, [layer, ready]);
 
   const escalate = React.useCallback((reason: string) => {
