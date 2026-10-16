@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from skeleton.ai.game_builder.story_canon_fabric import SCENE, sign
+from skeleton.ai.game_builder.story_canon_fabric import BIBLE, SCENE, sign
 from skeleton.ai.game_builder.story_direction_quality import (
     DIMS, DirectionError, evaluate_direction, revision_plan,
 )
@@ -20,6 +20,16 @@ def scenes(n: int):
     for i in range(1,n+1):
         history.append(scene_source(bible,i,history[-1] if history else None))
     return bible,history
+
+
+def project_scenes(project: str, n: int):
+    bible = canonical_bible()
+    bible["project"] = project
+    bible = sign(bible, BIBLE)
+    output = []
+    for i in range(1, n+1):
+        output.append(scene_source(bible, i, output[-1] if output else None))
+    return bible, output
 
 
 def claimed_panel(score=95):
@@ -118,7 +128,7 @@ def test_journal_cli_review_and_revision_reuse_canonical_source(tmp_path):
     init=run_game_cli(["init","writer-room","--dir",str(tmp_path)])
     assert init["ok"],init
     root=tmp_path/"writer-room"
-    bible,history=scenes(3)
+    bible,history=project_scenes(root.name,3)
     data={
         "schema":"skeleton.jeeves.direction_dossier.v1",
         "bible":bible,"scenes":history,"expert_reviews":claimed_panel(95),
@@ -144,8 +154,9 @@ def test_cli_dossier_missing_or_tampered_fails_closed(tmp_path):
     assert init["ok"]
     root=tmp_path/"story-review"
     dossier=root/"design"/"story_direction_packet.json"
+    bible,_=project_scenes(root.name,0)
     data={"schema":"skeleton.jeeves.direction_dossier.v1",
-          "bible":canonical_bible(),"scenes":[],"expert_reviews":[]}
+          "bible":bible,"scenes":[],"expert_reviews":[]}
     dossier.write_text(json.dumps(data))
     assert run_game_cli(["jeeves","direction-audit","--project",str(root),
                          "--source","design/story_direction_packet.json"])["ok"]
@@ -165,7 +176,7 @@ def test_direction_optin_model_brief_uses_metrics_and_no_copyrighted_scene_text(
     init=run_game_cli(["init","creative-studio","--dir",str(tmp_path)])
     assert init["ok"]
     root=tmp_path/"creative-studio"
-    bible,history=scenes(2)
+    bible,history=project_scenes(root.name,2)
     original_line="The route remains ours to map."
     payload={
         "schema":"skeleton.jeeves.direction_dossier.v1",
@@ -237,7 +248,7 @@ def test_production_cycle_checks_real_signed_story_and_never_invents_quality(tmp
                          "--gate","story_continuity"])
     assert absent["ok"]
     assert absent["observations"][0]["outcome"]=="failed"
-    bible,history=scenes(1)
+    bible,history=project_scenes(root.name,1)
     packet=root/"design"/"story_direction_packet.json"
     packet.write_text(json.dumps({
         "schema":"skeleton.jeeves.direction_dossier.v1",
