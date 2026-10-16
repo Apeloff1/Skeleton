@@ -34,6 +34,7 @@
     "test:dragon-native-editor": "node --test scripts/test-dragon-native-puzzle-preview.mjs scripts/test-dragon-native-puzzle-history.mjs",
     "test:product-journeys": "node --test scripts/test-product-journeys.mjs scripts/test-jeeves-model-inventory.mjs",
     "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
+    "test:stability": "node --test scripts/test-startup-stability.mjs",
     "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
     "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
     "test:story-continuity": "node --test scripts/test-story-continuity.mjs",
