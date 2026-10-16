@@ -51,6 +51,40 @@ def test_invalid_archetype_fails_before_side_effects(tmp_path: Path):
     assert not (tmp_path / "bad-game").exists()
 
 
+@pytest.mark.parametrize("name", [
+    "CON", "nul", "AUX.game", "prn.txt", "COM1", "com9.log", "Lpt1",
+    "LPT9.asset", "savegame.", "original-world.",
+])
+def test_workspace_init_rejects_nonportable_windows_directory_names(
+    tmp_path: Path, name: str,
+):
+    result = run_game_cli(["init", name, "--dir", str(tmp_path)])
+    assert result["ok"] is False
+    assert "portable" in result["error"]
+    assert not (tmp_path / name).exists()
+    assert not list(tmp_path.glob(".game-init-*"))
+
+
+@pytest.mark.parametrize("name", ["NUL.txt", "COM7.log", "world."])
+def test_workspace_manifest_rejects_nonportable_name_even_after_tampering(
+    tmp_path: Path, name: str,
+):
+    root = workspace(tmp_path)
+    manifest = root / "skeleton.game.json"
+    cfg = json.loads(manifest.read_text(encoding="utf-8"))
+    cfg["name"] = name
+    manifest.write_text(json.dumps(cfg), encoding="utf-8")
+    result = run_game_cli(["info", "--project", str(root)])
+    assert result["ok"] is False
+    assert "invalid game workspace name" in result["error"]
+
+
+def test_portable_dotted_workspace_name_is_allowed(tmp_path: Path):
+    result = run_game_cli(["init", "world.v2", "--dir", str(tmp_path)])
+    assert result["ok"] is True
+    assert (tmp_path / "world.v2" / "skeleton.game.json").is_file()
+
+
 def test_game_dry_run_has_no_effect_and_rejects_traversal(tmp_path: Path):
     result = run_game_cli(["init", "planned-game", "--dir", str(tmp_path), "--dry-run"])
     assert result["ok"] and result["dry_run"]
