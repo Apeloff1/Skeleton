@@ -314,3 +314,54 @@ def test_unknown_quality_gate_cannot_be_deleted_or_lowered(tmp_path):
                              "--passes", "0"])["ok"]
     assert not run_game_cli(["jeeves", "production-cycle", "--project", str(root),
                              "--passes", "9"])["ok"]
+
+
+
+def test_only_observed_real_checker_fail_to_pass_pairs_enter_training_queue(tmp_path, monkeypatch):
+    root = workspace(tmp_path)
+    initialize(root)
+    result_seq = iter(("failed", "passed", "failed", "passed"))
+    calls = {"count": 0}
+    def probe(*args):
+        calls["count"] += 1
+        return (
+            next(result_seq),
+            hashlib.sha256(str(calls["count"]).encode()).hexdigest(),
+            "canonical_source",
+            "real source evidence rechecked",
+        )
+    monkeypatch.setattr(prod, "_probe", probe)
+    assert run_game_cli(["jeeves", "production-cycle", "--project", str(root),
+                         "--gate", "source_integrity", "--passes", "4"])["ok"]
+    reviewed = run_game_cli(["jeeves", "production-training", "--project", str(root),
+                             "--page", "0", "--page-size", "1"])
+    assert reviewed["ok"], reviewed
+    assert reviewed["total_observed_transitions"] == 2
+    assert len(reviewed["examples"]) == 1
+    assert reviewed["next_page"] == 1
+    assert reviewed["examples"][0]["model_weights_updated"] is False
+    assert reviewed["examples"][0]["eligible_for_training_promotion"] is False
+    second = run_game_cli(["jeeves", "production-training", "--project", str(root),
+                           "--page", "1", "--page-size", "1"])
+    assert second["total_observed_transitions"] == 2
+    assert second["next_page"] is None
+    assert second["examples"][0]["failed_event_sha256"] != reviewed["examples"][0]["failed_event_sha256"]
+    assert second["all_history_still_retained"]
+    assert not second["neural_network_training_performed"]
+
+
+def test_production_training_does_not_classify_operator_reviews_as_training_proof(tmp_path, monkeypatch):
+    root = workspace(tmp_path)
+    initialize(root)
+    n = {"v": 0}
+    def probe(*args):
+        n["v"] += 1
+        return ("failed" if n["v"] == 1 else "passed",
+                hashlib.sha256(str(n["v"]).encode()).hexdigest(),
+                "operator_observation", "self-reported original artwork quality")
+    monkeypatch.setattr(prod, "_probe", probe)
+    assert run_game_cli(["jeeves", "production-cycle", "--project", str(root),
+                         "--gate", "original_assets", "--passes", "2"])["ok"]
+    checked = run_game_cli(["jeeves", "production-training", "--project", str(root)])
+    assert checked["ok"] and checked["examples"] == []
+    assert checked["total_observed_transitions"] == 0
