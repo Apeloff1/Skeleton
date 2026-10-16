@@ -41,6 +41,7 @@ def _independent_trace(world: Any, witness: Any,
     passage_by_key = {p.key: p for p in world.dynamics.passages}
     total_transport_turns = 0
     stage_checkpoints = []
+    noteworthy_total = 0
 
     for segment in witness.replay["segments"]:
         if segment["start_digest"] != state.digest:
@@ -96,12 +97,13 @@ def _independent_trace(world: Any, witness: Any,
                     "standing": dict(current.standings),
                     "world_flags": list(current.world_flags),
                 })
-            if (len(journey) < max_details
-                    and (action.kind == "transit"
-                         or len(state.results) != len(before.results)
-                         or current.world_flags != old.world_flags
-                         or current.standings != old.standings)):
-                journey.append({
+            if (action.kind == "transit"
+                    or len(state.results) != len(before.results)
+                    or current.world_flags != old.world_flags
+                    or current.standings != old.standings):
+                noteworthy_total += 1
+                if len(journey) < max_details:
+                    journey.append({
                     "sequence": action_count, "action": action.payload(),
                     "scene_before": before.scene,
                     "scene_after": state.scene, "turns": state.turn - before.turn,
@@ -142,10 +144,8 @@ def _independent_trace(world: Any, witness: Any,
         "acquired_items": dict(sorted(earned.items())),
         "causal_event_counts": dict(sorted(effect_count.items())),
         "verified_noteworthy_event_sample": journey,
-        "noteworthy_event_sample_covers_all": (
-            len(journey) < max_details
-            and action_count == 0
-        ),  # never falsely promise exhaustive event capture
+        "noteworthy_event_count": noteworthy_total,
+        "noteworthy_event_sample_covers_all": noteworthy_total <= max_details,
         "all_quest_actions_executed_in_canonical_engine": True,
         "godot_binary_launched": False,
         "real_installed_game_tested": False,
