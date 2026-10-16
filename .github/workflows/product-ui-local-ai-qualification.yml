@@ -66,11 +66,28 @@ jobs:
         working-directory: frontend
         run: yarn install --frozen-lockfile --ignore-scripts
       - name: Typecheck complete Expo TypeScript project
+        id: full_typescript
         working-directory: frontend
+        continue-on-error: true
         run: yarn typecheck
       - name: Typecheck Jeeves-specific TypeScript project
+        id: jeeves_typescript
         working-directory: frontend
+        if: always() && steps.full_typescript.outcome != 'skipped'
+        continue-on-error: true
         run: yarn typecheck:jeeves
+      - name: Verify both TypeScript compiler verdicts
+        if: always()
+        shell: pwsh
+        env:
+          FULL_TS_RESULT: ${{ steps.full_typescript.outcome }}
+          JEEVES_TS_RESULT: ${{ steps.jeeves_typescript.outcome }}
+        run: |
+          Write-Host "Full Expo TypeScript: $env:FULL_TS_RESULT"
+          Write-Host "Jeeves TypeScript: $env:JEEVES_TS_RESULT"
+          if ($env:FULL_TS_RESULT -ne 'success' -or $env:JEEVES_TS_RESULT -ne 'success') {
+            throw "Both TypeScript projects must compile successfully."
+          }
       - name: Exercise existing Jeeves workspace contracts
         working-directory: frontend
         run: yarn test:jeeves
