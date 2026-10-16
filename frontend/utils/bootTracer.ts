@@ -255,16 +255,24 @@ let _rotated = false;
 async function rotateSessionsOnce(): Promise<void> {
   if (_rotated) return; _rotated = true;
   try {
-    const prevRaw = await AsyncStorage.getItem(KEY_TRACE);
+    // Session evidence is best-effort; a stalled native storage read must
+    // never block every subsequent boot-trace write indefinitely.
+    const prevRaw = await readStorageBounded(KEY_TRACE);
     if (!prevRaw) return;
     const prev = JSON.parse(prevRaw);
     if (!Array.isArray(prev) || prev.length === 0) return;
     let arc: ArchivedSession[] = [];
-    try { const a = await AsyncStorage.getItem(KEY_SESSIONS); arc = a ? JSON.parse(a) : []; } catch {}
+    try {
+      const raw = await readStorageBounded(KEY_SESSIONS);
+      arc = raw ? JSON.parse(raw) : [];
+    } catch {}
     if (!Array.isArray(arc)) arc = [];
     arc.unshift({ at: Date.now(), steps: prev.slice(-80) });
     arc = arc.slice(0, MAX_SESSIONS);
-    await AsyncStorage.setItem(KEY_SESSIONS, JSON.stringify(arc));
+    await boundedOperation(
+      AsyncStorage.setItem(KEY_SESSIONS, JSON.stringify(arc)),
+      STORAGE_READ_BUDGET_MS,
+    );
   } catch { /* never block */ }
 }
 // Kick rotation immediately on module load (queues the read before writes).
@@ -349,24 +357,37 @@ export async function resetBootState(): Promise<boolean> {
   if (_resetInProgress) return false;
   _resetInProgress = true;
   if (_flushTimer !== null) { clearTimeout(_flushTimer); _flushTimer = null; }
+  let releaseFence = true;
   try {
-    // Do not delete storage while an older trace write is unresolved:
-    // it could finish after removal and silently restore stale evidence.
     const idle = _traceWriter.pauseAndDiscard();
     if (!(await boundedOperation(idle, STORAGE_READ_BUDGET_MS))) return false;
-    const removed = await boundedOperation(
-      AsyncStorage.multiRemove([KEY_TRACE, KEY_CRASH_COUNT, KEY_LAST_CLEAN]),
-      STORAGE_READ_BUDGET_MS,
-    );
-    if (!removed) return false;
+
+    // A timeout cannot cancel an AsyncStorage mutation. If the underlying
+    // removal has not settled, keep the writer fenced so a *late* native
+    // completion cannot delete a newly persisted diagnostic snapshot.
+    const removal = AsyncStorage.multiRemove([KEY_TRACE, KEY_CRASH_COUNT, KEY_LAST_CLEAN]);
+    const removed = await boundedOperation(removal, STORAGE_READ_BUDGET_MS);
+    if (!removed) {
+      releaseFence = false;
+      void removal.then(
+        () => { _memoryTrace = []; _notify(); },
+        () => undefined,
+      ).then(() => {
+        _resetInProgress = false;
+        _traceWriter.resume();
+      });
+      return false; // unknown or failed; never claim durable success
+    }
     _memoryTrace = [];
     _notify();
     return true;
   } catch {
     return false;
   } finally {
-    _traceWriter.resume();
-    _resetInProgress = false;
+    if (releaseFence) {
+      _resetInProgress = false;
+      _traceWriter.resume();
+    }
   }
 }
 
