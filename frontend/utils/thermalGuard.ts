@@ -43,6 +43,8 @@ class StaggerQueue {
   private queue: QueuedRequest[] = [];
   private processing = false;
   private activeCount = 0;
+  // Invalidates a request that has left the queue but is still in its delay.
+  private generation = 0;
   private maxConcurrent: number;
   private baseDelayMs: number;
   private currentDelayMs: number;
@@ -103,37 +105,44 @@ class StaggerQueue {
   private async process() {
     if (this.processing) return;
     this.processing = true;
+    try {
+      while (this.queue.length > 0) {
+        if (this.activeCount >= this.maxConcurrent) {
+          await new Promise<void>(resolve => setTimeout(resolve, 50));
+          continue;
+        }
 
-    while (this.queue.length > 0) {
-      // Wait for a slot to open
-      if (this.activeCount >= this.maxConcurrent) {
-        await new Promise(r => setTimeout(r, 50));
-        continue;
+        const item = this.queue.shift();
+        if (!item) break;
+        const generation = this.generation;
+        if (this.currentDelayMs > 0) {
+          await new Promise<void>(resolve => setTimeout(resolve, this.currentDelayMs));
+        }
+
+        // A cooldown may have flushed the queue during the stagger delay.
+        // Never launch a request whose caller was already cancelled.
+        if (generation !== this.generation) {
+          item.reject(new Error('Queue flushed'));
+          continue;
+        }
+
+        this.activeCount++;
+        this.requestLog.push(Date.now());
+        // Schedule user-supplied callbacks on the promise chain: even a
+        // synchronous throw must settle its caller and release the slot.
+        void Promise.resolve().then(item.fn).then(item.resolve, item.reject).finally(() => {
+          this.activeCount--;
+        });
       }
-
-      const item = this.queue.shift();
-      if (!item) break;
-
-      // Stutterstep delay between requests
-      if (this.currentDelayMs > 0) {
-        await new Promise(r => setTimeout(r, this.currentDelayMs));
-      }
-
-      this.activeCount++;
-      this.requestLog.push(Date.now());
-
-      // Execute without blocking the queue loop
-      item.fn()
-        .then(item.resolve)
-        .catch(item.reject)
-        .finally(() => { this.activeCount--; });
+    } finally {
+      this.processing = false;
+      if (this.queue.length > 0) void this.process();
     }
-
-    this.processing = false;
   }
 
   /** Flush all queued requests (cancel them) */
   flush() {
+    this.generation++;
     for (const item of this.queue) {
       item.reject(new Error('Queue flushed'));
     }
@@ -292,6 +301,9 @@ export class ThermalGuard {
 
   /** Update battery info from usePowerAwareness */
   setBattery(level: number, charging: boolean) {
+    // Expo may report -1 for an unknown battery state. Treat it as missing,
+    // not a 0% battery that would force perpetual thermal throttling.
+    if (!Number.isFinite(level) || level < 0 || level > 1) return;
     this._batteryLevel = level;
     this._isCharging = charging;
     this._recalculate();
@@ -399,9 +411,9 @@ export class ThermalGuard {
     this._thermalLevel = level;
 
     // Adjust queue parameters
-    this.queue.setThermalMultiplier(level);
+    this.queue.setThermalMultiplier(this._appInBackground ? 'critical' : level);
 
-    if (level === 'critical') {
+    if (this._appInBackground || level === 'critical') {
       this.queue.setMaxConcurrent(1);
     } else if (level === 'hot') {
       this.queue.setMaxConcurrent(1);
@@ -429,8 +441,8 @@ export class ThermalGuard {
     this.cache.clear();
     this.queue.flush();
     this._thermalLevel = 'cool';
-    this.queue.setThermalMultiplier('cool');
-    this.queue.setMaxConcurrent(3);
+    this.queue.setThermalMultiplier(this._appInBackground ? 'critical' : 'cool');
+    this.queue.setMaxConcurrent(this._appInBackground ? 1 : 3);
     this._notify();
   }
 
