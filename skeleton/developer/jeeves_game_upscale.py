@@ -100,6 +100,14 @@ def _policy(target_id: str) -> dict[str, Any]:
     pixel_eras = {"pong_discrete_1972", "vector_sprite_1977",
                   "eight_bit_tile_1983", "sixteen_bit_raster_1989"}
     is_pixel = target.era.value in pixel_eras
+    historical_3d = target.era.value in {
+        "early_3d_software_1993", "fixed_function_3d_1996",
+        "shader_console_2001",
+    }
+    modern_graph = target.era.value in {
+        "hd_programmable_2005", "deferred_open_world_2013",
+        "data_oriented_modern_2020", "next_hybrid_2027",
+    }
     return {
         "target_id": target.target_id,
         "era": target.era.value,
@@ -114,6 +122,8 @@ def _policy(target_id: str) -> dict[str, Any]:
             ["preserve_authoring_style", "preserve_texture_silhouette",
              "resample_only_existing_pixels", "do_not_claim_mesh_enhancement"]
         ),
+        "historical_3d_reference_raster": historical_3d,
+        "modern_render_graph_evidence": modern_graph,
         "native_hardware_qualified": False,
         "original_game_engine_qualified": False,
         "GPU_acceleration": False,
@@ -208,6 +218,10 @@ def fidelity_matrix() -> dict[str, Any]:
             raise UpscaleError("unknown canonical render-era identity") from exc
         pixel = era in {"pong_discrete_1972", "vector_sprite_1977",
                         "eight_bit_tile_1983", "sixteen_bit_raster_1989"}
+        reference_3d = era in {"early_3d_software_1993", "fixed_function_3d_1996",
+                               "shader_console_2001"}
+        modern_graph = era in {"hd_programmable_2005", "deferred_open_world_2013",
+                                "data_oriented_modern_2020", "next_hybrid_2027"}
         kind = str(target.get("runtime_kind") or "unspecified")
         caps = target.get("capabilities") or {}
         ready = target.get("readiness") or {}
@@ -225,7 +239,13 @@ def fidelity_matrix() -> dict[str, Any]:
                 caps.get("actual_framebuffer") is True if isinstance(caps, dict) else False
             ),
             "implemented_pixel_upscale": True,
-            "upscale_kind": "native_grid_integer_and_scale2x" if pixel else "texture_pixel_resampling_only",
+            "upscale_kind": "native_grid_integer_and_scale2x" if pixel else (
+                "texture_plus_bounded_reference_raster" if reference_3d
+                else "texture_resampling_plus_graph_evidence" if modern_graph
+                else "texture_pixel_resampling_only"
+            ),
+            "historical_3d_reference_raster": reference_3d,
+            "modern_render_graph_evidence": modern_graph,
             "original_game_native_rendering_qualified": False,
             "cross_console_visual_parity_verified": False,
             "upscaling_quality_verified": False,
