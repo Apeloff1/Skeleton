@@ -5,10 +5,28 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 
 from skeleton.repo_intelligence import GitIndex, build_exact_duplicate_atlas
+
+
+def _require_clean_index(scanner: GitIndex) -> None:
+    """Reject staged changes: GitIndex hashes index + worktree, not HEAD tree."""
+    command = [
+        "git", "-c", "core.fsmonitor=false", "-c", "diff.external=",
+        "diff", "--no-ext-diff", "--cached", "--quiet", "--exit-code",
+    ]
+    result = subprocess.run(
+        command, cwd=scanner.root,
+        env=GitIndex._safe_git_environment(),
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, timeout=scanner.timeout_seconds,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("cannot attest HEAD tree: staged diff or Git check failure")
 
 
 def main() -> int:
@@ -24,7 +42,10 @@ def main() -> int:
         parser.error("output directory must exist; destination must not be a symlink or overwritten implicitly")
     # GitIndex has pinned-head/index stability guards, bounded byte/file/time
     # ceilings and symlink-safe read-only hashing. Do not build a second walker.
-    snapshot = GitIndex(args.root).snapshot()
+    scanner = GitIndex(args.root)
+    _require_clean_index(scanner)
+    snapshot = scanner.snapshot()
+    _require_clean_index(scanner)
     atlas = build_exact_duplicate_atlas(snapshot)
     payload = (json.dumps(atlas.to_dict(), sort_keys=True, indent=2, ensure_ascii=False)
                + "\n").encode("utf-8")
