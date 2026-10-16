@@ -1,4 +1,3 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * ErrorBoundary — top-level React error catcher.
  *
@@ -14,7 +13,6 @@ import { navToSafeMode } from '../utils/bootTracer';
 import { crashTelemetryFields, isDevErrorDetails, redactSecrets, safeErrorMessage } from '../utils/safeError';
 import { postCrashReport } from '../utils/crashTelemetry';
 
-const BACKEND = CANONICAL_API_BASE || '';
 
 interface State {
   error: Error | null;
