@@ -370,7 +370,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
-                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke"))
+                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
