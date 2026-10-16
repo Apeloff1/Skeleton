@@ -23,6 +23,13 @@ SURFACES = (
     "frontend/app/product.tsx",
     "frontend/app/capability.tsx",
     "frontend/app/jeeves-hub.tsx",
+    "frontend/app/studio.tsx",
+    "frontend/app/snowball.tsx",
+    "frontend/app/settings/index.tsx",
+    "frontend/features/Jeeves/ChatWorkspace.tsx",
+    "frontend/features/Jeeves/GovernedChatWorkspace.tsx",
+    "frontend/features/Jeeves/WorkspaceController.ts",
+    "frontend/state/settingsStore.ts",
     "frontend/src/product/productCatalog.ts",
 )
 
