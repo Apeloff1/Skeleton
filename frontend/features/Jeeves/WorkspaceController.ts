@@ -249,7 +249,9 @@ export class WorkspaceController {
     // The first turn uses the device conversation ID before the server returns a session ID.
     // Its reply may have committed even if the HTTP response was lost.
     if (!current || (!current.sessionId && !current.messages.length)) return false;
-    if (!current.canonicalThreadId && !current.sessionId) return true;
+    // A first turn has no server-issued session yet, but its device conversation
+    // ID is the admitted session identity. A no-op "success" here would let
+    // Retry bypass authoritative history and duplicate committed generation.
     const sessionId = current.sessionId || current.id;
     try {
       const result = await this.historyTransport(sessionId);
@@ -465,6 +467,10 @@ export class WorkspaceController {
     }
     const content = conversation.draft.trim() || (attachment ? `Analyze this ${attachment.modality}` : '');
     if (!content) return;
+    if (conversation.messages.length >= MAX_MESSAGES) {
+      this.notify('The conversation is full. Start a new conversation to preserve the complete transcript. Your draft remains saved.');
+      return;
+    }
     // Reject invalid preference snapshots before mutating attachments or draft.
     if (preferences.context !== undefined && preferences.context.length > MAX_CONTEXT) {
       this.notify(`Jeeves request context exceeds the ${MAX_CONTEXT}-character bound.`);
