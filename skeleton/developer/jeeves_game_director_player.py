@@ -109,6 +109,9 @@ func _ready() -> void:
     activate.text = "Act / A"
     activate.pressed.connect(_activate_selected)
     gamepad_bar.add_child(activate)
+    var legend := Label.new()
+    legend.text = "Controller: D-pad changes choices • A interacts • B skips scene • Start pauses • X refreshes"
+    layout.add_child(legend)
     var playback := HBoxContainer.new()
     layout.add_child(playback)
     for speed in [0.25, 1.0, 2.0, 4.0]:
@@ -141,8 +144,18 @@ func _unhandled_input(event: InputEvent) -> void:
     elif event.is_action_pressed("ui_down") or event.is_action_pressed("ui_right"):
         _select_action(1)
         get_viewport().set_input_as_handled()
-    elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_A:
-        _activate_selected()
+    elif event is InputEventJoypadButton and event.pressed:
+        match event.button_index:
+            JOY_BUTTON_A:
+                _activate_selected()
+            JOY_BUTTON_B:
+                stage.skip_timeline()
+            JOY_BUTTON_START:
+                stage.toggle_pause()
+            JOY_BUTTON_X:
+                _refresh()
+            _:
+                return
         get_viewport().set_input_as_handled()
 
 
