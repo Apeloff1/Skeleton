@@ -162,7 +162,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-serve", "director-atlas-export", "director-atlas-verify",
-                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage"))
+                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage", "director-godot-smoke"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -187,6 +187,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--session")
     parser.add_argument("--sessions")
     parser.add_argument("--port", type=int)
+    parser.add_argument("--timeout", type=float)
     parser.add_argument("--other-session")
     parser.add_argument("--choice")
     parser.add_argument("--output")
@@ -229,6 +230,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-bindings-check": {"action", "source", "digest"},
             "dragon-lab": {"action", "sessions", "approve"},
             "director-coverage": {"action", "source", "routes"},
+            "director-godot-smoke": {"action", "source", "timeout"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
@@ -245,6 +247,12 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 if not args.sessions:
                     raise ValueError("Dragon comparative lab requires --sessions a,b,...")
                 return queue(root, sessions=args.sessions, approved_sha256=args.approve)
+            if args.action == "director-godot-smoke":
+                from skeleton.developer.jeeves_game_director_godot_smoke import smoke
+                if not args.source:
+                    raise ValueError("director-godot-smoke requires --source")
+                return smoke(root, source=args.source,
+                             timeout=args.timeout if args.timeout is not None else 90.0)
             if args.action == "director-coverage":
                 from skeleton.developer.jeeves_game_director_coverage import coverage
                 if not args.source:
@@ -291,7 +299,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             if not args.session:
                 raise ValueError("Dragon session lesson requires --session")
             return enqueue(root, session=args.session, approved_digest=args.approve)
-        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port)):
+        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout)):
             raise ValueError("runtime options require a director-session or dragon-session action")
         director_actions = {"director-draft", "director-revise", "director-examine", "director-promote",
                             "director-board", "director-prepare-training"}
