@@ -165,3 +165,79 @@ def test_alternative_requirement_without_real_gameplay_fails_closed(tmp_path):
     ])
     assert not result["ok"]
     assert "requires both signed dramatic threads and real gameplay replays" in result["error"]
+
+
+
+def test_governed_ai_proposal_pins_both_story_and_transitive_gameplay_source(
+    tmp_path, monkeypatch,
+):
+    from skeleton.developer import jeeves_game_authoring as authoring
+    created = run_game_cli(["init", "story-player-game", "--dir", str(tmp_path)])
+    assert created["ok"]
+    root = tmp_path / "story-player-game"
+    _, _, bible, scenes, world, runs, bindings = verified()
+    source = root / "design" / "story_gameplay_dossier.json"
+    gameplay_doc = {
+        "schema": "skeleton.jeeves.story_gameplay_dossier.v1",
+        "bible": bible, "scenes": scenes,
+        "director_world": world.payload(), "author_review_acknowledged": True,
+        "replays": runs, "bindings": bindings,
+        "require_distinct_choices": True,
+    }
+    source.write_text(json.dumps(gameplay_doc), encoding="utf-8")
+    direction_doc = {
+        "schema": "skeleton.jeeves.direction_dossier.v1",
+        "bible": bible, "scenes": scenes, "expert_reviews": [],
+        "dramatic_threads": [fulfilled()],
+        "gameplay_source": "design/story_gameplay_dossier.json",
+        "payoff_alternatives_required": True,
+    }
+    packet = root / "design" / "story_direction_packet.json"
+    packet.write_text(json.dumps(direction_doc), encoding="utf-8")
+    prompts = []
+
+    async def legitimate_model(prompt):
+        prompts.append(json.loads(prompt))
+        return json.dumps({
+            "kind": "scene", "slug": "new_playable_payoff",
+            "title": "An Original Played Dramatic Consequence",
+            "summary": "An original narrative payoff with a costly dramatic choice",
+            "body": "A new choice changes a region in the original signed story world.",
+            "rationale": "The scene links human consequences and playable quest progress",
+        }), {"provider": "fixture", "model": "mock", "request_id": "scene-check"}
+
+    monkeypatch.setattr(authoring, "_infer", legitimate_model)
+    proposal = run_game_cli([
+        "jeeves", "propose", "--project", str(root),
+        "--kind", "scene", "--brief", "Original playable dramatic payoff",
+        "--direction-source", "design/story_direction_packet.json",
+    ])
+    assert proposal["ok"], proposal
+    requested = prompts[0]["authored_story_direction"]["played_dramatic_payoffs"]
+    assert requested["declared"] == 1
+    assert requested["played"] == 1
+    assert not requested["professionally_qualified"]
+    digest = proposal["proposal_sha256"]
+    stored = json.loads((root / ".jeeves" / "proposals" / (digest + ".json")).read_text())
+    assert stored["schema"] == "skeleton.jeeves.game_proposal.v3"
+    assert stored["direction_dossier"]["linked_gameplay"]["path"] == (
+        "design/story_gameplay_dossier.json"
+    )
+    assert run_game_cli([
+        "jeeves", "review", "--project", str(root), "--digest", digest
+    ])["ok"]
+    # The story direction packet did not change, only its transitively linked
+    # source. Old proposals must nevertheless become stale at approval time.
+    gameplay_doc["bindings"][0]["source_anchor"] = "arrival_2"
+    source.write_text(json.dumps(gameplay_doc), encoding="utf-8")
+    stale = run_game_cli([
+        "jeeves", "review", "--project", str(root), "--digest", digest
+    ])
+    assert not stale["ok"]
+    assert "gameplay replay dossier changed" in stale["error"]
+    rejected = run_game_cli([
+        "jeeves", "apply", "--project", str(root), "--digest", digest,
+        "--approve", digest,
+    ])
+    assert not rejected["ok"]
+    assert not (root / "design" / "scene" / "new_playable_payoff.md").exists()
