@@ -29,3 +29,10 @@ export function retryDelayMs(attempt: number): number {
   const power = Number.isFinite(attempt) ? Math.max(0, Math.min(5, Math.trunc(attempt))) : 0;
   return Math.min(8_000, 400 * (2 ** power));
 }
+
+/** Large game workspaces can opt in to more response data without losing a cap. */
+export function boundedResponseChars(value: number | undefined): number {
+  const fallback = 8 * 1024 * 1024;
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.min(64 * 1024 * 1024, Math.max(1024, Math.trunc(value)));
+}
