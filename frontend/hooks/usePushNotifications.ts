@@ -93,7 +93,11 @@ export async function scheduleDailyReminder(): Promise<void> {
       body: 'Keep your polyglot streak alive. 1,500+ concepts await you!',
       sound: true,
     },
-    trigger: { seconds: 86_400, repeats: true } as Notifications.NotificationTriggerInput,
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 86_400,
+      repeats: true,
+    },
   });
   try {
     await AsyncStorage.setItem(DAILY_REMINDER_KEY, newId);
