@@ -30,18 +30,52 @@ MAX_FRONTIER = 120000
 MAX_PATH_STEPS = 512
 
 
-def _state_identity(state: Any) -> tuple[Any, ...]:
-    """Ignore turn and route counters; include all future access permissions."""
+def _state_identity(world: Any, state: Any) -> tuple[Any, ...]:
+    """State-space key includes all future social access permissions.
+
+    Only discard absolute time after normalizing schedule phase and
+    conversation cooldowns. Otherwise the planner could use an NPC who is
+    away or speak twice in one calendar cycle. Transaction *counters* do not
+    affect legality, but shop stock, balance, possessions and trust do.
+    """
     status: WorldState = state.world_state
     if status is None:
         raise ValueError("dynamic search requires a canonical living-world state")
+    social: tuple[Any, ...] = ()
+    if status.society is not None:
+        from skeleton.ai.game_builder.quest_society import phase
+        society = world.dynamics.society
+        clock = phase(society, state.turn)
+        recent_talk = tuple(sorted(
+            person for person, cycle in status.society.last_talk_cycle
+            if cycle == clock["cycle"]
+        ))
+        social = (
+            status.society.balance, status.society.relationships,
+            status.society.shop_stock, status.society.owned,
+            clock["phase_index"], state.turn % society.phase_turns,
+            recent_talk,
+        )
     return (
         state.scene, state.acquired, state.complete, state.narrative_flags,
-        status.standings, status.world_flags,
+        status.standings, status.world_flags, social,
     )
 
 
 def _transport_details(world: Any, state: Any, action: DirectorAction) -> dict:
+    if action.kind in {"speak", "rest", "buy", "sell"}:
+        rules = world.dynamics.society
+        duration = rules.phase_turns if action.kind == "rest" else (
+            2 if action.kind in {"buy", "sell"} else 1
+        )
+        return {
+            "kind": action.kind, "transport_key": None,
+            "mode": "market" if action.kind in {"buy", "sell"} else "social",
+            "from": state.scene, "to": state.scene, "turns": duration,
+            "resident_or_item": action.key,
+            "consumes": None,
+            "canonical_npc_or_economy_action": True,
+        }
     if action.kind == "travel":
         return {"kind": "walk", "transport_key": None, "mode": "foot",
                 "from": state.scene, "to": action.key, "turns": 1,
@@ -106,7 +140,7 @@ def _expand(world: Any, state: Any, goal: set[str], *,
             break
         price, hops, _, at, steps, places = heapq.heappop(heap)
         expansions += 1
-        signature = _state_identity(at)
+        signature = _state_identity(world, at)
         # Multiple independent paths to the *same goal* may be retained, but
         # prune dominated intermediate states so cyclic worlds cannot explode.
         previous = best.get(signature)
@@ -119,12 +153,19 @@ def _expand(world: Any, state: Any, goal: set[str], *,
                 "actions": [x["choice"] for x in steps],
                 "destination": at.scene,
                 "hops": hops,
+                "travel_hops": sum(x["kind"] in {"walk", "transit"} for x in steps),
+                "social_and_market_actions": [
+                    x["choice"] for x in steps
+                    if x["kind"] in {"speak", "rest", "buy", "sell"}
+                ],
                 "turn_cost": at.turn - state.turn,
                 "policy_cost": price,
                 "expected_arrival_state_sha256": at.digest,
                 "reputation_after": [list(x) for x in at.world_state.standings],
                 "world_flags_after": list(at.world_state.world_flags),
                 "inventory_after": list(at.acquired),
+                "society_after": at.world_state.society.payload()
+                                 if at.world_state.society else None,
                 "transport_modes": sorted({x["mode"] for x in steps}),
                 "gate_rules_actually_evaluated": True,
                 "canonical_actions_replayed": True,
@@ -139,11 +180,12 @@ def _expand(world: Any, state: Any, goal: set[str], *,
             continue
         best[signature] = price
         for action in available_director_actions(world, at):
-            if action.kind not in {"travel", "transit"}:
+            if action.kind not in {
+                    "travel", "transit", "speak", "buy", "sell", "rest"}:
                 continue
             details = _transport_details(world, at, action)
             next_state = director_step(world, at, action)
-            next_signature = _state_identity(next_state)
+            next_signature = _state_identity(world, next_state)
             extra = (1 if optimize_hops else _step_cost(
                 scenes[next_state.scene], action, details,
                 profile, visited, sites,
@@ -157,6 +199,16 @@ def _expand(world: Any, state: Any, goal: set[str], *,
             step = {"choice": action.kind + ":" + action.key, **details,
                     "prior_state_sha256": at.digest,
                     "after_state_sha256": next_state.digest}
+            if at.world_state.society is not None:
+                before_society = at.world_state.society
+                after_society = next_state.world_state.society
+                step["wallet_change"] = (
+                    after_society.balance - before_society.balance)
+                step["trust_changes"] = [{
+                    "resident": npc, "before": score,
+                    "after": dict(after_society.relationships)[npc],
+                } for npc, score in before_society.relationships
+                    if dict(after_society.relationships)[npc] != score]
             heapq.heappush(
                 heap, (new_price, hops + 1, serial, next_state,
                        steps + (step,), places + (next_state.scene,)),
