@@ -89,11 +89,28 @@ jobs:
             throw "Both TypeScript projects must compile successfully."
           }
       - name: Exercise existing Jeeves workspace contracts
+        id: jeeves_contracts
         working-directory: frontend
+        continue-on-error: true
         run: yarn test:jeeves
       - name: Exercise existing product journey contracts
+        id: product_journeys
         working-directory: frontend
+        if: always() && steps.jeeves_contracts.outcome != 'skipped'
+        continue-on-error: true
         run: yarn test:product-journeys
+      - name: Verify both test suites without masking failures
+        if: always()
+        shell: pwsh
+        env:
+          JEEVES_TEST_RESULT: ${{ steps.jeeves_contracts.outcome }}
+          JOURNEY_TEST_RESULT: ${{ steps.product_journeys.outcome }}
+        run: |
+          Write-Host "Jeeves regression suite: $env:JEEVES_TEST_RESULT"
+          Write-Host "Product journey suite: $env:JOURNEY_TEST_RESULT"
+          if ($env:JEEVES_TEST_RESULT -ne 'success' -or $env:JOURNEY_TEST_RESULT -ne 'success') {
+            throw "Both Jeeves and product journey suites must pass."
+          }
 
   python-runtime:
     name: Checkpoint inference, route imports and controller game replay
