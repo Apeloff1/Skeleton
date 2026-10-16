@@ -79,6 +79,28 @@ class LocalGameplayHTTPTest(unittest.TestCase):
         self.assertEqual(result["snapshot"]["sequence"], 1)
         self.assertEqual(self.send("POST", "/v1/actions", action)[0], 409)
 
+    def test_cross_origin_and_unrecognized_host_are_rejected(self):
+        port = self.server.server_port
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=4)
+        try:
+            connection.request("GET", "/v1/status", headers={
+                "Host": "127.0.0.1:" + str(port),
+                "Origin": "https://example.invalid",
+                "Authorization": "Bearer " + self.token,
+            })
+            self.assertEqual(connection.getresponse().status, 403)
+        finally:
+            connection.close()
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=4)
+        try:
+            connection.request("GET", "/v1/status", headers={
+                "Host": "example.invalid",
+                "Authorization": "Bearer " + self.token,
+            })
+            self.assertEqual(connection.getresponse().status, 403)
+        finally:
+            connection.close()
+
     def test_invalid_input_cannot_advance_game(self):
         status, body = self.send("POST", "/v1/actions", {
             "choice": "wait:wait", "expected_sequence": True,
