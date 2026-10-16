@@ -341,7 +341,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves = subs.add_parser("jeeves", help="Jeeves design planning, source audit and developer handoff")
     jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
-                                                   "fidelity-plan", "fidelity-matrix", "upscale", "production-init",
+                                                   "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "production-init",
                                                    "production-status", "production-cycle"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
@@ -364,6 +364,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--passes", type=int)
     jeeves.add_argument("--gate")
     jeeves.add_argument("--repair-generated", action="store_true")
+    for dimension in ("native-width", "native-height", "screen-width",
+                      "screen-height", "pixel-aspect-num", "pixel-aspect-den"):
+        jeeves.add_argument("--" + dimension, type=int)
     for action in ("info", "doctor", "build", "verify", "playtest", "assets", "package"):
         child = subs.add_parser(action)
         child.add_argument("--project", default=".")
@@ -396,7 +399,13 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--target", options.target), ("--source", options.source),
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
-                                ("--gate", options.gate)):
+                                ("--gate", options.gate),
+                                ("--native-width", options.native_width),
+                                ("--native-height", options.native_height),
+                                ("--screen-width", options.screen_width),
+                                ("--screen-height", options.screen_height),
+                                ("--pixel-aspect-num", options.pixel_aspect_num),
+                                ("--pixel-aspect-den", options.pixel_aspect_den)):
                 if value is not None:
                     command.extend([flag, str(value)])
             if options.include_notes:
