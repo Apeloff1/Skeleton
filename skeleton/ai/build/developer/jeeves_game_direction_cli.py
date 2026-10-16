@@ -213,6 +213,11 @@ def gameplay(root: Path, *, source: str, passes: int = 1) -> dict[str, Any]:
         receipts.append({"pass": iteration + 1,
                          "evidence_sha256": checked["replay_evidence_sha256"],
                          "canonical_quest_actions_reexecuted": True})
+    # An externally edited dossier must never certify a replay assembled
+    # from a stale in-memory snapshot while a long scrutiny run executes.
+    _, final_sha = _read(root, source, 16 * 1024 * 1024)
+    if final_sha != source_sha:
+        raise StoryGameBridgeError("story gameplay source changed during replay scrutiny")
     checked["scrutiny_passes"] = receipts
     checked["dossier_sha256"] = source_sha
     checked["dossier_path"] = source
