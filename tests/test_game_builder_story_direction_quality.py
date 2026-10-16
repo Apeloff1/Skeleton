@@ -157,3 +157,68 @@ def test_cli_dossier_missing_or_tampered_fails_closed(tmp_path):
     assert not denied["ok"]
     assert not run_game_cli(["jeeves","direction-audit","--project",str(root),
                              "--source","../../etc/shadow"])["ok"]
+
+
+
+def test_direction_optin_model_brief_uses_metrics_and_no_copyrighted_scene_text(tmp_path, monkeypatch):
+    from skeleton.developer import jeeves_game_authoring as authoring
+    init=run_game_cli(["init","creative-studio","--dir",str(tmp_path)])
+    assert init["ok"]
+    root=tmp_path/"creative-studio"
+    bible,history=scenes(2)
+    original_line="The route remains ours to map."
+    payload={
+        "schema":"skeleton.jeeves.direction_dossier.v1",
+        "bible":bible,"scenes":history,"expert_reviews":[],
+    }
+    packet=root/"design"/"direction.json"
+    packet.write_text(json.dumps(payload),encoding="utf-8")
+    observed=[]
+    async def mock_inference(prompt):
+        observed.append(json.loads(prompt))
+        return json.dumps({
+            "kind":"scene","slug":"original-mystery","title":"Original mystery",
+            "summary":"Original agent pursues a meaningful difficult decision",
+            "body":"The heroine makes a costly decision that changes the world and resolves a prior setup",
+            "rationale":"Causal payoff, clear agency, and character change",
+        }),{"provider":"fixture","model":"mock","request_id":"test"}
+    monkeypatch.setattr(authoring,"_infer",mock_inference)
+    generated=run_game_cli([
+        "jeeves","propose","--project",str(root),"--kind","scene",
+        "--brief","Original transformative scene",
+        "--direction-source","design/direction.json",
+    ])
+    assert generated["ok"],generated
+    prompt=observed[0]["authored_story_direction"]
+    assert prompt["canonical_scene_count"]==2
+    assert original_line not in json.dumps(observed[0])
+    assert prompt["quality_floor"]==90
+    digest=generated["proposal_sha256"]
+    assert run_game_cli(["jeeves","review","--project",str(root),
+                         "--digest",digest])["ok"]
+    payload["expert_reviews"]=claimed_panel()
+    packet.write_text(json.dumps(payload),encoding="utf-8")
+    stale=run_game_cli(["jeeves","review","--project",str(root),"--digest",digest])
+    assert not stale["ok"] and "direction dossier changed" in stale["error"]
+
+
+def test_existing_v2_model_proposal_still_reviews_without_direction_packet(tmp_path, monkeypatch):
+    from skeleton.developer import jeeves_game_authoring as authoring
+    init=run_game_cli(["init","continuity-compat","--dir",str(tmp_path)])
+    assert init["ok"]
+    root=tmp_path/"continuity-compat"
+    async def mock_inference(prompt):
+        return json.dumps({
+            "kind":"quest","slug":"original-v2","title":"New original quest",
+            "summary":"The player changes a settlement through a difficult choice",
+            "body":"Original narrative brief with defensible cause and consequences",
+            "rationale":"A locally approved proposal only",
+        }),{"provider":"fixture","model":"mock","request_id":"test"}
+    monkeypatch.setattr(authoring,"_infer",mock_inference)
+    result=run_game_cli(["jeeves","propose","--project",str(root),
+                         "--kind","quest","--brief","Original quest"])
+    assert result["ok"],result
+    stored=json.loads((root/".jeeves"/"proposals"/(result["proposal_sha256"]+".json")).read_text())
+    assert stored["schema"]=="skeleton.jeeves.game_proposal.v2"
+    assert run_game_cli(["jeeves","review","--project",str(root),
+                         "--digest",result["proposal_sha256"]])["ok"]
