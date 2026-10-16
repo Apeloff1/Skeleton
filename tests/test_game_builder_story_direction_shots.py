@@ -154,3 +154,77 @@ def test_story_packet_other_project_and_unrelated_cli_option_fail(tmp_path):
     assert "different story project" in wrong["error"]
     with_unrelated = run_game_cli(params + ["--factor", "3"])
     assert not with_unrelated["ok"]
+
+
+
+def test_one_direction_audit_joins_signed_book_story_and_cinematic_evidence(tmp_path):
+    created = run_game_cli(["init", "film-room", "--dir", str(tmp_path)])
+    assert created["ok"]
+    root = tmp_path / "film-room"
+    bible, contract, scenes, boards = original_production("film_room", scenes=2)
+    packet = {
+        "schema": "skeleton.jeeves.direction_dossier.v1",
+        "bible": bible, "scenes": scenes, "expert_reviews": [],
+        "production_contract": contract, "shot_boards": boards,
+    }
+    (root / "design" / "story_direction_packet.json").write_text(
+        json.dumps(packet), encoding="utf-8",
+    )
+    args = ["jeeves", "direction-audit", "--project", str(root),
+            "--source", "design/story_direction_packet.json", "--passes", "4"]
+    result = run_game_cli(args)
+    assert result["ok"], result
+    assert result["observed_story_metrics"]["canonical_scene_count"] == 2
+    cinematic = result["cinematic_direction"]
+    assert cinematic["pre_render_source_verified"]
+    assert cinematic["scenes"] == 2
+    assert cinematic["shots"] == 2
+    assert cinematic["timeline_ms"] == 12000
+    assert not cinematic["rendered_film_quality_verified"]
+    assert not result["hollywood_level_film_quality_proven"]
+    revision = run_game_cli(["jeeves", "direction-revision", "--project", str(root),
+                             "--source", "design/story_direction_packet.json"])
+    assert revision["ok"], revision
+    assert revision["cinematic_direction"]["shots"] == 2
+    assert not revision["source_files_modified"]
+
+
+@pytest.mark.parametrize("missing", ["production_contract", "shot_boards"])
+def test_partial_story_film_evidence_is_never_counted_as_a_qualified_audit(tmp_path, missing):
+    created = run_game_cli(["init", "film-room", "--dir", str(tmp_path)])
+    assert created["ok"]
+    root = tmp_path / "film-room"
+    bible, contract, scenes, boards = original_production("film_room", scenes=1)
+    packet = {
+        "schema": "skeleton.jeeves.direction_dossier.v1",
+        "bible": bible, "scenes": scenes, "expert_reviews": [],
+        "production_contract": contract, "shot_boards": boards,
+    }
+    packet.pop(missing)
+    (root / "design" / "story_direction_packet.json").write_text(
+        json.dumps(packet), encoding="utf-8",
+    )
+    result = run_game_cli(["jeeves", "direction-audit", "--project", str(root),
+                           "--source", "design/story_direction_packet.json"])
+    assert not result["ok"]
+    assert "together" in result["error"]
+
+
+def test_unverified_shot_never_certifies_professional_performance_in_combined_review(tmp_path):
+    created = run_game_cli(["init", "film-room", "--dir", str(tmp_path)])
+    assert created["ok"]
+    root = tmp_path / "film-room"
+    bible, contract, scenes, boards = original_production("film_room", scenes=1)
+    boards[0]["shots"][0]["face_id"] = "stolen_face"
+    packet = {
+        "schema": "skeleton.jeeves.direction_dossier.v1",
+        "bible": bible, "scenes": scenes, "expert_reviews": [],
+        "production_contract": contract, "shot_boards": boards,
+    }
+    (root / "design" / "story_direction_packet.json").write_text(
+        json.dumps(packet), encoding="utf-8",
+    )
+    result = run_game_cli(["jeeves", "direction-audit", "--project", str(root),
+                           "--source", "design/story_direction_packet.json"])
+    assert not result["ok"]
+    assert "voice or facial identity" in result["error"]
