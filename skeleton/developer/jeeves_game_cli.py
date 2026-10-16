@@ -198,6 +198,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
+        if args.dragon_digest is not None and args.action != "propose":
+            raise ValueError("--dragon-digest only supports proposal authoring")
         if args.action in {"dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt"}:
             allowed = ({"action", "source", "approve"} if args.action == "dragon-ingest"
                        else {"action", "source", "genre", "target", "approve"}
@@ -269,8 +271,6 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         display_args = (args.native_width, args.native_height, args.screen_width,
                         args.screen_height, args.pixel_aspect_num, args.pixel_aspect_den)
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
-        if args.dragon_digest is not None and args.action != "propose":
-            raise ValueError("--dragon-digest only supports proposal authoring")
         if args.direction_source is not None and args.action != "propose":
             raise ValueError("--direction-source only supports proposal authoring")
         render_args = (args.target, args.source, args.output, args.mode, args.factor,
