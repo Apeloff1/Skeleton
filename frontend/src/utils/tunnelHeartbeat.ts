@@ -23,13 +23,17 @@ let _last: any = null;
 let _timer: ReturnType<typeof setTimeout> | null = null;
 let _started = false;
 let _inFlight = false;
+let _generation = 0;
+let _subscription: { remove: () => void } | null = null;
 let _fails = 0;                   // consecutive heartbeat failures
 const _listeners = new Set<Listener>();
 
 function _emit() { _listeners.forEach(fn => { try { fn(_status, _last); } catch {} }); }
 
 async function _poll() {
-  if (_inFlight) return;
+  if (!_started || AppState.currentState !== 'active') return;
+  if (_inFlight) { _schedule(); return; }
+  const generation = _generation;
   _inFlight = true;
   let failed = false;
   try {
@@ -56,6 +60,11 @@ async function _poll() {
     }
   } catch { failed = true; }
 
+  if (generation !== _generation) {
+    _inFlight = false;
+    return; // An old request must not change state after stop/restart.
+  }
+
   if (failed) {
     // A single slow/blipped heartbeat is NOT an outage — only flip to "down"
     // after DOWN_THRESHOLD consecutive failures so we never flash a false alarm.
@@ -73,7 +82,7 @@ async function _poll() {
 
 function _schedule(fast = false) {
   if (_timer) clearTimeout(_timer);
-  if (AppState.currentState !== 'active') return;
+  if (!_started || AppState.currentState !== 'active') return;
   const base = fast ? POLL_FAIL_MS : POLL_BASE_MS;
   const jitter = Math.floor(Math.random() * POLL_JITTER_MS);
   _timer = setTimeout(_poll, base + jitter);
@@ -82,12 +91,27 @@ function _schedule(fast = false) {
 export function startTunnelHeartbeat(): void {
   if (_started) return;
   _started = true;
-  // Repoll on foreground transitions.
-  AppState.addEventListener('change', (s: AppStateStatus) => {
-    if (s === 'active') _poll();
-    else if (_timer) { clearTimeout(_timer); _timer = null; }
-  });
-  _poll();
+  _generation += 1;
+  // Repoll on foreground transitions; one removable listener per root owner.
+  try {
+    _subscription = AppState.addEventListener('change', (s: AppStateStatus) => {
+      if (!_started) return;
+      if (s === 'active') void _poll();
+      else if (_timer) { clearTimeout(_timer); _timer = null; }
+    });
+  } catch {
+    _subscription = null;
+  }
+  if (AppState.currentState === 'active') void _poll();
+}
+
+export function stopTunnelHeartbeat(): void {
+  if (!_started) return;
+  _started = false;
+  _generation += 1; // invalidate in-flight results without blocking teardown
+  if (_timer) { clearTimeout(_timer); _timer = null; }
+  try { _subscription?.remove(); } catch {}
+  _subscription = null;
 }
 
 export function subscribeTunnel(fn: Listener): () => void {
