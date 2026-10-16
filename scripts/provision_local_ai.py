@@ -287,7 +287,7 @@ def _runtime_files(archive: Path, target: Path) -> list[dict]:
     return records
 
 
-def _existing(target: Path, *, threads: int) -> dict:
+def _existing(target: Path, *, threads: int, context_size: int = 8192) -> dict:
     from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
 
     if target.is_symlink() or (target / ".incomplete").exists():
@@ -342,7 +342,7 @@ def _existing(target: Path, *, threads: int) -> dict:
         raise ValueError("Existing thread configuration conflicts; choose a new directory.")
     if (
         deployment.model_id != "Qwen3-0.6B-Q8_0"
-        or deployment.context_size != 8192
+        or deployment.context_size != context_size
         or deployment.batch_size != 512
         or deployment.gpu_layers != 0
         or deployment.timeout_seconds != 600
@@ -380,6 +380,9 @@ def provision(args) -> dict:
 
     if type(args.threads) is not int or not 1 <= args.threads <= 8:
         raise ValueError("Threads must be between one and eight.")
+    context_size = getattr(args, "context_size", 8192)
+    if type(context_size) is not int or context_size not in {4096, 8192, 12288, 16384}:
+        raise ValueError("Context size must be 4096, 8192, 12288 or 16384 tokens.")
     platform_diagnostic = _platform_diagnostic(args)
     target = args.output.expanduser().absolute()
     existing_empty = False
@@ -387,13 +390,14 @@ def provision(args) -> dict:
         if target.is_symlink() or not target.is_dir() or target.resolve() != target:
             raise ValueError("Destination must be a nonsymlink artifact directory.")
         if any(target.iterdir()):
-            receipt = _existing(target, threads=args.threads)
+            receipt = _existing(target, threads=args.threads, context_size=context_size)
             return {
                 "status": "verified_existing",
                 "receipt_digest": receipt["receipt_digest"],
                 "destination": str(target),
                 "platform": platform_diagnostic,
                 "threads": args.threads,
+                "context_size": context_size,
             }
         ownership = target.stat()
         if (
@@ -438,7 +442,7 @@ def provision(args) -> dict:
         "model_path": MODEL["filename"],
         "model_sha256": MODEL["sha256"],
         "config": {
-            "context_size": 8192,
+            "context_size": context_size,
             "threads": args.threads,
             "batch_size": 512,
             "gpu_layers": 0,
@@ -482,6 +486,7 @@ def provision(args) -> dict:
         "runtime_files": len(files) - 2,
         "platform": platform_diagnostic,
         "threads": args.threads,
+        "context_size": context_size,
         "activation": {
             "AI_PROVIDER": "local",
             "AI_LOCAL_MODEL_PATH": "",
@@ -510,6 +515,13 @@ def main() -> int:
         "--runtime-archive", type=Path, help="existing exact pinned Ubuntu x64 release archive"
     )
     parser.add_argument("--threads", type=int, default=2)
+    parser.add_argument(
+        "--context-size",
+        type=int,
+        choices=(4096, 8192, 12288, 16384),
+        default=8192,
+        help="requested context; use 12288 for the original studio workflow when capacity permits",
+    )
     args = parser.parse_args()
     try:
         result = provision(args)
