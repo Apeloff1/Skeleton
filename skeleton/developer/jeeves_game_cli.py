@@ -1,0 +1,182 @@
+"""Jeeves game-development workbench over the existing local GameForge workspace.
+
+This is a deterministic, evidence-grounded CLI adapter to canonical Jeeves
+BuilderBrain and Forge verification; it does not impersonate trained inference.
+Recommendations are proposals, never implicit filesystem mutations.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+SCHEMA = "skeleton.jeeves.game_workbench.v1"
+MAX_NOTES_BYTES = 256 * 1024
+
+
+def _digest(value: object) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=True, default=str).encode("ascii")).hexdigest()
+
+
+def _context(root: Path) -> tuple[dict[str, str], dict[str, Any]]:
+    from skeleton.developer.game_cli import _load
+    cfg = _load(root)
+    from skeleton.forge.eras import list_eras
+    from skeleton.forge.archetypes import default_library
+    if cfg["era"] not in set(list_eras()):
+        raise ValueError("unsupported configured era")
+    if cfg["archetype"] not in {"auto", "vision", *default_library().names()}:
+        raise ValueError("unsupported configured archetype")
+    from skeleton.forge.eras import compile_era
+    pack = compile_era(cfg["era"])
+    return cfg, pack
+
+
+def _plan(root: Path) -> dict[str, Any]:
+    cfg, pack = _context(root)
+    from skeleton.context.tensor import ContextTensor
+    from skeleton.jeeves.builder import BuilderBrain
+    tensor = ContextTensor.from_era(cfg["era"])
+    # Intentionally uses no external model, checkpoint, or fabricated oracle.
+    plan = BuilderBrain().plan(pack, tensor=tensor).to_dict()
+    return {"schema": SCHEMA, "action": "plan", "project": str(root),
+            "vision": cfg["vision"], "era": cfg["era"], "archetype": cfg["archetype"],
+            "plan": plan, "authorship": "deterministic-local-jeeves-builder",
+            "model_inference": False, "checkpoint_verified": False,
+            "plan_sha256": _digest(plan)}
+
+
+def _audit(root: Path) -> dict[str, Any]:
+    """Cross-check product input, actual files, and real evidence without inventing passes."""
+    from skeleton.developer.game_cli import _read_forge, _check_assets, GameCLIError
+    cfg, _ = _context(root)
+    checks: list[dict[str, Any]] = []
+    def record(name: str, ok: bool, detail: str, *, category: str = "static") -> None:
+        checks.append({"name": name, "ok": ok, "detail": detail, "category": category})
+    record("workspace_manifest", True, f"{cfg['name']} ({cfg['era']})")
+    try:
+        _, files, receipt = _read_forge(root)
+        record("emitted_source_integrity", True,
+               f"{len(files)} source files; sha256 {receipt['sha256']}")
+    except (GameCLIError, OSError, ValueError) as exc:
+        receipt = None
+        record("emitted_source_integrity", False, str(exc))
+    try:
+        assets = _check_assets(root)
+        record("asset_inventory", True, f"{assets['count']} tracked assets")
+    except (GameCLIError, OSError, ValueError) as exc:
+        assets = None
+        record("asset_inventory", False, str(exc))
+    from skeleton.forge.playtest import resolve_binary
+    binary, source, verified = resolve_binary()
+    record("godot_binary", bool(binary), f"source={source}; artifact_verified={verified}",
+           category="runtime")
+    # A binary existing is NOT proof that this emitted project can boot.
+    record("headless_playthrough", False, "not executed by this read-only audit",
+           category="unverified")
+    record("release_export", False, "native export/signing not performed",
+           category="unverified")
+    failures = [c["name"] for c in checks if not c["ok"] and c["category"] != "unverified"]
+    return {"schema": SCHEMA, "action": "audit", "project": str(root),
+            "ok": not failures, "ready_for_source_review": receipt is not None,
+            "production_qualified": False, "checks": checks,
+            "blocking": failures, "assets": {"count": assets["count"]} if assets else None,
+            "source_sha256": receipt["sha256"] if receipt else None}
+
+
+def _recommendations(plan: dict[str, Any], audit: dict[str, Any]) -> list[dict[str, str]]:
+    failed = {item["name"] for item in audit["checks"] if not item["ok"]}
+    out: list[dict[str, str]] = []
+    def add(priority: str, goal: str, command: str, why: str) -> None:
+        out.append({"priority": priority, "goal": goal, "command": command, "reason": why})
+    if "emitted_source_integrity" in failed:
+        add("P0", "Generate or repair emitted game source",
+            "python -m skeleton dev game build --project .",
+            "No verified canonical Godot source receipt exists")
+    if "asset_inventory" in failed:
+        add("P0", "Repair local assets directory", "python -m skeleton dev game assets --project .",
+            "Asset inventory is missing, unsafe or unreadable")
+    if "godot_binary" in failed:
+        add("P1", "Provision and qualify Godot toolchain",
+            "python -m skeleton dev game doctor --project . --require-godot",
+            "A dynamic boot cannot be verified without Godot")
+    else:
+        add("P1", "Execute a real headless boot",
+            "python -m skeleton dev game playtest --project .",
+            "A readable source manifest is not evidence of runtime playability")
+    add("P1", "Review gameplay pacing and balance",
+        "python -m skeleton walk --era " + plan["era"] + " --mode thermal --json",
+        "A generated plan must face reproducible gameplay simulation")
+    add("P2", "Review story and continuity in design notes",
+        "python -m skeleton dev game jeeves context --project .",
+        "Narrative continuity requires authored evidence, not inferred completion")
+    add("P2", "Review verified source release material",
+        "python -m skeleton dev game package --project . --dry-run",
+        "Packaging remains a separate operator-approved action")
+    return out
+
+
+def _notes(root: Path) -> list[dict[str, str]]:
+    base = root / "design"
+    if base.is_symlink() or not base.is_dir():
+        raise ValueError("design directory missing or symlinked")
+    result: list[dict[str, str]] = []
+    for node in sorted(base.rglob("*")):
+        if node.is_symlink():
+            raise ValueError("symlinks in design material are not allowed")
+        if node.is_dir():
+            continue
+        if node.suffix.lower() not in {".md", ".txt", ".json"}:
+            continue
+        if len(result) >= 128 or node.stat().st_size > MAX_NOTES_BYTES:
+            raise ValueError("design note count or size exceeds bounds")
+        try:
+            content = node.read_text(encoding="utf-8")
+        except UnicodeError as exc:
+            raise ValueError("design notes must be UTF-8") from exc
+        result.append({"path": node.relative_to(root).as_posix(),
+                       "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                       "excerpt": content[:240]})
+    return result
+
+
+def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
+    """Read-only Jeeves CLI surface; no implicit writes or privileged execution."""
+    parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
+    parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff"))
+    args = parser.parse_args(argv)
+    try:
+        if args.action == "plan":
+            output = _plan(root)
+        elif args.action == "audit":
+            output = _audit(root)
+        elif args.action == "context":
+            cfg, _ = _context(root)
+            notes = _notes(root)
+            output = {"schema": SCHEMA, "action": "context", "project": str(root),
+                      "vision": cfg["vision"], "era": cfg["era"], "notes": notes,
+                      "notes_sha256": _digest([{k: v for k, v in n.items() if k != "excerpt"}
+                                               for n in notes])}
+        else:
+            planned, audited = _plan(root), _audit(root)
+            recs = _recommendations(planned["plan"], audited)
+            output = {"schema": SCHEMA, "action": args.action, "project": str(root),
+                      "plan_sha256": planned["plan_sha256"],
+                      "recommendations": recs,
+                      "blocking": audited["blocking"], "production_qualified": False}
+            if args.action == "handoff":
+                ctx = _notes(root)
+                output["project_vision"] = planned["vision"]
+                output["era"] = planned["era"]
+                output["design_notes"] = [{k: v for k, v in n.items() if k != "excerpt"} for n in ctx]
+                output["source_sha256"] = audited["source_sha256"]
+                output["plan"] = planned["plan"]
+                output["checks"] = audited["checks"]
+        output["ok"] = bool(output.get("ok", True))
+        return output
+    except (OSError, ValueError) as exc:
+        return {"schema": SCHEMA, "action": args.action, "ok": False,
+                "project": str(root), "error": str(exc)}
