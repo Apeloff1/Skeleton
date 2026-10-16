@@ -52,6 +52,11 @@ def test_complete_census_distinguishes_ancestor_divergent_and_protected(tmp_path
     assert all(not item["deletion_authorized"] for item in rows.values())
     assert r["all_deletion_authorized"] is False
     assert r["coverage_complete"] is True
+    assert r["scope"] == "local_refs_heads_only"
+    assert r["remote_coverage_complete"] is False
+    assert r["main_tree_sha"] == git(root, "rev-parse", "main^{tree}")
+    assert rows["fix/old-ancestor"]["tree_sha"] == rows["backup/immutable"]["tree_sha"]
+    assert rows["feat/divergent"]["content_equivalent_to_main"] is False
     assert git(root, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads") == before
 
 
@@ -76,3 +81,25 @@ def test_young_branch_is_never_retirement_candidate(tmp_path):
     assert row["ahead"] == 0
     assert row["reason"] == "young_ref"
     assert row["ancestry_candidate"] is False
+
+
+def test_squash_equivalent_tree_is_still_divergent_history(tmp_path):
+    """Empty/replay commits can match the whole tree without sharing ancestry."""
+    root = repo(tmp_path)
+    git(root, "switch", "-q", "-c", "fix/squash-equivalent")
+    git(root, "commit", "-q", "--allow-empty", "-m", "same tree, new commit")
+    git(root, "switch", "-q", "main")
+    main_sha = git(root, "rev-parse", "main")
+    result = audit(
+        root, expected_main=main_sha, as_of=int(time.time()) + 45 * 86400,
+        min_age_days=30,
+    )
+    branch = next(r for r in result["refs"]
+                  if r["branch"] == "fix/squash-equivalent")
+    assert branch["ahead"] == 1
+    assert branch["content_equivalent_to_main"] is True
+    assert branch["tree_sha"] == result["main_tree_sha"]
+    assert branch["reason"] == "tree_equivalent_but_divergent_history"
+    assert branch["ancestry_candidate"] is False
+    assert branch["deletion_authorized"] is False
+    assert result["remote_coverage_complete"] is False
