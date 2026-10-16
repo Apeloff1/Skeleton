@@ -147,7 +147,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     """Game-authoring proposals require real model I/O and explicit local acceptance."""
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
-                                            "propose", "review", "apply", "queue", "benchmark", "asset-gate"))
+                                            "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -161,7 +161,13 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     args = parser.parse_args(argv)
     try:
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
-        if args.action in {"benchmark", "asset-gate"}:
+        if args.action == "benchmark-matrix":
+            if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
+                    args.console, args.genre, args.period, args.evidence)):
+                raise ValueError("benchmark-matrix accepts --profile only")
+            from skeleton.developer.jeeves_game_quality import benchmark_matrix
+            output = benchmark_matrix(root, profile=args.profile or "design/market_benchmarks.json")
+        elif args.action in {"benchmark", "asset-gate"}:
             if not all((args.console, args.genre, args.period)):
                 raise ValueError("benchmark needs --console, --genre, --period")
             if any((args.kind, args.brief, args.digest, args.approve, args.include_notes)):
