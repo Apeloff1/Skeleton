@@ -11,6 +11,8 @@ signal node_selected(key: String)
 
 var nodes: Dictionary = {}
 var graph: Dictionary = {}
+var authored_passages: Array = []
+var blocked_foot_links: Array = []
 var ordered_nodes: Array[String] = []
 var now: String = ""
 var selected_path: Array = []
@@ -39,7 +41,17 @@ func set_world(world: Dictionary) -> void:
             }
             ordered_nodes.append(key)
     ordered_nodes.sort()
+    authored_passages.clear()
+    var dynamics: Dictionary = world.get("dynamics", {})
+    for record in dynamics.get("passages", []):
+        if record is Dictionary:
+            authored_passages.append(record)
     _rebuild()
+
+func blocked_routes(blocked: Array) -> void:
+    blocked_foot_links = blocked.duplicate(true)
+    queue_redraw()
+
 
 func highlight(scene: String, route: Array = []) -> void:
     now = scene
@@ -107,6 +119,22 @@ func _draw() -> void:
                     linked = true
                     break
             _edge(src, graph[next], linked)
+    # World passages are labeled transit routes, visually distinct from
+    # walkable graph edges. They remain locked unless the Python engine offers
+    # an actual action; clicking a node does not override its permission.
+    for passage in authored_passages:
+        var a: String = str(passage.get("source", ""))
+        var b: String = str(passage.get("destination", ""))
+        if graph.has(a) and graph.has(b):
+            var color := Color(0.73, 0.33, 0.93, 0.70)
+            draw_dashed_line(graph[a], graph[b], color, 1.4, 6.0)
+            if passage.get("bidirectional", false) != true:
+                draw_circle(graph[b], 2.0, color)
+    for blocked in blocked_foot_links:
+        var a: String = str(blocked.get("source", now))
+        var b: String = str(blocked.get("destination", ""))
+        if graph.has(a) and graph.has(b):
+            draw_line(graph[a], graph[b], Color(0.93, 0.23, 0.16, 0.80), 2.0)
     for name in ordered_nodes:
         if not graph.has(name):
             continue
