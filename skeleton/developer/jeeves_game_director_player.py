@@ -132,6 +132,10 @@ func _ready() -> void:
     skip.text = "Skip presentation"
     skip.pressed.connect(stage.skip_timeline)
     playback.add_child(skip)
+    var music := Button.new()
+    music.text = "Mute / play original score"
+    music.pressed.connect(stage.toggle_music)
+    playback.add_child(music)
     var scroll := ScrollContainer.new()
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     layout.add_child(scroll)
