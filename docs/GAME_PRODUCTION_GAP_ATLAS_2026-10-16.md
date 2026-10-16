@@ -212,3 +212,20 @@ certification.
 source and CI checks. Individual verified controls/target counts may be
 reported only with exact supporting execution evidence. A registered
 platform or a signed story schema is not a completed playable game.
+
+
+## P0 execution workpass — 2026-10-16
+
+See `docs/P0_GAME_PRODUCTION_EXECUTION_2026-10-16.md` for the recovered
+whole-product scope and the authoritative **P0-01..P0-20** acceptance
+diagnostic. Source progress now includes real Director multi-quest campaign
+execution with branch divergence proof, SHA-256-linked complete action
+replays, and create-only replay-verified logic-state saves. The Jeeves
+`direction-campaign` command runs this in an explicitly approved original
+project; `p0-acceptance` reports all release gates without converting
+source-only success into independent native/human/rights qualification.
+
+**No P0 gate is independently closed by this workpass alone.** In particular,
+Python quest completion is not installed Godot completion, full-game
+playthrough, story quality or native signed game release. CI must still
+qualify these exact new commits.
