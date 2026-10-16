@@ -20,19 +20,15 @@ import pytest
 import requests
 
 
-def _base_url() -> str:
-    base = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
-    if not base:
-        with open("/app/frontend/.env") as fh:
-            for line in fh:
-                if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
-                    base = line.split("=", 1)[1].strip().strip('"').rstrip("/")
-                    break
-    assert base, "EXPO_PUBLIC_BACKEND_URL not configured"
-    return base
+from skeleton.testing.live_service_gate import (
+    approved_disposable_target,
+    require_provider_job_approval,
+)
 
-
-BASE_URL = _base_url()
+pytestmark = pytest.mark.live_service
+if os.environ.get("SKELETON_DISPOSABLE_E2E_APPROVED") != "1":
+    pytest.skip("disposable playable live E2E is opt-in", allow_module_level=True)
+BASE_URL = approved_disposable_target()
 KNOWN_GOOD_PID = "8ca4a00512034787b0094a8f7c07db3b"
 BRIEF = "A one-thumb arcade game: tap to make a glowing orb hop between rising platforms"
 
@@ -66,6 +62,10 @@ class TestAsyncJobNonBlocking:
     while the long LLM call runs."""
 
     def test_kick_fast_and_health_stays_responsive(self):
+        try:
+            require_provider_job_approval()
+        except ValueError as exc:
+            pytest.skip(str(exc))
         # ---- 1. kick must return <10s with a job_id ----
         t0 = time.time()
         r = requests.post(
