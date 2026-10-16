@@ -145,7 +145,7 @@ def _source(src: Any, role: str) -> dict[str, str]:
             pass
         else:
             _error("literal IP addresses cannot qualify as public citations")
-        if (not re.fullmatch(r"[a-z0-9-]+(?:\\.[a-z0-9-]+)+", host)
+        if (not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+", host)
                 or any(label.startswith("-") or label.endswith("-")
                        for label in host.split("."))
                 or re.fullmatch(r"[a-z]{2,63}|xn--[a-z0-9-]+", host.rsplit(".", 1)[-1]) is None
