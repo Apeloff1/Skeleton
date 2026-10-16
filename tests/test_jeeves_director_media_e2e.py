@@ -82,6 +82,11 @@ class DirectorMediaE2ETests(unittest.TestCase):
         self.assertIn("AudioStreamPlayer.new()", script)
         self.assertIn("draw_texture_rect(backdrop", script)
         self.assertIn("toggle_music()", script)
+        self.assertIn("set_environment_quality", script)
+        self.assertIn("environment_redraw_accumulator", script)
+        self.assertIn("weather_name.contains", script)
+        controls = (location / "director_player.gd").read_text()
+        self.assertIn("Animated weather / foliage density", controls)
         (location / ".godot" / "imported").mkdir(parents=True)
         (location / ".godot" / "imported" / "ignored.ctex").write_bytes(b"cache")
         scene = self.world.scenes[0]
