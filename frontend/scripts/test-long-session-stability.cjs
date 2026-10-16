@@ -37,7 +37,7 @@ function reactHarness() {
   const react = {
     useState(initial) {
       const slot = states.length;
-      states.push(initial);
+      states.push(typeof initial === 'function' ? initial() : initial);
       return [initial, next => {
         assert.equal(setting, false, 'nested React state setter');
         setting = true;
@@ -54,12 +54,14 @@ function reactHarness() {
     },
     useEffect(fn) { effects.push(fn); },
     useCallback(fn) { return fn; },
+    useMemo(fn) { return fn(); },
   };
   let cleanups = [];
   return {
     react,
     refs,
     get state() { return states[0]; },
+    get states() { return states; },
     get setters() { return setters; },
     mount() { cleanups = effects.map(fn => fn()).filter(fn => typeof fn === 'function'); },
     unmount() { for (const fn of cleanups.reverse()) fn(); cleanups = []; },
@@ -316,4 +318,184 @@ test('heartbeat stop/restart fences in-flight probes and their timers', async ()
     global.setTimeout = originalSet;
     global.clearTimeout = originalClear;
   }
+});
+
+test('thermal queue coalesces active work and maintains a finite pending queue', async t => {
+  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const guard = new ThermalGuard();
+  t.after(() => guard.destroy());
+  let executions = 0;
+  const first = guard.queue.enqueue('same', async () => { executions++; return 41; });
+  const second = guard.queue.enqueue('same', async () => { executions++; return 99; });
+  assert.equal(first, second, 'active and queued callers share one pending promise');
+  assert.deepEqual(await Promise.all([first, second]), [41, 41]);
+  assert.equal(executions, 1);
+
+  const attempts = Array.from({ length: 260 }, (_, i) =>
+    guard.queue.enqueue('unique-' + i, async () => i));
+  const statuses = await Promise.allSettled(attempts);
+  assert.ok(statuses.some(item => item.status === 'rejected' &&
+    /saturated/.test(item.reason.message)), 'queue must refuse work at capacity');
+});
+
+test('activity events are bounded even under sustained input bursts', t => {
+  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const guard = new ThermalGuard();
+  t.after(() => guard.destroy());
+  for (let i = 0; i < 7000; i++) guard.recordActivity();
+  assert.ok(guard.activity.events.length <= 2048);
+});
+
+test('storage hydration completes before chapter writes and never drops concurrent edits', async () => {
+  const h = reactHarness();
+  let resolveSaved;
+  const persisted = [];
+  const STORAGE_KEYS = {
+    TUTORIAL_COMPLETED: 'tutorial', ADVANCED_UNLOCKED: 'advanced', BIBLE_PROGRESS: 'bible',
+  };
+  const storage = {
+    getItem: key => key === 'bible'
+      ? new Promise(resolve => { resolveSaved = resolve; })
+      : Promise.resolve(null),
+    setItem: async (key, value) => { persisted.push({ key, value }); },
+  };
+  const { useStorage } = loadTS('hooks/useStorage.ts', {
+    react: h.react,
+    '@react-native-async-storage/async-storage': storage,
+    '../constants/config': { STORAGE_KEYS },
+  });
+  const hook = useStorage();
+  h.mount();
+  const first = hook.markChapterComplete('new-1');
+  const second = hook.markChapterComplete('new-2');
+  await settle();
+  assert.equal(persisted.length, 0, 'never persist over unread authoritative data');
+  resolveSaved(JSON.stringify({
+    completedChapters: { saved: true }, bookmarks: ['saved-bookmark'], exerciseResults: {},
+  }));
+  await Promise.all([first, second]);
+  const latest = JSON.parse(persisted.at(-1).value);
+  assert.deepEqual(latest.completedChapters, { saved: true, 'new-1': true, 'new-2': true });
+  assert.deepEqual(latest.bookmarks, ['saved-bookmark']);
+  h.unmount();
+});
+
+test('storage save failures do not poison the serialized write queue', async () => {
+  const h = reactHarness();
+  let writes = 0;
+  const storage = {
+    getItem: async () => null,
+    setItem: async () => { if (++writes === 1) throw new Error('disk full'); },
+  };
+  const { useStorage } = loadTS('hooks/useStorage.ts', {
+    react: h.react,
+    '@react-native-async-storage/async-storage': storage,
+    '../constants/config': {
+      STORAGE_KEYS: { TUTORIAL_COMPLETED: 'tutorial', ADVANCED_UNLOCKED: 'advanced', BIBLE_PROGRESS: 'bible' },
+    },
+  });
+  const hook = useStorage();
+  h.mount();
+  await settle();
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    await hook.markChapterComplete('a');
+    await hook.markChapterComplete('b');
+    assert.equal(writes, 2, 'second write retries the latest full snapshot');
+    assert.deepEqual(h.states[2].completedChapters, { a: true, b: true });
+  } finally {
+    console.error = originalError;
+    h.unmount();
+  }
+});
+
+test('interaction tasks reject on unmount and throwing callbacks reject their promises', async () => {
+  const h = reactHarness();
+  const metrics = {
+    Dimensions: {
+      get: () => ({ width: 400, height: 800 }),
+      addEventListener: () => ({ remove() {} }),
+    },
+    PixelRatio: { get: () => 2, getFontScale: () => 1, roundToNearestPixel: n => n },
+    Platform: { OS: 'android' },
+  };
+  const { useMobileOptimization } = loadTS('hooks/useMobileOptimization.ts', {
+    react: h.react, 'react-native': metrics,
+  });
+  const hook = useMobileOptimization();
+  h.mount();
+  const bad = hook.runAfterInteraction(() => { throw new Error('render work failed'); });
+  await assert.rejects(bad, /render work failed/);
+  const a = hook.runAfterInteraction(() => 1);
+  const b = hook.runAfterInteraction(() => 2);
+  h.unmount();
+  await assert.rejects(a, /Component unmounted/);
+  await assert.rejects(b, /Component unmounted/);
+});
+
+test('a late session-start response cannot replace a newer session', async () => {
+  const h = reactHarness();
+  const pending = new Map();
+  const service = {
+    startSession: (_user, moduleId) => new Promise(resolve => pending.set(moduleId, resolve)),
+    updateProgress: async () => ({ progress_updated: true, xp_earned: 0, new_achievements: [] }),
+    logAIInteraction: async () => ({ logged: true }),
+  };
+  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+    react: h.react, '../services/synergy': { synergyService: service },
+  });
+  const hook = useSessionTracker('person');
+  h.mount();
+  const older = hook.startSession('older');
+  const newer = hook.startSession('newer');
+  const response = module_id => ({
+    session_started: true, module_id, emotional_context: {
+      detected_emotion: 'neutral', stress_level: 0.2,
+    }, content_adaptations: [], tips: [],
+  });
+  pending.get('newer')(response('newer'));
+  await newer;
+  pending.get('older')(response('older'));
+  assert.equal(await older, null);
+  assert.equal(h.states[0].moduleId, 'newer');
+  h.unmount();
+});
+
+test('ending a session waits for pending progress then sends final progress once', async () => {
+  const h = reactHarness();
+  const updates = [];
+  const service = {
+    startSession: async (_user, moduleId) => ({
+      session_started: true, module_id: moduleId,
+      emotional_context: { detected_emotion: 'neutral', stress_level: 0.2 },
+      content_adaptations: [], tips: [],
+    }),
+    updateProgress: (_user, moduleId, progress) => new Promise(resolve => {
+      updates.push({ moduleId, progress, resolve });
+    }),
+    logAIInteraction: async () => ({ logged: true }),
+  };
+  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+    react: h.react, '../services/synergy': { synergyService: service },
+  });
+  const hook = useSessionTracker('person');
+  h.mount();
+  await hook.startSession('book');
+  const early = hook.updateProgress(10);
+  await settle();
+  assert.equal(updates.length, 1);
+  await hook.updateProgress(20); // debounced while the first request is in flight
+  const ending = hook.endSession();
+  await settle();
+  assert.equal(updates.length, 1, 'final write waits for in-flight update');
+  updates[0].resolve({ progress_updated: true, xp_earned: 3, new_achievements: [] });
+  await early;
+  await settle();
+  assert.equal(updates.length, 2);
+  assert.deepEqual(updates.map(item => item.progress), [10, 20]);
+  updates[1].resolve({ progress_updated: true, xp_earned: 0, new_achievements: [] });
+  await ending;
+  assert.equal(h.states[0].active, false);
+  h.unmount();
 });
