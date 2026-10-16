@@ -31,7 +31,7 @@
 
 ## Open-issue reconciliation overlay
 
-GitHub returned **12 open issues** (non-PR issues) at this baseline. None was blindly closed or dismissed. Each remains separately actionable:
+GitHub returned **11 open issues** (non-PR issues) at this baseline. None was blindly closed or dismissed. Each remains separately actionable:
 
 | Issue | Disposition | Next necessary evidence |
 | --- | --- | --- |
@@ -46,7 +46,6 @@ GitHub returned **12 open issues** (non-PR issues) at this baseline. None was bl
 | [#3790](https://github.com/Apeloff1/Skeleton/issues/3790) | Likely advanced, needs proof | Learning-evidence PRs #4059/#4063/#4064 merged; acceptance requires exact-head verification |
 | [#3791](https://github.com/Apeloff1/Skeleton/issues/3791) | Stale census needs fresh audit | Historical 82 ancestor refs not a current deletion authorization |
 | [#3902](https://github.com/Apeloff1/Skeleton/issues/3902) | Provider-blocked | 28 historical queued runs returned 409; do not falsely claim cancellation |
-| [#4080](https://github.com/Apeloff1/Skeleton/issues/4080) | Needs triage | Read current issue acceptance |
 
 ## Intake and draft work
 
