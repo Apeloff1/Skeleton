@@ -226,7 +226,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-session-compare": {"action", "session", "other_session"},
             "director-session-fork": {"action", "session", "other_session", "at", "approve"},
             "director-session-trace": {"action", "session", "tail"},
-            "director-serve": {"action", "session", "port"},
+            "director-serve": {"action", "session", "port", "digest"},
             "director-atlas-export": {"action", "source", "dry_run"},
             "director-atlas-verify": {"action", "source"},
             "dragon-session-lesson": {"action", "session", "approve"},
@@ -249,7 +249,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 if not args.session:
                     raise ValueError("director-serve requires --session")
                 return serve(root, session=args.session,
-                             port=args.port if args.port is not None else 8765)
+                             port=args.port if args.port is not None else 8765,
+                             policy_digest=args.digest)
             if args.action in {"dragon-policy-preview", "dragon-policy-train",
                                "dragon-policy-predict"}:
                 from skeleton.developer.jeeves_game_dragon_policy import preview, train, predict
