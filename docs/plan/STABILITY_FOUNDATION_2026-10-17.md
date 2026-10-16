@@ -73,3 +73,52 @@ Additional regression cases needed at platform level: simulate failed `AsyncStor
 
 ## L13 — Closure and residual risk
 This slice closes source-level **false-readiness**, **fallback timer**, **skin remount**, and **physical probe** defects. It does **not** establish that the reported production/native crash is fixed. Unresolved: device crash logs, runtime resource exhaustion, API/process supervision, first-install recovery drills, full TypeScript build, and complete end-to-end application playthrough. These require exact-head checks and platform evidence before signing them closed.
+
+
+## Second large stability batch — 2026-10-17
+
+The existing owners were extended in place, with no new database authority or
+background process. The additional code changes address the following failure
+classes:
+
+| Milestone | Code/evidence | Protection |
+| --- | --- | --- |
+| Retry policy | `frontend/utils/requestRecoveryPolicy.ts` | Finite retry/timeout/response budgets; no implicit replay of unkeyed POST/PUT/PATCH/DELETE |
+| Full HTTP transport | `frontend/src/utils/apiClient.ts` | Capped attempts, deadlines spanning response bodies, no breaker poisoning by 4xx, no half-open lease on cache hit |
+| Defensive HTTP transport | `frontend/utils/safeFetch.ts` | Abortable retry delay, cancellable caller signal, body-level timeout and bounded memory use |
+| Crash telemetry | `frontend/utils/crashTelemetry.ts` + existing root/screen/global handlers | Burst budget, de-duplication, bounded concurrency and deadline without replays |
+| Cold-start stage runner | `frontend/src/boot/runner.ts` | Synchronous stage failures yield terminal results; retry and backoff caps; child abort per timed-out attempt |
+| Background observer ownership | `frontend/src/hooks/useTunnelStatus.ts`, `frontend/src/utils/tunnelHeartbeat.ts`, `frontend/app/_layout.tsx` | Single delayed startup, removable AppState listener, invalidated stale in-flight responses |
+| Boot tracing | `frontend/utils/bootTracer.ts` | Coalesced writes/render notifications, serialized native writes, bounded recovery reads, previous-session rotation before writes |
+| Offline Windows browser | `skeleton/app/windows_launcher.py` | Dead worker is reclaimed; shutdown is not invoked against an already-dead serving thread; browser failure does not kill active service |
+| Service health | `skeleton/app/health.py` | Missing public probe is not a pass; invalid/non-finite retry/timeout budgets rejected |
+| Failure injection | `skeleton/testing/test_app_stability_recovery.py` | Tests of dead worker, key removal, missing health contract, invalid polling inputs |
+| Focused frontend policy tests | `frontend/scripts/test-request-recovery.mjs` and `test-startup-stability.mjs` | Legacy fallback compatibility, bounded retries, no implicit write duplication, transient HTTP classification, memory budgets |
+
+**Compatibility and security:** This intentionally changes the historical
+implicit retry behavior for unkeyed writes: a network fault now returns a
+failure receipt rather than silently resubmitting a potentially already-committed
+mutation. Keyed writes can still retry when the server supports idempotency keys;
+client-side keys alone do not prove server deduplication. HTTP response budgets
+default to 8 MiB and may be explicitly raised to at most 64 MiB for large
+game-workspace requests. This is a bounded response safeguard, not a streaming
+data plane; large assets still require streamed/chunked owners.
+
+**Test evidence:** The original recovery policy and first request policy
+regressions were executed together against SHA-matching local files and passed
+9/9. The subsequently added response-budget test and Python failure-injection
+suite require fresh exact-head execution. GitHub changed-file/secret/malware
+checks are different from TypeScript/native runtime tests; they cannot qualify
+the assembled product.
+
+**Outstanding qualification:** `cd frontend && yarn typecheck && yarn
+test:stability && yarn export:web`; Python stability/recovery tests; cold install;
+Windows offline-browser service failure; low-storage/OOM Android startup;
+device crash log capture; Docker service restart with backing-store outage;
+full AI checkpoint inference and game playthrough. The PR remains a candidate,
+not an attested crash-free release.
+
+**Rollback:** Revert the stability PR; no persistent schema migration. Retain
+safe mode, startup attempts, launcher controls and the canonical configuration
+authority. The stricter request policy should be validated against every
+mutating endpoint that expects a server-owned idempotency key.
