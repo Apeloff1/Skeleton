@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  boundedRetries, boundedTimeoutMs, retryableHttpStatus, retryDelayMs,
+  boundedRetries, boundedTimeoutMs, boundedResponseChars, retryableHttpStatus, retryDelayMs,
 } from '../utils/requestRecoveryPolicy.ts';
 
 test('safe GET can retry within a finite budget', () => {
@@ -31,4 +31,11 @@ test('timeouts and retry waits are always finite', () => {
 test('only transient HTTP responses are retryable', () => {
   for (const code of [408, 429, 500, 502, 503, 504, 599]) assert.equal(retryableHttpStatus(code), true);
   for (const code of [200, 400, 401, 403, 404, 409, 422]) assert.equal(retryableHttpStatus(code), false);
+});
+
+test('large game responses have an explicit finite size budget', () => {
+  assert.equal(boundedResponseChars(undefined), 8 * 1024 * 1024);
+  assert.equal(boundedResponseChars(1), 1024);
+  assert.equal(boundedResponseChars(128 * 1024 * 1024), 64 * 1024 * 1024);
+  assert.equal(boundedResponseChars(Number.POSITIVE_INFINITY), 8 * 1024 * 1024);
 });
