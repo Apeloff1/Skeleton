@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date
 import math
 from pathlib import Path, PurePosixPath
 import re
@@ -136,6 +137,12 @@ def _source(src: Any, role: str) -> dict[str, str]:
     published = src["published"]
     if not isinstance(published, str) or re.fullmatch(r"(?:19|20)[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])", published) is None:
         _error("evidence published date must be ISO YYYY-MM-DD (2000+)")
+    try:
+        observed = date.fromisoformat(published)
+    except ValueError as exc:
+        raise QualityError("evidence publication date is not a real calendar date") from exc
+    if observed > date.today():
+        _error("future-dated quality evidence cannot qualify")
     return {"url": uri, "issuer": issuer, "kind": kind, "published": published}
 
 
@@ -163,6 +170,9 @@ def _entry(value: Any, *, era: str, console: str, genre: str,
     rating_cite = _source(value["rating_source"], "rating")
     if sale_cite["url"] == rating_cite["url"]:
         _error("sales and ratings must be independently sourced")
+    if (int(sale_cite["published"][:4]) < release
+        or int(rating_cite["published"][:4]) < release):
+        _error("commercial or review evidence predates the recorded title release")
     return {"id": identity, "release_year": release, "sales_units": sales,
             "sales_basis": basis, "sales_scope": scope,
             "critic_score": quality, "critic_reviews": reviews,
