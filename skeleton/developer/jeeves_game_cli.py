@@ -162,7 +162,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-board", "director-prepare-training",
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-serve", "director-atlas-export", "director-atlas-verify",
-                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check"))
+                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "director-coverage"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -185,6 +185,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--goal")
     parser.add_argument("--routes", type=int)
     parser.add_argument("--session")
+    parser.add_argument("--sessions")
     parser.add_argument("--port", type=int)
     parser.add_argument("--other-session")
     parser.add_argument("--choice")
@@ -226,6 +227,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-bindings": {"action", "source"},
             "director-bindings-publish": {"action", "source", "approve"},
             "director-bindings-check": {"action", "source", "digest"},
+            "dragon-lab": {"action", "sessions", "approve"},
+            "director-coverage": {"action", "source", "routes"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
@@ -237,6 +240,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     raise ValueError("director-serve requires --session")
                 return serve(root, session=args.session,
                              port=args.port if args.port is not None else 8765)
+            if args.action == "dragon-lab":
+                from skeleton.developer.jeeves_game_dragon_lab import queue
+                if not args.sessions:
+                    raise ValueError("Dragon comparative lab requires --sessions a,b,...")
+                return queue(root, sessions=args.sessions, approved_sha256=args.approve)
+            if args.action == "director-coverage":
+                from skeleton.developer.jeeves_game_director_coverage import coverage
+                if not args.source:
+                    raise ValueError("director-coverage requires --source")
+                return coverage(root, source=args.source,
+                                routes=args.routes if args.routes is not None else 3)
             if args.action.startswith("director-session-"):
                 from skeleton.developer.jeeves_game_director_session import begin, inspect, choose, compare
                 if not args.session:
@@ -277,7 +291,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             if not args.session:
                 raise ValueError("Dragon session lesson requires --session")
             return enqueue(root, session=args.session, approved_digest=args.approve)
-        if any(value is not None for value in (args.session, args.other_session, args.choice, args.port)):
+        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port)):
             raise ValueError("runtime options require a director-session or dragon-session action")
         director_actions = {"director-draft", "director-revise", "director-examine", "director-promote",
                             "director-board", "director-prepare-training"}
