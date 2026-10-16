@@ -271,8 +271,30 @@ def _preview(root: Path, *, source: str, genre: str, target: str) -> dict[str, A
 def plan(root: Path, *, source: str, genre: str, target: str) -> dict[str, Any]:
     packet = _preview(root, source=source, genre=genre, target=target)
     digest = _hash(packet)
+    workorders = [
+        {
+            "kind": "mechanic",
+            "mechanic": item["mechanic"],
+            "priority": "P1",
+            "design_objective": item["objective"],
+            "input_to_implement": item["player_action"],
+            "system_response_to_implement": item["system_response"],
+            "player_feedback_to_implement": item["feedback"],
+            "acceptance_to_execute": item["validation"],
+            "implemented": False,
+            "tested_in_game": False,
+            "next_after_adoption": "jeeves propose --kind mechanic --dragon-digest " + digest,
+        }
+        for item in packet["prototype"]["mechanics"]
+    ]
     return {"ok": True, "action": "dragon-plan",
             "handoff_sha256": digest, "handoff": packet,
+            "workorders": workorders,
+            "unresolved_game_production": [
+                "author and verify original world/story canon",
+                "implement mechanics in engine and run interactive game playthrough",
+                "audit original assets, audio, accessibility and release provenance",
+            ],
             "approved_for_model_context": False,
             "next": "dragon-adopt --source ... --genre ... --target ... --approve " + digest}
 
