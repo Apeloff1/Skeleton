@@ -190,6 +190,36 @@ def _dynamic_world_signal(world: Any) -> dict[str, Any]:
     }
 
 
+def _society_signal(world: Any) -> dict[str, Any]:
+    """Social simulation facts; no false approval of cinematic acting or AI."""
+    if world.dynamics is None or world.dynamics.society is None:
+        return {
+            "enabled": False,
+            "NPC_personality_or_language_model_trained": False,
+        }
+    from skeleton.developer.jeeves_game_director_society_audit import analyze
+    report = analyze(world)
+    return {
+        "enabled": True,
+        "typed_source_compiled": True,
+        "NPC_count": report["NPC_count"],
+        "merchant_count": report["shop_count"],
+        "goods_count": report["tradeable_item_count"],
+        "NPC_dialogue_choices": sum(
+            len(person.dialogue)
+            for person in world.dynamics.society.residents
+        ),
+        "authored_social_gates": len(report["conditional_society_links"]),
+        "initial_social_actions": report["actual_initial_NPC_market_actions"][:40],
+        "structural_review_item_count": report["structural_review_item_count"],
+        "structural_review_item_sample": report["structural_review_items"][:30],
+        "assurance_sha256": report["assurance_sha256"],
+        "native_NPC_walk_cycle_verified": False,
+        "literary_character_voice_human_approved": False,
+        "NPC_language_model_trained": False,
+    }
+
+
 def board(root: Path, *, source: str, routes: int = 3,
           dragon_digest: str | None = None) -> dict[str, Any]:
     from skeleton.ai.game_builder.quest_campaign_completion import compare_campaign_branches
@@ -281,6 +311,7 @@ def board(root: Path, *, source: str, routes: int = 3,
         "new_runtime_development_evidence": {
             "labyrinth_topology": _labyrinth_signal(root, source=source),
             "dynamic_living_world": _dynamic_world_signal(world),
+            "NPC_society_and_economy": _society_signal(world),
             "interactive_director_sessions": _runtime_signal_sessions(
                 root, world_digest=world.digest),
             "godot_scene_atlas": _runtime_signal_atlas(
