@@ -41,14 +41,21 @@ export const T = {
   get small() { return { ...typography.caption, color: C.textMute }; },
 } as const;
 
+// Getter properties preserve the legacy exported object shape while reading
+// the active skin at render time rather than freezing first-import colors.
 export const card = {
-  backgroundColor: C.surface,
+  get backgroundColor() { return C.surface; },
   borderRadius: R.lg,
   borderWidth: 1,
-  borderColor: C.border,
+  get borderColor() { return C.border; },
 };
 
-export const cardActive = { ...card, borderColor: C.brand, borderWidth: 1 };
+export const cardActive = {
+  get backgroundColor() { return C.surface; },
+  borderRadius: R.lg,
+  borderWidth: 1,
+  get borderColor() { return C.brand; },
+};
 export const glow = elevation.glow as object;
 
 export default { C, S, R, T, card, cardActive, glow };
