@@ -13,6 +13,9 @@ import re
 from typing import Any
 
 from skeleton.ai.game_builder.story_canon_fabric import verify_story_history
+from skeleton.ai.game_builder.quest_playthrough_journal import (
+    SegmentedDirectorTrace, replay_director_segments,
+)
 from skeleton.ai.game_builder.quest_scene_engine import (
     DirectorWorld, DirectorAction, director_play, director_verify,
 )
@@ -71,21 +74,28 @@ def review_story_gameplay(
 
     played = {}
     for packet in replays:
-        if not isinstance(packet, dict) or set(packet) != {"name", "actions"}:
-            raise StoryGameBridgeError("replay requires name and real DirectorAction sequence")
+        if not isinstance(packet, dict) or set(packet) not in (
+            {"name", "actions"}, {"name", "segments"},
+        ):
+            raise StoryGameBridgeError(
+                "replay requires name and real actions or linked segments"
+            )
         name = _id(packet["name"], "replay name")
         if name in played:
             raise StoryGameBridgeError("duplicate named original gameplay replay")
-        steps = packet["actions"]
-        if not isinstance(steps, list) or len(steps) > MAX_ACTIONS_PER_REPLAY:
-            raise StoryGameBridgeError("replay segment exceeds bounded Director action budget")
-        actions = []
-        for item in steps:
-            if not isinstance(item, dict) or set(item) != {"kind", "key", "scene"}:
-                raise StoryGameBridgeError("only original typed DirectorAction inputs are allowed")
-            actions.append(DirectorAction(**item))
-        replay = director_play(world, actions)
-        director_verify(world, replay)
+        if "segments" in packet:
+            replay = replay_director_segments(world, packet["segments"])
+        else:
+            steps = packet["actions"]
+            if not isinstance(steps, list) or len(steps) > MAX_ACTIONS_PER_REPLAY:
+                raise StoryGameBridgeError("replay segment exceeds bounded Director action budget")
+            actions = []
+            for item in steps:
+                if not isinstance(item, dict) or set(item) != {"kind", "key", "scene"}:
+                    raise StoryGameBridgeError("only original typed DirectorAction inputs are allowed")
+                actions.append(DirectorAction(**item))
+            replay = director_play(world, actions)
+            director_verify(world, replay)
         results = {(x.quest, x.stage): x for x in replay.final.results}
         played[name] = (replay, results)
 
@@ -159,7 +169,15 @@ def review_story_gameplay(
         "canonical_story_digest": history["digest"],
         "director_world_digest": world.digest,
         "replay_count": len(played),
-        "real_actions_executed": sum(len(r.actions) for r, _ in played.values()),
+        "real_actions_executed": sum(
+            r.action_count if isinstance(r, SegmentedDirectorTrace) else len(r.actions)
+            for r, _ in played.values()
+        ),
+        "replay_segment_receipts": {
+            name: list(replay.segment_receipts)
+            for name, (replay, _) in sorted(played.items())
+            if isinstance(replay, SegmentedDirectorTrace)
+        },
         "source_scenes_reparsed": len(scenes),
         "source_scenes_bound": len(source_coverage),
         "unbound_source_scene_sequences": unbound_source,
