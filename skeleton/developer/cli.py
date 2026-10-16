@@ -60,6 +60,10 @@ def dev_help_text() -> str:
         jeeves dragon-policy-predict --session NAME --digest MODEL_SHA256
         jeeves director-serve --session NAME [--port 8765 --digest MODEL_SHA256]
         jeeves director-godot-smoke --source design/director_campaign_source.json [--timeout 90]
+        jeeves director-loopback-e2e --source design/director_campaign_source.json [--routes 1..8]
+        jeeves director-native-http-e2e --source design/director_campaign_source.json [--timeout 90]
+        Godot export includes original source-generated PNG backdrops and ambient WAV scores
+        Real HTTP full-quest playback and actual native Godot->Python probe are separate tests
         jeeves director-coverage --source design/director_campaign_source.json [--routes 2..8]
         jeeves dragon-lab --sessions hero_a,hero_b [--approve RESEARCH_SHA256]
         jeeves director-atlas-export --source design/director_campaign_source.json [--dry-run]
