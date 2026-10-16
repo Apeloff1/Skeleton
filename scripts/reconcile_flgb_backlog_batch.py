@@ -159,7 +159,13 @@ def main() -> int:
     parser.add_argument("--count", type=int, default=100)
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     args = parser.parse_args()
-    manifest = json.loads((args.repo / BACKLOG).read_text(encoding="utf-8"))
+    # Bind the manifest to the same commit as the tracked-file inventory.
+    # Reading the working copy could silently mix dirty draft edits with HEAD.
+    manifest_bytes = subprocess.run(
+        ["git", "-C", str(args.repo), "show", f"HEAD:{BACKLOG}"],
+        capture_output=True, check=True,
+    ).stdout
+    manifest = json.loads(manifest_bytes.decode("utf-8"))
     head, paths = git_snapshot(args.repo)
     report = reconcile(manifest, paths, head, start=args.start, count=args.count)
     if args.format == "markdown":
