@@ -387,6 +387,12 @@ class NumpyRecurrentLM:
     ) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
+        if not isinstance(cancel, threading.Event):
+            raise TypeError("cancel must be threading.Event")
+        if request.tools:
+            raise NeuralLMError("native neural baseline cannot produce governed tool calls")
+        if request.structured_output_schema is not None:
+            raise NeuralLMError("native neural baseline cannot guarantee structured output")
         start = time.perf_counter()
         if cancel.is_set():
             raise LocalInferenceCancelled("native neural generation cancelled")
@@ -419,13 +425,20 @@ class NumpyRecurrentLM:
                 output_tokens.append(token)
             hidden = np.tanh(self.embedding[token] + hidden @ self.recurrent + self.hidden_bias)
             text = _decode(output_tokens)
-            if any(text.endswith(marker) for marker in request.stop):
+            if any(marker and marker in text for marker in request.stop):
                 finish = "completed"
                 break
 
+        if cancel.is_set():
+            raise LocalInferenceCancelled("native neural generation cancelled")
         text = _decode(output_tokens)
-        if not text:
-            text = " "
+        # Publish the prefix before the first stop marker, never the marker
+        # itself or any bytes generated beyond it.
+        locations = [text.find(marker) for marker in request.stop if marker and marker in text]
+        if locations:
+            text = text[:min(locations)]
+            finish = "completed"
+        published_tokens = _encode(text)
         response_id = (
             "local-neural:"
             + hashlib.sha256(
@@ -433,7 +446,8 @@ class NumpyRecurrentLM:
                     {
                         "model": self.model_digest,
                         "request": request.digest,
-                        "output": output_tokens,
+                        "output": list(published_tokens),
+                        "finish_reason": finish,
                     }
                 ).encode("utf-8")
             ).hexdigest()[:32]
@@ -443,7 +457,7 @@ class NumpyRecurrentLM:
             model_id=self.model_id,
             model_digest=self.model_digest,
             input_tokens=len(prompt_tokens),
-            output_tokens=len(output_tokens),
+            output_tokens=len(published_tokens),
             finish_reason=finish,
             response_id=response_id,
             latency_ms=(time.perf_counter() - start) * 1000.0,
