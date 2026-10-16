@@ -117,7 +117,7 @@ def _source(src: Any, role: str) -> dict[str, str]:
     if not isinstance(src, dict) or set(src) != {"url", "issuer", "kind", "published"}:
         _error(f"invalid {role} evidence citation")
     kind = src["kind"]
-    if kind not in (_SALES if role == "sales" else _RATINGS):
+    if not isinstance(kind, str) or kind not in (_SALES if role == "sales" else _RATINGS):
         _error(f"unsupported {role} evidence authority")
     issuer = _ident(src["issuer"], f"{role} evidence issuer")
     uri = src["url"]
@@ -132,7 +132,7 @@ def _source(src: Any, role: str) -> dict[str, str]:
     except ValueError as exc:
         raise QualityError("invalid evidence URL") from exc
     published = src["published"]
-    if not isinstance(published, str) or re.fullmatch(r"20[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])", published) is None:
+    if not isinstance(published, str) or re.fullmatch(r"(?:19|20)[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])", published) is None:
         _error("evidence published date must be ISO YYYY-MM-DD (2000+)")
     return {"url": uri, "issuer": issuer, "kind": kind, "published": published}
 
@@ -221,8 +221,6 @@ def rank_cohort(root: Path, *, console: str, genre: str, period: str,
         _error("cannot compare inconsistent unit-sales basis or geographic scope")
     # Ordinal top quartile for BOTH axes; ties share rank rather than
     # arbitrarily excluding an equivalent result by alphabetical sort order.
-    sales_values = sorted({r["sales_units"] for r in records}, reverse=True)
-    score_values = sorted({r["critic_score"] for r in records}, reverse=True)
     cutoff = max(1, math.ceil(len(records) * TOP_PERCENT))
     rows = []
     for rec in records:
