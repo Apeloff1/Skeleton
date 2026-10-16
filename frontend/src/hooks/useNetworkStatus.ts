@@ -29,9 +29,13 @@ export function useNetworkStatus(): NetStatus {
       (async () => {
         try {
           const NetInfo: any = await import('@react-native-community/netinfo');
+          // Dynamic import can settle after unmount; never install an orphan
+          // OS network listener once the component has gone away.
+          if (cancelled) return;
           unsub = NetInfo.default.addEventListener((state: any) => {
             if (!cancelled) setStatus(state.isConnected ? 'online' : 'offline');
           });
+          if (cancelled) { try { unsub?.(); } catch {} }
         } catch {
           if (!cancelled) setStatus('unknown');
         }

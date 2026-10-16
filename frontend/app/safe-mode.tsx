@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearMirror, pauseSafeStorageForWipe, resumeSafeStorageAfterWipe } from '../utils/safeStorage';
+import { clearMirror, safeRemoveItem, pauseSafeStorageForWipe, resumeSafeStorageAfterWipe } from '../utils/safeStorage';
 import {
   getLastTrace, getCrashCount, getLastCleanBoot,
   resetBootState, TraceStep,
@@ -68,11 +68,12 @@ export default function SafeModeRoute() {
     setBusy(true);
     setRecoveryError(null);
     try {
-      await AsyncStorage.removeItem('@codedock:welcome_seen:v1');
+      const acknowledged = await safeRemoveItem('@codedock:welcome_seen:v1', 1_000);
+      if (!acknowledged) throw new Error('welcome key deletion unconfirmed');
       clearMirror();
       router.replace('/welcome');
     } catch {
-      setRecoveryError('Could not reset the welcome state. Device storage may be unavailable.');
+      setRecoveryError('Welcome reset was not confirmed. Local storage may be unavailable; other settings and projects were not intentionally removed.');
     } finally {
       setBusy(false);
     }
