@@ -111,6 +111,25 @@ supply the complete authored `DirectorWorld.payload()` and a matching
 current GameForge project ID. `--passes` specifies 1..8 fully replayed
 choices, rather than synthetic scoring or independent human reviews.
 
+### Operator save and reopen, without native-release claims
+
+```bash
+python -m skeleton dev game jeeves direction-campaign --project ./original-game --source design/director_campaign_source.json --passes 2 --output original_campaign
+python -m skeleton dev game jeeves direction-campaign-reopen --project ./original-game --source design/director_campaign_source.json --output original_campaign_0
+python -m skeleton dev game jeeves p0-acceptance --project ./original-game
+```
+
+The first command executes both routes, then writes each route's **actual
+replayed action history** as create-only JSON under
+`design/campaign_saves/original_campaign_0.json` and
+`original_campaign_1.json`. Existing save names cannot be overwritten.
+The second command recompiles the exact approved world and re-executes
+every legal action from genesis to reconstruct the selected DirectorState;
+it rejects forged actions, stale/foreign world IDs and altered checkpoint
+receipts. The third command displays the separately blocked release gates.
+This proves Director **logic-state save/reopen**, not installed Godot save
+migration or consumer native-state recovery.
+
 The resulting `replays_for_signed_story_binding` can be incorporated
 into an approved StoryCanon / `direction-gameplay` dossier with exact
 author-controlled `source_anchor` / quest / stage / approach / consequence.
