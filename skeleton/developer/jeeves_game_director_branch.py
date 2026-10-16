@@ -44,6 +44,7 @@ def trace(root: Path, *, session: str, tail: int = 64) -> dict[str, Any]:
             for item in recent
         ],
         "recorded_timeline_complete": len(recent) == count,
+        "fork_origin": manifest.get("fork_origin"),
         "native_save_file_verified": False,
     }
 
@@ -64,6 +65,9 @@ def fork(root: Path, *, session: str, new_session: str, at: int,
     # different, so rehash every derived action receipt to prevent lineage fraud.
     manifest = {key: value for key, value in original.items() if key != "receipt_sha256"}
     manifest["name"] = new_session
+    manifest["fork_origin"] = {
+        "parent_session": session, "parent_head_sha256": head, "fork_sequence": at,
+    }
     manifest["receipt_sha256"] = _hash(manifest)
     prior = manifest["receipt_sha256"]
     state = director_initial(world)
