@@ -157,11 +157,18 @@ def audit(root: Path, *, session: str, page: int = 1,
                 wallet_received += max(0, shop_wallet_delta)
                 if action.kind == "speak":
                     NPC_contacts[action.key] += 1
+                elif action.kind == "discuss":
+                    resident = next(
+                        n for n in world.dynamics.society.residents
+                        if any(n.key + "_" + c.key == action.key
+                               for c in n.dialogue)
+                    )
+                    NPC_contacts[resident.key] += 1
                 elif action.kind == "buy":
                     shop_purchases[action.key] += 1
                 elif action.kind == "sell":
                     shop_sales[action.key] += 1
-                if action.kind in {"speak", "buy", "sell", "rest"}:
+                if action.kind in {"speak", "discuss", "buy", "sell", "rest"}:
                     society_action_total += 1
                     from skeleton.ai.game_builder.quest_society import phase
                     rules = world.dynamics.society
