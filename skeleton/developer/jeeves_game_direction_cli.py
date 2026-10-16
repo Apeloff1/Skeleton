@@ -80,6 +80,13 @@ def direction(root: Path, *, action: str, source: str,
             "original_director_world_sha256": gameplay_result["director_world_digest"],
             "replay_evidence_sha256": gameplay_result["replay_evidence_sha256"],
             "replayed_quest_actions": gameplay_result["real_actions_executed"],
+            "verified_recording_segments": sum(
+                len(records) for records in gameplay_result["replay_segment_receipts"].values()
+            ),
+            "recorded_playthrough_checkpoint_heads": {
+                name: records[-1]["receipt_sha256"]
+                for name, records in sorted(gameplay_result["replay_segment_receipts"].items())
+            },
             "bound_story_scenes": gameplay_result["source_scenes_bound"],
             "total_original_scenes": gameplay_result["source_scenes_reparsed"],
             "distinct_executed_consequences": gameplay_result["distinct_replayed_consequence_pairs"],
