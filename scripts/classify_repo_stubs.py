@@ -102,7 +102,9 @@ def classify(ref: str, output: Path, summary_file: Path, max_bytes: int = MAX_SO
     eligible = [(mode, sha, size, path) for mode, sha, size, path in tracked if path.endswith(TEXT_EXTENSIONS)]
     counters: Counter[str] = Counter()
     categories: Counter[str] = Counter()
-    seen_blob: dict[str, bytes] = {}
+    # Cache small marker lists, never entire source blobs: historical snapshots
+    # repeat large files and unbounded byte caching could exhaust the runner.
+    seen_markers: dict[tuple[str, str], tuple[str, list[tuple[int, str]]]] = {}
     output.parent.mkdir(parents=True, exist_ok=True)
     summary_file.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as stream:
@@ -125,7 +127,8 @@ def classify(ref: str, output: Path, summary_file: Path, max_bytes: int = MAX_SO
                         "bytes": size, "category": owner(path), "severity": "manual_review"
                     }, ensure_ascii=False) + "\n")
                     continue
-                if sha not in seen_blob:
+                cache_key = (sha, Path(path).suffix.lower())
+                if cache_key not in seen_markers:
                     worker.stdin.write((sha + "\n").encode("ascii"))
                     worker.stdin.flush()
                     header = worker.stdout.readline().decode("ascii").split()
@@ -137,19 +140,25 @@ def classify(ref: str, output: Path, summary_file: Path, max_bytes: int = MAX_SO
                         raise ValueError("Git blob terminator missing")
                     if length != size:
                         raise ValueError("Git tree reported inconsistent blob size")
-                    seen_blob[sha] = blob
-                blob = seen_blob[sha]
+                    if b"\0" in blob:
+                        seen_markers[cache_key] = ("binary", [])
+                    else:
+                        try:
+                            decoded = blob.decode("utf-8", errors="strict")
+                        except UnicodeDecodeError:
+                            seen_markers[cache_key] = ("non_utf8", [])
+                        else:
+                            seen_markers[cache_key] = ("ok", markers(path, decoded))
+                status, found = seen_markers[cache_key]
                 counters["inspected_text_paths"] += 1
-                if b"\0" in blob:
+                if status == "binary":
                     counters["binary_marked_text"] += 1
                     continue
-                try:
-                    text = blob.decode("utf-8", errors="strict")
-                except UnicodeDecodeError:
+                if status == "non_utf8":
                     counters["non_utf8_sources"] += 1
                     continue
                 category = owner(path)
-                for line, kind in markers(path, text):
+                for line, kind in found:
                     item = {
                         "path": path, "blob": sha, "line": line,
                         "kind": kind, "category": category,
