@@ -149,7 +149,12 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                             "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
-                                            "production-status", "production-cycle", "production-training"))
+                                            "production-status", "production-cycle", "production-training",
+                                            "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
+                                            "upscale-foliage", "upscale-animation", "upscale-shadow",
+                                            "upscale-parallax", "upscale-music", "asset-inventory",
+                                            "upscale-review", "vividness-review", "queue-upscaled-training",
+                                            "camera-plan"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -163,7 +168,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--target")
     parser.add_argument("--source")
     parser.add_argument("--output")
-    parser.add_argument("--mode", choices=("nearest", "scale2x"))
+    parser.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     parser.add_argument("--factor", type=int)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--passes", type=int)
@@ -171,11 +176,33 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--page", type=int)
     parser.add_argument("--page-size", type=int)
     parser.add_argument("--repair-generated", action="store_true")
+    parser.add_argument("--pattern", choices=("wind", "breathe", "bob", "shimmer", "water"))
+    parser.add_argument("--frames", type=int)
+    parser.add_argument("--frame-height", type=int)
+    parser.add_argument("--richness", type=int)
+    parser.add_argument("--focus", choices=("world", "environment", "foliage", "clutter", "shadow"))
+    parser.add_argument("--pan", type=int)
+    parser.add_argument("--distance", type=int)
+    parser.add_argument("--ambience")
+    parser.add_argument("--depth", choices=("2d", "2_5d", "2_9d", "3d"))
+    parser.add_argument("--yaw", type=float)
+    parser.add_argument("--pitch", type=float)
+    parser.add_argument("--parallax-planes", type=int)
     for dimension in ("native-width", "native-height", "screen-width",
                       "screen-height", "pixel-aspect-num", "pixel-aspect-den"):
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
+        from skeleton.developer.jeeves_game_world_cli import ACTIONS, dispatch
+        if args.action in ACTIONS:
+            output = dispatch(args, root)
+            output["ok"] = bool(output.get("ok", True))
+            return output
+        world_args = (args.pattern, args.frames, args.frame_height, args.richness,
+                      args.focus, args.pan, args.distance, args.ambience,
+                      args.depth, args.yaw, args.pitch, args.parallax_planes)
+        if any(x is not None for x in world_args):
+            raise ValueError("multidomain upscale options require an upscale studio action")
         display_args = (args.native_width, args.native_height, args.screen_width,
                         args.screen_height, args.pixel_aspect_num, args.pixel_aspect_den)
         quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
