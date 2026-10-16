@@ -78,6 +78,9 @@ def _init(args: argparse.Namespace) -> dict[str, Any]:
     from skeleton.forge.eras import list_eras
     if args.era not in set(list_eras()):
         _fail(f"unknown era: {args.era}")
+    from skeleton.forge.archetypes import default_library
+    if args.archetype not in {"auto", "vision", *default_library().names()}:
+        _fail(f"unknown archetype: {args.archetype}")
     parent = Path(args.dir).expanduser().resolve()
     dest = parent / name
     if dest.is_symlink() or dest.exists():
@@ -170,7 +173,8 @@ def _read_forge(root: Path) -> tuple[Path, dict[str, str], dict[str, Any]]:
         raise GameCLIError(f"invalid emitted source manifest: {exc}") from exc
     if report.get("source_sha256") != receipt["sha256"]:
         _fail("Forge source-manifest identity mismatch")
-    if sorted(report.get("files", [])) != sorted(files):
+    names = report.get("files")
+    if not isinstance(names, list) or any(not isinstance(name, str) for name in names) or sorted(names) != sorted(files):
         _fail("Forge file-list identity mismatch")
     return build, files, receipt
 
@@ -207,6 +211,9 @@ def _doctor(root: Path, *, require_godot: bool) -> dict[str, Any]:
     problems: list[str] = []
     if config["era"] not in set(list_eras()):
         problems.append("configured era is unavailable")
+    from skeleton.forge.archetypes import default_library
+    if config["archetype"] not in {"auto", "vision", *default_library().names()}:
+        problems.append("configured archetype is unavailable")
     if not root.is_dir():
         problems.append("project directory does not exist")
     if (root / "build").is_symlink():
@@ -221,6 +228,9 @@ def _doctor(root: Path, *, require_godot: bool) -> dict[str, Any]:
 
 
 def _build(root: Path, args: argparse.Namespace) -> dict[str, Any]:
+    checked = _doctor(root, require_godot=False)
+    if not checked["ok"]:
+        _fail(f"GameForge prerequisites invalid: {checked['problems']}")
     config = _load(root)
     if (root / "build").is_symlink() or (root / "build" / "godot").is_symlink():
         _fail("refusing symlinked build output")
