@@ -22,6 +22,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isPrunableStorageKey } from './storageRetentionPolicy';
 
 const _mirror = new Map<string, string | null>();
+const _keyVersions = new Map<string, number>();
+let _mirrorGeneration = 0;
+
+function bumpVersion(key: string): number {
+  const next = (_keyVersions.get(key) || 0) + 1;
+  _keyVersions.set(key, next);
+  return next;
+}
+
+function isCurrent(key: string, version: number, generation: number): boolean {
+  return (_keyVersions.get(key) || 0) === version && generation === _mirrorGeneration;
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Stale-key self-pruning (added 2026-02).
@@ -84,6 +96,8 @@ function timeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 
 export async function safeGetItem(key: string, fallback: string | null = null, ms = 800): Promise<string | null> {
   if (_mirror.has(key)) return _mirror.get(key) ?? fallback;
+  const version = _keyVersions.get(key) || 0;
+  const generation = _mirrorGeneration;
   try {
     const result = await timeout(
       AsyncStorage.getItem(key).then(value => ({ ok: true, value })),
@@ -92,18 +106,23 @@ export async function safeGetItem(key: string, fallback: string | null = null, m
     );
     // Do not permanently cache a timeout as a real stored value.
     if (!result.ok) return fallback;
+    // A native read that began before a newer write/reset is stale. Never
+    // let its late completion replace the newer in-process state.
+    if (!isCurrent(key, version, generation)) return _mirror.get(key) ?? fallback;
     _mirror.set(key, result.value);
     return result.value;
   } catch { return fallback; }
 }
 
 export async function safeSetItem(key: string, value: string, ms = 800): Promise<boolean> {
-  _mirror.set(key, value); // optimistic mirror — read-after-write is always consistent
+  const version = bumpVersion(key);
+  const generation = _mirrorGeneration;
+  _mirror.set(key, value); // provisional until native write is verified
   try {
     const saved = await timeout(AsyncStorage.setItem(key, value).then(() => true), ms, false);
     if (!saved) {
       // A timed-out write is unverified: invalidate the optimistic mirror.
-      if (_mirror.get(key) === value) _mirror.delete(key);
+      if (isCurrent(key, version, generation)) _mirror.delete(key);
       return false;
     }
     // Update sidecar metadata for prune-eligible keys.
@@ -116,12 +135,13 @@ export async function safeSetItem(key: string, value: string, ms = 800): Promise
     }
     return true;
   } catch {
-    if (_mirror.get(key) === value) _mirror.delete(key);
+    if (isCurrent(key, version, generation)) _mirror.delete(key);
     return false;
   }
 }
 
 export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
+  bumpVersion(key);
   _mirror.delete(key);
   try {
     const removed = await timeout(AsyncStorage.removeItem(key).then(() => true), ms, false);
@@ -136,7 +156,7 @@ export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
 }
 
 export async function safeMultiRemove(keys: string[], ms = 1500): Promise<boolean> {
-  for (const k of keys) _mirror.delete(k);
+  for (const k of keys) { bumpVersion(k); _mirror.delete(k); }
   try {
     const removed = await timeout(AsyncStorage.multiRemove(keys).then(() => true), ms, false);
     if (!removed) return false;
@@ -151,7 +171,12 @@ export async function safeMultiRemove(keys: string[], ms = 1500): Promise<boolea
   } catch { return false; }
 }
 
-export function clearMirror() { _mirror.clear(); _metaCache = null; }
+export function clearMirror() {
+  _mirrorGeneration += 1; // fence every in-flight native read result
+  _keyVersions.clear();
+  _mirror.clear();
+  _metaCache = null;
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // pruneExpired — drop @boot/* and @codedock/* entries older than `ttlMs`.
@@ -174,7 +199,8 @@ export async function pruneExpired(opts: {
   const started = Date.now();
   const ttl = opts.ttlMs ?? DEFAULT_TTL_MS;
   const prefixes = opts.prefixes ?? DEFAULT_PRUNE_PREFIXES;
-  const scanAll = opts.scanAllKeys ?? true;
+  // A full key scan is opt-in; huge game workspaces can have many durable keys.
+  const scanAll = opts.scanAllKeys ?? false;
   const timeoutMs = opts.ms ?? 1500;
 
   const meta = await _loadMeta();
