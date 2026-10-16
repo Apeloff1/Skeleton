@@ -40,7 +40,7 @@ function packageName(selector) {
  * Reject ambiguous stanzas, missing versions and unsupported lock versions.
  */
 function parseYarnV1(source) {
-  if (typeof source !== 'string' || !source.startsWith('# yarn lockfile v1\n'))
+  if (typeof source !== 'string' || !source.split('\n').slice(0, 5).includes('# yarn lockfile v1'))
     throw new Error('expected Yarn classic lockfile v1');
   const rows = [];
   for (const raw of source.split(/\n\s*\n/)) {
