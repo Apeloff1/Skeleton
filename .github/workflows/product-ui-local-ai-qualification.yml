@@ -33,14 +33,29 @@ concurrency:
 jobs:
   typescript:
     name: Full frontend TypeScript + Jeeves typechecks
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # Windows runner capacity is independently observed from Setup.exe CI.
+    # Avoid historical satellite checkout case collisions with an exact-head
+    # sparse checkout containing only the standalone Expo application.
+    runs-on: windows-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout exact PR head
+      - name: Checkout exact PR head (frontend only)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /frontend/
+      - name: Verify source provenance
+        shell: pwsh
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne $env:EXPECTED_HEAD) {
+            throw "TypeScript checkout mismatch: $actual != $env:EXPECTED_HEAD"
+          }
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
