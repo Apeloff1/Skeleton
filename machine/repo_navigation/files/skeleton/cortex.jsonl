@@ -5,7 +5,7 @@
 {"b":23857,"f":"skeleton/cortex","g":"d33714f6a09a0b11a2fa11f9d3cd7d203920d9c5","m":"100644","p":"skeleton/cortex/adversarial.py","t":"blob","z":"ai"}
 {"b":5059,"f":"skeleton/cortex","g":"4d4a5a2895525b88aca10339647254da51358b6c","m":"100644","p":"skeleton/cortex/alert_correlator.py","t":"blob","z":"ai"}
 {"b":2296,"f":"skeleton/cortex","g":"5d8f67aa0ea410b197f063e523f3d1dfa0398742","m":"100644","p":"skeleton/cortex/antiplag.py","t":"blob","z":"ai"}
-{"b":11772,"f":"skeleton/cortex","g":"5810f1151b982bf3025cb159879396d798188990","m":"100644","p":"skeleton/cortex/attn.py","t":"blob","z":"ai"}
+{"b":12691,"f":"skeleton/cortex","g":"6568a341d104db4ecfc20254b44a4288ee0f7fd1","m":"100644","p":"skeleton/cortex/attn.py","t":"blob","z":"ai"}
 {"b":2310,"f":"skeleton/cortex","g":"a36306494c4b352d8c069a45dfa599cd6c56d1d9","m":"100644","p":"skeleton/cortex/batch.py","t":"blob","z":"ai"}
 {"b":2554,"f":"skeleton/cortex","g":"9d97b036d8f2a62c92f57b5c2be99824363d3cb0","m":"100644","p":"skeleton/cortex/beam.py","t":"blob","z":"ai"}
 {"b":4699,"f":"skeleton/cortex","g":"191df7e1996e3bb819e260fca79c74503030db8d","m":"100644","p":"skeleton/cortex/bpe.py","t":"blob","z":"ai"}
@@ -34,7 +34,7 @@
 {"b":9693,"f":"skeleton/cortex","g":"93028068175fa250f3c7e4fe7fa176501a93d716","m":"100644","p":"skeleton/cortex/interchange.py","t":"blob","z":"ai"}
 {"b":1961,"f":"skeleton/cortex","g":"58d3206c372ee9282d1bc9123d64fb09bfbff290","m":"100644","p":"skeleton/cortex/laws.py","t":"blob","z":"ai"}
 {"b":2785,"f":"skeleton/cortex","g":"b3acdc9542898be390d708d23bae0695b0d6783a","m":"100644","p":"skeleton/cortex/learned.py","t":"blob","z":"ai"}
-{"b":5893,"f":"skeleton/cortex","g":"6cc926cb2bc44cc0589888c33e65fa6f9774d4fc","m":"100644","p":"skeleton/cortex/live.py","t":"blob","z":"ai"}
+{"b":9524,"f":"skeleton/cortex","g":"517391f5ea3f421844cdfd099948487892064d3f","m":"100644","p":"skeleton/cortex/live.py","t":"blob","z":"ai"}
 {"b":9534,"f":"skeleton/cortex","g":"ef529cebfb897d3355222b272f0795b580d5e5cc","m":"100644","p":"skeleton/cortex/lm.py","t":"blob","z":"ai"}
 {"b":7418,"f":"skeleton/cortex","g":"379504c86485c4e495bef176f11831c43912ed70","m":"100644","p":"skeleton/cortex/lora.py","t":"blob","z":"ai"}
 {"b":6696,"f":"skeleton/cortex","g":"2de4f3a500e5ff69f6738c277e006abb6234699a","m":"100644","p":"skeleton/cortex/metrics.py","t":"blob","z":"ai"}
@@ -43,7 +43,7 @@
 {"b":14625,"f":"skeleton/cortex","g":"a6f02ff6615e5f215215ce95569c079653ce764b","m":"100644","p":"skeleton/cortex/mod.py","t":"blob","z":"ai"}
 {"b":10332,"f":"skeleton/cortex","g":"fae08a39fb456a107a2c6a7303fd3928a517b932","m":"100644","p":"skeleton/cortex/moe.py","t":"blob","z":"ai"}
 {"b":4387,"f":"skeleton/cortex","g":"06582f6e24a0d8495601df068602897ec7ed78b1","m":"100644","p":"skeleton/cortex/multimodal.py","t":"blob","z":"ai"}
-{"b":44416,"f":"skeleton/cortex","g":"9af3e4ed862b72eb6d799338c76b1568c8ac9113","m":"100644","p":"skeleton/cortex/neocortex.py","t":"blob","z":"ai"}
+{"b":46317,"f":"skeleton/cortex","g":"c0fb4a6110c61b59661ce7371867ce1947a55b2b","m":"100644","p":"skeleton/cortex/neocortex.py","t":"blob","z":"ai"}
 {"b":9309,"f":"skeleton/cortex","g":"3278552c68fbb7cb6c19d1addf64adfb64705f6f","m":"100644","p":"skeleton/cortex/neural.py","t":"blob","z":"ai"}
 {"b":4080,"f":"skeleton/cortex","g":"5516325d866fa0bc316aa4234cb525ece8cfcc7b","m":"100644","p":"skeleton/cortex/oncall_rotation.py","t":"blob","z":"ai"}
 {"b":4089,"f":"skeleton/cortex","g":"a905a35947d6bb1afd5c29419ed38b45dff6c62f","m":"100644","p":"skeleton/cortex/operator_dashboard.py","t":"blob","z":"ai"}
@@ -66,6 +66,7 @@
 {"b":4369,"f":"skeleton/cortex","g":"0567212b93960a52fb91b56e6e1081c9c3213472","m":"100644","p":"skeleton/cortex/pfc.py","t":"blob","z":"ai"}
 {"b":2270,"f":"skeleton/cortex","g":"56752660b01bd2e9823cf850cc4ede2de8a30b4a","m":"100644","p":"skeleton/cortex/polite.py","t":"blob","z":"ai"}
 {"b":6398,"f":"skeleton/cortex","g":"3cb24c7cc976a8adb3af56ebed50ebccf8416db9","m":"100644","p":"skeleton/cortex/port.py","t":"blob","z":"ai"}
+{"b":3588,"f":"skeleton/cortex","g":"3abf354db89907096335ca2255efc8632aefbf60","m":"100644","p":"skeleton/cortex/production_profile.py","t":"blob","z":"ai"}
 {"b":2610,"f":"skeleton/cortex","g":"59c25d1e7572bade3e20319e5582bbcdad3b026d","m":"100644","p":"skeleton/cortex/push_server.py","t":"blob","z":"ai"}
 {"b":7419,"f":"skeleton/cortex","g":"61efdedfb4e56273ba5a173784b9b7078cd096ec","m":"100644","p":"skeleton/cortex/reference_provenance.py","t":"blob","z":"ai"}
 {"b":4104,"f":"skeleton/cortex","g":"77b589a6150f36f4d7e8d4df5e658b98579a3dd7","m":"100644","p":"skeleton/cortex/refs.py","t":"blob","z":"ai"}
@@ -74,8 +75,8 @@
 {"b":1793,"f":"skeleton/cortex","g":"c7a2efe0176f0157f29afc77c971065c9a342e10","m":"100644","p":"skeleton/cortex/sleep_prior.py","t":"blob","z":"ai"}
 {"b":3409,"f":"skeleton/cortex","g":"56642baddaf22b23ab6b26242d71516bc1185415","m":"100644","p":"skeleton/cortex/speculate.py","t":"blob","z":"ai"}
 {"b":2042,"f":"skeleton/cortex","g":"bbd4664a4bf4c23f1fcdccbf20a7fe1a77eee36d","m":"100644","p":"skeleton/cortex/speculative.py","t":"blob","z":"ai"}
-{"b":41319,"f":"skeleton/cortex","g":"f0b7d2af157a4fd56b5ed6291c7f710825b4e8a5","m":"100644","p":"skeleton/cortex/torch_lm.py","t":"blob","z":"ai"}
-{"b":43172,"f":"skeleton/cortex","g":"20bd4b13dd4f61711da9bdced6bfe92f1b9bd692","m":"100644","p":"skeleton/cortex/transformer.py","t":"blob","z":"ai"}
+{"b":45152,"f":"skeleton/cortex","g":"7a4307d9f9b66b31b2bacb332e216796ecd7584f","m":"100644","p":"skeleton/cortex/torch_lm.py","t":"blob","z":"ai"}
+{"b":49974,"f":"skeleton/cortex","g":"340b842390a3a91c74bf209416b5b7e747df4479","m":"100644","p":"skeleton/cortex/transformer.py","t":"blob","z":"ai"}
 {"b":17273,"f":"skeleton/cortex","g":"63f8c96ec61beeaf4fa16143c9697984eb3f61c1","m":"100644","p":"skeleton/cortex/tri_adversarial.py","t":"blob","z":"ai"}
 {"b":1618,"f":"skeleton/cortex","g":"a1ebe02a6adec17a3084a6a5d957c06ef4820449","m":"100644","p":"skeleton/cortex/uncertainty.py","t":"blob","z":"ai"}
 {"b":5306,"f":"skeleton/cortex","g":"dd5ede60860f20073f85da77b45e573ae19c7ad4","m":"100644","p":"skeleton/cortex/zaibatsu.py","t":"blob","z":"ai"}

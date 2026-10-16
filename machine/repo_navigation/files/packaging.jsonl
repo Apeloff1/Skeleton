@@ -1,3 +1,4 @@
-{"b":2132,"f":"packaging/windows","g":"97708ad242e29f53890479ce384a65970fefbf93","m":"100644","p":"packaging/windows/SkeletonSetup.iss","t":"blob","z":"build-delivery"}
+{"b":3055,"f":"packaging/windows","g":"5dd33267a4b4a46541e82a2486e667a931452185","m":"100644","p":"packaging/windows/SkeletonSetup.iss","t":"blob","z":"build-delivery"}
 {"b":2489,"f":"packaging/windows","g":"3425e559a4dd446b141a80649c77d512883a2ff7","m":"100644","p":"packaging/windows/game_preview_entry.py","t":"blob","z":"build-delivery"}
 {"b":169,"f":"packaging/windows","g":"22a5f098f9142225952e4eb199ab0aa0676fd38d","m":"100644","p":"packaging/windows/launcher_entry.py","t":"blob","z":"build-delivery"}
+{"b":171,"f":"packaging/windows","g":"32ce03bca7de183729f11de35e03491571ecbeec","m":"100644","p":"packaging/windows/offline_cli_entry.py","t":"blob","z":"build-delivery"}

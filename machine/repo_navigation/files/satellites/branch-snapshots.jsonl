@@ -1,4 +1,5 @@
 {"b":6656,"f":"satellites/branch-snapshots/DEPENDENCY_ARCHIVE_MAP.json","g":"2d78872f244f158ed9fb5579859a08afb3706f5d","m":"100644","p":"satellites/branch-snapshots/DEPENDENCY_ARCHIVE_MAP.json","t":"blob","z":"external-sources"}
+{"b":3508,"f":"satellites/branch-snapshots/PORTABILITY_RENAMES.json","g":"0d6d541d47db3f8a8d3de32cca036e606284d9ab","m":"100644","p":"satellites/branch-snapshots/PORTABILITY_RENAMES.json","t":"blob","z":"external-sources"}
 {"b":1321,"f":"satellites/branch-snapshots/README.md","g":"bf3950869506661f8d57a4bc90ceb1dee3c6983d","m":"100644","p":"satellites/branch-snapshots/README.md","t":"blob","z":"external-sources"}
 {"b":632,"f":"satellites/branch-snapshots/codex-frontier-runtime-integration","g":"b18d305e8bca2b9c336ca91ed0cd9578f1083024","m":"100644","p":"satellites/branch-snapshots/codex-frontier-runtime-integration/.dockerignore","t":"blob","z":"external-sources"}
 {"b":908,"f":"satellites/branch-snapshots/codex-frontier-runtime-integration","g":"3276ae6c9fabb5940851ddb4a0dc6c84329cb329","m":"100644","p":"satellites/branch-snapshots/codex-frontier-runtime-integration/.env.example","t":"blob","z":"external-sources"}

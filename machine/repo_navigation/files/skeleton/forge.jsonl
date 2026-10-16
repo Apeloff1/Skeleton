@@ -48,7 +48,7 @@
 {"b":10350,"f":"skeleton/forge","g":"e78135281362e21cb23ec35a66e3acfac30266e9","m":"100644","p":"skeleton/forge/quality_rubric.py","t":"blob","z":"build-delivery"}
 {"b":17488,"f":"skeleton/forge","g":"3d07f156bbb0c541b03013e4debe25204c48727f","m":"100644","p":"skeleton/forge/repair.py","t":"blob","z":"build-delivery"}
 {"b":10779,"f":"skeleton/forge","g":"ea12320f3703bf46b5b33e4164e14e94519d2129","m":"100644","p":"skeleton/forge/sim.py","t":"blob","z":"build-delivery"}
-{"b":1207,"f":"skeleton/forge","g":"291f799a62bcea8a3949f6eff72f1e1708dc4091","m":"100644","p":"skeleton/forge/source_manifest.py","t":"blob","z":"build-delivery"}
+{"b":1335,"f":"skeleton/forge","g":"66f656cd3616e7d0d6f12102e1429d27fbd83d95","m":"100644","p":"skeleton/forge/source_manifest.py","t":"blob","z":"build-delivery"}
 {"b":11822,"f":"skeleton/forge","g":"1cc5792cd74516271bee7d30a655b03c9b06b442","m":"100644","p":"skeleton/forge/structured_verify.py","t":"blob","z":"build-delivery"}
 {"b":28500,"f":"skeleton/forge","g":"6916b6345daa56e94de59b38eaee43669018177e","m":"100644","p":"skeleton/forge/universal.py","t":"blob","z":"build-delivery"}
 {"b":3291,"f":"skeleton/forge","g":"4e455d23e91ffc654de501e0ae2119a808d97ebb","m":"100644","p":"skeleton/forge/validator.py","t":"blob","z":"build-delivery"}

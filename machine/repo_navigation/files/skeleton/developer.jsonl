@@ -1,6 +1,6 @@
 {"b":1200,"f":"skeleton/developer","g":"1d4f5323f129676e1424d619fc4b8d9de505e7ec","m":"100644","p":"skeleton/developer/__init__.py","t":"blob","z":"build-delivery"}
 {"b":4180,"f":"skeleton/developer","g":"07025099beca9919163d7adc00c03a32fdebf90b","m":"100644","p":"skeleton/developer/bootstrap.py","t":"blob","z":"build-delivery"}
-{"b":11453,"f":"skeleton/developer","g":"46b930f4636b6d557264b3fbab049509fc3cede1","m":"100644","p":"skeleton/developer/cli.py","t":"blob","z":"build-delivery"}
+{"b":13050,"f":"skeleton/developer","g":"2dee9274e7968be50bbe3cdefd4776674ace45b4","m":"100644","p":"skeleton/developer/cli.py","t":"blob","z":"build-delivery"}
 {"b":7809,"f":"skeleton/developer","g":"5316f595de9e8e6c93ff83b662945e93c4f20d44","m":"100644","p":"skeleton/developer/cockpit_deepen.py","t":"blob","z":"build-delivery"}
 {"b":4127,"f":"skeleton/developer","g":"da51a993eb0c86e17544b916e9bd77e574b4eda8","m":"100644","p":"skeleton/developer/cockpit_gates.py","t":"blob","z":"build-delivery"}
 {"b":21604,"f":"skeleton/developer","g":"4d5dc96c790b0999fbdf3f13e43600c5e1ee6f25","m":"100644","p":"skeleton/developer/commands.py","t":"blob","z":"build-delivery"}

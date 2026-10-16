@@ -1,6 +1,6 @@
 {"b":3365,"f":"skeleton","g":"f73bdeccf04952b2115e9f50817c6b4fcd8338f0","m":"100644","p":"skeleton/README.py","t":"blob","z":"foundation"}
 {"b":2050,"f":"skeleton","g":"d8f18849a537a333bc82c8d825ca90b82cf8afd3","m":"100644","p":"skeleton/__init__.py","t":"blob","z":"foundation"}
-{"b":33743,"f":"skeleton","g":"3c890429856162b790dac7c7293fcff6efeed493","m":"100644","p":"skeleton/__main__.py","t":"blob","z":"foundation"}
+{"b":33617,"f":"skeleton","g":"80c4b20b4209efe0a5e98e723d574c4e963a4db1","m":"100644","p":"skeleton/__main__.py","t":"blob","z":"foundation"}
 {"b":32264,"f":"skeleton","g":"fa5ce86b5a439b89b45cf505c45527758bce7f9f","m":"100644","p":"skeleton/architecture.py","t":"blob","z":"foundation"}
 {"b":149,"f":"skeleton","g":"fca82e70c1cbd8e0a59f16dc8c41d97d874c3195","m":"100644","p":"skeleton/architecture_index.py","t":"blob","z":"architecture-history-compat"}
 {"b":167,"f":"skeleton","g":"943604f1b34355c867a84982c4e3b5a78feb9a15","m":"100644","p":"skeleton/architecture_round10.py","t":"blob","z":"architecture-history-compat"}
@@ -28,7 +28,7 @@
 {"b":95,"f":"skeleton","g":"5f6313da545dd5f70ed2cc0e2d2f87d7d8962193","m":"100644","p":"skeleton/kv_cache.py","t":"blob","z":"kv-cache-compat"}
 {"b":13569,"f":"skeleton","g":"05c7faf2f9b9c604c67fc2e0475214764e62a1bc","m":"100644","p":"skeleton/manifest.py","t":"blob","z":"foundation"}
 {"b":133,"f":"skeleton","g":"17c1972145d85489735dc72bdb1351ad7d9abb50","m":"100644","p":"skeleton/provider_contract.py","t":"blob","z":"provider-contract-compat"}
-{"b":133164,"f":"skeleton","g":"9e76b5cdbf049f50f9a28c2559cd8110c78859e6","m":"100644","p":"skeleton/provider_runtime.py","t":"blob","z":"integrations"}
+{"b":147548,"f":"skeleton","g":"7bbe8375bce83294c687cdaa8fac083d8e787694","m":"100644","p":"skeleton/provider_runtime.py","t":"blob","z":"integrations"}
 {"b":8281,"f":"skeleton","g":"47bb7bdc8e76a3c1c13b93e91028aeb9b5a60a2d","m":"100644","p":"skeleton/quickstart.py","t":"blob","z":"foundation"}
 {"b":509,"f":"skeleton","g":"9f6e41ea5e0bea519be2c02dda37b372ca1beb4e","m":"100644","p":"skeleton/requirements.py","t":"blob","z":"foundation"}
 {"b":3097,"f":"skeleton","g":"baaf7c3371ec86c3256f9427de9cc084e7822609","m":"100644","p":"skeleton/setup_config.py","t":"blob","z":"foundation"}

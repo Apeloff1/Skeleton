@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["data"],"files":6,"name":"data/conversational","zones":{"unclassified":6}},{"file_shards":["data"],"files":13,"name":"data/game_building","zones":{"unclassified":13}},{"file_shards":["data"],"files":13,"name":"data/game_data_v2","zones":{"unclassified":13}}],"schema":"skeleton.repository-navigation.v1"}
