@@ -20,8 +20,10 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isPrunableStorageKey } from './storageRetentionPolicy';
+import { NativeMutationFence } from './NativeMutationFence';
 
 const _mirror = new Map<string, string | null>();
+const _nativeMutations = new NativeMutationFence();
 const _keyVersions = new Map<string, number>();
 const MAX_MIRROR_ENTRIES = 2_048;
 const MAX_VERSION_ENTRIES = 4_096;
@@ -84,7 +86,7 @@ async function _flushMeta() {
   if (!_metaDirty || !_metaCache) return;
   _metaDirty = false;
   try {
-    const ok = await timeout(AsyncStorage.setItem(META_KEY, JSON.stringify(_metaCache)).then(() => true), 800, false);
+    const ok = await timeout(_nativeMutations.run([META_KEY], () => AsyncStorage.setItem(META_KEY, JSON.stringify(_metaCache))), 800, false);
     if (!ok) _metaDirty = true; // a failed metadata flush must remain retryable
   } catch {
     _metaDirty = true;
@@ -112,6 +114,9 @@ function timeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 }
 
 export async function safeGetItem(key: string, fallback: string | null = null, ms = 800): Promise<string | null> {
+  // Never present a cached or underlying pre-write value as current while
+  // a native mutation for this key is unacknowledged.
+  if (_nativeMutations.isBusy(key)) return fallback;
   if (_mirror.has(key)) return _mirror.get(key) ?? fallback;
   const version = _keyVersions.get(key) || 0;
   const generation = _mirrorGeneration;
@@ -134,14 +139,18 @@ export async function safeGetItem(key: string, fallback: string | null = null, m
 export async function safeSetItem(key: string, value: string, ms = 800): Promise<boolean> {
   const version = bumpVersion(key);
   const generation = _mirrorGeneration;
-  remember(key, value); // provisional until native write is verified
+  _mirror.delete(key); // only physical acknowledgement can populate cache
   try {
-    const saved = await timeout(AsyncStorage.setItem(key, value).then(() => true), ms, false);
+    const saved = await timeout(
+      _nativeMutations.run([key], () => AsyncStorage.setItem(key, value)),
+      ms, false,
+    );
     if (!saved) {
       // A timed-out write is unverified: invalidate the optimistic mirror.
       if (isCurrent(key, version, generation)) _mirror.delete(key);
       return false;
     }
+    if (isCurrent(key, version, generation)) remember(key, value);
     // Update sidecar metadata for prune-eligible keys.
     if (_shouldTrack(key, DEFAULT_PRUNE_PREFIXES)) {
       const meta = await _loadMeta();
@@ -161,7 +170,7 @@ export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
   bumpVersion(key);
   _mirror.delete(key);
   try {
-    const removed = await timeout(AsyncStorage.removeItem(key).then(() => true), ms, false);
+    const removed = await timeout(_nativeMutations.run([key], () => AsyncStorage.removeItem(key)), ms, false);
     if (!removed) return false;
     if (_metaCache && key in _metaCache) {
       delete _metaCache[key];
@@ -175,7 +184,7 @@ export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
 export async function safeMultiRemove(keys: string[], ms = 1500): Promise<boolean> {
   for (const k of keys) { bumpVersion(k); _mirror.delete(k); }
   try {
-    const removed = await timeout(AsyncStorage.multiRemove(keys).then(() => true), ms, false);
+    const removed = await timeout(_nativeMutations.run(keys, () => AsyncStorage.multiRemove(keys)), ms, false);
     if (!removed) return false;
     if (_metaCache) {
       let touched = false;
@@ -257,7 +266,7 @@ export async function pruneExpired(opts: {
   const prunedKeys = Array.from(expired);
   if (prunedKeys.length) {
     const removed = await timeout(
-      AsyncStorage.multiRemove(prunedKeys).then(() => true),
+      _nativeMutations.run(prunedKeys, () => AsyncStorage.multiRemove(prunedKeys)),
       timeoutMs,
       false,
     ).catch(() => false);
