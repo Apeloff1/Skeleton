@@ -197,6 +197,23 @@ export async function safeMultiRemove(keys: string[], ms = 1500): Promise<boolea
   } catch { return false; }
 }
 
+/**
+ * Full-device reset admission: refuse new wrapper writes until every
+ * previously accepted native mutation physically settles. The caller must
+ * resume in a finally block whether or not a wipe was attempted.
+ */
+export async function pauseSafeStorageForWipe(ms = 1_500): Promise<boolean> {
+  try {
+    return await timeout(_nativeMutations.pauseAndDrain().then(() => true), ms, false);
+  } catch {
+    return false;
+  }
+}
+
+export function resumeSafeStorageAfterWipe(): void {
+  _nativeMutations.resume();
+}
+
 export function clearMirror() {
   _mirrorGeneration += 1; // fence every in-flight native read result
   _keyVersions.clear();
