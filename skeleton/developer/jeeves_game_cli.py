@@ -163,7 +163,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
-                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke"))
+                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -239,6 +239,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "dragon-policy-predict": {"action", "session", "digest"},
             "director-coverage": {"action", "source", "routes"},
             "director-godot-smoke": {"action", "source", "timeout"},
+            "director-loopback-e2e": {"action", "source", "routes"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
@@ -268,6 +269,12 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 if not args.sessions:
                     raise ValueError("Dragon comparative lab requires --sessions a,b,...")
                 return queue(root, sessions=args.sessions, approved_sha256=args.approve)
+            if args.action == "director-loopback-e2e":
+                from skeleton.developer.jeeves_game_director_e2e import run
+                if not args.source:
+                    raise ValueError("director-loopback-e2e requires --source")
+                return run(root, source=args.source,
+                           routes=args.routes if args.routes is not None else 2)
             if args.action == "director-godot-smoke":
                 from skeleton.developer.jeeves_game_director_godot_smoke import smoke
                 if not args.source:
