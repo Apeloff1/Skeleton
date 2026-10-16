@@ -147,39 +147,81 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     """Game-authoring proposals require real model I/O and explicit local acceptance."""
     parser = argparse.ArgumentParser(prog="skeleton dev game jeeves")
     parser.add_argument("action", choices=("plan", "audit", "next", "context", "handoff",
-                                            "propose", "review", "apply", "queue"))
+                                            "propose", "review", "apply", "queue", "benchmark", "asset-gate"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
     parser.add_argument("--digest")
     parser.add_argument("--approve")
+    parser.add_argument("--console")
+    parser.add_argument("--genre")
+    parser.add_argument("--period")
+    parser.add_argument("--profile")
+    parser.add_argument("--evidence")
     args = parser.parse_args(argv)
     try:
-        if args.action in {"propose", "review", "apply", "queue"}:
+        quality_args = (args.console, args.genre, args.period, args.profile, args.evidence)
+        if args.action in {"benchmark", "asset-gate"}:
+            if not all((args.console, args.genre, args.period)):
+                raise ValueError("benchmark needs --console, --genre, --period")
+            if any((args.kind, args.brief, args.digest, args.approve, args.include_notes)):
+                raise ValueError("unsupported game quality gate option")
+            from skeleton.developer.jeeves_game_quality import rank_cohort, gate_render_asset
+            if args.action == "benchmark":
+                if args.evidence:
+                    raise ValueError("benchmark does not use --evidence")
+                output = rank_cohort(root, console=args.console, genre=args.genre,
+                                     period=args.period,
+                                     profile=args.profile or "design/market_benchmarks.json")
+                output["action"] = "benchmark"
+                output["ok"] = output["eligible_for_inspiration"]
+            else:
+                if not args.evidence:
+                    raise ValueError("asset-gate requires --evidence")
+                output = gate_render_asset(
+                    root, console=args.console, genre=args.genre, period=args.period,
+                    profile=args.profile or "design/market_benchmarks.json",
+                    evidence=args.evidence,
+                )
+        elif args.action in {"propose", "review", "apply", "queue"}:
             from skeleton.developer.jeeves_game_authoring import propose, review, apply, queue
             if args.action == "queue":
-                if any((args.kind, args.brief, args.digest, args.approve, args.include_notes)):
+                if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
+                        *quality_args)):
                     raise ValueError("queue takes no proposal selection options")
                 output = queue(root)
             elif args.action == "propose":
-                if args.kind is None or args.brief is None or args.digest or args.approve:
-                    raise ValueError("propose requires --kind and --brief, without --digest/--approve")
-                output = propose(root, kind=args.kind, brief=args.brief, include_notes=args.include_notes)
+                if args.kind is None or args.brief is None or args.digest or args.approve or args.evidence:
+                    raise ValueError("propose requires --kind and --brief; cannot include digest/approval/evidence")
+                output = propose(
+                    root, kind=args.kind, brief=args.brief, include_notes=args.include_notes,
+                    console=args.console, genre=args.genre, period=args.period,
+                    profile=args.profile or "design/market_benchmarks.json",
+                )
             elif args.action == "review":
-                if not args.digest or args.kind or args.brief or args.approve or args.include_notes:
+                if not args.digest or any((args.kind, args.brief, args.approve, args.include_notes,
+                                           *quality_args)):
                     raise ValueError("review requires --digest only")
                 output = review(root, args.digest)
             else:
-                if not args.digest or not args.approve or args.kind or args.brief or args.include_notes:
+                if not args.digest or not args.approve or any((args.kind, args.brief,
+                                                               args.include_notes, *quality_args)):
                     raise ValueError("apply requires --digest and --approve only")
                 output = apply(root, digest=args.digest, approved_digest=args.approve)
         elif args.action == "plan":
-            if any((args.kind, args.brief, args.digest, args.approve, args.include_notes)):
+            if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
+                    *quality_args)):
                 raise ValueError("unused Jeeves options")
             output = _plan(root)
         elif args.action == "audit":
+            if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
+                    *quality_args)):
+                raise ValueError("unused Jeeves options")
             output = _audit(root)
         elif args.action == "context":
+            if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
+                    *quality_args)):
+                raise ValueError("unused Jeeves options")
             cfg, _ = _context(root)
             notes = _notes(root)
             output = {"schema": SCHEMA, "action": "context", "project": str(root),
@@ -187,6 +229,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                       "notes_sha256": _digest([{k: v for k, v in n.items() if k != "excerpt"}
                                                for n in notes])}
         else:
+            if any((args.kind, args.brief, args.digest, args.approve, args.include_notes,
+                    *quality_args)):
+                raise ValueError("unused Jeeves options")
             planned, audited = _plan(root), _audit(root)
             recs = _recommendations(planned["plan"], audited)
             output = {"schema": SCHEMA, "action": args.action, "project": str(root),
