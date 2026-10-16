@@ -158,12 +158,32 @@ export function _circuitBreakerReset(bucket?: string) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false);
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener?.('abort', onAbort);
+      resolve(value);
+    };
+    const onAbort = () => finish(false);
+    const timer = setTimeout(() => finish(true), ms);
+    signal?.addEventListener?.('abort', onAbort, { once: true });
+    if (signal?.aborted) finish(false);
+  });
+}
+
 async function _doFetch<T>(
   method: string, path: string, body: any, opts: RequestOpts,
 ): Promise<ApiResult<T>> {
   const url = path.startsWith('http') ? path : `${BACKEND}${path}`;
   const rid = newRid();
   const bucket = _cbBucket(path);
+  // Query parameters can carry signed URLs, bearer tokens or opaque IDs.
+  const logPath = path.split(/[?#]/, 1)[0].slice(0, 160);
 
   // Read sessionStorage cache (web only) — a hit needs no network/timer.
   if (method === 'GET' && opts.cacheKey && typeof sessionStorage !== 'undefined') {
@@ -212,7 +232,6 @@ async function _doFetch<T>(
     return Math.min(base * Math.pow(2, attempt), 4_000) + Math.floor(Math.random() * 150);
   };
 
-  let lastErr: any = null;
   let lastStatus = 0;
   let lastTimedOut = false;
 
@@ -282,9 +301,12 @@ async function _doFetch<T>(
       const transient = retryableHttpStatus(res.status);
       if (!res.ok && transient && attempt < maxAttempts - 1) {
         lastStatus = res.status;
-        trail.add('api', `${method} ${path} → ${res.status} (retry ${attempt + 1}/${maxAttempts - 1})`,
+        trail.add('api', `${method} ${logPath} → ${res.status} (retry ${attempt + 1}/${maxAttempts - 1})`,
           { rid, gateway: GATEWAY.has(res.status) }, 'warn');
-        await new Promise(r => setTimeout(r, backoff(attempt, GATEWAY.has(res.status))));
+        if (!(await sleepWithAbort(backoff(attempt, GATEWAY.has(res.status)), opts.signal))) {
+          _cbReleaseProbe(bucket, isProbe);
+          return { ok: false, status: 0, data: null, error: 'aborted', rid };
+        }
         continue;
       }
 
@@ -295,8 +317,8 @@ async function _doFetch<T>(
       if (!res.ok) {
         if (transient) _cbRecordFail(bucket, isProbe);
         else _cbRecordOk(bucket, isProbe); // 4xx proves the transport is reachable
-        trail.add('api', `${method} ${path.split('?', 1)[0]} → ${res.status}`,
-          { rid, error: (typeof data === 'object' ? data?.error || data?.detail : String(data)) || `HTTP ${res.status}` },
+        trail.add('api', `${method} ${logPath} → ${res.status}`,
+          { rid, error: `HTTP ${res.status}` },
           res.status >= 500 ? 'error' : 'warn',
         );
       } else {
@@ -310,7 +332,6 @@ async function _doFetch<T>(
       };
     } catch (e: any) {
       cleanup();
-      lastErr = e;
       lastTimedOut = timedOut;
 
       // Caller cancellation is intentional. It must neither retry nor poison
@@ -324,16 +345,21 @@ async function _doFetch<T>(
       // Our own timeout or a network error is a transient blip: retry while
       // attempts remain, preserving the same request id for correlation.
       if (attempt < maxAttempts - 1) {
-        trail.add('api', `${method} ${path} ${timedOut ? 'timeout' : 'network_error'} (retry ${attempt + 1}/${maxAttempts - 1})`,
+        trail.add('api', `${method} ${logPath} ${timedOut ? 'timeout' : 'network_error'} (retry ${attempt + 1}/${maxAttempts - 1})`,
           { rid }, 'warn');
-        await new Promise(r => setTimeout(r, backoff(attempt, true)));
+        if (!(await sleepWithAbort(backoff(attempt, true), opts.signal))) {
+          _cbReleaseProbe(bucket, isProbe);
+          return { ok: false, status: 0, data: null, error: 'aborted', rid };
+        }
         continue;
       }
     }
   }
   _cbRecordFail(bucket, isProbe);
-  const finalError = lastTimedOut ? 'timeout' : (lastErr?.message || (lastStatus ? `HTTP ${lastStatus}` : 'network_error'));
-  trail.add('api', `${method} ${path} failed_after_retries`,
+  // A native fetch exception can echo auth headers or the full signed URL.
+  // Surface a typed error rather than propagating untrusted exception text.
+  const finalError = lastTimedOut ? 'timeout' : (lastStatus ? `HTTP ${lastStatus}` : 'network_error');
+  trail.add('api', `${method} ${logPath} failed_after_retries`,
     { rid, lastStatus, error: finalError }, 'error');
   return {
     ok: false, status: lastStatus || 0, data: null,
