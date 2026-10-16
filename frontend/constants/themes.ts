@@ -1,7 +1,8 @@
-// ============================================================================
-// CODEDOCK QUANTUM NEXUS - THEME DEFINITIONS
-// Version: 4.2.0 | Refactored Architecture
-// ============================================================================
+/** Compatibility roles sourced from the canonical design-token module.
+ * No competing palette: useTheme reads the current skin for dark mode.
+ */
+import design, { colors as canonicalColors } from '../theme/tokens';
+import { onPrimaryFor } from '../theme/skins';
 
 export interface ThemeColors {
   background: string;
@@ -27,57 +28,48 @@ export interface ThemeColors {
   gradient: string[];
 }
 
-export const darkTheme: ThemeColors = {
-  background: '#0A0A0F',
-  surface: '#12121A',
-  surfaceAlt: '#1A1A24',
-  card: '#1A1A24',
-  text: '#FFFFFF',
-  textSecondary: '#A0A0B0',
-  textMuted: '#606070',
-  primary: '#6366F1',
-  secondary: '#8B5CF6',
-  accent: '#22D3EE',
-  success: '#22C55E',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  border: '#2A2A3A',
-  borderSubtle: '#1F1F2E',
-  codeBackground: '#0D0D14',
-  lineNumbers: '#404050',
-  tutorial: '#8B5CF6',
-  tutorialGlow: 'rgba(139, 92, 246, 0.3)',
-  gold: '#FFD700',
-  gradient: ['#6366F1', '#8B5CF6', '#A855F7'],
-};
 
-export const lightTheme: ThemeColors = {
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  surfaceAlt: '#F1F5F9',
-  card: '#FFFFFF',
-  text: '#0F172A',
-  textSecondary: '#475569',
-  textMuted: '#94A3B8',
-  primary: '#4F46E5',
-  secondary: '#7C3AED',
-  accent: '#0891B2',
-  success: '#16A34A',
-  warning: '#D97706',
-  error: '#DC2626',
-  border: '#E2E8F0',
-  borderSubtle: '#F1F5F9',
-  codeBackground: '#F8FAFC',
-  lineNumbers: '#94A3B8',
-  tutorial: '#7C3AED',
-  tutorialGlow: 'rgba(124, 58, 237, 0.2)',
-  gold: '#CA8A04',
-  gradient: ['#4F46E5', '#7C3AED', '#9333EA'],
-};
+/** Legacy role adapters are constructed on access to reflect live skin changes. */
+export function getThemeColors(mode: 'dark' | 'light'): ThemeColors {
+  const c = mode === 'dark' ? design.colors : canonicalColors.light;
+  return {
+    background: c.bg,
+    surface: c.bgElevated,
+    surfaceAlt: c.bgSubtle,
+    card: c.bgElevated,
+    text: c.text,
+    textSecondary: c.textMuted,
+    textMuted: c.textMuted,
+    primary: c.primary,
+    secondary: c.primaryHover,
+    accent: c.accentCyan,
+    success: c.success,
+    warning: c.warning,
+    error: c.danger,
+    border: c.borderStrong,
+    borderSubtle: c.border,
+    codeBackground: c.bgSubtle,
+    lineNumbers: c.textDim,
+    tutorial: c.primaryHover,
+    tutorialGlow: c.primarySoft,
+    gold: c.accentGold,
+    gradient: [c.primary, c.primaryHover, c.accent],
+  };
+}
 
+/** Getters keep older `themes.dark` imports compatible and current. */
 export const themes = {
-  dark: darkTheme,
-  light: lightTheme,
+  get dark(): ThemeColors { return getThemeColors('dark'); },
+  get light(): ThemeColors { return getThemeColors('light'); },
 };
 
+export const darkTheme: ThemeColors = new Proxy({} as ThemeColors, {
+  get(_target, key: string) {
+    return getThemeColors('dark')[key as keyof ThemeColors];
+  },
+  ownKeys() { return Object.keys(getThemeColors('dark')); },
+  getOwnPropertyDescriptor() { return { enumerable: true, configurable: true }; },
+});
+
+export const lightTheme: ThemeColors = getThemeColors('light');
 export type ThemeType = keyof typeof themes;
