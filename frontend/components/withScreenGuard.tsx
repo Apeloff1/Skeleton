@@ -23,6 +23,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from '
 import { getSessionId, recordEvent } from '../utils/modalLogger';
 import { navToSafeMode } from '../utils/bootTracer';
 import { crashTelemetryFields, isDevErrorDetails, redactSecrets, safeErrorMessage } from '../utils/safeError';
+import { postCrashReport } from '../utils/crashTelemetry';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -59,18 +60,14 @@ class ScreenGuard extends React.Component<{ name: string; children: React.ReactN
         stack:   fields.stack,
         componentStack: redactSecrets((info.componentStack || '').slice(0, 2000)),
       });
-      fetch(`${BACKEND}/api/telemetry/last-crash`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      postCrashReport({
           source:     'ScreenGuard',
           component:  name,
           message:    fields.message,
           stack:      fields.stack,
           info:       { componentStack: redactSecrets((info.componentStack || '').slice(0, 2000)) },
           session_id: getSessionId(),
-        }),
-      }).catch(() => {});
+        });
     } catch { /* swallow */ }
 
     // ── SELF-HEAL ─────────────────────────────────────────────
