@@ -331,6 +331,76 @@ class OriginalLivingWorldTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             prove(self.root, source=self.dynamic_file, optional=1)
 
+    def test_quest_action_unlocks_real_gate_without_static_cheating(self):
+        # Find an authored *initially playable* quest interaction; replace
+        # only the starting location and explicitly authored gate conditions.
+        start = None
+        used = None
+        starting_world = None
+        for original_scene in self.status.scenes:
+            candidate = replace(self.status, starting_scene=original_scene.key)
+            options = [
+                action for action in available_director_actions(
+                    candidate, director_initial(candidate))
+                if action.kind == "use"
+            ]
+            if options and original_scene.links:
+                start = original_scene
+                used = options[0]
+                starting_world = candidate
+                break
+        self.assertIsNotNone(start, "an original quest must have playable stage action")
+        gated = replace(
+            starting_world,
+            dynamics=replace(
+                starting_world.dynamics,
+                passages=(),
+                gates=tuple(
+                    Gate(start.key, neighbor,
+                         Requirements(world_flags=("approved_charter",)),
+                         "Original quest-earned charter gate")
+                    for neighbor in start.links
+                ),
+                influences=(Influence(
+                    key="authored_quest_gate_trigger", trigger="use",
+                    faction="council", delta=0, scene=start.key,
+                    affordance=used.key, grant_world_flag="approved_charter",
+                    once=True,
+                ),),
+            ),
+        )
+        source = "design/director_quest_gated_reviewed.json"
+        (self.root / source).write_text(json.dumps({
+            "schema": "skeleton.jeeves.director_campaign_source.v1",
+            "director_world": gated.payload(),
+            "author_review_acknowledged": True,
+        }))
+        start_receipt = self._start(name="quest_gate", source=source)
+        self.assertFalse(any(a["kind"] in {"travel", "transit"}
+                             for a in start_receipt["actions"]))
+        destination = start.links[0]
+        witness = plan(
+            self.root, session="quest_gate", destination=destination,
+            profile="fastest", alternatives=1,
+        )
+        self.assertEqual(witness["route_count"], 1)
+        actions = witness["routes"][0]["actions"]
+        self.assertEqual(actions[0], "use:" + used.key)
+        self.assertIn("travel:" + destination, actions)
+        self.assertIn(
+            "approved_charter", witness["routes"][0]["world_flags_after"])
+        self.assertEqual(inspect(self.root, session="quest_gate")["sequence"], 0)
+        state = director_initial(gated)
+        for name in actions:
+            kind, key = name.split(":", 1)
+            move = DirectorAction(kind, key, state.scene)
+            self.assertIn(move, available_director_actions(gated, state))
+            state = director_step(gated, state, move)
+        self.assertEqual(
+            state.digest,
+            witness["routes"][0]["expected_arrival_state_sha256"])
+        self.assertEqual(state.scene, destination)
+
     def test_explicit_dynamics_consistency_assurance(self):
         self._start()
         report = audit(self.root, source=self.dynamic_file)
