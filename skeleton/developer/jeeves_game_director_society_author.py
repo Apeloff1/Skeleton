@@ -16,7 +16,7 @@ from typing import Any
 from skeleton.ai.game_builder.quest_scene_forge import compile_director_blueprint
 from skeleton.ai.game_builder.quest_world_dynamics import WorldDynamics, Passage, Requirements
 from skeleton.ai.game_builder.quest_society import (
-    SocietyRules, Resident, Shop, Good, TrustRequirement,
+    SocietyRules, Resident, Shop, Good, TrustRequirement, DialogueChoice,
 )
 from skeleton.developer.jeeves_game_production_board import _load_world
 
@@ -58,6 +58,8 @@ def _draft(world: Any, intensity: int) -> tuple[Any, dict[str, Any]]:
     })
     if not cast:
         cast = ["traveler", "artisan", "keeper"]
+    main_story = next(q for q in world.quests if q.scope == "main")
+    canon_choice = main_story.stages[0].solutions[0].outcome_flag
     for number in range(count):
         home = scenes[number % len(scenes)]
         branch = scenes[(number + 1) % len(scenes)]
@@ -67,6 +69,39 @@ def _draft(world: Any, intensity: int) -> tuple[Any, dict[str, Any]]:
         greeting = ("I remember the road through " + home.region.replace("_", " ")
                     + ". Listen to the choices people make before you judge them.")
         unlock = "friend_" + key if number < 3 else None
+        dialogue = [
+            DialogueChoice(
+                key="offer_help",
+                prompt="Offer to help without demanding a reward",
+                response=("Your generosity matters in " + home.region.replace("_", " ")
+                          + ". I will remember that you helped."),
+                trust_delta=24,
+                reputation_delta=2 if faction is not None else 0,
+                requires_flags=(),
+                grant_world_flag="aided_" + key,
+            ),
+            DialogueChoice(
+                key="question_motives",
+                prompt="Ask hard questions about their responsibilities",
+                response=("Trust is earned by actions. My people will remember "
+                          "what you choose to do next."),
+                trust_delta=-8,
+                reputation_delta=-1 if faction is not None else 0,
+                requires_flags=(),
+                grant_world_flag=None,
+            ),
+        ]
+        if intensity >= 3:
+            dialogue.append(DialogueChoice(
+                key="reflect_on_choice",
+                prompt="Reflect on the first major story decision",
+                response=("I know what happened. This region carries the "
+                          "consequences, even when the hero moves on."),
+                trust_delta=12,
+                reputation_delta=1 if faction is not None else 0,
+                requires_flags=(canon_choice,),
+                grant_world_flag="witness_" + key,
+            ))
         people.append(Resident(
             key=key,
             name=cameo.replace("_", " ").title() + " of " + home.region.replace("_", " ").title(),
@@ -76,6 +111,7 @@ def _draft(world: Any, intensity: int) -> tuple[Any, dict[str, Any]]:
             reputation_gain=2 if faction is not None else 0,
             unlock_at_trust=40,
             unlock_world_flag=unlock,
+            dialogue=tuple(dialogue),
         ))
     # Merchant goods never reuse resources earned from original quest
     # affordances, so player shop sales cannot destroy script-earned items.
@@ -151,7 +187,9 @@ def _draft(world: Any, intensity: int) -> tuple[Any, dict[str, Any]]:
     if compiled.payload() != rewritten or compiled.digest == world.digest:
         raise ValueError("society design failed exact original world compilation")
     return compiled, {
-        "residents": len(people), "merchant_locations": len(shops),
+        "residents": len(people),
+        "authored_dialogue_choices": sum(len(n.dialogue) for n in people),
+        "merchant_locations": len(shops),
         "merchandise_types": sum(len(shop.goods) for shop in shops),
         "phase_turns": society.phase_turns,
         "starting_balance": society.starting_balance,
