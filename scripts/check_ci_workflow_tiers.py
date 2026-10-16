@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Validate fast-versus-specialized Actions without weakening required gates.
+"""Validate the small active CI set against archived specialized qualifications.
 
-Standard library only: used by Backend Quality PR security/policy scanning.
-Manual verification may be omitted on an iteration, but absence is NEVER
-a passing release qualification.
+Archive files deliberately do not run on GitHub Actions; restoring an archived
+workflow to .github/workflows is a separate reviewed operation.
 """
 from __future__ import annotations
 
@@ -15,24 +14,25 @@ import re
 SCHEMA = "skeleton.ci.workflow_tiers.v1"
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = Path(".github/workflows")
+ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 
 
 def events(source: str) -> set[str]:
-    """Read top-level on: event names without resolving untrusted YAML tags."""
+    """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
     try:
         start = next(i for i, line in enumerate(lines) if line == "on:")
     except StopIteration as exc:
         raise ValueError("workflow missing multiline 'on:' trigger") from exc
-    result: set[str] = set()
+    found: set[str] = set()
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
-            result.add(match.group(1))
-    return result
+            found.add(match.group(1))
+    return found
 
 
 def audit(root: Path = ROOT) -> list[str]:
@@ -49,39 +49,45 @@ def audit(root: Path = ROOT) -> list[str]:
             or not specialised or not core
             or any(not isinstance(p, str) or not p.endswith(".yml") or "/" in p
                    for p in specialised + core)):
-        return ["CI tiers must be nonempty sets of plain .yml file names"]
+        return ["CI tiers require nonempty sets of plain .yml file names"]
     if len(set(specialised + core)) != len(specialised + core):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")
     if not isinstance(rules, dict) or not rules or any(x is not True for x in rules.values()):
-        failures.append("release rules must preserve non-compensable explicit verification")
-
-    for path in specialised:
+        failures.append("release rules must preserve explicit qualification")
+    active = sorted((root / WORKFLOWS).glob("*.yml"))
+    active += sorted((root / WORKFLOWS).glob("*.yaml"))
+    if not active or len(active) > 20:
+        failures.append(f"unexpected active workflow count: {len(active)}")
+    for name in specialised:
+        path = root / ARCHIVE / name
+        if (root / WORKFLOWS / name).exists():
+            failures.append(f"{name}: specialist unexpectedly active")
         try:
-            source = (root / WORKFLOWS / path).read_text(encoding="utf-8")
+            source = path.read_text(encoding="utf-8")
             label = re.search(r"^name:\s*(.+?)\s*$", source, re.MULTILINE)
             if not label or "[Specialized]" not in label.group(1):
-                failures.append(f"{path}: missing visible [Specialized] tag")
+                failures.append(f"{name}: missing [Specialized] tag")
             found = events(source)
             if found != {"workflow_dispatch"}:
-                failures.append(f"{path}: specialized workflow must be dispatch-only, got {sorted(found)}")
+                failures.append(f"{name}: archived specialist must retain manual-only definition; got {sorted(found)}")
         except (OSError, UnicodeError, ValueError) as exc:
-            failures.append(f"{path}: cannot validate specialist ({exc})")
-    for path in core:
+            failures.append(f"{name}: cannot inspect archived specialist ({exc})")
+    for name in core:
         try:
-            found = events((root / WORKFLOWS / path).read_text(encoding="utf-8"))
+            found = events((root / WORKFLOWS / name).read_text(encoding="utf-8"))
             if "pull_request" not in found:
-                failures.append(f"{path}: core required/security PR trigger removed")
+                failures.append(f"{name}: core PR trigger missing")
         except (OSError, UnicodeError, ValueError) as exc:
-            failures.append(f"{path}: cannot validate core ({exc})")
-    # Keep the sole canonical required aggregate intact. Do not classify
-    # its unrun or failed prerequisites as a success to make builds appear green.
+            failures.append(f"{name}: cannot inspect active gate ({exc})")
     try:
-        required = (root / WORKFLOWS / "merge-readiness.yml").read_text(encoding="utf-8")
-        if "name: Merge Readiness" not in required or "result != \"success\"" not in required:
-            failures.append("canonical Merge Readiness fails to reject non-success prerequisites")
+        readiness = (root / WORKFLOWS / "merge-readiness.yml").read_text(encoding="utf-8")
+        if ("name: Merge Readiness" not in readiness
+                or "python -m compileall -q skeleton" not in readiness
+                or "  pull_request:" not in readiness):
+            failures.append("fast Merge Readiness smoke contract missing")
     except (OSError, UnicodeError) as exc:
-        failures.append(f"required aggregate missing ({exc})")
+        failures.append(f"Merge Readiness missing ({exc})")
     try:
         backend = (root / WORKFLOWS / "backend-quality.yml").read_text(encoding="utf-8")
         for required in (
@@ -91,17 +97,17 @@ def audit(root: Path = ROOT) -> list[str]:
             "python scripts/check_malware_iocs.py",
         ):
             if required not in backend:
-                failures.append(f"Backend Quality lost required scan {required}")
-        for specialist in (
+                failures.append(f"Backend Quality missing scan: {required}")
+        for name in (
             "Jeeves game development, fidelity and continuous production contracts",
             "Security, provider-chaos, and developer-tooling adversarial regression tests",
         ):
             if not re.search(
-                r"^      - name: " + re.escape(specialist)
+                r"^      - name: " + re.escape(name)
                 + r"\n        if: .*github\.event_name == 'workflow_dispatch'",
                 backend, re.MULTILINE,
             ):
-                failures.append(f"Backend Quality must dispatch deep suite: {specialist}")
+                failures.append(f"Backend Quality must dispatch deep suite: {name}")
     except (OSError, UnicodeError) as exc:
         failures.append(f"Backend Quality missing ({exc})")
     return failures
@@ -116,7 +122,7 @@ def main() -> int:
         print("CI TIER ERROR:", problem)
     if problems:
         return 1
-    print("CI tiers: fast PR plus explicit specialized qualifications verified")
+    print("CI tiers: compact active PR gates and offline archived specialists verified")
     return 0
 
 

@@ -3,8 +3,8 @@ name: Actions Housekeeping CLI
 on:
   workflow_dispatch:
   schedule:
-    # Six-hour safety sweep; event-driven queue recovery handles urgent demand.
-    - cron: '23 */6 * * *'
+    # Twice-daily safety sweep; separate queue drain is hourly.
+    - cron: '23 4,16 * * *'
   push:
     branches: [main]
     paths:

@@ -1,31 +1,8 @@
 name: Reproducible Release
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - "pyproject.toml"
-      - "requirements.txt"
-      - "requirements-build.txt"
-      - "scripts/release_provenance.py"
-      - "scripts/testing/test_release_provenance.py"
-      - "skeleton/release/evidence.py"
-      - "skeleton/testing/test_release_evidence.py"
-      - ".github/workflows/reproducible-release.yml"
-      - "docs/REPRODUCIBLE_RELEASES.md"
   push:
-    branches: [main]
     tags: ["v*"]
-    paths:
-      - "pyproject.toml"
-      - "requirements.txt"
-      - "requirements-build.txt"
-      - "scripts/release_provenance.py"
-      - "scripts/testing/test_release_provenance.py"
-      - "skeleton/release/evidence.py"
-      - "skeleton/testing/test_release_evidence.py"
-      - ".github/workflows/reproducible-release.yml"
-      - "docs/REPRODUCIBLE_RELEASES.md"
   workflow_dispatch:
 
 permissions:

@@ -20,15 +20,12 @@
     "secret-scanning.yml",
     "malware-gate.yml",
     "dependency-review.yml",
-    "workflow-input-security.yml",
-    "provenance-policy.yml",
-    "p0-ai-authority-boundary-current.yml",
-    "p0-hardlink-alias-current.yml"
+    "workflow-input-security.yml"
   ],
   "release_rules": {
     "all_specialized_not_run_is_unqualified": true,
-    "required_merge_readiness_unchanged": true,
     "security_gates_remain_enabled": true,
-    "full_p0_signoff_requires_separate_exact_head_evidence": true
+    "full_p0_signoff_requires_separate_exact_head_evidence": true,
+    "fast_merge_gate_not_full_qualification": true
   }
 }

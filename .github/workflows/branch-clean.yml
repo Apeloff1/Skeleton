@@ -2,20 +2,6 @@ name: Prune redundant branches safely
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Actions Housekeeping CLI"]
-    types: [completed]
-    # Admit only default-branch housekeeping completions. Non-main sources
-    # were always skipped by the prune job but still created workflow runs.
-    branches: [main]
-  schedule:
-    # Bound full graph fetches to hourly; housekeeping completion and manual
-    # recovery still wake this controller independently of the timer.
-    - cron: '3 * * * *'
-  push:
-    branches: [main]
-    # Immediate kick only when this maintenance workflow itself changes.
-    paths: ['.github/workflows/branch-clean.yml']
 
 # Keep one cleanup sweep alive while main is moving rapidly. New triggers
 # coalesce behind the active worker instead of repeatedly cancelling it.
@@ -29,10 +15,6 @@ permissions: {}
 
 jobs:
   prune:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.head_repository.full_name == github.repository &&
-       github.event.workflow_run.head_branch == github.event.repository.default_branch)
     name: Delete refs with no unique commits
     # Use independent ARM recovery capacity while x64 validation is saturated.
     runs-on: ubuntu-24.04-arm

@@ -1,4 +1,4 @@
-"""Fast/specialized tier audit remains fail-closed without running GitHub."""
+"""Regression checks for archived specialist workflows and lean active CI."""
 from __future__ import annotations
 
 import json
@@ -13,28 +13,39 @@ class WorkflowTierTests(unittest.TestCase):
     def test_repo_tiers_are_consistent(self):
         self.assertEqual(audit(ROOT), [])
 
-    def test_trigger_event_parser(self):
-        self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n  x:\n"), {"workflow_dispatch"})
-        self.assertEqual(events("on:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [main]\njobs:\n"), {"pull_request", "push"})
+    def test_event_parser(self):
+        self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
+        self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
 
-    def test_auto_activating_specialist_fails_and_core_disabling_fails(self):
+    def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
             (root / ".github/workflows").mkdir(parents=True)
+            (root / ".github/workflows-archive").mkdir()
             (root / "machine").mkdir()
             registry = json.loads((ROOT / "machine/ci_workflow_tiers.json").read_text())
             (root / "machine/ci_workflow_tiers.json").write_text(json.dumps(registry))
-            for file in registry["specialized_manual_only"] + registry["core_automatic_pr"]:
-                body = (ROOT / ".github/workflows" / file).read_text()
-                (root / ".github/workflows" / file).write_text(body)
+            # Include all active YAML workflows so count and core contracts are realistic.
+            for source in (ROOT / ".github/workflows").glob("*.yml"):
+                (root / ".github/workflows" / source.name).write_text(source.read_text())
+            for source in (ROOT / ".github/workflows").glob("*.yaml"):
+                (root / ".github/workflows" / source.name).write_text(source.read_text())
+            for name in registry["specialized_manual_only"]:
+                source = ROOT / ".github/workflows-archive" / name
+                (root / ".github/workflows-archive" / name).write_text(source.read_text())
             self.assertEqual(audit(root), [])
-            spec = root / ".github/workflows" / registry["specialized_manual_only"][0]
-            spec.write_text(spec.read_text().replace("  workflow_dispatch:", "  pull_request:\n  workflow_dispatch:"))
-            self.assertTrue(any("dispatch-only" in x for x in audit(root)))
-            spec.write_text((ROOT / ".github/workflows" / registry["specialized_manual_only"][0]).read_text())
+            name = registry["specialized_manual_only"][0]
+            spec = root / ".github/workflows-archive" / name
+            original = spec.read_text()
+            spec.write_text(original.replace("  workflow_dispatch:", "  pull_request:\n  workflow_dispatch:"))
+            self.assertTrue(any("archived specialist" in p for p in audit(root)))
+            spec.write_text(original)
+            (root / ".github/workflows" / name).write_text(original)
+            self.assertTrue(any("unexpectedly active" in p for p in audit(root)))
+            (root / ".github/workflows" / name).unlink()
             core = root / ".github/workflows" / registry["core_automatic_pr"][0]
             core.write_text("name: disabled\non:\n  workflow_dispatch:\njobs:\n")
-            self.assertTrue(any("core required/security" in x for x in audit(root)))
+            self.assertTrue(any("core PR trigger missing" in p for p in audit(root)))
 
 
 if __name__ == "__main__":
