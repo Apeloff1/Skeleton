@@ -142,6 +142,38 @@ def delta(root: Path, *, session: str, before: dict[str, Any],
                 set(before.get("acquired", [])) - set(after.get("acquired", []))),
             "transport": transport,
         }
+        society_before = previous_state.get("society")
+        society_after = next_state.get("society")
+        if society_before is not None or society_after is not None:
+            if not isinstance(society_before, dict) or not isinstance(society_after, dict):
+                raise ValueError("society presentation lost its persistent NPC ledger")
+            trust_before = dict(society_before.get("relationships", []))
+            trust_after = dict(society_after.get("relationships", []))
+            if set(trust_before) != set(trust_after):
+                raise ValueError("society actor roster drift in recorded cinematic delta")
+            npc_changes = [{
+                "resident": npc, "before": trust_before[npc],
+                "after": trust_after[npc],
+                "delta": trust_after[npc] - trust_before[npc],
+            } for npc in sorted(trust_before)
+                if trust_before[npc] != trust_after[npc]]
+            old_stock = {(shop, item): amount for shop, item, amount
+                         in society_before.get("shop_stock", [])}
+            changed_stock = [{
+                "shop": shop, "good": item,
+                "before": old_stock[(shop, item)], "after": amount,
+            } for shop, item, amount in society_after.get("shop_stock", [])
+                if old_stock[(shop, item)] != amount]
+            living_events["society"] = {
+                "wallet_before": society_before["balance"],
+                "wallet_after": society_after["balance"],
+                "wallet_delta": society_after["balance"] - society_before["balance"],
+                "NPC_trust_changes": npc_changes,
+                "merchant_stock_changes": changed_stock,
+                "action": event["action"]["kind"] + ":" + event["action"]["key"],
+                "has_original_model_generated_dialogue": False,
+                "authoritative_action_journal_verified": True,
+            }
     return {
         "schema": SCHEMA, "source_sha256": manifest["source_sha256"],
         "director_world_sha256": world.digest,
