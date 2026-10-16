@@ -17,6 +17,8 @@ A campaign can now contain an *optional* `world.dynamics.society` block:
   greet-lines and four-phase home/work schedules; persistent trust; faction
   reputation effects; named world flags that unlock at specified trust;
   multiple mutually exclusive per-period authored conversation choices.
+  Exact choices are recorded in the canonical persistent dialogue history;
+  authored one-time revelations cannot be repeated merely by resting.
 - **The calendar:** a reviewable number of canonical game turns per phase;
   dawn, day, dusk and night rotate deterministically. A `rest:rest`
   action advances game time without touching the wall clock. NPC attendance
