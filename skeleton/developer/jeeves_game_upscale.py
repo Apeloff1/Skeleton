@@ -250,3 +250,59 @@ def fidelity_matrix() -> dict[str, Any]:
         "catalogue_complete_for_all_historical_hardware": False,
         "reason": "A console registration, editor or emulation candidate is not full native game creation/rendering capability",
     }
+
+
+
+def display_plan(*, target: str, native_width: int, native_height: int,
+                 screen_width: int, screen_height: int,
+                 pixel_aspect_num: int = 1, pixel_aspect_den: int = 1) -> dict[str, Any]:
+    """Plan authentic integer pixel-aspect scaling + pillar/letter boxing.
+
+    No silent horizontal stretching to make 4:3 content fill 16:9. Treat
+    non-square legacy CRT pixels as an explicit rational sampling parameter.
+    This is a non-mutating presentation plan, not a GPU shader or rendered image.
+    """
+    from math import gcd
+    for name, value, high in (
+        ("native_width", native_width, 4096),
+        ("native_height", native_height, 4096),
+        ("screen_width", screen_width, 16384),
+        ("screen_height", screen_height, 16384),
+        ("pixel_aspect_num", pixel_aspect_num, 64),
+        ("pixel_aspect_den", pixel_aspect_den, 64),
+    ):
+        if type(value) is not int or not 1 <= value <= high:
+            raise UpscaleError(f"invalid {name}")
+    if gcd(pixel_aspect_num, pixel_aspect_den) != 1:
+        raise UpscaleError("pixel aspect fraction must be reduced")
+    _policy(target)  # fail closed on unregistered target
+    base_width = native_width * pixel_aspect_num
+    base_height = native_height * pixel_aspect_den
+    scale = min(screen_width // base_width, screen_height // base_height)
+    if scale < 1:
+        raise UpscaleError("screen too small for integer-pixel-aspect scaling")
+    rendered_w, rendered_h = base_width * scale, base_height * scale
+    left = (screen_width - rendered_w) // 2
+    right = screen_width - rendered_w - left
+    top = (screen_height - rendered_h) // 2
+    bottom = screen_height - rendered_h - top
+    return {
+        "ok": True, "schema": SCHEMA, "action": "display-plan",
+        "target": target, "source_pixels": [native_width, native_height],
+        "viewport_pixels": [screen_width, screen_height],
+        "pixel_aspect_ratio": [pixel_aspect_num, pixel_aspect_den],
+        "integer_scale": scale,
+        "physical_block_size": [pixel_aspect_num * scale,
+                                pixel_aspect_den * scale],
+        "presented_pixels": [rendered_w, rendered_h],
+        "letterbox_pixels": {"left": left, "right": right,
+                             "top": top, "bottom": bottom},
+        "stretching_permitted": False,
+        "original_grid_aligned": True,
+        "aspect_ratio_preserved": True,
+        "crt_scanlines_enabled": False,
+        "crt_shader_optional": True,
+        "tiled_or_gpu_render_required": rendered_w * rendered_h > MAX_PIXELS,
+        "actually_rendered": False,
+        "native_hardware_certified": False,
+    }
