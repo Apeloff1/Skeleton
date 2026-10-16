@@ -195,6 +195,9 @@ class OriginalSocietyTests(unittest.TestCase):
             self.npc.initial_trust + option.trust_delta,
         )
         self.assertIn(option.grant_world_flag, after["world_state"]["world_flags"])
+        self.assertTrue(option.once)
+        self.assertIn([self.npc.key, option.key, 1],
+                      after["society"]["canonical_dialogue_history"])
         presentation = delta(self.root, session="hero", before=before, after=after)
         spoken = presentation["living_world_events"]["society"]["authored_dialogue"]
         self.assertEqual(spoken["line"], option.response)
@@ -203,6 +206,10 @@ class OriginalSocietyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self._do("discuss:" + self.npc.key + "_" + rejected.key)
         self._reach_next_conversation()
+        offered = {x["choice"] for x in inspect(
+            self.root, session="hero")["actions"]}
+        self.assertNotIn("discuss:" + self.npc.key + "_" + option.key, offered)
+        self.assertIn("discuss:" + self.npc.key + "_" + rejected.key, offered)
         second = self._do("discuss:" + self.npc.key + "_" + rejected.key)
         trust = dict(second["society"]["relationships"])[self.npc.key]
         self.assertEqual(
