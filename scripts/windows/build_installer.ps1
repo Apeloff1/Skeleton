@@ -125,6 +125,19 @@ $ArchiveArgs = @(
 if ($LASTEXITCODE -ne 0) {
     throw "git archive failed"
 }
+
+# Inspect ZIP metadata before Expand-Archive touches NTFS. Linux-valid Git
+# paths can collide on Windows, use reserved names, or exceed the installer's
+# portable path budget; rejecting them after extraction is too late.
+$ArchivePreflight = Join-Path $RepoRoot "scripts\windows\check_payload_zip.py"
+if (-not (Test-Path -LiteralPath $ArchivePreflight -PathType Leaf)) {
+    throw "Windows payload ZIP preflight tool is missing"
+}
+$DefaultInstallRoot = "C:\Users\" + ("x" * 32) + "\AppData\Local\Programs\Skeleton"
+& python $ArchivePreflight --archive $ArchivePath --install-root $DefaultInstallRoot
+if ($LASTEXITCODE -ne 0) {
+    throw "Windows payload ZIP preflight rejected the archived SourceRef"
+}
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
 
 foreach ($RequiredPath in $SourceManifest.required_paths) {
@@ -186,17 +199,23 @@ if ($MissingPayloadPaths.Count -gt 0) {
 # and with the exact offending relative path.
 $MaxRuntimeRelativePathChars = 190
 $MaxRuntimeDefaultInstallChars = 240
-# Model a reasonably long local profile name; SUBST shortens the build only.
-$DefaultInstallRoot = "C:\\Users\\" + ("x" * 32) + "\\AppData\\Local\\Programs\\Skeleton"
 $PathBudgetViolations = @(
     Get-ChildItem -LiteralPath $PayloadDir -File -Recurse | ForEach-Object {
         $relative = [IO.Path]::GetRelativePath($PayloadDir, $_.FullName)
+        $portable = $relative.Replace("\", "/")
+        $absolute = Join-Path $DefaultInstallRoot $relative
+        $relativeUtf8Bytes = [Text.Encoding]::UTF8.GetByteCount($portable)
+        $absoluteUtf8Bytes = [Text.Encoding]::UTF8.GetByteCount($absolute)
         if ($relative.Length -gt $MaxRuntimeRelativePathChars -or
-            (Join-Path $DefaultInstallRoot $relative).Length -gt $MaxRuntimeDefaultInstallChars) {
+            $relativeUtf8Bytes -gt $MaxRuntimeRelativePathChars -or
+            $absolute.Length -gt $MaxRuntimeDefaultInstallChars -or
+            $absoluteUtf8Bytes -gt $MaxRuntimeDefaultInstallChars) {
             [PSCustomObject]@{
-                Length = $relative.Length
-                AbsoluteLength = (Join-Path $DefaultInstallRoot $relative).Length
-                Path = $relative
+                Utf8Bytes = $relativeUtf8Bytes
+                Utf16Units = $relative.Length
+                InstalledUtf8Bytes = $absoluteUtf8Bytes
+                InstalledUtf16Units = $absolute.Length
+                Path = $portable
             }
         }
     }
@@ -204,7 +223,7 @@ $PathBudgetViolations = @(
 if ($PathBudgetViolations.Count -gt 0) {
     Write-Host "Windows runtime payload path budget exceeded:"
     $PathBudgetViolations |
-        Sort-Object Length -Descending |
+        Sort-Object InstalledUtf16Units -Descending |
         Format-Table -AutoSize |
         Out-String |
         Write-Host
