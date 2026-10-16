@@ -25,6 +25,14 @@ def emit(root: Path) -> None:
     })
 
 
+def test_game_catalog_matches_existing_forge_catalog():
+    from skeleton.forge.eras import list_eras
+    catalog = run_game_cli(["catalog"])
+    assert catalog["ok"] and catalog["eras"] == list_eras()
+    assert {"auto", "extraction"} <= set(catalog["archetypes"])
+    assert catalog["build_targets"] == ["godot"]
+
+
 def test_game_workspace_init_and_inspect(tmp_path: Path):
     root = workspace(tmp_path)
     assert (root / "assets").is_dir()
@@ -34,6 +42,13 @@ def test_game_workspace_init_and_inspect(tmp_path: Path):
     assert run_game_cli(["info", "--project", str(root)])["config"]["schema"] == "skeleton.game.workspace.v1"
     assert run_game_cli(["assets", "--project", str(root)])["inventory"]["count"] == 0
     assert not run_game_cli(["init", "original-world", "--dir", str(tmp_path)])["ok"]
+
+
+def test_invalid_archetype_fails_before_side_effects(tmp_path: Path):
+    result = run_game_cli(["init", "bad-game", "--dir", str(tmp_path),
+                           "--archetype", "not-an-archetype"])
+    assert result["ok"] is False
+    assert not (tmp_path / "bad-game").exists()
 
 
 def test_game_dry_run_has_no_effect_and_rejects_traversal(tmp_path: Path):
