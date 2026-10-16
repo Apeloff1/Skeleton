@@ -78,6 +78,7 @@ class DialogueChoice:
     reputation_delta: int = 0
     requires_flags: tuple[str, ...] = ()
     grant_world_flag: str | None = None
+    once: bool = False
 
     def __post_init__(self):
         _id(self.key)
@@ -93,9 +94,11 @@ class DialogueChoice:
             _id(flag)
         if self.grant_world_flag is not None:
             _id(self.grant_world_flag)
+        if type(self.once) is not bool:
+            raise ValueError("NPC dialogue repeat policy must be explicit")
 
     def payload(self):
-        return {
+        result = {
             "key": self.key, "prompt": self.prompt,
             "response": self.response,
             "trust_delta": self.trust_delta,
@@ -103,6 +106,9 @@ class DialogueChoice:
             "requires_flags": list(self.requires_flags),
             "grant_world_flag": self.grant_world_flag,
         }
+        if self.once:
+            result["once"] = True
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,6 +269,7 @@ class SocietyState:
     shop_stock: tuple[tuple[str, str, int], ...] = ()
     owned: tuple[tuple[str, int], ...] = ()
     transactions: tuple[tuple[str, str, int, int], ...] = ()
+    dialogue_history: tuple[tuple[str, str, int], ...] = ()
 
     def __post_init__(self):
         _int(self.balance, 0, MAX_BALANCE)
@@ -308,9 +315,18 @@ class SocietyState:
                 raise ValueError("transaction direction must be buy(0)/sell(1)")
             if type(count) is not int or count < 1:
                 raise ValueError("shop transaction counter must be a positive integer")
+        if len(self.dialogue_history) > MAX_RESIDENTS * 16 or len({
+                (npc, topic) for npc, topic, _ in self.dialogue_history
+        }) != len(self.dialogue_history):
+            raise ValueError("duplicate or oversized canon dialogue history")
+        for npc, topic, count in self.dialogue_history:
+            _id(npc)
+            _id(topic)
+            if type(count) is not int or count < 1:
+                raise ValueError("NPC dialogue count must remain positive")
 
     def payload(self):
-        return {
+        result = {
             "balance": self.balance,
             "relationships": [list(x) for x in self.relationships],
             "last_talk_cycle": [list(x) for x in self.last_talk_cycle],
@@ -318,6 +334,9 @@ class SocietyState:
             "owned": [list(x) for x in self.owned],
             "transactions": [list(x) for x in self.transactions],
         }
+        if self.dialogue_history:
+            result["dialogue_history"] = [list(x) for x in self.dialogue_history]
+        return result
 
 
 def compile_society(data: Any) -> SocietyRules:
@@ -342,10 +361,12 @@ def compile_society(data: Any) -> SocietyRules:
             raise ValueError("NPC dialogue options require bounded typed list")
         choices = []
         for option in dialogues:
-            choice = _exact(option, {"key", "prompt", "response",
-                                     "trust_delta", "reputation_delta",
-                                     "requires_flags", "grant_world_flag"},
-                            "original NPC conversation")
+            fields = {"key", "prompt", "response", "trust_delta",
+                      "reputation_delta", "requires_flags", "grant_world_flag"}
+            if type(option) is not dict or set(option) not in (
+                    fields, fields | {"once"}):
+                raise ValueError("invalid exact original authored dialogue schema")
+            choice = option
             if type(choice["requires_flags"]) is not list:
                 raise ValueError("dialogue required flags must be an ordered array")
             choices.append(DialogueChoice(
@@ -355,6 +376,7 @@ def compile_society(data: Any) -> SocietyRules:
                 reputation_delta=choice["reputation_delta"],
                 requires_flags=tuple(choice["requires_flags"]),
                 grant_world_flag=choice["grant_world_flag"],
+                once=choice.get("once", False),
             ))
         if type(row["schedule"]) is not list:
             raise ValueError("NPC schedule must be a four-phase array")
@@ -414,13 +436,17 @@ def legal_actions(rules: SocietyRules, state: Any) -> tuple[tuple[str, str], ...
         raise ValueError("missing original NPC and shop state")
     present = {n.key: n for n in residents_here(rules, state.scene, state.turn)}
     cooldown = dict(society.last_talk_cycle)
+    played = {(npc, topic): count
+              for npc, topic, count in society.dialogue_history}
     cycle = phase(rules, state.turn)["cycle"]
     actions: list[tuple[str, str]] = []
     for npc in present.values():
         if cooldown.get(npc.key) != cycle:
             actions.append(("speak", npc.key))
             for choice in npc.dialogue:
-                if set(choice.requires_flags).issubset(state.narrative_flags):
+                if (set(choice.requires_flags).issubset(state.narrative_flags)
+                        and not (choice.once and played.get(
+                            (npc.key, choice.key), 0) > 0)):
                     actions.append(("discuss", npc.key + "_" + choice.key))
     stock = {(shop, good): count for shop, good, count in society.shop_stock}
     owned = dict(society.owned)
@@ -456,6 +482,8 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
     if kind == "rest":
         return old, (), (), (), rules.phase_turns
     if kind in {"speak", "discuss"}:
+        history = {(n, topic): count
+                   for n, topic, count in old.dialogue_history}
         if kind == "speak":
             resident = next(n for n in rules.residents if n.key == key)
             delta = resident.trust_gain
@@ -465,6 +493,9 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
             resident, choice = next(
                 (n, option) for n in rules.residents for option in n.dialogue
                 if n.key + "_" + option.key == key
+            )
+            history[(resident.key, choice.key)] = (
+                history.get((resident.key, choice.key), 0) + 1
             )
             delta = choice.trust_delta
             faction_delta = choice.reputation_delta
@@ -487,6 +518,8 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
             old.balance, tuple(sorted(relationships.items())),
             tuple(sorted(touched.items())), old.shop_stock, old.owned,
             old.transactions,
+            tuple(sorted((npc, topic, count)
+                         for (npc, topic), count in history.items())),
         ), faction_effects, tuple(sorted(flags)), (), 1
     good_shop = next(
         (s for s in rules.shops for good in s.goods
@@ -524,6 +557,7 @@ def perform(rules: SocietyRules, state: Any, kind: str, key: str
         owned=tuple(sorted(inventory.items())),
         transactions=tuple(sorted((shop, item, direction, count)
                                   for (shop, item, direction), count in counts.items())),
+        dialogue_history=old.dialogue_history,
     )
     return updated, (), (), acquired, time_cost
 
