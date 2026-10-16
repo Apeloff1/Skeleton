@@ -60,6 +60,10 @@ def dev_help_text() -> str:
         jeeves upscale-review [--passes 1..8]
         jeeves vividness-review --source design/enhanced.json [--passes 1..8]
         jeeves queue-upscaled-training [--page N --page-size N]
+        jeeves direction-audit --source design/story_direction_packet.json [--passes 1..8]
+        jeeves direction-revision --source design/story_direction_packet.json [--passes 1..8]
+        jeeves propose --kind scene --brief "Original scene" --direction-source design/story_direction_packet.json
+        Professional prose/film review still requires independent signed real-world evidence
         Only bounded painter/fixed/shader 3D render families; no native hardware claim
         jeeves upscale --target CONSOLE --source assets/input.png --output assets/hd.png [--factor 2|4|8] [--mode nearest|scale2x]
         jeeves production-init --target CONSOLE --genre GENRE --period YYYY-YYYY
