@@ -213,6 +213,13 @@ def propose(root: Path, *, kind: str, brief: str, include_notes: bool = False) -
     except RuntimeError as exc:
         # Fail closed instead of silently substituting a local echo or template.
         raise AuthoringError("configured Jeeves model runtime unavailable or rejected request") from exc
+    # The model call can take time; never publish a proposal against stale
+    # project context even if the provider returned a well-formed object.
+    from skeleton.developer.game_cli import _load
+    if _config_identity(_load(root)) != _config_identity(cfg):
+        raise AuthoringError("project configuration changed while model was drafting")
+    if include_notes and _notes_digest(_notes(root)) != context_sha:
+        raise AuthoringError("design context changed while model was drafting")
     draft = _parse_model(raw)
     if draft["kind"] != kind:
         raise AuthoringError("model returned different design kind")
@@ -280,3 +287,29 @@ def apply(root: Path, *, digest: str, approved_digest: str) -> dict[str, Any]:
     return {"ok": True, "action": "apply", "target": str(target),
             "proposal_sha256": digest, "applied": True,
             "scope": "new-local-design-draft-only"}
+
+
+def queue(root: Path) -> dict[str, Any]:
+    """Read-only, bounded list of identity-checked pending game proposals."""
+    from skeleton.developer.game_cli import _load
+    _load(root)
+    location = _proposal_path(root, "0" * 64).parent
+    if not location.exists():
+        return {"ok": True, "action": "queue", "project": str(root), "proposals": []}
+    rows: list[dict[str, Any]] = []
+    for item in sorted(location.iterdir()):
+        if item.is_symlink() or not item.is_file() or item.suffix != ".json":
+            raise AuthoringError("unexpected nonregular proposal-queue entry")
+        if len(rows) >= 128:
+            raise AuthoringError("proposal queue exceeds 128 entries")
+        digest = item.stem
+        value = _read_proposal(root, digest)
+        target = _target(root, value["draft"])
+        rows.append({
+            "proposal_sha256": digest, "kind": value["draft"]["kind"],
+            "title": value["draft"]["title"], "slug": value["draft"]["slug"],
+            "target_exists": target.exists(), "provider": value["provider"],
+            "model": value["model"],
+        })
+    return {"ok": True, "action": "queue", "project": str(root),
+            "count": len(rows), "proposals": rows}
