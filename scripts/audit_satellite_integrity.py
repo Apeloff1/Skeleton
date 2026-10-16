@@ -20,7 +20,8 @@ MAX_SCAN_BYTES = 262144
 STALE_UI = re.compile(r"(?:(?:components/|@/components/)UI/|(?:\.\.?/)UI/)")
 STUB = re.compile(
     r"\b(?:TODO|FIXME|NotImplementedError)\b|"
-    r"throw\s+new\s+Error\s*\(\s*[\"'](?:not implemented|TODO)|"\n    r"(?m)^\s{4,}(?:pass|\.\.\.)\s*(?:#.*)?$",
+    r"throw\s+new\s+Error\s*\(\s*[\"'](?:not implemented|TODO)|"
+    r"(?m:^\s{4,}(?:pass|\.\.\.)\s*(?:#.*)?$)",
     re.I,
 )
 TRUNC = re.compile(r"\[truncated\]|<truncated>|content truncated|output truncated", re.I)
@@ -74,6 +75,9 @@ def content_audit(records: list[tuple[str, str, int]], max_bytes: int, max_examp
                   if path.endswith(SOURCE_SUFFIXES) and 0 <= size <= max_bytes]
     findings = []
     counts = Counter()
+    counts["content_skipped_oversize"] = sum(
+        1 for path, _sha, size in records if path.endswith(SOURCE_SUFFIXES) and size > max_bytes
+    )
     content_cache: dict[str, bytes] = {}
     proc = subprocess.Popen(["git", "cat-file", "--batch"], stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -95,8 +99,10 @@ def content_audit(records: list[tuple[str, str, int]], max_bytes: int, max_examp
                 continue
             txt = raw.decode("utf-8", "replace")
             is_frontend = "/frontend/" in path and path.endswith((".ts", ".tsx", ".js", ".jsx"))
+            has_old_ui = STALE_UI.search(txt)
             for kind, match in (
-                ("stale_ui_reference", has_old_ui if is_frontend else None),\n                ("other_ui_reference", has_old_ui if not is_frontend else None),
+                ("stale_ui_reference", has_old_ui if is_frontend else None),
+                ("other_ui_reference", has_old_ui if not is_frontend else None),
                 ("stub_marker", STUB.search(txt) if path.endswith((".ts", ".tsx", ".js", ".jsx", ".py")) else None),
                 ("truncation_marker", TRUNC.search(txt)),
             ):
