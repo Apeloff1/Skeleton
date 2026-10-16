@@ -340,7 +340,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     subs.add_parser("catalog", help="List supported GameForge eras and archetypes")
     jeeves = subs.add_parser("jeeves", help="Jeeves design planning, source audit and developer handoff")
     jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
-                                                   "propose", "review", "apply")) 
+                                                   "propose", "review", "apply", "queue")) 
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
