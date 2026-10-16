@@ -47,4 +47,22 @@ module.exports = defineConfig([
       'import/first': 'off',
     },
   },
+  {
+    // Re-enable high-signal safety rules incrementally on code that has
+    // received explicit lifecycle/concurrency review. Legacy modules keep
+    // their prior baseline until they can be fixed without bulk churn.
+    files: [
+      'hooks/usePowerAwareness.ts',
+      'hooks/useThermalGuard.ts',
+      'hooks/useStability.ts',
+      'utils/thermalGuard.ts',
+    ],
+    rules: {
+      'react-hooks/exhaustive-deps': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      }],
+    },
+  },
 ]);
