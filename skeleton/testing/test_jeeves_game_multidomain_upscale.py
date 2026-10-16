@@ -352,3 +352,34 @@ def test_vividness_does_not_certify_unexecuted_stage(tmp_path):
     result=command(root,"vividness-review",
                    "--source","design/forest-stage.json")
     assert not result["ok"]
+
+
+
+def test_2_5d_camera_render_produces_actual_rotated_pixel_planes(tmp_path):
+    root=workspace(tmp_path)
+    stage_source(root,depth="2_5d",yaw=28.0)
+    args=["--target","snes","--source","design/forest-stage.json",
+          "--output","assets/rotating-stage.png"]
+    dry=command(root,"camera-render",*args,"--dry-run")
+    assert dry["ok"],dry
+    assert not (root/"assets"/"rotating-stage.png").exists()
+    result=command(root,"camera-render",*args)
+    assert result["ok"],result
+    assert result["billboard_plane_rotation_preview"]
+    assert result["actual_pixels_projected"]>0
+    assert not result["actual_mesh_geometry_rotated"]
+    assert not result["native_gpu_qualified"]
+    w,h,rgba=decode_png((root/"assets"/"rotating-stage.png").read_bytes())
+    assert (w,h)==(8,8)
+    assert any(x for x in rgba)
+    assert result["training_candidate"]["priority"]=="P1"
+
+
+def test_2d_camera_renderer_rejects_fake_three_dimensional_camera(tmp_path):
+    root=workspace(tmp_path)
+    stage_source(root,depth="2d",yaw=0.0)
+    result=command(root,"camera-render","--target","nes",
+                   "--source","design/forest-stage.json",
+                   "--output","assets/misleading.png")
+    assert not result["ok"]
+    assert not (root/"assets"/"misleading.png").exists()
