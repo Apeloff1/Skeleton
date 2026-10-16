@@ -385,6 +385,8 @@ func _render_state() -> void:
               " | next phase in " + str(calendar.get("turns_until_next_phase", 0)) + " turns")
         _line("Gold balance: " + str(society_info.get("wallet", 0)))
         _line("Trade inventory: " + str(society_info.get("owned_goods", [])))
+        _line("Used or redeemed goods (cannot resell): " +
+              str(society_info.get("redeemed_or_used_goods", [])))
         _line("Authenticated characters currently here:")
         for resident in society_info.get("present_residents", []):
             _line("  " + str(resident.get("name", "")) +
@@ -476,6 +478,10 @@ func _render_state() -> void:
                     _line("  NPC relationship: " + str(bond.get("resident", "")) +
                           " " + str(bond.get("before", 0)) + " → " +
                           str(bond.get("after", 0)))
+                for spent in local.get("actual_redeemed_merchandise", []):
+                    _line("  Redeemed merchandise: " +
+                          str(spent.get("good", "")) + " ×" +
+                          str(spent.get("quantity", 0)))
             if effects.get("transport") is Dictionary:
                 var transport: Dictionary = effects["transport"]
                 _line("  Transit: " + str(transport.get("mode", "")) + " " +
