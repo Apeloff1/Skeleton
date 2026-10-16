@@ -37,6 +37,9 @@ def dev_help_text() -> str:
         assets --project DIR
         package --project DIR [--dry-run] [--overwrite]
         jeeves plan|audit|next|context|handoff [--project DIR]
+        jeeves propose --kind quest --brief "Original branching quest" [--include-notes]
+        jeeves review --digest SHA256 [--project DIR]
+        jeeves apply --digest SHA256 --approve SHA256 [--project DIR]
 
     skeleton dev scaffold <name> [options]
         Generate a new project from a template
