@@ -22,7 +22,11 @@ def direction(root: Path, *, action: str, source: str,
         raise DirectionError("signed story-direction dossier requires bible, scenes and independent review claims")
     from skeleton.developer.game_cli import _load
     project = _load(root)["name"]
-    if not isinstance(data["bible"], dict) or data["bible"].get("project") != project:
+    # GameForge permits hyphenated workspace names, while canonical StoryCanon
+    # signs normalized underscore identifiers. Keep an exact, one-way mapping;
+    # no prefix, case-fold, or fuzzy cross-project comparisons.
+    canonical_project = project.replace("-", "_")
+    if not isinstance(data["bible"], dict) or data["bible"].get("project") != canonical_project:
         raise DirectionError("story direction bible belongs to a different active game project")
     report = evaluate_direction(
         data["bible"],data["scenes"],reviewers=data["expert_reviews"],
