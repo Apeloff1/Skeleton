@@ -184,8 +184,42 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
         if option.kind == "use":
             af = affordances[option.key]
             description = af.kind + " " + af.target
+        elif option.kind == "transit" and world.dynamics is not None:
+            passage = next(p for p in world.dynamics.passages
+                           if p.key == option.key)
+            destination = (passage.destination if state.scene == passage.source
+                           else passage.source)
+            description = passage.mode + ": " + passage.name + " → " + destination
         actions.append({**option.payload(), "choice": option.kind + ":" + option.key,
                         "description": description})
+    world_state = state.world_state.payload() if state.world_state is not None else None
+    blocked = []
+    available_passages = []
+    if world.dynamics is not None:
+        from skeleton.ai.game_builder.quest_world_dynamics import (
+            permits, gate_for, offered_passages,
+        )
+        for destination in here.links:
+            gate = gate_for(world.dynamics, state.scene, destination)
+            if gate is not None and not permits(gate.requirements, state):
+                blocked.append({
+                    "kind": "walk", "destination": destination,
+                    "gate_label": gate.label,
+                    "requirements": gate.requirements.payload(),
+                })
+        legal = {p.key for p in offered_passages(world.dynamics, state)}
+        for passage in world.dynamics.passages:
+            if (passage.source == state.scene or
+                    passage.bidirectional and passage.destination == state.scene):
+                dest = passage.destination if state.scene == passage.source else passage.source
+                offered = passage.key in legal
+                available_passages.append({
+                    "key": passage.key, "mode": passage.mode,
+                    "destination": dest, "cost_turns": passage.cost_turns,
+                    "available": offered,
+                    "requirements": passage.requirements.payload(),
+                    "fare_item": passage.consume_item,
+                })
     return {
         "ok": True, "schema": SCHEMA, "session": name,
         "world_sha256": world.digest, "sequence": sequence,
@@ -197,6 +231,12 @@ def _view(world: DirectorWorld, state: Any, *, name: str,
         "complete": len(completed) == len(world.quests),
         "quest_stage_results": [r.payload() for r in state.results],
         "narrative_flags": list(state.narrative_flags),
+        **({
+            "world_state": world_state,
+            "acquired": list(state.acquired),
+            "conditional_walking_links_blocked": blocked,
+            "transport_options": available_passages,
+        } if world_state is not None else {}),
         "real_player_or_hardware_test_verified": False,
         "actual_interactive_director_logic_executed": sequence > 0,
     }

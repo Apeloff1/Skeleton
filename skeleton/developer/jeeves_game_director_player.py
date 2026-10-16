@@ -298,7 +298,8 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
         var route_list: Array = found.get("routes", [])
         if not route_list.is_empty():
             native_map.highlight(str(snapshot.get("scene", "")),
-                                 route_list[0].get("places", []))
+                                 route_list[0].get("places", []),
+                                 route_list[0].get("steps", []))
         status_text.text = "Director found replay-verified alternate routes (read-only)."
         _render_state()
         return
@@ -321,10 +322,13 @@ func _on_response(result: int, status_code: int, _headers: PackedStringArray,
             or last_navigation.get("session_head_sha256") != snapshot.get("last_receipt_sha256")):
         last_navigation = {}
     var route_nodes: Array = []
+    var route_steps: Array = []
     var shown_routes: Array = last_navigation.get("routes", [])
     if not shown_routes.is_empty():
         route_nodes = shown_routes[0].get("places", [])
-    native_map.highlight(str(snapshot.get("scene", "")), route_nodes)
+        route_steps = shown_routes[0].get("steps", [])
+    native_map.highlight(str(snapshot.get("scene", "")),
+                         route_nodes, route_steps)
     last_presentation = {}
     if parsed.get("presentation") is Dictionary:
         last_presentation = parsed["presentation"]
@@ -339,6 +343,8 @@ func _render_state() -> void:
         view.remove_child(item)
     var here: String = str(snapshot.get("scene", ""))
     var region = scene_lookup.get(here, {})
+    native_map.blocked_routes(snapshot.get("conditional_walking_links_blocked", []))
+    native_map.update_transport_options(snapshot.get("transport_options", []))
     if here != previous_scene:
         previous_scene = here
         stage.apply_scene(region)
@@ -348,6 +354,22 @@ func _render_state() -> void:
     _line("Weather: " + str(snapshot.get("weather", "")) +
           " | Lighting: " + str(snapshot.get("lighting", "")) +
           " | Score cue: " + str(snapshot.get("music_cue", "")))
+    if snapshot.get("world_state") is Dictionary:
+        var living: Dictionary = snapshot["world_state"]
+        _line("Persistent world status:")
+        for reputation in living.get("standings", []):
+            if reputation is Array and reputation.size() == 2:
+                _line("  Faction " + str(reputation[0]) + ": " + str(reputation[1]))
+        _line("  Earned world changes: " + str(living.get("world_flags", [])))
+        _line("  Transport history: " + str(living.get("passage_uses", [])))
+        for blocked in snapshot.get("conditional_walking_links_blocked", []):
+            _line("  Locked walking exit to " + str(blocked.get("destination", "")) +
+                  " — " + str(blocked.get("gate_label", "")))
+        for passage in snapshot.get("transport_options", []):
+            if passage is Dictionary:
+                _line("  " + str(passage.get("mode", "")) + " to " +
+                      str(passage.get("destination", "")) + " : " +
+                      ("AVAILABLE" if passage.get("available", false) else "LOCKED"))
     _line("Quest progress:")
     for quest in snapshot.get("quests", []):
         var qline: String = str(quest["title"]) + " (" + str(quest["stage_index"]) + "/" + str(quest["stage_total"]) + ")"
@@ -398,6 +420,24 @@ func _render_state() -> void:
                       " | sampled " + str(option.get("observations", 0)) +
                       " | p ≈ " + str(option.get("estimated_probability", 0.0)))
     if not last_presentation.is_empty():
+        if last_presentation.get("living_world_events") is Dictionary:
+            var effects: Dictionary = last_presentation["living_world_events"]
+            _line("Actual persisted world consequences of the selected action:")
+            for changed in effects.get("standing_changes", []):
+                _line("  " + str(changed.get("faction", "")) + " reputation: " +
+                      str(changed.get("before", 0)) + " → " +
+                      str(changed.get("after", 0)) +
+                      " (" + str(changed.get("delta", 0)) + ")")
+            for flag in effects.get("new_world_flags", []):
+                _line("  World changed permanently: " + str(flag))
+            for item in effects.get("inventory_spent", []):
+                _line("  Item used or fare paid: " + str(item))
+            if effects.get("transport") is Dictionary:
+                var transport: Dictionary = effects["transport"]
+                _line("  Transit: " + str(transport.get("mode", "")) + " " +
+                      str(transport.get("source", "")) + " → " +
+                      str(transport.get("destination", "")) +
+                      " • " + str(transport.get("cost_turns", 0)) + " turns")
         _line("New canonical narrative and cinematic presentation cues:")
         for outcome in last_presentation.get("new_story_results", []):
             _line("  Outcome: " + str(outcome.get("quest", "")) + " / " +

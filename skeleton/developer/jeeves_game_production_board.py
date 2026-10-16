@@ -39,7 +39,7 @@ def _load_world(root: Path, source: str):
 def _runtime_signal_atlas(root: Path, *, source: str, world_digest: str) -> dict[str, Any]:
     """Read-only local source evidence; failures remain diagnostics, never P0 signoff."""
     from skeleton.developer.jeeves_game_director_atlas import verify
-    target = root / "build" / "director_atlases" / (world_digest[:20] + "-live-v5")
+    target = root / "build" / "director_atlases" / (world_digest[:20] + "-live-v6")
     if not target.exists() and not target.is_symlink():
         return {"present": False, "source_verified": False}
     try:
@@ -166,6 +166,30 @@ def _labyrinth_signal(root: Path, *, source: str) -> dict[str, Any]:
     }
 
 
+def _dynamic_world_signal(world: Any) -> dict[str, Any]:
+    """Surface factual authored world systems separately from native game claims."""
+    if world.dynamics is None:
+        return {
+            "enabled": False, "compiled_and_type_checked": False,
+            "native_transport_animation_executed": False,
+        }
+    from skeleton.developer.jeeves_game_director_dynamic_audit import analyze
+    report = analyze(world)
+    return {
+        "enabled": True,
+        "compiled_and_type_checked": True,
+        "faction_count": report["faction_count"],
+        "walking_gate_count": report["walking_gate_count"],
+        "transport_count": report["transport_count"],
+        "world_influence_count": report["authored_influence_count"],
+        "initial_permission_risks": report["structural_risks"][:50],
+        "initial_permission_risk_total": report["risk_count"],
+        "state_space_exhaustively_verified": False,
+        "real_native_transport_playthrough_verified": False,
+        "assurance_sha256": report["assurance_sha256"],
+    }
+
+
 def board(root: Path, *, source: str, routes: int = 3,
           dragon_digest: str | None = None) -> dict[str, Any]:
     from skeleton.ai.game_builder.quest_campaign_completion import compare_campaign_branches
@@ -256,6 +280,7 @@ def board(root: Path, *, source: str, routes: int = 3,
         "gameforge_engine": engine,
         "new_runtime_development_evidence": {
             "labyrinth_topology": _labyrinth_signal(root, source=source),
+            "dynamic_living_world": _dynamic_world_signal(world),
             "interactive_director_sessions": _runtime_signal_sessions(
                 root, world_digest=world.digest),
             "godot_scene_atlas": _runtime_signal_atlas(

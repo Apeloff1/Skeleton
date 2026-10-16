@@ -164,7 +164,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
                                             "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
-                                            "director-causality", "director-story-contrast", "dragon-navigation-study"))
+                                            "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
+                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast", "director-dynamics-playthrough"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -192,6 +193,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--destination")
     parser.add_argument("--route-profile", choices=("fastest", "scenic", "quiet", "novel", "quest"))
     parser.add_argument("--alternatives", type=int)
+    parser.add_argument("--intensity", type=int)
+    parser.add_argument("--include-optional", action="store_true")
     parser.add_argument("--sessions")
     parser.add_argument("--port", type=int)
     parser.add_argument("--timeout", type=float)
@@ -250,11 +253,48 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "director-causality": {"action", "session", "page", "page_size"},
             "director-story-contrast": {"action", "session", "other_session"},
             "dragon-navigation-study": {"action", "session", "approve"},
+            "director-dynamics-design": {"action", "source", "intensity"},
+            "director-dynamics-publish": {"action", "source", "intensity", "approve"},
+            "director-dynamics-audit": {"action", "source"},
+            "director-dynamics-playthrough": {"action", "source", "routes", "include_optional"},
+            "dragon-world-study": {"action", "session", "approve"},
+            "dragon-world-contrast": {"action", "session", "other_session"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
                 if key not in live_actions[args.action] and value is not None and value is not False:
                     raise ValueError("unrelated Director runtime option --" + key.replace("_", "-"))
+            if args.action == "director-dynamics-playthrough":
+                from skeleton.developer.jeeves_game_director_dynamic_playthrough import prove
+                if not args.source:
+                    raise ValueError("living campaign proof requires --source")
+                return prove(root, source=args.source,
+                             routes=args.routes if args.routes is not None else 3,
+                             optional=args.include_optional)
+            if args.action in {"dragon-world-study", "dragon-world-contrast"}:
+                from skeleton.developer.jeeves_game_dragon_world import queue, compare
+                if not args.session:
+                    raise ValueError("Dragon world research requires --session")
+                if args.action == "dragon-world-contrast":
+                    if not args.other_session:
+                        raise ValueError("Dragon world contrast requires --other-session")
+                    return compare(root, first=args.session, second=args.other_session)
+                return queue(root, session=args.session, approved_sha256=args.approve)
+            if args.action in {"director-dynamics-design",
+                               "director-dynamics-publish", "director-dynamics-audit"}:
+                if not args.source:
+                    raise ValueError("dynamic-world authoring requires --source")
+                if args.action == "director-dynamics-audit":
+                    from skeleton.developer.jeeves_game_director_dynamic_audit import audit
+                    return audit(root, source=args.source)
+                from skeleton.developer.jeeves_game_director_dynamic_author import (
+                    preview, publish,
+                )
+                complexity = args.intensity if args.intensity is not None else 3
+                if args.action == "director-dynamics-design":
+                    return preview(root, source=args.source, intensity=complexity)
+                return publish(root, source=args.source, intensity=complexity,
+                               approved_sha256=args.approve)
             if args.action == "dragon-navigation-study":
                 from skeleton.developer.jeeves_game_dragon_navigation import queue
                 if not args.session:
@@ -381,7 +421,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             if not args.session:
                 raise ValueError("Dragon session lesson requires --session")
             return enqueue(root, session=args.session, approved_digest=args.approve)
-        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout, args.at, args.tail, args.destination, args.route_profile, args.alternatives)):
+        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout, args.at, args.tail, args.destination, args.route_profile, args.alternatives, args.intensity)):
             raise ValueError("runtime options require a director-session or dragon-session action")
         director_actions = {"director-draft", "director-revise", "director-examine", "director-promote",
                             "director-board", "director-prepare-training"}

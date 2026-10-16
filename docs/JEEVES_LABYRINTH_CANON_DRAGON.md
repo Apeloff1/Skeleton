@@ -54,7 +54,7 @@ risks without asserting a creative-quality pass.
 
 ### Native Godot overview and route selection
 
-The latest media-backed Godot export uses a new `-live-v5` path and preserves
+The latest media-backed Godot export uses a new `-live-v6` path and preserves
 earlier v1/v2/v3/v4 projects rather than overwriting them. It includes an
 original directed-world minimap: nodes represent actual authored scenes,
 arrowed links represent actual permitted navigation edges, the current scene

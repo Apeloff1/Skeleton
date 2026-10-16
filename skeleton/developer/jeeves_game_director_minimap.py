@@ -11,6 +11,10 @@ signal node_selected(key: String)
 
 var nodes: Dictionary = {}
 var graph: Dictionary = {}
+var authored_passages: Array = []
+var blocked_foot_links: Array = []
+var live_transport_permissions: Dictionary = {}
+var selected_steps: Array = []
 var ordered_nodes: Array[String] = []
 var now: String = ""
 var selected_path: Array = []
@@ -39,11 +43,31 @@ func set_world(world: Dictionary) -> void:
             }
             ordered_nodes.append(key)
     ordered_nodes.sort()
+    authored_passages.clear()
+    var dynamics: Dictionary = world.get("dynamics", {})
+    for record in dynamics.get("passages", []):
+        if record is Dictionary:
+            authored_passages.append(record)
     _rebuild()
 
-func highlight(scene: String, route: Array = []) -> void:
+func blocked_routes(blocked: Array) -> void:
+    blocked_foot_links = blocked.duplicate(true)
+    queue_redraw()
+
+
+func update_transport_options(options: Array) -> void:
+    live_transport_permissions.clear()
+    for option in options:
+        if option is Dictionary:
+            live_transport_permissions[str(option.get("key", ""))] = option.get(
+                "available", false) == true
+    queue_redraw()
+
+
+func highlight(scene: String, route: Array = [], steps: Array = []) -> void:
     now = scene
     selected_path = route.duplicate()
+    selected_steps = steps.duplicate(true)
     queue_redraw()
 
 func _rebuild() -> void:
@@ -107,6 +131,32 @@ func _draw() -> void:
                     linked = true
                     break
             _edge(src, graph[next], linked)
+    # World passages are labeled transit routes, visually distinct from
+    # walkable graph edges. They remain locked unless the Python engine offers
+    # an actual action; clicking a node does not override its permission.
+    for passage in authored_passages:
+        var a: String = str(passage.get("source", ""))
+        var b: String = str(passage.get("destination", ""))
+        if graph.has(a) and graph.has(b):
+            var key: String = str(passage.get("key", ""))
+            var selected: bool = false
+            for choice in selected_steps:
+                if choice is Dictionary and choice.get("transport_key") == key:
+                    selected = true
+                    break
+            var available: bool = live_transport_permissions.get(key, false) == true
+            var color = (Color(0.96, 0.77, 0.22, 0.99) if selected else
+                Color(0.29, 0.90, 0.52, 0.89) if available else
+                Color(0.73, 0.33, 0.93, 0.70))
+            draw_dashed_line(graph[a], graph[b], color,
+                             3.0 if selected else 1.4, 6.0)
+            if passage.get("bidirectional", false) != true:
+                draw_circle(graph[b], 2.0, color)
+    for blocked in blocked_foot_links:
+        var a: String = str(blocked.get("source", now))
+        var b: String = str(blocked.get("destination", ""))
+        if graph.has(a) and graph.has(b):
+            draw_line(graph[a], graph[b], Color(0.93, 0.23, 0.16, 0.80), 2.0)
     for name in ordered_nodes:
         if not graph.has(name):
             continue

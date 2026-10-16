@@ -131,6 +131,14 @@ def plan(root: Path, *, session: str, destination: str | None = None,
     if type(alternatives) is not int or not 1 <= alternatives <= 8:
         raise ValueError("1..8 alternative paths can be displayed per request")
     folder, world, state, source, head, sequence = _load(root, name=session)
+    if world.dynamics is not None:
+        # Dynamic routes must evaluate actual ticket/faction/world-state changes.
+        # Static BFS over scene links would propose illegal or impossible moves.
+        from skeleton.developer.jeeves_game_director_dynamic_routes import plan as living_plan
+        return living_plan(
+            root, session=session, destination=destination,
+            profile=profile, alternatives=alternatives,
+        )
     graph = _graph(world)
     lookup = {scene.key: scene for scene in world.scenes}
     active_sites, goals = _active_sites(world, state)

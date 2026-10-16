@@ -31,10 +31,22 @@ def _hash(doc: object) -> str:
 
 
 def _context(state: Any) -> str:
-    # The scene and current ordered quest stage indices encode a coarse,
-    # stable authored state. No personal identifier enters the policy features.
-    return _hash({"scene": state.scene, "stage_index": list(state.stage_index),
-                  "completed": list(state.complete)})
+    # The legacy feature identity is byte-for-byte stable. Living worlds add
+    # all access-affecting facts; otherwise the model might wrongly transfer a
+    # policy learned *after* an unlock into the same scene before the unlock.
+    feature = {
+        "scene": state.scene,
+        "stage_index": list(state.stage_index),
+        "completed": list(state.complete),
+    }
+    if state.world_state is not None:
+        feature["dynamic_permissions"] = {
+            "acquired_items": list(state.acquired),
+            "narrative_flags": list(state.narrative_flags),
+            "world_flags": list(state.world_state.world_flags),
+            "faction_standings": [list(x) for x in state.world_state.standings],
+        }
+    return _hash(feature)
 
 
 def _examples(root: Path, session: str) -> tuple[Any, dict[str, Any], list[tuple[str, str]]]:
