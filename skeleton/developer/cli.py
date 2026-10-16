@@ -47,6 +47,19 @@ def dev_help_text() -> str:
         jeeves display-plan --target CONSOLE --native-width PX --native-height PX --screen-width PX --screen-height PX [--pixel-aspect-num N --pixel-aspect-den N]
         jeeves upscale-verify --target CONSOLE --source assets/in.png --output assets/out.png [--mode nearest|scale2x] [--passes 1..8]
         jeeves render-reference --target CONSOLE --source design/scene.json --output assets/frame.png
+        jeeves upscale-animation --target CONSOLE --source assets/sprite.png --output assets/animated.png [--pattern wind|breathe|bob|shimmer|water] [--frames N]
+        jeeves upscale-foliage --target CONSOLE --source assets/foliage.png --output assets/sway.png [--pattern wind]
+        jeeves upscale-shadow --target CONSOLE --source assets/prop.png --output assets/shadow.png
+        jeeves upscale-world --target CONSOLE --source design/stage.json --output design/enhanced.json [--richness 1..5]
+        jeeves upscale-environment|upscale-clutter|upscale-stage --target CONSOLE --source design/stage.json --output design/enhanced.json
+        jeeves upscale-parallax --target CONSOLE --source design/parallax.json --output assets/view.png
+        jeeves camera-plan --depth 2_5d|2_9d|3d [--yaw DEG --pitch DEG]
+        jeeves camera-render --target CONSOLE --source design/stage.json --output assets/rotated.png
+        jeeves upscale-music --target CONSOLE --source assets/score.wav --output assets/remaster.wav [--mode remaster|ambience|cinematic]
+        jeeves asset-inventory [--page N --page-size N]
+        jeeves upscale-review [--passes 1..8]
+        jeeves vividness-review --source design/enhanced.json [--passes 1..8]
+        jeeves queue-upscaled-training [--page N --page-size N]
         Only bounded painter/fixed/shader 3D render families; no native hardware claim
         jeeves upscale --target CONSOLE --source assets/input.png --output assets/hd.png [--factor 2|4|8] [--mode nearest|scale2x]
         jeeves production-init --target CONSOLE --genre GENRE --period YYYY-YYYY
