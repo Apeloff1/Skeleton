@@ -117,6 +117,8 @@ def inspect_python(path: str, source: str, tracked: set[str], *, test: bool = Fa
         result["ambiguous_package_exports"], key=lambda item: (item["package"], item["symbol"]))
     if result["unresolved_relative_modules"]:
         result["warnings"].append("missing-relative-import-module")
+    if result["ambiguous_package_exports"]:
+        result["warnings"].append("package-export-requires-owner-review")
     if result["kind"] in ("forwarding-module", "empty-or-docstring-only"):
         result["warnings"].append("no-local-executable-definition")
     if test:
@@ -196,6 +198,10 @@ def audit(manifest: dict[str, Any], tracked: set[str], head: str, root: Path,
             details[kind] = value
             if kind == "implementation":
                 counts["implementation_" + value.get("kind", "unreadable")] += 1
+                counts["delegated_relative_owner_references"] += len(
+                    value.get("relative_owner_imports", []))
+                counts["ambiguous_package_export_references"] += len(
+                    value.get("ambiguous_package_exports", []))
             for warning in value.get("warnings", []):
                 counts[warning.split(":")[0]] += 1
         items.append(details)
