@@ -39,7 +39,9 @@ def _locate(sequence: list[dict[str, Any]], key: str) -> dict[str, Any]:
 
 def _edit(world: dict[str, Any], edit: dict[str, Any]) -> None:
     target = edit.get("target")
-    if target not in ALLOWED or edit.get("field") not in ALLOWED[target]:
+    if (not isinstance(target, str) or target not in ALLOWED
+            or not isinstance(edit.get("field"), str)
+            or edit["field"] not in ALLOWED[target]):
         raise ValueError("unsupported Director authored field")
     selector = {
         "bible": {"target", "field", "value"},
