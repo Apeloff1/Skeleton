@@ -200,6 +200,10 @@ def test_real_provider_adapter_contract_is_used(monkeypatch):
     assert isinstance(observed[0], ProviderRequest)
     assert observed[0].purpose == "jeeves-game-design-proposal"
     assert observed[0].data_class == "internal"
+    assert observed[0].resource_budget.max_output_tokens == 1800
+    assert observed[0].resource_budget.max_cost_usd == 1.0
+    assert observed[0].resource_budget.max_tool_calls == 0
+    assert observed[0].operation_id
     assert not observed[0].tools
 
 
