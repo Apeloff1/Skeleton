@@ -32,7 +32,7 @@
     "test:localization": "node --test scripts/test-localization-contract.mjs",
     "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
     "test:dragon-native-editor": "node --test scripts/test-dragon-native-puzzle-preview.mjs scripts/test-dragon-native-puzzle-history.mjs",
-    "test:product-journeys": "node --test scripts/test-product-journeys.mjs",
+    "test:product-journeys": "node --test scripts/test-product-journeys.mjs scripts/test-jeeves-model-inventory.mjs",
     "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
     "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
     "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
@@ -113,7 +113,6 @@
   "private": true,
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "resolutions": {
-
     "shell-quote": "1.11.0",
     "tar": "7.5.21",
     "undici": "6.28.1",
