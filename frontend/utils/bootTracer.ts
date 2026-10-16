@@ -304,12 +304,15 @@ export async function markCrash(): Promise<number> {
   return n;
 }
 
-export async function clearCrashes(): Promise<void> {
+export async function clearCrashes(): Promise<boolean> {
+  if (_resetInProgress) return false;
   try {
-    if (_resetInProgress) return;
     await writeCrashCount(0);
     await AsyncStorage.setItem(KEY_LAST_CLEAN, String(Date.now()));
-  } catch { /* swallow */ }
+    return true;
+  } catch {
+    return false; // no clean-boot claim without native acknowledgement
+  }
 }
 
 /**
@@ -351,10 +354,20 @@ export async function bootGuard(signal?: AbortSignal): Promise<'safe-mode' | 'no
 }
 
 /** Mark this boot as clean — call once the app finishes initial mount. */
-export async function markBootClean(): Promise<void> {
-  await clearCrashes();
-  await traceStep('boot_clean');
-  // Track lifetime clean-boot count (diagnostics) — best effort.
+let _cleanBootAcknowledged = false;
+let _cleanBootPromise: Promise<void> | null = null;
+
+export function markBootClean(): Promise<void> {
+  if (_cleanBootAcknowledged) return Promise.resolve();
+  if (_cleanBootPromise) return _cleanBootPromise;
+  const operation = (async () => {
+    if (!(await clearCrashes())) {
+      await traceStep('boot_clean_unverified');
+      return;
+    }
+    _cleanBootAcknowledged = true; // one durable clean receipt per process
+    await traceStep('boot_clean');
+    // Track lifetime clean-boot count (diagnostics) — best effort.
   try {
     const prev = parseInt((await AsyncStorage.getItem('@boot/clean_count')) || '0', 10) || 0;
     await AsyncStorage.setItem('@boot/clean_count', String(prev + 1));
@@ -367,6 +380,9 @@ export async function markBootClean(): Promise<void> {
       .then(m => m.runSelfCleaner('boot_clean'))
       .catch(() => {});
   } catch { /* swallow */ }
+  })();
+  _cleanBootPromise = operation.finally(() => { _cleanBootPromise = null; });
+  return _cleanBootPromise;
 }
 
 /** Wipes boot state (for "Reset & retry" buttons). */
