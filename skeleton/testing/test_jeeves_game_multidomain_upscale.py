@@ -322,3 +322,33 @@ def test_invalid_or_unrelated_options_fail_closed(tmp_path,action,params):
     root=workspace(tmp_path)
     result=command(root,action,*params)
     assert not result["ok"],result
+
+
+
+def test_vividness_replays_every_stage_asset_and_preserved_path(tmp_path):
+    root=workspace(tmp_path)
+    stage_source(root)
+    result=command(root,"upscale-world","--target","snes",
+                   "--source","design/forest-stage.json",
+                   "--output","design/vivid.json","--richness","4")
+    assert result["ok"],result
+    review=command(root,"vividness-review","--source","design/vivid.json",
+                   "--passes","5")
+    assert review["ok"],review
+    assert len(review["passes"])==5
+    assert all(row["route_preserved"] for row in review["passes"])
+    assert all(row["authoring_assets_checked"]==2 for row in review["passes"])
+    assert review["every_stage_dressing_item_scrutinized"]
+    assert not review["professional_quality_certified"]
+    sprite(root,"background.png",w=8,h=8)  # overwrite source reference after upscale
+    after=command(root,"vividness-review","--source","design/vivid.json")
+    assert not after["ok"]
+    assert "texture changed" in after["error"]
+
+
+def test_vividness_does_not_certify_unexecuted_stage(tmp_path):
+    root=workspace(tmp_path)
+    stage_source(root)
+    result=command(root,"vividness-review",
+                   "--source","design/forest-stage.json")
+    assert not result["ok"]
