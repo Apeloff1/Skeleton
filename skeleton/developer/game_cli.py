@@ -347,7 +347,7 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "upscale-foliage", "upscale-animation", "upscale-shadow",
                                                    "upscale-parallax", "upscale-music", "asset-inventory",
                                                    "upscale-review", "vividness-review", "queue-upscaled-training",
-                                                   "camera-plan"))
+                                                   "camera-plan", "camera-render"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
