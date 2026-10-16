@@ -44,6 +44,36 @@ def _packet(root: Path, source: str) -> dict[str, Any]:
             }
             for destination in scene.links
         ]
+        if world.dynamics is not None:
+            from skeleton.ai.game_builder.quest_world_dynamics import gate_for
+            for movement in transitions:
+                guard = gate_for(world.dynamics, scene.key,
+                                 movement["destination_scene"])
+                movement["requires_current_world_state"] = guard is not None
+                if guard is not None:
+                    movement["author_condition"] = guard.requirements.payload()
+                    movement["gate_label"] = guard.label
+                    movement["permission_checked_at_runtime"] = True
+            for route in world.dynamics.passages:
+                if not (route.source == scene.key or
+                        route.bidirectional and route.destination == scene.key):
+                    continue
+                destination = route.destination if route.source == scene.key else route.source
+                transitions.append({
+                    "input": "ui_or_controller_select",
+                    "action": {
+                        "kind": "transit", "key": route.key, "scene": scene.key,
+                    },
+                    "destination_scene": destination, "transport_mode": route.mode,
+                    "original_transport_name": route.name,
+                    "turn_cost": route.cost_turns,
+                    "condition": route.requirements.payload(),
+                    "consumes_item": route.consume_item,
+                    "grants_world_flag": route.grant_world_flag,
+                    "faction_changes": [list(x) for x in route.reputation_change],
+                    "permission_checked_at_runtime": True,
+                    "checked_by": "Director.available_director_actions",
+                })
         for affordance in scene.affordances:
             transitions.append({
                 "input": "ui_or_controller_interact",
@@ -73,12 +103,24 @@ def _packet(root: Path, source: str) -> dict[str, Any]:
                 for c in scene.cutscenes
             ],
         })
+    dynamics = {}
+    if world.dynamics is not None:
+        dynamics = {
+            "living_world_bindings_present": True,
+            "dynamic_world_schema": world.dynamics.payload()["schema"],
+            "faction_identities": [x.key for x in world.dynamics.factions],
+            "guarded_walking_links": len(world.dynamics.gates),
+            "authored_transport_routes": len(world.dynamics.passages),
+            "reputation_influence_rules": len(world.dynamics.influences),
+            "static_source_declarations_are_not_runtime_permissions": True,
+        }
     return {
         "schema": SCHEMA, "project": world.project_id,
         "source": source, "source_sha256": source_sha,
         "world_sha256": world.digest, "scene_count": len(scenes),
         "declared_action_bindings": all_actions,
         "scene_bindings": scenes,
+        **dynamics,
         "runtime_rule": "Re-evaluate available Director actions against the current canonical state before executing every event",
         "scene_rendering_implemented": False,
         "runtime_ui_wired_to_director": False,
