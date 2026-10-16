@@ -44,7 +44,8 @@ function DiagnosticsOverlay() {
 
 export default function RootLayout() {
   const pathname = usePathname();
-  const { version: skinVersion } = useActiveSkin();
+  // Subscribe to palette changes without destroying screens, providers or in-flight work.
+  useActiveSkin();
 
   useEffect(() => {
     if (__DEV__) {
@@ -85,7 +86,7 @@ export default function RootLayout() {
       </Head>
       <LocaleProvider>
         <FeatureFlagProvider>
-          <View style={[styles.root, { backgroundColor: theme.colors.bg }]} key={`skin-${skinVersion}`}>
+          <View style={[styles.root, { backgroundColor: theme.colors.bg }]}>
           <StatusBar style="light" />
           <ErrorBoundary>
             <ScreenGuard key={pathname || '/'} name={pathname || '/'}>
