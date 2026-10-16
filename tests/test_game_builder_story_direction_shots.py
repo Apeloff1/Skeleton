@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from skeleton.ai.game_builder.story_canon_fabric import BIBLE, SCENE, sign
+from skeleton.ai.game_builder.story_canon_fabric import BIBLE, sign
 from skeleton.ai.game_builder.story_direction_shot_pipeline import (
     ShotDirectionError, audit_cinematic_direction,
 )
