@@ -58,7 +58,11 @@ export function useMobileOptimization() {
     imageQuality: 'medium',
   });
 
-  const interactionRef = useRef<ReturnType<typeof requestIdleTask> | null>(null);
+  const pendingIdleRef = useRef(new Set<{
+    cancel: () => void;
+    reject: (error: Error) => void;
+  }>());
+  const mountedRef = useRef(true);
 
   // Update metrics on dimension change
   useEffect(() => {
@@ -90,30 +94,49 @@ export function useMobileOptimization() {
       maxListItems = 100;
     }
 
-    setOptimization(prev => ({
-      ...prev,
-      imageQuality,
-      maxListItems,
-      isReady: true,
-    }));
+    setOptimization(prev => {
+      if (prev.imageQuality === imageQuality && prev.maxListItems === maxListItems && prev.isReady) {
+        return prev;
+      }
+      return { ...prev, imageQuality, maxListItems, isReady: true };
+    });
   }, [metrics]);
 
   // Run after interactions complete (prevents jank)
   const runAfterInteraction = useCallback(<T,>(callback: () => T): Promise<T> => {
-    return new Promise((resolve) => {
-      interactionRef.current = requestIdleTask(() => {
-        resolve(callback());
+    if (!mountedRef.current) return Promise.reject(new Error('Component unmounted'));
+    if (pendingIdleRef.current.size >= 128) {
+      return Promise.reject(new Error('Interaction queue saturated'));
+    }
+    return new Promise<T>((resolve, reject) => {
+      const job = { cancel: () => {}, reject };
+      pendingIdleRef.current.add(job);
+      const timer = requestIdleTask(() => {
+        pendingIdleRef.current.delete(job);
+        if (!mountedRef.current) {
+          reject(new Error('Component unmounted'));
+          return;
+        }
+        try {
+          resolve(callback());
+        } catch (error) {
+          reject(error);
+        }
       });
+      job.cancel = timer.cancel;
     });
   }, []);
 
   // Debounced heavy operations
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounce = useCallback((callback: () => void, delay: number = 300) => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    debounceRef.current = setTimeout(callback, delay);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!mountedRef.current) return;
+    const boundedDelay = Number.isFinite(delay) ? Math.max(0, Math.min(delay, 60_000)) : 300;
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      if (mountedRef.current) callback();
+    }, boundedDelay);
   }, []);
 
   // Throttled operations
@@ -158,13 +181,16 @@ export function useMobileOptimization() {
 
   // Cleanup on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      if (interactionRef.current) {
-        interactionRef.current.cancel();
+      mountedRef.current = false;
+      for (const task of pendingIdleRef.current) {
+        task.cancel();
+        task.reject(new Error('Component unmounted'));
       }
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+      pendingIdleRef.current.clear();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = null;
     };
   }, []);
 
