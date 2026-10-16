@@ -78,23 +78,33 @@ def content_audit(records: list[tuple[str, str, int]], max_bytes: int, max_examp
     counts["content_skipped_oversize"] = sum(
         1 for path, _sha, size in records if path.endswith(SOURCE_SUFFIXES) and size > max_bytes
     )
+    # Bounded cache: archival snapshots repeat blobs, but storing every source
+    # indefinitely would accumulate unbounded memory across a full audit.
     content_cache: dict[str, bytes] = {}
+    cache_bytes = 0
+    max_cache_bytes = 16 * 1024 * 1024
     proc = subprocess.Popen(["git", "cat-file", "--batch"], stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     assert proc.stdin is not None and proc.stdout is not None
     try:
         for path, sha in candidates:
-            if sha not in content_cache:
+            raw = content_cache.get(sha)
+            if raw is None:
                 proc.stdin.write((sha + "\n").encode("ascii"))
                 proc.stdin.flush()
                 header = proc.stdout.readline().decode("ascii", "replace").strip().split()
                 if len(header) != 3 or header[0] != sha or header[1] != "blob":
                     raise ValueError(f"unexpected Git object header: {header}")
                 length = int(header[2])
-                content_cache[sha] = proc.stdout.read(length)
+                raw = proc.stdout.read(length)
                 if proc.stdout.read(1) != b"\n":
                     raise ValueError("missing Git object separator")
-            raw = content_cache[sha]
+                if length <= 128 * 1024:
+                    while content_cache and cache_bytes + length > max_cache_bytes:
+                        oldest = next(iter(content_cache))
+                        cache_bytes -= len(content_cache.pop(oldest))
+                    content_cache[sha] = raw
+                    cache_bytes += length
             if b"\0" in raw:
                 continue
             txt = raw.decode("utf-8", "replace")
