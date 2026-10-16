@@ -150,7 +150,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                             "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                             "production-status", "production-cycle", "production-training",
-                                                   "direction-audit", "direction-revision",
+                                                   "direction-audit", "direction-revision", "direction-benchmark",
                                             "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                             "upscale-foliage", "upscale-animation", "upscale-shadow",
                                             "upscale-parallax", "upscale-music", "asset-inventory",
@@ -251,7 +251,17 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                        *display_args)
         other_content = (args.kind, args.brief, args.digest, args.approve,
                          args.include_notes, args.profile, args.evidence)
-        if args.action in {"direction-audit", "direction-revision"}:
+        if args.action == "direction-benchmark":
+            if not args.source:
+                raise ValueError("direction-benchmark requires --source design/story_reference_cohorts.json")
+            if any((args.kind, args.brief, args.include_notes, args.digest, args.approve,
+                    *quality_args, args.target, args.output, args.mode, args.factor,
+                    args.dry_run, args.passes, args.gate, args.repair_generated,
+                    args.page, args.page_size, *display_args)):
+                raise ValueError("direction-benchmark accepts --source only")
+            from skeleton.developer.jeeves_game_direction_cli import benchmark
+            output = benchmark(root, source=args.source)
+        elif args.action in {"direction-audit", "direction-revision"}:
             if not args.source:
                 raise ValueError("direction-audit/revision require --source design/story_direction_packet.json")
             if any((args.kind, args.brief, args.include_notes, args.digest, args.approve,
