@@ -29,6 +29,18 @@ REQUIRED_GATES = (
     "runtime_boot", "full_playthrough", "performance_and_release",
 )
 AUTOMATED_GATES = frozenset(("market_quality", "source_integrity", "runtime_boot"))
+# A terminal success requires a real domain verifier for every discipline.
+# Mere JSON receipts or an observed Godot boot are never enough.
+EXPECTED_EVIDENCE_OWNERS = {
+    "market_quality": "independent_market_audit",
+    "source_integrity": "canonical_source",
+    "runtime_boot": "godot_boot",
+    "full_playthrough": "verified_end_to_end_run",
+    "performance_and_release": "verified_hardware_and_release",
+    **{name: "qualified_" + name for name in REQUIRED_GATES if name not in {
+        "market_quality", "source_integrity", "runtime_boot",
+        "full_playthrough", "performance_and_release"}},
+}
 HASH = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -193,8 +205,10 @@ def _events(root: Path, policy_sha: str):
             or not isinstance(item["reason"], str) or len(item["reason"]) > 2000
             or not isinstance(item["at_utc"], str)):
             raise ProductionError("invalid event identity")
-        if item["evidence_kind"] not in ("canonical_source", "market_operator_evidence",
-                                         "godot_boot", "operator_observation"):
+        if item["evidence_kind"] not in (
+            "canonical_source", "market_operator_evidence", "godot_boot",
+            "operator_observation", *EXPECTED_EVIDENCE_OWNERS.values()
+        ):
             raise ProductionError("unsupported evidence owner")
         calculated = _digest({k: v for k, v in item.items() if k != "digest"})
         if calculated != item["digest"]:
@@ -226,9 +240,14 @@ def status(root: Path) -> dict[str, Any]:
             "last_evidence_kind": current["evidence_kind"] if current else None,
             "needs_more_work": current is None or current["outcome"] != "passed",
         })
-    # NOTE: a verified Godot boot is not a full user game playthrough and an
-    # operator-supplied benchmark is not independently corroborated.
-    qualified = False
+    # NOT just an "all green" count: require exactly the designated
+    # independent/engine-backed evidence owner for each disciplinary gate.
+    # Most owners are not yet implemented, so incomplete studios remain open.
+    qualified = all(
+        gate in latest and latest[gate]["outcome"] == "passed"
+        and latest[gate]["evidence_kind"] == EXPECTED_EVIDENCE_OWNERS[gate]
+        for gate in REQUIRED_GATES
+    )
     return {
         "ok": True, "action": "production-status", "schema": SCHEMA,
         "policy_sha256": digest, "last_event_sha256": last_digest,
