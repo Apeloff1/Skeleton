@@ -37,17 +37,48 @@ export interface TraceStep {
 }
 
 let _memoryTrace: TraceStep[] = [];  // mirror so synchronous reads work
+const TRACE_COALESCE_MS = 125;
+let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+let _traceWriteTail: Promise<void> = Promise.resolve();
+
+function flushTrace(): Promise<void> {
+  if (_flushTimer !== null) {
+    clearTimeout(_flushTimer);
+    _flushTimer = null;
+  }
+  const serialized = JSON.stringify(_memoryTrace);
+  // Serialize writes so a delayed native adapter cannot overwrite a newer
+  // snapshot with an older one. A failed write never stops later attempts.
+  _traceWriteTail = _traceWriteTail.catch(() => {}).then(async () => {
+    await _rotationReady;
+    await AsyncStorage.setItem(KEY_TRACE, serialized);
+  }).catch(() => {});
+  return _traceWriteTail;
+}
+
+function queueTraceFlush(step: string): Promise<void> {
+  const crashCritical = /^(GLOBAL_ERROR|NAV_SAFE_MODE|UNHANDLED_REJECTION|boot_clean|crash:)/.test(step);
+  if (crashCritical) return flushTrace();
+  if (_flushTimer === null) {
+    _flushTimer = setTimeout(() => { _flushTimer = null; void flushTrace(); }, TRACE_COALESCE_MS);
+  }
+  return Promise.resolve();
+}
 
 // ── Live trace pub/sub (drives the on-screen DevLogOverlay) ─────────────
 type TraceListener = (t: TraceStep[]) => void;
 const _listeners = new Set<TraceListener>();
+let _notifyScheduled = false;
 function _notify(): void {
-  const snap = [..._memoryTrace];
-  // Defer listener (React setState) out of the current render/commit phase —
-  // traceStepSync is sometimes called DURING render (e.g. hub_render_enter),
-  // and notifying synchronously would "setState while rendering another
-  // component". queueMicrotask schedules it safely after the current frame.
-  const run = () => { _listeners.forEach(l => { try { l(snap); } catch {} }); };
+  // Collapse bursts into one React notification; never update React during
+  // another component's render or enqueue hundreds of hot-path setStates.
+  if (_notifyScheduled) return;
+  _notifyScheduled = true;
+  const run = () => {
+    _notifyScheduled = false;
+    const snap = [..._memoryTrace];
+    _listeners.forEach(l => { try { l(snap); } catch {} });
+  };
   try {
     if (typeof queueMicrotask === 'function') queueMicrotask(run);
     else setTimeout(run, 0);
@@ -93,9 +124,7 @@ export async function traceStep(step: string, extra?: Record<string, any>): Prom
   // crash, the single most reliable trail for diagnosing device force-close.
   try { console.log(`[BOOTTRACE +${row.ts - _T0}ms] ${label}`); } catch {}
   _notify();
-  try {
-    await AsyncStorage.setItem(KEY_TRACE, JSON.stringify(_memoryTrace));
-  } catch { /* swallow */ }
+  try { await queueTraceFlush(step); } catch { /* swallow */ }
 }
 
 /**
@@ -111,7 +140,7 @@ export function traceStepSync(step: string, extra?: Record<string, any>): void {
   if (_memoryTrace.length > MAX_TRACE_LEN) _memoryTrace = _memoryTrace.slice(-MAX_TRACE_LEN);
   try { console.log(`[BOOTTRACE +${row.ts - _T0}ms] ${label}`); } catch {}
   _notify();
-  try { AsyncStorage.setItem(KEY_TRACE, JSON.stringify(_memoryTrace)).catch(() => {}); } catch {}
+  try { void queueTraceFlush(step).catch(() => {}); } catch {}
 }
 
 let _crashTraceInstalled = false;
@@ -194,7 +223,7 @@ async function rotateSessionsOnce(): Promise<void> {
   } catch { /* never block */ }
 }
 // Kick rotation immediately on module load (queues the read before writes).
-rotateSessionsOnce();
+const _rotationReady = rotateSessionsOnce();
 
 export async function getCrashCount(): Promise<number> {
   try {
@@ -279,6 +308,7 @@ export async function resetBootState(): Promise<void> {
     await AsyncStorage.multiRemove([KEY_TRACE, KEY_CRASH_COUNT, KEY_LAST_CLEAN]);
   } catch { /* swallow */ }
   _memoryTrace = [];
+  if (_flushTimer !== null) { clearTimeout(_flushTimer); _flushTimer = null; }
 }
 
 /** Read-only synchronous mirror of the in-process trace (since boot). */
