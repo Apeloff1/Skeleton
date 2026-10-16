@@ -114,7 +114,7 @@ jobs:
 
   python-runtime:
     name: Checkpoint inference, route imports and controller game replay
-    runs-on: ubuntu-24.04
+    runs-on: windows-latest
     timeout-minutes: 25
     env:
       PYTHONPATH: "."
@@ -123,11 +123,20 @@ jobs:
       XAI_API_KEY: ""
       ANTHROPIC_API_KEY: ""
     steps:
-      - name: Checkout exact PR head
+      - name: Checkout exact PR head (runtime sources)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /frontend/
+            /skeleton/
+            /backend/
+            /scripts/
+            /tests/
+            /machine/
+            /pyproject.toml
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -171,19 +180,24 @@ jobs:
 
   stub-inventory:
     name: Full tracked stub / truncation evidence inventory
-    runs-on: ubuntu-24.04
+    runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout exact PR head
+      - name: Checkout exact PR head (Git objects and audit sources)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /scripts/classify_repo_stubs.py
+            /tests/test_classify_repo_stubs.py
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
       - name: Compile and sanity-check scanner
+        shell: bash
         run: |
           python -m py_compile scripts/classify_repo_stubs.py
           python - <<'PY'
