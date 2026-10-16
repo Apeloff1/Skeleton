@@ -81,7 +81,8 @@ def _dynamic_path(world: DirectorWorld, state: DirectorState,
                 tuple(sorted(npc for npc, cycle in society.last_talk_cycle
                              if cycle == clock["cycle"])),
             )
-        return (at.scene, at.acquired, status.standings,
+        return (at.scene, at.acquired, at.stage_index, at.records,
+                status.fired_influences, status.standings,
                 status.world_flags, at.narrative_flags, at.complete, social)
     expansions = 0
     while frontier and expansions < 30000:
@@ -101,7 +102,8 @@ def _dynamic_path(world: DirectorWorld, state: DirectorState,
         best[key] = cost
         for action in available_director_actions(world, here):
             if action.kind not in {
-                    "travel", "transit", "speak", "discuss", "buy", "sell", "rest"}:
+                    "travel", "transit", "speak", "discuss",
+                    "buy", "sell", "rest", "use"}:
                 continue
             after = director_step(world, here, action)
             next_status = after.world_state
