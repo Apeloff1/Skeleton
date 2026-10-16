@@ -1,64 +1,47 @@
-## Lint setup for the Expo frontend
+# Frontend lint and long-session stability
 
-This project ships a TypeScript-aware ESLint config (`.eslintrc.cjs`) but
-**deliberately does not pin any lint packages in `package.json`**. This is
-because `eslint-config-expo` was removed in Feb 2026 — it ran
-`expo install --check` inside the EAS CI build pipeline and caused the
-cloud Android builds to fail by overriding the pinned
-`@react-native-async-storage/async-storage` version.
+The canonical lint configuration is [eslint.config.js](eslint.config.js)
+(ESLint 9 flat config, Expo). The frontend pins `eslint` and
+`eslint-config-expo` in `package.json`; do **not** use unpinned
+`npx -y` commands or a stale `.eslintrc.cjs` recipe.
 
-### How to run lint locally
+From `frontend/`, with the project dependencies installed:
 
-```bash
-cd /app/frontend
-npx --yes \
-  -p eslint@9 \
-  -p @typescript-eslint/parser@8 \
-  -p @typescript-eslint/eslint-plugin@8 \
-  -p eslint-plugin-react-hooks@5 \
-  eslint . --ext .ts,.tsx
+```sh
+yarn lint:ci
+yarn typecheck
+yarn test:stability
+yarn test:stability:reconciliation
 ```
 
-Or, the most common one-liner used in CI / dev:
+The stability suite includes deterministic Node regression tests for
+boot recovery, request retries, storage retention, thermal queue liveness,
+battery listeners, and recovery single-flight behavior. It does not replace
+on-device endurance, installed-app E2E, or native lifecycle testing.
 
-```bash
-cd /app/frontend
-npx -y eslint . --ext .ts,.tsx
-```
+## Incremental lint debt retirement
 
-`npx` fetches the peers on first run, caches them locally, and never
-mutates `node_modules/.bin` — so the EAS build path stays clean.
+The broader app still has pre-existing React Hooks lint debt. We do not
+turn every legacy violation into a build blocker or suppress every rule
+globally without accounting for it. The battery, thermal, and recovery
+modules now opt back into `react-hooks/exhaustive-deps` and
+`@typescript-eslint/no-unused-vars`. Future migrations should expand
+that list only after fixing the affected hooks and adding lifecycle
+regressions. Do not disable `react-hooks/rules-of-hooks`.
 
-### Autofix a single file
+## Operational invariants
 
-```bash
-npx -y eslint app/hub.tsx --fix
-```
+- Native listeners acquired after an async initialization step must be
+  cancelled if the component unmounted while awaiting the device.
+- A React state updater cannot call another state setter.
+- Device observations should not be fabricated or replaced when another
+  sensor sends a partial update; unknown battery readings are ignored.
+- Queued work must settle after synchronous callback failures, and
+  cancelled delayed work must not execute side effects.
+- Background throttling survives thermal recalculation and cooldown.
+- Recovery runs are single-flight, bounded, and do not update unmounted UI.
 
-### Continuous integration
-
-If a CI runner needs to enforce lint, install the four peer packages there
-(not in `package.json`):
-
-```yaml
-- run: npm i -g eslint@9 @typescript-eslint/parser@8 @typescript-eslint/eslint-plugin@8 eslint-plugin-react-hooks@5
-- run: eslint . --ext .ts,.tsx
-```
-
-### What this config catches
-
-* **`react-hooks/rules-of-hooks`** — wrong hook ordering / conditional hooks
-* **`react-hooks/exhaustive-deps`** — missing useEffect/useCallback dependencies
-* **`@typescript-eslint/no-unused-vars`** — unused locals (ignored if `_`-prefixed)
-* **`eslint:recommended`** — common bugs (no-undef-init, no-irregular-whitespace, etc.)
-* TypeScript-aware rules from `@typescript-eslint/recommended`
-
-### What this config intentionally does **not** catch
-
-* `no-explicit-any` — too many existing usages in the codebase; flipped off.
-* Style rules — leave that to prettier / editor settings.
-
-### Adding new rules
-
-Edit `.eslintrc.cjs`. Avoid extending `eslint-config-expo` — it pulls in
-the broken `expo install --check` hook (see top of file).
+For a release verdict, also run the complete app and backend checks,
+first-install checks, and a real multi-hour device exercise. Passing lint,
+unit tests, or TypeScript compilation alone does not prove long-session
+stability.
