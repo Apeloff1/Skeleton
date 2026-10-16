@@ -1,29 +1,8 @@
-name: ARM64 Ubuntu Validation
+name: "[Specialized] ARM64 Ubuntu Validation"
 
+# SPECIALIZED: heavyweight verification; explicit dispatch only.
+# Not running is NOT a passed release/security qualification.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "Dockerfile"
-      - "backend/**"
-      - "frontend/**"
-      - "skeleton/**"
-      - "!backend/tests/**"
-      - "pyproject.toml"
-      - "docker-compose.yml"
-      - ".github/workflows/arm64.yml"
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "Dockerfile"
-      - "backend/**"
-      - "frontend/**"
-      - "skeleton/**"
-      - "!backend/tests/**"
-      - "pyproject.toml"
-      - "docker-compose.yml"
-      - ".github/workflows/arm64.yml"
   workflow_dispatch:
 
 permissions:

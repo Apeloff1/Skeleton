@@ -1,0 +1,31 @@
+{
+  "schema": "skeleton.ci.workflow_tiers.v1",
+  "purpose": "fast iteration without falsely clearing specialized acceptance",
+  "specialized_manual_only": [
+    "ci.yml",
+    "app-assembly.yml",
+    "arm64.yml",
+    "ai-product-completion.yml",
+    "ai-p0-current-main-validation.yml",
+    "p3t2-governed-storage.yml",
+    "p3t2-governed-data.yml",
+    "frontier-contracts.yml",
+    "packaging-runtime-image.yml",
+    "cost-admission-closure.yml",
+    "governance-closure.yml"
+  ],
+  "core_automatic_pr": [
+    "merge-readiness.yml",
+    "backend-quality.yml",
+    "secret-scanning.yml",
+    "malware-gate.yml",
+    "dependency-review.yml",
+    "workflow-input-security.yml"
+  ],
+  "release_rules": {
+    "all_specialized_not_run_is_unqualified": true,
+    "security_gates_remain_enabled": true,
+    "full_p0_signoff_requires_separate_exact_head_evidence": true,
+    "fast_merge_gate_not_full_qualification": true
+  }
+}

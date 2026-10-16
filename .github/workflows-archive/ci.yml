@@ -1,34 +1,12 @@
 # ============================================================================
 # Tutolage CI/CD Pipeline
 # ============================================================================
-name: CI/CD
+name: "[Specialized] CI/CD"
+# SPECIALIZED: heavyweight verification; explicit dispatch only.
+# Not running is NOT a passed release/security qualification.
 on:
-  push:
-    branches: [develop]
-    paths:
-      - '**'
-      - '!docs/**'
-      - '!**/*.md'
-      - '!.github/workflows/**'
-      - '.github/workflows/ci.yml'
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '**'
-      - '!docs/**'
-      - '!**/*.md'
-      - '!.github/workflows/**'
-      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
-# PR and develop pushes keep CI; main instead uses the canonical Merge
-# Readiness aggregate plus independent security gates, avoiding duplicate CI.
-# Collapse superseded validation for the same PR so rapid pushes do not occupy
-# runner capacity with stale commits. Non-PR runs use a per-commit group so a
-# later main/develop push cannot replace an earlier pending commit.
-# Workflow name keeps unrelated pipelines isolated while PR number/ref scopes
-# cancellation to one change set.
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

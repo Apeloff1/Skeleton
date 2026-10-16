@@ -123,6 +123,30 @@ jobs:
       - name: Syntax check (full backend)
         if: steps.scope.outputs.full == 'true'
         run: python -m compileall -q .
+      # Deep suite remains available on explicit specialized dispatch.
+      - name: Jeeves game development, fidelity and continuous production contracts
+        if: steps.scope.outputs.full == 'true' && github.event_name == 'workflow_dispatch'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_jeeves_game_completion.py
+          skeleton/testing/test_jeeves_game_multidomain_upscale.py
+          tests/test_game_builder_story_direction_quality.py
+          tests/test_game_builder_story_dramaturgy_graph.py
+          tests/test_game_builder_story_direction_shots.py
+          tests/test_game_builder_story_gameplay_bridge.py
+          tests/test_game_builder_story_playthrough_segments.py
+          tests/test_game_builder_p0_campaign.py
+          tests/test_game_builder_story_playable_payoffs.py
+          skeleton/testing/test_jeeves_game_direction.py
+          skeleton/testing/test_jeeves_game_render.py
+          skeleton/testing/test_jeeves_game_quality.py
+          skeleton/testing/test_jeeves_game_authoring.py
+          skeleton/testing/test_jeeves_game_cli.py
+          skeleton/testing/test_game_creator_cli.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
@@ -216,6 +240,10 @@ jobs:
       - name: GitHub Actions token permissions
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_permissions.py
+      - name: Verify specialized CI tier contract
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        run: python scripts/check_ci_workflow_tiers.py
       - name: GitHub Actions trigger-fanout audit
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_trigger_fanout.py
@@ -236,8 +264,9 @@ jobs:
         run: |
           python scripts/check_live_service_test_boundaries.py
           python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
+      # Deep adversarial suite is specialized; scanner policy remains on PRs.
       - name: Security, provider-chaos, and developer-tooling adversarial regression tests
-        if: steps.scope.outputs.full == 'true'
+        if: steps.scope.outputs.full == 'true' && github.event_name == 'workflow_dispatch'
         working-directory: ${{ github.workspace }}
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"

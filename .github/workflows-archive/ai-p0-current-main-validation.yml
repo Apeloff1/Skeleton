@@ -1,15 +1,8 @@
-name: AI P0 Current-Main Validation
+name: "[Specialized] AI P0 Current-Main Validation"
 
+# SPECIALIZED: heavyweight verification; explicit dispatch only.
+# Not running is NOT a passed release/security qualification.
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/ai-p0-current-main-validation.yml"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_ai_file_tree.py"
-      - "scripts/check_ai_assistant_control_plane.py"
   workflow_dispatch:
 
 permissions:

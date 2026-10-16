@@ -1,43 +1,9 @@
-name: P3 T2 Governed Data Plane
+name: "[Specialized] P3 T2 Governed Data Plane"
+# SPECIALIZED: heavyweight verification; explicit dispatch only.
+# Not running is NOT a passed release/security qualification.
 on:
-  pull_request:
-    paths:
-      - "skeleton/data/**"
-      - "skeleton/ai/runtime/data/**"
-      - "skeleton/ai/runtime/training/data.py"
-      - "skeleton/testing/test_p3t2_data_candidate.py"
-      - "skeleton/testing/test_data_ingestion.py"
-      - "skeleton/testing/test_document_intelligence.py"
-      - "skeleton/testing/test_data_lineage.py"
-      - "skeleton/testing/test_data_quality.py"
-      - "skeleton/testing/test_dataset_registry.py"
-      - "skeleton/testing/test_p3_training_data.py"
-      - "skeleton/testing/test_synthetic_data_factory.py"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_p3t2_data_candidate.json"
-      - "scripts/check_p3t2_data_candidate.py"
-      - ".github/workflows/p3t2-governed-data.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/data/**"
-      - "skeleton/ai/runtime/data/**"
-      - "skeleton/ai/runtime/training/data.py"
-      - "skeleton/testing/test_p3t2_data_candidate.py"
-      - "skeleton/testing/test_data_ingestion.py"
-      - "skeleton/testing/test_document_intelligence.py"
-      - "skeleton/testing/test_data_lineage.py"
-      - "skeleton/testing/test_data_quality.py"
-      - "skeleton/testing/test_dataset_registry.py"
-      - "skeleton/testing/test_p3_training_data.py"
-      - "skeleton/testing/test_synthetic_data_factory.py"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_p3t2_data_candidate.json"
-      - "scripts/check_p3t2_data_candidate.py"
-      - ".github/workflows/p3t2-governed-data.yml"
   workflow_dispatch:
+
 permissions:
   contents: read
 concurrency:

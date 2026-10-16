@@ -121,7 +121,7 @@ def _init(args: argparse.Namespace) -> dict[str, Any]:
             "Package sources: python -m skeleton dev game package --project .\n",
             encoding="utf-8",
         )
-        (stage / ".gitignore").write_text("build/\ndist/\n.godot/\n", encoding="utf-8")
+        (stage / ".gitignore").write_text("build/\ndist/\n.godot/\n.jeeves/\n", encoding="utf-8")
         for folder in ("assets", "design", "tests"):
             (stage / folder).mkdir()
             (stage / folder / ".gitkeep").write_text("", encoding="utf-8")
@@ -352,6 +352,57 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     init.add_argument("--archetype", default="auto")
     init.add_argument("--dry-run", action="store_true")
     subs.add_parser("catalog", help="List supported GameForge eras and archetypes")
+    jeeves = subs.add_parser("jeeves", help="Jeeves design planning, source audit and developer handoff")
+    jeeves.add_argument("jeeves_action", choices=("plan", "audit", "next", "context", "handoff",
+                                                   "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
+                                                   "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
+                                                   "production-status", "production-cycle", "production-training",
+                                                   "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "direction-campaign-reopen", "p0-acceptance",
+                                                   "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
+                                                   "upscale-foliage", "upscale-animation", "upscale-shadow",
+                                                   "upscale-parallax", "upscale-music", "asset-inventory",
+                                                   "upscale-review", "vividness-review", "queue-upscaled-training",
+                                                   "camera-plan", "camera-render",
+                                                   "direction-audit", "direction-workorder", "production-gap-matrix"))
+    jeeves.add_argument("--project", default=".")
+    jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
+                                           "scene", "animation", "cutscene", "asset", "music"))
+    jeeves.add_argument("--brief")
+    jeeves.add_argument("--include-notes", action="store_true")
+    jeeves.add_argument("--digest")
+    jeeves.add_argument("--approve")
+    jeeves.add_argument("--console")
+    jeeves.add_argument("--genre")
+    jeeves.add_argument("--period")
+    jeeves.add_argument("--profile")
+    jeeves.add_argument("--evidence")
+    jeeves.add_argument("--target")
+    jeeves.add_argument("--source")
+    jeeves.add_argument("--direction-source")
+    jeeves.add_argument("--output")
+    jeeves.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
+    jeeves.add_argument("--factor", type=int)
+    jeeves.add_argument("--dry-run", action="store_true")
+    jeeves.add_argument("--passes", type=int)
+    jeeves.add_argument("--gate")
+    jeeves.add_argument("--page", type=int)
+    jeeves.add_argument("--page-size", type=int)
+    jeeves.add_argument("--repair-generated", action="store_true")
+    jeeves.add_argument("--pattern", choices=("wind", "breathe", "bob", "shimmer", "water"))
+    jeeves.add_argument("--frames", type=int)
+    jeeves.add_argument("--frame-height", type=int)
+    jeeves.add_argument("--richness", type=int)
+    jeeves.add_argument("--focus", choices=("world", "environment", "foliage", "clutter", "shadow"))
+    jeeves.add_argument("--pan", type=int)
+    jeeves.add_argument("--distance", type=int)
+    jeeves.add_argument("--ambience")
+    jeeves.add_argument("--depth", choices=("2d", "2_5d", "2_9d", "3d"))
+    jeeves.add_argument("--yaw", type=float)
+    jeeves.add_argument("--pitch", type=float)
+    jeeves.add_argument("--parallax-planes", type=int)
+    for dimension in ("native-width", "native-height", "screen-width",
+                      "screen-height", "pixel-aspect-num", "pixel-aspect-den"):
+        jeeves.add_argument("--" + dimension, type=int)
     for action in ("info", "doctor", "build", "verify", "playtest", "assets", "package"):
         child = subs.add_parser(action)
         child.add_argument("--project", default=".")
@@ -373,6 +424,48 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     try:
         if options.action == "init":
             return _init(options)
+        if options.action == "jeeves":
+            from skeleton.developer.jeeves_game_cli import run_jeeves_game_cli
+            command = [options.jeeves_action]
+            for flag, value in (("--kind", options.kind), ("--brief", options.brief),
+                                ("--digest", options.digest), ("--approve", options.approve),
+                                ("--console", options.console), ("--genre", options.genre),
+                                ("--period", options.period), ("--profile", options.profile),
+                                ("--evidence", options.evidence),
+                                ("--target", options.target), ("--source", options.source),
+                                ("--direction-source", options.direction_source),
+                                ("--output", options.output), ("--mode", options.mode),
+                                ("--factor", options.factor), ("--passes", options.passes),
+                                ("--gate", options.gate),
+                                ("--page", options.page),
+                                ("--page-size", options.page_size),
+                                ("--pattern", options.pattern),
+                                ("--frames", options.frames),
+                                ("--frame-height", options.frame_height),
+                                ("--richness", options.richness),
+                                ("--focus", options.focus),
+                                ("--pan", options.pan),
+                                ("--distance", options.distance),
+                                ("--ambience", options.ambience),
+                                ("--depth", options.depth),
+                                ("--yaw", options.yaw),
+                                ("--pitch", options.pitch),
+                                ("--parallax-planes", options.parallax_planes),
+                                ("--native-width", options.native_width),
+                                ("--native-height", options.native_height),
+                                ("--screen-width", options.screen_width),
+                                ("--screen-height", options.screen_height),
+                                ("--pixel-aspect-num", options.pixel_aspect_num),
+                                ("--pixel-aspect-den", options.pixel_aspect_den)):
+                if value is not None:
+                    command.extend([flag, str(value)])
+            if options.include_notes:
+                command.append("--include-notes")
+            if options.dry_run:
+                command.append("--dry-run")
+            if options.repair_generated:
+                command.append("--repair-generated")
+            return run_jeeves_game_cli(command, _project(options.project))
         if options.action == "catalog":
             from skeleton.forge.eras import list_eras
             from skeleton.forge.archetypes import default_library

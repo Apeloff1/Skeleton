@@ -1,31 +1,9 @@
-name: Packaging and Runtime Image Gate
+name: "[Specialized] Packaging and Runtime Image Gate"
 
+# SPECIALIZED: heavyweight verification; explicit dispatch only.
+# Not running is NOT a passed release/security qualification.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches: [main]
-    paths:
-      - "Dockerfile"
-      - "backend/Dockerfile"
-      - "frontend/Dockerfile"
-      - "pyproject.toml"
-      - "setup.cfg"
-      - "skeleton/developer/cli.py"
-      - "skeleton/native/**"
-      - "skeleton/testing/test_packaging_contract.py"
-      - ".github/workflows/packaging-runtime-image.yml"
-  push:
-    branches: [main]
-    paths:
-      - "Dockerfile"
-      - "backend/Dockerfile"
-      - "frontend/Dockerfile"
-      - "pyproject.toml"
-      - "setup.cfg"
-      - "skeleton/developer/cli.py"
-      - "skeleton/native/**"
-      - "skeleton/testing/test_packaging_contract.py"
-      - ".github/workflows/packaging-runtime-image.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
