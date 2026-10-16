@@ -16,7 +16,7 @@ from typing import Any
 from skeleton.ai.game_builder.quest_scene_engine import (
     DirectorAction, available_director_actions, director_initial, director_step,
 )
-from skeleton.ai.game_builder.quest_society import phase
+from skeleton.ai.game_builder.quest_society import phase, verify_inventory
 from skeleton.developer.jeeves_game_production_board import _load_world
 
 SCHEMA = "skeleton.jeeves.original_society_adversarial.v1"
@@ -92,6 +92,7 @@ def _probe(world: Any, *, index: int, steps: int) -> dict[str, Any]:
     rules = world.dynamics.society
     before = director_initial(world)
     now = before
+    verify_inventory(rules, before.acquired, before.world_state.society)
     turns = 0
     actions = []
     spent = 0
@@ -117,6 +118,7 @@ def _probe(world: Any, *, index: int, steps: int) -> dict[str, Any]:
         later_social = now.world_state.society
         if later_social is None:
             raise ValueError("NPC economy vanished during adversarial replay")
+        verify_inventory(rules, now.acquired, later_social)
         phase_hits[period["phase"]] += 1
         turns += now.turn - prior.turn
         money_delta = later_social.balance - previous_social.balance
@@ -172,6 +174,7 @@ def _probe(world: Any, *, index: int, steps: int) -> dict[str, Any]:
     ending = now.world_state.society
     if ending.balance != beginning.balance + received - spent:
         raise ValueError("NPC economy lost or fabricated original-game currency")
+    verify_inventory(rules, now.acquired, ending)
     # Original market has no free money creation, and price rules prohibit
     # arbitrage. A higher final wallet would be a real economic exploit.
     if ending.balance > beginning.balance:
@@ -211,6 +214,8 @@ def _probe(world: Any, *, index: int, steps: int) -> dict[str, Any]:
             if stock_start[(shop, item)] != stock_end[(shop, item)]
         ],
         "final_player_commerce_goods": [list(x) for x in ending.owned],
+        "irreversibly_used_merchandise": [list(x) for x in ending.consumed_goods],
+        "all_world_merchandise_physically_accounted_for": True,
         "gameplay_receipt_count": len(actions),
         "full_action_receipts_held_only_during_verification": True,
         "shop_conservation_invariants_verified": True,
