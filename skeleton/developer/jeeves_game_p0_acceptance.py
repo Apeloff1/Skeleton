@@ -35,6 +35,28 @@ GATES = (
 )
 
 
+# Whole-app P0 is strictly above the 20 game-specific release areas.
+# These entries track previously specified independent AI-chat/app gates;
+# historical Dragon's 22-gate baseline is a further separate qualification.
+CROSS_LANE_REQUIREMENTS = (
+    ("CHAT-01", "in_app_conversation_and_project_selection"),
+    ("CHAT-02", "real_local_checkpoint_load_generate_and_stop"),
+    ("CHAT-03", "durable_conversation_branching_and_recovery"),
+    ("CHAT-04", "streaming_cancel_retry_and_reconnect"),
+    ("CHAT-05", "jeeves_active_editor_project_and_runtime_awareness"),
+    ("CHAT-06", "reviewable_ai_project_edits_and_undo"),
+    ("CHAT-07", "cited_governed_project_and_research_retrieval"),
+    ("CHAT-10", "complete_installed_ai_chat_acceptance"),
+    ("APP-TS", "full_frontend_typescript_compilation"),
+    ("APP-MODEL", "real_checkpoint_inference_and_output"),
+    ("APP-STUBS", "complete_stub_and_truncation_classification"),
+    ("APP-E2E", "full_real_game_and_app_playthroughs"),
+    ("APP-INSTALL", "first_install_and_reopen"),
+    ("APP-STUDIO", "academy_galaxy_snowball_jeeves_cockpit_unified_ui"),
+    ("DRAGON-P0", "dragon_reproducibility_and_rights_bound_learning"),
+)
+
+
 def assess_p0(root: Path) -> dict[str, Any]:
     """Report observed source progress separately from independent release proof.
 
@@ -112,6 +134,13 @@ def assess_p0(root: Path) -> dict[str, Any]:
         "independently_qualified_p0_gates": 0,
         "blocked_p0_gates": len(gates),
         "p0_complete": False, "product_release_qualified": False,
+        "game_specific_p0_scope": "P0-01..P0-20; whole-app P0 is broader",
+        "additional_noncompensable_app_p0": [
+            {"id": name, "required": requirement, "state": "blocked_unverified"}
+            for name, requirement in CROSS_LANE_REQUIREMENTS
+        ],
+        "historical_dragon_22_gate_baseline_not_qualified_by_this_command": True,
+        "whole_application_p0_complete": False,
         "technical_source_signals": signals,
         "unavailable_or_invalid_source_evidence": errors,
         "gates": gates,
