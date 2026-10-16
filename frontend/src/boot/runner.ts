@@ -217,8 +217,9 @@ export class BootRunner {
       return;
     }
 
-    const maxAttempts = 1 + Math.max(0, def.retries ?? 0);
-    const backoffBase = def.backoffMs ?? 250;
+    // Admission budgets protect against malformed config and runaway retry storms.
+    const maxAttempts = 1 + Math.min(3, Math.max(0, Math.trunc(def.retries ?? 0)));
+    const backoffBase = Math.min(2_000, Math.max(0, def.backoffMs ?? 250));
     const startedAt = Date.now();
     state.startedAt = startedAt;
     let lastResult: TimeoutResult<StageRun> = { ok: false, reason: 'init' };
@@ -238,7 +239,12 @@ export class BootRunner {
       state.status = 'running';
       this.emit();
       trail.add('boot', `stage_started ${def.id}`, { attempt, max: maxAttempts }, 'info');
-      lastResult = await withTimeout<StageRun>(def.run(signal), def.timeoutMs, signal);
+      // Def.run can throw before returning a Promise. The wrapper ensures
+      // that both synchronous and asynchronous faults become terminal stage
+      // receipts instead of leaving the phase permanently 'running'.
+      const invoked = Promise.resolve().then(() => def.run(signal));
+      const timeoutMs = Math.min(30_000, Math.max(100, def.timeoutMs));
+      lastResult = await withTimeout<StageRun>(invoked, timeoutMs, signal);
 
       if (lastResult.ok && lastResult.v?.ok) {
         state.endedAt = Date.now();
@@ -262,7 +268,7 @@ export class BootRunner {
       trail.add('boot', `stage_attempt_failed ${def.id}`, { attempt, max: maxAttempts, reason: note }, 'warn');
 
       if (attempt < maxAttempts) {
-        const wait = backoffBase * Math.pow(2, attempt - 1);
+        const wait = Math.min(5_000, backoffBase * Math.pow(2, attempt - 1));
         try {
           await sleep(wait, signal);
         } catch {
