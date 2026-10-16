@@ -447,7 +447,7 @@ export function getNarrativeDnaDriftCount(): number {
   return n;
 }
 
-/** Build a concatenated system-prompt prefix from the 3 Jeeves blurbs. */
+/** Build user-selected Jeeves preferences (not a privileged system prompt). */
 export function getJeevesSystemPrefix(): string {
   const j = useSettings.getState().jeeves;
   if (!j.enforceOnEveryRequest) return '';
