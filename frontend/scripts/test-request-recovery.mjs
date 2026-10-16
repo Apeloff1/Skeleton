@@ -15,7 +15,9 @@ test('writes never replay without explicit idempotency identity', () => {
   for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
     assert.equal(boundedRetries(undefined, method, false), 0, method);
     assert.equal(boundedRetries(50, method, false), 0, method);
-    assert.equal(boundedRetries(9, method, true), 3, method);
+    // A client-generated key alone is NOT proof that the server deduplicates.
+    assert.equal(boundedRetries(9, method, true), 0, method);
+    assert.equal(boundedRetries(9, method, true, true), 3, method);
   }
 });
 
@@ -38,4 +40,11 @@ test('large game responses have an explicit finite size budget', () => {
   assert.equal(boundedResponseChars(1), 1024);
   assert.equal(boundedResponseChars(128 * 1024 * 1024), 64 * 1024 * 1024);
   assert.equal(boundedResponseChars(Number.POSITIVE_INFINITY), 8 * 1024 * 1024);
+});
+
+test('malformed retry requests fail closed despite a claimed idempotency key', () => {
+  for (const value of [Number.NaN, Number.POSITIVE_INFINITY, -100]) {
+    assert.equal(boundedRetries(value, 'POST', true, true), 0);
+  }
+  assert.equal(boundedRetries(2, 'POST', false, true), 0);
 });
