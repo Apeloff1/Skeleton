@@ -171,3 +171,45 @@ def test_direction_gameplay_cli_forbids_unrelated_flags(tmp_path):
     ])
     assert not result["ok"]
     assert "accepts --source and --passes only" in result["error"]
+
+
+
+def test_continuous_production_gate_replays_actual_story_not_merely_declared_scenes(tmp_path):
+    created = run_game_cli(["init", "story-player-game", "--dir", str(tmp_path)])
+    assert created["ok"]
+    root = tmp_path / "story-player-game"
+    established = run_game_cli([
+        "jeeves", "production-init", "--project", str(root),
+        "--target", "nes", "--genre", "Platformer", "--period", "1985-1989",
+    ])
+    assert established["ok"], established
+    missing = run_game_cli([
+        "jeeves", "production-cycle", "--project", str(root),
+        "--gate", "quests_and_dialogue", "--passes", "2",
+    ])
+    assert missing["ok"], missing
+    assert len(missing["observations"]) == 2
+    assert all(o["outcome"] == "failed" for o in missing["observations"])
+    bible, scenes, world, replays, bindings = fixture()
+    doc = {
+        "schema": "skeleton.jeeves.story_gameplay_dossier.v1",
+        "bible": bible, "scenes": scenes, "director_world": world.payload(),
+        "author_review_acknowledged": True, "replays": replays,
+        "bindings": bindings, "require_distinct_choices": True,
+    }
+    (root / "design" / "story_gameplay_dossier.json").write_text(json.dumps(doc))
+    next_pass = run_game_cli([
+        "jeeves", "production-cycle", "--project", str(root),
+        "--gate", "quests_and_dialogue", "--passes", "3",
+    ])
+    assert next_pass["ok"], next_pass
+    assert all(o["outcome"] == "blocked" for o in next_pass["observations"])
+    assert any(o["new_evidence"] for o in next_pass["observations"])
+    assert next_pass["recorded_events"] == 5
+    assert next_pass["quality_threshold_lowered"] is False
+    assert next_pass["project_complete"] is False
+    audit = run_game_cli(["jeeves", "production-status", "--project", str(root)])
+    assert audit["ok"]
+    assert audit["no_lifetime_attempt_limit"] is True
+    assert audit["recorded_events"] == 5
+    assert audit["project_complete"] is False
