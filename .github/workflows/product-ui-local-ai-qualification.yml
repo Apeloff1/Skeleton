@@ -14,6 +14,7 @@ on:
       - "skeleton/ai/runtime/inference/neural.py"
       - "scripts/check_product_surfaces.py"
       - "scripts/classify_repo_stubs.py"
+      - "tests/test_classify_repo_stubs.py"
       - "tests/test_product_surface_navigation.py"
       - "tests/test_native_transformer_stops.py"
       - "tests/test_neural_stop_handling.py"
@@ -139,6 +140,8 @@ jobs:
           assert owner("satellites/branch-snapshots/old/foo.py") == "historical_snapshot"
           assert owner("frontend/app/foo.tsx") == "production_candidate"
           PY
+      - name: Run classifier Git-object regression cases
+        run: python -m unittest tests.test_classify_repo_stubs
       - name: Inventory every tracked source without truncating findings
         run: >-
           python scripts/classify_repo_stubs.py
