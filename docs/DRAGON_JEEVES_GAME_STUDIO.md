@@ -45,6 +45,7 @@ does not acquire media, decompile ROMs, copy reference assets, or retain video.
 ```bash
 python -m skeleton dev game jeeves dragon-review --project ./my-original-game --source design/dragon_study.json
 python -m skeleton dev game jeeves dragon-ingest --project ./my-original-game --source design/dragon_study.json --approve <source_sha256>
+python -m skeleton dev game jeeves dragon-portfolio --project ./my-original-game --source design/dragon_study.json
 python -m skeleton dev game jeeves dragon-plan --project ./my-original-game --source design/dragon_study.json --genre platformer --target gameboy
 python -m skeleton dev game jeeves dragon-adopt --project ./my-original-game --source design/dragon_study.json --genre platformer --target gameboy --approve <handoff_sha256>
 ```
@@ -53,6 +54,8 @@ Copy the source SHA-256 from `dragon-review` and the complete handoff SHA-256
 from `dragon-plan`; placeholders are **not** literal. A mistake in either
 digest is rejected. Review and plan are read-only. Ingest idempotently saves
 reviewed, non-video observations in the project's local SQLite database.
+Portfolio is read-only and compares stored games, reviewed mechanics, preference
+conflicts and evidence session IDs (up to 100 reviewed sessions per query).
 Adopt writes a **create-only** JSON handoff to
 `.jeeves/dragon_handoffs/<handoff_sha256>.json`. It can never overwrite an
 approved handoff. Each handoff includes original game mechanic objectives,
