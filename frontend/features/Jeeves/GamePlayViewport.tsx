@@ -208,7 +208,7 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
   }, [play?.play_id, play?.status, accept, safe]);
   useEffect(() => {
     const timer = setInterval(() => {
-      if (!safe() || mutation.current || !heldSources.current.size || inputQueue.current.length) return;
+      if (!safe() || mutation.current || !heldSources.current.size || inputQueue.current.length || live.current?.capabilities?.held_buttons === false || live.current?.capabilities?.input_mode === 'one_turn_per_press') return;
       for (const action of heldSources.current.keys()) inputQueue.current.push({ action, held: true }); drain();
     }, 400);
     return () => clearInterval(timer);
@@ -342,10 +342,10 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     {!!humanControls && <>
       {Platform.OS === 'web' && <View style={s.chips}><Button label={keyboard ? 'Keyboard on · arrows / WASD' : 'Enable keyboard'} primary={keyboard} press={() => { release(); setKeyboard(value => !value); }} /><Button label={gamepad ? 'Gamepad on' : 'Enable gamepad'} primary={gamepad} press={() => { release(); setGamepad(value => !value); }} /></View>}
       {play.actions.includes('fish') && play.actions.includes('rest') && <><Text style={s.label}>Tools · 1 Fish · 2 Hoe · 3 Water · 4 Plant · 5 Harvest</Text>{gamepad && <><Text style={s.muted}>Gamepad X uses the selected tool. A interacts, B attacks, and Y cycles the game’s hotbar.</Text><View style={s.chips}>{['fish', 'hoe', 'water', 'plant', 'harvest'].filter(action => play.actions.includes(action)).map(action => <Button key={action} label={human(action)} primary={gamepadTool === action} press={() => setGamepadTool(action)} />)}</View></>}<Text style={s.dim}>E interact · J attack · K fire · R rest. Tool actions come from this game’s actual controls.</Text></>}
-      <View style={s.chips}>{play.actions.filter(action => !['noop', 'none', 'idle'].includes(action)).map(action => <TouchableOpacity key={action} accessibilityRole="button"
-        accessibilityLabel={`Hold ${human(action)}`} accessibilityState={{ selected: held.includes(action) }} onPressIn={() => hold(action, true, 'touch:' + action)} onPressOut={() => hold(action, false, 'touch:' + action)}
-        style={[s.button, { minWidth: 64, minHeight: 56 }, held.includes(action) && s.primaryButton]}><Text style={s.buttonText}>{human(action)}</Text></TouchableOpacity>)}</View>
-      <Text style={s.dim}>Hold buttons for continuous input. Keyboard shortcuts only act while enabled; typing in an editor remains available.</Text>
+      <View style={s.chips}>{play.actions.filter(action => play.capabilities?.input_mode === 'one_turn_per_press' || !['noop', 'none', 'idle'].includes(action)).map(action => <TouchableOpacity key={action} accessibilityRole="button"
+        accessibilityLabel={`${play.capabilities?.input_mode === 'one_turn_per_press' ? 'Take one turn: ' : 'Hold '}${human(action)}`} accessibilityState={{ selected: held.includes(action) }} onPressIn={() => hold(action, true, 'touch:' + action)} onPressOut={() => hold(action, false, 'touch:' + action)}
+        style={[s.button, { minWidth: 64, minHeight: 56 }, held.includes(action) && s.primaryButton]}><Text style={s.buttonText}>{play.capabilities?.input_mode === 'one_turn_per_press' && ['noop', 'none', 'idle'].includes(action) ? 'Wait one turn' : human(action)}</Text></TouchableOpacity>)}</View>
+      <Text style={s.dim}>{play.capabilities?.input_mode === 'one_turn_per_press' ? 'Each press takes one measured turn. Release and press again to act; leaving controls idle does not advance this scene.' : 'Hold buttons for continuous input.'} Keyboard shortcuts only act while enabled; typing in an editor remains available.</Text>
     </>}
     {disabled && <Text style={s.unsaved}>Save your project before starting or resuming play.</Text>}
     <View style={s.divider} />
