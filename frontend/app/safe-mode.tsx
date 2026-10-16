@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearMirror } from '../utils/safeStorage';
 import {
   getLastTrace, getCrashCount, getLastCleanBoot,
   clearCrashes, resetBootState, TraceStep,
@@ -64,6 +65,8 @@ export default function SafeModeRoute() {
       // Keep only the bootTracer keys cleared, plus welcome flag
       await AsyncStorage.multiRemove(keys);
     } catch {}
+    // A raw AsyncStorage wipe must invalidate the wrapper's in-memory cache.
+    clearMirror();
     await resetBootState();
     router.replace('/welcome');
   };
