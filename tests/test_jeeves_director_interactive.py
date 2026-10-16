@@ -130,7 +130,7 @@ class DirectorInteractiveTests(unittest.TestCase):
         self.assertTrue(inspect_result["dry_run"])
         self.assertFalse(Path(inspect_result["path"]).exists())
         result = export(self.root, source=self.source)
-        self.assertEqual(result["manifest"]["scope"], "interactive-scene-atlas-only")
+        self.assertEqual(result["manifest"]["scope"], "navigable-atlas-and-loopback-authoritative-quest-ui")
         self.assertFalse(result["manifest"]["native_binary_executed"])
         self.assertTrue(verify(self.root, source=self.source)["source_manifest_verified"])
         path = Path(result["path"])
