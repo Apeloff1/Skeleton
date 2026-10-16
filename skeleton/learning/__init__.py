@@ -32,6 +32,7 @@ from .evidence import (
     canonical_fingerprint,
     empty_calibration,
     make_provenance,
+    make_provenance_from_evidence_envelope,
 )
 from .instruction_runtime import (
     INSTRUCTION_SCHEMA,
@@ -111,6 +112,7 @@ __all__ = [
     "canonical_fingerprint",
     "empty_calibration",
     "make_provenance",
+    "make_provenance_from_evidence_envelope",
     "EvaluationReceipt",
     "ExperimentAssignment",
     "ExperimentSpec",
