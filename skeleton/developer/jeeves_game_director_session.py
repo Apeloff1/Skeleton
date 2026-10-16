@@ -210,7 +210,9 @@ def inspect(root: Path, *, session: str) -> dict[str, Any]:
             **_view(world, state, name=session, sequence=index, last_sha=prior)}
 
 
-def choose(root: Path, *, session: str, choice: str) -> dict[str, Any]:
+def choose(root: Path, *, session: str, choice: str,
+           expected_sequence: int | None = None,
+           expected_state_sha256: str | None = None) -> dict[str, Any]:
     if not isinstance(choice, str) or len(choice) > 140 or ":" not in choice:
         raise ValueError("choose an exact offered action, e.g. travel:scene_01")
     kind, key = choice.split(":", 1)
@@ -225,6 +227,16 @@ def choose(root: Path, *, session: str, choice: str) -> dict[str, Any]:
     try:
         os.close(fd)
         folder, world, state, manifest, prior, index = _load(root, name=session)
+        # Optimistic concurrency checked AGAIN under the journal writer lock;
+        # external CLI clients cannot race an HTTP status check into applying
+        # an action against a different game state.
+        if (expected_sequence is not None and (
+                type(expected_sequence) is not int or expected_sequence != index)):
+            raise ValueError("stale Director sequence")
+        if (expected_state_sha256 is not None and (
+                not isinstance(expected_state_sha256, str)
+                or expected_state_sha256 != state.digest)):
+            raise ValueError("stale Director state identity")
         action = DirectorAction(kind, key, state.scene)
         if action not in available_director_actions(world, state):
             raise ValueError("selected action is not currently available")
