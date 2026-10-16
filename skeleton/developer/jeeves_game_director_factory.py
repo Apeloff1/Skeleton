@@ -59,7 +59,11 @@ def _candidate(root: Path, source: str) -> tuple[dict[str, Any], str, Any]:
     packet, source_sha = _read(root, source, MAX_CANDIDATE_BYTES)
     expected = {"schema", "project", "config_sha256", "director_world",
                 "dragon_handoff_sha256", "generator", "receipt_sha256"}
-    if set(packet) != expected or packet.get("schema") != CANDIDATE_SCHEMA:
+    revisioned = packet.get("schema") == "skeleton.jeeves.director_candidate.v2"
+    if revisioned:
+        expected.add("revision_history")
+    if set(packet) != expected or packet.get("schema") not in (
+            CANDIDATE_SCHEMA, "skeleton.jeeves.director_candidate.v2"):
         raise ValueError("unsupported original Director candidate")
     receipt = packet["receipt_sha256"]
     if not isinstance(receipt, str) or not HEX.fullmatch(receipt):
@@ -69,8 +73,23 @@ def _candidate(root: Path, source: str) -> tuple[dict[str, Any], str, Any]:
     cfg, project, config_hash = _project(root)
     if packet["project"] != cfg["name"] or packet["config_sha256"] != config_hash:
         raise ValueError("game project changed since candidate generation")
-    if packet["generator"] != "canonical-seeded-director-v1":
+    expected_generator = ("canonical-reviewed-director-revision-v1" if revisioned
+                          else "canonical-seeded-director-v1")
+    if packet["generator"] != expected_generator:
         raise ValueError("unrecognized Director forge engine")
+    if revisioned:
+        from skeleton.developer.jeeves_game_quality import _read
+        history = packet["revision_history"]
+        if not isinstance(history, list) or not history:
+            raise ValueError("revised Director campaign requires revision lineage")
+        for entry in history:
+            if (not isinstance(entry, dict) or set(entry) != {"path", "sha256"}
+                    or not isinstance(entry["sha256"], str)
+                    or not HEX.fullmatch(entry["sha256"])):
+                raise ValueError("invalid authored Director revision lineage")
+            _, revision_sha = _read(root, entry["path"], 256 * 1024)
+            if revision_sha != entry["sha256"]:
+                raise ValueError("source of Director revision changed after editing")
     handoff_id = packet["dragon_handoff_sha256"]
     if handoff_id is not None:
         from skeleton.developer.jeeves_game_dragon import load_handoff
