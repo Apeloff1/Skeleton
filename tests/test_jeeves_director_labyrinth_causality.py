@@ -192,6 +192,14 @@ class LabyrinthCausalityTests(unittest.TestCase):
         self.assertIn("/v1/navigation", native)
         self.assertIn("session_head_sha256", native)
         self.assertIn("Travel first step", native)
+        self.assertIn("res://director_minimap.gd", native)
+        self.assertIn("native_map.node_selected.connect", native)
+        map_source = (project / "director_minimap.gd").read_text()
+        self.assertIn("signal node_selected", map_source)
+        self.assertIn("selected_path", map_source)
+        self.assertIn("graph[name]", map_source)
+        self.assertIn("node_selected.emit", map_source)
+        self.assertTrue(exported["manifest"]["directed_world_minimap_in_source"])
         self.assertTrue(verify(self.root, source=self.source)["source_manifest_verified"])
 
     def test_cli_wiring_rejects_irrelevant_options(self):
