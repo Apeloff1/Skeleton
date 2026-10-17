@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 from .desktop_native_export import compile_native_desktop, export_native_desktop_source
@@ -121,101 +124,129 @@ def build_game(
         )
         if engine_package.manifest["world_digest"] != world.digest:
             raise ValueError("engine source manifests do not match native source")
-    kind = _NATIVE[target]
-    if kind == "gb_rgbds":
-        project = compile_native_game_boy(world, source, authorized=True, tile_art=tile_art)
-        folder = export_native_game_boy(project, output, authorized=True)
-        artifact_type = "native_game_boy_rgbds_6502free_rom_source"
-        digest = project.content_digest
-    elif kind == "cgb_rgbds":
-        project = compile_native_game_boy_color(world, source, authorized=True, tile_art=tile_art)
-        folder = export_native_game_boy_color(project, output, authorized=True)
-        artifact_type = "native_cgb_rgb555_rgbds_rom_source"
-        digest = project.content_digest
-    elif kind == "nes_ca65":
-        project = compile_native_nes(world, source, authorized=True, tile_art=tile_art)
-        folder = export_native_nes(project, output, authorized=True)
-        artifact_type = "native_nes_6502_ca65_nrom_source"
-        digest = project.content_digest
-    elif kind == "c64_cc65":
-        project = compile_native_c64(world, source, authorized=True)
-        folder = export_native_c64(project, output, authorized=True)
-        artifact_type = "native_c64_6510_vic_ii_sid_cc65_prg_source"
-        digest = project.content_digest
-    elif kind == "dos_nasm_8086":
-        project = compile_native_dos(world, source, authorized=True)
-        folder = export_native_dos(project, output, authorized=True)
-        artifact_type = "native_dos_8086_pc_textmode_com_source"
-        digest = project.content_digest
-    elif kind == "atari8_cc65":
-        project = compile_native_atari8(world, source, authorized=True)
-        folder = export_native_atari8(project, output, authorized=True)
-        artifact_type = "native_atari8_6502_antic_gtia_pokey_xex_source"
-        digest = project.content_digest
-    elif kind == "apple2_cc65":
-        project = compile_native_apple2(world, source, authorized=True)
-        folder = export_native_apple2(project, output, authorized=True)
-        artifact_type = "native_apple2_cc65_applesingle_source"
-        digest = project.content_digest
-    elif kind == "spectrum_z80asm":
-        project = compile_native_spectrum(world, source, authorized=True)
-        folder = export_native_spectrum(project, output, authorized=True)
-        artifact_type = "native_spectrum_48k_z80_tap_source"
-        digest = project.content_digest
-    elif kind in ("sms_sdcc_z80", "gg_sdcc_z80"):
-        project = compile_native_sega_8bit(world, source, target, authorized=True, tile_art=tile_art)
-        folder = export_native_sega_8bit(project, output, authorized=True)
-        artifact_type = "native_sega_8bit_sdcc_vdp_original_game_source"
-        digest = project.content_digest
-    elif kind == "msx1_z80asm":
-        project = compile_native_msx1(world, source, authorized=True)
-        folder = export_native_msx1(project, output, authorized=True)
-        artifact_type = "native_msx1_z80_16kb_bios_rom_source"
-        digest = project.content_digest
-    elif kind == "coleco_z80asm":
-        project = compile_native_coleco(world, source, authorized=True)
-        folder = export_native_coleco(project, output, authorized=True)
-        artifact_type = "native_colecovision_32kb_z80_tms9918_source"
-        digest = project.content_digest
-    elif kind == "vectrex_lwasm":
-        project = compile_native_vectrex(world, source, authorized=True)
-        folder = export_native_vectrex(project, output, authorized=True)
-        artifact_type = "native_vectrex_mc6809_vector_cartridge_source"
-        digest = project.content_digest
-    elif kind == "sms_z80asm":
-        project = compile_native_sms(world, source, authorized=True, tile_art=tile_art)
-        folder = export_native_sms(project, output, authorized=True)
-        artifact_type = "native_sms_z80_mode4_32kb_cartridge_source"
-        digest = project.content_digest
-    else:
-        project = compile_native_desktop(world, source, target, authorized=True)
-        folder = export_native_desktop_source(project, output, authorized=True)
-        artifact_type = "native_desktop_sdl2_c11_source"
-        digest = project.content_digest
-    engine_receipt = None
-    if engine_package is not None:
-        engine_path = export_dual_runtime_package(
-            engine_package, folder / "engines", authorized=True,
+    destination = Path(output)
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError("native source output must not already exist")
+    if not destination.parent.is_dir() or destination.parent.is_symlink():
+        raise ValueError("native source destination parent must be a real directory")
+    staging_parent = Path(tempfile.mkdtemp(
+        prefix=".jeeves-native-studio-", dir=str(destination.parent),
+    ))
+    try:
+        output = staging_parent / "payload"
+        kind = _NATIVE[target]
+        if kind == "gb_rgbds":
+            project = compile_native_game_boy(world, source, authorized=True, tile_art=tile_art)
+            folder = export_native_game_boy(project, output, authorized=True)
+            artifact_type = "native_game_boy_rgbds_6502free_rom_source"
+            digest = project.content_digest
+        elif kind == "cgb_rgbds":
+            project = compile_native_game_boy_color(world, source, authorized=True, tile_art=tile_art)
+            folder = export_native_game_boy_color(project, output, authorized=True)
+            artifact_type = "native_cgb_rgb555_rgbds_rom_source"
+            digest = project.content_digest
+        elif kind == "nes_ca65":
+            project = compile_native_nes(world, source, authorized=True, tile_art=tile_art)
+            folder = export_native_nes(project, output, authorized=True)
+            artifact_type = "native_nes_6502_ca65_nrom_source"
+            digest = project.content_digest
+        elif kind == "c64_cc65":
+            project = compile_native_c64(world, source, authorized=True)
+            folder = export_native_c64(project, output, authorized=True)
+            artifact_type = "native_c64_6510_vic_ii_sid_cc65_prg_source"
+            digest = project.content_digest
+        elif kind == "dos_nasm_8086":
+            project = compile_native_dos(world, source, authorized=True)
+            folder = export_native_dos(project, output, authorized=True)
+            artifact_type = "native_dos_8086_pc_textmode_com_source"
+            digest = project.content_digest
+        elif kind == "atari8_cc65":
+            project = compile_native_atari8(world, source, authorized=True)
+            folder = export_native_atari8(project, output, authorized=True)
+            artifact_type = "native_atari8_6502_antic_gtia_pokey_xex_source"
+            digest = project.content_digest
+        elif kind == "apple2_cc65":
+            project = compile_native_apple2(world, source, authorized=True)
+            folder = export_native_apple2(project, output, authorized=True)
+            artifact_type = "native_apple2_cc65_applesingle_source"
+            digest = project.content_digest
+        elif kind == "spectrum_z80asm":
+            project = compile_native_spectrum(world, source, authorized=True)
+            folder = export_native_spectrum(project, output, authorized=True)
+            artifact_type = "native_spectrum_48k_z80_tap_source"
+            digest = project.content_digest
+        elif kind in ("sms_sdcc_z80", "gg_sdcc_z80"):
+            project = compile_native_sega_8bit(world, source, target, authorized=True, tile_art=tile_art)
+            folder = export_native_sega_8bit(project, output, authorized=True)
+            artifact_type = "native_sega_8bit_sdcc_vdp_original_game_source"
+            digest = project.content_digest
+        elif kind == "msx1_z80asm":
+            project = compile_native_msx1(world, source, authorized=True)
+            folder = export_native_msx1(project, output, authorized=True)
+            artifact_type = "native_msx1_z80_16kb_bios_rom_source"
+            digest = project.content_digest
+        elif kind == "coleco_z80asm":
+            project = compile_native_coleco(world, source, authorized=True)
+            folder = export_native_coleco(project, output, authorized=True)
+            artifact_type = "native_colecovision_32kb_z80_tms9918_source"
+            digest = project.content_digest
+        elif kind == "vectrex_lwasm":
+            project = compile_native_vectrex(world, source, authorized=True)
+            folder = export_native_vectrex(project, output, authorized=True)
+            artifact_type = "native_vectrex_mc6809_vector_cartridge_source"
+            digest = project.content_digest
+        elif kind == "sms_z80asm":
+            project = compile_native_sms(world, source, authorized=True, tile_art=tile_art)
+            folder = export_native_sms(project, output, authorized=True)
+            artifact_type = "native_sms_z80_mode4_32kb_cartridge_source"
+            digest = project.content_digest
+        else:
+            project = compile_native_desktop(world, source, target, authorized=True)
+            folder = export_native_desktop_source(project, output, authorized=True)
+            artifact_type = "native_desktop_sdl2_c11_source"
+            digest = project.content_digest
+        engine_receipt = None
+        if engine_package is not None:
+            engine_path = export_dual_runtime_package(
+                engine_package, folder / "engines", authorized=True,
+            )
+            engine_receipt = {
+                "path": str(engine_path),
+                "manifest_digest": engine_package.manifest["manifest_digest"],
+                "world_digest": world.digest,
+                "browser_source_rendered": "index.html" in engine_package.files,
+                "godot4_source_rendered": "godot/scripts/main.gd" in engine_package.files,
+                "interactive_tile_editor_source": "tile-editor.html" in engine_package.files,
+                "actual_winning_python_replay": True,
+                "godot_binary_executed": False,
+                "hardware_qualified": False,
+                "runtime_uses_custom_asset_tiles": True,
+                "actual_browser_sprite_rasterizer_embedded": True,
+                "godot_source_sprite_rasterizer_embedded": True,
+                "godot_sprite_renderer_executed": False,
+            }
+        art_receipt = (
+            export_studio_art(art_pack, folder, authorized=True)
+            if art_pack is not None else None
         )
-        engine_receipt = {
-            "path": str(engine_path),
-            "manifest_digest": engine_package.manifest["manifest_digest"],
-            "world_digest": world.digest,
-            "browser_source_rendered": "index.html" in engine_package.files,
-            "godot4_source_rendered": "godot/scripts/main.gd" in engine_package.files,
-            "interactive_tile_editor_source": "tile-editor.html" in engine_package.files,
-            "actual_winning_python_replay": True,
-            "godot_binary_executed": False,
-            "hardware_qualified": False,
-            "runtime_uses_custom_asset_tiles": True,
-            "actual_browser_sprite_rasterizer_embedded": True,
-            "godot_source_sprite_rasterizer_embedded": True,
-            "godot_sprite_renderer_executed": False,
-        }
-    art_receipt = (
-        export_studio_art(art_pack, folder, authorized=True)
-        if art_pack is not None else None
-    )
+        # Publish one complete game with source, engine and media receipts.
+        # A partial source or failed render never becomes the destination.
+        if destination.exists() or destination.is_symlink():
+            raise FileExistsError("native source destination changed before publication")
+        os.rename(folder, destination)
+        if os.name == "posix":
+            descriptor = os.open(destination.parent, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        if engine_receipt is not None:
+            engine_receipt["path"] = str(destination / "engines")
+        if art_receipt is not None:
+            art_receipt["assets_directory"] = str(destination / "assets")
+        folder = destination
+    finally:
+        shutil.rmtree(staging_parent, ignore_errors=True)
     return {
         "schema": "skeleton.game_builder.native_creation_receipt.v1",
         "project_id": source.project_id,
