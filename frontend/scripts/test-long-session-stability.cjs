@@ -376,9 +376,16 @@ test('storage hydration completes before chapter writes and never drops concurre
     completedChapters: { saved: true }, bookmarks: ['saved-bookmark'], exerciseResults: {},
   }));
   await Promise.all([first, second]);
+  await Promise.all([
+    hook.toggleBookmark('new-bookmark-1'),
+    hook.toggleBookmark('new-bookmark-2'),
+    hook.markExerciseComplete('exercise-1', true),
+    hook.markExerciseComplete('exercise-2', false),
+  ]);
   const latest = JSON.parse(persisted.at(-1).value);
   assert.deepEqual(latest.completedChapters, { saved: true, 'new-1': true, 'new-2': true });
-  assert.deepEqual(latest.bookmarks, ['saved-bookmark']);
+  assert.deepEqual(latest.bookmarks, ['saved-bookmark', 'new-bookmark-1', 'new-bookmark-2']);
+  assert.deepEqual(latest.exerciseResults, { 'exercise-1': true, 'exercise-2': false });
   h.unmount();
 });
 
