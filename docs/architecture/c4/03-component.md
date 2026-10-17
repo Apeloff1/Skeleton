@@ -39,7 +39,7 @@ flowchart TB
 | Kernel | `skeleton.contracts.subsystem_boundaries.KernelEventBoundary` | None. Kernel does not serve HTTP. |
 | Agents | `AgentTaskBoundary` | Swarm routers under `/api/v1/swarm`, mounted by `create_app`. |
 | Memory | `MemoryWriteBoundary` plus `skeleton.contracts.memory_record` | Memory routes on the main router. Mongo is behind persistence. |
-| GameForge | `GameForgeCommandBoundary` for `run` and `intake` only | Charter-gated `POST /api/v1/gameforge/run` and `/intake` on `skeleton.api.routes`. Sidecar handlers remain importable and are not mounted. |
+| GameForge | `GameForgeCommandBoundary` for `run` and `intake` only | `build_playable_game` (#4119) is the only build entry. It wraps `Forge.materialise` and `godot_emit`. CLI `skeleton game`, `POST /api/v1/game/build`, `POST /gameforge/run`, and Projects `POST /builds` are thin adapters. #4118 supplies the planner and QA hooks. Charter-gated `/api/v1/gameforge/run` and `/intake` stay on `skeleton.api.routes`. This branch leaves `skeleton/api/gameforge_routes.py` to #4119. |
 | API | `ApiErrorBoundary` and `skeleton.api.errors` | `create_app`. |
 | Projects | `skeleton.contracts.projects` (`skeleton.projects.v1` at `1.0.0`) | `/api/v1/projects` inside `create_app`, behind `install_gate`. Matches #4097 at `959eec134`: session actor and tenant, string or structured brief, start-build or optional `execution_id` link. |
 

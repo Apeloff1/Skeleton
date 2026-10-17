@@ -11,4 +11,4 @@ Typed contracts live in `skeleton/contracts/`. Human-readable HTTP and boundary 
 | Memory record | `skeleton/contracts/memory_record.py` | Existing durable memory authority. |
 | Job queue | `skeleton/app_services/job_api.py` | [docs/contracts/job_queue.md](../../contracts/job_queue.md). Public enqueue, status, result, and cancel API used by Projects builds (`game.build`). |
 
-Projects is the contract for the #4097 router at commit `959eec134` (create from a string or structured brief, list, get, start or link a build, paginated build list). The session supplies `actor_id` and `tenant_id`. A started build's `execution_id` equals its `build_id`.
+Projects is the contract for the #4097 router. The router blob is identical at `959eec134` and at the current #4097 head `c71ad467`. It creates a project from a string or structured brief, lists, gets, starts or links a build, and paginates the build list. The session supplies `actor_id`. `tenant_id` is the deployment-scoped `APP_TENANT_ID`. A started build's `execution_id` equals its `build_id`, and the `game.build` worker runs `build_playable_game`.

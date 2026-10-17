@@ -19,7 +19,7 @@ Publishing a second Projects shape beside the #4097 router would fork the resour
 - `POST /api/v1/projects` creates a project from a string or a structured brief. The stored brief is the object. `Idempotency-Key` replays with 200 or returns `PROJECT.IDEMPOTENCY_MISMATCH`.
 - `GET /api/v1/projects` is paginated (`limit`, `cursor`) and returns `{schema_version, items, next_cursor}`.
 - `GET /api/v1/projects/{project_id}` returns one project. `actor_id` is the session user. `tenant_id` is `APP_TENANT_ID` (default `default`).
-- `POST /api/v1/projects/{project_id}/builds` starts a `game.build` job and returns `Build` (`execution_id` equals `build_id`). A body that is only `execution_id` links that execution and returns `ProjectBuildLink`.
+- `POST /api/v1/projects/{project_id}/builds` starts a `game.build` job and returns `Build` (`execution_id` equals `build_id`). The `game.build` worker runs `build_playable_game` (#4119). A body that is only `execution_id` links that execution and returns `ProjectBuildLink`.
 - `GET /api/v1/projects/{project_id}/builds` is paginated, newest first. `GET .../builds/{build_id}` returns one build.
 
 Errors use `{error:{type, code:PROJECT.*, message, context}}`, including `PROJECT.NAME_CONFLICT`, `PROJECT.IDEMPOTENCY_MISMATCH`, and `PROJECT.UNAVAILABLE`. The job queue is `docs/contracts/job_queue.md`.
@@ -29,6 +29,8 @@ Health payloads keep their current JSON. `skeleton/contracts/health.py` parses t
 ## Consequences
 
 The foundation client adds `ProjectsClient` against `PROJECT_ROUTES` and the `Project` / `Build` documents. A missing project and a project outside the session actor and tenant share `PROJECT.NOT_FOUND`.
+
+#4097 (head `c71ad467`) also adds `skeleton/contracts/projects.py`. Its router file is byte-identical to commit `959eec134` (blob `01e6121eaee7c4afc15e85a0c3772f9098e4c0fd`). #4097 merges first. This branch then merges `main` with a merge commit and keeps this contract file (900 lines). A follow-up moves #4097's duplicated `PROJECT_ERROR_*` constants and idempotency scoping onto the contract helpers, including `build_idempotency_scope`.
 
 ## Amendment
 

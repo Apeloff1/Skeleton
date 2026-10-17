@@ -1,6 +1,6 @@
 # Projects resource contract
 
-**Status: describes PR #4097 at commit `959eec134`.**
+**Status: describes PR #4097.** The router is commit `959eec134`. #4097's current head is `c71ad467`, and `skeleton/api/projects_routes.py` is the same blob at both commits (`01e6121eaee7c4afc15e85a0c3772f9098e4c0fd`).
 
 Typed schema: `skeleton/contracts/projects.py`
 JSON schema: `docs/architecture/contracts/projects.schema.json`
@@ -17,7 +17,7 @@ Every Projects call needs both:
 - `x-gf-seal`, checked by `install_gate` before the handler
 - `Authorization: Bearer <session>`
 
-`actor_id` is the session user id. `tenant_id` is `APP_TENANT_ID`, or `default` when that variable is unset. Neither is taken from the query string. A body may repeat them, and the value must equal the session value. A different value is `PROJECT.INVALID`.
+`actor_id` is the session user id. `tenant_id` is the process-wide `APP_TENANT_ID`, or `default` when that variable is unset. It is deployment-scoped until sessions carry a tenant. Neither value is taken from the query string. A body may repeat them, and the value must equal the session value. A different value is `PROJECT.INVALID`.
 
 A missing or unknown bearer token is `PROJECT.UNAUTHENTICATED` (HTTP 401), message `valid session required`. A seal failure is the gate's own response, `401 invalid_seal` or `503 seal_unavailable`, and is not a `PROJECT.*` envelope.
 
@@ -62,7 +62,7 @@ A start is `POST` without `execution_id`:
 | `options` | object, default `{}` |
 | `idempotency_key` | optional string, 1..128 characters |
 
-The handler calls `job_api.enqueue("game.build", {"target", "options"}, ...)`. `x-request-id` is the correlation id. The effective idempotency key is `{tenant}:{actor}:game.build:{project_id}:{key}`. The same key with the same target and options returns 202 and the original build with `replayed: true`. A different target or options is `PROJECT.IDEMPOTENCY_MISMATCH`. See [`docs/contracts/job_queue.md`](../../contracts/job_queue.md).
+The handler calls `job_api.enqueue("game.build", {"target", "options"}, ...)`. The `game.build` worker runs `build_playable_game` (#4119); this route does not call `Forge.materialise` itself. `x-request-id` is the correlation id. The effective idempotency key is `{tenant}:{actor}:game.build:{project_id}:{key}`. The same key with the same target and options returns 202 and the original build with `replayed: true`. A different target or options is `PROJECT.IDEMPOTENCY_MISMATCH`. See [`docs/contracts/job_queue.md`](../../contracts/job_queue.md).
 
 `Build` is:
 

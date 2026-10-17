@@ -25,7 +25,20 @@ A classified module may import its own layer or a lower order. `scripts/check_ar
 
 `skeleton/application` stays unclassified. It is a compatibility facade over `skeleton.app.runtime`, not the application layer.
 
-GameForge HTTP production stays on `skeleton.api.routes`. The seal-gated sidecar keeps its handlers for direct tests and does not include the command router. Command routes and the sidecar resolve `get_state` inside the dependency function. The dev harness mounts the main router and the command router, not the sidecar. Cortex routes stay unmounted. The included-router guard fix stays on the Internal Systems PR. OmniFabric and Pack H stay opt-in and unmounted.
+`build_playable_game` (PR #4119, `skeleton/forge/game_builder.py`) is the only build entry. It is the wrapper around `Forge.materialise` and `godot_emit`. These callers are thin adapters over that function:
+
+- CLI `skeleton game` (`python -m skeleton game`)
+- `POST /api/v1/game/build`
+- `POST /gameforge/run`
+- Projects `POST /api/v1/projects/{project_id}/builds`, whose `game.build` worker calls `build_playable_game`
+
+PR #4118 plugs the studio swarm in as the `planner` and `qa` hooks on `build_playable_game`. The default hooks are no-ops, so the CLI, the game build route, `/gameforge/run`, and the Projects worker stay on one executor.
+
+`skeleton/api/gameforge_routes.py` belongs to #4119. This branch leaves that file untouched. #4119 makes the unmounted `/gameforge/run` handler delegate to `build_playable_game`.
+
+Charter-gated GameForge HTTP on `skeleton.api.routes` stays the mounted surface inside `create_app`. Command routes resolve `get_state` inside the dependency function. The dev harness in `skeleton/deploy/harness.py` mounts `skeleton.api.routes` and `skeleton.api.command_routes`, and leaves the GameForge sidecar unmounted. Cortex routes stay unmounted. The included-router guard fix stays on the Internal Systems PR. OmniFabric and Pack H stay opt-in and unmounted.
+
+`scripts/check_architecture_logical_layers.py` resolves relative imports that climb out of the current package (level 2 or more), treats `from skeleton import name` as `skeleton.name`, and checks string literals passed to `importlib.import_module` or `__import__`. A level-1 relative import stays in the current package. The debt list in `machine/logical_layers.json` is the upward edges already present; a new edge fails the build.
 
 ## Consequences
 
@@ -33,4 +46,4 @@ Import-linter is not added. The repository already owns architecture fitness scr
 
 Three infrastructure modules still import application code and are named in the debt list: `skeleton/persistence/snapshots.py`, `skeleton/observability/cost_governor.py`, and `skeleton/observability/budget_accounting.py`. The cost-governor codec split adds `cost_governor_codec.py` to that list rather than pretending the dependency is gone.
 
-This ADR does not collapse the byte-identical `skeleton/ai` mirror and does not rewrite the GameForge pipeline.
+This ADR does not collapse the byte-identical `skeleton/ai` mirror. The GameForge pipeline stays behind `build_playable_game`.

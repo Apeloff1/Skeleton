@@ -1,6 +1,6 @@
 # C4 views
 
-These views describe the system as it is wired today, plus the Projects contract at `/api/v1/projects` (`skeleton.projects.v1` version `1.0.0`).
+These views describe the system as it is wired today, plus the Projects contract at `/api/v1/projects` (`skeleton.projects.v1` version `1.0.0`). Playable builds have one entry, `build_playable_game` (#4119). The mount list for `create_app` lives in [api-gateway.md](../api-gateway.md).
 
 | View | Question it answers |
 |------|---------------------|

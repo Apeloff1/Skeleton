@@ -1,14 +1,8 @@
-"""Seal-gated GameForge sidecar.
+"""
+Skeleton API — GameForge route handlers
 
-Production GameForge HTTP is the charter-gated handlers on
-``skeleton.api.routes`` (``POST /api/v1/gameforge/run`` and
-``POST /api/v1/gameforge/intake``), mounted by ``create_app``.
-
-This module keeps the older seal-gated handlers for direct tests and for
-callers that still import them. It does not include the command router.
-Nesting that router imported ``skeleton.api.server`` at module scope and
-made a cycle whenever the server imported this module. Command routes mount
-on their own.
+/gameforge/run      — full intake → blueprint → pipelines generation
+/gameforge/intake   — questionnaire answers → structured intake only
 """
 
 from __future__ import annotations
@@ -17,19 +11,18 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from skeleton.api.command_routes import router as command_router
 from skeleton.api.hmac_seal import require_seal
 from skeleton.api.idempotency import IdempotencyGuard
+from skeleton.api.server import get_state
 from skeleton.application import build_runtime_command_service
 
-CANONICAL_HTTP_SURFACE = "skeleton.api.routes"
-
 router = APIRouter()
+router.include_router(command_router)
 _idempotency = IdempotencyGuard()
 
 
 def _state():
-    from skeleton.api.server import get_state
-
     return get_state()
 
 

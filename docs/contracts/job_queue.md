@@ -14,6 +14,8 @@ def build_playable_game_handler(ctx: job_api.JobContext, payload: dict) -> dict:
     return {"rom_asset_id": "..."}      # JSON-serialisable result
 
 job_api.register_handler("game.build", build_playable_game_handler)
+# The production handler calls build_playable_game (#4119), the only
+# build entry wrapping Forge.materialise / godot_emit.
 job_api.start_worker()                  # explicit, idempotent; NOT from api/server.py lifespan
 h = job_api.enqueue("game.build", {"target": "gb"}, actor_id=user, tenant_id=tenant,
                     project_id=pid, idempotency_key="k", correlation_id=request_id, timeout_s=900)

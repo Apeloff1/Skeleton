@@ -25,4 +25,4 @@ flowchart LR
     backend --> chroma
 ```
 
-The client SDK in progress covers auth, agents, builds, and stream parsing. Projects are published in `docs/architecture/contracts/projects.md` (`skeleton.projects.v1` at `1.0.0`) as the contract for the #4097 router at `/api/v1/projects`. A started build's `execution_id` equals its `build_id`.
+The client SDK in progress covers auth, agents, builds, and stream parsing. Projects are published in `docs/architecture/contracts/projects.md` (`skeleton.projects.v1` at `1.0.0`) as the contract for the #4097 router at `/api/v1/projects`. A started build's `execution_id` equals its `build_id`. Playable builds go through one entry, `build_playable_game` (#4119). The CLI, `POST /api/v1/game/build`, `/gameforge/run`, and the Projects `game.build` worker are adapters. The #4118 studio swarm is that entry's planner and QA hook.
