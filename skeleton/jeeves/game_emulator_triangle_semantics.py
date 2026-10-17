@@ -49,6 +49,12 @@ def _canonical_router():
 
 
 def _source_observations(episode: dict[str, Any]):
+    """Route lens QUESTIONS using positive native measurements only.
+
+    Do not seed the router with unobserved terms like dialogue, camera,
+    game-story, music, success or emotion in a negation sentence: the canonical
+    lexical router would otherwise treat those unmeasured words as support.
+    """
     from skeleton.jeeves.agent.semantic_lenses import SemanticObservation
 
     trace = episode["source_trace_sha256"]
@@ -57,63 +63,73 @@ def _source_observations(episode: dict[str, Any]):
     companion = episode["companion_viewing"]
     play = episode["ai_playing"]
     repeat = episode["repetition"]
-    # These are references to source-measured native quantities, not generated
-    # narrative details or transcribed third-party ROM audiovisual material.
-    content = [
-        (
-            "visual",
-            "Actual native video frame pixels, visual change, frames and color "
-            f"inspection: {companion['native_rgb24_frames_optically_inspected']} "
-            f"RGB observations with frame sequence {companion['frame_sequence_sha256']}. "
-            "Visual content semantics and character identity remain unknown.",
-            ("visual", "frame", "pixel", "color", "film", "camera", "scene", "observation"),
-        ),
+    optical = companion["native_rgb24_frames_optically_inspected"]
+    if type(optical) is not int or optical < 0:
+        raise TriangleSemanticError("native optical frame count is invalid")
+    visual_tags = (
+        ("visual", "frame", "pixel", "color", "observation", "video")
+        if optical else ("visual", "frame", "hash", "observation")
+    )
+    visual_description = (
+        f"Measured native RGB24 pixel color and tile inspection for {optical} "
+        f"frames; source frame sequence {companion['frame_sequence_sha256']}."
+        if optical else
+        "Native emulator frame SHA256 sequence only: "
+        f"{companion['frame_sequence_sha256']}."
+    )
+    probes = play["counterfactual_native_probes"]
+    if type(probes) is not int or probes < 0:
+        raise TriangleSemanticError("native counterfactual count is invalid")
+    probe_tags = (
+        ("counterfactual", "probe", "alternative", "action", "simulation")
+        if probes else ("controller", "action")
+    )
+    content = (
+        ("visual", visual_description, visual_tags),
         (
             "audio",
-            "Measured native audio waveform RMS and ambience with audio "
-            f"sequence {companion['audio_sequence_sha256']}. "
-            "No score, dialogue, emotional music or speech semantics were measured.",
-            ("audio", "sound", "music", "measurement", "signal"),
+            "Native measured audio waveform RMS sequence "
+            f"{companion['audio_sequence_sha256']}.",
+            ("audio", "sound", "waveform", "rms", "measurement", "signal"),
         ),
         (
             "control",
-            "Actual gameplay controller input actions and policy sequence "
+            "Native measured controller action and executed policy sequence "
             f"{measured['controller_action']['action_sequence_sha256']}; "
-            f"{play['actual_native_steps']} real action transitions and "
-            f"{play['actual_q_table_updates']} tabular Q-policy updates. "
-            "Player intention and user enjoyment were not observed.",
-            ("game", "player", "controller", "input", "action", "policy", "movement"),
+            f"{play['actual_native_steps']} native transitions, "
+            f"{play['actual_q_table_updates']} Q updates.",
+            ("game", "controller", "input", "action", "policy", "transition"),
         ),
         (
             "reward",
-            "Measured reward and consequence sequence "
-            f"{measured['reward_and_consequence']['measured_reward_sequence_sha256']}. "
-            "Success, quality and player enjoyment are not established by reward alone.",
-            ("reward", "consequence", "outcome", "feedback", "risk", "goal"),
+            "Native measured reward and consequence sequence "
+            f"{measured['reward_and_consequence']['measured_reward_sequence_sha256']}.",
+            ("reward", "consequence", "measurement", "feedback"),
         ),
         (
             "temporal",
-            f"Reverse replays executed {repeat['replayed_native_steps']} native steps "
-            f"with {repeat['reverse_checkpoint_count']} checked checkpoints, "
-            "not new independent observations. Temporal replay is not evidence "
-            "of novel game history or scene continuity.",
-            ("time", "temporal", "repeat", "replay", "sequence", "memory", "continuity"),
+            f"Native reverse checkpoints replayed {repeat['replayed_native_steps']} "
+            f"steps across {repeat['reverse_checkpoint_count']} checkpoints.",
+            ("time", "temporal", "repeat", "replay", "checkpoint", "sequence"),
         ),
         (
             "counterfactual",
-            f"Counterfactual probes {play['counterfactual_native_probes']} "
-            f"and controller-only probes {play['controller_only_probes']} "
-            "inspect alternate actions. Their simulations do not establish causal "
-            "effects or produce independent training samples.",
-            ("causal", "counterfactual", "simulate", "alternative", "uncertainty",
-             "adversarial", "system", "hypothesis"),
+            f"Native probes executed: {probes} alternate-action probes and "
+            f"{play['controller_only_probes']} controller-only probes.",
+            probe_tags,
         ),
-    ]
+    )
     return tuple(
         SemanticObservation(
             observation_id=f"{trace}:{name}", content=statement, position=i,
             source="verified_native_emulator_training_triangle",
             evidence_ids=(trace, receipt), tags=tags,
+            metadata={
+                "positive_measurements_only": True,
+                "measured_native_pixel_frames": optical if name == "visual" else 0,
+                "native_counterfactual_probes": probes if name == "counterfactual" else 0,
+                "semantic_game_footage_interpretation_available": False,
+            },
         )
         for i, (name, statement, tags) in enumerate(content)
     )
@@ -195,15 +211,26 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         if (decision is None or decision.factual_assertion_authorized
                 or decision.causal_assertion_authorized):
             raise TriangleSemanticError("canonical semantic lens lacks safe governance decision")
+        # Positive native terms only: observational limitations and absent
+        # modalities do not activate e.g. music, characters or scene reading.
+        # The canonical router still allocates a 43-question budget. This
+        # separate evidence check prevents a routed question being mistaken
+        # for measured support of its content or prediction.
+        positive_observation = " ".join(
+            obs.content + " " + " ".join(obs.tags) for obs in observations
+        ).casefold()
         cues = tuple(
             cue for cue in spec.activation_cues
-            if cue and cue in " ".join(
-                obs.content + " " + " ".join(obs.tags) for obs in observations
-            ).casefold()
+            if cue and cue in positive_observation
         )
         route.append({
             "matched_native_observation_cues": list(cues),
             "cue_support_present": bool(cues),
+            "native_evidence_support_class": (
+                "measured_native_cue_present"
+                if cues else "hypothesis_only_without_matching_native_cue"
+            ),
+            "semantic_media_interpretation_verified": False,
             "operator_requested_not_evidence": bool(requested_keys),
             "governance_grade": decision.grade.value,
             "governance_fingerprint": decision.fingerprint,
@@ -240,6 +267,13 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         "semantic_lenses_remain_hypotheses_not_source_evidence": True,
         "selection_is_dynamic_not_a_claim_of_exactly_43_catalog_lenses": True,
         "source_evidence_observation_count": len(observations),
+        "native_rgb24_frames_measured": episode["companion_viewing"][
+            "native_rgb24_frames_optically_inspected"
+        ],
+        "native_counterfactual_probes_measured": episode["ai_playing"][
+            "counterfactual_native_probes"
+        ],
+        "unobserved_semantics_cannot_activate_lens_cues": True,
         "observation_fingerprints": [obs.fingerprint for obs in observations],
         "evidence_owner": "existing_eight_measured_native_lenses",
         "factual_assertions_authorized": False,
