@@ -8,6 +8,7 @@ from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
 import wave
+from unittest.mock import patch
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -303,6 +304,43 @@ class StudioProductionAssetTests(unittest.TestCase):
                         output=folder, authorized=True,
                         studio_art=ArtDirection(seed=107),
                     )
+
+    def test_native_export_failure_leaves_no_partial_source_or_media_directory(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            evidence = root / "authorship.txt"
+            evidence.write_text("Only original homebrew materials")
+            destination = root / "new-build"
+            kwargs = {
+                "target": "nintendo_game_boy",
+                "basis": "bandai_wonderswan",
+                "project_id": "jeeves-native-art-e2e",
+                "title": "Original Dragon Art Studio",
+                "seed": 733, "width": 11, "height": 11, "levels": 1,
+                "collectibles": 1, "hazards": 1, "health": 4,
+                "rights_evidence": evidence,
+                "creative_identity": ("original-characters", "independent-mechanics"),
+                "output": destination, "authorized": True,
+                "studio_art": ArtDirection(seed=299),
+            }
+            with patch(
+                "skeleton.ai.game_builder.native_game_cli.export_studio_art",
+                side_effect=StudioArtError("simulated late asset-stage fault"),
+            ):
+                with self.assertRaisesRegex(StudioArtError, "late asset-stage"):
+                    build_game(**kwargs)
+            self.assertFalse(destination.exists())
+            self.assertFalse(any(
+                path.name.startswith(".jeeves-native-studio-")
+                for path in root.iterdir()
+            ))
+            result = build_game(**kwargs)
+            self.assertTrue(destination.is_dir())
+            self.assertEqual(result["output_directory"], str(destination))
+            self.assertEqual(result["studio_assets"]["assets_directory"],
+                             str(destination / "assets"))
+            self.assertEqual(result["engine_sources"]["path"],
+                             str(destination / "engines"))
 
     def test_bundle_export_denies_replay_and_never_overwrites(self):
         pack = render_studio_art(self.world, target="nintendo_game_boy",
