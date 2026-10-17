@@ -3,6 +3,8 @@ export * from './queryCache';
 export * from './strings';
 export * from './a11y';
 export * from './tokens';
+export * from './queries';
+export { useT } from './useT';
 export { useSession, selectSnapshot } from './sessionStore';
 export { useQuery } from './useQuery';
 export type { UseQueryOptions, UseQueryResult } from './useQuery';
