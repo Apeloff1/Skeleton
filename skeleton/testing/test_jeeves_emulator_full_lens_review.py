@@ -15,10 +15,15 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from skeleton.jeeves.game_learning import _digest
 from skeleton.jeeves.agent.lens_system import LensCatalog
-from skeleton.jeeves.game_emulator_training_lab import SCHEMA as TRAINING_SCHEMA
+from skeleton.jeeves.game_emulator_training_lab import (
+    SCHEMA as TRAINING_SCHEMA, EmulatorLabConfig, run_emulator_training_lab,
+)
+from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+from skeleton.testing.test_game_emulator_training_lab import ControlledNativeFixture, _request
 from skeleton.jeeves.game_emulator_lens_review import (
     EmulatorLensReviewError,
     complete_lens_registry,
@@ -90,6 +95,32 @@ class AllLensReviewContract(unittest.TestCase):
         self.assertEqual(seen, expected)
         self.assertFalse(first["production_model_promotion_authorized"])
         self.assertEqual(first["actual_neural_parameter_updates_by_review"], 0)
+
+    def test_actual_stateful_fixture_training_receipts_reach_every_lens(self):
+        """Exercises canonical runner, not a commercial/native core or GPU weights."""
+        config = EmulatorLabConfig(
+            max_runs=11, steps_per_run=4, stagnation_runs=10,
+            checkpoint_stride=2, boomerang_interval=2,
+            boomerang_retained=2, heldout_episodes=1,
+        )
+        with patch.object(
+            GameEnvironmentRequest, "build",
+            side_effect=lambda **_: ControlledNativeFixture(),
+        ):
+            report = run_emulator_training_lab(
+                _request(), source_lineage={"rights_acknowledged": True, "fixture": True},
+                config=config,
+            )
+        validation = validate_training_receipts(report)
+        self.assertEqual(validation["run_count"], report["run_count"])
+        self.assertEqual(validation["tabular_q_updates"], report["actual_q_table_updates"])
+        review = review_verified_training_report(report, limit=24)
+        self.assertEqual(review["review_lens_count"], 24)
+        self.assertFalse(review["source_integrity"]["native_runtime_reexecuted"])
+        self.assertEqual(review["source_actual_steps_claimed_by_report"]
+                         if "source_actual_steps_claimed_by_report" in review else
+                         review["source_integrity"]["source_actual_steps_claimed_by_report"],
+                         report["actual_training_steps"])
 
     def test_page_stable_digest_source_and_catalog_unchanged(self):
         report = _synthetic_report()
