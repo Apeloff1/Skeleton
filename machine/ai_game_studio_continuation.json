@@ -1437,5 +1437,133 @@
       "six_month_endurance_verified": false
     },
     "specialist_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_original_compiled_art_and_independent_e2e_extension": {
+    "status": "committed_source_pending_exact_head_specialized_E2E_and_real_native_execution",
+    "tranche": "M181-M200",
+    "owners": [
+      "skeleton/ai/game_builder/studio_game_boy_rom_art_parity.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_production_blocker_taxonomy.py",
+      "skeleton/ai/game_builder/studio_native_correction_triage.py",
+      "machine/e2e_suites.json"
+    ],
+    "milestones": [
+      {
+        "id": "M181",
+        "name": "Require exact native source artifact receipt rather than campaign identity for verified source stage",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M182",
+        "name": "Reconcile every verified production source/ROM/emulator/browser/Godot/canvas stage against independently audited artifact SHA",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M183",
+        "name": "Reject rehashed false-positive successes and incompatible runtime evidence",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M184",
+        "name": "Validate historical stage evidence again while holding campaign OS lock",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M185",
+        "name": "Reject forged source, browser or native binary claims despite internally consistent run digest",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M186",
+        "name": "Read actual RGBLINK bank-0 Tiles and TilesEnd symbols for original GB/GBC source",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M187",
+        "name": "Validate sprite bank, offset, tile count and linker state manifest boundaries",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M188",
+        "name": "Compare 96 original 2bpp tile bytes in actual compiled GB/GBC ROM to source asset producer",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M189",
+        "name": "Require original compiled sprite parity before publishing a handheld cartridge qualification",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M190",
+        "name": "Recheck same compiled GB/GBC ROM bytes in independent assurance inspections",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M191",
+        "name": "Rollback only owned ROM and symbols after a compiled sprite mismatch",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M192",
+        "name": "Add tamper/incorrect linker/address original source regression tests",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M193",
+        "name": "Update mock compiled cartridges to contain actual game art instead of fabricated zero sprite bytes",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M194",
+        "name": "Classify missing compiler, ROM art, emulator, browser, Godot and native CPU blockers independently",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M195",
+        "name": "Do not persist raw command logs, secrets or arbitrary runtime error text into Dragon repair memory",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M196",
+        "name": "Preserve bounded blocker classes in digest-linked production history",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M197",
+        "name": "Expose current-source Dragon corrective review proposals specific to cause and target",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M198",
+        "name": "Fail closed on stale source, forged stages and invalid blocker categories with tests",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M199",
+        "name": "Run full specialized 13-test source, native ROM and emulator E2E suite on exact branch head",
+        "state": "not_verified"
+      },
+      {
+        "id": "M200",
+        "name": "Sign off first-install, real native emulator/hardware runtime, full renderer/audio and longform endurance",
+        "state": "not_qualified"
+      }
+    ],
+    "assurance_truth": {
+      "changed_source_stage_attestation_from_campaign_identity_to_target_digest": true,
+      "all_claimed_verified_stages_have_independent_runtime_artifact_digest": true,
+      "GB_GBC_compiled_rom_original_tiles_must_match_source": true,
+      "NES_compiled_chr_original_tiles_must_match_source": true,
+      "Dragon_root_cause_classifier_persists_no_untrusted_raw_compiler_output": true,
+      "actual_RGBDS_cc65_native_ROM_playthrough_this_session": false,
+      "native_hardware_controller_audio_gpu_verified": false,
+      "exact_head_specialized_suite_confirmed_pass": false,
+      "model_weights_updated": false,
+      "game_release_signed_off": false
+    },
+    "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
