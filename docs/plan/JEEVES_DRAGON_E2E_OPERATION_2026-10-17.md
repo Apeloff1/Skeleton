@@ -356,3 +356,74 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 The new code and tests are committed but none is represented as a passing game E2E run. Exact-head GitHub checks and real installed native/browser/Godot runtimes are required before accepting any runtime qualification or game release.
+
+
+## M81–M100: verified native ROM/WRAM emulator and complete E2E campaign runner
+
+This tranche turns an earlier source-to-ROM structural boundary into a **real optional GB/GBC emulator input/playthrough qualification path**, with exact source evidence. Source code and tests are committed on the feature branch. The actual RGBDS assembler and PyBoy must still be installed and successfully executed locally before a ROM/gameplay milestone may be signed complete.
+
+### M81–M84: native ROM plus exact RGBDS symbols
+
+GB and GBC source now links with an actual `-n game.sym` argument to RGBLINK. The native build qualifier validates the assembler-emitted WRAM labels `Level`, `PlayerX`, `PlayerY`, `Health`, `Score`, `GemsRemaining`, `GameWon`, and `GameLost` and refuses missing, duplicate, overlapping or out-of-WRAM addresses. Source cannot simply guess the offsets from the template.
+
+Compiled ROM and symbol-map outputs use exclusive publication and an owned rollback path on failure. The native ROM qualification receipt commits both ROM and symbol SHA-256; changed symbols cannot pass future build or emulator inspection. The explicit lower-level native build CLI accepts `--output-symbols <new-path>` for GB/GBC; NES remains ROM-only.
+
+### M85–M92: run the *actual* compiled cartridge in an emulator
+
+`studio_game_boy_emulator.py` is a conditional PyBoy adapter, not a simulated rendering of the Python world. After explicit local operator execution authorization, it opens a private copy of the qualified ROM, advances boot frames, delivers the canonical winning directional inputs using real PyBoy gamepad methods, observes the actual 8-bit WRAM flags through assembler-owned symbol addresses, and hashes the final rendered emulated LCD framebuffer. It compares the cartridge's final coordinates, level, health, score, remaining crystals, victory/loss status to the actual Python source proof.
+
+The adapter enforces a maximum wall-clock budget, an explicit frame budget and a bounded reference action list. A missing PyBoy installation, early win/loss, incorrect score/health/coordinates, ROM mismatch or expired time budget remains a **failed/blocked qualification**, never a successful build or “controller verified” fiction. Emulated D-pad input is not a physical USB controller, hardware console, actual audio device or rights clearance.
+
+### M93–M95: binding native execution to production and Dragon
+
+`qualify_campaign_emulator()` refuses unqualified source/ROM/symbols and writes a separate evidence receipt only after actual machine-code victory. The canonical assurance projection independently re-reads the current ROM, exact native source, assembler symbols and browser/Python reference proof before accepting a native emulator claim. The independent production gates `emulator_playthrough_executed` and `controller_response_verified` can be filled by this **emulated** full-game result. The physical controller and hardware release flags remain false.
+
+Dragon's read-only production observation chain now records `studio.native_cpu_dpad_playthrough` only against that verified native emulator receipt. No automatic Dragon knowledge promotion, hidden recording or checkpoint weight updates are authorized.
+
+### M96–M98: one ordered end-to-end operator campaign
+
+`studio_execution_campaign.py` drives the actual canonical owners rather than installing a second game-building application. Stages run in order: source -> ROM -> emulator -> browser -> Godot -> optional canvas. The operator can select a subset, run full production, cap per-stage elapsed time/frames and source targets per invocation, and choose to stop on the first blocker or continue with independent targets.
+
+Native console-specific stages are explicitly marked `unsupported` for targets without real compiler/emulator adapters. Missing tools and bad execution receipts remain `blocked`. The summarized plan has a fresh SHA of the canonical full-assurance report, per-target stage results and exact current artifact/evidence hashes; never an invented percentage of release completion.
+
+### M99–M100: remaining native hardware gaps
+
+The NES build adapter currently validates the iNES cartridge structure but **does not** execute a full 6502 CPU/PPU/D-pad winning replay. Other legacy-platform emulators and full emulation/controller matrix, actual native audio/video timing, physical input devices and hardware-specific releases remain future real implementations. Real RGBDS+PyBoy compilation/playthrough and a production installer-first-launch also need actual execution and recorded evidence.
+
+### Exact operator execution
+
+```bash
+# Produce full original game source, then compile GB/GBC/NES where supported,
+# run the PyBoy native CPU replay for GB/GBC, and run browser/Godot proofs
+# if the respective tools are installed:
+python -m skeleton.ai.game_builder.studio_execution_campaign_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --stages source,rom,emulator,browser,godot \
+  --authorize-local-operation --execute-run \
+  --timeout-seconds 90 --max-emulator-frames 260000
+
+# One specific qualified native Game Boy ROM against actual PyBoy CPU/PPU:
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --emulator-target nintendo_game_boy --execute-build \
+  --authorize-local-operation --timeout-seconds 90
+
+# Explicitly consent to game-only Chromium image capture (never implied by a
+# regular source, emulator or gameplay command):
+python -m skeleton.ai.game_builder.studio_execution_campaign_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --stages canvas --consent-generated-game-canvas \
+  --authorize-local-operation --execute-run
+```
+
+### Milestone-test contract
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_build_qualification.py \
+  tests/test_studio_game_boy_emulator_e2e.py \
+  tests/test_studio_campaign_assurance_e2e.py \
+  tests/test_studio_execution_campaign_e2e.py
+```
+
+Synthetic/mocked native-emulator tests validate error paths and receipt contracts only; they do not qualify a real cartridge. An operator must install and execute real RGBDS, PyBoy and downstream runtimes on the generated original game before checking off runtime, completion or publishing criteria.
