@@ -27,7 +27,7 @@ import re
 import secrets
 import sqlite3
 import time
-from typing import Iterator
+from typing import Callable, Iterator
 
 SCHEMA = "skeleton.annual-production.v1"
 SYSTEMS = frozenset({"jeeves", "builder", "dragon"})
@@ -151,6 +151,19 @@ class AnnualProductionStore:
                 );
                 CREATE INDEX IF NOT EXISTS annual_due_idx
                   ON annual_productions(status, next_run_at, production_id);
+                CREATE TABLE IF NOT EXISTS annual_authority_rotations (
+                  production_id TEXT NOT NULL,
+                  revision INTEGER NOT NULL,
+                  old_authority_digest TEXT NOT NULL,
+                  new_authority_digest TEXT NOT NULL,
+                  approval_digest TEXT NOT NULL,
+                  expires_at REAL NOT NULL,
+                  approved_at REAL NOT NULL,
+                  previous_rotation_digest TEXT,
+                  rotation_digest TEXT NOT NULL,
+                  PRIMARY KEY (production_id, revision),
+                  FOREIGN KEY (production_id) REFERENCES annual_productions(production_id)
+                );
             """)
 
     @contextmanager
@@ -373,6 +386,90 @@ class AnnualProductionStore:
                 lease_expires_at=NULL, updated_at=? WHERE production_id=?""",
                 (state, evidence, at, claim.production_id))
             return self._state(self._row(db, claim.production_id))
+
+    def renew_authority(
+        self, production_id: str, *, expected_authority_digest: str,
+        new_authority_digest: str, approval_digest: str, new_expires_at: float,
+        verify_approval: Callable[[str, str, str, str, float], bool],
+        now: float | None = None,
+    ) -> ProductionState:
+        """Operator-approved grant rotation; old lease generations are fenced.
+
+        The trusted host must authenticate and validate the original approval
+        (signature, issuer, purpose and project scope) in verify_approval.
+        Passing a digest alone does not grant permission and is never enough.
+        """
+        production_id = _name(production_id, "production id")
+        prior = _digest(expected_authority_digest, "previous authority")
+        updated = _digest(new_authority_digest, "new authority")
+        receipt = _digest(approval_digest, "approval")
+        at = _clock(time.time() if now is None else now)
+        expiry = _clock(new_expires_at)
+        if prior == updated or expiry <= at or not callable(verify_approval):
+            raise ValueError("invalid renewed approval or grant")
+        if verify_approval(production_id, prior, updated, receipt, expiry) is not True:
+            raise PermissionError("independent operator approval was not verified")
+        with self._tx() as db:
+            row = self._row(db, production_id)
+            if row["status"] in TERMINAL:
+                raise ProductionConflict("terminal production cannot be revived by grant rotation")
+            if row["authority_digest"] != prior:
+                raise ProductionConflict("stale authority renewal")
+            if expiry <= row["authority_expires_at"]:
+                raise ProductionConflict("renewed authority must extend expiry")
+            prior_rotation = db.execute("""SELECT revision,rotation_digest
+                FROM annual_authority_rotations WHERE production_id=?
+                ORDER BY revision DESC LIMIT 1""", (production_id,)).fetchone()
+            revision = 1 if prior_rotation is None else prior_rotation[0] + 1
+            previous = None if prior_rotation is None else prior_rotation[1]
+            body = {"schema": SCHEMA, "production_id": production_id,
+                    "revision": revision, "old_authority_digest": prior,
+                    "new_authority_digest": updated, "approval_digest": receipt,
+                    "expires_at": expiry, "approved_at": at,
+                    "previous_rotation_digest": previous}
+            rotation_digest = _hash(body)
+            db.execute("""INSERT INTO annual_authority_rotations VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (production_id, revision, prior, updated, receipt, expiry, at,
+                 previous, rotation_digest))
+            # Reauthorization invalidates any prior grant's worker token.
+            db.execute("""UPDATE annual_productions
+                SET authority_digest=?, authority_expires_at=?,
+                    lease_epoch=lease_epoch+1, lease_token_digest=NULL,
+                    lease_worker=NULL, lease_expires_at=NULL,
+                    status='waiting', next_run_at=?, updated_at=?
+                WHERE production_id=?""", (updated, expiry, at, at, production_id))
+            return self._state(self._row(db, production_id))
+
+    def verify_authority_chain(self, production_id: str) -> int:
+        """Streaming integrity verification of every explicit grant rotation."""
+        production_id = _name(production_id, "production id")
+        with self._connect() as db:
+            row = self._row(db, production_id)
+            cursor = db.execute("""SELECT revision,old_authority_digest,
+                new_authority_digest,approval_digest,expires_at,approved_at,
+                previous_rotation_digest,rotation_digest
+                FROM annual_authority_rotations WHERE production_id=?
+                ORDER BY revision""", (production_id,))
+            prev_digest = None
+            prev_grant = None
+            revisions = 0
+            for record in cursor:
+                (rev, old, new, receipt, expiry, approved, link, digest) = record
+                revisions += 1
+                data = {"schema": SCHEMA, "production_id": production_id,
+                        "revision": rev, "old_authority_digest": old,
+                        "new_authority_digest": new, "approval_digest": receipt,
+                        "expires_at": expiry, "approved_at": approved,
+                        "previous_rotation_digest": link}
+                if (rev != revisions or link != prev_digest or
+                    (prev_grant is not None and old != prev_grant) or
+                    _hash(data) != digest):
+                    raise ProductionConflict("production grant history integrity failure")
+                prev_digest, prev_grant = digest, new
+            if prev_grant is not None and row["authority_digest"] != prev_grant:
+                raise ProductionConflict("production grant head differs from verified history")
+            return revisions
 
     def verify_chain(self, production_id: str) -> int:
         production_id = _name(production_id, "production id")
