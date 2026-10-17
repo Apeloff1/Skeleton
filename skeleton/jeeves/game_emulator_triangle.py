@@ -237,11 +237,55 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
         }) == sample["verified_training_projection_sha256"],
                  "triangle source numeric features do not match native replay projection")
         seen_samples.add((trace, sequence))
+    samples_by_trace: dict[str, list[dict[str, Any]]] = {trace: [] for trace in proofs}
+    for sample in samples:
+        samples_by_trace[sample["trace_digest"]].append(sample)
+    # These are genuinely different deterministic readings of the SAME data.
+    # Keeping feature and trace hashes together prevents a lens from silently
+    # inflating the sample count or leaking heldout gameplay to the candidate set.
+    for view in views:
+        trace = view["source_trace_sha256"]
+        episode = episodes[view["run_index"]]
+        ordered = sorted(samples_by_trace[trace], key=lambda item: item["sequence"])
+        _require(len(ordered) == view["unique_source_transitions"],
+                 "each lens requires every source action exactly once")
+        view["grounded_lens_evidence"] = {
+            "visual_state": {
+                "source_frame_sequence_sha256": view["companion_viewing"]["frame_sequence_sha256"],
+            },
+            "audio_ambience": {
+                "source_audio_sequence_sha256": view["companion_viewing"]["audio_sequence_sha256"],
+            },
+            "controller_action": {
+                "action_sequence_sha256": _digest([item["action"] for item in ordered]),
+            },
+            "reward_and_consequence": {
+                "measured_reward_sequence_sha256": _digest([
+                    [item["measured_reward"], item["measured_reward_components"]]
+                    for item in ordered
+                ]),
+            },
+            "temporal_reversal": {
+                "reverse_checkpoint_sha256": _digest(episode["reverse_checkpoints"]),
+            },
+            "causal_counterfactual": {
+                "real_native_probe_sha256": _digest(episode["counterfactual_probes"]),
+                "simulation_is_new_training_data": False,
+            },
+            "policy_progress": {
+                "actual_episode_q_updates": episode["actual_tabular_q_updates"],
+                "committed_policy_snapshot_sha256": episode.get("policy_snapshot_digest_after"),
+            },
+            "adversarial_boundary": {
+                "native_scrutiny_sha256": _digest(episode["scrutiny_checks"]),
+                "independent_critic_attested": False,
+            },
+        }
     boomerangs = report.get("boomerang_replay_receipts")
     _require(type(boomerangs) is list and all(
         type(b) is dict and b.get("reparse_verified") is True
         and b.get("policy_updates") == 0
-        and b.get("original_trace_digest") in proofs
+        and _sha(b.get("original_trace_digest")) and b["original_trace_digest"] in proofs
         and type(b.get("replayed_steps")) is int and b["replayed_steps"] >= 1
         and b.get("return_receipt_digest") == _digest({
             k: v for k, v in b.items() if k != "return_receipt_digest"
@@ -256,6 +300,16 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
         if view["ai_playing"]["counterfactual_native_probes"] == 0:
             challenges.append({"kind": "no_counterfactual_native_probe",
                                "source_trace_sha256": view["source_trace_sha256"]})
+        challenges.append({
+            "kind": "dragon_semantic_view_pending",
+            "source_trace_sha256": view["source_trace_sha256"],
+            "frame_sequence_sha256": view["companion_viewing"]["frame_sequence_sha256"],
+        })
+        challenges.append({
+            "kind": "independent_model_red_team_pending",
+            "source_trace_sha256": view["source_trace_sha256"],
+            "source_receipt_sha256": view["source_receipt_sha256"],
+        })
     triangle = {
         "schema_version": SCHEMA,
         "parent_emulator_evidence_sha256": report["report_digest"],
