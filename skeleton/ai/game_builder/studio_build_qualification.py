@@ -32,14 +32,14 @@ _BUILD_ADAPTERS = {
     "nintendo_game_boy": (
         "main.asm", (), (
             ("rgbasm", "-o", "game.o", "main.asm"),
-            ("rgblink", "-o", "game.gb", "game.o"),
+            ("rgblink", "-n", "game.sym", "-o", "game.gb", "game.o"),
             ("rgbfix", "-v", "-p", "0", "-t", "SKELORIG", "game.gb"),
         ), "game.gb", "gb",
     ),
     "nintendo_game_boy_color": (
         "main.asm", (), (
             ("rgbasm", "-o", "game.o", "main.asm"),
-            ("rgblink", "-o", "game.gbc", "game.o"),
+            ("rgblink", "-n", "game.sym", "-o", "game.gbc", "game.o"),
             ("rgbfix", "-v", "-C", "-p", "0", "-t", "SKELCOLOR", "game.gbc"),
         ), "game.gbc", "gbc",
     ),
@@ -66,6 +66,7 @@ class BuildQualification:
     rom_header_verified: bool
     binary_sha256: str | None
     binary_size: int | None
+    symbol_sha256: str | None
     blocker: str | None
     tool_versions: tuple[str, ...]
     receipt_digest: str
@@ -81,6 +82,7 @@ class BuildQualification:
             "rom_header_verified": self.rom_header_verified,
             "binary_sha256": self.binary_sha256,
             "binary_size": self.binary_size,
+            "symbol_sha256": self.symbol_sha256,
             "blocker": self.blocker,
             "tool_versions": list(self.tool_versions),
             "emulator_playthrough_verified": False,
@@ -96,6 +98,7 @@ class BuildQualification:
 def _receipt(target: str, source_digest: str, *, available: bool = False,
              invoked: bool = False, built: bool = False, header: bool = False,
              digest: str | None = None, size: int | None = None,
+             symbol_sha256: str | None = None,
              blocker: str | None = None, versions: tuple[str, ...] = ()) -> BuildQualification:
     body = {
         "schema": SCHEMA,
@@ -103,6 +106,7 @@ def _receipt(target: str, source_digest: str, *, available: bool = False,
         "toolchain_available": available, "tools_invoked": invoked,
         "binary_built": built, "rom_header_verified": header,
         "binary_sha256": digest, "binary_size": size,
+        "symbol_sha256": symbol_sha256,
         "blocker": blocker, "tool_versions": list(versions),
         "emulator_playthrough_verified": False,
         "controller_verified": False,
@@ -110,7 +114,7 @@ def _receipt(target: str, source_digest: str, *, available: bool = False,
         "publication_approved": False,
     }
     return BuildQualification(target, source_digest, available, invoked, built,
-                              header, digest, size, blocker, versions, canonical_digest(body))
+                              header, digest, size, symbol_sha256, blocker, versions, canonical_digest(body))
 
 
 def _regular(path: Path, maximum: int) -> bytes:
@@ -209,9 +213,37 @@ def _header(family: str, payload: bytes) -> None:
         raise NativeBuildQualificationError("unsupported cartridge format")
 
 
+_GB_WRAM_LABELS = ("Level", "PlayerX", "PlayerY", "Health", "Score",
+                   "GemsRemaining", "GameWon", "GameLost")
+
+
+def parse_game_boy_symbols(payload: bytes) -> dict[str, int]:
+    """Read *assembler-generated* WRAM symbol addresses, never guessed offsets."""
+    import re
+    if type(payload) is not bytes or len(payload) > 128_000:
+        raise NativeBuildQualificationError("bounded actual RGBDS symbol map required")
+    labels: dict[str, int] = {}
+    for line in payload.decode("ascii", errors="strict").splitlines():
+        if not line or line.lstrip().startswith(";"):
+            continue
+        match = re.fullmatch(r"([0-9A-Fa-f]{2}):([0-9A-Fa-f]{4})\\s+([A-Za-z][A-Za-z0-9_]*)", line.strip())
+        if match is None:
+            continue
+        bank, address, name = int(match[1], 16), int(match[2], 16), match[3]
+        if name not in _GB_WRAM_LABELS:
+            continue
+        if name in labels or bank != 0 or not 0xC000 <= address <= 0xDFFF:
+            raise NativeBuildQualificationError("Game Boy state label is duplicated/outside WRAM")
+        labels[name] = address
+    if set(labels) != set(_GB_WRAM_LABELS) or len(set(labels.values())) != len(labels):
+        raise NativeBuildQualificationError("Game Boy symbol map lacks exact engine state")
+    return labels
+
+
 def qualify_native_build(
     project: str | Path, target: str, *, authorized: bool,
     execute: bool = False, output: str | Path | None = None,
+    output_symbols: str | Path | None = None,
     timeout_seconds: int = 45,
 ) -> BuildQualification:
     """Preflight by default; opt-in build publishes a hash-verified cartridge.
@@ -246,6 +278,18 @@ def qualify_native_build(
     if (destination.exists() or destination.is_symlink()
             or not destination.parent.is_dir() or destination.parent.is_symlink()):
         raise NativeBuildQualificationError("native binary output must be a new contained path")
+    symbols_path = None
+    if adapter[4] in ("gb", "gbc"):
+        if output_symbols is None:
+            raise NativeBuildQualificationError("GB/GBC qualification requires explicit symbol output")
+        symbols_path = Path(output_symbols)
+        if (symbols_path.parent != destination.parent
+                or symbols_path == destination
+                or symbols_path.exists() or symbols_path.is_symlink()
+                or symbols_path.parent.is_symlink()):
+            raise NativeBuildQualificationError("symbol map must be a separate new file beside ROM")
+    elif output_symbols is not None:
+        raise NativeBuildQualificationError("symbol output unsupported for target")
     names = dict(zip(programs, binaries))
     versions = tuple(sha256(str(Path(item).resolve()).encode()).hexdigest() for item in binaries)
     invoked = False
@@ -307,6 +351,14 @@ def qualify_native_build(
         # Stage verified ROM bytes, then atomically hard-link exclusively
         # into an as-yet nonexistent output. Concurrent writers cannot replace
         # a previously published image and failed writes leave no partial ROM.
+        symbol_data = None
+        if symbols_path is not None:
+            try:
+                symbol_data = _regular(work / "game.sym", 128_000)
+                parse_game_boy_symbols(symbol_data)
+            except (OSError, ValueError) as exc:
+                return _receipt(target, source_digest, available=True, invoked=True,
+                                blocker="gameboy_symbol_map_invalid", versions=versions)
         fd, candidate = tempfile.mkstemp(prefix=".skeleton-rom-", dir=destination.parent)
         try:
             with os.fdopen(fd, "wb") as handle:
@@ -317,9 +369,21 @@ def qualify_native_build(
         finally:
             if os.path.exists(candidate):
                 os.unlink(candidate)
+        if symbols_path is not None and symbol_data is not None:
+            fd, candidate = tempfile.mkstemp(prefix=".skeleton-sym-", dir=destination.parent)
+            try:
+                with os.fdopen(fd, "wb") as handle:
+                    handle.write(symbol_data)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.link(candidate, symbols_path)
+            finally:
+                if os.path.exists(candidate):
+                    os.unlink(candidate)
         digest = sha256(rom).hexdigest()
         return _receipt(target, source_digest, available=True, invoked=True,
                         built=True, header=True, digest=digest, size=len(rom),
+                        symbol_sha256=sha256(symbol_data).hexdigest() if symbol_data else None,
                         versions=versions)
 
 
