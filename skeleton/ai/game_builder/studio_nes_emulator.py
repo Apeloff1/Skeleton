@@ -24,6 +24,7 @@ from .studio_build_qualification import _header, _regular, parse_nes_labels
 from .studio_runtime_qualification import _inputs
 from .studio_native_replay_telemetry import (
     selected_checkpoints, parse_nes_samples, validate_checkpoints, NativeCheckpointError,
+    reference_cpu_checkpoints,
 )
 
 SCHEMA = "skeleton.game_builder.nes_cpu_ppu_playthrough.v1"
@@ -217,6 +218,13 @@ def qualify_nes_cpu_ppu(
         trace = json.loads(proof)
     except (OSError, UnicodeError, ValueError) as exc:
         raise NativeNESEmulationError("native NES cartridge/symbols/replay failed preflight") from exc
+    try:
+        reference = reference_cpu_checkpoints(engine_source)
+    except (OSError, ValueError) as exc:
+        raise NativeNESEmulationError("signed Python world and action replay are inconsistent") from exc
+    if (reference["world_digest"] != world
+            or reference["proof_sha256"] != sha256(proof).hexdigest()):
+        raise NativeNESEmulationError("reference checkpoint source differs from NROM game")
     actions = trace.get("actions")
     expected = trace.get("final_state")
     if (type(actions) is not list or not 1 <= len(actions) <= 20_000
@@ -328,6 +336,7 @@ def qualify_nes_cpu_ppu(
                 samples, actions=len(actions),
                 source_world=world, source_proof=proofhash,
                 expected_final=expected,
+                expected_samples=reference["samples"],
             )
         except (OSError, ValueError, NativeCheckpointError):
             return _receipt(
