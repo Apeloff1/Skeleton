@@ -149,7 +149,7 @@ async function requestJson(url: string, signal?: AbortSignal): Promise<unknown> 
   signal?.addEventListener('abort', onAbort, { once: true });
   if (signal?.aborted) controller.abort();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  let rejectOnAbort: (() => void) | null = null;
+  let rejectOnAbort: () => void = () => {};
   const abortPromise = new Promise<never>((_resolve, reject) => {
     rejectOnAbort = () => reject(new Error('Offline request aborted'));
     if (controller.signal.aborted) rejectOnAbort();
@@ -167,7 +167,7 @@ async function requestJson(url: string, signal?: AbortSignal): Promise<unknown> 
     return JSON.parse(text);
   } finally {
     clearTimeout(timer);
-    if (rejectOnAbort) controller.signal.removeEventListener('abort', rejectOnAbort);
+    controller.signal.removeEventListener('abort', rejectOnAbort);
     signal?.removeEventListener('abort', onAbort);
   }
 }
@@ -343,7 +343,23 @@ export async function clearOfflineCache(): Promise<void> {
   clearing = true;
   try {
     cancelOfflineSync();
-    if (activeSync) await activeSync.catch(() => {});
+    if (activeSync) {
+      // An unresponsive native storage adapter may never settle. Refuse to
+      // delete authoritative keys unless old writes have physically drained:
+      // a late write could otherwise resurrect an apparently cleared cache.
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      try {
+        const drained = await Promise.race([
+          activeSync.then(() => true, () => true),
+          new Promise<boolean>(resolve => {
+            timer = setTimeout(() => resolve(false), 5_000);
+          }),
+        ]);
+        if (!drained) throw new Error('Offline synchronization still draining; cache not cleared');
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
     await AsyncStorage.removeItem(COMMIT_KEY);
     const keys = await AsyncStorage.getAllKeys();
     const owned = keys.filter(key => key.startsWith(CACHE_PREFIX) ||
