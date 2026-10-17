@@ -357,3 +357,42 @@ def test_adversarial_generated_text_refuses_unhashable_trace():
     assert _interpret(
         output, attack="source_integrity", traces={"a" * 64}
     )["status"] == "unsupported_claim_or_schema_requires_manual_review"
+
+def test_dragon_temporal_optics_detects_changed_tiles_without_extra_steps():
+    from skeleton.jeeves.game_emulator_dragon_observer import (
+        observe_native_frame_with_cursor, verify_native_observation,
+    )
+    class Native:
+        frame = 0
+        def inspect_frame(self):
+            frame = ("a" if self.frame == 0 else "b") * 64
+            return {
+                "schema_version": "skeleton.game.native_frame_inspection.v1",
+                "pixel_sha256": frame,
+                "full_resolution_tile_hashes": True,
+                "tile_color_statistics_are_sampled": True,
+                "native_frames_executed_for_inspection": 0,
+                "width": 16, "height": 16, "total_tiles": 16,
+                "tiles": [{
+                    "samples": 64,
+                    "sampled_rgb_mean": [64.0, 128.0, 192.0],
+                    "sampled_luminance_range": [92, 92],
+                    "sampled_dark_count": 0, "sampled_bright_count": 0,
+                    "tile_rgb_sha256": ("c" if self.frame == 0 else "d") * 64,
+                } for _ in range(16)],
+            }
+    environment = Native()
+    first, cursor = observe_native_frame_with_cursor(
+        environment, expected_frame_sha256="a" * 64,
+    )
+    assert first["previous_native_frame_sha256"] is None
+    environment.frame = 1
+    second, _ = observe_native_frame_with_cursor(
+        environment, expected_frame_sha256="b" * 64, previous_cursor=cursor,
+    )
+    verify_native_observation(second, frame_sha256="b" * 64)
+    assert second["previous_native_frame_sha256"] == "a" * 64
+    assert second["changed_native_rgb_tile_count"] == 16
+    assert second["changed_native_rgb_tile_fraction"] == 1.0
+    assert second["candidate_full_frame_transition"] is True
+    assert second["new_native_steps_for_observation"] == 0

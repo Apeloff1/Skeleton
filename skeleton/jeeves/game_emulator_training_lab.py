@@ -314,6 +314,7 @@ def _collect_audited(
         checkpoints = [(0, first_state, first_observation)]
         transitions: list[dict[str, Any]] = []
         modality = []
+        dragon_optical_cursor = None
         rng = random.Random(_digest([config.seed, run_index, angle]))
         counterfactual = []
         multi_controller = []
@@ -350,9 +351,12 @@ def _collect_audited(
                 # The canonical host independently verifies and measures RGB24
                 # tiles. This runs after the real action, before any reverse
                 # replay restores earlier states. No image data is persisted.
-                from .game_emulator_dragon_observer import observe_native_frame
-                optical = observe_native_frame(
+                from .game_emulator_dragon_observer import (
+                    observe_native_frame_with_cursor,
+                )
+                optical, dragon_optical_cursor = observe_native_frame_with_cursor(
                     environment, expected_frame_sha256=frame,
+                    previous_cursor=dragon_optical_cursor,
                 )
             modality.append({
                 "dragon_optical": optical,
