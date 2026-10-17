@@ -58,3 +58,26 @@ def test_snapshot_does_not_invent_empty_history(tmp_path):
     target.mkdir(mode=0o700)
     with pytest.raises(StudioHistoryBackupError):
         snapshot_studio_history(source, target, name="empty", identity=IDENTITY)
+
+def test_symlinked_archive_segment_directory_is_not_a_valid_backup(tmp_path):
+    source = tmp_path / "campaign"
+    source.mkdir()
+    backup = tmp_path / "private"
+    backup.mkdir(mode=0o700)
+    runs = chain(1, 65, None)
+    with campaign_lock(source):
+        segments, tail = seal_full_heads(
+            source, IDENTITY, [], runs, entry_schema=ENTRY_SCHEMA,
+        )
+        head(source, tail, segments)
+    snapshot_studio_history(source, backup, name="record", identity=IDENTITY)
+    image = backup / "record"
+    archive = image / "qualification_history_segments"
+    real = image / "segments_relocated"
+    archive.rename(real)
+    archive.symlink_to(real, target_is_directory=True)
+    with pytest.raises(StudioHistoryBackupError):
+        verify_studio_history_snapshot(
+            backup, name="record", identity=IDENTITY,
+        )
+
