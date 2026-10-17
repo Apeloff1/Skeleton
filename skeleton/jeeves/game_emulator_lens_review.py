@@ -13,9 +13,11 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter
+from types import SimpleNamespace
 from collections.abc import Mapping
 from typing import Any
 
+from .agent.lens_system import LensCatalog
 from .agent.semantic_depth_lenses import register_depth_lenses
 from .agent.semantic_extreme_lenses import register_rare_lenses
 from .agent.semantic_frontier import FrontierSemanticRegistry
@@ -41,6 +43,33 @@ def complete_lens_registry() -> FrontierSemanticRegistry:
     register_research_lenses(registry)
     register_plane_lenses(registry)
     return registry
+
+
+def _all_review_specs() -> tuple[Any, ...]:
+    """Unify the two existing Jeeves catalogs for review without re-registering.
+
+    Routing lenses use their own LensCatalog and authority model. The adapter
+    keeps stable prefixed identifiers rather than pretending that routing
+    operators and semantic hypotheses are the same type or evidence source.
+    """
+    semantic = complete_lens_registry().all()
+    routing = tuple(
+        SimpleNamespace(
+            key="routing/" + item.lens_id,
+            family=item.family,
+            role=SimpleNamespace(value="routing_" + item.authority.value),
+            lineage_year=0,
+            minimum_observations=1,
+            pairwise=False,
+            sequential=False,
+            description=item.description,
+            asks=item.outputs or (item.description,),
+            predicts="Routing operator proposes a research direction, not a measurement",
+            failure_mode="Compare the proposed routing choice with a disconfirming native replay",
+        )
+        for item in LensCatalog().all()
+    )
+    return tuple(sorted((*semantic, *routing), key=lambda item: item.key))
 
 
 def _positive(value: Any, name: str, *, minimum: int = 0, maximum: int = 2**31) -> int:
@@ -125,12 +154,17 @@ def _channel_checks(family: str) -> tuple[str, ...]:
     # narrative, audio signal, or visual pattern was actually observed.
     families = {
         "film": ("frame temporal continuity", "camera/cut falsifier"),
+        "cinema": ("frame temporal continuity", "camera/cut falsifier"),
         "literature": ("narrative trace provenance", "voice-continuity counterexample"),
+        "literary": ("narrative trace provenance", "voice-continuity counterexample"),
         "narrative": ("event ordering", "branch/ending counterexample"),
         "game": ("state-action accessibility", "counterfactual controller probe"),
+        "ludic": ("state-action accessibility", "counterfactual controller probe"),
         "semiotic": ("cue-to-effect correspondence", "false-affordance counterexample"),
         "cognitive": ("revisit versus novel perception", "recall/interference alternative"),
+        "memory": ("revisit versus novel perception", "recall/interference alternative"),
         "rhetoric": ("dialogue choice consequences", "speaker-meaning counterexample"),
+        "pragmatic": ("dialogue choice consequences", "speaker-meaning counterexample"),
         "social": ("agent incentive alternatives", "unobserved actor caveat"),
         "temporal": ("checkpoint timeline", "delayed effect counterexample"),
         "system": ("state invariant", "failure and recovery trace"),
@@ -159,7 +193,7 @@ def review_verified_training_report(
     source = validate_training_receipts(report)
     start = _positive(offset, "offset", maximum=1_000_000)
     page_size = _positive(limit, "limit", minimum=1, maximum=MAX_PAGE)
-    all_specs = complete_lens_registry().all()
+    all_specs = _all_review_specs()
     if len(all_specs) != len({spec.key for spec in all_specs}):
         raise EmulatorLensReviewError("lens keys are not unique")
     total = len(all_specs)
