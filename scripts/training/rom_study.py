@@ -108,6 +108,20 @@ def parser() -> argparse.ArgumentParser:
     triangle.add_argument("--neural-width", type=int, default=8)
     triangle.add_argument("--review-seed", type=int, default=0)
     triangle.add_argument("--review-tokens", type=int, default=160)
+    triangle.add_argument(
+        "--semantic-checkpoint", type=Path,
+        help="opt in to real local model inference for 43 original Jeeves lenses",
+    )
+    triangle.add_argument(
+        "--semantic-lens-set", type=Path,
+        help="optional pinned exact 43 canonical semantic lens keys; needs semantic checkpoint",
+    )
+    triangle.add_argument(
+        "--semantic-all-runs", action="store_true",
+        help="execute all 43 lenses for EVERY native episode, not only episode zero",
+    )
+    triangle.add_argument("--semantic-seed", type=int, default=0)
+    triangle.add_argument("--semantic-tokens", type=int, default=192)
     corpus = commands.add_parser(
         "export-triangle-corpus",
         help="replay the independent critic and export weighted Jeeves candidate training views",
@@ -317,8 +331,20 @@ def main(argv: list[str] | None = None) -> int:
         cursor, pages = args.cursor, 0
         if args.operation == "train-triangle":
             from skeleton.ai.model_runtime.offline_chat import load_offline_engine
-            from skeleton.ai.training.rom_triangle_campaign import triangle_campaign_page
+            from skeleton.ai.training.rom_triangle_campaign import (
+                triangle_campaign_page, load_operator_semantic_lens_set,
+            )
+            if (args.semantic_lens_set is not None or args.semantic_all_runs) and args.semantic_checkpoint is None:
+                raise RomStudyError("43-lens manifest and full-run mode require semantic checkpoint")
+            keys = (
+                load_operator_semantic_lens_set(args.semantic_lens_set)
+                if args.semantic_lens_set is not None else ()
+            )
             runtime = load_offline_engine(args.reviewer_checkpoint).runtime
+            semantic_runtime = (
+                load_offline_engine(args.semantic_checkpoint).runtime
+                if args.semantic_checkpoint is not None else None
+            )
             while True:
                 result = triangle_campaign_page(
                     args.root, args.approvals, args.output_dir, runtime,
@@ -330,6 +356,11 @@ def main(argv: list[str] | None = None) -> int:
                     inventory_snapshot=frozen,
                     review_seed=args.review_seed,
                     review_tokens=args.review_tokens,
+                    semantic_runtime=semantic_runtime,
+                    semantic_lens_keys=keys,
+                    semantic_all_runs=args.semantic_all_runs,
+                    semantic_seed=args.semantic_seed,
+                    semantic_tokens=args.semantic_tokens,
                 )
                 pages += 1
                 print(json.dumps({
