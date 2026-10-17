@@ -85,3 +85,20 @@ scheduling failures, plus finite background timer policies.
 The session API has no durable offline outbox. These checks prove ordered
 in-memory behavior and explicit local degradation, not crash-safe delivery
 of unsent progress across process termination.
+
+## Transactional offline academy cache
+
+`services/offlineCache.ts` now writes downloads in 100-document staging
+pages with bounded response budgets. A single committed-generation receipt
+becomes authoritative **only after** every expected page and metadata row
+has been acknowledged by AsyncStorage. Truncation, malformed counts, native
+write errors and aborts leave the prior generation readable. Incompatible or
+oversized collections must use `getCachedCollectionPage`, rather than
+materializing the entire collection in memory.
+
+`scripts/test-offline-cache-integrity.cjs` runs in the existing fast-gate
+Node test step. This tests atomic publication, legacy compatibility, complete
+count checks, cancellation, storage failure and bounded paging. New sync
+generations are not pruned out from under older readers; explicit clearing
+removes all owned generations. Crash-surviving orphan staging will require an
+independently reader-safe reclamation policy in a later pass.
