@@ -18,6 +18,7 @@ import tempfile
 
 from .contracts import canonical_digest
 from .studio_runtime_qualification import _inputs
+from .studio_pixel_parity import _game_json
 
 SCHEMA = "skeleton.game_builder.dragon_generated_canvas_capture.v1"
 _MAX_ACTIONS = 20_000
@@ -55,6 +56,9 @@ def capture_generated_game(
     root = Path(engines)
     html, data, world = _inputs(root)
     proof = json.loads(data)
+    game = _game_json(html.decode("utf-8"))
+    if game.get("world_digest") != world:
+        raise DragonCanvasCaptureError("graphical game source differs from winning replay")
     actions = proof["actions"]
     if not 1 <= len(actions) <= _MAX_ACTIONS:
         raise DragonCanvasCaptureError("original game trace outside capture work budget")
@@ -109,9 +113,12 @@ def capture_generated_game(
                     )
                     dimensions = _png_geometry(screenshot)
                     files[f"frame_{index:02d}.png"] = screenshot
-                    if dimensions != (proof["final_state"].get("width", dimensions[0]),
-                                      proof["final_state"].get("height", dimensions[1])):
-                        raise DragonCanvasCaptureError("source canvas changed dimensions")
+                    if (type(final.get("level")) is not int
+                            or not 0 <= final["level"] < len(game["levels"])):
+                        raise DragonCanvasCaptureError("rendered canvas level is not canonical")
+                    level = game["levels"][final["level"]]
+                    if dimensions != (int(level["width"]) * 24, int(level["height"]) * 24):
+                        raise DragonCanvasCaptureError("rendered canvas pixel dimensions are incorrect")
                 state = proof["final_state"]
                 if (final["status"] != "won" or final["status"] != state["status"]
                         or final["steps"] != state["steps"] or final["score"] != state["score"]
