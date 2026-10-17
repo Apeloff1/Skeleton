@@ -151,7 +151,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                             "production-status", "production-cycle", "production-training",
                                             "dragon-observe-start", "dragon-observe-sync", "dragon-observe-status",
-                                            "dragon-observe-cycle", "dragon-observe-action", "dragon-observe-lessons", "dragon-observe-revoke",
+                                            "dragon-observe-cycle", "dragon-observe-action", "dragon-observe-lessons",
+                                            "dragon-observe-trace", "dragon-observe-coverage", "dragon-observe-revoke",
                                                    "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "direction-campaign-reopen", "p0-acceptance",
                                             "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                             "upscale-foliage", "upscale-animation", "upscale-shadow",
@@ -243,6 +244,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 "dragon-observe-cycle": {"passes", "gate", "repair_generated"},
                 "dragon-observe-action": {"actor", "phase", "event", "outcome", "evidence"},
                 "dragon-observe-lessons": {"page", "page_size"},
+                "dragon-observe-trace": {"page", "page_size", "actor", "phase"},
+                "dragon-observe-coverage": set(),
                 "dragon-observe-revoke": set(),
             }
             allowed = observer_options[args.action] | {"action"}
@@ -270,6 +273,14 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     root, page=args.page if args.page is not None else 0,
                     page_size=args.page_size if args.page_size is not None else 64,
                 )
+            if args.action == "dragon-observe-trace":
+                return witness.trace(
+                    root, page=args.page if args.page is not None else 0,
+                    page_size=args.page_size if args.page_size is not None else 64,
+                    actor=args.actor, phase=args.phase,
+                )
+            if args.action == "dragon-observe-coverage":
+                return witness.coverage(root)
             return witness.revoke(root)
         if (args.consent or any(value is not None for value in (
                 args.actor, args.phase, args.event, args.outcome))):
