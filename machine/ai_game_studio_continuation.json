@@ -2295,5 +2295,131 @@
       "installer_and_model_training_completed": false,
       "studio_release_signed_off": false
     }
+  },
+  "jeeves_longform_qualification_history_v2": {
+    "status": "segmented_source_implemented_pending_independent_test_execution_real_endurance_and_backup_review",
+    "tranche": "M281-M300",
+    "milestones": [
+      {
+        "id": "M281",
+        "name": "Identify actual 256-KB JSON receipt limit as long-production E2E history blocker",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M282",
+        "name": "Preserve legacy unsegmented journal parsing and campaign identity",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M283",
+        "name": "Seal each 64-run head into a dedicated immutable-sized run-history file",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M284",
+        "name": "Link every historical entry digest through the archival segment boundary",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M285",
+        "name": "Commit a canonical index with source identity, segment digest and terminal run digest",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M286",
+        "name": "Revalidate historical segment file hashes, receipts, sequence and chain on every read",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M287",
+        "name": "Prevent symlink archives, missing archive files and reordered segments",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M288",
+        "name": "Prevent in-place overwrite of conflicting preexisting sealed source evidence",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M289",
+        "name": "Recover safe interrupted rotation by recognizing matching orphan archive files",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M290",
+        "name": "Keep active journal bounded so frequent production runs never cause uncontrolled JSON growth",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M291",
+        "name": "Bound every sealed segment to original 256-KB reader contract before publication",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M292",
+        "name": "Preserve correct historic CPU divergence totals and incident-free run counts across rollovers",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M293",
+        "name": "Offer 512 sealed segments, or 32,768 canonical E2E run identities, per original campaign",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M294",
+        "name": "Integrate exact archival history into existing Jeeves operator inspect/read and append APIs",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M295",
+        "name": "Add deterministic crash, migration, archive tamper and true studio 65th-run tests",
+        "state": "implemented_source_tests_unverified"
+      },
+      {
+        "id": "M296",
+        "name": "Execute large synthetic 32,768-run replay through the same archive reading budget",
+        "state": "not_verified"
+      },
+      {
+        "id": "M297",
+        "name": "Demonstrate actual year-long unattended original game studio production with checkpoint recovery",
+        "state": "not_verified"
+      },
+      {
+        "id": "M298",
+        "name": "Prove durable recovery across power failure, Windows installer reboot and filesystem corruption",
+        "state": "not_verified"
+      },
+      {
+        "id": "M299",
+        "name": "Independently attest archive backup/restore off-machine and retention governance",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M300",
+        "name": "Sign qualified multi-month production, real console playback and original model learning",
+        "state": "not_qualified"
+      }
+    ],
+    "owners": [
+      "skeleton/ai/game_builder/studio_history_segments.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "tests/test_studio_execution_history_segments.py",
+      "tests/test_studio_execution_history_e2e.py"
+    ],
+    "assumptions": {
+      "segment_entries": 64,
+      "max_segments": 512,
+      "maximum_archived_runs": 32768,
+      "regular_reader_max_bytes": 256000,
+      "legacy_history_accepted": true,
+      "crash_interruption_safe_on_seal_then_index_publishing": true,
+      "autonomous_background_schedule_added": false,
+      "full_year_endurance_run_performed": false,
+      "real_native_cartridge_e2e_verified": false,
+      "model_weights_updated": false,
+      "artifact_release_signed": false
+    },
+    "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
