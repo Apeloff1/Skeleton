@@ -1,162 +1,190 @@
-"""ROM fleet strict local admission; real training owner is mocked only at dispatch seam."""
+"""ROM-wide training: local inventory, rights gates and replay-evidence integrity."""
 from __future__ import annotations
 
-from hashlib import sha256
+import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from skeleton.ai.training.rom_study import (
-    SCHEMA, RomFleetError, discover, validate_manifest, train_all, _split_evidence,
-)
+from skeleton.ai.training import rom_study as rom
 from skeleton.jeeves.game_learning import _digest
 
 
-def _fixture(tmp_path: Path):
-    root = tmp_path / "owned_roms"
+def _roms(tmp_path: Path):
+    root = tmp_path / "roms"
     root.mkdir()
-    data = b"not yet an executable emulator cartridge, but a bounded local file"
-    (root / "homebrew.gb").write_bytes(data)
-    return root, data
+    first = root / "a.gb"
+    first.write_bytes(b"original homebrew rom example only" * 2)
+    second = root / "b.nes"
+    second.write_bytes(b"second original test game")
+    (root / "ignore.txt").write_text("not a ROM")
+    (root / "link.gb").symlink_to(first)
+    return root, first, second
 
 
-def _review(path: Path, data: bytes):
-    doc = json.loads(path.read_text())
-    for item in doc["roms"]:
-        item["rights"] = {
-            "training_permitted": True, "human_reviewed": True,
-            "rights_holder": "Author of original homebrew",
-            "rights_basis": "original:author-owned fixture",
-            "review_id": "human-reviewed-001",
+def _approvals(tmp_path: Path, item: Path, *, permitted: bool = True):
+    digest = hashlib.sha256(item.read_bytes()).hexdigest()
+    row = {
+        "sha256": digest,
+        "content_size_bytes": item.stat().st_size,
+        "target_id": "game_boy",
+        "core_id": "gambatte",
+        "rights": {
+            "rights_holder": "Original test author",
+            "rights_basis": "original:authored-test-only",
+            "review_id": "human-review-001",
+            "human_reviewed": permitted,
+            "training_permitted": permitted,
+        },
+    }
+    output = tmp_path / "approvals.json"
+    output.write_text(json.dumps({
+        "schema_version": rom.APPROVAL_SCHEMA,
+        "roms": [row],
+    }))
+    return output, row
+
+
+def test_inventory_page_deterministic_and_symlinks_not_followed(tmp_path):
+    root, first, second = _roms(tmp_path)
+    first_page = rom.inventory_page(root, limit=1)
+    assert first_page["total_candidate_files"] == 2
+    assert len(first_page["rows"]) == 1
+    assert first_page["rows"][0]["relative_path"] == "a.gb"
+    assert first_page["rows"][0]["file_sha256"] == hashlib.sha256(first.read_bytes()).hexdigest()
+    assert first_page["next_cursor"] == "a.gb"
+    assert first_page["rows"][0]["authorized_for_training"] is False
+    second_page = rom.inventory_page(root, cursor=first_page["next_cursor"], limit=1)
+    assert [r["relative_path"] for r in second_page["rows"]] == ["b.nes"]
+    assert second_page["finished"] is True
+    assert second_page["next_cursor"] is None
+    assert second_page["rows"][0]["file_sha256"] == hashlib.sha256(second.read_bytes()).hexdigest()
+
+
+def test_inventory_rejects_symlinked_root(tmp_path):
+    root, _, _ = _roms(tmp_path)
+    link = tmp_path / "library_link"
+    link.symlink_to(root, target_is_directory=True)
+    with pytest.raises(rom.RomStudyError, match="symlinks"):
+        rom.inventory_page(link)
+
+
+def test_inventory_rejects_bad_page_and_cursor(tmp_path):
+    root, _, _ = _roms(tmp_path)
+    with pytest.raises(rom.RomStudyError, match="page size"):
+        rom.inventory_page(root, limit=129)
+    with pytest.raises(rom.RomStudyError, match="continuation"):
+        rom.inventory_page(root, cursor="../private-file")
+
+
+def test_training_rights_cannot_be_inferred(tmp_path):
+    root, first, _ = _roms(tmp_path)
+    output = tmp_path / "receipts"
+    output.mkdir(mode=0o700)
+    rights = tmp_path / "approvals.json"
+    rights.write_text(json.dumps({
+        "schema_version": rom.APPROVAL_SCHEMA, "roms": [],
+    }))
+    report = rom.train_page(root, rights, output, limit=2, runs=1)
+    assert report["q_policy_training_completed"] == 0
+    assert report["blocked_or_unreviewed"] == 2
+    assert all(row["state"] == "no_training_rights_review"
+               for row in report["page_results"])
+    assert not list(output.glob("*.json"))
+
+
+def test_explicit_review_is_required(tmp_path):
+    _, first, _ = _roms(tmp_path)
+    approvals, _ = _approvals(tmp_path, first, permitted=False)
+    with pytest.raises(rom.RomStudyError, match="unapproved"):
+        rom._load_approvals(approvals)
+
+
+def _fake_training(tmp_path, monkeypatch, *, updates: int):
+    """Stub only native execution; exercise real inventory, rights, batch and receipt code."""
+    from skeleton.jeeves import game_emulator_catalog as catalog
+    from skeleton.jeeves import game_emulator_training_lab as lab
+
+    core = SimpleNamespace(
+        core_id="gambatte", target_ids=("game_boy",),
+    )
+    registry = SimpleNamespace(
+        registry_digest="a" * 64,
+        resolve_core=lambda name: core if name == "gambatte" else None,
+    )
+    monkeypatch.setattr(catalog.GameEmulatorRegistry, "from_environment",
+                        classmethod(lambda cls: registry))
+    monkeypatch.setattr(catalog, "emulator_content_admission",
+                        lambda name: {"admitted_entrypoint_extensions": [".gb"]})
+    prepared = SimpleNamespace(
+        as_dict=lambda: {
+            "root": str(tmp_path), "entrypoint": "a.gb",
+            "files": [{"name": "a.gb", "size_bytes": 1, "sha256": "b" * 64}],
+            "content_digest": "c" * 64,
+        },
+        close=lambda: None,
+    )
+    monkeypatch.setattr(rom, "_content_for_training", lambda *a, **k: prepared)
+    captured = []
+    def fake_training(request, *, source_lineage, config, policy_id, cancel=None):
+        captured.append((request, source_lineage))
+        original = {
+            "actual_q_table_updates": updates,
+            "actual_training_steps": 6,
+            "actual_neural_parameter_updates": 0,
         }
-    path.write_text(json.dumps(doc))
-    return doc
+        return {**original, "report_digest": _digest(original)}
+    monkeypatch.setattr(lab, "run_emulator_training_lab", fake_training)
+    return captured
 
 
-def test_scan_never_claims_training(tmp_path):
-    root, data = _fixture(tmp_path)
-    report = discover(root)
-    assert report["schema_version"] == SCHEMA
-    assert report["inventory_count"] == 1
-    assert report["roms"][0]["sha256"] == sha256(data).hexdigest()
-    assert report["roms"][0]["rights"]["training_permitted"] is False
-    assert report["production_jeeves_weights_modified"] is False
-
-
-def test_unreviewed_stays_unauthorized(tmp_path):
-    root, _ = _fixture(tmp_path)
-    report = discover(root)
-    manifest = tmp_path / "review.json"
-    manifest.write_text(json.dumps(report))
-    folder, rows, digest = validate_manifest(manifest)
-    assert folder == root
-    assert len(rows) == 1
-    assert not rows[0]["rights"]["training_permitted"]
-    assert len(digest) == 64
-
-
-def test_mutation_after_approval_rejected(tmp_path):
-    root, data = _fixture(tmp_path)
-    manifest = tmp_path / "review.json"
-    manifest.write_text(json.dumps(discover(root)))
-    _review(manifest, data)
-    (root / "homebrew.gb").write_bytes(data + b"changed")
-    with pytest.raises(RomFleetError, match="changed"):
-        # Error is in the per-ROM execution, not an admission that fakes work.
-        from skeleton.ai.training.rom_study import _read, _safe, _digest
-        row = validate_manifest(manifest)[1][0]
-        raw = _read(_safe(root, row["path"]), 2 * 1024 * 1024)
-        if len(raw) != row["bytes"] or _digest(raw) != row["sha256"]:
-            raise RomFleetError("ROM bytes changed after operator rights approval")
-
-
-def test_manifest_cannot_grant_unreviewed_rights(tmp_path):
-    root, data = _fixture(tmp_path)
-    path = tmp_path / "review.json"
-    path.write_text(json.dumps(discover(root)))
-    doc = json.loads(path.read_text())
-    doc["roms"][0]["rights"]["training_permitted"] = True
-    path.write_text(json.dumps(doc))
-    with pytest.raises(RomFleetError, match="human rights review"):
-        validate_manifest(path)
-
-
-def test_symlinks_fail_closed(tmp_path):
-    root, _ = _fixture(tmp_path)
-    (root / "fake.gb").symlink_to(root / "homebrew.gb")
-    with pytest.raises(RomFleetError, match="symlink"):
-        discover(root)
-
-
-def test_dispatch_reuses_real_training_path_without_claiming_jeeves_weights(monkeypatch, tmp_path):
-    root, raw = _fixture(tmp_path)
-    manifest = tmp_path / "review.json"
-    manifest.write_text(json.dumps(discover(root)))
-    _review(manifest, raw)
-    output = tmp_path / "results"
-    output.mkdir()
-    calls = []
-    def fake_train(row, **kwargs):
-        calls.append((row["rom_id"], kwargs["max_runs"], kwargs["neural"]))
-        return (
-            {"snapshot_digest": "a" * 64}, {"report_digest": "b" * 64}, None,
-            {"summary": {
-                "rom_id": row["rom_id"], "rom_sha256": row["sha256"],
-                "actual_q_updates": 77, "real_emulator_steps": 77,
-                "audited_runs": 12, "report_digest": "b" * 64,
-                "neural_optimizer_steps": 0,
-            }, "neural_report": None},
-        )
-    monkeypatch.setattr("skeleton.ai.training.rom_study.train_one", fake_train)
-    report = train_all(manifest, output, max_runs=12, steps=12)
-    assert len(calls) == 1
-    assert report["roms_trained"] == 1
-    assert report["actual_q_updates"] == 77
-    assert report["production_jeeves_weight_updates"] == 0
-    assert len(list(output.glob("*-receipt.json"))) == 1
-
-
-def test_evidence_digest_matches_canonical_neural_handoff():
-    base = {"policy_snapshot": {"snapshot_digest": "a" * 64},
-            "report_digest": "b" * 64, "run_count": 2}
-    policy, evidence = _split_evidence(base)
-    expected = dict(base)
-    del expected["policy_snapshot"]
-    expected["policy_snapshot_digest"] = "a" * 64
-    assert evidence["evidence_digest"] == _digest(expected)
-
-
-def test_missing_approved_core_is_blocked_not_train_success(tmp_path):
-    root, raw = _fixture(tmp_path)
-    path = tmp_path / "review.json"
-    path.write_text(json.dumps(discover(root)))
-    _review(path, raw)
-    output = tmp_path / "results"
-    output.mkdir()
-    result = train_all(path, output, max_runs=10, steps=4)
-    assert result["roms_trained"] == 0
-    assert result["per_rom_results"][0]["status"] == "blocked"
-
-
-def test_two_identical_roms_share_one_candidate(monkeypatch, tmp_path):
-    root, raw = _fixture(tmp_path)
-    (root / "second.gb").write_bytes(raw)
-    manifest = tmp_path / "roms.json"
-    manifest.write_text(json.dumps(discover(root)))
-    doc = _review(manifest, raw)
-    output = tmp_path / "out"
-    output.mkdir()
-    called = []
-    def fake_train(row, **kw):
-        called.append(row["rom_id"])
-        return ({"snapshot_digest": "a" * 64}, {"report_digest": "b" * 64}, None,
-                {"summary": {"rom_id": row["rom_id"], "rom_sha256": row["sha256"],
-                             "actual_q_updates": 3, "neural_optimizer_steps": 0},
-                 "neural_report": None})
-    monkeypatch.setattr("skeleton.ai.training.rom_study.train_one", fake_train)
-    result = train_all(manifest, output, max_runs=10, steps=4)
-    assert result["roms_authorized"] == 2
-    assert result["roms_trained"] == 1
-    assert result["roms_covered"] == 2
+@pytest.mark.parametrize("updates,expected", [
+    (2, "q_policy_updated_with_receipt"),
+    (0, "q_policy_executed_no_updates"),
+])
+def test_batch_uses_existing_lab_and_distinguishes_real_updates(
+    tmp_path, monkeypatch, updates, expected
+):
+    root, first, _ = _roms(tmp_path)
+    approvals, _ = _approvals(tmp_path, first)
+    out = tmp_path / "receipts"
+    out.mkdir(mode=0o700)
+    called = _fake_training(tmp_path, monkeypatch, updates=updates)
+    result = rom.train_page(root, approvals, out, limit=2, runs=1, steps=4)
+    row = next(r for r in result["page_results"] if r["relative_path"] == "a.gb")
+    assert row["state"] == expected
+    assert row["actual_q_table_updates"] == updates
     assert len(called) == 1
+    assert called[0][0].kind == "libretro"
+    assert called[0][1]["rights_acknowledged"] is True
+    assert result["actual_jeeves_weight_training"] is False
+    receipts = list(out.glob("rom-*.json"))
+    assert len(receipts) == 1
+    identity = hashlib.sha256(first.read_bytes()).hexdigest()
+    checked = rom.verified_rom_receipt(receipts[0], expected_source_sha256=identity)
+    assert checked["actual_q_table_updates"] == updates
+    # Existing identical receipt is independently checked before skipping.
+    later = rom.train_page(root, approvals, out, limit=2, runs=1, steps=4)
+    prior = next(r for r in later["page_results"] if r["relative_path"] == "a.gb")
+    assert prior["state"] == "previous_verified_receipt_no_reexecution"
+    assert len(called) == 1
+
+
+def test_corrupted_existing_receipt_fails_closed(tmp_path, monkeypatch):
+    root, first, _ = _roms(tmp_path)
+    approvals, _ = _approvals(tmp_path, first)
+    out = tmp_path / "receipts"
+    out.mkdir(mode=0o700)
+    _fake_training(tmp_path, monkeypatch, updates=1)
+    rom.train_page(root, approvals, out, runs=1, steps=4)
+    receipt = next(out.glob("rom-*.json"))
+    original = json.loads(receipt.read_text())
+    original["candidate_evidence"]["actual_q_table_updates"] = 999
+    receipt.write_text(json.dumps(original) + "\n")
+    result = rom.train_page(root, approvals, out, runs=1, steps=4)
+    item = next(r for r in result["page_results"] if r["relative_path"] == "a.gb")
+    assert item["state"] == "emulator_training_blocked"
+    assert item["failure_type"] == "RomStudyError"
+    assert result["q_policy_training_completed"] == 0

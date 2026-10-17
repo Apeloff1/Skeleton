@@ -1,4 +1,7 @@
-"""Operator CLI: discover all local ROMs, then train each admitted ROM on real cores."""
+"""Inspect all local ROM candidates and train eligible ROM Q-policies on the real emulator lab.
+
+No ROM download, emulated-completion claim, or automatic production-weight change.
+"""
 from __future__ import annotations
 
 import argparse
@@ -7,63 +10,64 @@ from pathlib import Path
 import sys
 
 from skeleton.ai.training.rom_study import (
-    RomFleetError, _write_new, discover, train_all, validate_manifest,
+    RomStudyError, inventory_page, train_page,
 )
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        description="Inventory local ROMs and train only individually rights-cleared sources."
-    )
-    subs = p.add_subparsers(dest="operation", required=True)
-    scan = subs.add_parser("inventory", help="write review-pending ROM inventory, no execution")
-    scan.add_argument("--root", required=True, type=Path)
-    scan.add_argument("--output", required=True, type=Path)
-    check = subs.add_parser("verify", help="validate operator-owned ROM manifest")
-    check.add_argument("--manifest", required=True, type=Path)
-    train = subs.add_parser("train-all", help="train admitted ROMs on actual compatible cores")
-    train.add_argument("--manifest", required=True, type=Path)
+    root = argparse.ArgumentParser(description=__doc__)
+    commands = root.add_subparsers(dest="operation", required=True)
+    inventory = commands.add_parser("inventory", help="read-only ROM inventory")
+    inventory.add_argument("--root", required=True, type=Path)
+    inventory.add_argument("--cursor")
+    inventory.add_argument("--limit", type=int, default=64)
+    train = commands.add_parser("train-all", help="run approved Q-policy learning per ROM")
+    train.add_argument("--root", required=True, type=Path)
+    train.add_argument("--approvals", required=True, type=Path)
     train.add_argument("--output-dir", required=True, type=Path)
-    train.add_argument("--seed", type=int, default=0)
+    train.add_argument("--cursor")
+    train.add_argument("--limit", type=int, default=32)
+    train.add_argument("--max-pages", type=int, default=1,
+                       help="0 scans all pages in this foreground invocation")
     train.add_argument("--runs", type=int, default=12)
-    train.add_argument("--steps", type=int, default=12)
-    train.add_argument("--neural", action="store_true",
-                       help="train local candidate MLP as well as verified tabular Q")
-    return p
+    train.add_argument("--steps", type=int, default=24)
+    train.add_argument("--seed", type=int, default=0)
+    return root
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         if args.operation == "inventory":
-            result = discover(args.root)
-            _write_new(args.output, result)
-            summary = {
-                "status": "awaiting_individual_rights_review",
-                "manifest": str(args.output),
-                "discovered_roms": result["inventory_count"],
-                "model_training_executed": False,
-            }
-        elif args.operation == "verify":
-            _root, rows, digest = validate_manifest(args.manifest)
-            summary = {
-                "status": "manifest_verified",
-                "roms": len(rows), "manifest_sha256": digest,
-                "authorized_roms": sum(
-                    r["rights"].get("training_permitted") is True for r in rows),
-                "training_executed": False,
-            }
-        else:
-            summary = train_all(
-                args.manifest, args.output_dir, seed=args.seed,
-                max_runs=args.runs, steps=args.steps, neural=args.neural,
+            print(json.dumps(inventory_page(args.root, cursor=args.cursor, limit=args.limit),
+                             sort_keys=True))
+            return 0
+        if type(args.max_pages) is not int or not 0 <= args.max_pages <= 100_000:
+            raise RomStudyError("max_pages must be 0 (whole inventory) or 1..100000")
+        cursor, pages = args.cursor, 0
+        while True:
+            result = train_page(
+                args.root, args.approvals, args.output_dir, cursor=cursor,
+                limit=args.limit, runs=args.runs, steps=args.steps, seed=args.seed,
             )
-            # Any partial or blocked result is surfaced to the operator.
-            # Per-ROM receipts are committed separately after actual training.
-        print(json.dumps(summary, sort_keys=True, indent=2))
-        return 0 if summary.get("roms_covered", 0) == summary.get("roms_authorized", 0) else 2
-    except (RomFleetError, OSError, ValueError, RuntimeError, ImportError) as exc:
-        print("ROM fleet blocked: " + type(exc).__name__ + ": " + str(exc),
+            pages += 1
+            print(json.dumps({
+                "page_number": pages,
+                "initial_cursor": cursor,
+                "next_cursor": result["next_cursor"],
+                "inventory_exhausted": result["finished_inventory"],
+                "q_policies_updated": result["q_policy_training_completed"],
+                "executed_without_updates": result["q_policy_runs_without_updates"],
+                "blocked_or_unreviewed": result["blocked_or_unreviewed"],
+                "results": result["page_results"],
+                "neural_weights_updated": 0,
+                "production_weights_modified": False,
+            }, sort_keys=True), flush=True)
+            cursor = result["next_cursor"]
+            if cursor is None or args.max_pages and pages >= args.max_pages:
+                return 0
+    except (ValueError, OSError, RuntimeError, ImportError) as exc:
+        print("ROM training blocked: " + type(exc).__name__ + ": " + str(exc),
               file=sys.stderr)
         return 2
 

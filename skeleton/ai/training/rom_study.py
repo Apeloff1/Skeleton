@@ -259,6 +259,68 @@ def _save_new(path: Path, document: dict[str, Any]) -> str:
     return _hash(raw)
 
 
+def verified_rom_receipt(path: Path, *, expected_source_sha256: str,
+                         expected_run_identity: str | None = None) -> dict[str, Any]:
+    """Read a previously committed receipt; never treat filename as evidence."""
+    source = _safe_path(path)
+    before = _regular_identity(source)
+    if before[2] > 32 * 1024 * 1024:
+        raise RomStudyError("ROM training receipt exceeds maximum size")
+    fd = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        if _stat_tuple(os.fstat(fd)) != before:
+            raise RomStudyError("training receipt identity changed")
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            raw = stream.read(32 * 1024 * 1024 + 1)
+        if len(raw) != before[2] or _stat_tuple(os.fstat(fd)) != before:
+            raise RomStudyError("training receipt changed during read")
+    finally:
+        os.close(fd)
+    if _regular_identity(source) != before:
+        raise RomStudyError("training receipt changed after read")
+    def no_duplicates(items):
+        found = {}
+        for key, value in items:
+            if key in found:
+                raise RomStudyError("duplicate ROM receipt property")
+            found[key] = value
+        return found
+    try:
+        row = json.loads(raw, object_pairs_hook=no_duplicates,
+                         parse_constant=lambda _: (_ for _ in ()).throw(
+                             RomStudyError("nonfinite ROM receipt value")))
+    except (UnicodeError, ValueError, RecursionError) as exc:
+        raise RomStudyError("invalid ROM training receipt JSON") from exc
+    if (not isinstance(row, dict)
+            or row.get("schema_version") != BATCH_SCHEMA
+            or row.get("source_sha256") != expected_source_sha256
+            or row.get("production_weights_modified") is not False
+            or row.get("model_promotion_authorized") is not False
+            or row.get("neural_weights_updated") != 0):
+        raise RomStudyError("ROM receipt disagrees with source and learning boundary")
+    if expected_run_identity is not None and row.get("run_identity") != expected_run_identity:
+        raise RomStudyError("ROM receipt is from a different training configuration")
+    evidence = row.get("candidate_evidence")
+    from skeleton.jeeves.game_learning import _digest
+    if (not isinstance(evidence, dict)
+            or evidence.get("report_digest") != _digest({
+                k: v for k, v in evidence.items() if k != "report_digest"
+            })
+            or evidence.get("actual_neural_parameter_updates") != 0
+            or type(evidence.get("actual_q_table_updates")) is not int
+            or evidence["actual_q_table_updates"] < 0):
+        raise RomStudyError("ROM receipt lacks authentic replay-lab evidence structure")
+    return {
+        "source_sha256": row["source_sha256"],
+        "run_identity": row.get("run_identity"),
+        "receipt_sha256": _hash(raw),
+        "actual_q_table_updates": evidence["actual_q_table_updates"],
+        "actual_training_steps": evidence.get("actual_training_steps"),
+        "neural_weights_updated": 0,
+        "model_promotion_authorized": False,
+    }
+
+
 def _content_for_training(path: Path, *, sha: str, core: Any) -> Any:
     """Produce a privately materialized canonical content bundle; no source execution."""
     from skeleton.jeeves.game_emulator_catalog import (
@@ -378,8 +440,14 @@ def train_page(
             filename = "rom-" + identity[:16] + "-" + run_identity[:16] + ".json"
             target = output_dir / filename
             if target.exists() or target.is_symlink():
-                summary["state"] = "previous_receipt_exists_not_reexecuted"
+                verified = verified_rom_receipt(
+                    target, expected_source_sha256=identity,
+                    expected_run_identity=run_identity,
+                )
+                summary["state"] = "previous_verified_receipt_no_reexecution"
                 summary["receipt_name"] = filename
+                summary["receipt_sha256"] = verified["receipt_sha256"]
+                summary["actual_q_table_updates"] = verified["actual_q_table_updates"]
                 results.append(summary)
                 continue
             prepared = _content_for_training(
@@ -411,7 +479,9 @@ def train_page(
             finally:
                 prepared.close()
             receipt = {
-                "schema_version": BATCH_SCHEMA, "source_sha256": identity,
+                "schema_version": BATCH_SCHEMA,
+                "run_identity": run_identity,
+                "source_sha256": identity,
                 "source_size_bytes": row["size_bytes"], "target_id": grant["target_id"],
                 "core_id": core.core_id, "registry_digest": registry.registry_digest,
                 "approval_manifest_sha256": approvals_digest,
@@ -422,7 +492,9 @@ def train_page(
             }
             receipt_digest = _save_new(target, receipt)
             summary.update({
-                "state": "q_policy_trained_with_receipt",
+                "state": ("q_policy_updated_with_receipt"
+                          if evidence["actual_q_table_updates"] > 0
+                          else "q_policy_executed_no_updates"),
                 "actual_q_table_updates": evidence["actual_q_table_updates"],
                 "measured_steps": evidence["actual_training_steps"],
                 "receipt_name": filename, "receipt_sha256": receipt_digest,
@@ -440,10 +512,13 @@ def train_page(
         "approval_manifest_sha256": approvals_digest,
         "page_results": results,
         "q_policy_training_completed": sum(
-            row["state"] == "q_policy_trained_with_receipt" for row in results),
+            row["state"] == "q_policy_updated_with_receipt" for row in results),
+        "q_policy_runs_without_updates": sum(
+            row["state"] == "q_policy_executed_no_updates" for row in results),
         "blocked_or_unreviewed": sum(
-            row["state"] not in ("q_policy_trained_with_receipt",
-                                 "previous_receipt_exists_not_reexecuted")
+            row["state"] not in ("q_policy_updated_with_receipt",
+                                 "q_policy_executed_no_updates",
+                                 "previous_verified_receipt_no_reexecution")
             for row in results),
         "actual_jeeves_weight_training": False,
         "production_weights_modified": False,
