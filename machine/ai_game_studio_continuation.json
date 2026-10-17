@@ -404,5 +404,134 @@
       "Native console sprite-frame playback, per-target sound driver, performance-tuned streaming assets and dynamic parallax scrolling in actual compiled ROM binaries"
     ],
     "budgets": "3-level 19x15 synchronous Jeeves source stage; at most 8 world levels for CLI, 1..4 sprite frames, 0..3 transparent background overlays, 0..3 shadow, 0..4 foliage/music, 1..24 FPS; bounded files/audio/images/source bytes"
+  },
+  "jeeves_multitarget_production_milestone_extension": {
+    "status": "implementation_candidate_pending_runtime_validation",
+    "canonical_production_owners": [
+      "skeleton/ai/game_builder/studio_campaign.py",
+      "skeleton/ai/game_builder/studio_campaign_lock.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py",
+      "skeleton/ai/game_builder/studio_sprite_authoring.py"
+    ],
+    "milestone_domains": [
+      {
+        "id": "PRODUCTION-001",
+        "scope": "operator-authorized deterministic multi-target build sequence",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-002",
+        "scope": "exact content-bound source/art/replay/engine checkpoints",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-003",
+        "scope": "process-lifetime exclusive lock protecting whole production transaction",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-004",
+        "scope": "crash-safe ownership-based interrupted stage recovery without external recursive deletion",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-005",
+        "scope": "partial production resume from completed target receipts",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-006",
+        "scope": "source attestation checks before native compiler",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-007",
+        "scope": "opt-in native GB/GBC/NES compilation with bounded commands/output/deadline",
+        "status": "implemented_not_executed"
+      },
+      {
+        "id": "PRODUCTION-008",
+        "scope": "source-sha and structural ROM proof without fictional emulator certification",
+        "status": "implemented_not_executed"
+      },
+      {
+        "id": "PRODUCTION-009",
+        "scope": "separate structured 16-gate readiness projection per native target",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-010",
+        "scope": "authoritative Dragon projection of source and binary evidence, no data/weight promotion",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-011",
+        "scope": "exact PNG/SHA or typed-pixel artist original sprite conversion",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-012",
+        "scope": "native/browser/Godot same-art digest and human-reviewed Jeeves source staging",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-013",
+        "scope": "multi-target order locks artist input by SHA across restarts",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-014",
+        "scope": "native toolchain actual compilation against installed toolchains",
+        "status": "not_verified"
+      },
+      {
+        "id": "PRODUCTION-015",
+        "scope": "emulator gameplay/controller, frame, palette and audio parity",
+        "status": "not_implemented"
+      },
+      {
+        "id": "PRODUCTION-016",
+        "scope": "Dragon consented screen/video observation and reviewed knowledge admission",
+        "status": "not_implemented"
+      },
+      {
+        "id": "PRODUCTION-017",
+        "scope": "whole-story game scene/dialogue/cinematic/AI direction to final release",
+        "status": "not_implemented"
+      },
+      {
+        "id": "PRODUCTION-018",
+        "scope": "multi-week endurance, recurrent recovery and long-lived checkpoint testing",
+        "status": "not_verified"
+      },
+      {
+        "id": "PRODUCTION-019",
+        "scope": "complete multi-platform 2D/2.5D/3D studio render and native runtime integration",
+        "status": "not_implemented"
+      },
+      {
+        "id": "PRODUCTION-020",
+        "scope": "real GPU/native Godot/editor integration and packaged installer playthrough",
+        "status": "not_verified"
+      }
+    ],
+    "required_quality_evidence": [
+      "tests/test_studio_build_qualification.py",
+      "tests/test_studio_campaign_e2e.py",
+      "tests/test_studio_campaign_assurance_e2e.py",
+      "tests/test_studio_artist_sprite_e2e.py"
+    ],
+    "status_honesty": {
+      "tests_written_not_equal_passed": true,
+      "native_rom_toolchain_executed_in_this_session": false,
+      "native_emulator_qualified": false,
+      "original_artist_png_import_runtime_validated": false,
+      "model_weights_trained": false,
+      "release_readiness_proven": false,
+      "signed_vendor_sdk_distributed": false
+    },
+    "local_authority": "Source generation, native compilation and private artist pixels require explicit permission; no unreviewed shell, vendor binaries, background recording or implicit training."
   }
 }
