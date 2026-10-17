@@ -37,6 +37,34 @@ def test_unrelated_registered_http_routes_still_work(path: str) -> None:
     )
 
 
+def test_included_routers_without_their_own_path_are_inspected() -> None:
+    class _Included:
+        path = None
+
+        def effective_candidates(self):
+            return [SimpleNamespace(path="/api/v1/health")]
+
+    reject_cortex_secret_routes(SimpleNamespace(routes=[_Included()]))
+
+    class _SecretIncluded:
+        path = None
+
+        def effective_candidates(self):
+            return [SimpleNamespace(path="/api/v1/secrets/{name}")]
+
+    with pytest.raises(RuntimeError, match="cortex secrets"):
+        reject_cortex_secret_routes(SimpleNamespace(routes=[_SecretIncluded()]))
+
+
+def test_mounted_child_paths_are_joined_before_the_secrets_check() -> None:
+    mount = SimpleNamespace(
+        path="/api/v1",
+        routes=[SimpleNamespace(path="secrets/rotate")],
+    )
+    with pytest.raises(RuntimeError, match="cortex secrets"):
+        reject_cortex_secret_routes(SimpleNamespace(routes=[mount]))
+
+
 def test_route_inventory_is_required() -> None:
     with pytest.raises(RuntimeError, match="route inventory"):
         reject_cortex_secret_routes(SimpleNamespace())
