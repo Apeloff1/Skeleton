@@ -15,6 +15,7 @@ import sqlite3
 import stat
 import tempfile
 from typing import Any
+from urllib.parse import quote
 
 from .annual_production import AnnualProductionStore, SCHEMA, _hash
 
@@ -283,15 +284,12 @@ def restore_annual_snapshot(folder: Path, label: str, destination: Path) -> dict
                 "authority_expires_at=0, lease_epoch=lease_epoch+1, "
                 "lease_token_digest=NULL, lease_worker=NULL, "
                 "lease_expires_at=NULL, "
-                "status=CASE WHEN status IN ('completed','failed','cancelled') "
-                "THEN status ELSE 'waiting' END"
+                "status=CASE WHEN status='running' THEN 'waiting' ELSE status END"
             )
         if _check_database(stage) != verified["table_counts"]:
             raise AnnualBackupError("fenced restoration changed chain or table inventory")
         with sqlite3.connect(
-            "file:" + __import__("urllib.parse", fromlist=["quote"]).quote(
-                str(stage), safe="/"
-            ) + "?mode=ro&immutable=1", uri=True,
+            "file:" + quote(str(stage), safe="/") + "?mode=ro&immutable=1", uri=True,
         ) as restored_db:
             if restored_db.execute(
                 "SELECT count(*) FROM annual_productions WHERE "
