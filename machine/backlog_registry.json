@@ -34,7 +34,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-CTRL-01"
+      "dedupe_key": "p2_task:P2-CTRL-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-ARCH-01",
@@ -52,7 +53,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-ARCH-01"
+      "dedupe_key": "p2_task:P2-ARCH-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-TRACE-01",
@@ -70,7 +72,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-TRACE-01"
+      "dedupe_key": "p2_task:P2-TRACE-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-REPO-01",
@@ -89,7 +92,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-REPO-01"
+      "dedupe_key": "p2_task:P2-REPO-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-QUAL-01",
@@ -107,7 +111,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-QUAL-01"
+      "dedupe_key": "p2_task:P2-QUAL-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-DOC-01",
@@ -125,7 +130,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-DOC-01"
+      "dedupe_key": "p2_task:P2-DOC-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-NATIVE-01",
@@ -143,7 +149,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-NATIVE-01"
+      "dedupe_key": "p2_task:P2-NATIVE-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-T1-DATA-01",
@@ -161,7 +168,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-T1-DATA-01"
+      "dedupe_key": "p2_task:P2-T1-DATA-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-T1-SEC-01",
@@ -179,7 +187,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-T1-SEC-01"
+      "dedupe_key": "p2_task:P2-T1-SEC-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-T1-INFER-01",
@@ -197,7 +206,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-T1-INFER-01"
+      "dedupe_key": "p2_task:P2-T1-INFER-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-T1-RECOVERY-01",
@@ -216,7 +226,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-T1-RECOVERY-01"
+      "dedupe_key": "p2_task:P2-T1-RECOVERY-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-P2-P2-T1-FUNCTIONAL-01",
@@ -237,7 +248,8 @@
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
-      "dedupe_key": "p2_task:P2-T1-FUNCTIONAL-01"
+      "dedupe_key": "p2_task:P2-T1-FUNCTIONAL-01",
+      "handled_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-HIST-SYS-019",
@@ -260,7 +272,8 @@
         "work_package:WP-W27"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:HIST-SYS-019"
+      "dedupe_key": "edge_case:HIST-SYS-019",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-018",
@@ -283,7 +296,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-018"
+      "dedupe_key": "edge_case:OBSCURE-018",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-010",
@@ -305,7 +319,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-CONTRACT-010"
+      "dedupe_key": "edge_case:EDGE-CONTRACT-010",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-009",
@@ -326,7 +341,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-CONTRACT-009"
+      "dedupe_key": "edge_case:EDGE-CONTRACT-009",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-010",
@@ -347,7 +363,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DATA-010"
+      "dedupe_key": "edge_case:EDGE-DATA-010",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-008",
@@ -368,7 +385,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-008"
+      "dedupe_key": "edge_case:EDGE-SEC-008",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-009",
@@ -389,7 +407,8 @@
         "work_package:WP-W27"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-009"
+      "dedupe_key": "edge_case:EDGE-SEC-009",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-AI-001",
@@ -409,7 +428,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-AI-001"
+      "dedupe_key": "edge_case:EDGE-AI-001",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-AI-002",
@@ -429,7 +449,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-AI-002"
+      "dedupe_key": "edge_case:EDGE-AI-002",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-AI-013",
@@ -449,7 +470,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-AI-013"
+      "dedupe_key": "edge_case:EDGE-AI-013",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-AI-030",
@@ -469,7 +491,8 @@
         "work_package:WP-W26"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-AI-030"
+      "dedupe_key": "edge_case:EDGE-AI-030",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-001",
@@ -489,7 +512,8 @@
         "work_package:WP-W22"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-CONTRACT-001"
+      "dedupe_key": "edge_case:EDGE-CONTRACT-001",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-020",
@@ -509,7 +533,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-CONTRACT-020"
+      "dedupe_key": "edge_case:EDGE-CONTRACT-020",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-005",
@@ -529,7 +554,8 @@
         "work_package:WP-W27"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-005"
+      "dedupe_key": "edge_case:EDGE-SEC-005",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-006",
@@ -549,7 +575,8 @@
         "work_package:WP-W27"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-006"
+      "dedupe_key": "edge_case:EDGE-SEC-006",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-007",
@@ -569,7 +596,8 @@
         "work_package:WP-W27"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-007"
+      "dedupe_key": "edge_case:EDGE-SEC-007",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-024",
@@ -589,7 +617,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-024"
+      "dedupe_key": "edge_case:OBSCURE-024",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-AI-021",
@@ -608,7 +637,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-AI-021"
+      "dedupe_key": "edge_case:EDGE-AI-021",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-009",
@@ -627,7 +657,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DATA-009"
+      "dedupe_key": "edge_case:EDGE-DATA-009",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-001",
@@ -646,7 +677,8 @@
         "work_package:WP-W27"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-001"
+      "dedupe_key": "edge_case:EDGE-SEC-001",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-011",
@@ -665,7 +697,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-011"
+      "dedupe_key": "edge_case:EDGE-SEC-011",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-015",
@@ -684,7 +717,8 @@
         "work_package:WP-W21"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-015"
+      "dedupe_key": "edge_case:EDGE-SEC-015",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-016",
@@ -703,7 +737,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-016"
+      "dedupe_key": "edge_case:EDGE-SEC-016",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-018",
@@ -722,13 +757,14 @@
         "work_package:WP-W24"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-018"
+      "dedupe_key": "edge_case:EDGE-SEC-018",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-HIST-SYS-020",
       "source_type": "edge_case",
       "source_ref": "HIST-SYS-020",
-      "rationale": "Saltzer–Schroeder principles",
+      "rationale": "Saltzer\u2013Schroeder principles",
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20",
       "dependency_refs": [],
@@ -741,7 +777,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:HIST-SYS-020"
+      "dedupe_key": "edge_case:HIST-SYS-020",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-025",
@@ -760,7 +797,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-025"
+      "dedupe_key": "edge_case:OBSCURE-025",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-AI-003",
@@ -778,7 +816,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-AI-003"
+      "dedupe_key": "edge_case:EDGE-AI-003",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-002",
@@ -796,7 +835,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-002"
+      "dedupe_key": "edge_case:EDGE-SEC-002",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-003",
@@ -814,7 +854,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-003"
+      "dedupe_key": "edge_case:EDGE-SEC-003",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-004",
@@ -832,7 +873,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-004"
+      "dedupe_key": "edge_case:EDGE-SEC-004",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-012",
@@ -850,7 +892,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-012"
+      "dedupe_key": "edge_case:EDGE-SEC-012",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-013",
@@ -868,7 +911,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-013"
+      "dedupe_key": "edge_case:EDGE-SEC-013",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-014",
@@ -886,7 +930,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-014"
+      "dedupe_key": "edge_case:EDGE-SEC-014",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-017",
@@ -904,7 +949,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-017"
+      "dedupe_key": "edge_case:EDGE-SEC-017",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-019",
@@ -922,7 +968,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-SEC-019"
+      "dedupe_key": "edge_case:EDGE-SEC-019",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-HIST-SYS-021",
@@ -940,7 +987,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:HIST-SYS-021"
+      "dedupe_key": "edge_case:HIST-SYS-021",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-HIST-AI-002",
@@ -964,7 +1012,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:HIST-AI-002"
+      "dedupe_key": "edge_case:HIST-AI-002",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-020",
@@ -987,7 +1036,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DIST-020"
+      "dedupe_key": "edge_case:EDGE-DIST-020",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-021",
@@ -1010,7 +1060,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DIST-021"
+      "dedupe_key": "edge_case:EDGE-DIST-021",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-HIST-SYS-003",
@@ -1032,7 +1083,8 @@
         "work_package:WP-W26"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:HIST-SYS-003"
+      "dedupe_key": "edge_case:HIST-SYS-003",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-002",
@@ -1053,7 +1105,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DATA-002"
+      "dedupe_key": "edge_case:EDGE-DATA-002",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-007",
@@ -1074,7 +1127,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DATA-007"
+      "dedupe_key": "edge_case:EDGE-DATA-007",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-010",
@@ -1095,7 +1149,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DIST-010"
+      "dedupe_key": "edge_case:EDGE-DIST-010",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-027",
@@ -1116,7 +1171,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DIST-027"
+      "dedupe_key": "edge_case:EDGE-DIST-027",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-005",
@@ -1137,7 +1193,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-005"
+      "dedupe_key": "edge_case:OBSCURE-005",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-010",
@@ -1158,7 +1215,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-010"
+      "dedupe_key": "edge_case:OBSCURE-010",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-029",
@@ -1179,7 +1237,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-029"
+      "dedupe_key": "edge_case:OBSCURE-029",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-005",
@@ -1199,7 +1258,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DATA-005"
+      "dedupe_key": "edge_case:EDGE-DATA-005",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-HIST-SYS-025",
@@ -1219,7 +1279,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:HIST-SYS-025"
+      "dedupe_key": "edge_case:HIST-SYS-025",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-014",
@@ -1239,7 +1300,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-014"
+      "dedupe_key": "edge_case:OBSCURE-014",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-021",
@@ -1259,7 +1321,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-021"
+      "dedupe_key": "edge_case:OBSCURE-021",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-013",
@@ -1278,7 +1341,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-CONTRACT-013"
+      "dedupe_key": "edge_case:EDGE-CONTRACT-013",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-001",
@@ -1297,7 +1361,8 @@
         "work_package:WP-W20"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DATA-001"
+      "dedupe_key": "edge_case:EDGE-DATA-001",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-006",
@@ -1316,7 +1381,8 @@
         "work_package:WP-W30"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DATA-006"
+      "dedupe_key": "edge_case:EDGE-DATA-006",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-007",
@@ -1335,7 +1401,8 @@
         "work_package:WP-W29"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DIST-007"
+      "dedupe_key": "edge_case:EDGE-DIST-007",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-024",
@@ -1353,7 +1420,8 @@
         "work_package:WP-W18"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:EDGE-DIST-024"
+      "dedupe_key": "edge_case:EDGE-DIST-024",
+      "reviewed_pass": "2026-10-17"
     },
     {
       "id": "BL-EDGE-OBSCURE-007",
@@ -1371,7 +1439,8 @@
         "work_package:WP-W27"
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
-      "dedupe_key": "edge_case:OBSCURE-007"
+      "dedupe_key": "edge_case:OBSCURE-007",
+      "reviewed_pass": "2026-10-17"
     }
   ]
 }

@@ -100,7 +100,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-02",
@@ -186,7 +187,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-03",
@@ -261,7 +263,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-04",
@@ -340,7 +343,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-05",
@@ -420,7 +424,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-06",
@@ -496,7 +501,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-INTEL-01",
@@ -574,7 +580,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-INTEL-02",
@@ -654,7 +661,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-INTEL-03",
@@ -1467,7 +1475,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-PROD-02",
@@ -1535,7 +1544,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-PROD-03",
@@ -1601,7 +1611,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-PROD-04",
@@ -1801,7 +1812,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-LEARN-02",
