@@ -733,3 +733,24 @@ hypotheses**. Eight numerical observation families are still the only
 measured gameplay candidate training rows per episode; 200 semantic
 interpretations do not create 200 new independent samples or change
 production Jeeves parameters.
+
+### Inspect 200-lens progress without generating more tokens
+
+```sh
+python -m scripts.training.rom_study triangle-lens-progress \
+  --receipt /private/rom-receipts/rom-<source>-<run>.json \
+  --review-receipt /private/rom-receipts/triangle-review-<source>-<config>.json \
+  --source-sha256 <full-source-sha256> \
+  --semantic-checkpoint /private/models/semantic.json \
+  --output-dir /private/rom-receipts \
+  --run-index 0 --seed 0 --max-new-tokens 192
+```
+
+This read-only command validates the native training report, canonical
+200-lens route, three critic findings, session fingerprint, and contiguous
+per-lens immutable checkpoint journal. It reports **all 200 original lens
+keys**, distinguishing persisted, still-pending and final-receipt-confirmed
+generations. It does **not** execute or replay the language model; only the
+actual `execute-200-lenses`/foreground campaign resume path can establish
+replay fidelity. Legacy complete native inference receipts created before
+per-lens journaling remain readable, explicitly identified as such.
