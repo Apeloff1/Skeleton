@@ -12,12 +12,14 @@ from skeleton.client.errors import (
     SkeletonCancelledError,
     SkeletonClientError,
     SkeletonHTTPError,
+    SkeletonSealConfigError,
     SkeletonTimeoutError,
     SkeletonTransportError,
 )
 from skeleton.client.gateway import GatewayClient
 from skeleton.client.memory import MemoryClient
 from skeleton.client.retry import RetryPolicy
+from skeleton.client.seal import RequestSealer
 from skeleton.client.services import ServicesClient
 from skeleton.client.streaming import StreamEvent
 
@@ -28,11 +30,13 @@ __all__ = [
     "CancelToken",
     "GatewayClient",
     "MemoryClient",
+    "RequestSealer",
     "RetryPolicy",
     "ServicesClient",
     "SkeletonCancelledError",
     "SkeletonClientError",
     "SkeletonHTTPError",
+    "SkeletonSealConfigError",
     "SkeletonTimeoutError",
     "SkeletonTransportError",
     "StreamEvent",

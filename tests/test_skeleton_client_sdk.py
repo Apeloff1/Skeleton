@@ -23,7 +23,7 @@ from skeleton.client import (
 from skeleton.client import agents as agents_mod
 from skeleton.client import auth as auth_mod
 from skeleton.client import builds as builds_mod
-from skeleton.client.streaming import parse_ndjson_lines, parse_sse_lines
+from skeleton.client.streaming import parse_sse_lines
 
 
 def _gw(handler, *, sleeps=None, retry=None, headers=None):
@@ -48,7 +48,8 @@ def test_backoff_sleeps_between_idempotent_retries():
 
     assert _gw(handler, sleeps=sleeps).health() == {"ok": True}
     assert len(hits) == 3
-    assert sleeps == [pytest.approx(0.1), pytest.approx(0.2)]
+    policy = RetryPolicy(max_attempts=3, base_delay_seconds=0.1, max_delay_seconds=1.0)
+    assert sleeps == [policy.delay_for_attempt(0), policy.delay_for_attempt(1)]
 
 
 def test_non_idempotent_never_sleeps_or_retries():
@@ -267,14 +268,30 @@ def test_sse_stream_envelope_heartbeats_and_last_event_id():
     assert not evs[1].is_envelope_v1
 
 
-def test_ndjson_stream_and_plain_list():
-    body = b'{"type":"a","id":1}\n\n{"type":"heartbeat"}\n{"type":"b"}\n'
-    gw = _gw(lambda r: httpx.Response(200, headers={"content-type": "application/x-ndjson"}, content=body))
-    evs = list(BuildsClient(gw, actor_id="u", tenant_id="t").stream_events("e1"))
-    assert [e.type for e in evs] == ["a", "b"] and evs[0].id == "1"
+def test_sse_control_events_surface_and_hb_comment_skipped():
+    body = (
+        ": hb\n\n"
+        "id: 10\nevent: stream.lagged\ndata: {\"v\":1,\"id\":\"10\",\"channel\":\"build\",\"type\":\"stream.lagged\",\"payload\":{\"dropped\":4}}\n\n"
+        ": hb\n\n"
+        "event: stream.reset\ndata: {\"type\":\"stream.reset\"}\n\n"
+    )
+    seen = []
 
-    gw2 = _gw(lambda r: httpx.Response(200, json=[{"type": "x"}, {"type": "heartbeat"}]))
-    assert [e.type for e in BuildsClient(gw2, actor_id="u", tenant_id="t").stream_events("e1")] == ["x"]
+    def handler(req):
+        seen.append(req)
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=body.encode())
+
+    evs = list(BuildsClient(_gw(handler), actor_id="u", tenant_id="t").stream_events("e1", cursor="9"))
+    assert [e.type for e in evs] == ["stream.lagged", "stream.reset"]
+    assert all(e.is_control for e in evs) and evs[0].payload == {"dropped": 4} and evs[0].id == "10"
+    assert seen[0].url.params["cursor"] == "9" and "last-event-id" not in seen[0].headers
+
+
+def test_ndjson_is_not_a_stream_format_plain_list_still_ok():
+    gw = _gw(lambda r: httpx.Response(200, json=[{"type": "x"}, {"type": "heartbeat"}]))
+    assert [e.type for e in BuildsClient(gw, actor_id="u", tenant_id="t").stream_events("e1")] == ["x"]
+    import skeleton.client.streaming as st
+    assert not hasattr(st, "parse_ndjson_lines")
 
 
 def test_stream_cancel_between_events():
@@ -286,10 +303,6 @@ def test_stream_cancel_between_events():
             out.append(ev)
             tok.cancel()
     assert [e.type for e in out] == ["a"]
-    tok2 = CancelToken()
-    tok2.cancel()
-    with pytest.raises(SkeletonCancelledError):
-        list(parse_ndjson_lines(['{"type":"a"}'], tok2))
 
 
 def test_stream_retries_retryable_status_then_raises_http_error():
@@ -361,3 +374,156 @@ def test_sdk_route_tables_match_calls():
     norm_seen = {(m, re.sub(r"/X(?=/|$)", "/{}", p)) for m, p in seen}
     assert norm_seen <= declared, norm_seen - declared
     assert len(norm_seen) == len(declared)
+
+
+# --- retry defaults (TD review) ---------------------------------------------
+
+@pytest.mark.parametrize("call", [
+    lambda gw: gw._json("GET", "/api/v1/x"),
+    lambda gw: gw.request_raw("GET", "/api/v1/x"),
+    lambda gw: gw.retrieval_query({}),
+    lambda gw: AgentsClient(gw).heartbeat("w"),
+    lambda gw: BuildsClient(gw, actor_id="u", tenant_id="t").submit({}),
+    lambda gw: BuildsClient(gw, actor_id="u", tenant_id="t").cancel("e"),
+])
+def test_requests_not_retried_by_default(call):
+    hits = []
+    sleeps: list[float] = []
+
+    def handler(req):
+        hits.append(1)
+        return httpx.Response(503, json={})
+
+    try:
+        call(_gw(handler, sleeps=sleeps))
+    except SkeletonHTTPError:
+        pass
+    assert len(hits) == 1 and sleeps == []
+
+
+def test_backoff_uses_delay_for_attempt_exactly():
+    policy = RetryPolicy(max_attempts=4, base_delay_seconds=0.05, max_delay_seconds=0.15)
+    sleeps: list[float] = []
+    with pytest.raises(SkeletonHTTPError):
+        _gw(lambda r: httpx.Response(500), sleeps=sleeps, retry=policy).health()
+    assert sleeps == [policy.delay_for_attempt(n) for n in range(3)]
+
+
+# --- request seal (docs/contracts/request_seal.md) ---------------------------
+
+from skeleton.client import RequestSealer, SkeletonSealConfigError  # noqa: E402
+
+
+def _verify(token, now):
+    from skeleton.api.hmac_seal import verify_seal
+
+    return verify_seal(token, now=now)
+
+
+@pytest.mark.parametrize("principal", [None, "user42"])
+def test_seal_roundtrip_with_real_verify_seal(monkeypatch, principal):
+    monkeypatch.setenv("GF_SEAL_SECRET", "test-only-secret")
+    monkeypatch.delenv("GF_SEAL_KEYRING", raising=False)
+    sealer = RequestSealer("sdk", principal=principal, clock=lambda: 1_000_000.0)
+    token = sealer.token()
+    assert token.count(".") == (3 if principal else 2)
+    assert _verify(token, 1_000_299) == "sdk"
+    from skeleton.api.middleware import AuthError
+
+    with pytest.raises(AuthError):
+        _verify(token, 1_000_301)  # absolute expiry, no skew
+    assert "test-only-secret" not in repr(sealer) and token not in repr(sealer)
+
+
+def test_seal_explicit_secret_and_missing_secret(monkeypatch):
+    monkeypatch.delenv("GF_SEAL_SECRET", raising=False)
+    monkeypatch.delenv("GF_SEAL_KEYRING", raising=False)
+    with pytest.raises(SkeletonSealConfigError) as info:
+        RequestSealer("sdk").token()
+    assert issubclass(SkeletonSealConfigError, SkeletonClientError)
+    tok = RequestSealer("sdk", seal_secret="explicit", clock=lambda: 100.0).token()
+    from skeleton.api.hmac_seal import verify_seal
+
+    assert verify_seal(tok, secret="explicit", now=150) == "sdk"
+    assert "explicit" not in str(info.value)
+    with pytest.raises(SkeletonSealConfigError):
+        RequestSealer("bad.attester", seal_secret="x")
+
+
+def test_seal_cached_and_reminted_30s_before_expiry():
+    now = [1000.0]
+    sealer = RequestSealer("sdk", seal_secret="s", clock=lambda: now[0])
+    first = sealer.token()
+    now[0] = 1000 + 269
+    assert sealer.token() == first
+    now[0] = 1000 + 270
+    assert sealer.token() != first
+
+
+def test_gateway_sends_seal_and_single_request_id():
+    seen = []
+
+    def handler(req):
+        seen.append(req.headers)
+        return httpx.Response(200, json={}, headers={"x-request-id": "echoed-1"})
+
+    gw = GatewayClient(
+        "http://test",
+        client=httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler)),
+        seal_attester="sdk", seal_secret="s",
+    )
+    MemoryClientCheck = gw._json("POST", "/api/v1/memory/query", json={})
+    assert MemoryClientCheck == {}
+    h = seen[0]
+    assert h["x-gf-seal"].startswith("sdk.") and len(h.get_list("x-request-id")) == 1
+    assert gw.last_request_id == "echoed-1"
+    with pytest.raises(ValueError):
+        gw._call_headers("bad id!")
+
+
+def test_seal_unavailable_503_never_retried():
+    hits = []
+    sleeps: list[float] = []
+
+    def handler(req):
+        hits.append(1)
+        return httpx.Response(503, json={"error": "seal_unavailable"})
+
+    gw = _gw(handler, sleeps=sleeps)
+    with pytest.raises(SkeletonSealConfigError):
+        gw.health()  # idempotent GET, still not retried
+    with pytest.raises(SkeletonSealConfigError):
+        list(AgentsClient(gw).stream_events())
+    assert len(hits) == 2 and sleeps == []
+
+
+def test_invalid_seal_401_reminted_once_then_raises():
+    tokens = []
+
+    def handler(req):
+        tokens.append(req.headers["x-gf-seal"])
+        return httpx.Response(401, json={"error": "invalid_seal"})
+
+    now = [5000.0]
+    sealer = RequestSealer("sdk", seal_secret="s", clock=lambda: now.__setitem__(0, now[0] + 1) or now[0])
+    gw = GatewayClient(
+        "http://test",
+        client=httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler)),
+        seal=sealer, sleep=lambda d: None,
+    )
+    with pytest.raises(SkeletonHTTPError) as info:
+        gw._json("POST", "/api/v1/commands/invoke", json={})
+    assert info.value.status_code == 401 and len(tokens) == 2 and tokens[0] != tokens[1]
+
+    ok = []
+
+    def handler2(req):
+        ok.append(1)
+        return httpx.Response(401 if len(ok) == 1 else 200, json={"error": "invalid_seal"} if len(ok) == 1 else {"ok": 1})
+
+    gw2 = GatewayClient(
+        "http://test",
+        client=httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler2)),
+        seal_attester="sdk", seal_secret="s",
+    )
+    assert gw2._json("POST", "/api/v1/commands/invoke", json={}) == {"ok": 1}
