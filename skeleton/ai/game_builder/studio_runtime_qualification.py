@@ -42,6 +42,8 @@ class BrowserReplayQualification:
     onscreen_button_input_verified: bool
     undo_replay_verified: bool
     restart_verified: bool
+    gamepad_input_verified: bool
+    gamepad_held_input_debounced: bool
     original_ambient_play_method_invoked: bool
     original_overlay_draw_calls: int
     audio_hardware_verified: bool
@@ -64,6 +66,8 @@ class BrowserReplayQualification:
             "onscreen_button_input_verified": self.onscreen_button_input_verified,
             "undo_replay_verified": self.undo_replay_verified,
             "restart_verified": self.restart_verified,
+            "gamepad_input_verified": self.gamepad_input_verified,
+            "gamepad_held_input_debounced": self.gamepad_held_input_debounced,
             "original_ambient_play_method_invoked": self.original_ambient_play_method_invoked,
             "original_overlay_draw_calls": self.original_overlay_draw_calls,
             "audio_hardware_verified": self.audio_hardware_verified,
@@ -94,6 +98,8 @@ def _receipt(world: str, html: str, proof: str, *, available: bool,
         "onscreen_button_input_verified": controls,
         "undo_replay_verified": controls,
         "restart_verified": controls,
+        "gamepad_input_verified": controls,
+        "gamepad_held_input_debounced": controls,
         "original_ambient_play_method_invoked": ambient,
         "original_overlay_draw_calls": overlays,
         "audio_hardware_verified": False,
@@ -104,7 +110,8 @@ def _receipt(world: str, html: str, proof: str, *, available: bool,
     }
     return BrowserReplayQualification(
         world, html, proof, available, executed, won, draws, sprites, frames,
-        controls, controls, controls, controls, ambient, overlays, False,
+        controls, controls, controls, controls, controls, controls,
+        ambient, overlays, False,
         failure, canonical_digest(body),
     )
 
@@ -203,6 +210,7 @@ def qualify_browser_gameplay(
             or any(result.get(key) is not True for key in (
                 "keyboard_input_verified", "onscreen_button_input_verified",
                 "undo_replay_verified", "restart_verified",
+                "gamepad_input_verified", "gamepad_held_input_debounced",
             ))
             or result.get("source_world_digest") != world
             or result.get("audio_hardware_verified") is not False
