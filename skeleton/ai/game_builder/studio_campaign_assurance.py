@@ -144,13 +144,25 @@ def _qualification_receipt(root: Path, target: str, source_identity: str) -> dic
                 raise StudioAssuranceError(
                     "actual handheld cartridge sprite bytes differ from source"
                 ) from exc
-    if _load_json(source / "manifest.json").get("native_psg_score_digest") is not None:
+    source_has_music = (
+        _load_json(source / "manifest.json").get("native_psg_score_digest")
+        is not None
+    )
+    compiled_score_digest = None
+    if source_has_music:
         try:
-            inspect_compiled_psg(body, raw_symbols, source, target=target)
+            compiled = inspect_compiled_psg(
+                body, raw_symbols, source, target=target,
+            )
         except CompiledPSGError as exc:
             raise StudioAssuranceError(
                 "actual compiled cartridge's original PSG music differs from source"
             ) from exc
+        compiled_score_digest = compiled["compiled_score_digest"]
+    if record.get("compiled_original_psg_evidence_digest") != compiled_score_digest:
+        raise StudioAssuranceError(
+            "compiled original PSG evidence is absent, stale or forged"
+        )
     return record
 
 
@@ -244,15 +256,17 @@ def qualify_campaign_target(
                     "source_identity": identity, "model_training_performed": False,
                 }
         source = base / "targets" / target
+        compiled_score_digest = None
         if _load_json(source / "manifest.json").get(
             "native_psg_score_digest"
         ) is not None:
             try:
-                inspect_compiled_psg(
+                compiled_psg = inspect_compiled_psg(
                     _regular(output, 8 * 1024 * 1024),
                     _regular(output.with_suffix(".sym"), 128_000),
                     source, target=target,
                 )
+                compiled_score_digest = compiled_psg["compiled_score_digest"]
             except (CompiledPSGError, OSError, ValueError):
                 if sha256(_regular(output, 8 * 1024 * 1024)).hexdigest() != result.binary_sha256:
                     raise StudioAssuranceError(
@@ -270,6 +284,7 @@ def qualify_campaign_target(
             "schema": QUALIFICATION_SCHEMA, "target": target,
             "source_identity": identity,
             "build": receipt,
+            "compiled_original_psg_evidence_digest": compiled_score_digest,
             "emulator_playthrough_verified": False,
             "hardware_controller_qualified": False,
             "publication_authorized": False,
@@ -281,6 +296,7 @@ def qualify_campaign_target(
             "target": target, "native_rom_compiled": True,
             "already_qualified": False,
             "binary_sha256": receipt["binary_sha256"],
+            "compiled_original_psg_evidence_digest": compiled_score_digest,
             "evidence_digest": record["evidence_digest"],
             "source_identity": identity,
             "emulator_playthrough_verified": False,
@@ -782,6 +798,9 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
             "native_binary_evidence_digest": (
                 binary["evidence_digest"] if binary else None
             ),
+            "compiled_original_psg_evidence_digest": (
+                binary["compiled_original_psg_evidence_digest"] if binary else None
+            ),
             "real_emulator_evidence_digest": (
                 emulator["evidence_digest"] if emulator else None
             ),
@@ -816,6 +835,10 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
         ),
         "native_roms_structurally_verified": sum(
             row["native_binary_evidence_digest"] is not None for row in by_target
+        ),
+        "compiled_original_psg_tables_verified": sum(
+            row["compiled_original_psg_evidence_digest"] is not None
+            for row in by_target
         ),
         "original_console_media_sources_independently_checked": sum(
             row["native_animation_audio_source_parity_digest"] is not None
