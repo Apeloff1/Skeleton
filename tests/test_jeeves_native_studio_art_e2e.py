@@ -267,10 +267,25 @@ class StudioProductionAssetTests(unittest.TestCase):
                     self.assertFalse(
                         result["native_hero_animation_runtime_executed"],
                     )
+                    self.assertTrue(
+                        result["native_psg_music_and_cues_source_integrated"],
+                    )
+                    self.assertIsInstance(result["native_psg_score_digest"], str)
+                    self.assertEqual(len(result["native_psg_score_digest"]), 64)
+                    self.assertFalse(
+                        result["native_psg_audio_emulator_verified"],
+                    )
+                    self.assertFalse(
+                        result["native_psg_pcm_wav_equivalence_claimed"],
+                    )
                 else:
                     self.assertEqual(
                         result["native_hero_animation_frames_in_source"], 0,
                     )
+                    self.assertFalse(
+                        result["native_psg_music_and_cues_source_integrated"],
+                    )
+                    self.assertIsNone(result["native_psg_score_digest"])
                 engines = result["engine_sources"]
                 self.assertIsNotNone(engines)
                 self.assertTrue(engines["browser_source_rendered"])
