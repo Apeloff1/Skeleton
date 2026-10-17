@@ -377,7 +377,10 @@
         "skeleton/ai/game_builder/game_boy_native_export.py",
         "skeleton/ai/game_builder/nes_native_export.py",
         "skeleton/ai/game_builder/studio_native_psg.py",
-        "tests/test_studio_native_psg.py"
+        "tests/test_studio_native_psg.py",
+        "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+        "tests/test_studio_native_source_media_parity.py",
+        "tests/test_studio_campaign_e2e.py"
       ],
       "command": [
         "python",
@@ -401,7 +404,9 @@
         "tests/test_studio_game_boy_rom_art_parity.py",
         "tests/test_studio_production_blocker_taxonomy.py",
         "tests/test_studio_native_console_animation_e2e.py",
-        "tests/test_studio_native_psg.py"
+        "tests/test_studio_native_psg.py",
+        "tests/test_studio_native_source_media_parity.py",
+        "tests/test_studio_campaign_e2e.py"
       ]
     }
   ]
