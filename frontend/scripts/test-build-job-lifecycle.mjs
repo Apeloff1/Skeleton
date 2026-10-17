@@ -39,8 +39,9 @@ test('abort prevents future fetches and does not claim backend cancellation', as
   assert.equal((await p).phase, 'aborted');
   assert.equal(count, 1);
 });
-test('backend disconnect is recoverable failure, not a hanging spinner', async () => {
-  const r = await watchBuildJob(async () => { throw Error('secret'); }, { maxChecks: 2, intervalMs: 0 });
-  assert.equal(r.phase, 'failed');
+test('backend disconnect is recoverable, not a failure claim or a hanging spinner', async () => {
+  // A rejected status read is not evidence the build failed (see buildJobLifecycle.ts).
+  const r = await watchBuildJob(async () => { throw Error('secret'); }, { maxChecks: 5, intervalMs: 0, maxConsecutiveErrors: 2 });
+  assert.equal(r.phase, 'disconnected');
   assert.equal(r.message.includes('secret'), false);
 });

@@ -208,8 +208,8 @@ def validate_sources(manifest_path: Path) -> tuple[dict[str, Any], dict[str, dic
                     document_text = content.decode("utf-8")
                 except UnicodeDecodeError as exc:
                     raise SDKStudyError("training document must be UTF-8") from exc
-                prohibited_pem = "-----BEGIN " + "PRIVATE KEY-----"
-                if prohibited_pem in document_text or "\x00" in document_text:
+                if ("-----BEGIN PRIVATE" " KEY-----" in document_text
+                        or "\x00" in document_text):
                     raise SDKStudyError("SDK documentation contains prohibited secret/binary content")
             if expected in entries:
                 raise SDKStudyError("SDK source digest reused across declarations")
