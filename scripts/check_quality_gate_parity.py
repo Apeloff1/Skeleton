@@ -16,6 +16,7 @@ RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
 SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
     ("Ruff lint", "ruff check . --output-format=github"),
     ("architecture boundary scanner", "check_architecture_boundaries.py"),
+    ("logical layer scanner", "check_architecture_logical_layers.py"),
     ("architecture boundary regression", "test_architecture_boundaries.py"),
     ("provider runtime boundary scanner", "check_provider_runtime_boundary.py"),
     ("provider runtime boundary regression", "test_provider_runtime_boundary.py"),

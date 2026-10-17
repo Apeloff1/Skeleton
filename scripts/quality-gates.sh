@@ -28,8 +28,11 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
 
 printf '\n== Architecture boundaries ==\n'
 python scripts/check_architecture_boundaries.py
+python scripts/check_architecture_logical_layers.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-  tests/test_architecture_boundaries.py
+  tests/test_architecture_boundaries.py \
+  tests/test_architecture_logical_layers.py \
+  skeleton/testing/test_projects_contract.py
 
 printf '\n== AI master plan ==\n'
 python scripts/check_ai_master_plan.py
