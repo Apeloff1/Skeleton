@@ -269,6 +269,7 @@ TickOriginalMusic:
 @musicOff:
     rts
 
+.export SoundPickup, SoundHazard, SoundGoal
 SoundPickup:
     lda #AUDIO_ENABLED
     beq @silent
