@@ -247,3 +247,59 @@ test('large collections require paged reads instead of enormous array accumulati
     assert.equal((await app.getCachedCollectionPage('books', 20000, 10)).length, 1);
   } finally { global.fetch = previous; }
 });
+
+test('legacy 200-row chunks remain accessible after the transactional upgrade', async () => {
+  const { storage, map } = makeStorage();
+  const app = service(storage);
+  const m = manifest({ books: 250 });
+  map.set('@tutolage_cache_version', '2026-SOTA-v2');
+  map.set('@tutolage_manifest', JSON.stringify(m));
+  map.set('@tutolage_offline_books_meta',
+    JSON.stringify({ total: 250, chunks: 2, cachedAt: new Date().toISOString() }));
+  map.set('@tutolage_offline_books_0', JSON.stringify(
+    Array.from({ length: 200 }, (_, i) => ({ id: i }))));
+  map.set('@tutolage_offline_books_1', JSON.stringify(
+    Array.from({ length: 50 }, (_, i) => ({ id: i + 200 }))));
+  assert.equal(await app.isCacheValid(), true);
+  const page = await app.getCachedCollectionPage('books', 190, 30);
+  assert.deepEqual(page.map(row => row.id), Array.from({ length: 30 }, (_, i) => 190 + i));
+  assert.equal((await app.getCachedCollection('books')).length, 250);
+});
+
+test('corrupt missing chunks fail closed instead of returning partial collections', async () => {
+  const { storage, map } = makeStorage();
+  const app = service(storage);
+  const oldFetch = global.fetch;
+  global.fetch = mockNetwork(manifest({ books: 120 })).fetcher;
+  try {
+    assert.equal((await app.syncAllOfflineData()).success, true);
+    const committed = JSON.parse(map.get('@tutolage_offline_commit:v1'));
+    map.delete('@tutolage_offline_g-' + committed.generation + '/books_1');
+    assert.deepEqual(await app.getCachedCollection('books'), []);
+    assert.deepEqual(await app.getCachedCollectionPage('books', 100, 20), []);
+  } finally { global.fetch = oldFetch; }
+});
+
+test('a fetch shim that ignores AbortSignal cannot prevent clear from settling', async () => {
+  const { storage } = makeStorage();
+  const app = service(storage);
+  const oldFetch = global.fetch;
+  let called = 0;
+  global.fetch = async url => {
+    called++;
+    if (String(url).endsWith('/manifest')) return http(manifest({ books: 1 }));
+    return new Promise(() => {}); // invalid native adapter: never settles
+  };
+  try {
+    const work = app.syncAllOfflineData();
+    await settle();
+    const clear = app.clearOfflineCache();
+    const result = await Promise.race([
+      work, new Promise((_resolve, reject) => setTimeout(() => reject(new Error('hung')), 1200)),
+    ]);
+    assert.equal(result.success, false);
+    await clear;
+    assert.equal(await app.isCacheValid(), false);
+    assert.equal(called, 2);
+  } finally { global.fetch = oldFetch; }
+});
