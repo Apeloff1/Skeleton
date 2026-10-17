@@ -6,6 +6,7 @@ import {
   View, TextInput, Pressable, Platform, StyleSheet, ViewStyle, StyleProp,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { hitSlopFor } from '../../src/foundation/a11y';
 import theme from '../../theme/tokens';
 
 interface SearchBarProps {
@@ -43,7 +44,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         testID={testID}
       />
       {value.length > 0 && (
-        <Pressable onPress={() => onChangeText('')} hitSlop={theme.hitSlop.sm}>
+        <Pressable onPress={() => onChangeText('')} hitSlop={hitSlopFor(18, 18)} accessibilityRole="button" accessibilityLabel="Clear search">
           <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
         </Pressable>
       )}
