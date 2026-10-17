@@ -301,7 +301,8 @@
         "tests/test_studio_godot_runtime_e2e.py",
         "tests/test_studio_pixel_parity_e2e.py",
         "skeleton/ai/game_builder/studio_dragon_canvas_capture.py",
-        "tests/test_studio_dragon_canvas_capture.py"
+        "tests/test_studio_dragon_canvas_capture.py",
+        "tests/test_studio_playable_media_e2e.py"
       ],
       "command": [
         "python",
@@ -314,7 +315,31 @@
         "tests/test_studio_browser_runtime_e2e.py",
         "tests/test_studio_godot_runtime_e2e.py",
         "tests/test_studio_pixel_parity_e2e.py",
-        "tests/test_studio_dragon_canvas_capture.py"
+        "tests/test_studio_dragon_canvas_capture.py",
+        "tests/test_studio_playable_media_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-dragon-reviewed-knowledge-gates",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_dragon_learning_bridge.py",
+        "skeleton/ai/game_builder/studio_dragon_lessons_cli.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "skeleton/ai/game_builder/studio_campaign_lock.py",
+        "tests/test_studio_dragon_learning_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_dragon_learning_e2e.py"
       ]
     }
   ]
