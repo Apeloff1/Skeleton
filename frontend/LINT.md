@@ -14,9 +14,12 @@ yarn test:stability
 yarn test:stability:reconciliation
 ```
 
-The stability suite includes deterministic Node regression tests for
-boot recovery, request retries, storage retention, thermal queue liveness,
-battery listeners, and recovery single-flight behavior. It does not replace
+The stability suite includes deterministic Node regression tests for boot
+recovery, request retries, storage retention, thermal queue saturation and
+liveness, battery listeners, recovery single-flight behavior, session progress
+ordering/coalescing, storage hydration, authenticated request isolation,
+bounded network responses, scoped health polling, push notification teardown,
+and timer cleanup. It does not replace
 on-device endurance, installed-app E2E, or native lifecycle testing.
 
 ## Incremental lint debt retirement
@@ -45,3 +48,12 @@ For a release verdict, also run the complete app and backend checks,
 first-install checks, and a real multi-hour device exercise. Passing lint,
 unit tests, or TypeScript compilation alone does not prove long-session
 stability.
+
+## Focused pull-request gate
+
+The existing `Merge Readiness` workflow runs
+`node --test scripts/test-long-session-stability.cjs` with an isolated
+TypeScript transpilation dependency. This adds no workflow and does not
+require the full Expo install. It is a focused runtime contract regression,
+not a substitute for `yarn typecheck`, `yarn lint:ci`, the installed
+application, or endurance/pressure E2E.
