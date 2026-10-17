@@ -299,3 +299,100 @@ def test_training_from_frozen_snapshot_rejects_replaced_rom(tmp_path):
     row = next(x for x in result["page_results"] if x["relative_path"] == "a.gb")
     assert row["state"] == "source_identity_unavailable"
     assert result["q_policy_training_completed"] == 0
+
+
+
+def test_exact_disc_companion_rights_and_hash_binding(tmp_path, monkeypatch):
+    from skeleton.jeeves import game_emulator_catalog as catalog
+    from skeleton.jeeves import game_emulator_host as host
+    from skeleton.jeeves import game_emulator_training_lab as lab
+    from skeleton.jeeves.game_emulator_operator_content import operator_directory_content
+    from types import SimpleNamespace
+
+    root = tmp_path / "library"
+    game = root / "original_disc"
+    game.mkdir(parents=True)
+    cue = game / "original_disc.cue"
+    cue.write_text('FILE "track01.bin" BINARY\n  TRACK 01 MODE1/2352\n'
+                   '    INDEX 01 00:00:00\n')
+    companion = game / "track01.bin"
+    companion.write_bytes(b"homebrew original disc sectors" * 1024)
+    bundle, reader = operator_directory_content(game, cue.name)
+    entry = bundle.files[cue.name]
+    assert entry.sha256 == hashlib.sha256(cue.read_bytes()).hexdigest()
+    approved_digest = bundle.bundle_digest
+    approval = {
+        "sha256": entry.sha256, "bundle_sha256": approved_digest,
+        "content_size_bytes": cue.stat().st_size,
+        "target_id": "ps1", "core_id": "swanstation",
+        "rights": {
+            "rights_holder": "Original example author",
+            "rights_basis": "original:homebrew-disc-and-companions",
+            "review_id": "independent-disc-review",
+            "training_permitted": True, "human_reviewed": True,
+        },
+    }
+    approved = tmp_path / "rights.json"
+    approved.write_text(json.dumps({
+        "schema_version": rom.APPROVAL_SCHEMA, "roms": [approval],
+    }))
+    out = tmp_path / "receipts"
+    out.mkdir(mode=0o700)
+    core = SimpleNamespace(core_id="swanstation", target_ids=("ps1",))
+    registry = SimpleNamespace(
+        registry_digest="a" * 64,
+        resolve_core=lambda ident: core,
+    )
+    monkeypatch.setattr(catalog.GameEmulatorRegistry, "from_environment",
+                        classmethod(lambda cls: registry))
+    monkeypatch.setattr(catalog, "emulator_content_admission",
+                        lambda ident: {"admitted_entrypoint_extensions": [".cue"]})
+    seen = []
+    def fake_prepare(actual_bundle, *, reader=None):
+        assert actual_bundle.bundle_digest == approved_digest
+        assert reader is not None
+        seen.append(actual_bundle)
+        return SimpleNamespace(
+            as_dict=lambda: {
+                "root": str(out), "entrypoint": cue.name,
+                "files": [{"name": cue.name, "size_bytes": cue.stat().st_size,
+                           "sha256": entry.sha256}],
+                "content_digest": approved_digest,
+            },
+            close=lambda: None,
+        )
+    monkeypatch.setattr(host, "prepare_emulator_content", fake_prepare)
+    from skeleton.jeeves.game_learning import _digest
+    def fake_training(request, *, source_lineage, config, policy_id, cancel=None):
+        assert source_lineage["content_bundle_sha256"] == approved_digest
+        receipt = {"policy_snapshot": {"snapshot_digest": "d" * 64},
+                   "actual_q_table_updates": 2, "actual_training_steps": 2,
+                   "actual_neural_parameter_updates": 0}
+        return {**receipt, "report_digest": _digest(receipt)}
+    monkeypatch.setattr(lab, "run_emulator_training_lab", fake_training)
+    result = rom.train_page(root, approved, out, runs=1, steps=4)
+    first = next(item for item in result["page_results"]
+                 if item["relative_path"] == "original_disc/original_disc.cue")
+    assert first["state"] == "q_policy_updated_with_receipt"
+    assert len(seen) == 1
+    # Companion change must invalidate the approved whole-disc binding,
+    # even when the entrypoint CUE bytes remain identical.
+    companion.write_bytes(b"modified homebrew sectors" * 1024)
+    second = rom.train_page(root, approved, out, runs=1, steps=4)
+    changed = next(item for item in second["page_results"]
+                   if item["relative_path"] == "original_disc/original_disc.cue")
+    assert changed["state"] == "emulator_training_blocked"
+    assert "disc companion bundle differs" in changed["failure_reason"]
+    assert len(seen) == 1
+
+
+def test_disc_approval_cannot_omit_companion_digest(tmp_path):
+    from skeleton.jeeves.game_emulator_operator_content import operator_directory_content
+    root = tmp_path / "disc"
+    root.mkdir()
+    (root / "test.cue").write_text('FILE "test.bin" BINARY\n  TRACK 01 MODE1/2352\n'
+                                   '    INDEX 01 00:00:00\n')
+    (root / "test.bin").write_bytes(b"a" * 2352)
+    bundle, reader = operator_directory_content(root, "test.cue")
+    assert bundle.bundle_digest
+    assert len(bundle.files) == 2

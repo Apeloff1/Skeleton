@@ -28,8 +28,9 @@ Results show exact relative path, SHA-256, size, extension, review state and
 a \`next_cursor\` when the scan has more pages. Re-run with
 \`--cursor "last/path/from/next_cursor"\`. File bytes are hashed in bounded
 streams, never exported as ROM content. Enumeration excludes symlinks and
-undeclared suffixes. CUE, GDI, M3U and other disc descriptors are surfaced
-but require explicit multi-file bundle admission, not single-file Q-training.
+undeclared suffixes. CUE, GDI, M3U and CCD disc descriptors are surfaced and can now enter
+training only after approval of their **entire exact companion bundle**.
+TOC/MDS remain unsupported by the canonical content owner.
 Ambiguous .bin/.iso/.rom/.zip entries always require manually declared
 hardware/core identity. Archive contents are not automatically extracted.
 
@@ -84,6 +85,29 @@ Create an operator-private \`/private/rom-training-approvals.json\`:
   ]
 }
 \`\`\`
+
+For an original homebrew disc with approved companion files, first inspect
+its exact **per-game directory**, rather than an entire collection containing
+unrelated discs:
+
+```sh
+python -m scripts.training.rom_study inspect-bundle \
+  --root /private/rom-library/original-disc-game \
+  --entrypoint original-disc.cue
+```
+
+This pins every file in the folder using the canonical streaming multi-file
+content verifier without executing any emulator. Copy the returned
+`bundle_sha256` into the corresponding ROM approval as a new
+`"bundle_sha256": "<64-hex-digest>"` field. The `sha256` field in the
+approval remains the **entrypoint file SHA-256**, as shown in the inventory.
+The rights review must cover **every file** in the declared disc bundle, not
+just the small descriptor. Changing a companion invalidates the approval
+and changes the run's idempotency identity. The original native qualification
+script uses this same content-verification owner. An unrelated extra file in
+the game directory also changes the bundle digest, so keep each game isolated
+in its own subdirectory. Directory trees are bounded to 96 content files
+and 4 GiB total by the existing emulator owner.
 
 No entry is approved automatically. A playable copy is not itself evidence of
 permission to train on copyrighted text, audiovisual output or extracted
@@ -155,8 +179,10 @@ is implied by these receipts.
 
 ### Limits
 
-- More than 2 GiB per ROM, multi-file discs, missing cores/firmware, and
-  unknown extensions remain explicitly unsupported by this batch path.
+- More than 2 GiB per file, more than 4 GiB per disc bundle, unsupported
+  disc descriptors (including TOC/MDS), missing cores/firmware, and unknown
+  extensions remain blocked. CUE/GDI/CCD/M3U are admitted only with exact
+  companion-bundle rights review and native core support.
 - Repeated inventory pages rescan the root. Freeze a ROM library for a
   complete crawl; partition mutable libraries.
 - A measured Q-policy update is a fact about that observed training run,

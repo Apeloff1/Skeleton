@@ -30,6 +30,11 @@ def parser() -> argparse.ArgumentParser:
     freeze.add_argument("--name", default="rom-library-snapshot.json")
     inventory.add_argument("--snapshot", type=Path,
                            help="use a previously frozen exact file census")
+    bundle = commands.add_parser(
+        "inspect-bundle", help="hash a lawful multi-file disc folder for independent review"
+    )
+    bundle.add_argument("--root", required=True, type=Path)
+    bundle.add_argument("--entrypoint", required=True)
     train = commands.add_parser("train-all", help="run approved Q-policy learning per ROM")
     train.add_argument("--root", required=True, type=Path)
     train.add_argument("--approvals", required=True, type=Path)
@@ -52,6 +57,26 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "inspect-bundle":
+            from skeleton.jeeves.game_emulator_operator_content import (
+                operator_directory_content,
+            )
+            bundle, _ = operator_directory_content(args.root, args.entrypoint)
+            data = bundle.as_dict()
+            print(json.dumps({
+                "schema_version": data["schema_version"],
+                "entrypoint": bundle.entrypoint,
+                "bundle_sha256": bundle.bundle_digest,
+                "source_sha256": bundle.source_digest,
+                "files": [{
+                    "name": item["name"], "size_bytes": item["size_bytes"],
+                    "sha256": item["sha256"],
+                } for item in data["files"]],
+                "source_rights_reviewed": False,
+                "training_permitted": False,
+                "emulator_execution_checked": False,
+            }, sort_keys=True))
+            return 0
         if args.operation == "freeze-inventory":
             result = freeze_rom_inventory(
                 args.root, args.output_dir, name=args.name,

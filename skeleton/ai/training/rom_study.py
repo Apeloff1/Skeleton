@@ -202,10 +202,15 @@ def _load_approvals(path: Path) -> tuple[dict[str, dict[str, Any]], str]:
         raise RomStudyError("ROM approval schema or entry count invalid")
     approved = {}
     for item in value["roms"]:
-        if not isinstance(item, dict) or set(item) != {
-            "sha256", "target_id", "core_id", "rights", "content_size_bytes"
-        }:
+        required = {"sha256", "target_id", "core_id", "rights", "content_size_bytes"}
+        if (not isinstance(item, dict) or not required <= set(item)
+                or set(item) - required - {"bundle_sha256"}):
             raise RomStudyError("ROM approval record schema differs")
+        if "bundle_sha256" in item and (
+            not isinstance(item["bundle_sha256"], str)
+            or not _SHA.fullmatch(item["bundle_sha256"])
+        ):
+            raise RomStudyError("ROM disc companion bundle SHA-256 invalid")
         identity = item["sha256"]
         if not isinstance(identity, str) or not _SHA.fullmatch(identity) or identity in approved:
             raise RomStudyError("invalid or duplicated ROM approval identity")
@@ -439,10 +444,6 @@ def train_page(
             summary["state"] = "approval_content_size_mismatch"
             results.append(summary)
             continue
-        if row["extension"] in _DISC_DESCRIPTORS:
-            summary["state"] = "explicit_multifile_bundle_required"
-            results.append(summary)
-            continue
         # File extension hints cannot authorize an emulator without an approved
         # exact core binding. The worker repeats all content and firmware checks.
         try:
@@ -452,8 +453,30 @@ def train_page(
             admission = emulator_content_admission(core.core_id)
             if row["extension"] not in admission["admitted_entrypoint_extensions"]:
                 raise RomStudyError("ROM extension has no approved core entrypoint")
+            source_path = _safe_path(Path(page["root"]) / row["relative_path"])
+            bundle_digest = None
+            disc_bundle = None
+            disc_reader = None
+            if row["extension"] in _DISC_DESCRIPTORS:
+                if "bundle_sha256" not in grant:
+                    raise RomStudyError("disc ROM requires rights review of all exact companion files")
+                from skeleton.jeeves.game_emulator_operator_content import (
+                    operator_directory_content,
+                )
+                disc_bundle, disc_reader = operator_directory_content(
+                    source_path.parent, source_path.name,
+                )
+                reference = disc_bundle.files[disc_bundle.entrypoint]
+                if reference.sha256 != identity or reference.size_bytes != row["size_bytes"]:
+                    raise RomStudyError("disc entrypoint differs from the approved ROM file")
+                bundle_digest = disc_bundle.bundle_digest
+                if bundle_digest != grant["bundle_sha256"]:
+                    raise RomStudyError("disc companion bundle differs from rights-approved identity")
+            elif "bundle_sha256" in grant:
+                raise RomStudyError("standalone ROM approval cannot claim a disc companion bundle")
             run_identity = _hash(_canonical({
-                "source_sha256": identity, "grant": grant,
+                "source_sha256": identity, "content_bundle_sha256": bundle_digest,
+                "grant": grant,
                 "approvals_manifest_sha256": approvals_digest,
                 "registry_digest": registry.registry_digest,
                 "runs": runs, "steps": steps, "seed": seed,
@@ -474,10 +497,11 @@ def train_page(
                 summary["actual_q_table_updates"] = verified["actual_q_table_updates"]
                 results.append(summary)
                 continue
-            prepared = _content_for_training(
-                _safe_path(Path(page["root"]) / row["relative_path"]),
-                sha=identity, core=core,
-            )
+            if disc_bundle is not None:
+                from skeleton.jeeves.game_emulator_host import prepare_emulator_content
+                prepared = prepare_emulator_content(disc_bundle, reader=disc_reader)
+            else:
+                prepared = _content_for_training(source_path, sha=identity, core=core)
             try:
                 request = GameEnvironmentRequest(
                     kind="libretro", target_id=grant["target_id"],
@@ -493,6 +517,7 @@ def train_page(
                     policy_id="rom-training-" + identity[:16],
                     source_lineage={
                         "rights_acknowledged": True, "source_sha256": identity,
+                        "content_bundle_sha256": bundle_digest,
                         "rights_review_id": grant["rights"]["review_id"],
                         "rights_basis": grant["rights"]["rights_basis"],
                         "core_id": core.core_id, "target_id": grant["target_id"],
@@ -558,7 +583,8 @@ def train_page(
                 "schema_version": BATCH_SCHEMA,
                 "run_identity": run_identity,
                 "source_sha256": identity,
-                "source_size_bytes": row["size_bytes"], "target_id": grant["target_id"],
+                "source_size_bytes": row["size_bytes"],
+                "content_bundle_sha256": bundle_digest, "target_id": grant["target_id"],
                 "core_id": core.core_id, "registry_digest": registry.registry_digest,
                 "approval_manifest_sha256": approvals_digest,
                 "training_kind": "actual_replay_audited_tabular_q_policy",
