@@ -339,6 +339,7 @@ def export_reviewed_candidate_corpus(
     source_sha256: str, output_dir: Path, runtime: Any,
     requested_semantic_lens_keys: tuple[str, ...] = (),
     semantic_review_receipt: Path | None = None,
+    semantic_review_receipts: tuple[Path, ...] = (),
     semantic_runtime: Any | None = None,
     semantic_lens_budget: int = 43,
 ) -> dict[str, Any]:
@@ -363,46 +364,65 @@ def export_reviewed_candidate_corpus(
     replay = replay_native_adversarial_review(evidence, triangle, review, runtime)
     if replay["native_generations_replayed"] != 3:
         raise RomStudyError("all independent model passes must replay before corpus export")
-    native_semantic_review = None
-    if semantic_review_receipt is not None:
-        if semantic_runtime is None:
-            raise RomStudyError("semantic checkpoint required for model-backed 43-lens candidate corpus")
+    if semantic_review_receipt is not None and semantic_review_receipts:
+        raise RomStudyError("single and multi-episode semantic paths cannot be combined")
+    if type(semantic_review_receipts) not in (list, tuple):
+        raise RomStudyError("semantic review receipt paths must be a bounded sequence")
+    paths = (semantic_review_receipts if semantic_review_receipts
+             else (semantic_review_receipt,) if semantic_review_receipt is not None
+             else ())
+    if len(paths) > len(triangle["episode_lens_references"]):
+        raise RomStudyError("more semantic reviews supplied than source native episodes")
+    if bool(paths) != (semantic_runtime is not None):
+        raise RomStudyError("saved semantic reviews and their local checkpoint must be paired")
+    native_semantic_reviews = []
+    if paths:
         from skeleton.jeeves.game_emulator_triangle_semantic_inference import (
             verify_native_semantic_lenses, replay_native_semantic_lenses,
         )
-        native_semantic_review, _ = read_receipt_document(semantic_review_receipt)
-        verify_native_semantic_lenses(
-            evidence, triangle, review, native_semantic_review,
-        )
-        replayed_semantic = replay_native_semantic_lenses(
-            evidence, triangle, review, native_semantic_review, semantic_runtime,
-        )
-        if replayed_semantic["native_jeeves_semantic_model_generations_replayed"] != semantic_lens_budget:
-            raise RomStudyError("43 native semantic checkpoint generations were not reproduced")
-    elif semantic_runtime is not None:
-        raise RomStudyError("semantic checkpoint must accompany a saved 43-lens review")
+        for path in paths:
+            prior, _ = read_receipt_document(path)
+            verify_native_semantic_lenses(evidence, triangle, review, prior)
+            replayed_semantic = replay_native_semantic_lenses(
+                evidence, triangle, review, prior, semantic_runtime,
+            )
+            if (replayed_semantic["native_jeeves_semantic_model_generations_replayed"]
+                    != semantic_lens_budget):
+                raise RomStudyError("all native semantic checkpoint generations must replay")
+            native_semantic_reviews.append(prior)
+    single_semantic = native_semantic_reviews[0] if len(native_semantic_reviews) == 1 else None
+    batch_semantic = tuple(native_semantic_reviews) if len(native_semantic_reviews) > 1 else ()
     candidate = compile_triangle_candidate_corpus(
         evidence, triangle, review,
         requested_semantic_lens_keys=requested_semantic_lens_keys,
-        semantic_inference_review=native_semantic_review,
+        semantic_inference_review=single_semantic,
+        semantic_inference_reviews=batch_semantic,
         semantic_lens_budget=semantic_lens_budget,
     )
     out = _private_output(output_dir)
+    semantic_identity = hashlib.sha256(json.dumps([
+        [item["source_native_trace_sha256"], item["semantic_review_digest"]]
+        for item in sorted(native_semantic_reviews,
+                           key=lambda x: x["source_native_trace_sha256"])
+    ], sort_keys=True).encode()).hexdigest() if native_semantic_reviews else None
+    prefix = (
+        "triangle-corpus-v4-" if batch_semantic else
+        "triangle-corpus-v3-" if single_semantic is not None
+        else "triangle-corpus-v2-"
+    )
     name = (
-        ("triangle-corpus-v3-" if native_semantic_review is not None
-         else "triangle-corpus-v2-")
-        + source_sha256[:16] + "-"
+        prefix + source_sha256[:16] + "-"
         + review["review_digest"][:16] + "-"
         + candidate["semantic_lens_selection_digest"][:16]
-        + (("-" + native_semantic_review["semantic_review_digest"][:16])
-           if native_semantic_review is not None else "") + ".json"
+        + (("-" + semantic_identity[:16]) if semantic_identity else "") + ".json"
     )
     target = out / name
     if target.exists() or target.is_symlink():
         saved, _ = read_receipt_document(target)
         verify_triangle_candidate_corpus(
             evidence, triangle, review, saved,
-            semantic_inference_review=native_semantic_review,
+            semantic_inference_review=single_semantic,
+            semantic_inference_reviews=batch_semantic,
         )
         state = "prior_verified_candidate_corpus"
     else:
@@ -413,11 +433,16 @@ def export_reviewed_candidate_corpus(
         "filename": name,
         "candidate_corpus_digest": candidate["candidate_corpus_digest"],
         "verified_native_semantic_inference_receipt": (
-            native_semantic_review["semantic_review_digest"]
-            if native_semantic_review is not None else None
+            single_semantic["semantic_review_digest"]
+            if single_semantic is not None else None
         ),
+        "verified_native_semantic_inference_receipts": (
+            [item["semantic_review_digest"] for item in native_semantic_reviews]
+            if batch_semantic else None
+        ),
+        "semantic_episodes_replayed": len(native_semantic_reviews),
         "replayed_semantic_model_generations": (
-            semantic_lens_budget if native_semantic_review is not None else 0
+            semantic_lens_budget * len(native_semantic_reviews)
         ),
         "semantic_generated_hypotheses_used_as_labels": False,
         "unique_native_episodes": candidate["unique_independent_native_episodes"],
