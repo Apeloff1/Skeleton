@@ -267,7 +267,7 @@ def export_reviewed_candidate_corpus(
     )
     out = _private_output(output_dir)
     name = (
-        "triangle-corpus-" + source_sha256[:16] + "-"
+        "triangle-corpus-v2-" + source_sha256[:16] + "-"
         + review["review_digest"][:16] + "-"
         + candidate["semantic_lens_selection_digest"][:16] + ".json"
     )
@@ -285,6 +285,9 @@ def export_reviewed_candidate_corpus(
         "candidate_corpus_digest": candidate["candidate_corpus_digest"],
         "unique_native_episodes": candidate["unique_independent_native_episodes"],
         "correlated_lens_views": candidate["total_lens_candidate_views"],
+        "canonical_semantic_lens_selection_budget": candidate["canonical_semantic_lens_selection_budget"],
+        "routed_semantic_lens_questions": candidate["routed_semantic_lens_questions"],
+        "semantic_questions_are_supervised_labels": False,
         "canonical_semantic_questions": candidate["routed_semantic_lens_questions"],
         "semantic_questions_are_not_training_labels": True,
         "semantic_catalog": candidate["native_semantic_catalog"],

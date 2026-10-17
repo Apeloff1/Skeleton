@@ -20,7 +20,7 @@ from .game_emulator_triangle_semantics import (
     SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
 )
 
-SCHEMA = "skeleton.jeeves.game_triangle_candidate_corpus.v1"
+SCHEMA = "skeleton.jeeves.game_triangle_candidate_corpus.v2"
 MAX_VIEWS = 8192
 
 

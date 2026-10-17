@@ -368,3 +368,11 @@ as supervised ground truth, extra native episodes, new Q updates, or
 production transformer steps. The exact number routed depends on
 applicability and the actual authored catalog; 43 is the selection budget,
 not an invented claim that the repository has only 43 lens definitions.
+
+The candidate format is now `game_triangle_candidate_corpus.v2` and uses
+`triangle-corpus-v2-*.json`; previously exported eight-view-only candidates
+remain untouched. The `triangle-status` command previews the **actual
+canonical keys routed** for the first three episodes, including catalog
+identity and selection counts. These semantic questions remain pending
+adjudication and cannot by themselves count as newly measured gameplay.
+

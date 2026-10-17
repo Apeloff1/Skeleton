@@ -148,7 +148,23 @@ def main(argv: list[str] | None = None) -> int:
                 raise RomStudyError("ROM training receipt changed since verification")
             evidence, triangle = document["candidate_evidence"], document["training_triangle"]
             verify_training_triangle(evidence, triangle)
+            from skeleton.jeeves.game_emulator_triangle_semantics import (
+                SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+            )
+            previews = [
+                route_episode_semantic_lenses(episode)
+                for episode in triangle["episode_lens_references"][:3]
+            ]
             print(json.dumps({
+                "semantic_router": "canonical_jeeves_maximal_registry",
+                "semantic_lens_selection_budget": SEMANTIC_LENS_BUDGET,
+                "semantic_episode_previews": [{
+                    "source_trace_sha256": item["source_native_trace_sha256"],
+                    "routed": item["actually_routed_lenses"],
+                    "lens_keys": [lens["lens_key"] for lens in item["routes"]],
+                    "catalog_digest": item["canonical_catalog_sha256"],
+                    "factual_assertions_authorized": False,
+                } for item in previews],
                 "state": "triangle_native_evidence_verified",
                 "receipt_sha256": verified["receipt_sha256"],
                 "source_sha256": args.source_sha256,
