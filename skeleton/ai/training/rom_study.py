@@ -359,6 +359,12 @@ def verified_rom_receipt(path: Path, *, expected_source_sha256: str,
                 or neural.get("production_model_promotion_authorized") is not False):
             raise RomStudyError("ROM neural candidate report does not bind the learned checkpoint")
     from skeleton.jeeves.game_learning import _digest
+    if evidence is not None and isinstance(evidence, dict) and evidence.get("schema_version") == "skeleton.game.emulator_training_lab.v1":
+        from skeleton.jeeves.game_emulator_triangle import verify_training_triangle
+        try:
+            verify_training_triangle(evidence, row.get("training_triangle"))
+        except ValueError as exc:
+            raise RomStudyError("ROM training triangle disagrees with the native evidence") from exc
     if (not isinstance(evidence, dict)
             or evidence.get("report_digest") != _digest({
                 k: v for k, v in evidence.items() if k != "report_digest"
@@ -371,6 +377,7 @@ def verified_rom_receipt(path: Path, *, expected_source_sha256: str,
         raise RomStudyError("ROM receipt lacks authentic replay-lab evidence structure")
     return {
         "source_sha256": row["source_sha256"],
+        "training_triangle_status": (row.get("training_triangle") or {}).get("vertices"),
         "run_identity": row.get("run_identity"),
         "receipt_sha256": _hash(raw),
         "actual_q_table_updates": evidence["actual_q_table_updates"],
@@ -578,6 +585,10 @@ def train_page(
                 )
             finally:
                 prepared.close()
+            triangle = None
+            if evidence.get("schema_version") == "skeleton.game.emulator_training_lab.v1":
+                from skeleton.jeeves.game_emulator_triangle import build_training_triangle
+                triangle = build_training_triangle(evidence)
             neural = {
                 "status": "not_requested",
                 "actual_candidate_optimizer_steps": 0,
@@ -643,6 +654,7 @@ def train_page(
                 "model_promotion_authorized": False,
                 "frozen_inventory_sha256": page.get("frozen_inventory_sha256"),
                 "neural_world": neural, "candidate_evidence": evidence,
+                "training_triangle": triangle,
             }
             receipt_digest = _save_new(target, receipt)
             summary.update({
@@ -653,6 +665,7 @@ def train_page(
                 "measured_steps": evidence["actual_training_steps"],
                 "receipt_name": filename, "receipt_sha256": receipt_digest,
                 "neural_world_status": neural["status"],
+                "training_triangle_status": (triangle or {}).get("vertices"),
                 "neural_candidate_optimizer_steps": neural["actual_candidate_optimizer_steps"],
             })
         except (ValueError, OSError, RuntimeError, ImportError) as exc:

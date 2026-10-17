@@ -189,3 +189,36 @@ is implied by these receipts.
   not proof of generalized game-playing capability.
 - Only ROM names/hashes and locally generated receipts belong in this
   operator path. Never commit ROM bytes, BIOS files or private manifests.
+
+## Training triangle: Dragon viewing + Jeeves playing + adversarial review
+
+Each **real replay-audited native emulator** run now emits a source-bound
+`training_triangle` inside its create-only ROM receipt. The triangle indexes
+eight non-destructive lenses: visual states, audio ambience, controller actions,
+reward/consequence, temporal reversal, causal counterfactuals, policy progress,
+and adversarial boundaries. It checks the ten native replay gates, receipt
+hashes, Q-update counts, unique training projections, heldout exclusion, native
+probe boundaries, reverse checkpoints, and boomerang evidence.
+
+The three vertices have **different proof obligations**:
+
+1. **Dragon companion observer:** exact frame/audio telemetry and sequence
+   digests form a viewing queue; the system **does not yet decode/watch pixels
+   semantically or attest that a visual AI viewed the game**. A separate media
+   viewer must supply a real witness before that vertex can pass.
+2. **Jeeves playing/simulation:** counts actual emulator actions, verified
+   reverse replay steps, and real native counterfactual/controller probes.
+   These are *not* synthesized playthroughs or game-completion evidence.
+3. **Adversarial reviewer:** independently reconstructs deterministic invariants
+   and emits challenge tasks for missing training angles/probes. This is
+   implemented scrutiny, **not an executed second reviewer LLM**. Independent
+   model criticism remains pending.
+
+Repetition and lens transformations **amplify interpretations, not sample
+count**. Every lens points to one unique native trace and receipt; revisits
+add zero independent examples and zero extra weight updates. Training examples
+stay in the original native sample corpus, and heldout data stays excluded.
+Corrupted/mismatched triangles invalidate previously saved real lab receipts,
+rather than letting a fabricated review certify training or promotion.
+This mechanism does not update the production Jeeves language model.
+
