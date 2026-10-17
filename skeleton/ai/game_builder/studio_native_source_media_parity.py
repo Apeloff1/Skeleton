@@ -54,8 +54,19 @@ def _object(file: Path, *, limit: int = 128_000) -> dict:
 
 
 def _exact_region(source: str, begin: str, end: str, body: str) -> None:
-    if (source.count(begin) != 1 or source.count(end) != 1
-            or source.split(begin, 1)[1].split(end, 1)[0].strip() != body.strip()):
+    """Compare whole labeled lines, not substrings of longer labels.
+
+    A ROM includes both Tiles: and AnimationTiles:. String.count("Tiles:")
+    also matches AnimationTiles:, falsely rejecting every real program.
+    """
+    lines = source.splitlines()
+    start_name = begin.strip()
+    end_name = end.strip()
+    starts = [i for i, line in enumerate(lines) if line == start_name]
+    ends = [i for i, line in enumerate(lines) if line == end_name]
+    if (len(starts) != 1 or len(ends) != 1
+            or starts[0] >= ends[0]
+            or "\n".join(lines[starts[0] + 1:ends[0]]).strip() != body.strip()):
         raise NativeMediaSourceError("console source region diverges from authored media")
 
 
