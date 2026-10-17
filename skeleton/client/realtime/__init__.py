@@ -1,6 +1,6 @@
 """Skeleton SDK realtime client (ADR-realtime-transport, PR #4101).
 
-SSE subscriber with Last-Event-ID resume, full-jitter reconnect over the SDK
+SSE subscriber with Last-Event-ID (+ ``?cursor=``) resume, full-jitter reconnect over the SDK
 ``RetryPolicy``, 45 s dead-stream detection and presence helpers. The v1
 envelope dataclass is shared with the server (``skeleton.realtime``).
 
@@ -11,12 +11,15 @@ from .backoff import HEALTHY_RESET_SECONDS, REALTIME_RETRY_POLICY, ReconnectBack
 from .client import DEAD_STREAM_SECONDS, RealtimeClient
 from .envelope import CHANNELS, ControlEvent, EnvelopeError, RealtimeEvent
 from .errors import (
+    RETRYABLE_STATUS_CODES,
+    SEAL_UNAVAILABLE,
     RealtimeAuthError,
     RealtimeConnectError,
     RealtimeError,
     RealtimeGaveUp,
     RealtimeHeartbeatTimeout,
     RealtimeProtocolError,
+    RealtimeSealUnavailable,
 )
 from .presence import HttpPresencePoster, PresenceClient
 from .transport import HEARTBEAT, InProcessTransport, SSETransport
@@ -32,6 +35,7 @@ __all__ = [
     "InProcessTransport",
     "PresenceClient",
     "REALTIME_RETRY_POLICY",
+    "RETRYABLE_STATUS_CODES",
     "RealtimeAuthError",
     "RealtimeClient",
     "RealtimeConnectError",
@@ -40,6 +44,8 @@ __all__ = [
     "RealtimeGaveUp",
     "RealtimeHeartbeatTimeout",
     "RealtimeProtocolError",
+    "RealtimeSealUnavailable",
     "ReconnectBackoff",
+    "SEAL_UNAVAILABLE",
     "SSETransport",
 ]
