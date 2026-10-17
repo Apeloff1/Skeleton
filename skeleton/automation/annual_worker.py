@@ -115,6 +115,8 @@ class AnnualWorkRunner:
             )
             return QuantumReport("terminal", final.production_id, final.sequence,
                                  receipt, output.terminal)
-        waiting = self.store.release(claim, now=self.clock(), retry_seconds=0)
+        # Minimum one-second yield lets other due productions make progress
+        # before this fast worker is admitted for another quantum.
+        waiting = self.store.release(claim, now=self.clock(), retry_seconds=1)
         return QuantumReport("checkpointed", waiting.production_id,
                              waiting.sequence, receipt, None)
