@@ -649,7 +649,9 @@ def execute_native_43_lens_review(
         f"semantic-{lens_budget}-native-" + source_sha256[:16] + "-"
         + identity[:32] + ".json"
     )
-    target = _private_output(output_dir) / name
+    progress_dir = _private_output(output_dir)
+    target = progress_dir / name
+    resumed_journal_generations = 0
     if target.exists() or target.is_symlink():
         prior, _ = read_receipt_document(target)
         verify_native_semantic_lenses(evidence, triangle, review, prior)
@@ -669,11 +671,32 @@ def execute_native_43_lens_review(
                  if prior["all_semantic_interpretations_valid"]
                  else f"replayed_{lens_budget}_native_generations_incomplete_interpretations")
     else:
+        completed = ()
+        on_entry = None
+        if lens_budget == EXTENDED_SEMANTIC_LENS_BUDGET:
+            from skeleton.jeeves.game_emulator_triangle_lens_journal import (
+                read_native_lens_progress, save_native_lens_progress,
+            )
+            pinned = {
+                "identity": identity,
+                "source_trace": source["source_trace_sha256"],
+                "route_digest": route["route_digest"],
+                "model_sha": semantic_runtime.model_digest,
+                "count": lens_budget, "seed": seed, "tokens": max_new_tokens,
+            }
+            completed = read_native_lens_progress(progress_dir, **pinned)
+            resumed_journal_generations = len(completed)
+            def on_entry(index: int, entry: dict[str, Any]) -> None:
+                save_native_lens_progress(
+                    progress_dir, index=index, entry=entry, **pinned,
+                )
         fresh = run_native_semantic_lenses(
             evidence, triangle, review, semantic_runtime,
             run_index=run_index, requested_keys=requested_keys,
             seed=seed, max_new_tokens=max_new_tokens,
             lens_budget=lens_budget,
+            **({"completed_entries": completed, "on_entry": on_entry}
+               if lens_budget == EXTENDED_SEMANTIC_LENS_BUDGET else {}),
         )
         verify_native_semantic_lenses(evidence, triangle, review, fresh)
         _save_new(target, fresh)
@@ -692,6 +715,12 @@ def execute_native_43_lens_review(
         "native_semantic_model_sha256": semantic_runtime.model_digest,
         "independent_adversarial_model_sha256": critic_runtime.model_digest,
         "native_model_lens_generations": count,
+        "resumed_native_lens_generations_replayed": resumed_journal_generations,
+        "new_native_lens_generations": (
+            0 if target.exists() and resumed_journal_generations == 0
+            and state.startswith("verified_")
+            else count - resumed_journal_generations
+        ),
         "source_referenced_interpretations": structured,
         "lens_interpretations_incomplete": lens_budget - structured,
         "all_lens_interpretations_valid": structured == lens_budget,
