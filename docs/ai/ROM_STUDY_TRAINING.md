@@ -710,3 +710,26 @@ verified gameplay episode**. The previously optional
 explicit legacy/diagnostic run, select `--semantic-first-run-only`.
 The command remains a foreground workload, creates no independent samples
 from repeated questions, and requires actual local checkpoint inference.
+
+### 200-lens crash-safe continuation and evidence semantics
+
+The full 200-lens mode is explicitly bound to a **real installed semantic
+checkpoint** and, within a `train-triangle` page, runs against **every
+measured native episode**. It will not silently pass a 200-lens campaign with
+only a three-pass critic and no semantic model.
+
+Long sessions use immutable, private, source/route/model/seed-bound files named
+`semantic-lens-progress-<session>-<step>.json`. This stores each actually
+generated native inference immediately. On restart, the runtime verifies a
+contiguous prefix, reconstructs the same canonical 200-lens route and **replays
+all saved native generations on the exact installed local checkpoint** before
+continuing with the remaining lenses. Corrupted or gapped checkpoints halt
+instead of fabricating coverage. Journals are separate from final reviewed
+200-lens receipts and do not by themselves authorize corpus promotion.
+
+For a smaller legacy operator workflow, `--semantic-lens-count 43` is still
+available. The 200 canonical semantic lenses remain **questions and
+hypotheses**. Eight numerical observation families are still the only
+measured gameplay candidate training rows per episode; 200 semantic
+interpretations do not create 200 new independent samples or change
+production Jeeves parameters.
