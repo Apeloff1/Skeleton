@@ -15,6 +15,7 @@ from scripts.check_automerge_contract import (
     REQUIRED_WORKFLOW_TRIGGERS,
     ROOT,
     WORKFLOW,
+    _PIPE_TO_SHELL,
     _cross_file_findings,
     _defined_symbols,
     _imports,
@@ -198,8 +199,8 @@ def test_workflow_installs_pytest_before_test_run():
         "persist-credentials: true",
         "permissions: write-all",
         "permissions: read-all",
-        "curl | sh",
-        "wget | sh",
+        "curl " + _PIPE_TO_SHELL,
+        "wget " + _PIPE_TO_SHELL,
         "sudo ",
     ],
 )
