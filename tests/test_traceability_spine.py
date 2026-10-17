@@ -28,6 +28,7 @@ class TraceabilitySpineTests(unittest.TestCase):
         self.assertEqual(result["nfr_count"], 37)
         self.assertEqual(result["behavior_count"], 37)
         self.assertEqual(result["state_machine_count"], 2)
+        self.assertEqual(result["state_domain_count"], 26)
         self.assertEqual(result["state_domain_count"], 27)
         self.assertEqual(result["interface_count"], 86)
         self.assertEqual(result["schema_count"], 40)

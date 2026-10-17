@@ -158,7 +158,8 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
           python scripts/check_architecture_boundaries.py
-          PYTHONPATH=. python -m pytest -q --noconftest tests/test_architecture_boundaries.py
+          python scripts/check_architecture_logical_layers.py
+          PYTHONPATH=. python -m pytest -q --noconftest tests/test_architecture_boundaries.py tests/test_architecture_logical_layers.py skeleton/testing/test_projects_contract.py
       - name: Provider runtime boundary gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
