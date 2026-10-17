@@ -15,7 +15,7 @@ from .studio_campaign_assurance import _inspect_production_assurance_unlocked
 from .studio_campaign_lock import campaign_lock
 from .studio_production_blocker_taxonomy import classify_production_blockers
 from .studio_history_segments import (
-    SEGMENT_SIZE, MAX_SEGMENTS, StudioHistorySegmentError,
+    MAX_SEGMENTS, StudioHistorySegmentError,
     audit_segments, seal_full_heads, _validate_entry,
 )
 
@@ -297,9 +297,13 @@ def inspect_execution_history(
                 rows[-1]["assurance_report_digest"] == report["report_digest"]
                 if rows else False
             ),
-            "runs_without_recorded_blockers": sum(x["blocked_stage_attempts"] == 0
-                                 and x["unsupported_stage_attempts"] == 0
-                                 for x in rows),
+            "runs_without_recorded_blockers": (
+                archive["archive_unblocked_runs"] + sum(
+                    x["blocked_stage_attempts"] == 0
+                    and x["unsupported_stage_attempts"] == 0
+                    for x in rows
+                )
+            ),
             "complete_game_release_certified": False,
             "model_training_performed": False,
         }
