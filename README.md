@@ -41,7 +41,9 @@ more proof pass, and only while the build deadline still has time left.
 The result contract is `skeleton.game_builder_run.v1`. One deadline covers
 materialisation, content, every prove round, the QA repair pass, and both
 hooks. The HTTP route sends that budget as the job `timeout_s` (default
-120 seconds, client maximum 120). Heartbeats use the same budget.
+120 seconds, client maximum 120). Heartbeats use the same budget. The content bundle walks a five-act longform
+to a completed ending: 8 chapters on a small brief, 120 on a large campaign.
+The opening beat stays `hook-0`. An unfinished campaign fails the core loop.
 
 `skeleton dev game build` is a workspace transport over that same
 `build_playable_game` function. It forwards the workspace vision, era,
