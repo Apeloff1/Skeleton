@@ -616,6 +616,7 @@ def _cmd_gameforge_run(rest: List[str]) -> int:
               "[--overwrite] [--playtest off|auto|require] "
               "[--repair-mode apply|suggest] [--blend ERA1 ERA2 --t 0..1] "
               "[--generation ID] [--json]")
+        print("Operator pipeline only. Playable builds use: python -m skeleton game <brief>")
         return 0
     try:
         (vision, era, out, overwrite, as_json, blend, generation, answers,

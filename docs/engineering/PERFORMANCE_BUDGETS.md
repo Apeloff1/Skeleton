@@ -37,7 +37,7 @@ No number on this page was measured for this document. Where main records no mea
 
 | Job | `timeout-minutes` |
 |-----|-------------------|
-| Skeleton GameForge | 15 |
+| Skeleton GameForge | 25 |
 | Cockpit Smoke | 10 |
 | Jeeves School Reasoning | 10 |
 | Java Batch Accelerators | 10 |
@@ -82,7 +82,7 @@ Boot is synchronous inside FastAPI's async `startup` and ticks four support engi
 | Budget | Target | Gate to build |
 |--------|--------|---------------|
 | `skeleton eras` + `plan` + `cockpit` + `walk` (current CI verbs) | ≤ 60 s total | step timing in Skeleton GameForge job |
-| `skeleton run "<vision>" --out <dir>` to a written Godot tree | ≤ 120 s, exit 0 | new CI step; **no CI step materialises a tree today** |
+| `skeleton run "<vision>" --out <dir>` to a written Godot tree | ≤ 120 s, exit 0 | Skeleton GameForge job runs `skeleton/testing/test_game_builder_golden.py` (brief to headless boot, 120 s deadline per build) |
 
 ### Runtime frame budget (generated Godot projects)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 
 import pytest
 
@@ -131,6 +132,19 @@ def test_cli_prints_platformer_build(capsys):
     assert "files" not in payload
 
 
+def _poll_build(client, execution_id: str):
+    deadline = time.time() + 90
+    last = None
+    while time.time() < deadline:
+        response = client.get(f"/api/v1/game/build/{execution_id}", headers=_headers())
+        assert response.status_code == 200, response.text
+        last = response.json()
+        if last["status"] in {"succeeded", "failed", "cancelled"}:
+            return last
+        time.sleep(0.05)
+    raise AssertionError(last)
+
+
 def test_api_builds_roguelike_and_rejects_empty_brief(client):
     missing = client.post("/api/v1/game/build", json={}, headers=_headers())
     assert missing.status_code == 422
@@ -139,8 +153,15 @@ def test_api_builds_roguelike_and_rejects_empty_brief(client):
         json={"brief": GOLDEN_BRIEFS[2]["brief"], "playtest": "off", "include_files": True},
         headers=_headers(),
     )
-    assert response.status_code == 200, response.text
-    body = response.json()
+    assert response.status_code == 202, response.text
+    accepted = response.json()
+    assert accepted["execution_id"]
+    assert accepted["job_id"]
+    assert accepted["status_ref"] == f"/api/v1/game/build/{accepted['execution_id']}"
+    assert "ok" not in accepted
+    polled = _poll_build(client, accepted["execution_id"])
+    assert polled["status"] == "succeeded", polled
+    body = polled["result"]
     assert body["ok"] is True
     assert body["spec"]["genre"] == "rpg_roguelike"
     assert body["marker"].startswith("rooms:")

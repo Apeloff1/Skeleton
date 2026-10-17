@@ -20,24 +20,43 @@ python -m skeleton game "A small top-down shooter. Fantasy: ash tunnels. Core lo
 ```
 
 The same build is `POST /api/v1/game/build` on the application created by
-`create_app` (the only HTTP entry). Body:
+`create_app` (the only HTTP entry). It returns **202** with `job_id`,
+`execution_id`, and `status_ref`. Poll `GET /api/v1/game/build/{execution_id}`
+until `status` is `succeeded` or `failed`. The body accepts a string `brief`
+or a `skeleton.projects.v1` object (`title`, optional `summary`, `genre`,
+`constraints`). Actor and tenant come from the charter session
+(`x-skeleton-tenant`, default `default`), not from the brief.
 `{"brief": "...", "playtest": "off"|"auto"|"require", "max_rounds": 3, "include_files": false}`.
 The route uses the forge charter. It does not write a server-side project
-directory; pass `--out` on the CLI for a directory.
+directory; pass `--out` on the CLI for a directory. Inline `files` stop at 8 MiB.
+
+The build is kind `game.build` on the job queue. When
+`skeleton.app_services.job_api` imports (#4097), that module is the queue.
+Until then `skeleton/forge/game_build_queue.py` runs the same
+`enqueue` / `JobHandle` / `ctx.progress` contract in-process. The handler is
+`build_playable_game`. Planner and QA hooks match Milestone C (#4118,
+`fdb6f491f`): optional callables, no-op when omitted. A planner that changes
+genre, engine, brief, or scope is discarded. QA `repair_requested` runs one
+more proof pass, and only while the build deadline still has time left.
+The result contract is `skeleton.game_builder_run.v1`. One deadline covers
+materialisation, content, every prove round, the QA repair pass, and both
+hooks. The HTTP route sends that budget as the job `timeout_s` (default
+120 seconds, client maximum 120). Heartbeats use the same budget.
 
 `skeleton dev game build` is a workspace transport over that same
 `build_playable_game` function. It forwards the workspace vision, era,
-archetype, playtest mode, and repair mode. `python -m skeleton run` and
-`POST /api/v1/gameforge/run` remain the ten-stage operator pipeline the
-builder executes (era steering, blends, cockpit). They are not a second
-playable-game product. `skeleton/api/gameforge_routes.py` is not mounted.
-Its run handler delegates to `build_playable_game`; its intake handler stays
-until nothing imports the module. `Harness.serve` calls `create_app`.
+archetype, playtest mode, and repair mode. `python -m skeleton run` is the
+operator-only ten-stage pipeline (era steering, blends, cockpit). It is not
+the playable-game product. `POST /api/v1/gameforge/run` is a thin adapter
+over `build_playable_game` that still returns the ten-stage body.
+`skeleton/api/gameforge_routes.py` is not mounted. Its run handler re-exports
+that adapter with the same charter gate; its intake handler stays until
+nothing imports the module. `Harness.serve` calls `create_app`.
 
 `playtest=require` fails the build unless Godot 4 boots the project and the
 core loop marker is in the engine log. Set `SKELETON_GODOT_BIN` when the
 binary is not on `PATH`. Golden briefs (top-down shooter, platformer, small
-roguelike RPG) are `skeleton/testing/test_game_builder_golden.py`.
+roguelike RPG) run inside the Skeleton GameForge job of `.github/workflows/ci.yml`.
 
 Still data, not a finished commercial game: sprites, meshes, audio, full
 input-driven play, multiplayer, and a driving simulation. The compiler is

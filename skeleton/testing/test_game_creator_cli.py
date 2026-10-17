@@ -202,8 +202,14 @@ def test_unmounted_gameforge_run_delegates_to_playable_builder(monkeypatch):
 
     def fake_build(brief, **kwargs):
         captured["brief"] = brief
-        captured.update(kwargs)
-        return {"ok": True, "files": {"project.godot": "config_version=5\n"}, "spec": {"genre": "platformer"}}
+        captured["playtest_mode"] = kwargs.get("playtest_mode")
+        captured["runner"] = kwargs.get("runner")
+        return {
+            "ok": True,
+            "files": {"project.godot": "config_version=5\n"},
+            "spec": {"genre": "platformer"},
+            "playtest": None,
+        }
 
     monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", fake_build)
 
@@ -211,8 +217,10 @@ def test_unmounted_gameforge_run_delegates_to_playable_builder(monkeypatch):
         headers: dict[str, str] = {}
 
     body = asyncio.run(gameforge_routes.gameforge_run(_Request(), {"vision": "A small platformer"}, object()))
-    assert captured == {"brief": "A small platformer", "playtest_mode": "off", "max_rounds": 3}
-    assert body["ok"] is True
+    assert captured["brief"] == "A small platformer"
+    assert captured["playtest_mode"] == "off"
+    assert captured["runner"] is not None
+    assert body["succeeded"] is True
     assert body["file_names"] == ["project.godot"]
     assert "files" not in body
 
