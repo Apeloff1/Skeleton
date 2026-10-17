@@ -29,8 +29,8 @@ from .studio_native_replay_telemetry import (
 
 SCHEMA = "skeleton.game_builder.nes_cpu_ppu_playthrough.v1"
 _ACTIONS = frozenset(("up", "down", "left", "right"))
-_OUTPUT = re.compile(r"NES_REPLAY_V1 " + r" ".join([r"([0-9]+)"] * 11) + r"\Z")
-_FIELDS = ("Level", "PlayerX", "PlayerY", "Health", "Score", "ScoreHigh",
+_OUTPUT = re.compile(r"NES_REPLAY_V1 " + r" ".join([r"([0-9]+)"] * 13) + r"\Z")
+_FIELDS = ("Level", "PlayerX", "PlayerY", "Health", "Score", "ScoreHigh", "TurnCount", "TurnCountHigh",
            "GemsRemaining", "GameWon", "GameLost")
 
 
@@ -159,7 +159,9 @@ if ok then
       local values = {_, memory.readbyte(ram.Level),
         memory.readbyte(ram.PlayerX), memory.readbyte(ram.PlayerY),
         memory.readbyte(ram.Health), memory.readbyte(ram.Score),
-        memory.readbyte(ram.ScoreHigh), memory.readbyte(ram.GemsRemaining),
+        memory.readbyte(ram.ScoreHigh),
+        memory.readbyte(ram.TurnCount), memory.readbyte(ram.TurnCountHigh),
+        memory.readbyte(ram.GemsRemaining),
         memory.readbyte(ram.GameWon), memory.readbyte(ram.GameLost)}
       snapshots:write(table.concat(values," "),string.char(10))
     end
@@ -175,6 +177,7 @@ if ok then
       memory.readbyte(ram.Level), memory.readbyte(ram.PlayerX),
       memory.readbyte(ram.PlayerY), memory.readbyte(ram.Health),
       memory.readbyte(ram.Score), memory.readbyte(ram.ScoreHigh),
+      memory.readbyte(ram.TurnCount), memory.readbyte(ram.TurnCountHigh),
       memory.readbyte(ram.GemsRemaining),
       memory.readbyte(ram.GameWon), memory.readbyte(ram.GameLost)
     }
@@ -324,6 +327,7 @@ def qualify_nes_cpu_ppu(
             and state["Level"] == expected["level_index"] + 1
             and state["Health"] == expected["health"]
             and state["Score"] + 256 * state["ScoreHigh"] == expected["score"]
+            and state["TurnCount"] + 256 * state["TurnCountHigh"] == count
         )
         if not victory:
             return _receipt(
