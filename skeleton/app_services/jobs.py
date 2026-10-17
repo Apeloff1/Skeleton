@@ -46,6 +46,10 @@ class SqliteJobQueue:
         rows = self.db.query("SELECT * FROM jobs WHERE job_id=?", (job_id,))
         return self._job(rows[0]) if rows else None
 
+    def get_by_idempotency_key(self, key: str) -> Optional[Job]:
+        rows = self.db.query("SELECT * FROM jobs WHERE idempotency_key=?", (key,))
+        return self._job(rows[0]) if rows else None
+
     def enqueue(self, kind: str, payload: Mapping[str, Any], *, max_attempts: int = 3,
                 delay_s: float = 0.0, correlation_id: str = "",
                 idempotency_key: Optional[str] = None) -> Job:

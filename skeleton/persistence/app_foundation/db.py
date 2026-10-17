@@ -90,6 +90,23 @@ MIGRATIONS: tuple[tuple[int, str, str], ...] = (
     (5, "projects_brief", """
         ALTER TABLE projects ADD COLUMN brief TEXT NOT NULL DEFAULT ''
     """),
+    (6, "projects_v1_contract", """
+        ALTER TABLE projects ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+        ALTER TABLE projects ADD COLUMN status TEXT NOT NULL DEFAULT 'draft';
+        ALTER TABLE projects ADD COLUMN brief_json TEXT NOT NULL DEFAULT '{}';
+        ALTER TABLE projects ADD COLUMN create_key TEXT;
+        CREATE UNIQUE INDEX idx_projects_create_key ON projects(create_key);
+        CREATE INDEX idx_projects_scope ON projects(tenant_id, owner_id, created_at);
+        CREATE TABLE project_build_links (
+            project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+            execution_id TEXT NOT NULL,
+            tenant_id TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            linked_at TEXT NOT NULL,
+            PRIMARY KEY (project_id, execution_id)
+        );
+        CREATE INDEX idx_links_execution ON project_build_links(execution_id)
+    """),
 )
 
 
