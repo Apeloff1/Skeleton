@@ -1,4 +1,8 @@
-"""Client-side ``x-gf-seal`` minting (contract: docs/contracts/request_seal.md).
+"""Client-side ``x-gf-seal`` minting.
+
+Contract: Internal Systems seal contract, documented in
+``docs/contracts/request_seal.md``, which is added by PR #4097 (not on this
+branch yet).
 
 The seal is a bearer-style expiring token, not a per-request signature. It is
 minted with the server helper :func:`skeleton.api.hmac_seal.mint_seal` so the

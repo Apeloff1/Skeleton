@@ -29,7 +29,7 @@ class GatewayClient:
 
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1",
+        base_url: str = "http://127.0.0.1:8010",
         *,
         timeout_seconds: float = 30.0,
         headers: Mapping[str, str] | None = None,

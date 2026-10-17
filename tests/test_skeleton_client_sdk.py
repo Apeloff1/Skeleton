@@ -527,3 +527,60 @@ def test_invalid_seal_401_reminted_once_then_raises():
         seal_attester="sdk", seal_secret="s",
     )
     assert gw2._json("POST", "/api/v1/commands/invoke", json={}) == {"ok": 1}
+
+
+# --- TD pre-merge fixes ------------------------------------------------------
+
+from skeleton.client import MemoryClient, ServicesClient  # noqa: E402
+
+
+def test_memory_query_unified_sends_top_k():
+    bodies = []
+
+    def handler(req):
+        bodies.append(json.loads(req.content))
+        return httpx.Response(200, json={})
+
+    mem = MemoryClient(_gw(handler))
+    mem.query_unified("q", top_k=5)
+    mem.query_unified("q", limit=4)  # alias
+    mem.query_unified("q")
+    assert bodies == [{"query": "q", "top_k": 5}, {"query": "q", "top_k": 4}, {"query": "q"}]
+    assert all("limit" not in b for b in bodies)
+    with pytest.raises(ValueError):
+        mem.query_unified("q", top_k=1, limit=2)
+
+
+def test_services_execute_quotes_command_segment():
+    raw = []
+
+    def handler(req):
+        raw.append(req.url.raw_path.decode())
+        return httpx.Response(200, json={})
+
+    svc = ServicesClient(_gw(handler))
+    svc.execute("forge/build now")
+    assert raw == ["/api/v1/commands/execute/forge%2Fbuild%20now"]
+
+
+def test_builds_wait_default_timeout_and_validation():
+    import inspect
+
+    gw = _gw(lambda r: httpx.Response(200, json={"execution_state": "running"}))
+    builds = BuildsClient(gw, actor_id="u", tenant_id="t")
+    assert inspect.signature(builds.wait).parameters["timeout_seconds"].default == 600.0
+    for bad in (None, 0, -1):
+        with pytest.raises(ValueError):
+            builds.wait("e1", timeout_seconds=bad)
+    t = [0.0]
+    with pytest.raises(SkeletonClientError):
+        builds.wait("e1", poll_seconds=100, sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
+    assert t[0] >= 600
+
+
+def test_gateway_default_base_url_is_backend_port_8010():
+    gw = GatewayClient()
+    try:
+        assert gw._base == "http://127.0.0.1:8010"
+    finally:
+        gw.close()
