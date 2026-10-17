@@ -46,6 +46,8 @@ CalcPtr: .res 2
 ScoreHigh: .res 1
 TurnCount: .res 1
 TurnCountHigh: .res 1
+AnimTick: .res 1
+AnimFrame: .res 1
 
 ; $0200-$02FF is hardware sprite DMA page.
 ; $0300-$06BF is a deterministic 960-byte shadow name table.
@@ -53,6 +55,8 @@ TurnCountHigh: .res 1
 MAZE_WIDTH = __WIDTH__
 MAZE_HEIGHT = __HEIGHT__
 LEVEL_COUNT = __LEVEL_COUNT__
+ANIM_COUNT = __ANIM_COUNT__
+ANIM_DELAY = __ANIM_DELAY__
 GEMS_PER_LEVEL = __GEMS__
 START_HEALTH = __HEALTH__
 MAP_RAM = $0300
@@ -88,6 +92,8 @@ Reset:
     sta ScoreHigh
     sta TurnCount
     sta TurnCountHigh
+    sta AnimTick
+    sta AnimFrame
     sta Cooldown
     lda #START_HEALTH
     sta Health
@@ -214,6 +220,25 @@ LoadLevel:
     rts
 
 UpdateSprite:
+    lda AnimTick
+    clc
+    adc #1
+    cmp #ANIM_DELAY
+    bcc @saveTick
+    lda #0
+    sta AnimTick
+    lda AnimFrame
+    clc
+    adc #1
+    cmp #ANIM_COUNT
+    bcc @storeFrame
+    lda #0
+@storeFrame:
+    sta AnimFrame
+    jmp @paint
+@saveTick:
+    sta AnimTick
+@paint:
     lda PlayerY
     asl a
     asl a
@@ -229,6 +254,8 @@ UpdateSprite:
     lda #0
     sta $0202
     lda #5
+    clc
+    adc AnimFrame
     ldx GameWon
     beq @notWon
     lda #4
@@ -449,7 +476,10 @@ IRQ:
 Tiles:
 __TILES__
 TilesEnd:
-.res $2000 - (TilesEnd - Tiles), 0
+AnimationTiles:
+__ANIMATION_TILES__
+AnimationTilesEnd:
+.res $2000 - (AnimationTilesEnd - Tiles), 0
 """
 
 _LINKER = """MEMORY {
@@ -523,9 +553,27 @@ def _nes_chr(tile_art: tuple[tuple[int, ...], ...] | None = None) -> str:
     return "\n".join(lines)
 
 
+def _hero_frame_chr(frames: tuple[tuple[int, ...], ...]) -> str:
+    """Native NES CHR planar sprites for animation frames after base tile 5."""
+    output = []
+    for index, tile in enumerate(frames):
+        low, high = [], []
+        for row in range(8):
+            pixels = tile[row * 8:(row + 1) * 8]
+            low.append(sum((pixel & 1) << (7 - x) for x, pixel in enumerate(pixels)))
+            high.append(sum(((pixel >> 1) & 1) << (7 - x)
+                            for x, pixel in enumerate(pixels)))
+        output.append(f"; original hero CHR animation frame {index + 1}")
+        for plane in (low, high):
+            output.append(".byte " + ", ".join(f"${value:02X}" for value in plane))
+    return "\n".join(output)
+
+
 def compile_native_nes(
     world: PlayableWorld, source: HomebrewSource, *, authorized: bool,
     tile_art: tuple[tuple[int, ...], ...] | None = None,
+    hero_frames: tuple[tuple[int, ...], ...] | None = None,
+    animation_delay: int = 12,
 ) -> NativeNESSourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("native NES homebrew source needs explicit authorization")
@@ -540,6 +588,17 @@ def compile_native_nes(
     if replay.world_digest != world.digest or replay.final_state.status != "won":
         raise NativeNESError("no safe-winning deterministic game replay")
 
+    if type(animation_delay) is not int or not 2 <= animation_delay <= 60:
+        raise NativeNESError("native animation frame timing outside budget")
+    if hero_frames is not None:
+        if (type(hero_frames) is not tuple or not 1 <= len(hero_frames) <= 4
+                or any(type(tile) is not tuple or len(tile) != 64
+                       or any(type(px) is not int or not 0 <= px <= 3 for px in tile)
+                       for tile in hero_frames)):
+            raise NativeNESError("native animation frames must be 1-4 real 2bpp sprites")
+        if tile_art is None or hero_frames[0] != tile_art[5]:
+            raise NativeNESError("original NES animation must start at authored player sprite")
+    frames = hero_frames if hero_frames is not None else ()
     maps = []
     for level in world.levels:
         rows = []
@@ -560,6 +619,12 @@ def compile_native_nes(
         "__START_Y__": ".byte " + ", ".join(str(level.start[1]) for level in world.levels),
         "__MAPS__": "\n\n".join(maps),
         "__TILES__": _nes_chr(tile_art),
+        "__ANIM_COUNT__": str(len(frames) if frames else 1),
+        "__ANIM_DELAY__": str(animation_delay),
+        "__ANIMATION_TILES__": (
+            _hero_frame_chr(frames[1:]) if len(frames) > 1
+            else "; single original player sprite"
+        ),
     }
     result = _ASM
     for marker, value in substitutions.items():
@@ -619,6 +684,14 @@ def compile_native_nes(
             [list(tile) for tile in tile_art]
         )
         manifest["custom_original_tile_pixels_in_native_source"] = True
+    manifest["native_hero_animation_frames"] = len(frames) if frames else 1
+    manifest["native_hero_animation_frame_delay"] = animation_delay
+    manifest["native_hero_animation_compiled"] = bool(frames and len(frames) > 1)
+    if frames:
+        from .contracts import canonical_digest
+        manifest["native_hero_animation_digest"] = canonical_digest(
+            [list(frame) for frame in frames]
+        )
     manifest_json = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     digest = sha256((asm + "\0" + _LINKER + "\0" + _MAKEFILE + "\0" + manifest_json).encode()).hexdigest()
     return NativeNESSourceProject(asm, _LINKER, _MAKEFILE, manifest_json, digest)
