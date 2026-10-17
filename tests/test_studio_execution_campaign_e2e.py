@@ -43,6 +43,9 @@ class FullStudioExecutionCampaignTests(unittest.TestCase):
         self.assertFalse(state["full_release_qualified"])
         self.assertFalse(state["model_weights_updated"])
         self.assertEqual(state["native_roms_verified"], 0)
+        self.assertEqual(state["native_animation_audio_source_targets_checked"], 2)
+        self.assertEqual(state["native_hero_animation_frames_in_source"], 6)
+        self.assertFalse(state["real_native_audio_capture_verified"])
         self.assertEqual(len(state["run_digest"]), 64)
 
     def test_real_source_missing_compiler_and_two_optional_emulators_blocked(self):
