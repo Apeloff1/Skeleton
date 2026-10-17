@@ -434,3 +434,92 @@ def observe_cli_result(root: Path, *, command: str, result: dict[str, Any]) -> d
             "actual_cli_return_observed": True,
             "side_effect_independently_verified": False,
             "raw_content_retained": False}
+
+
+def trace(root: Path, *, page: int = 0, page_size: int = 64,
+          actor: str | None = None, phase: str | None = None) -> dict[str, Any]:
+    """Browse a redacted, versioned, hash-checked Jeeves/Dragon action trail."""
+    if (type(page) is not int or page < 0 or type(page_size) is not int
+        or not 1 <= page_size <= 256):
+        raise WitnessError("observer trace requires nonnegative page and 1..256 size")
+    if actor is not None and actor not in ACTORS:
+        raise WitnessError("unknown observer actor filter")
+    if phase is not None and phase not in PHASES:
+        raise WitnessError("unknown observer phase filter")
+    policy = _policy(root)
+    events = _observations(root, policy, _source_events(root, policy))
+    eligible = [e for e in events if (actor is None or e["actor"] == actor)
+                and (phase is None or e["phase"] == phase)]
+    start_at = page * page_size
+    items = [{
+        "sequence": e["sequence"], "at_utc": e["at_utc"],
+        "actor": e["actor"], "phase": e["phase"], "action": e["action"],
+        "outcome": e["outcome"], "trust": e["trust"],
+        "evidence_sha256": e["evidence_sha256"], "event_sha256": e["digest"],
+        "canonical_source_sequence": e["source_sequence"],
+    } for e in eligible[start_at:start_at + page_size]]
+    return {
+        "ok": True, "action": "dragon-observe-trace",
+        "page": page, "page_size": page_size,
+        "filter": {"actor": actor, "phase": phase},
+        "total": len(eligible), "items": items,
+        "next_page": page + 1 if start_at + page_size < len(eligible) else None,
+        "raw_prompts_or_media_included": False,
+    }
+
+
+def coverage(root: Path) -> dict[str, Any]:
+    """Explain every quality gate and independent verifier still missing.
+
+    This report is observation ABOUT the game pipeline, not new authority
+    to pass an unimplemented validator or evidence to release a game.
+    """
+    policy = _policy(root)
+    source = _source_events(root, policy)
+    observations = _observations(root, policy, source)
+    producer = production.status(root)
+    observed = {e["source_sequence"] for e in observations
+                if e["source_sequence"] is not None}
+    by_gate = {name: [] for name in production.REQUIRED_GATES}
+    for event in source:
+        by_gate[event["gate"]].append(event)
+    records = []
+    for gate in production.REQUIRED_GATES:
+        history = by_gate[gate]
+        latest = history[-1] if history else None
+        expected = production.EXPECTED_EVIDENCE_OWNERS[gate]
+        qualified = bool(latest and latest["outcome"] == "passed"
+                         and latest["evidence_kind"] == expected)
+        independently_implemented = gate in production.AUTOMATED_GATES
+        if qualified:
+            next_action = "continue independent regression/replay scrutiny"
+        elif independently_implemented:
+            next_action = "run canonical verifier, inspect failure and restore prerequisites"
+        else:
+            next_action = "implement and connect independent discipline-specific evaluator"
+        records.append({
+            "gate": gate, "phase": _GATE_PHASE[gate],
+            "expected_evidence_owner": expected,
+            "canonical_checks": len(history),
+            "dragon_observed_checks": sum(e["sequence"] in observed for e in history),
+            "latest_outcome": latest["outcome"] if latest else "not_evaluated",
+            "latest_owner": latest["evidence_kind"] if latest else None,
+            "qualified": qualified,
+            "automated_checker_registered": independently_implemented,
+            "next_action": next_action,
+        })
+    unqualified = [r for r in records if not r["qualified"]]
+    return {
+        "ok": True, "action": "dragon-observe-coverage",
+        "required_gates": len(records),
+        "qualified_gates": len(records) - len(unqualified),
+        "remaining_gates": len(unqualified),
+        "unwitnessed_canonical_checks": len(source) - len(observed),
+        "unimplemented_independent_evaluators": [
+            r["gate"] for r in unqualified
+            if not r["automated_checker_registered"]
+        ],
+        "records": records,
+        "project_complete": producer["project_complete"],
+        "automatic_pass_or_release": False, "training_performed": False,
+    }
