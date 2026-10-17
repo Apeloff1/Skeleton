@@ -10,9 +10,19 @@ STAGE_SCRIPT = r'''extends Control
 
 # Original procedural stage. Never eval authored strings or load arbitrary paths.
 var scene_data: Dictionary = {}
+var media_catalog: Dictionary = {}
+var backdrop: Texture2D
+var score_player: AudioStreamPlayer
+var music_enabled: bool = true
+var current_score: String = ""
+var environment_seconds: float = 0.0
+var environment_redraw_accumulator: float = 0.0
+var environment_quality: int = 2
 var shift: float = 0.0
 var camera_scale: float = 1.0
 var actors: Array = []
+var scheduled_residents: Array = []
+var society_phase: String = ""
 var cue_text: String = ""
 var environmental_tint: Color = Color(0.13, 0.25, 0.40)
 var active_cues: Array = []
@@ -43,6 +53,13 @@ var supported_cues: Dictionary = {
 }
 
 func _ready() -> void:
+    var source := FileAccess.get_file_as_string("res://media_catalog.json")
+    var parsed = JSON.parse_string(source)
+    if parsed is Dictionary and parsed.get("scenes") is Dictionary:
+        media_catalog = parsed["scenes"]
+    score_player = AudioStreamPlayer.new()
+    score_player.volume_db = -18.0
+    add_child(score_player)
     custom_minimum_size = Vector2(450, 310)
     clip_contents = true
     cue_label = Label.new()
@@ -62,6 +79,25 @@ func _ready() -> void:
 
 func apply_scene(data: Dictionary) -> void:
     scene_data = data
+    var binding: Dictionary = media_catalog.get(str(data.get("key", "")), {})
+    backdrop = null
+    var image_path: String = str(binding.get("backdrop", ""))
+    if image_path.begins_with("res://media/") and ResourceLoader.exists(image_path):
+        var image_resource = load(image_path)
+        if image_resource is Texture2D:
+            backdrop = image_resource
+    var music_path: String = str(binding.get("music", ""))
+    if music_path != current_score:
+        score_player.stop()
+        current_score = music_path
+        if music_path.begins_with("res://media/") and ResourceLoader.exists(music_path):
+            var soundtrack = load(music_path)
+            if soundtrack is AudioStream:
+                if soundtrack is AudioStreamWAV:
+                    soundtrack.loop_mode = AudioStreamWAV.LOOP_FORWARD
+                score_player.stream = soundtrack
+                if music_enabled:
+                    score_player.play()
     actors = data.get("cast", []).duplicate()
     cue_text = str(data.get("title", ""))
     environmental_tint = _scene_tint(str(data.get("weather", "")))
@@ -69,6 +105,14 @@ func apply_scene(data: Dictionary) -> void:
     camera_scale = 1.0
     _labels()
     queue_redraw()
+
+func update_scheduled_residents(people: Array, period: String) -> void:
+    # Only render characters confirmed present by canonical Director status,
+    # never infer availability from original scene cast or cached project data.
+    scheduled_residents = people.duplicate(true)
+    society_phase = period
+    queue_redraw()
+
 
 func _scene_tint(weather: String) -> Color:
     var normalized := weather.to_lower()
@@ -86,6 +130,15 @@ func _draw() -> void:
     if w <= 0.0 or h <= 0.0:
         return
     draw_rect(Rect2(Vector2.ZERO, size), environmental_tint)
+    if backdrop != null:
+        draw_texture_rect(backdrop, Rect2(Vector2.ZERO, size), false)
+    if environment_quality > 0:
+        var wind: float = sin(environment_seconds * 0.85) * 7.0
+        for i in range(environment_quality * 14):
+            var px: float = fposmod(float(i * 67 + 13) + environment_seconds * 11.0, max(w, 1.0))
+            var py: float = h * 0.50 + float((i * 29) % 53)
+            draw_line(Vector2(px, py), Vector2(px + wind, py - 3.0),
+                      Color(0.34, 0.63, 0.41, 0.48), 1.6)
     draw_circle(Vector2(w * 0.80, h * 0.22), 22.0, Color(0.96, 0.87, 0.56))
     var camera_offset: float = shift
     var ground_y: float = h * 0.70
@@ -100,6 +153,22 @@ func _draw() -> void:
         var tower_h: float = 45.0 + float((i * 13) % 4) * 19.0
         draw_rect(Rect2(px, ground_y - tower_h, 25.0, tower_h), Color(0.18, 0.25, 0.29))
         draw_rect(Rect2(px + 5.0, ground_y - tower_h + 12.0, 6.0, 7.0), Color(0.91, 0.67, 0.34))
+    var weather_name: String = str(scene_data.get("weather", "")).to_lower()
+    if environment_quality > 0 and (weather_name.contains("rain") or weather_name.contains("storm")):
+        for index in range(environment_quality * 24):
+            var rain_x: float = fposmod(float(index * 47 + 17) +
+                environment_seconds * (35.0 + float(index % 6) * 11.0), max(w, 1.0))
+            var rain_y: float = fposmod(float(index * 31) +
+                environment_seconds * 133.0, max(h, 1.0))
+            draw_line(Vector2(rain_x, rain_y), Vector2(rain_x - 5.0, rain_y + 13.0),
+                      Color(0.72, 0.81, 0.94, 0.56), 1.0)
+    elif environment_quality > 0 and weather_name.contains("snow"):
+        for index in range(environment_quality * 28):
+            var snow_x: float = fposmod(float(index * 37 + 19) +
+                environment_seconds * 13.0, max(w, 1.0))
+            var snow_y: float = fposmod(float(index * 17 + 3) +
+                environment_seconds * 23.0, max(h, 1.0))
+            draw_circle(Vector2(snow_x, snow_y), 1.5, Color(0.93, 0.96, 0.99, 0.7))
     var spacing: float = min(95.0, max(52.0, w / float(max(actors.size() + 1, 2))))
     var origin_x: float = (w - spacing * float(max(actors.size() - 1, 0))) * 0.5
     for i in range(actors.size()):
@@ -115,10 +184,35 @@ func _draw() -> void:
         if get_theme_default_font() != null:
             draw_string(get_theme_default_font(), Vector2(px - 23.0, py - 45.0),
                         str(actors[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
+    # A visibly different, bounded group of schedule-authoritative NPCs.
+    # Small procedural actor markers are honest scaffolds, not produced
+    # motion-captured character animations.
+    var population: int = mini(scheduled_residents.size(), 12)
+    for i in range(population):
+        var npc: Dictionary = scheduled_residents[i]
+        var px: float = w * 0.09 + float(i) * minf(42.0, w * 0.81 / float(maxi(population, 1)))
+        var wander: float = sin(environment_seconds * (0.6 + float(i % 3) * 0.2)
+                                 + float(i)) * 3.0
+        var py: float = ground_y - 4.0 + wander
+        var trust: int = int(npc.get("trust", 0))
+        var coat = Color(0.25, 0.72, 0.60) if trust >= 40 else (
+            Color(0.71, 0.35, 0.36) if trust < 0 else Color(0.41, 0.54, 0.85))
+        draw_rect(Rect2(Vector2(px - 5.0, py - 18.0), Vector2(11.0, 22.0)), coat)
+        draw_circle(Vector2(px, py - 25.0), 6.0, Color(0.91, 0.75, 0.60))
+        draw_arc(Vector2(px, py - 18.0), 15.0, 0.0, TAU, 16,
+                 Color(0.99, 0.82, 0.30, 0.5), 0.8)
+        if get_theme_default_font() != null:
+            draw_string(get_theme_default_font(), Vector2(px - 10.0, py - 38.0),
+                        str(npc.get("name", "")), HORIZONTAL_ALIGNMENT_LEFT,
+                        95.0, 10, Color.WHITE)
     if get_theme_default_font() != null:
         draw_string(get_theme_default_font(), Vector2(12.0, 22.0),
                     str(scene_data.get("region", "Original world")),
                     HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
+        if not society_phase.is_empty():
+            draw_string(get_theme_default_font(), Vector2(12.0, 43.0),
+                        "Original-world period: " + society_phase,
+                        HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 
 func enqueue_presentation(receipt: Dictionary) -> void:
     for item in receipt.get("presentation_timelines", []):
@@ -148,6 +242,11 @@ func _next_timeline() -> void:
     _labels()
 
 func _process(delta: float) -> void:
+    environment_seconds += min(delta, 0.15)
+    environment_redraw_accumulator += min(delta, 0.15)
+    if environment_quality > 0 and environment_redraw_accumulator >= 1.0 / 24.0:
+        environment_redraw_accumulator = 0.0
+        queue_redraw()
     if not playing or is_paused:
         return
     elapsed_ms += min(delta, 0.15) * 1000.0 * playback_speed
@@ -209,6 +308,21 @@ func _execute_cue(cue: Dictionary) -> void:
     cue_text = kind.replace("_", " ").capitalize() + ": " + value.left(160)
     queue_redraw()
     _labels()
+
+func set_environment_quality(value: int) -> void:
+    environment_quality = clampi(value, 0, 3)
+    queue_redraw()
+
+
+func toggle_music() -> void:
+    music_enabled = not music_enabled
+    if not music_enabled:
+        score_player.stop()
+    elif score_player.stream != null:
+        score_player.play()
+    cue_text = "Original generated score: " + ("playing" if music_enabled else "muted")
+    _labels()
+
 
 func toggle_pause() -> void:
     is_paused = not is_paused

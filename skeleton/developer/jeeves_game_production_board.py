@@ -39,13 +39,14 @@ def _load_world(root: Path, source: str):
 def _runtime_signal_atlas(root: Path, *, source: str, world_digest: str) -> dict[str, Any]:
     """Read-only local source evidence; failures remain diagnostics, never P0 signoff."""
     from skeleton.developer.jeeves_game_director_atlas import verify
-    target = root / "build" / "director_atlases" / (world_digest[:20] + "-live-v3")
+    target = root / "build" / "director_atlases" / (world_digest[:20] + "-live-v8")
     if not target.exists() and not target.is_symlink():
         return {"present": False, "source_verified": False}
     try:
         checked = verify(root, source=source)
         return {"present": True, "source_verified": checked["source_manifest_verified"],
                 "native_live_quest_ui_source_verified": True,
+                "generated_original_scene_media_hashes_verified": True,
                 "godot_engine_executed": False}
     except (OSError, ValueError, KeyError) as exc:
         return {"present": True, "source_verified": False, "error": str(exc)}
@@ -150,6 +151,75 @@ def _runtime_signal_dragon_policy(root: Path, *, world_digest: str
             "production_transformer_training_verified": False}
 
 
+def _labyrinth_signal(root: Path, *, source: str) -> dict[str, Any]:
+    """Surface topology risks as evidence, never conflate with artistic signoff."""
+    from skeleton.developer.jeeves_game_director_labyrinth import topology
+    report = topology(root, source=source)
+    return {
+        "all_scenes_accessible": report["all_scenes_accessible_from_start"],
+        "strongly_connected": report["fully_strongly_connected"],
+        "one_way_exit_count": len(report["one_way_links"]),
+        "cannot_return_to_start_count": len(report["cannot_return_to_start"]),
+        "unreachable_quest_stage_count": len(report["quest_placement_gaps"]),
+        "scene_count": report["scene_count"],
+        "artistic_path_quality_approved": False,
+    }
+
+
+def _dynamic_world_signal(world: Any) -> dict[str, Any]:
+    """Surface factual authored world systems separately from native game claims."""
+    if world.dynamics is None:
+        return {
+            "enabled": False, "compiled_and_type_checked": False,
+            "native_transport_animation_executed": False,
+        }
+    from skeleton.developer.jeeves_game_director_dynamic_audit import analyze
+    report = analyze(world)
+    return {
+        "enabled": True,
+        "compiled_and_type_checked": True,
+        "faction_count": report["faction_count"],
+        "walking_gate_count": report["walking_gate_count"],
+        "transport_count": report["transport_count"],
+        "world_influence_count": report["authored_influence_count"],
+        "initial_permission_risks": report["structural_risks"][:50],
+        "initial_permission_risk_total": report["risk_count"],
+        "state_space_exhaustively_verified": False,
+        "real_native_transport_playthrough_verified": False,
+        "assurance_sha256": report["assurance_sha256"],
+    }
+
+
+def _society_signal(world: Any) -> dict[str, Any]:
+    """Social simulation facts; no false approval of cinematic acting or AI."""
+    if world.dynamics is None or world.dynamics.society is None:
+        return {
+            "enabled": False,
+            "NPC_personality_or_language_model_trained": False,
+        }
+    from skeleton.developer.jeeves_game_director_society_audit import analyze
+    report = analyze(world)
+    return {
+        "enabled": True,
+        "typed_source_compiled": True,
+        "NPC_count": report["NPC_count"],
+        "merchant_count": report["shop_count"],
+        "goods_count": report["tradeable_item_count"],
+        "NPC_dialogue_choices": sum(
+            len(person.dialogue)
+            for person in world.dynamics.society.residents
+        ),
+        "authored_social_gates": len(report["conditional_society_links"]),
+        "initial_social_actions": report["actual_initial_NPC_market_actions"][:40],
+        "structural_review_item_count": report["structural_review_item_count"],
+        "structural_review_item_sample": report["structural_review_items"][:30],
+        "assurance_sha256": report["assurance_sha256"],
+        "native_NPC_walk_cycle_verified": False,
+        "literary_character_voice_human_approved": False,
+        "NPC_language_model_trained": False,
+    }
+
+
 def board(root: Path, *, source: str, routes: int = 3,
           dragon_digest: str | None = None) -> dict[str, Any]:
     from skeleton.ai.game_builder.quest_campaign_completion import compare_campaign_branches
@@ -239,6 +309,9 @@ def board(root: Path, *, source: str, routes: int = 3,
         "dragon_mechanic_workorders": dragon_work,
         "gameforge_engine": engine,
         "new_runtime_development_evidence": {
+            "labyrinth_topology": _labyrinth_signal(root, source=source),
+            "dynamic_living_world": _dynamic_world_signal(world),
+            "NPC_society_and_economy": _society_signal(world),
             "interactive_director_sessions": _runtime_signal_sessions(
                 root, world_digest=world.digest),
             "godot_scene_atlas": _runtime_signal_atlas(

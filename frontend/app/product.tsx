@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { markBootClean } from '../utils/bootTracer';
 
 import {
   PRODUCT_CAPABILITIES,
@@ -53,11 +54,32 @@ export default function ProductShellRoute() {
 
   useEffect(() => {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    void refreshHealth(controller?.signal);
+    // Health checks are advisory; an unreachable backend must not create an
+    // unhandled rejection or block the local-first product shell.
+    void refreshHealth(controller?.signal).catch(() => {});
     return () => {
       try { controller?.abort(); } catch {}
     };
   }, [refreshHealth]);
+
+  useEffect(() => {
+    // Only an actually committed product screen counts as a clean boot.
+    // Two paint frames avoid clearing a real crash-loop inside the launcher.
+    let cancelled = false;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    firstFrame = requestAnimationFrame(() => {
+      if (cancelled) return;
+      secondFrame = requestAnimationFrame(() => {
+        if (!cancelled) void markBootClean().catch(() => {});
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, []);
 
   const visibleCapabilities = useMemo(() => {
     if (!normalizedQuery) return PRODUCT_CAPABILITIES;

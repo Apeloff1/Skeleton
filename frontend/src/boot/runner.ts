@@ -92,6 +92,35 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+/** Fail closed on malformed or cyclic startup dependencies. */
+export function validateBootStages(stages: readonly BootStageDef[]): void {
+  const ids = new Map<string, BootStageDef>();
+  for (const stage of stages) {
+    if (!stage.id?.trim() || ids.has(stage.id)) throw new Error(`invalid or duplicate boot stage: ${stage.id}`);
+    if (![0, 1, 2].includes(stage.phase) || !Number.isFinite(stage.timeoutMs) || stage.timeoutMs <= 0
+      || !Number.isFinite(stage.weight) || stage.weight < 0 || !Array.isArray(stage.deps)
+      || typeof stage.run !== 'function') throw new Error(`invalid stage contract: ${stage.id}`);
+    if (stage.retries !== undefined && (!Number.isInteger(stage.retries) || stage.retries < 0 || stage.retries > 10))
+      throw new Error(`invalid retry budget: ${stage.id}`);
+    ids.set(stage.id, stage);
+  }
+  if (!stages.some(stage => stage.phase === 0)) throw new Error('boot graph requires a local phase');
+  for (const stage of stages) for (const dep of stage.deps) {
+    if (!ids.has(dep) || ids.get(dep)!.phase > stage.phase)
+      throw new Error(`invalid boot dependency: ${stage.id} -> ${dep}`);
+  }
+  const entered = new Set<string>(), done = new Set<string>();
+  const visit = (id: string) => {
+    if (entered.has(id)) throw new Error(`cyclic boot dependency: ${id}`);
+    if (done.has(id)) return;
+    entered.add(id);
+    for (const dep of ids.get(id)!.deps) visit(dep);
+    entered.delete(id);
+    done.add(id);
+  };
+  for (const id of ids.keys()) visit(id);
+}
+
 export class BootRunner {
   private states: Record<string, StageState>;
   private listeners = new Set<Listener>();
@@ -99,9 +128,11 @@ export class BootRunner {
   private resolvedTasks: Record<string, Promise<void>> = {};
   private aborter: AbortController | null = null;
   private started = false;
+  private cancelled = false;
   private runPromise: Promise<RunnerSnapshot> | null = null;
 
   constructor(private stages: BootStageDef[]) {
+    validateBootStages(stages);
     this.states = Object.fromEntries(stages.map(stage => [stage.id, {
       id: stage.id,
       label: stage.label,
@@ -157,24 +188,28 @@ export class BootRunner {
       phaseDone[phase] = stages.length > 0 && stages.every(state => state.status !== 'pending' && state.status !== 'running');
     }
     return {
-      ok: failed === 0 && criticalOk,
+      ok: pending === 0 && failed === 0 && !this.cancelled && criticalOk,
       bootScore: Math.round((100 * okWeight / totalWeight) * 10) / 10,
       phaseProgress: this.phaseProgress(),
       counts: { ok, failed, skipped, pending, total },
       criticalOk,
       elapsedMs: Date.now() - this.startedAt,
-      stages: { ...this.states },
+      stages: Object.fromEntries(list.map(state => [state.id, { ...state, deps: [...state.deps] }])),
       phaseDone,
-      cancelled: !!this.aborter?.signal?.aborted,
+      cancelled: this.cancelled,
     };
   }
 
   cancel(): void {
+    if (this.cancelled) return;
+    this.cancelled = true;
     try { this.aborter?.abort(); } catch {}
     for (const state of Object.values(this.states)) {
       if (state.status === 'pending' || state.status === 'running') {
         state.status = 'skipped';
-        state.error = state.error || 'cancelled';
+        state.error = 'cancelled';
+        state.endedAt = Date.now();
+        if (state.startedAt !== undefined) state.durationMs = state.endedAt - state.startedAt;
       }
     }
     trail.add('boot', 'runner_cancelled', {}, 'warn');
@@ -194,6 +229,7 @@ export class BootRunner {
     const state = this.states[def.id];
     const signal = this.aborter?.signal;
     await this.waitForEarlierPhases(def);
+    if (this.cancelled) return;
 
     for (const depId of def.deps) {
       const depPromise = this.resolvedTasks[depId];
@@ -201,7 +237,7 @@ export class BootRunner {
         try { await depPromise; } catch {}
       }
       const dep = this.states[depId];
-      if (!dep || (dep.critical && dep.status !== 'ok')) {
+      if (!dep || dep.status !== 'ok') {
         state.status = 'skipped';
         state.error = `dep failed: ${depId}`;
         trail.add('boot', `stage_skipped ${def.id}`, { dep: depId }, 'warn');
@@ -210,21 +246,22 @@ export class BootRunner {
       }
     }
 
-    if (signal?.aborted) {
+    if (this.cancelled || signal?.aborted) {
       state.status = 'skipped';
       state.error = 'cancelled';
       this.emit();
       return;
     }
 
-    const maxAttempts = 1 + Math.max(0, def.retries ?? 0);
-    const backoffBase = def.backoffMs ?? 250;
+    // Admission budgets protect against malformed config and runaway retry storms.
+    const maxAttempts = 1 + Math.min(3, Math.max(0, Math.trunc(def.retries ?? 0)));
+    const backoffBase = Math.min(2_000, Math.max(0, def.backoffMs ?? 250));
     const startedAt = Date.now();
     state.startedAt = startedAt;
     let lastResult: TimeoutResult<StageRun> = { ok: false, reason: 'init' };
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      if (signal?.aborted) {
+      if (this.cancelled || signal?.aborted) {
         state.status = 'skipped';
         state.error = 'cancelled';
         state.attempts = attempt - 1;
@@ -238,8 +275,25 @@ export class BootRunner {
       state.status = 'running';
       this.emit();
       trail.add('boot', `stage_started ${def.id}`, { attempt, max: maxAttempts }, 'info');
-      lastResult = await withTimeout<StageRun>(def.run(signal), def.timeoutMs, signal);
+      // Each attempt owns a child cancellation signal. A timed-out critical
+      // probe must not continue launching later stages in the background.
+      // Native I/O that ignores abort still cannot be forcibly stopped, but
+      // its eventual result cannot make a completed stage healthy.
+      const attemptController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const abortAttempt = () => { try { attemptController?.abort(); } catch {} };
+      signal?.addEventListener?.('abort', abortAttempt, { once: true });
+      // Def.run can throw before returning a Promise. Normalize sync and async
+      // errors into a failed stage receipt instead of a permanent 'running'.
+      const invoked = Promise.resolve().then(() => def.run(attemptController?.signal || signal));
+      const timeoutMs = Math.min(30_000, Math.max(100, def.timeoutMs));
+      try {
+        lastResult = await withTimeout<StageRun>(invoked, timeoutMs, signal);
+        if (!lastResult.ok || !lastResult.v?.ok) abortAttempt();
+      } finally {
+        signal?.removeEventListener?.('abort', abortAttempt);
+      }
 
+      if (this.cancelled) return; // late completion cannot revive a cancelled stage
       if (lastResult.ok && lastResult.v?.ok) {
         state.endedAt = Date.now();
         state.durationMs = state.endedAt - startedAt;
@@ -249,7 +303,7 @@ export class BootRunner {
         return;
       }
 
-      if (lastResult.reason === 'aborted' || signal?.aborted) {
+      if (this.cancelled || lastResult.reason === 'aborted' || signal?.aborted) {
         state.endedAt = Date.now();
         state.durationMs = state.endedAt - startedAt;
         state.status = 'skipped';
@@ -262,7 +316,7 @@ export class BootRunner {
       trail.add('boot', `stage_attempt_failed ${def.id}`, { attempt, max: maxAttempts, reason: note }, 'warn');
 
       if (attempt < maxAttempts) {
-        const wait = backoffBase * Math.pow(2, attempt - 1);
+        const wait = Math.min(5_000, backoffBase * Math.pow(2, attempt - 1));
         try {
           await sleep(wait, signal);
         } catch {
@@ -276,6 +330,7 @@ export class BootRunner {
       }
     }
 
+    if (this.cancelled) return;
     state.endedAt = Date.now();
     state.durationMs = state.endedAt - startedAt;
     if (lastResult.reason === 'timeout') {

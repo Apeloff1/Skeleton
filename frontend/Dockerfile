@@ -51,6 +51,12 @@ RUN --mount=type=secret,id=proxy_ca \
     apk add --no-cache --upgrade "pcre2=10.49-r0" \
     && chown nginx:nginx /run \
     && chown -R nginx:nginx /var/cache/nginx /etc/nginx/conf.d /usr/share/nginx/html
+ARG APP_VERSION=dev
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.version=$APP_VERSION \
+      org.opencontainers.image.revision=$VCS_REF \
+      org.opencontainers.image.source=https://github.com/Apeloff1/Skeleton \
+      org.opencontainers.image.title=skeleton-frontend
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 

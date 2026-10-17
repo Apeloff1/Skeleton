@@ -37,6 +37,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/gameforge-studio',
     actions: [
       { id: 'unified-galaxy', title: 'Galaxy Studio · unified', description: 'Open the existing idea-to-build workflow with Snowball and export handoffs.', navigationId: 'studio.galaxy.unified', href: '/studio' },
+      { id: 'skeleton-studio', title: 'Skeleton studio', description: 'Open the Skeleton forge from a brief: first-run, account, projects, build status, and settings.', navigationId: 'studio.skeleton.foundation', href: '/skeleton-studio' },
       { id: 'classic-galaxy', title: 'Galaxy Studio Factory', description: 'Use the classic questionnaire and 100-phase builder.', navigationId: 'studio.galaxy.classic', href: '/galaxy' },
       { id: 'snowball-flow', title: 'Snowball Flow', description: 'Review, refine and lock forge stages with the growing game design document.', navigationId: 'studio.snowball', href: '/snowball' },
       { id: 'world-workbench', title: 'World Workbench', description: 'Inspect and author persistent world systems for the current build.', navigationId: 'studio.world.workbench', href: '/world-workbench' },
@@ -100,6 +101,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'jeeves-workbench', title: 'Jeeves Workbench', description: 'Open the existing agent workbench and orchestration workspace.', navigationId: 'jeeves.workbench', href: '/jeeves-workbench' },
       { id: 'jeeves-settings', title: 'Jeeves settings', description: 'Edit persona, directives, DNA controls and model-facing preferences.', navigationId: 'jeeves.settings', href: '/settings/jeeves' },
       { id: 'jeeves-runtime', title: 'AI runtime and readiness', description: 'Inspect setup, local inference readiness and model service status.', navigationId: 'jeeves.runtime.setup', href: '/setup' },
+      { id: 'model-inventory', title: 'Observed model inventory', description: 'Inspect authenticated engine model readiness, capability reports and selection availability without asserting model activation.', navigationId: 'jeeves.models.inventory', href: '/ai-models' },
       { id: 'model-chat', title: 'Governed model workspace', description: 'Inspect model inventory and use server-authorized conversation and replay.', navigationId: 'jeeves.models.workspace', href: '/ai-chat' },
       { id: 'mirror-simulation', title: 'Mirror Room', description: 'Open the existing training, review and adversarial mirror UI.', navigationId: 'jeeves.mirrors', href: '/mirror-room' },
       { id: 'reason', title: 'AI chat', description: 'Work through a problem with the configured engine and durable conversation history.', navigationId: 'jeeves.chat.canonical', href: '/jeeves-chat' },
@@ -169,12 +171,14 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
  */
 export const PRODUCT_HOME_SHORTCUT_IDS = [
   'studio.galaxy.unified',
+  'studio.skeleton.foundation',
   'studio.snowball',
   'academy.mega',
   'jeeves.cockpit',
   'jeeves.workbench',
   'jeeves.chat.governed',
   'jeeves.runtime.setup',
+  'jeeves.models.inventory',
   'ops.settings',
 ] as const;
 

@@ -357,6 +357,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                                    "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                                    "production-status", "production-cycle", "production-training",
+                                                   "dragon-observe-start", "dragon-observe-sync", "dragon-observe-status",
+                                                   "dragon-observe-cycle", "dragon-observe-action", "dragon-observe-lessons",
+                                            "dragon-observe-trace", "dragon-observe-coverage", "dragon-observe-revoke",
                                                    "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "direction-campaign-reopen", "p0-acceptance",
                                                    "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                                    "upscale-foliage", "upscale-animation", "upscale-shadow",
@@ -370,7 +373,10 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
-                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke"))
+                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
+                                            "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
+                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast", "director-dynamics-playthrough", "director-society-design", "director-society-publish",
+                                             "director-society-audit", "dragon-society-study", "dragon-society-contrast", "director-society-stress", "director-society-acceptance"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -397,6 +403,11 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--session")
     jeeves.add_argument("--at", type=int)
     jeeves.add_argument("--tail", type=int)
+    jeeves.add_argument("--destination")
+    jeeves.add_argument("--route-profile", choices=("fastest", "scenic", "quiet", "novel", "quest"))
+    jeeves.add_argument("--alternatives", type=int)
+    jeeves.add_argument("--intensity", type=int)
+    jeeves.add_argument("--include-optional", action="store_true")
     jeeves.add_argument("--sessions")
     jeeves.add_argument("--port", type=int)
     jeeves.add_argument("--timeout", type=float)
@@ -411,6 +422,11 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--page", type=int)
     jeeves.add_argument("--page-size", type=int)
     jeeves.add_argument("--repair-generated", action="store_true")
+    jeeves.add_argument("--consent", action="store_true")
+    jeeves.add_argument("--actor")
+    jeeves.add_argument("--phase")
+    jeeves.add_argument("--event")
+    jeeves.add_argument("--outcome")
     jeeves.add_argument("--pattern", choices=("wind", "breathe", "bob", "shimmer", "water"))
     jeeves.add_argument("--frames", type=int)
     jeeves.add_argument("--frame-height", type=int)
@@ -464,6 +480,9 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--goal", options.goal), ("--routes", options.routes),
                                 ("--session", options.session), ("--other-session", options.other_session),
                                 ("--at", options.at), ("--tail", options.tail),
+                                ("--destination", options.destination), ("--route-profile", options.route_profile),
+                                ("--alternatives", options.alternatives),
+                                ("--intensity", options.intensity),
                                 ("--sessions", options.sessions),
                                 ("--port", options.port),
                                 ("--timeout", options.timeout),
@@ -471,6 +490,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
                                 ("--gate", options.gate),
+                                ("--actor", options.actor), ("--phase", options.phase),
+                                ("--event", options.event), ("--outcome", options.outcome),
                                 ("--page", options.page),
                                 ("--page-size", options.page_size),
                                 ("--pattern", options.pattern),
@@ -493,13 +514,40 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--pixel-aspect-den", options.pixel_aspect_den)):
                 if value is not None:
                     command.extend([flag, str(value)])
+            if options.include_optional:
+                command.append("--include-optional")
             if options.include_notes:
                 command.append("--include-notes")
             if options.dry_run:
                 command.append("--dry-run")
             if options.repair_generated:
                 command.append("--repair-generated")
-            return run_jeeves_game_cli(command, _project(options.project))
+            if options.consent:
+                command.append("--consent")
+            root = _project(options.project)
+            result = run_jeeves_game_cli(command, root)
+            # The CLI is the existing Jeeves transport: once an operator has
+            # opted in, witness its actual returns without storing prompts,
+            # files, tool arguments, chat, video, or model reasoning.
+            if not options.jeeves_action.startswith("dragon-observe-"):
+                from skeleton.developer.jeeves_dragon_observer import observe_cli_result
+                try:
+                    witness = observe_cli_result(
+                        root, command=options.jeeves_action, result=result,
+                    )
+                except (ValueError, OSError, TypeError) as exc:
+                    # A completed underlying effect is not rolled back by an
+                    # optional witness failure. Surface the observability loss.
+                    parent = root / ".jeeves" / "production" / "dragon_observer"
+                    if parent.exists():
+                        result["dragon_observer"] = {
+                            "ok": False, "observation_error": str(exc)[:250],
+                            "underlying_action_not_rolled_back": True,
+                        }
+                else:
+                    if witness is not None:
+                        result["dragon_observer"] = witness
+            return result
         if options.action == "catalog":
             from skeleton.forge.eras import list_eras
             from skeleton.forge.archetypes import default_library

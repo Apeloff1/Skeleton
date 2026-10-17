@@ -150,6 +150,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                             "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                             "production-status", "production-cycle", "production-training",
+                                            "dragon-observe-start", "dragon-observe-sync", "dragon-observe-status",
+                                            "dragon-observe-cycle", "dragon-observe-action", "dragon-observe-lessons",
+                                            "dragon-observe-trace", "dragon-observe-coverage", "dragon-observe-review-queue", "dragon-observe-revoke",
                                                    "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "direction-campaign-reopen", "p0-acceptance",
                                             "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                             "upscale-foliage", "upscale-animation", "upscale-shadow",
@@ -163,7 +166,10 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "director-session-begin", "director-session-status", "director-session-step",
                                             "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
                                             "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
-                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke"))
+                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
+                                            "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
+                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast", "director-dynamics-playthrough", "director-society-design", "director-society-publish",
+                                             "director-society-audit", "dragon-society-study", "dragon-society-contrast", "director-society-stress", "director-society-acceptance"))
     parser.add_argument("--kind")
     parser.add_argument("--brief")
     parser.add_argument("--include-notes", action="store_true")
@@ -188,6 +194,11 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--session")
     parser.add_argument("--at", type=int)
     parser.add_argument("--tail", type=int)
+    parser.add_argument("--destination")
+    parser.add_argument("--route-profile", choices=("fastest", "scenic", "quiet", "novel", "quest"))
+    parser.add_argument("--alternatives", type=int)
+    parser.add_argument("--intensity", type=int)
+    parser.add_argument("--include-optional", action="store_true")
     parser.add_argument("--sessions")
     parser.add_argument("--port", type=int)
     parser.add_argument("--timeout", type=float)
@@ -202,6 +213,11 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--page", type=int)
     parser.add_argument("--page-size", type=int)
     parser.add_argument("--repair-generated", action="store_true")
+    parser.add_argument("--consent", action="store_true")
+    parser.add_argument("--actor")
+    parser.add_argument("--phase")
+    parser.add_argument("--event")
+    parser.add_argument("--outcome")
     parser.add_argument("--pattern", choices=("wind", "breathe", "bob", "shimmer", "water"))
     parser.add_argument("--frames", type=int)
     parser.add_argument("--frame-height", type=int)
@@ -219,6 +235,63 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
+        if args.action.startswith("dragon-observe-"):
+            from skeleton.developer import jeeves_dragon_observer as witness
+            observer_options = {
+                "dragon-observe-start": {"consent"},
+                "dragon-observe-sync": {"page_size"},
+                "dragon-observe-status": set(),
+                "dragon-observe-cycle": {"passes", "gate", "repair_generated"},
+                "dragon-observe-action": {"actor", "phase", "event", "outcome", "evidence"},
+                "dragon-observe-lessons": {"page", "page_size"},
+                "dragon-observe-trace": {"page", "page_size", "actor", "phase"},
+                "dragon-observe-coverage": set(),
+                "dragon-observe-review-queue": {"page", "page_size"},
+                "dragon-observe-revoke": set(),
+            }
+            allowed = observer_options[args.action] | {"action"}
+            for key, value in vars(args).items():
+                if key not in allowed and value is not None and value is not False:
+                    raise ValueError("unrelated observer option --" + key.replace("_", "-"))
+            if args.action == "dragon-observe-start":
+                return witness.start(root, consent=args.consent)
+            if args.action == "dragon-observe-sync":
+                return witness.sync(root, limit=args.page_size if args.page_size is not None else 256)
+            if args.action == "dragon-observe-status":
+                return witness.status(root)
+            if args.action == "dragon-observe-cycle":
+                return witness.cycle(
+                    root, passes=args.passes if args.passes is not None else 1,
+                    gate=args.gate, repair_generated=args.repair_generated,
+                )
+            if args.action == "dragon-observe-action":
+                return witness.record_action(
+                    root, actor=args.actor, phase=args.phase, action=args.event,
+                    outcome=args.outcome, evidence_sha256=args.evidence,
+                )
+            if args.action == "dragon-observe-lessons":
+                return witness.lessons(
+                    root, page=args.page if args.page is not None else 0,
+                    page_size=args.page_size if args.page_size is not None else 64,
+                )
+            if args.action == "dragon-observe-trace":
+                return witness.trace(
+                    root, page=args.page if args.page is not None else 0,
+                    page_size=args.page_size if args.page_size is not None else 64,
+                    actor=args.actor, phase=args.phase,
+                )
+            if args.action == "dragon-observe-coverage":
+                return witness.coverage(root)
+            if args.action == "dragon-observe-review-queue":
+                from skeleton.developer.jeeves_dragon_review_queue import review_queue
+                return review_queue(
+                    root, page=args.page if args.page is not None else 0,
+                    page_size=args.page_size if args.page_size is not None else 32,
+                )
+            return witness.revoke(root)
+        if (args.consent or any(value is not None for value in (
+                args.actor, args.phase, args.event, args.outcome))):
+            raise ValueError("observer instrumentation flags require a dragon-observe action")
         live_actions = {
             "director-session-begin": {"action", "source", "session"},
             "director-session-status": {"action", "session"},
@@ -239,11 +312,123 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             "dragon-policy-predict": {"action", "session", "digest"},
             "director-coverage": {"action", "source", "routes"},
             "director-godot-smoke": {"action", "source", "timeout"},
+            "director-loopback-e2e": {"action", "source", "routes"},
+            "director-native-http-e2e": {"action", "source", "timeout"},
+            "director-route": {"action", "session", "destination", "route_profile", "alternatives"},
+            "director-topology": {"action", "source"},
+            "director-causality": {"action", "session", "page", "page_size"},
+            "director-story-contrast": {"action", "session", "other_session"},
+            "dragon-navigation-study": {"action", "session", "approve"},
+            "director-dynamics-design": {"action", "source", "intensity"},
+            "director-dynamics-publish": {"action", "source", "intensity", "approve"},
+            "director-dynamics-audit": {"action", "source"},
+            "director-dynamics-playthrough": {"action", "source", "routes", "include_optional"},
+            "dragon-world-study": {"action", "session", "approve"},
+            "dragon-world-contrast": {"action", "session", "other_session"},
+            "director-society-design": {"action", "source", "intensity"},
+            "director-society-publish": {"action", "source", "intensity", "approve"},
+            "director-society-audit": {"action", "source"},
+            "director-society-stress": {"action", "source", "routes", "intensity"},
+            "director-society-acceptance": {"action", "source"},
+            "dragon-society-study": {"action", "session", "approve"},
+            "dragon-society-contrast": {"action", "session", "other_session"},
         }
         if args.action in live_actions:
             for key, value in vars(args).items():
                 if key not in live_actions[args.action] and value is not None and value is not False:
                     raise ValueError("unrelated Director runtime option --" + key.replace("_", "-"))
+            if args.action == "director-society-acceptance":
+                from skeleton.developer.jeeves_game_director_society_acceptance import prove
+                if not args.source:
+                    raise ValueError("NPC acceptance requires --source")
+                return prove(root, source=args.source)
+            if args.action == "director-society-stress":
+                from skeleton.developer.jeeves_game_director_society_stress import stress
+                if not args.source:
+                    raise ValueError("NPC stress requires --source")
+                return stress(root, source=args.source,
+                              routes=args.routes if args.routes is not None else 4,
+                              intensity=args.intensity if args.intensity is not None else 3)
+            if args.action in {"director-society-design",
+                               "director-society-publish", "director-society-audit"}:
+                if not args.source:
+                    raise ValueError("original NPC society requires --source")
+                if args.action == "director-society-audit":
+                    from skeleton.developer.jeeves_game_director_society_audit import audit
+                    return audit(root, source=args.source)
+                from skeleton.developer.jeeves_game_director_society_author import preview, publish
+                level = args.intensity if args.intensity is not None else 3
+                if args.action == "director-society-design":
+                    return preview(root, source=args.source, intensity=level)
+                return publish(root, source=args.source, intensity=level,
+                               approved_sha256=args.approve)
+            if args.action in {"dragon-society-study", "dragon-society-contrast"}:
+                from skeleton.developer.jeeves_game_dragon_society import queue, compare
+                if not args.session:
+                    raise ValueError("Dragon NPC study requires --session")
+                if args.action == "dragon-society-contrast":
+                    if not args.other_session:
+                        raise ValueError("Dragon society comparison requires --other-session")
+                    return compare(root, first=args.session, second=args.other_session)
+                return queue(root, session=args.session, approved_sha256=args.approve)
+            if args.action == "director-dynamics-playthrough":
+                from skeleton.developer.jeeves_game_director_dynamic_playthrough import prove
+                if not args.source:
+                    raise ValueError("living campaign proof requires --source")
+                return prove(root, source=args.source,
+                             routes=args.routes if args.routes is not None else 3,
+                             optional=args.include_optional)
+            if args.action in {"dragon-world-study", "dragon-world-contrast"}:
+                from skeleton.developer.jeeves_game_dragon_world import queue, compare
+                if not args.session:
+                    raise ValueError("Dragon world research requires --session")
+                if args.action == "dragon-world-contrast":
+                    if not args.other_session:
+                        raise ValueError("Dragon world contrast requires --other-session")
+                    return compare(root, first=args.session, second=args.other_session)
+                return queue(root, session=args.session, approved_sha256=args.approve)
+            if args.action in {"director-dynamics-design",
+                               "director-dynamics-publish", "director-dynamics-audit"}:
+                if not args.source:
+                    raise ValueError("dynamic-world authoring requires --source")
+                if args.action == "director-dynamics-audit":
+                    from skeleton.developer.jeeves_game_director_dynamic_audit import audit
+                    return audit(root, source=args.source)
+                from skeleton.developer.jeeves_game_director_dynamic_author import (
+                    preview, publish,
+                )
+                complexity = args.intensity if args.intensity is not None else 3
+                if args.action == "director-dynamics-design":
+                    return preview(root, source=args.source, intensity=complexity)
+                return publish(root, source=args.source, intensity=complexity,
+                               approved_sha256=args.approve)
+            if args.action == "dragon-navigation-study":
+                from skeleton.developer.jeeves_game_dragon_navigation import queue
+                if not args.session:
+                    raise ValueError("Dragon navigation review requires --session")
+                return queue(root, session=args.session, approved_digest=args.approve)
+            if args.action in {"director-route", "director-topology"}:
+                from skeleton.developer.jeeves_game_director_labyrinth import plan, topology
+                if args.action == "director-topology":
+                    if not args.source:
+                        raise ValueError("director-topology requires --source")
+                    return topology(root, source=args.source)
+                if not args.session:
+                    raise ValueError("director-route requires --session")
+                return plan(root, session=args.session, destination=args.destination,
+                            profile=args.route_profile or "fastest",
+                            alternatives=args.alternatives if args.alternatives is not None else 3)
+            if args.action in {"director-causality", "director-story-contrast"}:
+                from skeleton.developer.jeeves_game_director_causality import audit, contrast
+                if not args.session:
+                    raise ValueError("causal study requires --session")
+                if args.action == "director-story-contrast":
+                    if not args.other_session:
+                        raise ValueError("story contrast needs --other-session")
+                    return contrast(root, first=args.session, second=args.other_session)
+                return audit(root, session=args.session,
+                             page=args.page if args.page is not None else 1,
+                             page_size=args.page_size if args.page_size is not None else 100)
             if args.action == "director-serve":
                 from skeleton.developer.jeeves_game_director_bridge import serve
                 if not args.session:
@@ -268,6 +453,18 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                 if not args.sessions:
                     raise ValueError("Dragon comparative lab requires --sessions a,b,...")
                 return queue(root, sessions=args.sessions, approved_sha256=args.approve)
+            if args.action == "director-native-http-e2e":
+                from skeleton.developer.jeeves_game_director_native_e2e import accept
+                if not args.source:
+                    raise ValueError("director-native-http-e2e requires --source")
+                return accept(root, source=args.source,
+                              timeout=args.timeout if args.timeout is not None else 90.0)
+            if args.action == "director-loopback-e2e":
+                from skeleton.developer.jeeves_game_director_e2e import run
+                if not args.source:
+                    raise ValueError("director-loopback-e2e requires --source")
+                return run(root, source=args.source,
+                           routes=args.routes if args.routes is not None else 2)
             if args.action == "director-godot-smoke":
                 from skeleton.developer.jeeves_game_director_godot_smoke import smoke
                 if not args.source:
@@ -331,7 +528,7 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
             if not args.session:
                 raise ValueError("Dragon session lesson requires --session")
             return enqueue(root, session=args.session, approved_digest=args.approve)
-        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout, args.at, args.tail)):
+        if any(value is not None for value in (args.session, args.sessions, args.other_session, args.choice, args.port, args.timeout, args.at, args.tail, args.destination, args.route_profile, args.alternatives, args.intensity)):
             raise ValueError("runtime options require a director-session or dragon-session action")
         director_actions = {"director-draft", "director-revise", "director-examine", "director-promote",
                             "director-board", "director-prepare-training"}

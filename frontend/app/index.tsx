@@ -33,17 +33,32 @@ traceStepSync('entry_module_eval');
 // the field). Decide ONCE per process; re-mounts reuse it.
 let _entryDecision: Decision = null;
 
-/** Run bootGuard with a hard timeout so a hung AsyncStorage never freezes us. */
+// One admission attempt per JS process, even across React strict-mode
+// remounts. A second overlapping guard would count one boot twice.
+let _entryGuardPromise: Promise<'safe-mode' | 'normal'> | null = null;
+
+/** Run bootGuard with an abortable deadline; expired reads cannot mutate later. */
 function bootGuardWithTimeout(ms: number): Promise<'safe-mode' | 'normal'> {
-  return new Promise(resolve => {
+  if (_entryGuardPromise) return _entryGuardPromise;
+  _entryGuardPromise = new Promise(resolve => {
     let settled = false;
+    const controller = new AbortController();
+    const finish = (result: 'safe-mode' | 'normal') => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(t);
+      resolve(result);
+    };
     const t = setTimeout(() => {
-      if (!settled) { settled = true; resolve('normal'); }
+      controller.abort();
+      finish('normal');
     }, ms);
-    bootGuard()
-      .then(v => { if (!settled) { settled = true; clearTimeout(t); resolve(v); } })
-      .catch(() => { if (!settled) { settled = true; clearTimeout(t); resolve('normal'); } });
+    void bootGuard(controller.signal).then(
+      mode => finish(mode),
+      () => { controller.abort(); finish('normal'); },
+    );
   });
+  return _entryGuardPromise;
 }
 
 export default function Entry() {
@@ -51,36 +66,36 @@ export default function Entry() {
   const { t } = useI18n();
 
   useEffect(() => {
-    // Re-mount fast-path: reuse the decision already made this process.
-    if (_entryDecision) { setDecision(_entryDecision); return; }
-    (async () => {
+    let cancelled = false;
+    // Only the first completed decision wins, including the timeout path.
+    // A late storage read may never flip an already shown launcher to safe mode.
+    const decideOnce = (next: Exclude<Decision, null>) => {
+      if (cancelled || _entryDecision) return;
+      _entryDecision = next;
+      setDecision(next);
+    };
+
+    if (_entryDecision) {
+      setDecision(_entryDecision);
+      return () => { cancelled = true; };
+    }
+
+    void (async () => {
       try {
-        await traceStep('entry_mounted');
-        // 1500ms (was 350ms) — on a near-full disk (seen at 98%) the single
-        // AsyncStorage read can be slow; bootGuardWithTimeout still defaults
-        // to 'normal' on timeout so we never block, but the wider budget lets
-        // a genuine crash-loop be detected reliably before we give up.
+        // Tracing is advisory and must not delay crash-loop admission.
+        void traceStep('entry_mounted').catch(() => {});
         const mode = await bootGuardWithTimeout(1500);
-        if (mode === 'safe-mode') {
-          _entryDecision = 'safe-mode';
-          await traceStep('entry_→safe_mode');
-          setDecision('safe-mode');
-          return;
-        }
-        _entryDecision = 'cascade';
-        await traceStep('entry_→cascade');
-        setDecision('cascade');
+        const target = mode === 'safe-mode' ? 'safe-mode' : 'cascade';
+        decideOnce(target);
+        void traceStep(target === 'safe-mode' ? 'entry_→safe_mode' : 'entry_→cascade').catch(() => {});
       } catch {
-        // Any failure → still try cascade (never blank-screen).
-        _entryDecision = 'cascade';
-        setDecision('cascade');
+        decideOnce('cascade');
       }
     })();
 
-    // Belt-and-braces: if useEffect itself somehow doesn't fire, force the
-    // cascade after a generous timeout (idempotent with the decision above).
-    const safety = setTimeout(() => setDecision(d => d || 'cascade'), 2000);
-    return () => clearTimeout(safety);
+    // Admission already has a single process-scoped bounded deadline; an
+    // independent second watchdog could race it and publish a false verdict.
+    return () => { cancelled = true; };
   }, []);
 
   if (decision === null) {

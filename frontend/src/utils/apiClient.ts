@@ -16,6 +16,7 @@
  */
 import { trail } from './breadcrumbs';
 import { API_BASE } from '../../utils/apiBase';
+import { boundedResponseChars, boundedRetries, boundedTimeoutMs, retryableHttpStatus } from '../../utils/requestRecoveryPolicy';
 
 const BACKEND = API_BASE;
 
@@ -35,6 +36,9 @@ interface RequestOpts {
   idempotencyKey?: string;
   cacheKey?: string;
   cacheTtlMs?: number;
+  maxResponseChars?: number;
+  /** Explicit opt-in only when server-side idempotent replay is verified. */
+  serverDedupeVerified?: boolean;
 }
 
 function newRid(): string {
@@ -154,18 +158,32 @@ export function _circuitBreakerReset(bucket?: string) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false);
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener?.('abort', onAbort);
+      resolve(value);
+    };
+    const onAbort = () => finish(false);
+    const timer = setTimeout(() => finish(true), ms);
+    signal?.addEventListener?.('abort', onAbort, { once: true });
+    if (signal?.aborted) finish(false);
+  });
+}
+
 async function _doFetch<T>(
   method: string, path: string, body: any, opts: RequestOpts,
 ): Promise<ApiResult<T>> {
   const url = path.startsWith('http') ? path : `${BACKEND}${path}`;
   const rid = newRid();
   const bucket = _cbBucket(path);
-
-  const gate = _cbCheck(bucket);
-  if (!gate.allowed) {
-    return { ok: false, status: 0, data: null, error: 'circuit_open', rid };
-  }
-  const isProbe = gate.isProbe;
+  // Query parameters can carry signed URLs, bearer tokens or opaque IDs.
+  const logPath = path.split(/[?#]/, 1)[0].slice(0, 160);
 
   // Read sessionStorage cache (web only) — a hit needs no network/timer.
   if (method === 'GET' && opts.cacheKey && typeof sessionStorage !== 'undefined') {
@@ -180,6 +198,14 @@ async function _doFetch<T>(
     } catch {}
   }
 
+  // Only a network operation may acquire the half-open probe lease.
+  // Cache hits must never strand the circuit in an un-releasable probe.
+  const gate = _cbCheck(bucket);
+  if (!gate.allowed) {
+    return { ok: false, status: 0, data: null, error: 'circuit_open', rid };
+  }
+  const isProbe = gate.isProbe;
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Request-Id': rid,
@@ -190,22 +216,22 @@ async function _doFetch<T>(
   // ── ANTI-BLIP RETRY POLICY ────────────────────────────────────────────
   // Transient gateway blips (Cloudflare/ingress 502/503/504), network drops
   // and brief backend unresponsiveness (our OWN timeout firing) are all
-  // RETRYABLE — they self-heal within a few seconds. Idempotent calls (GET /
-  // DELETE / anything with an Idempotency-Key) get a bigger retry budget;
-  // plain writes keep a single safety retry. Each attempt gets a FRESH abort
+  // RETRYABLE — they self-heal within a few seconds. Only safe reads and
+  // explicitly keyed writes are replayable. Each attempt gets a FRESH abort
   // timer so a hung retry can't outlive its budget, and back-off carries
   // jitter to avoid a thundering herd when the backend recovers.
   const GATEWAY = new Set([502, 503, 504]);
-  const idempotent = method === 'GET' || method === 'DELETE' || !!opts.idempotencyKey;
-  const maxAttempts = (opts.retries ?? (idempotent ? 3 : 1)) + 1;
-  const perAttemptTimeout = opts.timeoutMs ?? 15_000;
+  // Unkeyed writes, including DELETE, are never replayed automatically.
+  // Do not let caller-supplied retries/timeout create an unbounded loop.
+  const maxAttempts = 1 + boundedRetries(opts.retries, method, !!opts.idempotencyKey, opts.serverDedupeVerified === true);
+  const perAttemptTimeout = boundedTimeoutMs(opts.timeoutMs ?? 15_000);
+  const maxResponseChars = boundedResponseChars(opts.maxResponseChars);
 
   const backoff = (attempt: number, gateway: boolean) => {
     const base = gateway ? 400 : 200;
     return Math.min(base * Math.pow(2, attempt), 4_000) + Math.floor(Math.random() * 150);
   };
 
-  let lastErr: any = null;
   let lastStatus = 0;
   let lastTimedOut = false;
 
@@ -227,22 +253,40 @@ async function _doFetch<T>(
     if (opts.signal) opts.signal.addEventListener('abort', abortFromCaller, { once: true });
     const signal = ac?.signal || opts.signal;
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      try { ac?.abort(); } catch {}
-    }, perAttemptTimeout);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // The deadline races the entire headers+body operation; AbortController
+    // alone does not guarantee a bounded wait on all native fetch adapters.
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        try { ac?.abort(); } catch {}
+        reject(new Error('request_timeout'));
+      }, perAttemptTimeout);
+    });
     const cleanup = () => {
-      clearTimeout(timer);
+      if (timer !== null) clearTimeout(timer);
       if (opts.signal) opts.signal.removeEventListener('abort', abortFromCaller);
     };
 
     try {
-      const res = await fetch(url, {
-        method, headers, signal,
-        body: body == null ? undefined : JSON.stringify(body),
-      });
-      const text = await res.text();
+      const { res, text, oversized } = await Promise.race([
+        (async () => {
+          const res = await fetch(url, {
+            method, headers, signal,
+            body: body == null ? undefined : JSON.stringify(body),
+          });
+          const length = Number(res.headers?.get?.('content-length') || 0);
+          if (length > maxResponseChars) return { res, text: '', oversized: true };
+          const text = await res.text();
+          return { res, text, oversized: text.length > maxResponseChars };
+        })(),
+        deadline,
+      ]);
       cleanup();
+      if (oversized) {
+        _cbReleaseProbe(bucket, isProbe);
+        return { ok: false, status: res.status, data: null, error: 'response_too_large', rid };
+      }
 
       // If cancellation raced a completed fetch/body read, cancellation wins:
       // callers that have left the screen should never receive stale success.
@@ -254,12 +298,15 @@ async function _doFetch<T>(
       let data: any = null;
       try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
-      const transient = res.status >= 500 || GATEWAY.has(res.status);
+      const transient = retryableHttpStatus(res.status);
       if (!res.ok && transient && attempt < maxAttempts - 1) {
         lastStatus = res.status;
-        trail.add('api', `${method} ${path} → ${res.status} (retry ${attempt + 1}/${maxAttempts - 1})`,
+        trail.add('api', `${method} ${logPath} → ${res.status} (retry ${attempt + 1}/${maxAttempts - 1})`,
           { rid, gateway: GATEWAY.has(res.status) }, 'warn');
-        await new Promise(r => setTimeout(r, backoff(attempt, GATEWAY.has(res.status))));
+        if (!(await sleepWithAbort(backoff(attempt, GATEWAY.has(res.status)), opts.signal))) {
+          _cbReleaseProbe(bucket, isProbe);
+          return { ok: false, status: 0, data: null, error: 'aborted', rid };
+        }
         continue;
       }
 
@@ -268,9 +315,10 @@ async function _doFetch<T>(
       }
 
       if (!res.ok) {
-        _cbRecordFail(bucket, isProbe);
-        trail.add('api', `${method} ${path} → ${res.status}`,
-          { rid, error: (typeof data === 'object' ? data?.error || data?.detail : String(data)) || `HTTP ${res.status}` },
+        if (transient) _cbRecordFail(bucket, isProbe);
+        else _cbRecordOk(bucket, isProbe); // 4xx proves the transport is reachable
+        trail.add('api', `${method} ${logPath} → ${res.status}`,
+          { rid, error: `HTTP ${res.status}` },
           res.status >= 500 ? 'error' : 'warn',
         );
       } else {
@@ -282,9 +330,8 @@ async function _doFetch<T>(
         error: res.ok ? null : (typeof data === 'object' ? data?.error || data?.detail : String(data)) || `HTTP ${res.status}`,
         rid: res.headers.get('x-request-id') || rid,
       };
-    } catch (e: any) {
+    } catch {
       cleanup();
-      lastErr = e;
       lastTimedOut = timedOut;
 
       // Caller cancellation is intentional. It must neither retry nor poison
@@ -298,16 +345,21 @@ async function _doFetch<T>(
       // Our own timeout or a network error is a transient blip: retry while
       // attempts remain, preserving the same request id for correlation.
       if (attempt < maxAttempts - 1) {
-        trail.add('api', `${method} ${path} ${timedOut ? 'timeout' : 'network_error'} (retry ${attempt + 1}/${maxAttempts - 1})`,
+        trail.add('api', `${method} ${logPath} ${timedOut ? 'timeout' : 'network_error'} (retry ${attempt + 1}/${maxAttempts - 1})`,
           { rid }, 'warn');
-        await new Promise(r => setTimeout(r, backoff(attempt, true)));
+        if (!(await sleepWithAbort(backoff(attempt, true), opts.signal))) {
+          _cbReleaseProbe(bucket, isProbe);
+          return { ok: false, status: 0, data: null, error: 'aborted', rid };
+        }
         continue;
       }
     }
   }
   _cbRecordFail(bucket, isProbe);
-  const finalError = lastTimedOut ? 'timeout' : (lastErr?.message || (lastStatus ? `HTTP ${lastStatus}` : 'network_error'));
-  trail.add('api', `${method} ${path} failed_after_retries`,
+  // A native fetch exception can echo auth headers or the full signed URL.
+  // Surface a typed error rather than propagating untrusted exception text.
+  const finalError = lastTimedOut ? 'timeout' : (lastStatus ? `HTTP ${lastStatus}` : 'network_error');
+  trail.add('api', `${method} ${logPath} failed_after_retries`,
     { rid, lastStatus, error: finalError }, 'error');
   return {
     ok: false, status: lastStatus || 0, data: null,

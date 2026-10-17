@@ -8,7 +8,7 @@ asset file reads or provider/network operations are trusted.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from collections import deque
 from typing import Sequence
@@ -16,6 +16,17 @@ import random
 import re
 
 from .contracts import canonical_digest
+from .quest_world_dynamics import (
+    WorldDynamics, WorldState, initial as initial_dynamics,
+    allowed_foot_travel, offered_passages, apply_changes,
+    effects_for_use, effects_for_results,
+)
+from .quest_society import (
+    legal_actions as society_legal_actions,
+    perform as society_perform, verify_world as society_verify_world,
+    consume_good as society_consume_good,
+    verify_inventory as society_verify_inventory,
+)
 
 MAX_SCENES = 128
 MAX_QUESTS = 256
@@ -396,6 +407,7 @@ class DirectorWorld:
     scenes: tuple[Scene, ...]
     quests: tuple[QuestArc, ...]
     starting_scene: str
+    dynamics: WorldDynamics | None = None
 
     def __post_init__(self):
         _id(self.project_id)
@@ -470,18 +482,103 @@ class DirectorWorld:
             raise DirectorError("main story with invariant global goal required")
         if not any(q.ending_axis != "none" for q in self.quests):
             raise DirectorError("main story must have meaningful choice-aligned outcome")
+        if self.dynamics is not None:
+            if not isinstance(self.dynamics, WorldDynamics):
+                raise DirectorError("original-world dynamics must be typed")
+            # Author permission paths MUST resolve to the same canonical
+            # game graph, quest scripts and available real affordances.
+            for gate in self.dynamics.gates:
+                if (gate.source not in scene_map or gate.destination not in
+                        scene_map[gate.source].links):
+                    raise DirectorError("gate references a nonexistent walking link")
+            for route in self.dynamics.passages:
+                if (route.source not in scene_map or route.destination not in scene_map):
+                    raise DirectorError("transit references an unbuilt scene")
+            for record in self.dynamics.influences:
+                if record.trigger == "use":
+                    scene = scene_map.get(record.scene)
+                    if scene is None or record.affordance not in {
+                            a.key for a in scene.affordances}:
+                        raise DirectorError("reputation influence has no actual interaction")
+                else:
+                    quest = quest_map.get(record.quest)
+                    if quest is None:
+                        raise DirectorError("reputation effect references unknown quest")
+                    if record.outcome_flag is not None and not any(
+                            method.outcome_flag == record.outcome_flag
+                            for stage in quest.stages for method in stage.solutions):
+                        raise DirectorError("faction outcome does not occur in authored story")
+            source_items = {
+                action.produces for scene in self.scenes
+                for action in scene.affordances if action.produces
+            }
+            known_items = set(source_items)
+            if self.dynamics.society is not None:
+                society_verify_world(
+                    self.dynamics.society,
+                    scene_ids=set(scene_map),
+                    faction_ids={f.key for f in self.dynamics.factions},
+                    quest_items=source_items,
+                )
+                known_items.update(
+                    good.key for merchant in self.dynamics.society.shops
+                    for good in merchant.goods
+                )
+            outcome_flags = {
+                method.outcome_flag for quest in self.quests
+                for stage in quest.stages for method in stage.solutions
+            }
+            possible_world_flags = {
+                item.grant_world_flag for item in
+                (*self.dynamics.passages, *self.dynamics.influences)
+                if item.grant_world_flag is not None
+            }
+            if self.dynamics.society is not None:
+                possible_world_flags.update(
+                    person.unlock_world_flag
+                    for person in self.dynamics.society.residents
+                    if person.unlock_world_flag is not None
+                )
+                possible_world_flags.update(
+                    dialogue.grant_world_flag
+                    for person in self.dynamics.society.residents
+                    for dialogue in person.dialogue
+                    if dialogue.grant_world_flag is not None
+                )
+                for person in self.dynamics.society.residents:
+                    for dialogue in person.dialogue:
+                        if not set(dialogue.requires_flags).issubset(outcome_flags):
+                            raise DirectorError(
+                                "NPC dialogue references unknown actual story outcome"
+                            )
+            for requirements in (
+                    *(g.requirements for g in self.dynamics.gates),
+                    *(p.requirements for p in self.dynamics.passages)):
+                if not set(requirements.quests).issubset(quest_map):
+                    raise DirectorError("travel condition references an unknown quest")
+                if not set(requirements.items).issubset(known_items):
+                    raise DirectorError("required ticket/key cannot be earned in this game")
+                if not set(requirements.flags).issubset(outcome_flags):
+                    raise DirectorError("conditional travel references an unknown ending flag")
+                if not set(requirements.world_flags).issubset(possible_world_flags):
+                    raise DirectorError("conditional travel requires an unproducible world flag")
 
     @property
     def digest(self):
         return canonical_digest(self.payload())
 
     def payload(self):
-        return dict(schema="skeleton.game_builder.director_world.v1",
-                    project_id=self.project_id, seed=self.seed,
-                    bible=self.bible.payload(),
-                    scenes=[s.payload() for s in self.scenes],
-                    quests=[q.payload() for q in self.quests],
-                    starting_scene=self.starting_scene)
+        result = dict(schema="skeleton.game_builder.director_world.v1",
+                      project_id=self.project_id, seed=self.seed,
+                      bible=self.bible.payload(),
+                      scenes=[s.payload() for s in self.scenes],
+                      quests=[q.payload() for q in self.quests],
+                      starting_scene=self.starting_scene)
+        # Critical backward compatibility: legacy worlds keep exactly the
+        # same canonical source hash and all existing session receipt hashes.
+        if self.dynamics is not None:
+            result["dynamics"] = self.dynamics.payload()
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -491,7 +588,8 @@ class DirectorAction:
     scene: str
 
     def __post_init__(self):
-        if self.kind not in {"travel", "use", "wait"}:
+        if self.kind not in {"travel", "use", "wait", "transit",
+                             "speak", "discuss", "buy", "sell", "rest"}:
             raise DirectorError("invalid action kind")
         _id(self.key)
         _id(self.scene)
@@ -533,19 +631,23 @@ class DirectorState:
     results: tuple[DirectorResult, ...]
     cutscenes_seen: tuple[str, ...]
     narrative_flags: tuple[str, ...]
+    world_state: WorldState | None = None
 
     @property
     def digest(self):
         return canonical_digest(self.payload())
 
     def payload(self):
-        return dict(world_digest=self.world_digest, scene=self.scene,
-                    turn=self.turn, stage_index=[list(x) for x in self.stage_index],
-                    complete=list(self.complete), records=[list(x) for x in self.records],
-                    acquired=list(self.acquired),
-                    results=[r.payload() for r in self.results],
-                    cutscenes_seen=list(self.cutscenes_seen),
-                    narrative_flags=list(self.narrative_flags))
+        result = dict(world_digest=self.world_digest, scene=self.scene,
+                      turn=self.turn, stage_index=[list(x) for x in self.stage_index],
+                      complete=list(self.complete), records=[list(x) for x in self.records],
+                      acquired=list(self.acquired),
+                      results=[r.payload() for r in self.results],
+                      cutscenes_seen=list(self.cutscenes_seen),
+                      narrative_flags=list(self.narrative_flags))
+        if self.world_state is not None:
+            result["world_state"] = self.world_state.payload()
+        return result
 
 
 def director_initial(world: DirectorWorld) -> DirectorState:
@@ -554,6 +656,7 @@ def director_initial(world: DirectorWorld) -> DirectorState:
     return DirectorState(
         world.digest, world.starting_scene, 0,
         tuple((q.key, 0) for q in world.quests), (), (), (), (), (), (),
+        initial_dynamics(world.dynamics) if world.dynamics is not None else None,
     )
 
 
@@ -583,12 +686,26 @@ def available_director_actions(world: DirectorWorld, state: DirectorState) -> tu
                           for p in solution.required for a in here.affordances
                           if (a.kind, a.target) == (p.kind, p.target))
             usable.update((p.kind, p.target) for p in stage.optional)
-    actions = [DirectorAction("travel", link, here.key) for link in here.links]
+    actions = [
+        DirectorAction("travel", link, here.key) for link in here.links
+        if world.dynamics is None
+        or allowed_foot_travel(world.dynamics, state, link)
+    ]
+    if world.dynamics is not None:
+        actions.extend(
+            DirectorAction("transit", passage.key, here.key)
+            for passage in offered_passages(world.dynamics, state)
+        )
     for a in here.affordances:
         if (a.kind, a.target) in usable and (
             a.consumes is None or a.consumes in state.acquired
         ):
             actions.append(DirectorAction("use", a.key, here.key))
+    if world.dynamics is not None and world.dynamics.society is not None:
+        actions.extend(
+            DirectorAction(kind, key, here.key)
+            for kind, key in society_legal_actions(world.dynamics.society, state)
+        )
     actions.append(DirectorAction("wait", "wait", here.key))
     return tuple(actions)
 
@@ -599,17 +716,64 @@ def director_step(world: DirectorWorld, state: DirectorState, action: DirectorAc
         raise DirectorError("action unavailable in current authored scene/quest stage")
     here = next(s for s in world.scenes if s.key == state.scene)
     if action.kind == "travel":
-        return DirectorState(
-            world.digest, action.key, state.turn + 1,
-            state.stage_index, state.complete, state.records, state.acquired,
-            state.results, state.cutscenes_seen, state.narrative_flags,
-        )
+        return replace(state, scene=action.key, turn=state.turn + 1)
     if action.kind == "wait":
-        return DirectorState(
-            world.digest, state.scene, state.turn + 1,
-            state.stage_index, state.complete, state.records, state.acquired,
-            state.results, state.cutscenes_seen, state.narrative_flags,
+        return replace(state, turn=state.turn + 1)
+    if action.kind == "transit":
+        if world.dynamics is None or state.world_state is None:
+            raise DirectorError("transit requires an approved dynamic world")
+        passage = next((p for p in world.dynamics.passages
+                        if p.key == action.key
+                        and (p.source == state.scene
+                             or p.bidirectional and p.destination == state.scene)), None)
+        if passage is None:
+            raise DirectorError("unrecognized or unlicensed transport route")
+        destination = (passage.destination if state.scene == passage.source
+                       else passage.source)
+        inventory = set(state.acquired)
+        before_effect = state.world_state
+        if passage.consume_item is not None:
+            if world.dynamics.society is not None:
+                owned_items, social = society_consume_good(
+                    world.dynamics.society, state.acquired,
+                    before_effect.society, passage.consume_item)
+                inventory = set(owned_items)
+                before_effect = replace(before_effect, society=social)
+            else:
+                if passage.consume_item not in inventory:
+                    raise DirectorError("transit fare not in actual inventory")
+                inventory.remove(passage.consume_item)
+        effect = apply_changes(
+            before_effect, passage.reputation_change,
+            add_flags=(passage.grant_world_flag,)
+            if passage.grant_world_flag is not None else (),
+            passage=passage.key,
         )
+        return replace(
+            state, scene=destination, turn=state.turn + passage.cost_turns,
+            acquired=tuple(sorted(inventory)), world_state=effect,
+        )
+    if action.kind in {"speak", "discuss", "buy", "sell", "rest"}:
+        if (world.dynamics is None or world.dynamics.society is None
+                or state.world_state is None):
+            raise DirectorError("original NPC economy action has no reviewed rules")
+        society, faction_effects, flags, stock_items, cost = society_perform(
+            world.dynamics.society, state, action.kind, action.key
+        )
+        new_world = replace(state.world_state, society=society)
+        new_world = apply_changes(
+            new_world, faction_effects, add_flags=flags,
+        )
+        items = set(state.acquired)
+        for item in stock_items:
+            if item.startswith("-"):
+                items.discard(item[1:])
+            else:
+                items.add(item)
+        society_verify_inventory(
+            world.dynamics.society, tuple(sorted(items)), new_world.society)
+        return replace(state, turn=state.turn + cost,
+                       acquired=tuple(sorted(items)), world_state=new_world)
     affordance = next(a for a in here.affordances if a.key == action.key)
     records = {(q, st, obj): n for q, st, obj, n in state.records}
     inventory = set(state.acquired)
@@ -668,18 +832,44 @@ def director_step(world: DirectorWorld, state: DirectorState, action: DirectorAc
             updated[quest.key] = index + 1
             if updated[quest.key] == len(quest.stages):
                 completed.add(quest.key)
+    dynamics_state = state.world_state
     if affordance.consumes:
-        inventory.remove(affordance.consumes)
+        if world.dynamics is not None and world.dynamics.society is not None:
+            updated_inventory, updated_society = society_consume_good(
+                world.dynamics.society, tuple(sorted(inventory)),
+                dynamics_state.society, affordance.consumes)
+            inventory = set(updated_inventory)
+            dynamics_state = replace(dynamics_state, society=updated_society)
+        else:
+            inventory.remove(affordance.consumes)
     if affordance.produces:
         inventory.add(affordance.produces)
     # At most one action per scene per step; all satisfied quests may progress.
-    return DirectorState(
-        world.digest, state.scene, state.turn + affordance.effort,
-        tuple((q.key, updated[q.key]) for q in world.quests),
-        tuple(sorted(completed)),
-        tuple(sorted((q, st, signature, count) for (q, st, signature), count in records.items())),
-        tuple(sorted(inventory)), tuple(results),
-        state.cutscenes_seen, tuple(sorted(flags)),
+    if world.dynamics is not None:
+        if dynamics_state is None:
+            raise DirectorError("world reputation snapshot missing")
+        effects, gained, fired = effects_for_use(
+            world.dynamics, dynamics_state,
+            scene=here.key, affordance=affordance.key,
+        )
+        dynamics_state = apply_changes(
+            dynamics_state, effects, add_flags=gained, fired=fired,
+        )
+        effects, gained, fired = effects_for_results(
+            world.dynamics, dynamics_state,
+            results=tuple(results[len(state.results):]),
+        )
+        dynamics_state = apply_changes(
+            dynamics_state, effects, add_flags=gained, fired=fired,
+        )
+    return replace(
+        state, turn=state.turn + affordance.effort,
+        stage_index=tuple((q.key, updated[q.key]) for q in world.quests),
+        complete=tuple(sorted(completed)),
+        records=tuple(sorted((q, st, signature, count)
+                             for (q, st, signature), count in records.items())),
+        acquired=tuple(sorted(inventory)), results=tuple(results),
+        narrative_flags=tuple(sorted(flags)), world_state=dynamics_state,
     )
 
 
@@ -761,5 +951,5 @@ __all__ = [
     "DirectorAction", "DirectorState", "DirectorResult", "DirectorReplay",
     "director_initial", "available_director_actions", "director_step",
     "director_play", "director_verify", "quest_methods", "ARCHETYPES",
-    "ACTION_TYPES", "CUE_TYPES",
+    "ACTION_TYPES", "CUE_TYPES", "WorldDynamics", "WorldState",
 ]

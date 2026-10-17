@@ -1,4 +1,3 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * ErrorBoundary — top-level React error catcher.
  *
@@ -12,8 +11,8 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from '
 import { getSessionId } from '../utils/modalLogger';
 import { navToSafeMode } from '../utils/bootTracer';
 import { crashTelemetryFields, isDevErrorDetails, redactSecrets, safeErrorMessage } from '../utils/safeError';
+import { postCrashReport } from '../utils/crashTelemetry';
 
-const BACKEND = CANONICAL_API_BASE || '';
 
 interface State {
   error: Error | null;
@@ -41,18 +40,14 @@ export class ErrorBoundary extends React.Component<Props, State> {
     // Fire-and-forget telemetry — never throw from telemetry itself.
     try {
       const fields = crashTelemetryFields(error);
-      fetch(`${BACKEND}/api/telemetry/last-crash`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      postCrashReport({
           source:     'ErrorBoundary',
           component:  (info.componentStack || '').split('\n')[1]?.trim() || null,
           message:    fields.message,
           stack:      fields.stack,
           info:       { componentStack: redactSecrets((info.componentStack || '').slice(0, 2000)) },
           session_id: getSessionId(),
-        }),
-      }).catch(() => {});
+        });
       // Also dump the breadcrumb trail so the server can reconstruct
       // what the user was doing before the crash.
       try {

@@ -31,10 +31,38 @@ def _hash(doc: object) -> str:
 
 
 def _context(state: Any) -> str:
-    # The scene and current ordered quest stage indices encode a coarse,
-    # stable authored state. No personal identifier enters the policy features.
-    return _hash({"scene": state.scene, "stage_index": list(state.stage_index),
-                  "completed": list(state.complete)})
+    # The legacy feature identity is byte-for-byte stable. Living worlds add
+    # all access-affecting facts; otherwise the model might wrongly transfer a
+    # policy learned *after* an unlock into the same scene before the unlock.
+    feature = {
+        "scene": state.scene,
+        "stage_index": list(state.stage_index),
+        "completed": list(state.complete),
+    }
+    if state.world_state is not None:
+        feature["dynamic_permissions"] = {
+            "acquired_items": list(state.acquired),
+            "narrative_flags": list(state.narrative_flags),
+            "world_flags": list(state.world_state.world_flags),
+            "faction_standings": [list(x) for x in state.world_state.standings],
+        }
+        if state.world_state.society is not None:
+            society = state.world_state.society
+            # Do not borrow advice learned with a full wallet, open shop,
+            # trusted NPC or new trade item for a pre-unlock state. Exact
+            # calendar permission is not available from a saved state alone
+            # without the original phase_turns; time is included separately.
+            feature["dynamic_permissions"]["society"] = {
+                "wallet": society.balance,
+                "trust": [list(x) for x in society.relationships],
+                "shop_stock": [list(x) for x in society.shop_stock],
+                "owned_goods": [list(x) for x in society.owned],
+                "last_talk": [list(x) for x in society.last_talk_cycle],
+                "dialogue_choices_previously_made": [
+                    list(x) for x in society.dialogue_history],
+                "game_turn": state.turn,
+            }
+    return _hash(feature)
 
 
 def _examples(root: Path, session: str) -> tuple[Any, dict[str, Any], list[tuple[str, str]]]:

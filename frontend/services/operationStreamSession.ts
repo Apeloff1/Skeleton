@@ -12,6 +12,7 @@ import {
   failOperationResync,
   reduceOperationReplay,
 } from './operationStreamReducer.ts';
+import type { MonthCycleLedger } from './monthCycleLedger';
 import type {
   OperationCanonicalResult,
   OperationClientState,
@@ -78,6 +79,7 @@ export interface OperationBrowserSessionOptions {
   consumerId: string;
   replayLimit?: number;
   pollMs?: number;
+  maxPollMs?: number;
   maxResyncAttempts?: number;
   initialState?: OperationClientState;
   onState?: (state: OperationClientState) => void;
@@ -152,10 +154,16 @@ export class OperationBrowserSession {
   readonly cursorStore: OperationSessionCursorStore;
   readonly replayLimit: number;
   readonly pollMs: number;
+  readonly maxPollMs: number;
   readonly maxResyncAttempts: number;
   readonly onState?: (state: OperationClientState) => void;
 
   private current: OperationClientState | null;
+  private epoch = 0;
+  private pendingReplay: Promise<OperationClientState> | null = null;
+  // Physical cursor mutations are ordered even when a storage driver finishes
+  // after a caller has been aborted or its state generation was invalidated.
+  private cursorTail: Promise<void> = Promise.resolve();
 
   constructor(
     operationId: string,
@@ -174,6 +182,9 @@ export class OperationBrowserSession {
     this.cursorStore = cursorStore;
     this.replayLimit = boundedInteger(options.replayLimit, 64, 1, 512);
     this.pollMs = boundedInteger(options.pollMs, 750, 100, 60_000);
+    this.maxPollMs = Math.max(
+      this.pollMs, boundedInteger(options.maxPollMs, 10_000, 100, 60_000),
+    );
     this.maxResyncAttempts = boundedInteger(
       options.maxResyncAttempts,
       2,
@@ -197,12 +208,20 @@ export class OperationBrowserSession {
 
   private publish(state: OperationClientState): OperationClientState {
     this.current = state;
-    this.onState?.(state);
+    // Observers are optional UI projections, never operation authorities.
+    try { this.onState?.(state); } catch { /* isolate consumer */ }
     return state;
+  }
+
+  private enqueueCursorWrite<T>(action: () => Promise<T>): Promise<T> {
+    const job = this.cursorTail.then(action);
+    this.cursorTail = job.then(() => undefined, () => undefined);
+    return job;
   }
 
   private async baseState(): Promise<OperationClientState> {
     if (this.current !== null) return this.current;
+    const generation = this.epoch;
     let cursor = 0;
     try {
       cursor = await this.cursorStore.load(
@@ -212,14 +231,31 @@ export class OperationBrowserSession {
     } catch {
       cursor = 0;
     }
+    // An in-flight load must not replace a new state published by clearCursor.
+    if (generation !== this.epoch || this.current !== null) {
+      return this.current ?? createOperationClientState(this.operationId);
+    }
     if (!Number.isSafeInteger(cursor) || cursor < 0) cursor = 0;
     return this.publish(
       createOperationClientState(this.operationId, cursor),
     );
   }
 
-  async replayOnce(signal?: AbortSignal): Promise<OperationClientState> {
+  replayOnce(signal?: AbortSignal): Promise<OperationClientState> {
+    if (this.pendingReplay) return this.pendingReplay;
+    const generation = this.epoch;
+    const work = this.performReplayOnce(signal, generation);
+    this.pendingReplay = work;
+    const release = () => {
+      if (this.pendingReplay === work) this.pendingReplay = null;
+    };
+    void work.then(release, release);
+    return work;
+  }
+
+  private async performReplayOnce(signal: AbortSignal | undefined, generation: number): Promise<OperationClientState> {
     let state = await this.baseState();
+    if (generation !== this.epoch) return this.current ?? state;
     if (signal?.aborted) {
       return this.publish({
         ...state,
@@ -228,13 +264,20 @@ export class OperationBrowserSession {
       });
     }
 
-    const response = await this.transport.replay(
-      this.operationId,
-      this.consumerId,
-      state.lastSequence,
-      this.replayLimit,
-      signal,
-    );
+    let response: Awaited<ReturnType<OperationSessionTransport['replay']>>;
+    try {
+      response = await this.transport.replay(
+        this.operationId, this.consumerId, state.lastSequence,
+        this.replayLimit, signal,
+      );
+    } catch {
+      if (generation !== this.epoch) return this.current ?? state;
+      return this.publish({
+        ...state, connection: signal?.aborted ? 'idle' : 'error',
+        error: signal?.aborted ? 'aborted' : 'replay_transport_unavailable',
+      });
+    }
+    if (generation !== this.epoch) return this.current ?? state;
 
     if (!response.ok) {
       if (response.replayGap) {
@@ -261,11 +304,14 @@ export class OperationBrowserSession {
 
     if (next.lastSequence !== state.lastSequence) {
       try {
-        await this.cursorStore.save(
-          this.operationId,
-          this.consumerId,
-          next.lastSequence,
-        );
+        if (generation !== this.epoch || signal?.aborted) return this.current ?? state;
+        await this.enqueueCursorWrite(async () => {
+          if (generation !== this.epoch) return;
+          await this.cursorStore.save(
+            this.operationId, this.consumerId, next.lastSequence,
+          );
+        });
+        if (generation !== this.epoch) return this.current ?? state;
       } catch {
         return this.publish({
           ...next,
@@ -275,12 +321,19 @@ export class OperationBrowserSession {
       }
     }
 
-    const ack = await this.transport.acknowledge(
-      this.operationId,
-      this.consumerId,
-      next.lastSequence,
-      signal,
-    );
+    let ack: Awaited<ReturnType<OperationSessionTransport['acknowledge']>>;
+    try {
+      ack = await this.transport.acknowledge(
+        this.operationId, this.consumerId, next.lastSequence, signal,
+      );
+    } catch {
+      if (generation !== this.epoch) return this.current ?? state;
+      return this.publish({
+        ...next, connection: signal?.aborted ? 'idle' : 'error',
+        error: signal?.aborted ? 'aborted' : 'cursor_ack_unavailable',
+      });
+    }
+    if (generation !== this.epoch) return this.current ?? state;
     if (!ack.ok) {
       if (signal?.aborted || ack.error === 'aborted') {
         return this.publish({
@@ -303,6 +356,7 @@ export class OperationBrowserSession {
     signal?: AbortSignal,
     maxAttempts = this.maxResyncAttempts,
   ): Promise<OperationClientState> {
+    const generation = this.epoch;
     const attempts = boundedInteger(maxAttempts, 1, 1, 5);
     let last = failOperationResync(
       createOperationClientState(this.operationId),
@@ -318,11 +372,20 @@ export class OperationBrowserSession {
         });
       }
 
-      const snapshot = await this.transport.resync(
-        this.operationId,
-        this.consumerId,
-        signal,
-      );
+      let snapshot: OperationSessionResyncSnapshot | null = null;
+      try {
+        snapshot = await this.transport.resync(
+          this.operationId, this.consumerId, signal,
+        );
+      } catch {
+        return this.publish({
+          ...last, connection: signal?.aborted ? 'idle' : 'error',
+          error: signal?.aborted ? 'aborted' : 'authoritative_resync_unavailable',
+        });
+      }
+      if (generation !== this.epoch) {
+        return this.current ?? createOperationClientState(this.operationId);
+      }
       if (!validResyncSnapshot(this.operationId, snapshot)) {
         return this.publish({
           ...last,
@@ -333,11 +396,13 @@ export class OperationBrowserSession {
 
       const floor = snapshot.resume_after_sequence;
       try {
-        await this.cursorStore.save(
-          this.operationId,
-          this.consumerId,
-          floor,
-        );
+        await this.enqueueCursorWrite(async () => {
+          if (generation !== this.epoch) return;
+          await this.cursorStore.save(this.operationId, this.consumerId, floor);
+        });
+        if (generation !== this.epoch) {
+          return this.current ?? createOperationClientState(this.operationId);
+        }
       } catch {
         return this.publish({
           ...last,
@@ -386,9 +451,42 @@ export class OperationBrowserSession {
     return this.resync(signal);
   }
 
+  /**
+   * Persist the operation identity BEFORE touching the network. If the app
+   * closes at any point, a later foreground recovery pass can enumerate this
+   * receipt and use the canonical replay API to verify its actual state.
+   * The cursor store remains authoritative for exact replay checkpoints.
+   */
+  async resumeDurable(
+    ledger: MonthCycleLedger, signal?: AbortSignal,
+  ): Promise<OperationClientState> {
+    const receipt = await ledger.enroll(this.operationId, this.consumerId, 'operation');
+    if (receipt.status === 'terminal_observed' || receipt.status === 'dismissed') {
+      // Terminal/dismissed operation is not secretly restarted by the client.
+      return this.current ?? this.baseState();
+    }
+    const observed = await this.resume(signal);
+    const now = Date.now();
+    const terminalState = observed.terminal && observed.contentReconciled &&
+      (observed.operationState === 'completed' ||
+        observed.operationState === 'failed' ||
+        observed.operationState === 'cancelled')
+      ? observed.operationState : null;
+    await ledger.observe(receipt, terminalState ? {
+      phase: 'terminal_observed', terminalState,
+      cursor: observed.lastSequence, now,
+    } : {
+      phase: observed.connection === 'error' || observed.resyncRequired ||
+        observed.connection === 'idle' ? 'disconnected' : 'observing',
+      cursor: observed.lastSequence, now, nextCheckAt: now + 5 * 60_000,
+    });
+    return observed;
+  }
+
   async follow(signal?: AbortSignal): Promise<OperationClientState> {
     let state = await this.baseState();
     let resyncAttempts = 0;
+    let idleRounds = 0;
     this.publish(state);
 
     while (!state.terminal && !signal?.aborted) {
@@ -419,11 +517,16 @@ export class OperationBrowserSession {
       }
 
       if (state.lastSequence === before) {
+        // An idle multi-hour operation should not issue the same status
+        // request every 750ms for its entire lifetime. New events immediately
+        // reset the backoff so progress remains responsive.
+        idleRounds = Math.min(10, idleRounds + 1);
+        const delay = Math.min(this.maxPollMs, this.pollMs * (2 ** Math.min(6, idleRounds - 1)));
         try {
-          await wait(this.pollMs, signal);
-        } catch {
-          break;
-        }
+          await wait(delay, signal);
+        } catch { break; }
+      } else {
+        idleRounds = 0;
       }
     }
 
@@ -431,12 +534,19 @@ export class OperationBrowserSession {
   }
 
   async cancel(signal?: AbortSignal): Promise<OperationSessionCancelResult> {
-    return this.transport.cancel(this.operationId, signal);
+    try { return await this.transport.cancel(this.operationId, signal); }
+    catch { return { ok: false, error: signal?.aborted ? 'aborted' : 'cancel_transport_unavailable' }; }
   }
 
   async clearCursor(): Promise<void> {
-    await this.cursorStore.clear(this.operationId, this.consumerId);
+    this.epoch++;
+    this.pendingReplay = null;
+    // Invalidate all in-flight network observations before clearing storage,
+    // and commit the clear AFTER any already-started native cursor write.
     this.current = createOperationClientState(this.operationId);
+    await this.enqueueCursorWrite(() => this.cursorStore.clear(
+      this.operationId, this.consumerId,
+    ));
     this.publish(this.current);
   }
 }

@@ -60,7 +60,36 @@ def dev_help_text() -> str:
         jeeves dragon-policy-predict --session NAME --digest MODEL_SHA256
         jeeves director-serve --session NAME [--port 8765 --digest MODEL_SHA256]
         jeeves director-godot-smoke --source design/director_campaign_source.json [--timeout 90]
+        jeeves director-loopback-e2e --source design/director_campaign_source.json [--routes 1..8]
+        jeeves director-native-http-e2e --source design/director_campaign_source.json [--timeout 90]
+        Godot export includes original source-generated PNG backdrops and ambient WAV scores
+        Real HTTP full-quest playback and actual native Godot->Python probe are separate tests
         jeeves director-coverage --source design/director_campaign_source.json [--routes 2..8]
+        jeeves director-topology --source design/director_campaign_source.json
+        jeeves director-route --session NAME [--destination scene_02 --route-profile fastest|scenic|quiet|novel|quest --alternatives 3]
+        jeeves director-causality --session NAME [--page N --page-size 100]
+        jeeves director-story-contrast --session NAME --other-session OTHER
+        jeeves dragon-navigation-study --session NAME [--approve STUDY_SHA256]
+        jeeves director-dynamics-design --source design/director_campaign_source.json [--intensity 1..5]
+        jeeves director-dynamics-publish --source design/director_campaign_source.json --intensity N --approve DESIGN_SHA256
+        jeeves director-dynamics-audit --source design/director_dynamic_SOURCE_SHA.json
+        jeeves director-dynamics-playthrough --source design/director_dynamic_SOURCE_SHA.json --routes 4 [--include-optional]
+        jeeves director-society-design --source design/director_campaign_source.json [--intensity 1..5]
+        jeeves director-society-publish --source design/director_campaign_source.json --intensity N --approve DESIGN_SHA256
+        jeeves director-society-audit --source design/director_society_SOURCE_SHA.json
+        jeeves director-society-stress --source design/director_society_SOURCE_SHA.json [--routes 1..8 --intensity 1..5]
+        jeeves director-society-acceptance --source design/director_society_SOURCE_SHA.json
+        jeeves dragon-society-study --session NAME [--approve STUDY_SHA256]
+        jeeves dragon-society-contrast --session NAME --other-session OTHER
+        Original NPCs now have source-authored branching dialogues, clock-bound schedules and actual economy transactions
+        Godot source v7 visualizes canonically present residents, prices and earned rapport
+        jeeves director-route --session NAME --route-profile fastest|scenic|quiet|novel|quest
+        jeeves dragon-world-study --session NAME [--approve STUDY_SHA256]
+        jeeves dragon-world-contrast --session NAME --other-session OTHER
+        Living worlds simulate persistent factions, locked passages, ferries, rail, portals and ticketed routes
+        Legacy game save receipts stay byte-compatible when dynamics are absent
+        Native Godot v5 includes an interactive directed-world map with verified route highlights
+        Navigation plans never execute player decisions without explicit input
         jeeves dragon-lab --sessions hero_a,hero_b [--approve RESEARCH_SHA256]
         jeeves director-atlas-export --source design/director_campaign_source.json [--dry-run]
         jeeves director-atlas-verify --source design/director_campaign_source.json

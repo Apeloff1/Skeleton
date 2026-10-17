@@ -13,6 +13,7 @@ import random
 
 from .contracts import canonical_digest
 from .authored_tiles import _no_duplicate_keys, _json_number_reject
+from .quest_world_dynamics import compile_dynamics
 from .quest_scene_engine import (
     ARCHETYPES, Affordance, Cue, Cutscene, DirectorError, DirectorWorld,
     NarrativeBible, Parameter, QuestArc, QuestStage, Scene, Solution,
@@ -216,9 +217,12 @@ def compile_director_blueprint(doc: dict, *, human_reviewed: bool) -> DirectorWo
             optional=tuple(Parameter(**obj(Parameter, p))
                            for p in s["optional"]),
         ) for s in d["stages"]))
-    if type(doc) is not dict or set(doc) != {
+    standard_fields = {
         "schema", "project_id", "seed", "bible", "scenes", "quests", "starting_scene"
-    } or doc["schema"] != "skeleton.game_builder.director_world.v1":
+    }
+    if (type(doc) is not dict or set(doc) not in (
+            standard_fields, standard_fields | {"dynamics"})
+            or doc["schema"] != "skeleton.game_builder.director_world.v1"):
         raise DirectorError("invalid authored director schema")
     b = obj(NarrativeBible, doc["bible"])
     return DirectorWorld(
@@ -231,6 +235,7 @@ def compile_director_blueprint(doc: dict, *, human_reviewed: bool) -> DirectorWo
         tuple(parse_scene(s) for s in doc["scenes"]),
         tuple(parse_arc(q) for q in doc["quests"]),
         doc["starting_scene"],
+        compile_dynamics(doc["dynamics"]) if "dynamics" in doc else None,
     )
 
 

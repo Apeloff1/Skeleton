@@ -16,6 +16,9 @@ from typing import Any
 from skeleton.developer.jeeves_game_production_board import _load_world
 from skeleton.developer.jeeves_game_director_player import PLAYER_SCRIPT, PLAYER_SCENE
 from skeleton.developer.jeeves_game_director_stage import STAGE_SCRIPT
+from skeleton.developer.jeeves_game_director_media import generate as generate_media
+from skeleton.developer.jeeves_game_director_native_probe import PROBE_SCRIPT
+from skeleton.developer.jeeves_game_director_minimap import MAP_SCRIPT
 
 SCHEMA = "skeleton.jeeves.director_atlas_export.v1"
 FILES = ("project.godot", "main.tscn", "director_atlas.gd", "director_world.json",
@@ -163,7 +166,11 @@ renderer/rendering_method.mobile="gl_compatibility"
         "director_player.gd": PLAYER_SCRIPT.encode("utf-8"),
         "director_player.tscn": PLAYER_SCENE.encode("utf-8"),
         "director_stage.gd": STAGE_SCRIPT.encode("utf-8"),
+        "director_probe.gd": PROBE_SCRIPT.encode("utf-8"),
+        "director_minimap.gd": MAP_SCRIPT.encode("utf-8"),
     }
+    authored_media, media_catalog = generate_media(world)
+    contents.update(authored_media)
     if any(len(content) > 2 * 1024 * 1024 for content in contents.values()):
         raise ValueError("Director atlas export file exceeds its supported size")
     manifest = {
@@ -178,6 +185,12 @@ renderer/rendering_method.mobile="gl_compatibility"
         "controller_action_selection_in_source": True,
         "procedural_2d_stage_in_source": True,
         "authored_cinematic_clock_in_source": True,
+        "generated_original_png_backdrops": media_catalog["original_exported_scene_image_count"],
+        "generated_original_wav_scores": media_catalog["original_exported_audio_music_count"],
+        "native_original_audio_playback_in_source": True,
+        "native_http_gameplay_probe_in_source": True,
+        "directed_world_minimap_in_source": True,
+        "minimap_navigation_requires_explicit_player_action": True,
         "native_asset_or_voice_quality_independently_verified": False,
         "quest_logic_implemented_in_native_preview": False,
         "native_binary_executed": False,
@@ -190,7 +203,7 @@ renderer/rendering_method.mobile="gl_compatibility"
 def export(root: Path, *, source: str, dry_run: bool = False) -> dict[str, Any]:
     contents, manifest = _payload(root, source)
     identity = manifest["source_sha256"]
-    dirname = manifest["director_world_sha256"][:20] + "-live-v3"
+    dirname = manifest["director_world_sha256"][:20] + "-live-v8"
     directory = _parent(root)
     destination = directory / dirname
     if destination.is_symlink() or destination.exists():
@@ -202,7 +215,9 @@ def export(root: Path, *, source: str, dry_run: bool = False) -> dict[str, Any]:
     stage = Path(tempfile.mkdtemp(prefix=".director-atlas-", dir=directory))
     try:
         for name, content in contents.items():
-            (stage / name).write_bytes(content)
+            output = stage / name
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(content)
         (stage / "ATLAS_MANIFEST.json").write_text(
             json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
         if _payload(root, source)[1]["source_sha256"] != identity:
@@ -217,20 +232,30 @@ def export(root: Path, *, source: str, dry_run: bool = False) -> dict[str, Any]:
 
 def verify(root: Path, *, source: str) -> dict[str, Any]:
     contents, manifest = _payload(root, source)
-    location = _parent(root) / (manifest["director_world_sha256"][:20] + "-live-v3")
+    location = _parent(root) / (manifest["director_world_sha256"][:20] + "-live-v8")
     if location.is_symlink() or not location.is_dir():
         raise ValueError("Director atlas missing or unsafe")
-    entries = sorted(location.iterdir())
-    # Godot creates its own regular local .godot cache after opening a project.
-    cache = location / ".godot"
-    if cache.exists() and (cache.is_symlink() or not cache.is_dir()):
-        raise ValueError("unsafe Godot atlas cache")
-    entries = [p for p in entries if p.name != ".godot"]
-    if set(x.name for x in entries) != {*FILES, "ATLAS_MANIFEST.json"}:
-        raise ValueError("Director atlas has unexpected source files")
-    for entry in entries:
-        if entry.is_symlink() or not entry.is_file():
-            raise ValueError("unsafe Director atlas entry")
+    # Godot generates nested .godot caches and resource .import sidecars.
+    # Neither is source evidence; all authored PNG/WAV and scripts are hashed.
+    expected = set(contents) | {"ATLAS_MANIFEST.json"}
+    actual = set()
+    for node in location.rglob("*"):
+        if node.is_symlink():
+            raise ValueError("unsafe symlink inside Director native project")
+        relative = node.relative_to(location).as_posix()
+        if node.is_dir():
+            if relative not in {".godot", "media"} and not relative.startswith(".godot/"):
+                raise ValueError("unknown directory in Director native project")
+            continue
+        if not node.is_file():
+            raise ValueError("unsafe file in Director native project")
+        if relative.startswith(".godot/"):
+            continue
+        if relative.endswith(".import") and relative[:-7] in contents:
+            continue
+        actual.add(relative)
+    if actual != expected:
+        raise ValueError("Director native source differs from expected original files")
     for name, expected in contents.items():
         if (location / name).stat().st_size > 2 * 1024 * 1024:
             raise ValueError("oversized Director atlas source")
@@ -242,4 +267,4 @@ def verify(root: Path, *, source: str) -> dict[str, Any]:
     return {"ok": True, "action": "director-atlas-verify",
             "path": str(location), "source_manifest_verified": True,
             "godot_binary_executed": False, "real_native_gameplay_verified": False,
-            "file_count": len(FILES)}
+            "file_count": len(contents)}

@@ -15,6 +15,7 @@ from .game_boy_native_export import _PIXELS, _TILE_INDEX
 from .playable_world import PlayableWorld
 from .playable_simulation import demonstrate_solvable
 from .port_planner import HomebrewSource, PortMode, PortRequest, compile_port
+from .studio_native_psg import NativePSGScore, console_psg_registers
 
 _MAX_WIDTH, _MAX_HEIGHT = 31, 29
 
@@ -24,6 +25,7 @@ _ASM = r"""; Original world-specific NES NROM-256 homebrew, ca65/ld65.
 .res 8, 0
 
 .segment "ZEROPAGE"
+.exportzp Level, PlayerX, PlayerY, Health, Score, ScoreHigh, TurnCount, TurnCountHigh, GemsRemaining, GameWon, GameLost
 Level: .res 1
 PlayerX: .res 1
 PlayerY: .res 1
@@ -42,6 +44,13 @@ PadRight: .res 1
 MapPtr: .res 2
 WorkPtr: .res 2
 CalcPtr: .res 2
+ScoreHigh: .res 1
+TurnCount: .res 1
+TurnCountHigh: .res 1
+AnimTick: .res 1
+AnimFrame: .res 1
+MusicTick: .res 1
+MusicIndex: .res 1
 
 ; $0200-$02FF is hardware sprite DMA page.
 ; $0300-$06BF is a deterministic 960-byte shadow name table.
@@ -49,6 +58,10 @@ CalcPtr: .res 2
 MAZE_WIDTH = __WIDTH__
 MAZE_HEIGHT = __HEIGHT__
 LEVEL_COUNT = __LEVEL_COUNT__
+ANIM_COUNT = __ANIM_COUNT__
+ANIM_DELAY = __ANIM_DELAY__
+AUDIO_ENABLED = __AUDIO_ENABLED__
+MUSIC_FRAME_DELAY = __MUSIC_DELAY__
 GEMS_PER_LEVEL = __GEMS__
 START_HEALTH = __HEALTH__
 MAP_RAM = $0300
@@ -81,11 +94,19 @@ Reset:
     sta GameWon
     sta GameLost
     sta Score
+    sta ScoreHigh
+    sta TurnCount
+    sta TurnCountHigh
+    sta AnimTick
+    sta AnimFrame
+    sta MusicTick
+    sta MusicIndex
     sta Cooldown
     lda #START_HEALTH
     sta Health
     jsr UploadPalette
     jsr LoadLevel
+    jsr InitOriginalAudio
     lda #$00
     sta $2000
     lda #$1E
@@ -93,6 +114,7 @@ Reset:
 
 MainLoop:
     jsr WaitFrame
+    jsr TickOriginalMusic
     jsr PollPad
     jsr UpdateSprite
     lda #$00
@@ -206,7 +228,101 @@ LoadLevel:
     sta $2001
     rts
 
+InitOriginalAudio:
+    lda #AUDIO_ENABLED
+    beq @audioDisabled
+    lda #$03
+    sta $4015
+    lda #$BF
+    sta $4000
+    sta $4004
+    lda #$08
+    sta $4001
+    sta $4005
+@audioDisabled:
+    rts
+
+TickOriginalMusic:
+    lda #AUDIO_ENABLED
+    beq @musicOff
+    lda MusicTick
+    clc
+    adc #1
+    cmp #MUSIC_FRAME_DELAY
+    bcc @saveTick
+    lda #0
+    sta MusicTick
+    lda MusicIndex
+    clc
+    adc #1
+    and #7
+    sta MusicIndex
+    tax
+    lda OriginalMusicLow,x
+    sta $4002
+    lda OriginalMusicHigh,x
+    ora #$F8
+    sta $4003
+    rts
+@saveTick:
+    sta MusicTick
+@musicOff:
+    rts
+
+.export SoundPickup, SoundHazard, SoundGoal
+SoundPickup:
+    lda #AUDIO_ENABLED
+    beq @silent
+    lda #__SFX_PICKUP_LOW__
+    sta $4006
+    lda #__SFX_PICKUP_HIGH__
+    ora #$10
+    sta $4007
+@silent:
+    rts
+
+SoundHazard:
+    lda #AUDIO_ENABLED
+    beq @silent
+    lda #__SFX_HAZARD_LOW__
+    sta $4006
+    lda #__SFX_HAZARD_HIGH__
+    ora #$10
+    sta $4007
+@silent:
+    rts
+
+SoundGoal:
+    lda #AUDIO_ENABLED
+    beq @silent
+    lda #__SFX_GOAL_LOW__
+    sta $4006
+    lda #__SFX_GOAL_HIGH__
+    ora #$10
+    sta $4007
+@silent:
+    rts
+
 UpdateSprite:
+    lda AnimTick
+    clc
+    adc #1
+    cmp #ANIM_DELAY
+    bcc @saveTick
+    lda #0
+    sta AnimTick
+    lda AnimFrame
+    clc
+    adc #1
+    cmp #ANIM_COUNT
+    bcc @storeFrame
+    lda #0
+@storeFrame:
+    sta AnimFrame
+    jmp @paint
+@saveTick:
+    sta AnimTick
+@paint:
     lda PlayerY
     asl a
     asl a
@@ -222,6 +338,8 @@ UpdateSprite:
     lda #0
     sta $0202
     lda #5
+    clc
+    adc AnimFrame
     ldx GameWon
     beq @notWon
     lda #4
@@ -316,6 +434,10 @@ MoveRight:
 TryMove:
     lda #7
     sta Cooldown
+    inc TurnCount
+    bne @turnRecorded
+    inc TurnCountHigh
+@turnRecorded:
     lda NextX
     cmp #MAZE_WIDTH
     bcc @xInside
@@ -359,12 +481,21 @@ TryMove:
     sta (CalcPtr),y
     jsr EraseGemTile
     dec GemsRemaining
-    inc Score
+    clc
+    lda Score
+    adc #10
+    sta Score
+    bcc @gemScored
+    inc ScoreHigh
+@gemScored:
+    jsr SoundPickup
     rts
 @hazard:
     cmp #3
     bne @goal
     dec Health
+    jsr SoundHazard
+    lda Health
     bne @blocked
     lda #1
     sta GameLost
@@ -374,6 +505,14 @@ TryMove:
     bne @blocked
     lda GemsRemaining
     bne @blocked
+    clc
+    lda Score
+    adc #100
+    sta Score
+    bcc @goalScored
+    inc ScoreHigh
+@goalScored:
+    jsr SoundGoal
     inc Level
     lda Level
     cmp #LEVEL_COUNT
@@ -413,6 +552,12 @@ SpawnYs:
 __START_Y__
 __MAPS__
 
+.export OriginalMusicLow, OriginalMusicHigh
+OriginalMusicLow:
+__MUSIC_LOW__
+OriginalMusicHigh:
+__MUSIC_HIGH__
+
 NMI:
     rti
 IRQ:
@@ -425,7 +570,10 @@ IRQ:
 Tiles:
 __TILES__
 TilesEnd:
-.res $2000 - (TilesEnd - Tiles), 0
+AnimationTiles:
+__ANIMATION_TILES__
+AnimationTilesEnd:
+.res $2000 - (AnimationTilesEnd - Tiles), 0
 """
 
 _LINKER = """MEMORY {
@@ -453,7 +601,7 @@ build/skeleton.o: main.s
 \tmkdir -p build
 \t$(CA65) -o $@ $<
 build/skeleton-original.nes: build/skeleton.o nes.cfg
-\t$(LD65) -C nes.cfg -o $@ $<
+\t$(LD65) -C nes.cfg -Ln build/skeleton-original.sym -o $@ $<
 clean:
 \trm -rf build
 """
@@ -476,9 +624,19 @@ class NativeNESSourceProject:
     hardware_verified: bool = False
 
 
-def _nes_chr() -> str:
+def _nes_chr(tile_art: tuple[tuple[int, ...], ...] | None = None) -> str:
+    if tile_art is not None:
+        if (type(tile_art) is not tuple or len(tile_art) != len(_PIXELS)
+                or any(type(tile) is not tuple or len(tile) != 64
+                       or any(type(px) is not int or not 0 <= px <= 3 for px in tile)
+                       for tile in tile_art)):
+            raise NativeNESError("NES CHR artwork must contain six exact 2bpp tiles")
+        images = tuple(tuple("".join(str(px) for px in tile[y * 8:(y + 1) * 8])
+                             for y in range(8)) for tile in tile_art)
+    else:
+        images = _PIXELS
     lines = []
-    for index, image in enumerate(_PIXELS):
+    for index, image in enumerate(images):
         lo, hi = [], []
         for row in image:
             lo.append(sum((int(ch) & 1) << (7 - i) for i, ch in enumerate(row)))
@@ -489,8 +647,28 @@ def _nes_chr() -> str:
     return "\n".join(lines)
 
 
+def _hero_frame_chr(frames: tuple[tuple[int, ...], ...]) -> str:
+    """Native NES CHR planar sprites for animation frames after base tile 5."""
+    output = []
+    for index, tile in enumerate(frames):
+        low, high = [], []
+        for row in range(8):
+            pixels = tile[row * 8:(row + 1) * 8]
+            low.append(sum((pixel & 1) << (7 - x) for x, pixel in enumerate(pixels)))
+            high.append(sum(((pixel >> 1) & 1) << (7 - x)
+                            for x, pixel in enumerate(pixels)))
+        output.append(f"; original hero CHR animation frame {index + 1}")
+        for plane in (low, high):
+            output.append(".byte " + ", ".join(f"${value:02X}" for value in plane))
+    return "\n".join(output)
+
+
 def compile_native_nes(
     world: PlayableWorld, source: HomebrewSource, *, authorized: bool,
+    tile_art: tuple[tuple[int, ...], ...] | None = None,
+    hero_frames: tuple[tuple[int, ...], ...] | None = None,
+    animation_delay: int = 12,
+    psg_score: NativePSGScore | None = None,
 ) -> NativeNESSourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("native NES homebrew source needs explicit authorization")
@@ -505,6 +683,23 @@ def compile_native_nes(
     if replay.world_digest != world.digest or replay.final_state.status != "won":
         raise NativeNESError("no safe-winning deterministic game replay")
 
+    if type(animation_delay) is not int or not 2 <= animation_delay <= 60:
+        raise NativeNESError("native animation frame timing outside budget")
+    if hero_frames is not None:
+        if (type(hero_frames) is not tuple or not 1 <= len(hero_frames) <= 4
+                or any(type(tile) is not tuple or len(tile) != 64
+                       or any(type(px) is not int or not 0 <= px <= 3 for px in tile)
+                       for tile in hero_frames)):
+            raise NativeNESError("native animation frames must be 1-4 real 2bpp sprites")
+        if tile_art is None or hero_frames[0] != tile_art[5]:
+            raise NativeNESError("original NES animation must start at authored player sprite")
+    frames = hero_frames if hero_frames is not None else ()
+    if psg_score is not None and not isinstance(psg_score, NativePSGScore):
+        raise NativeNESError("native audio requires typed original PSG score")
+    if psg_score is not None and psg_score.theme != world.intent.theme:
+        raise NativeNESError("NES music and authored game theme differ")
+    sound = (console_psg_registers(psg_score, "nintendo_famicom")
+             if psg_score is not None else None)
     maps = []
     for level in world.levels:
         rows = []
@@ -524,7 +719,31 @@ def compile_native_nes(
         "__START_X__": ".byte " + ", ".join(str(level.start[0]) for level in world.levels),
         "__START_Y__": ".byte " + ", ".join(str(level.start[1]) for level in world.levels),
         "__MAPS__": "\n\n".join(maps),
-        "__TILES__": _nes_chr(),
+        "__TILES__": _nes_chr(tile_art),
+        "__ANIM_COUNT__": str(len(frames) if frames else 1),
+        "__ANIM_DELAY__": str(animation_delay),
+        "__AUDIO_ENABLED__": str(int(sound is not None and sound["enabled"])),
+        "__MUSIC_DELAY__": str(sound["frames_per_note"] if sound else 24),
+        "__MUSIC_LOW__": ".byte " + ", ".join(
+            f"${value:02X}" for value in (
+                sound["notes_low"] if sound else (0,) * 8
+            )
+        ),
+        "__MUSIC_HIGH__": ".byte " + ", ".join(
+            f"${value:02X}" for value in (
+                sound["notes_high"] if sound else (0,) * 8
+            )
+        ),
+        "__SFX_PICKUP_LOW__": str(sound["events_low"][0] if sound else 0),
+        "__SFX_PICKUP_HIGH__": str(sound["events_high"][0] if sound else 0),
+        "__SFX_HAZARD_LOW__": str(sound["events_low"][1] if sound else 0),
+        "__SFX_HAZARD_HIGH__": str(sound["events_high"][1] if sound else 0),
+        "__SFX_GOAL_LOW__": str(sound["events_low"][2] if sound else 0),
+        "__SFX_GOAL_HIGH__": str(sound["events_high"][2] if sound else 0),
+        "__ANIMATION_TILES__": (
+            _hero_frame_chr(frames[1:]) if len(frames) > 1
+            else "; single original player sprite"
+        ),
     }
     result = _ASM
     for marker, value in substitutions.items():
@@ -578,6 +797,24 @@ def compile_native_nes(
         "release_approved": False,
         "distribution_licensed": False,
     }
+    if tile_art is not None:
+        from .contracts import canonical_digest
+        manifest["generated_runtime_art_tile_digest"] = canonical_digest(
+            [list(tile) for tile in tile_art]
+        )
+        manifest["custom_original_tile_pixels_in_native_source"] = True
+    manifest["native_hero_animation_frames"] = len(frames) if frames else 1
+    manifest["native_hero_animation_frame_delay"] = animation_delay
+    manifest["native_hero_animation_compiled"] = bool(frames and len(frames) > 1)
+    if frames:
+        from .contracts import canonical_digest
+        manifest["native_hero_animation_digest"] = canonical_digest(
+            [list(frame) for frame in frames]
+        )
+    manifest["original_native_psg_integrated"] = bool(sound and sound["enabled"])
+    manifest["native_psg_score_digest"] = psg_score.digest if psg_score else None
+    manifest["native_psg_hardware_audio_played"] = False
+    manifest["native_psg_not_pcm_identity"] = True
     manifest_json = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     digest = sha256((asm + "\0" + _LINKER + "\0" + _MAKEFILE + "\0" + manifest_json).encode()).hexdigest()
     return NativeNESSourceProject(asm, _LINKER, _MAKEFILE, manifest_json, digest)

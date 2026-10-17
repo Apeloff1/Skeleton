@@ -8,6 +8,7 @@ remain governed by the existing approved Director blueprint compiler.
 from __future__ import annotations
 
 from collections import deque, defaultdict
+import heapq
 from dataclasses import dataclass
 from typing import Any
 
@@ -45,6 +46,81 @@ def _path(world: DirectorWorld, current: str, destination: str) -> tuple[Directo
     raise CampaignCompletionError("approved authored quest scene is unreachable")
 
 
+def _dynamic_path(world: DirectorWorld, state: DirectorState,
+                  destination: str, required_item: str | None = None
+                  ) -> tuple[DirectorAction, ...]:
+    """Minimum canonical turn-cost route over the changing *actual* world state.
+
+    A fixed graph path cannot model earning standing on a ferry, spending a
+    unique ticket, or an irreversible charter flag. Search expands only
+    currently legal travel/transit actions and applies director_step. It never
+    creates inventory, mutates the live game or guesses access permissions.
+    """
+    if (state.scene == destination
+            and (required_item is None or required_item in state.acquired)):
+        return ()
+    if world.dynamics is None:
+        return _path(world, state.scene, destination)
+    frontier = [(0, 0, state, ())]
+    serial = 0
+    best: dict[tuple, int] = {}
+
+    def key_for(at: DirectorState) -> tuple:
+        status = at.world_state
+        society = status.society
+        social: tuple[Any, ...] = ()
+        if society is not None:
+            from .quest_society import phase
+            rules = world.dynamics.society
+            clock = phase(rules, at.turn)
+            social = (
+                society.balance, society.relationships,
+                society.shop_stock, society.owned,
+                society.dialogue_history,
+                clock["phase_index"], at.turn % rules.phase_turns,
+                tuple(sorted(npc for npc, cycle in society.last_talk_cycle
+                             if cycle == clock["cycle"])),
+            )
+        return (at.scene, at.acquired, at.stage_index, at.records,
+                status.fired_influences, status.standings,
+                status.world_flags, at.narrative_flags, at.complete, social)
+    expansions = 0
+    while frontier and expansions < 30000:
+        cost, _, here, actions = heapq.heappop(frontier)
+        status = here.world_state
+        if status is None:
+            raise CampaignCompletionError("dynamic campaign has no persistent world state")
+        key = key_for(here)
+        if cost > best.get(key, cost):
+            continue
+        if here.scene == destination and (
+                required_item is None or required_item in here.acquired):
+            return actions
+        expansions += 1
+        if len(frontier) >= 60000 or len(actions) >= 512:
+            continue
+        best[key] = cost
+        for action in available_director_actions(world, here):
+            if action.kind not in {
+                    "travel", "transit", "speak", "discuss",
+                    "buy", "sell", "rest", "use"}:
+                continue
+            after = director_step(world, here, action)
+            next_status = after.world_state
+            if next_status is None:
+                raise CampaignCompletionError("transport lost persistent world state")
+            next_key = key_for(after)
+            updated = cost + after.turn - here.turn
+            if updated >= best.get(next_key, updated + 1):
+                continue
+            serial += 1
+            heapq.heappush(frontier, (updated, serial, after, actions + (action,)))
+    raise CampaignCompletionError(
+        "no proven canonical route to required quest scene under current permissions "
+        "(or bounded route search exhausted)"
+    )
+
+
 def _candidate(world: DirectorWorld, state: DirectorState, stage: Any,
                parameter: Any) -> tuple[str, Any] | None:
     """Choose a reachable legal affordance, never assume a missing resource."""
@@ -54,9 +130,25 @@ def _candidate(world: DirectorWorld, state: DirectorState, stage: Any,
             continue
         for affordance in scene.affordances:
             if ((affordance.kind, affordance.target) == (parameter.kind, parameter.target)
-                    and (affordance.consumes is None or affordance.consumes in state.acquired)):
-                candidates.append((len(_path(world, state.scene, scene.key)), scene.key,
-                                   affordance.key, affordance))
+                    and (affordance.consumes is None or affordance.consumes in state.acquired
+                         or (world.dynamics is not None
+                             and world.dynamics.society is not None))):
+                try:
+                    route = _dynamic_path(
+                        world, state, scene.key, required_item=affordance.consumes)
+                except CampaignCompletionError:
+                    continue
+                probe = state
+                for leg in route:
+                    if leg not in available_director_actions(world, probe):
+                        raise CampaignCompletionError(
+                            "authoritative stage route contains unavailable action"
+                        )
+                    probe = director_step(world, probe, leg)
+                # Use exact in-game elapsed turns, not estimated action
+                # categories; rest costs depend on the current clock phase.
+                total = probe.turn - state.turn
+                candidates.append((total, scene.key, affordance.key, affordance))
     if not candidates:
         return None
     _, site, _, affordance = min(candidates, key=lambda row: row[:3])
@@ -95,7 +187,8 @@ def _complete_stage(world: DirectorWorld, state: DirectorState, quest: Any,
             if picked is None:
                 raise CampaignCompletionError("missing original scene resource for quest objective")
             site, affordance = picked
-            for step in _path(world, state.scene, site):
+            for step in _dynamic_path(
+                    world, state, site, required_item=affordance.consumes):
                 apply(step)
             apply(DirectorAction("use", affordance.key, site))
 

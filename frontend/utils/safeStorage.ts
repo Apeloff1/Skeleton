@@ -19,8 +19,71 @@
  *   await safeSetItem('@codedock:welcome_seen:v1', '1');
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isPrunableStorageKey } from './storageRetentionPolicy';
+import { NativeMutationFence } from './NativeMutationFence';
 
 const _mirror = new Map<string, string | null>();
+const _nativeMutations = new NativeMutationFence();
+const _keyVersions = new Map<string, number>();
+const MAX_MIRROR_ENTRIES = 2_048;
+const MAX_MIRROR_CHARS = 1024 * 1024; // ≈2 MiB UTF-16 memory budget
+const MAX_MIRROR_ITEM_CHARS = 64 * 1024;
+const MAX_VERSION_ENTRIES = 4_096;
+let _mirrorGeneration = 0;
+let _mirrorChars = 0;
+
+function forgetMirror(key: string): void {
+  if (!_mirror.has(key)) return;
+  const old = _mirror.get(key);
+  if (typeof old === 'string') _mirrorChars = Math.max(0, _mirrorChars - old.length);
+  _mirror.delete(key);
+}
+
+function remember(key: string, value: string | null): void {
+  forgetMirror(key);
+  const chars = typeof value === 'string' ? value.length : 0;
+  // The native store remains authoritative even when an object is too large
+  // for the ephemeral fast-read mirror.
+  if (chars > MAX_MIRROR_ITEM_CHARS) return;
+  while (_mirror.size >= MAX_MIRROR_ENTRIES ||
+         (_mirrorChars + chars > MAX_MIRROR_CHARS && _mirror.size > 0)) {
+    const oldest = _mirror.keys().next().value;
+    if (oldest === undefined) break;
+    forgetMirror(oldest);
+  }
+  _mirror.set(key, value);
+  _mirrorChars += chars;
+}
+
+export function safeStorageMirrorStats() {
+  return { entries: _mirror.size, chars: _mirrorChars, maxChars: MAX_MIRROR_CHARS };
+}
+
+/** Drop only replaceable fast-read memory; never wipe native stored values. */
+export function shedSafeStorageMirror(): void {
+  _mirrorGeneration++; // fence late reads started before the pressure warning
+  _keyVersions.clear();
+  _mirror.clear();
+  _mirrorChars = 0;
+}
+
+function bumpVersion(key: string): number {
+  if (!_keyVersions.has(key) && _keyVersions.size >= MAX_VERSION_ENTRIES) {
+    // A new generation fences late native read results even if we drop old
+    // key-version bookkeeping under very large studio workloads.
+    _mirrorGeneration += 1;
+    _keyVersions.clear();
+    _mirror.clear();
+    _mirrorChars = 0;
+  }
+  const next = (_keyVersions.get(key) || 0) + 1;
+  _keyVersions.set(key, next);
+  return next;
+}
+
+function isCurrent(key: string, version: number, generation: number): boolean {
+  return (_keyVersions.get(key) || 0) === version && generation === _mirrorGeneration;
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Stale-key self-pruning (added 2026-02).
@@ -30,15 +93,11 @@ const _mirror = new Map<string, string | null>();
 // pruner O(1) on cold boots (one read + at most one write).
 // ─────────────────────────────────────────────────────────────────────
 const META_KEY = '@safeStorage:meta:v1';
-const DEFAULT_PRUNE_PREFIXES = [
-  '@boot/',
-  '@codedock/',
-  // ★ Feb 2026: also prune feature-flag + telemetry caches so they age out
-  // naturally instead of growing forever on the dev box.
-  '@feature-flags/',
-  '@telemetry/',
-];
-const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+// The retention policy is an explicit allowlist. Never prune a full
+// @codedock/, @boot/ or @feature/ namespace: these contain durable state.
+const DEFAULT_PRUNE_PREFIXES = ['@boot/last_ok:v1', '@telemetry/cache/'];
+const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 
 let _metaCache: Record<string, number> | null = null;
 let _metaDirty = false;
@@ -58,12 +117,17 @@ async function _flushMeta() {
   if (!_metaDirty || !_metaCache) return;
   _metaDirty = false;
   try {
-    await timeout(AsyncStorage.setItem(META_KEY, JSON.stringify(_metaCache)).then(() => null), 800, null);
-  } catch { /* best-effort */ }
+    const ok = await timeout(_nativeMutations.run([META_KEY], () => AsyncStorage.setItem(META_KEY, JSON.stringify(_metaCache))), 800, false);
+    if (!ok) _metaDirty = true; // a failed metadata flush must remain retryable
+  } catch {
+    _metaDirty = true;
+  }
 }
 
 function _shouldTrack(key: string, prefixes: string[]): boolean {
-  return prefixes.some(p => key.startsWith(p));
+  // Caller-supplied prefixes can only narrow the allowlist, never authorize
+  // deletion of a project, flag, preference, credential or crash receipt.
+  return isPrunableStorageKey(key) && prefixes.some(p => key.startsWith(p));
 }
 
 function timeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -81,18 +145,43 @@ function timeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 }
 
 export async function safeGetItem(key: string, fallback: string | null = null, ms = 800): Promise<string | null> {
+  // Never present a cached or underlying pre-write value as current while
+  // a native mutation for this key is unacknowledged.
+  if (_nativeMutations.isBusy(key)) return fallback;
   if (_mirror.has(key)) return _mirror.get(key) ?? fallback;
+  const version = _keyVersions.get(key) || 0;
+  const generation = _mirrorGeneration;
   try {
-    const v = await timeout(AsyncStorage.getItem(key), ms, fallback);
-    _mirror.set(key, v);
-    return v;
+    const result = await timeout(
+      AsyncStorage.getItem(key).then(value => ({ ok: true, value })),
+      ms,
+      { ok: false, value: fallback },
+    );
+    // Do not permanently cache a timeout as a real stored value.
+    if (!result.ok) return fallback;
+    // A native read that began before a newer write/reset is stale. Never
+    // let its late completion replace the newer in-process state.
+    if (!isCurrent(key, version, generation)) return _mirror.get(key) ?? fallback;
+    remember(key, result.value);
+    return result.value;
   } catch { return fallback; }
 }
 
 export async function safeSetItem(key: string, value: string, ms = 800): Promise<boolean> {
-  _mirror.set(key, value); // optimistic mirror — read-after-write is always consistent
+  const version = bumpVersion(key);
+  const generation = _mirrorGeneration;
+  forgetMirror(key); // only physical acknowledgement can populate cache
   try {
-    await timeout(AsyncStorage.setItem(key, value).then(() => null), ms, null);
+    const saved = await timeout(
+      _nativeMutations.run([key], () => AsyncStorage.setItem(key, value)),
+      ms, false,
+    );
+    if (!saved) {
+      // A timed-out write is unverified: invalidate the optimistic mirror.
+      if (isCurrent(key, version, generation)) forgetMirror(key);
+      return false;
+    }
+    if (isCurrent(key, version, generation)) remember(key, value);
     // Update sidecar metadata for prune-eligible keys.
     if (_shouldTrack(key, DEFAULT_PRUNE_PREFIXES)) {
       const meta = await _loadMeta();
@@ -102,13 +191,18 @@ export async function safeSetItem(key: string, value: string, ms = 800): Promise
       void _flushMeta();
     }
     return true;
-  } catch { return false; }
+  } catch {
+    if (isCurrent(key, version, generation)) forgetMirror(key);
+    return false;
+  }
 }
 
 export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
-  _mirror.delete(key);
+  bumpVersion(key);
+  forgetMirror(key);
   try {
-    await timeout(AsyncStorage.removeItem(key).then(() => null), ms, null);
+    const removed = await timeout(_nativeMutations.run([key], () => AsyncStorage.removeItem(key)), ms, false);
+    if (!removed) return false;
     if (_metaCache && key in _metaCache) {
       delete _metaCache[key];
       _metaDirty = true;
@@ -119,9 +213,10 @@ export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
 }
 
 export async function safeMultiRemove(keys: string[], ms = 1500): Promise<boolean> {
-  for (const k of keys) _mirror.delete(k);
+  for (const k of keys) { bumpVersion(k); forgetMirror(k); }
   try {
-    await timeout(AsyncStorage.multiRemove(keys).then(() => null), ms, null);
+    const removed = await timeout(_nativeMutations.run(keys, () => AsyncStorage.multiRemove(keys)), ms, false);
+    if (!removed) return false;
     if (_metaCache) {
       let touched = false;
       for (const k of keys) {
@@ -133,7 +228,27 @@ export async function safeMultiRemove(keys: string[], ms = 1500): Promise<boolea
   } catch { return false; }
 }
 
-export function clearMirror() { _mirror.clear(); _metaCache = null; }
+/**
+ * Full-device reset admission: refuse new wrapper writes until every
+ * previously accepted native mutation physically settles. The caller must
+ * resume in a finally block whether or not a wipe was attempted.
+ */
+export async function pauseSafeStorageForWipe(ms = 1_500): Promise<boolean> {
+  try {
+    return await timeout(_nativeMutations.pauseAndDrain().then(() => true), ms, false);
+  } catch {
+    return false;
+  }
+}
+
+export function resumeSafeStorageAfterWipe(): void {
+  _nativeMutations.resume();
+}
+
+export function clearMirror() {
+  shedSafeStorageMirror();
+  _metaCache = null;
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // pruneExpired — drop @boot/* and @codedock/* entries older than `ttlMs`.
@@ -156,7 +271,8 @@ export async function pruneExpired(opts: {
   const started = Date.now();
   const ttl = opts.ttlMs ?? DEFAULT_TTL_MS;
   const prefixes = opts.prefixes ?? DEFAULT_PRUNE_PREFIXES;
-  const scanAll = opts.scanAllKeys ?? true;
+  // A full key scan is opt-in; huge game workspaces can have many durable keys.
+  const scanAll = opts.scanAllKeys ?? false;
   const timeoutMs = opts.ms ?? 1500;
 
   const meta = await _loadMeta();
@@ -195,14 +311,20 @@ export async function pruneExpired(opts: {
   // 3. Remove expired keys + their meta entries.
   const prunedKeys = Array.from(expired);
   if (prunedKeys.length) {
-    try {
-      await timeout(AsyncStorage.multiRemove(prunedKeys).then(() => null), timeoutMs, null);
-    } catch { /* best-effort */ }
-    for (const k of prunedKeys) {
-      _mirror.delete(k);
-      delete meta[k];
+    const removed = await timeout(
+      _nativeMutations.run(prunedKeys, () => AsyncStorage.multiRemove(prunedKeys)),
+      timeoutMs,
+      false,
+    ).catch(() => false);
+    // A failed prune must not declare authoritative state deleted. Preserve
+    // metadata for the next attempt; prevent a stale mirror in either case.
+    for (const k of prunedKeys) { bumpVersion(k); forgetMirror(k); }
+    if (removed) {
+      for (const k of prunedKeys) delete meta[k];
+      _metaDirty = true;
+    } else {
+      prunedKeys.length = 0;
     }
-    _metaDirty = true;
   }
 
   await _flushMeta();

@@ -22,8 +22,9 @@ const requestIdleTask = (callback: () => void) => {
   const id = setTimeout(callback, 0);
   return { cancel: () => clearTimeout(id) };
 };import { safeGetItem, safeSetItem } from '../utils/safeStorage';
-import { traceStep, getMemoryTrace, clearCrashes } from '../utils/bootTracer';
+import { traceStep, getMemoryTrace } from '../utils/bootTracer';
 import { STAGES, BootRunner, RunnerSnapshot, readBootCache, writeBootCache } from '../src/boot';
+import { shouldAcceptLocalBoot } from '../src/boot/recoveryPolicy';
 import api from '../src/utils/apiClient';
 import { onMemoryPressure, getMemTier } from '../utils/memoryGuard';
 import { useReduceMotion } from '../src/hooks/useReduceMotion';
@@ -142,7 +143,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
   const [phase, setPhase] = React.useState<'running' | 'ready' | 'failed'>('running');
   const [welcomeSeen, setWelcomeSeen] = React.useState<boolean | null>(null);
   const [showDiag, setShowDiag] = React.useState(false);
-  const [, setLongPressCount] = React.useState(0);
+  const longPressCountRef = React.useRef(0);
   const reduceMotion = useReduceMotion();
   const [retryKey, setRetryKey] = React.useState(0);
   const [failedStages, setFailedStages] = React.useState<CheckResult[]>([]);
@@ -151,12 +152,14 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
   const runnerRef = React.useRef<BootRunner | null>(null);
   const stageStatusRef = React.useRef<Record<string, string>>({});
   const phaseLockedRef = React.useRef(false);
+  const attemptEpochRef = React.useRef(0);
   const phase0DoneRef = React.useRef(false);
   const shedRef = React.useRef(false);
   const memTier = React.useRef(getMemTier()).current;
   const fadeIn = React.useRef(new Animated.Value(0)).current;
 
-  const commitPhase = React.useCallback((next: 'running' | 'ready' | 'failed') => {
+  const commitPhase = React.useCallback((next: 'running' | 'ready' | 'failed', epoch: number) => {
+    if (epoch !== attemptEpochRef.current) return;
     if (phaseLockedRef.current) {
       blog(`commitPhase(${next}) ignored`);
       return;
@@ -188,27 +191,24 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
     const mountedAt = Date.now();
     const minimumVisibleMs = reduceMotion ? 200 : (memTier === 'low' ? 400 : 800);
     let cancelled = false;
+    const epoch = attemptEpochRef.current;
+    const current = () => !cancelled && epoch === attemptEpochRef.current;
+    phaseLockedRef.current = false;
 
     phase0DoneRef.current = false;
     shedRef.current = false;
     stageStatusRef.current = {};
 
-    if (memTier === 'low') {
-      durable('boot_low_tier_preclean');
-      try {
-        import('../utils/selfCleaner')
-          .then(module => module.runSelfCleaner('boot_low_tier'))
-          .catch(() => {});
-      } catch {}
-    }
+    // Defer storage cleanup until Product confirms a healthy boot.
 
     const offMemoryPressure = onMemoryPressure(() => {
-      if (cancelled) return;
+      if (!current()) return;
       shedRef.current = true;
       durable('boot_mem_pressure_shed', { phase0: phase0DoneRef.current });
-      if (phase0DoneRef.current && !phaseLockedRef.current) {
-        clearCrashes().catch(() => {});
-        commitPhase('ready');
+      // Memory pressure may shed optional background work, not bypass an
+      // unverified critical local stage or erase crash-loop evidence.
+      if (phase0DoneRef.current && runnerRef.current && shouldAcceptLocalBoot(phase0DoneRef.current, runnerRef.current.snapshot().criticalOk) && !phaseLockedRef.current) {
+        commitPhase('ready', epoch);
       }
     });
 
@@ -229,23 +229,28 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
           age >= 0 &&
           age < WARM_BOOT_MAX_AGE_MS
         ) {
-          if (cancelled) return;
+          if (!current()) return;
+          // The previous process' cache is advisory. Do not skip current
+          // critical checks, or classify the new boot as healthy yet.
           setWarmBoot(true);
-          setProgress(100);
-          setActiveLabel('Resuming session');
-          commitPhase('ready');
-          clearCrashes().catch(() => {});
+          setActiveLabel('Checking local session');
           await traceStep(`bootlauncher_warm_score${cache.score}_age${age}ms`);
         }
       } catch {}
     })();
 
-    const runner = new BootRunner(STAGES);
+    let runner: BootRunner;
+    try { runner = new BootRunner(STAGES); }
+    catch (err: any) {
+      durable('boot_graph_invalid', { message: String(err?.message || err).slice(0, 160) });
+      commitPhase('failed', epoch);
+      return () => { cancelled = true; try { offMemoryPressure(); } catch {} };
+    }
     runnerRef.current = runner;
     void runner.run();
 
     const unsubscribe = runner.on((snapshot: RunnerSnapshot) => {
-      if (cancelled) return;
+      if (!current()) return;
 
       // The primary progress bar represents only work that blocks entry.
       // Once phase 0 is terminal and its critical stages are healthy, the
@@ -301,6 +306,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
       try {
         durable('boot_start');
         await runner.waitForPhase(0);
+        if (!current()) return;
         const localSnapshot = runner.snapshot();
         phase0DoneRef.current = true;
         setProgress(localSnapshot.criticalOk ? 100 : Math.round(localSnapshot.phaseProgress[0] || 0));
@@ -311,9 +317,9 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
           elapsed: localSnapshot.elapsedMs,
         });
 
-        if (!localSnapshot.criticalOk) {
-          if (cancelled) return;
-          commitPhase('failed');
+        if (!shouldAcceptLocalBoot(localSnapshot.phaseDone[0], localSnapshot.criticalOk)) {
+          if (!current()) return;
+          commitPhase('failed', epoch);
           await traceStep('bootlauncher_critical_fail');
           try {
             api.post('/api/telemetry/boot', {
@@ -333,14 +339,15 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         if (elapsed < minimumVisibleMs) {
           await new Promise(resolve => setTimeout(resolve, minimumVisibleMs - elapsed));
         }
-        if (cancelled) return;
+        if (!current()) return;
 
-        commitPhase('ready');
-        clearCrashes().catch(() => {});
+        commitPhase('ready', epoch);
+        // ProductShellRoute marks the boot clean only after it renders.
         await traceStep(
           `bootlauncher_ready_phase0_${Math.round(localSnapshot.phaseProgress[0] || 0)}_${localSnapshot.elapsedMs}ms`,
         );
 
+        if (!current()) return;
         if (shedRef.current) {
           durable('boot_shed_background_phases');
           try { runner.cancel(); } catch {}
@@ -348,6 +355,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         }
 
         runner.waitForPhase(2).then(finalSnapshot => {
+          if (!current() || finalSnapshot.cancelled) return;
           const runtimeOk = finalSnapshot.stages.app_runtime?.status === 'ok';
           writeBootCache({
             ts: Date.now(),
@@ -368,17 +376,23 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         }).catch(() => {});
       } catch (error: any) {
         await traceStep(`bootlauncher_exception_${String(error?.message || error).slice(0, 60)}`);
-        if (!cancelled) commitPhase('failed');
+        if (current()) commitPhase('failed', epoch);
       }
     })();
 
     const watchdogMs = memTier === 'low' ? BOOT_WATCHDOG_LOW_MEM_MS : BOOT_WATCHDOG_NORMAL_MS;
     durable('watchdog_scheduled', { ms: watchdogMs, tier: memTier });
     const watchdog = setTimeout(() => {
-      if (cancelled || phaseLockedRef.current) return;
-      durable('watchdog_fired_force_ready');
-      clearCrashes().catch(() => {});
-      commitPhase('ready');
+      if (!current() || phaseLockedRef.current) return;
+      const snapshot = runner.snapshot();
+      durable('watchdog_fired', { criticalOk: snapshot.criticalOk, phase0Done: snapshot.phaseDone[0] });
+      if (shouldAcceptLocalBoot(snapshot.phaseDone[0], snapshot.criticalOk)) {
+        commitPhase('ready', epoch);
+      } else {
+        // Use the independent static launcher instead of pretending boot
+        // succeeded. It preserves access to Product and Safe Mode.
+        onEscalate('phase0_watchdog');
+      }
     }, watchdogMs);
 
     return () => {
@@ -400,24 +414,25 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
     return () => clearTimeout(timer);
   }, [phase, welcomeSeen, onReady]);
 
-  const handleEnterPress = React.useCallback(async () => {
+  const handleEnterPress = React.useCallback(() => {
     durable('user_enter_product_press');
-    try { await safeSetItem(WELCOME_FLAG_KEY, '1'); } catch {}
+    // Never gate routing on native storage or tracing.
+    void safeSetItem(WELCOME_FLAG_KEY, '1').catch(() => {});
     onReady();
   }, [onReady]);
 
   const handleLogoLongPress = React.useCallback(() => {
-    setLongPressCount(count => {
-      const next = count + 1;
-      if (next >= 2) setShowDiag(true);
-      return next;
-    });
+    longPressCountRef.current += 1;
+    if (longPressCountRef.current >= 2) setShowDiag(true);
   }, []);
 
-  const handleRetryBoot = React.useCallback(async () => {
+  const handleRetryBoot = React.useCallback(() => {
     durable('user_retry');
-    try { await safeSetItem('@boot/crash_count', '0'); } catch {}
-    await traceStep('bootlauncher_user_retry');
+    // Preserve the crash counter; invalidate and cancel the prior attempt
+    // before React mounts the next runner.
+    attemptEpochRef.current += 1;
+    try { runnerRef.current?.cancel(); } catch {}
+    void traceStep('bootlauncher_user_retry').catch(() => {});
     setProgress(0);
     setPhase1Pct(0);
     setActiveLabel('Starting up…');

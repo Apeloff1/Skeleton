@@ -36,6 +36,9 @@ SYSTEM_FEATURES = [
     "ultimate_hub"
 ]
 
+# Typed per-environment loader (dev/staging/prod); call at boot to fail fast.
+from config.environment import ConfigError, RuntimeConfig, load_runtime_config  # noqa: E402,F401
+
 # =============================================================================
 # Database Configuration
 # =============================================================================
