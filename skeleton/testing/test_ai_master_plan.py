@@ -369,7 +369,7 @@ def test_lifecycle_volumes_bind_landed_shared_contracts() -> None:
         if volume["id"] not in ids:
             continue
         assert "skeleton/ai/runtime/deferred/lifecycle_governance.py" in volume["implementation_paths"]
-        assert volume["tests"] == ["skeleton/testing/test_lifecycle_governance.py"]
+        assert volume["tests"] == ["skeleton/testing/test_lifecycle_governance.py", "tests/flgb/test_volume_wave4_completion.py"]
         assert not any(path.startswith("planned:") for path in volume["implementation_paths"] + volume["tests"])
         assert volume["implementation_status"] == "unverified"
         assert volume["completion_checkbox"] is False

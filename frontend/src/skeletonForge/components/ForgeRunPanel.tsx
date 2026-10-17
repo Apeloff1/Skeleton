@@ -160,7 +160,7 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
 
 function StageTrack({ stages, running }: { stages: StageView[]; running: boolean }) {
   const [active, setActive] = useRovingIndex(stages.length);
-  const refs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const refs = React.useRef<({ focus?: () => void } | null)[]>([]);
   const viaKey = React.useRef(false);
   React.useEffect(() => {
     if (!viaKey.current) return;
