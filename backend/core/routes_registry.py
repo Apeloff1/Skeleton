@@ -119,6 +119,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.systems_forge", "router"),
     ("routes.galaxy_studio_axes", "router"),
     ("routes.build_ledger", "router"),
+    ("routes.app_projects", "router"),  # app foundation Projects (/api/app/projects)
     ("routes.text_gamefile", "router"),
     ("routes.stage_builder", "router"),
     ("routes.build_journey", "router"),
