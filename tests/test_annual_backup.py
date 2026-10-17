@@ -109,6 +109,10 @@ class AnnualSnapshotTests(unittest.TestCase):
                 (digest("forged"),),
             )
             db.commit()
+            # Flush the modified WAL into the sealed main-file image so this
+            # tests the hash chain, not only an unsealed SQLite sidecar.
+            db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            db.execute("PRAGMA journal_mode=DELETE")
         self._reseal_after_db_mutation("checkpointed")
         with self.assertRaisesRegex(AnnualBackupError, "checkpoint chain"):
             verify_annual_snapshot(self.root, "checkpointed")
@@ -130,9 +134,23 @@ class AnnualSnapshotTests(unittest.TestCase):
                 (digest("substituted-approval"),),
             )
             db.commit()
+            # Flush the modified WAL into the sealed main-file image so this
+            # tests the hash chain, not only an unsealed SQLite sidecar.
+            db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            db.execute("PRAGMA journal_mode=DELETE")
         self._reseal_after_db_mutation("grant-rotated")
         with self.assertRaisesRegex(AnnualBackupError, "authority chain"):
             verify_annual_snapshot(self.root, "grant-rotated")
+
+
+    def test_unsealed_wal_sidecar_is_rejected_even_if_manifest_is_unchanged(self):
+        snapshot_annual_production(self.store, self.root, label="offline")
+        sidecar = self.root / "offline.db-wal"
+        sidecar.write_bytes(b"unsealed after-snapshot SQLite log")
+        with self.assertRaisesRegex(AnnualBackupError, "sidecars"):
+            verify_annual_snapshot(self.root, "offline")
+        sidecar.unlink()
+        self.assertTrue(verify_annual_snapshot(self.root, "offline")["verified"])
 
 
 if __name__ == "__main__":
