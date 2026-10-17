@@ -111,6 +111,12 @@ def _verify(snapshot: dict) -> dict[tuple[str, str], dict]:
 def compare_custody(before: dict, after: dict) -> dict:
     """Identify loss, additions and changes requiring a fresh reviewed corpus."""
     previous, current = _verify(before), _verify(after)
+    # A manifest revision can modify licensing, admission scope or authority
+    # without changing the redacted per-document descriptors. Never call that
+    # a reusable unchanged corpus: every retained document needs new review.
+    manifest_changed = (
+        before["source_manifest_sha256"] != after["source_manifest_sha256"]
+    )
     changes = []
     for sdk_id, path in sorted(previous.keys() | current.keys()):
         old, new = previous.get((sdk_id, path)), current.get((sdk_id, path))
@@ -119,7 +125,9 @@ def compare_custody(before: dict, after: dict) -> dict:
         elif new is None:
             state = "document_removed_or_deauthorized"
         elif old == new:
-            continue
+            if not manifest_changed:
+                continue
+            state = "manifest_authority_changed_requires_reapproval"
         elif old.get("trainable") is True and new.get("trainable") is not True:
             state = "training_authority_revoked"
         elif old.get("sha256") != new.get("sha256"):
@@ -143,6 +151,7 @@ def compare_custody(before: dict, after: dict) -> dict:
         "schema_version": DRIFT_SCHEMA,
         "before_snapshot_digest": before["snapshot_digest"],
         "after_snapshot_digest": after["snapshot_digest"],
+        "source_manifest_changed": manifest_changed,
         "unchanged_documents": 0,
         "changed_documents": len(changes),
         "changes": changes,
