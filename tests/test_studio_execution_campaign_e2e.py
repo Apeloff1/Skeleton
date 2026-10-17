@@ -45,7 +45,7 @@ class FullStudioExecutionCampaignTests(unittest.TestCase):
         self.assertEqual(state["native_roms_verified"], 0)
         self.assertEqual(len(state["run_digest"]), 64)
 
-    def test_real_source_missing_compiler_and_nes_emulator_unsupported(self):
+    def test_real_source_missing_compiler_and_two_optional_emulators_blocked(self):
         with patch(
             "skeleton.ai.game_builder.studio_execution_campaign.qualify_campaign_target",
             return_value={
@@ -66,15 +66,15 @@ class FullStudioExecutionCampaignTests(unittest.TestCase):
                 authorized=True, execute=True,
             )
         self.assertEqual(state["verified_stage_attempts"], 2)
-        self.assertEqual(state["blocked_stage_attempts"], 3)
-        self.assertEqual(state["unsupported_stage_attempts"], 1)
+        self.assertEqual(state["blocked_stage_attempts"], 4)
+        self.assertEqual(state["unsupported_stage_attempts"], 0)
         self.assertEqual(state["native_roms_verified"], 0)
         self.assertEqual(state["compiled_cartridge_victories"], 0)
         self.assertFalse(state["full_release_qualified"])
         self.assertTrue(any(
             event["target"] == "nintendo_famicom"
             and event["stage"] == "emulator"
-            and event["status"] == "unsupported"
+            and event["status"] == "blocked"
             for event in state["events"]
         ))
 
