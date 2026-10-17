@@ -86,6 +86,12 @@ class TrueOriginalConsoleMediaSourceTests(unittest.TestCase):
             ("AnimationTiles:\n", "AnimationTiles:\n    db $00, $00\n"),
             ("OriginalMusicLow:\n", "OriginalMusicLow:\n    db $00\n"),
             ("SoundPickup:\n", "SoundPickup:\n    ret\n"),
+            ("    call TickOriginalMusic\n",
+             "    ; intentionally bypass native original audio\n"),
+            ("    call AnimateHero\n",
+             "    ; intentionally bypass native sprite animation\n"),
+            ("    call InitOriginalAudio\n",
+             "    ; intentionally skip console APU setup\n"),
         )
         for before, after in swaps:
             with self.subTest(before=before):
@@ -107,6 +113,7 @@ class TrueOriginalConsoleMediaSourceTests(unittest.TestCase):
         program = folder / "main.s"
         original = program.read_text(encoding="utf-8")
         self.assertIn("OriginalMusicHigh:\n", original)
+        self.assertIn("    jsr TickOriginalMusic\n", original)
         program.write_text(
             original.replace(
                 "OriginalMusicHigh:\n",
