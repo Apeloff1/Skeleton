@@ -239,6 +239,7 @@ def observe_production_campaign(
             ("studio.source_integrity_checked", target["source_receipt_digest"]),
             ("studio.cross_engine_pixel_parity", target["cross_engine_pixel_parity_digest"]),
             ("studio.rom_structure_checked", target["native_binary_evidence_digest"]),
+            ("studio.native_cpu_dpad_playthrough", target["real_emulator_evidence_digest"]),
             ("studio.browser_javascript_replay", target["browser_javascript_evidence_digest"]),
             ("studio.godot_headless_replay", target["godot_headless_evidence_digest"]),
             ("studio.generated_game_canvas_frames", target["generated_canvas_evidence_digest"]),
@@ -278,6 +279,7 @@ def observe_production_campaign(
             for row in report["targets"]
         ),
         "rom_structurally_checked_count": report["native_roms_structurally_verified"],
+        "actual_native_rom_victory_replays": report["native_rom_machine_code_playthroughs_verified"],
         "actual_browser_javascript_replays": report["browser_javascript_playthroughs_verified"],
         "actual_godot_headless_replays": report["godot_headless_playthroughs_verified"],
         "generated_game_canvas_captures": report["generated_game_canvas_captures_verified"],
