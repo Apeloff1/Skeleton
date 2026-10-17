@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from hashlib import sha256
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -20,6 +19,7 @@ class JeevesConsoleSourceStageTests(unittest.TestCase):
         self.workspace = GameWorkspace.create(Path(self.tmp.name) / "studio", authorized=True)
         self.project = "originalconsole"
         self.workspace.create_project(self.project, "puzzle", authorized=True)
+        self.initial_paths = sorted(row.path for row in self.workspace.files("current", self.project))
         self.intent = {
             "title": "Original Console Source",
             "subtitle": "One real input-driven game and its original graphic assets",
@@ -122,9 +122,8 @@ class JeevesConsoleSourceStageTests(unittest.TestCase):
                 **self.request(), "creative_identity": []
             })
         self.assertEqual(
-            [item.path for item in self.workspace.files("current", self.project)],
-            ["project.json", "game/readme.md"] if False else
-            [item.path for item in self.workspace.files("current", self.project)],
+            sorted(row.path for row in self.workspace.files("current", self.project)),
+            self.initial_paths,
         )
 
     def test_stale_source_revisions_do_not_overwrite_and_unauthorized_commit_denied(self):
@@ -135,7 +134,7 @@ class JeevesConsoleSourceStageTests(unittest.TestCase):
         self.workspace.commit(result["proposal_id"], human_approved=True, authorized=True)
         with self.assertRaises(WorkspaceError):
             self.call("game.console.source.stage", payload)
-        with self.assertRaises(Exception):
+        with self.assertRaises(WorkspaceError):
             self.workspace.commit(result["proposal_id"], human_approved=True, authorized=True)
 
 
