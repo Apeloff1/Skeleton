@@ -19,7 +19,14 @@ from skeleton.client.errors import (
 )
 from skeleton.client.gateway import GatewayClient
 from skeleton.client.memory import MemoryClient
-from skeleton.client.projects import Project, ProjectBuild, ProjectsClient
+from skeleton.client.projects import (
+    PROJECTS_BASE_PATH,
+    Project,
+    ProjectBrief,
+    ProjectBuild,
+    ProjectPage,
+    ProjectsClient,
+)
 from skeleton.client.retry import RetryPolicy
 from skeleton.client.seal import RequestSealer
 from skeleton.client.services import ServicesClient
@@ -32,8 +39,11 @@ __all__ = [
     "CancelToken",
     "GatewayClient",
     "MemoryClient",
+    "PROJECTS_BASE_PATH",
     "Project",
+    "ProjectBrief",
     "ProjectBuild",
+    "ProjectPage",
     "ProjectsClient",
     "RequestSealer",
     "RetryPolicy",

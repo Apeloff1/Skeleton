@@ -34,8 +34,19 @@ class SkeletonHTTPError(SkeletonClientError):
         self.message = message
         self.url = url
         self.body = body
-        if code is None and isinstance(body, dict) and isinstance(body.get("detail"), str):
-            code = body["detail"]
+        #: Structured context from a v1 error envelope (empty otherwise).
+        self.context: dict[str, Any] = {}
+        if code is None and isinstance(body, dict):
+            envelope = body.get("error")
+            if isinstance(envelope, dict) and isinstance(envelope.get("code"), str):
+                # v1 envelope: {"error": {"code": "PROJECT.*", "message": ..., ...}}
+                code = envelope["code"]
+                if isinstance(envelope.get("message"), str) and envelope["message"]:
+                    self.message = envelope["message"]
+                ctx = envelope.get("context")
+                self.context = dict(ctx) if isinstance(ctx, dict) else {}
+            elif isinstance(body.get("detail"), str):
+                code = body["detail"]  # legacy {"detail": "<code>"}
         #: Machine-readable error code from ``{"detail": "<code>"}`` bodies.
         self.code = code
 
