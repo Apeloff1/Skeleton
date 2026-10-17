@@ -24,7 +24,7 @@ class ArchitectureRuleRegistryTests(unittest.TestCase):
     def test_current_registry_is_valid(self) -> None:
         result = MODULE.validate(ROOT, as_of=AS_OF)
         self.assertEqual(result["status"], "valid")
-        self.assertEqual(result["rule_count"], 13)
+        self.assertEqual(result["rule_count"], 14)
         self.assertEqual(result["waiver_count"], 0)
         self.assertEqual(result["masterplan_bindings"], ["VOL-055", "VOL-116"])
 

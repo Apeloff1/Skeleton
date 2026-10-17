@@ -1,6 +1,6 @@
 # Architecture Rule Registry
 
-<!-- machine-git-blob: machine/architecture_rule_registry.json@e7f22313f6d8a00a0a4e0c347d1e9f735008c647 -->
+<!-- machine-git-blob: machine/architecture_rule_registry.json@95fb29f95746117f953abe47cd4b3294c759c7cd -->
 
 This registry implements the P2 masterplan gaps in **VOL-055 Architecture Linter** and **VOL-116 Architecture Fitness Functions** without creating a new architecture domain.
 

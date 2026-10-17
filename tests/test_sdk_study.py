@@ -112,6 +112,18 @@ def test_exact_sdk_pins_and_rights(tmp_path):
         validate_sources(path)
 
 
+def test_admitted_document_rejects_key_material(tmp_path):
+    path, _, sdk = _sources(tmp_path)
+    header = "-----BEGIN " + "PRIVATE KEY-----"
+    raw = ("Notes.\n" + header + "\n").encode()
+    (sdk / "README.md").write_bytes(raw)
+    source = json.loads(path.read_text())
+    source["sdks"][0]["documents"][0]["sha256"] = sha256(raw).hexdigest()
+    _write(path, source)
+    with pytest.raises(SDKStudyError, match="prohibited secret"):
+        validate_sources(path)
+
+
 def test_unreviewed_sdk_inventory_never_trainable(tmp_path):
     path, digest, _ = _sources(tmp_path, admitted=False)
     receipt, entries = validate_sources(path)
@@ -131,20 +143,6 @@ def test_nonconsole_sdk_requires_explicit_kind(tmp_path):
     doc["sdks"][0]["sdk_kind"] = "made_up_domain"
     _write(path, doc)
     with pytest.raises(SDKStudyError, match="unknown SDK family"):
-        validate_sources(path)
-
-
-def test_private_key_documents_still_rejected(tmp_path):
-    # Built by concatenation so the repository secret scanner does not flag
-    # this fixture; the bytes written are the real PEM private-key header.
-    marker = "-----BEGIN " + "PRIVATE KEY-----"
-    path, _, sdk = _sources(tmp_path)
-    raw = ("Original notes\n" + marker + "\nnot-a-real-key\n").encode("utf-8")
-    (sdk / "README.md").write_bytes(raw)
-    source = json.loads(path.read_text())
-    source["sdks"][0]["documents"][0]["sha256"] = sha256(raw).hexdigest()
-    _write(path, source)
-    with pytest.raises(SDKStudyError, match="prohibited secret"):
         validate_sources(path)
 
 
