@@ -31,6 +31,16 @@ CODECS = {
     "windows_modern": TileCodec.INDEXED_8BPP,
     "linux_desktop": TileCodec.INDEXED_8BPP,
     "macos_modern": TileCodec.INDEXED_8BPP,
+    # These targets receive real portable asset previews and editable data;
+    # their existing native source exporters do not yet consume these tiles.
+    "commodore_64": TileCodec.INDEXED_8BPP,
+    "dos_vga": TileCodec.INDEXED_8BPP,
+    "atari_400_800": TileCodec.INDEXED_8BPP,
+    "apple_ii": TileCodec.INDEXED_8BPP,
+    "sinclair_zx_spectrum": TileCodec.INDEXED_8BPP,
+    "msx1": TileCodec.INDEXED_8BPP,
+    "colecovision": TileCodec.INDEXED_8BPP,
+    "vectrex": TileCodec.INDEXED_8BPP,
 }
 NATIVE_EMBEDDED_TARGETS = frozenset({
     "nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
