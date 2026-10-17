@@ -1,6 +1,7 @@
 name: Release Images
 
-# Tag-triggered release: verifies the tag matches VERSION, generates the
+# Tag-triggered release: verifies the tag matches the canonical version
+# ([project].version in the root pyproject.toml), generates the
 # changelog section, then builds and pushes backend + frontend images to GHCR.
 # Auth is the built-in GITHUB_TOKEN only (packages: write); nothing else is required.
 # workflow_dispatch builds both images without pushing (dry run).
@@ -45,7 +46,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          version="$(tr -d '[:space:]' < VERSION)"
+          version="$(python -c 'import sys; sys.path.insert(0, "scripts"); import check_version_drift as d; print(d.read_version())')"
           if [ "$PUSH" = "true" ]; then
             python scripts/check_version_drift.py --tag "$GITHUB_REF_NAME"
           else

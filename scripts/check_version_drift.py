@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Fail if any versioned manifest drifts from the repo-root VERSION file.
+"""Fail if any versioned manifest drifts from the canonical version.
 
-VERSION is the single source of truth (semantic version, no leading "v").
+The single source of truth is ``[project].version`` in the repo-root
+``pyproject.toml`` (semantic version, no leading "v"). Every other manifest
+must match it.
 Usage: python scripts/check_version_drift.py [--tag vX.Y.Z]
 """
 from __future__ import annotations
@@ -29,23 +31,26 @@ def _app_json(rel: str) -> str:
     return json.loads((ROOT / rel).read_text())["expo"]["version"]
 
 
+SOURCE = "pyproject.toml"
 MANIFESTS = {
-    "pyproject.toml": _toml,
     "backend/pyproject.toml": _toml,
     "frontend/package.json": _package_json,
     "frontend/app.json": _app_json,
 }
 
 
-def read_version(root: Path = ROOT) -> str:
-    return (root / "VERSION").read_text().strip()
+def read_version() -> str:
+    return _toml(SOURCE).strip()
 
 
 def check(tag: str | None = None) -> list[str]:
     problems: list[str] = []
-    version = read_version()
+    try:
+        version = read_version()
+    except (KeyError, FileNotFoundError, ValueError) as exc:
+        return [f"{SOURCE}: cannot read canonical version ({exc})"]
     if not SEMVER.match(version):
-        problems.append(f"VERSION {version!r} is not a semantic version")
+        problems.append(f"{SOURCE} version {version!r} is not a semantic version")
     for rel, reader in MANIFESTS.items():
         try:
             found = reader(rel)
@@ -53,9 +58,9 @@ def check(tag: str | None = None) -> list[str]:
             problems.append(f"{rel}: cannot read version ({exc})")
             continue
         if found != version:
-            problems.append(f"{rel}: version {found!r} != VERSION {version!r}")
+            problems.append(f"{rel}: version {found!r} != {SOURCE} {version!r}")
     if tag is not None and tag.removeprefix("refs/tags/") != f"v{version}":
-        problems.append(f"tag {tag!r} does not match VERSION (expected 'v{version}')")
+        problems.append(f"tag {tag!r} does not match {SOURCE} (expected 'v{version}')")
     return problems
 
 

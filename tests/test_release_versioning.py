@@ -1,4 +1,4 @@
-"""Release pipeline contract: single VERSION source, changelog generation, image workflow."""
+"""Release pipeline contract: single version source (root pyproject.toml), changelog generation, image workflow."""
 from __future__ import annotations
 
 import importlib.util
@@ -37,13 +37,18 @@ def test_tag_must_match_version():
 
 
 def test_drift_detected(monkeypatch, tmp_path):
-    (tmp_path / "VERSION").write_text("1.2.3\n")
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.2.3"\n')
     monkeypatch.setattr(drift, "ROOT", tmp_path)
     (tmp_path / "frontend").mkdir()
     (tmp_path / "frontend" / "package.json").write_text('{"version": "1.2.4"}')
     problems = drift.check()
     assert any("frontend/package.json" in p and "1.2.4" in p for p in problems)
-    assert any("pyproject.toml: cannot read" in p for p in problems)
+    assert any("backend/pyproject.toml: cannot read" in p for p in problems)
+
+
+def test_missing_source_reported(monkeypatch, tmp_path):
+    monkeypatch.setattr(drift, "ROOT", tmp_path)
+    assert drift.check()[0].startswith("pyproject.toml: cannot read canonical version")
 
 
 def test_semver_validation():
