@@ -23,6 +23,7 @@ from .studio_campaign_lock import campaign_lock
 from .studio_runtime_qualification import _inputs as _browser_inputs, qualify_browser_gameplay
 from .studio_godot_qualification import godot_inputs, qualify_godot_headless
 from .studio_pixel_parity import inspect_cross_engine_pixels
+from .studio_dragon_canvas_capture import capture_generated_game, _png_geometry
 
 SCHEMA = "skeleton.game_builder.production_assurance.v1"
 QUALIFICATION_SCHEMA = "skeleton.game_builder.campaign_rom_evidence.v1"
@@ -39,6 +40,7 @@ GATES = (
     "cartridge_structure_checked",
     "browser_javascript_playthrough_executed",
     "godot_headless_playthrough_executed",
+    "generated_game_canvas_frames_recorded",
     "emulator_playthrough_executed",
     "controller_response_verified",
     "visual_and_audio_runtime_qualified",
@@ -51,6 +53,7 @@ SOURCE_GATES = frozenset(GATES[:7])
 PARITY_GATE = "cross_engine_pixel_art_parity"
 BROWSER_GATE = "browser_javascript_playthrough_executed"
 GODOT_GATE = "godot_headless_playthrough_executed"
+CANVAS_GATE = "generated_game_canvas_frames_recorded"
 NATIVE_GATES = frozenset(GATES[8:10])
 
 
@@ -353,6 +356,107 @@ def qualify_campaign_godot(
                 "graphical_framebuffer_verified": False}
 
 
+def _canvas_receipt(root: Path, target: str, source_identity: str) -> dict | None:
+    folder = root / "qualifications" / target / "canvas_capture"
+    manifest = folder / "capture.json"
+    if not manifest.exists():
+        return None
+    if folder.is_symlink() or manifest.is_symlink():
+        raise StudioAssuranceError("generated game capture may not be a symlink")
+    record = _load_json(manifest)
+    if (record.get("schema") != "skeleton.game_builder.dragon_generated_canvas_capture.v1"
+            or record.get("source") != "actual_local_headless_browser_canvas_screenshots"
+            or record.get("graphical_browser_pixels_observed") is not True
+            or record.get("user_screen_recorded") is not False
+            or record.get("model_training_authorized") is not False
+            or record.get("dragon_knowledge_promoted") is not False
+            or record.get("release_authorized") is not False):
+        raise StudioAssuranceError("capture lacks explicit original-canvas-only evidence")
+    if canonical_digest({k: v for k, v in record.items()
+                         if k != "capture_digest"}) != record.get("capture_digest"):
+        raise StudioAssuranceError("real game canvas manifest digest is corrupted")
+    frames = record.get("frames")
+    if (type(frames) is not dict or not 2 <= len(frames) <= 3
+            or set(frames) != {f"frame_{i:02d}.png" for i in range(len(frames))}):
+        raise StudioAssuranceError("browser canvas capture must contain bounded frames")
+    for name, claim in frames.items():
+        frame = folder / name
+        if frame.is_symlink() or not frame.is_file():
+            raise StudioAssuranceError("frameback evidence missing or replaced")
+        blob = frame.read_bytes()
+        try:
+            _png_geometry(blob)
+        except ValueError as exc:
+            raise StudioAssuranceError("captured canvas PNG is corrupted") from exc
+        if (type(claim) is not dict or claim.get("sha256") != sha256(blob).hexdigest()
+                or claim.get("bytes") != len(blob)):
+            raise StudioAssuranceError("captured screenshot differs from reviewed frame hash")
+    try:
+        html, replay, world = _browser_inputs(root / "targets" / target / "engines")
+    except (ValueError, OSError) as exc:
+        raise StudioAssuranceError("canvas capture's original HTML source is not current") from exc
+    if (record.get("world_digest") != world
+            or record.get("html_sha256") != sha256(html).hexdigest()
+            or record.get("proof_sha256") != sha256(replay).hexdigest()):
+        raise StudioAssuranceError("canvas capture belongs to a different game source revision")
+    return record
+
+
+def qualify_campaign_canvas(
+    order: CampaignOrder, root: str | Path, target: str, *,
+    authorized: bool, capture_consent: bool, execute: bool,
+    timeout_seconds: int = 60,
+) -> dict:
+    """Capture actual browser-generated game pixels with explicit local consent."""
+    if authorized is not True or capture_consent is not True:
+        raise PermissionError("operator must explicitly approve original-game frame capture")
+    if execute is not True:
+        raise StudioAssuranceError("actual Chromium capture requires explicit run intent")
+    if not isinstance(order, CampaignOrder) or target not in order.targets:
+        raise StudioAssuranceError("original game target not in campaign")
+    base = Path(root)
+    with campaign_lock(base):
+        current = _inspect_campaign_unlocked(order, base)
+        if target not in current["completed_targets"]:
+            raise StudioAssuranceError("source must be verified before image observation")
+        earlier = _canvas_receipt(base, target, current["identity"])
+        if earlier is not None:
+            return {
+                "target": target, "already_qualified": True,
+                "generated_game_canvas_recorded": True,
+                "evidence_digest": earlier["capture_digest"],
+                "model_training_authorized": False,
+            }
+        folder = base / "qualifications" / target
+        if folder.is_symlink():
+            raise StudioAssuranceError("qualification destination may not be a symlink")
+        folder.mkdir(parents=True, exist_ok=True)
+        dest = folder / "canvas_capture"
+        if dest.exists() or dest.is_symlink():
+            raise StudioAssuranceError("unverified capture already occupies output")
+        result = capture_generated_game(
+            base / "targets" / target / "engines", dest,
+            authorized=True, capture_consent=True,
+            execute=True, timeout_seconds=timeout_seconds,
+        )
+        if result.get("graphical_browser_pixels_observed") is not True:
+            return {
+                "target": target, "generated_game_canvas_recorded": False,
+                "blocker": result.get("blocker", "capture_unavailable"),
+                "model_training_authorized": False,
+            }
+        verified = _canvas_receipt(base, target, current["identity"])
+        if verified is None:
+            raise StudioAssuranceError("saved canvas record was not verifiable")
+        return {
+            "target": target, "generated_game_canvas_recorded": True,
+            "already_qualified": False,
+            "evidence_digest": verified["capture_digest"],
+            "model_training_authorized": False,
+            "user_screen_recorded": False,
+        }
+
+
 def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict:
     """Recheck real on-disk campaign artifacts and exact qualified binaries.
 
@@ -377,18 +481,22 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
             browser = None
             godot = None
             art_parity = None
+            canvas = None
             if source_receipt is not None:
                 if target in _BUILD_ADAPTERS:
                     binary = _qualification_receipt(base, target, campaign["identity"])
                 art_parity = inspect_cross_engine_pixels(source)
                 browser = _browser_receipt(base, target, campaign["identity"])
                 godot = _godot_receipt(base, target, campaign["identity"])
+                canvas = _canvas_receipt(base, target, campaign["identity"])
             gates = {}
             for gate in GATES:
                 if gate in SOURCE_GATES and source_receipt is not None:
                     status, reason = "artifact_integrity_checked", None
                 elif gate in NATIVE_GATES and binary is not None:
                     status, reason = "binary_structure_checked", None
+                elif gate == CANVAS_GATE and canvas is not None:
+                    status, reason = "generated_game_canvas_pixels_recorded", None
                 elif gate == PARITY_GATE and art_parity is not None:
                     status, reason = "pixel_source_parity_checked", None
                 elif gate == GODOT_GATE and godot is not None:
@@ -404,7 +512,7 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                     )
                 gates[gate] = {"status": status, "blocker": reason}
                 if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed", "godot_gameplay_executed",
-                              "pixel_source_parity_checked"}:
+                              "pixel_source_parity_checked", "generated_game_canvas_pixels_recorded"}:
                     passed += 1
             by_target.append({
                 "target": target,
@@ -413,6 +521,9 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                 ),
                 "cross_engine_pixel_parity_digest": (
                     art_parity["receipt_digest"] if art_parity else None
+                ),
+                "generated_canvas_evidence_digest": (
+                    canvas["capture_digest"] if canvas else None
                 ),
                 "native_binary_evidence_digest": (
                     binary["evidence_digest"] if binary else None
@@ -437,6 +548,9 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
             "native_roms_structurally_verified": sum(
                 row["native_binary_evidence_digest"] is not None for row in by_target
             ),
+            "generated_game_canvas_captures_verified": sum(
+                row["generated_canvas_evidence_digest"] is not None for row in by_target
+            ),
             "godot_headless_playthroughs_verified": sum(
                 row["godot_headless_evidence_digest"] is not None for row in by_target
             ),
@@ -458,5 +572,6 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
 __all__ = [
     "StudioAssuranceError", "GATES", "qualify_campaign_target",
     "qualify_campaign_browser", "qualify_campaign_godot",
+    "qualify_campaign_canvas",
     "inspect_production_assurance",
 ]
