@@ -42,6 +42,9 @@ class BrowserReplayQualification:
     onscreen_button_input_verified: bool
     undo_replay_verified: bool
     restart_verified: bool
+    original_ambient_play_method_invoked: bool
+    original_overlay_draw_calls: int
+    audio_hardware_verified: bool
     failure: str | None
     receipt_digest: str
 
@@ -61,6 +64,9 @@ class BrowserReplayQualification:
             "onscreen_button_input_verified": self.onscreen_button_input_verified,
             "undo_replay_verified": self.undo_replay_verified,
             "restart_verified": self.restart_verified,
+            "original_ambient_play_method_invoked": self.original_ambient_play_method_invoked,
+            "original_overlay_draw_calls": self.original_overlay_draw_calls,
+            "audio_hardware_verified": self.audio_hardware_verified,
             "graphical_browser_pixels_verified": False,
             "godot_executable_tested": False,
             "controller_hardware_tested": False,
@@ -75,7 +81,8 @@ class BrowserReplayQualification:
 def _receipt(world: str, html: str, proof: str, *, available: bool,
              executed: bool = False, won: bool = False, draws: int = 0,
              sprites: bool = False, frames: bool = False,
-             controls: bool = False, failure: str | None = None) -> BrowserReplayQualification:
+             controls: bool = False, ambient: bool = False,
+             overlays: int = 0, failure: str | None = None) -> BrowserReplayQualification:
     body = {
         "schema": SCHEMA,
         "world_digest": world, "html_sha256": html, "proof_sha256": proof,
@@ -87,6 +94,9 @@ def _receipt(world: str, html: str, proof: str, *, available: bool,
         "onscreen_button_input_verified": controls,
         "undo_replay_verified": controls,
         "restart_verified": controls,
+        "original_ambient_play_method_invoked": ambient,
+        "original_overlay_draw_calls": overlays,
+        "audio_hardware_verified": False,
         "graphical_browser_pixels_verified": False,
         "godot_executable_tested": False,
         "controller_hardware_tested": False,
@@ -94,7 +104,8 @@ def _receipt(world: str, html: str, proof: str, *, available: bool,
     }
     return BrowserReplayQualification(
         world, html, proof, available, executed, won, draws, sprites, frames,
-        controls, controls, controls, controls, failure, canonical_digest(body),
+        controls, controls, controls, controls, ambient, overlays, False,
+        failure, canonical_digest(body),
     )
 
 
@@ -194,6 +205,9 @@ def qualify_browser_gameplay(
                 "undo_replay_verified", "restart_verified",
             ))
             or result.get("source_world_digest") != world
+            or result.get("audio_hardware_verified") is not False
+            or type(result.get("original_overlay_draw_calls")) is not int
+            or not 0 <= result["original_overlay_draw_calls"] <= 50_000_000
             or type(result.get("canvas_draw_calls")) is not int
             or not 0 < result["canvas_draw_calls"] <= 50_000_000):
         return _receipt(world, html_digest, proof_digest, available=True,
@@ -204,6 +218,8 @@ def qualify_browser_gameplay(
         sprites=result.get("original_sprites_drawn") is True,
         frames=result.get("original_animation_tick_exercised") is True,
         controls=True,
+        ambient=result.get("original_soundtrack_playback_method_called") is True,
+        overlays=result["original_overlay_draw_calls"],
     )
 
 
