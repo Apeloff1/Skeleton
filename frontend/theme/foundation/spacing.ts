@@ -2,7 +2,9 @@
  * Foundation spacing — 4-pt scale, layout rhythm, touch and HUD safe zones.
  * Values from tokens.ts (UI_ART_KIT §2.3) and UI_ART_KIT §3.1.
  */
-import { breathing as tokenBreathing, hitSlop as tokenHitSlop, hud, spacing as tokenSpacing } from '../tokens';
+import tokens, { hud } from '../tokens';
+
+const { breathing: tokenBreathing, hitSlop: tokenHitSlop, spacing: tokenSpacing } = tokens;
 
 export const spacing = tokenSpacing;
 export type SpacingKey = keyof typeof tokenSpacing;
