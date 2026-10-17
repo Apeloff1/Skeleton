@@ -50,7 +50,7 @@ def _music_addresses(raw: bytes, target: str) -> tuple[int, int]:
                 continue
             label = match[2]
             address = int(match[1], 16)
-            valid = 0x8000 <= address <= 0xFFF1
+            valid = 0x8000 <= address <= 0xFFEA
         else:
             match = re.fullmatch(
                 r"([0-9A-Fa-f]{2}):([0-9A-Fa-f]{4})\s+([A-Za-z][A-Za-z0-9_]*)",
@@ -83,6 +83,8 @@ def inspect_compiled_psg(
     source = Path(source_project)
     try:
         _header(_TARGETS[target], rom)
+        if target == "nintendo_famicom" and rom[4] != 2:
+            raise CompiledPSGError("original NROM-256 requires exactly two PRG ROM banks")
         manifest = json.loads(_regular(source / "manifest.json", 128_000))
         art = json.loads(
             _regular(source / "assets/metadata/descriptors.json", 128_000)
@@ -112,8 +114,12 @@ def inspect_compiled_psg(
     start = (16 + low - 0x8000
              if target == "nintendo_famicom" else low)
     expected = bytes((*periods["notes_low"], *periods["notes_high"]))
-    if start < 0 or start + len(expected) > len(rom):
-        raise CompiledPSGError("music bytes lie outside compiled cartridge")
+    prg_end = (
+        16 + rom[4] * 16_384 if target == "nintendo_famicom"
+        else min(0x4000, len(rom))
+    )
+    if start < 0 or start + len(expected) > prg_end:
+        raise CompiledPSGError("music bytes lie outside actual PRG/ROM0 bank")
     if rom[start:start + len(expected)] != expected:
         raise CompiledPSGError("actual cartridge PSG note tables differ from original score")
     body = {
