@@ -537,3 +537,41 @@ def test_fleet_audit_rejects_falsified_neural_optimizer_receipt(tmp_path, monkey
     assert invalid["totals"]["verified_neural_candidate_sources"] == 0
     assert invalid["totals"]["verified_q_policy_sources"] == 0
     assert invalid["totals"]["invalid_or_stale_receipt_sources"] == 1
+
+
+
+def test_fleet_audit_hardware_core_coverage_and_alias_deduplication(
+    tmp_path, monkeypatch
+):
+    from skeleton.ai.training.rom_inventory_snapshot import (
+        freeze_rom_inventory, load_frozen_inventory,
+    )
+    from skeleton.ai.training.rom_fleet_audit import audit_fleet_all
+
+    root, first, _ = _roms(tmp_path)
+    (root / "same-source.gb").write_bytes(first.read_bytes())
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    inventory = freeze_rom_inventory(root, private)
+    frozen = load_frozen_inventory(Path(inventory["manifest_path"]), root=root)
+    approvals, _ = _approvals(tmp_path, first)
+    _fake_training(tmp_path, monkeypatch, updates=4)
+
+    rom.train_page(
+        root, approvals, private, steps=4, runs=1, inventory_snapshot=frozen,
+    )
+    full = audit_fleet_all(
+        root, Path(inventory["manifest_path"]), approvals, private, limit=1,
+    )
+    groups = full["by_hardware_core"]
+    assert len(groups) == 1
+    assert groups[0]["target_id"] == "game_boy"
+    assert groups[0]["core_id"] == "gambatte"
+    assert groups[0]["rights_approved_unique_sources"] == 1
+    assert groups[0]["verified_q_policy_updated_sources"] == 1
+    assert groups[0]["verified_execution_coverage_pct"] == 100.0
+    assert groups[0]["neural_candidate_coverage_pct"] == 0.0
+    assert full["totals"]["duplicates_not_retrained"] == 1
+    assert full["totals"]["distinct_sources_in_page"] == 2
+    assert full["source_execution_coverage_pct"] == 50.0
+    assert full["production_jeeves_weights_modified"] is False

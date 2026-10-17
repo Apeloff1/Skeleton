@@ -64,6 +64,8 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
             counts["rights_review_required"] += 1
             entries.append(entry)
             continue
+        entry["target_id"] = grant["target_id"]
+        entry["core_id"] = grant["core_id"]
         if grant["content_size_bytes"] != row["size_bytes"]:
             entry["status"] = "source_identity_changed"
             counts["source_identity_changed"] += 1
@@ -183,6 +185,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
     approved, approval_sha = _load_approvals(approvals_file)
     receipts_dir = _private_output(receipts_dir)
     totals: dict[str, int] = {}
+    by_target_core: dict[str, dict[str, Any]] = {}
     pages = 0
     examples: list[dict[str, Any]] = []
     while True:
@@ -193,6 +196,27 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
         for key, count in page["page_counts"].items():
             totals[key] = totals.get(key, 0) + count
         for row in page["rows"]:
+            target, core = row.get("target_id"), row.get("core_id")
+            if target is not None and core is not None:
+                identity = target + "::" + core
+                lane = by_target_core.setdefault(identity, {
+                    "target_id": target,
+                    "core_id": core,
+                    "rights_approved_unique_sources": 0,
+                    "verified_q_policy_updated_sources": 0,
+                    "verified_neural_candidate_sources": 0,
+                    "verified_executed_without_q_updates": 0,
+                    "blocked_or_unverified_sources": 0,
+                })
+                lane["rights_approved_unique_sources"] += 1
+                if row["status"] == "verified_q_policy_updated":
+                    lane["verified_q_policy_updated_sources"] += 1
+                elif row["status"] == "verified_executed_without_q_update":
+                    lane["verified_executed_without_q_updates"] += 1
+                else:
+                    lane["blocked_or_unverified_sources"] += 1
+                if row.get("neural_candidate_trained") is True:
+                    lane["verified_neural_candidate_sources"] += 1
             if (row["status"] not in ("verified_q_policy_updated",
                                       "verified_executed_without_q_update")
                     and len(examples) < 24):
@@ -214,6 +238,22 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
         "pages_audited": pages,
         "total_snapshot_candidate_files": len(snapshot["entries"]),
         "totals": totals,
+        "by_hardware_core": [
+            {
+                **value,
+                "verified_execution_coverage_pct": round(
+                    100 * (
+                        value["verified_q_policy_updated_sources"] +
+                        value["verified_executed_without_q_updates"]
+                    ) / value["rights_approved_unique_sources"], 2
+                ),
+                "neural_candidate_coverage_pct": round(
+                    100 * value["verified_neural_candidate_sources"] /
+                    value["rights_approved_unique_sources"], 2
+                ),
+            }
+            for _, value in sorted(by_target_core.items())
+        ],
         "source_execution_coverage_pct": (
             round(100 * verified / distinct, 2) if distinct else 0.0
         ),

@@ -162,7 +162,11 @@ duplicate identities, stale receipts and missing reviews. A non-null
 remains incomplete. Execution coverage is not game-mastery coverage.
 
 Coverage is **per distinct verified source on that page**; aliases and
-repeated training receipts never inflate the denominator. Outcomes separate
+repeated training receipts never inflate the denominator. In a full fleet
+audit, `by_hardware_core` summarizes rights-approved unique source counts,
+measured Q-policy updates, execution without updates, verified neural-world
+candidates, blocked/unverified sources and both execution/neural coverage
+percentages separately for every approved hardware target and core identity. Outcomes separate
 `verified_q_policy_updated`, `verified_executed_without_q_update`,
 `approved_but_no_receipt`, `rights_review_required`,
 `source_identity_changed`, `duplicate_source_inventory_alias`, and
