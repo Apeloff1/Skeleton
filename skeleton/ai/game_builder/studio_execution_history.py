@@ -57,6 +57,49 @@ def _read_history(root: Path, identity: str) -> dict:
     return raw
 
 
+_STAGE_EVIDENCE = {
+    "source": ("source_receipt_digest", "source_receipt_digest"),
+    "rom": ("evidence_digest", "native_binary_evidence_digest"),
+    "emulator": ("evidence_digest", "real_emulator_evidence_digest"),
+    "browser": ("evidence_digest", "browser_javascript_evidence_digest"),
+    "godot": ("evidence_digest", "godot_headless_evidence_digest"),
+    "canvas": ("evidence_digest", "generated_canvas_evidence_digest"),
+}
+
+
+def validate_stage_evidence(entries: list[dict], report: dict) -> None:
+    """No stage can claim success absent its exact independently audited artifact."""
+    if type(entries) is not list or type(report) is not dict:
+        raise StudioQualificationHistoryError("canonical production report required")
+    targets = report.get("targets")
+    if type(targets) is not list or len(targets) > 64:
+        raise StudioQualificationHistoryError("bounded production target inventory required")
+    indexed = {}
+    for row in targets:
+        if type(row) is not dict or type(row.get("target")) is not str:
+            raise StudioQualificationHistoryError("invalid source assurance target")
+        if row["target"] in indexed:
+            raise StudioQualificationHistoryError("repeated source assurance target")
+        indexed[row["target"]] = row
+    for event in entries:
+        if type(event) is not dict or event.get("target") not in indexed:
+            raise StudioQualificationHistoryError("stage claims an unknown project target")
+        if event.get("status") != "verified":
+            continue
+        stage = event.get("stage")
+        if stage not in _STAGE_EVIDENCE:
+            raise StudioQualificationHistoryError("unknown successful production stage")
+        event_key, proof_key = _STAGE_EVIDENCE[stage]
+        observed = event.get(event_key)
+        independently_checked = indexed[event["target"]].get(proof_key)
+        if (type(observed) is not str or len(observed) != 64
+                or any(c not in "0123456789abcdef" for c in observed)
+                or observed != independently_checked):
+            raise StudioQualificationHistoryError(
+                "claimed successful stage lacks exact independently verified evidence"
+            )
+
+
 def _validated_native_failure_events(run: dict, targets: tuple[str, ...]) -> list[dict]:
     events = run.get("events")
     if type(events) is not list or len(events) > 4096:
@@ -143,6 +186,7 @@ def record_execution_run(
     root = Path(campaign)
     with campaign_lock(root):
         checked = _inspect_production_assurance_unlocked(order, root)
+        validate_stage_evidence(run["events"], checked)
         if (checked["campaign_identity"] != run.get("campaign_identity")
                 or checked["report_digest"] != run.get("assurance_report_digest")):
             raise StudioQualificationHistoryError("run report is stale for this game version")
@@ -218,6 +262,7 @@ def inspect_execution_history(
 
 
 __all__ = [
-    "StudioQualificationHistoryError", "record_execution_run",
+    "StudioQualificationHistoryError", "validate_stage_evidence",
+    "record_execution_run",
     "inspect_execution_history",
 ]
