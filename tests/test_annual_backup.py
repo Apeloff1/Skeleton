@@ -10,7 +10,8 @@ import unittest
 
 from skeleton.automation.annual_production import AnnualProductionStore
 from skeleton.automation.annual_backup import (
-    AnnualBackupError, snapshot_annual_production, verify_annual_snapshot,
+    AnnualBackupError, restore_annual_snapshot,
+    snapshot_annual_production, verify_annual_snapshot,
 )
 
 
@@ -152,6 +153,67 @@ class AnnualSnapshotTests(unittest.TestCase):
         sidecar.unlink()
         self.assertTrue(verify_annual_snapshot(self.root, "offline")["verified"])
 
+
+    def test_recovery_is_new_independent_db_and_fences_old_worker_tokens(self):
+        claim = self.store.claim(
+            "original-game", worker="worker-1",
+            authority_digest=digest("authority"),
+            now=1_800_000_000, lease_seconds=120,
+        )
+        self.store.checkpoint(
+            claim, sequence=1, state_digest=digest("checkpoint"),
+            evidence_digest=digest("proof"), now=1_800_000_001,
+        )
+        snapshot_annual_production(self.store, self.root, label="sealed")
+        recovered_path = self.root / "recovered.db"
+        summary = restore_annual_snapshot(self.root, "sealed", recovered_path)
+        self.assertTrue(summary["historic_leases_and_grants_fenced"])
+        self.assertTrue(summary["independent_database_copy"])
+        self.assertFalse(summary["workers_started"])
+        self.assertNotEqual(
+            self.root.joinpath("sealed.db").stat().st_ino,
+            recovered_path.stat().st_ino,
+        )
+        restored = AnnualProductionStore(recovered_path)
+        self.assertEqual(restored.verify_chain("original-game"), 1)
+        self.assertEqual(restored.verify_authority_chain("original-game"), 0)
+        self.assertEqual(restored.state("original-game").authority_expires_at, 0)
+        self.assertIsNone(restored.state("original-game").lease_expires_at)
+        with self.assertRaises(PermissionError):
+            restored.claim(
+                "original-game", worker="worker-2",
+                authority_digest=digest("authority"), now=1_800_000_002,
+            )
+        # Previously authorized grant cannot be used again. Reopening
+        # requires a NEW independently verified operator approval.
+        reauthorized = restored.renew_authority(
+            "original-game",
+            expected_authority_digest=digest("authority"),
+            new_authority_digest=digest("new-authority"),
+            approval_digest=digest("operator-reviewed"),
+            new_expires_at=2_100_000_000,
+            verify_approval=lambda *args: True,
+            now=1_800_000_002,
+        )
+        self.assertEqual(reauthorized.authority_expires_at, 2_100_000_000)
+        self.assertEqual(restored.verify_chain("original-game"), 1)
+        with self.assertRaises(AnnualBackupError):
+            restore_annual_snapshot(self.root, "sealed", recovered_path)
+        self.assertTrue(verify_annual_snapshot(self.root, "sealed")["verified"])
+
+    def test_restore_refuses_tampered_archive_and_existing_database(self):
+        snapshot_annual_production(self.store, self.root, label="clean")
+        backup_path = self.root / "clean.db"
+        restored = self.root / "target.db"
+        backup_path.write_bytes(backup_path.read_bytes() + b"x")
+        with self.assertRaises(AnnualBackupError):
+            restore_annual_snapshot(self.root, "clean", restored)
+        self.assertFalse(restored.exists())
+        snapshot_annual_production(self.store, self.root, label="clean2")
+        restored.write_bytes(b"cannot replace existing")
+        with self.assertRaises(AnnualBackupError):
+            restore_annual_snapshot(self.root, "clean2", restored)
+        self.assertEqual(restored.read_bytes(), b"cannot replace existing")
 
 if __name__ == "__main__":
     unittest.main()
