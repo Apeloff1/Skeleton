@@ -213,6 +213,13 @@ def record_execution_run(
             "blocker_classification_digest": classified["classification_digest"],
             "native_cartridge_victories": checked["native_rom_machine_code_playthroughs_verified"],
             "native_cpu_checkpoint_samples_verified": checked["native_cpu_checkpoint_samples_verified"],
+            "native_animation_audio_source_targets_checked": (
+                checked["original_console_media_sources_independently_checked"]
+            ),
+            "native_hero_animation_frames_in_source": (
+                checked["original_console_animation_frames_in_source"]
+            ),
+            "real_native_audio_capture_verified": False,
             "actual_browser_replays": checked["browser_javascript_playthroughs_verified"],
             "actual_godot_replays": checked["godot_headless_playthroughs_verified"],
             "full_release_qualified": False,
