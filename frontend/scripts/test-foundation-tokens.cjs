@@ -1,4 +1,5 @@
 'use strict';
+/* global __dirname */
 /**
  * Foundation design-token package (frontend/theme/foundation) regression.
  * Executes the TypeScript sources without a React Native runtime, following
@@ -126,7 +127,7 @@ const F = load('theme/foundation/index.ts');
 const THEME_KEYS = ['mode', 'isDark', 'skinId', 'statusBarStyle', 'colors', 'status',
   'surfaces', 'gradients', 'type', 'fontFamily', 'hudType', 'spacing', 'breathing',
   'touch', 'hitSlop', 'hudSafeZone', 'radius', 'shadows', 'motion', 'icons'];
-const COLOR_KEYS = [...Object.keys(tokens.colors.dark), 'primaryText'];
+const COLOR_KEYS = [...Object.keys(tokens.default.colorModes.dark), 'primaryText'];
 
 test('every §2.5 text/background pair meets its claimed ratio in both modes', () => {
   for (const mode of ['dark', 'light']) {
@@ -201,15 +202,15 @@ test('light mode ignores dark skins; unknown skins fall back to canonical', () =
 
 test('canonical colours: true cyan, blue alias and tokens.ts canonical snapshot', () => {
   const fresh = makeLoader()('theme/tokens.ts');
-  same(fresh.canonicalColors.dark, fresh.colors.dark);
-  same(fresh.canonicalColors.light, fresh.colors.light);
+  same(fresh.canonicalColors.dark, fresh.default.colorModes.dark);
+  same(fresh.canonicalColors.light, fresh.default.colorModes.light);
   assert.ok(Object.isFrozen(fresh.canonicalColors.dark));
-  same(F.getTheme('dark').colors, { ...fresh.colors.dark, primaryText: fresh.colors.dark.primary });
-  same(F.getTheme('light').colors, { ...fresh.colors.light, primaryText: fresh.colors.light.primary });
+  same(F.getTheme('dark').colors, { ...fresh.default.colorModes.dark, primaryText: fresh.default.colorModes.dark.primary });
+  same(F.getTheme('light').colors, { ...fresh.default.colorModes.light, primaryText: fresh.default.colorModes.light.primary });
   assert.equal(F.TRUE_CYAN, '#22D3EE');
   assert.equal(F.getTheme('dark').colors.accentCyan, '#22D3EE');
   assert.equal(F.LEGACY_CYAN_BLUE[400], '#3B82F6');
-  assert.equal(F.ramps.blue, tokens.palette.blue);
+  assert.equal(F.ramps.blue, tokens.default.palette.blue);
 });
 
 test('a skin mutation before import does not leak into the canonical dark theme', () => {
@@ -238,11 +239,11 @@ test('status roles pair colour + glyph + shape, colour-blind swap keeps glyphs',
 });
 
 test('type, spacing, radius, motion and icons come from tokens.ts and the icon spec', () => {
-  assert.equal(F.typeScale.metric, tokens.typography.metric);
+  assert.equal(F.typeScale.metric, tokens.default.typography.metric);
   assert.equal(F.typeScale.label.fontSize, 12);
   assert.equal(F.hudType.minMovingTextSize, 14);
-  assert.equal(F.spacing, tokens.spacing);
-  assert.equal(F.radius, tokens.radii);
+  assert.equal(F.spacing, tokens.default.spacing);
+  assert.equal(F.radius, tokens.default.radii);
   assert.equal(F.touch.min, 44);
   assert.equal(F.duration, tokens.default.motion.duration);
   assert.equal(F.hudMotion.stateIn, 150);
@@ -301,10 +302,19 @@ test('compatibility layers keep their export names and resolve from tokens.ts', 
     }, id);
   });
   const deluxe = l('src/theme/deluxe.ts');
-  assert.equal(deluxe.glow, t.elevation.glow);
+  assert.equal(deluxe.glow, t.default.elevation.glow);
   assert.deepEqual(Object.keys(deluxe.default).sort(), ['C', 'R', 'S', 'T', 'card', 'cardActive', 'glow']);
   // skinStore-style mutation still drives the live legacy palette.
   Object.assign(t.default.colors, sk.SKIN_BY_ID.ember.colors);
   assert.equal(deluxe.C.brand, sk.SKIN_BY_ID.ember.colors.primary);
-  assert.equal(t.canonicalColors.dark.primary, t.palette.brand[500]);
+  assert.equal(t.canonicalColors.dark.primary, t.default.palette.brand[500]);
+});
+
+test('lint:ci guard: no named export duplicates a default-object binding (import/no-named-as-default-member)', () => {
+  const t = makeLoader()('theme/tokens.ts');
+  const named = Object.keys(t).filter(k => k !== 'default' && k !== '__esModule');
+  const dup = named.filter(k => Object.prototype.hasOwnProperty.call(t.default, k));
+  assert.deepEqual(dup, [], 'tokens.ts named exports also on default: ' + dup.join(', '));
+  for (const k of ['colors', 'colorModes', 'palette', 'spacing', 'radii', 'typography', 'elevation', 'motion', 'gradients', 'hitSlop', 'breathing'])
+    assert.ok(t.default[k], 'default.' + k);
 });
