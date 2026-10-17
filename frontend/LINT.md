@@ -1,64 +1,213 @@
-## Lint setup for the Expo frontend
+# Frontend lint and long-session stability
 
-This project ships a TypeScript-aware ESLint config (`.eslintrc.cjs`) but
-**deliberately does not pin any lint packages in `package.json`**. This is
-because `eslint-config-expo` was removed in Feb 2026 — it ran
-`expo install --check` inside the EAS CI build pipeline and caused the
-cloud Android builds to fail by overriding the pinned
-`@react-native-async-storage/async-storage` version.
+The canonical lint configuration is [eslint.config.js](eslint.config.js)
+(ESLint 9 flat config, Expo). The frontend pins `eslint` and
+`eslint-config-expo` in `package.json`; do **not** use unpinned
+`npx -y` commands or a stale `.eslintrc.cjs` recipe.
 
-### How to run lint locally
+From `frontend/`, with the project dependencies installed:
 
-```bash
-cd /app/frontend
-npx --yes \
-  -p eslint@9 \
-  -p @typescript-eslint/parser@8 \
-  -p @typescript-eslint/eslint-plugin@8 \
-  -p eslint-plugin-react-hooks@5 \
-  eslint . --ext .ts,.tsx
+```sh
+yarn lint:ci
+yarn typecheck
+yarn test:stability
+yarn test:stability:reconciliation
 ```
 
-Or, the most common one-liner used in CI / dev:
+The stability suite includes deterministic Node regression tests for boot
+recovery, request retries, storage retention, thermal queue saturation and
+liveness, battery listeners, recovery single-flight behavior, session progress
+ordering/coalescing, storage hydration, authenticated request isolation,
+bounded network responses, scoped health polling, push notification teardown,
+and timer cleanup. It does not replace
+on-device endurance, installed-app E2E, or native lifecycle testing.
 
-```bash
-cd /app/frontend
-npx -y eslint . --ext .ts,.tsx
-```
+## Incremental lint debt retirement
 
-`npx` fetches the peers on first run, caches them locally, and never
-mutates `node_modules/.bin` — so the EAS build path stays clean.
+The broader app still has pre-existing React Hooks lint debt. We do not
+turn every legacy violation into a build blocker or suppress every rule
+globally without accounting for it. The battery, thermal, and recovery
+modules now opt back into `react-hooks/exhaustive-deps` and
+`@typescript-eslint/no-unused-vars`. Future migrations should expand
+that list only after fixing the affected hooks and adding lifecycle
+regressions. Do not disable `react-hooks/rules-of-hooks`.
 
-### Autofix a single file
+## Operational invariants
 
-```bash
-npx -y eslint app/hub.tsx --fix
-```
+- Native listeners acquired after an async initialization step must be
+  cancelled if the component unmounted while awaiting the device.
+- A React state updater cannot call another state setter.
+- Device observations should not be fabricated or replaced when another
+  sensor sends a partial update; unknown battery readings are ignored.
+- Queued work must settle after synchronous callback failures, and
+  cancelled delayed work must not execute side effects.
+- Background throttling survives thermal recalculation and cooldown.
+- Recovery runs are single-flight, bounded, and do not update unmounted UI.
 
-### Continuous integration
+For a release verdict, also run the complete app and backend checks,
+first-install checks, and a real multi-hour device exercise. Passing lint,
+unit tests, or TypeScript compilation alone does not prove long-session
+stability.
 
-If a CI runner needs to enforce lint, install the four peer packages there
-(not in `package.json`):
+## Focused pull-request gate
 
-```yaml
-- run: npm i -g eslint@9 @typescript-eslint/parser@8 @typescript-eslint/eslint-plugin@8 eslint-plugin-react-hooks@5
-- run: eslint . --ext .ts,.tsx
-```
+The existing `Merge Readiness` workflow runs
+`node --test scripts/test-long-session-stability.cjs` with an isolated
+TypeScript transpilation dependency. This adds no workflow and does not
+require the full Expo install. It is a focused runtime contract regression,
+not a substitute for `yarn typecheck`, `yarn lint:ci`, the installed
+application, or endurance/pressure E2E.
 
-### What this config catches
+## Marathon pressure regressions (network and thermal)
 
-* **`react-hooks/rules-of-hooks`** — wrong hook ordering / conditional hooks
-* **`react-hooks/exhaustive-deps`** — missing useEffect/useCallback dependencies
-* **`@typescript-eslint/no-unused-vars`** — unused locals (ignored if `_`-prefixed)
-* **`eslint:recommended`** — common bugs (no-undef-init, no-irregular-whitespace, etc.)
-* TypeScript-aware rules from `@typescript-eslint/recommended`
+The existing fast Merge Readiness job additionally runs
+`scripts/test-marathon-pressure.cjs` beside the lifecycle suite; no new
+workflow is created. The pressure suite checks explicit read-only
+coalescing, non-coalesced writes, cache memory admission, streaming response
+budgets, request-format isolation, safe fallback behavior for requests
+with custom headers, reset fencing, and thermal observer failure isolation.
 
-### What this config intentionally does **not** catch
+These checks are deterministic simulations. Release qualification still
+requires `yarn typecheck`, `yarn lint:ci`, a real native install and
+sustained device monitoring. A response body adapter that exposes only
+`.text()` cannot be prevented from buffering its full body internally;
+it is rejected after materialization if oversized. Streaming adapters
+enforce the limit before full buffering.
 
-* `no-explicit-any` — too many existing usages in the codebase; flipped off.
-* Style rules — leave that to prettier / editor settings.
+## Session-transition and background-load invariants
 
-### Adding new rules
+The same Merge Readiness job now also executes
+`scripts/test-session-transition-pressure.cjs`. It covers end-during-start,
+module switches that await previous final progress, concurrent latest-wins
+switches, unmount fencing, singleflight reminder installation and retry after
+scheduling failures, plus finite background timer policies.
 
-Edit `.eslintrc.cjs`. Avoid extending `eslint-config-expo` — it pulls in
-the broken `expo install --check` hook (see top of file).
+The session API has no durable offline outbox. These checks prove ordered
+in-memory behavior and explicit local degradation, not crash-safe delivery
+of unsent progress across process termination.
+
+## Transactional offline academy cache
+
+`services/offlineCache.ts` now writes downloads in 100-document staging
+pages with bounded response budgets. A single committed-generation receipt
+becomes authoritative **only after** every expected page and metadata row
+has been acknowledged by AsyncStorage. Truncation, malformed counts, native
+write errors and aborts leave the prior generation readable. Incompatible or
+oversized collections must use `getCachedCollectionPage`, rather than
+materializing the entire collection in memory.
+
+`scripts/test-offline-cache-integrity.cjs` runs in the existing fast-gate
+Node test step. This tests atomic publication, legacy compatibility, complete
+count checks, cancellation, storage failure and bounded paging. New sync
+generations are not pruned out from under older readers; explicit clearing
+removes all owned generations. Crash-surviving orphan staging will require an
+independently reader-safe reclamation policy in a later pass.
+
+## Memory pressure and durable operation monitoring
+
+`memoryGuard` now owns an idempotent native memory-warning listener and
+optional heap sampling timer, with explicit teardown and bounded synchronous
+shedding callbacks. RootLayout registers disposal of only regenerable
+network/thermal caches; active projects, model weights, and durable receipts
+are never memory-purged.
+
+`operationStreamSession` uses bounded idle polling backoff for multi-hour
+tasks; thrown transport adapters become truthful error states instead of
+unhandled promise rejections. Concurrent replay is single-flight, user-facing
+observers are isolated, and cursor-save/clear operations remain physically
+serialized to prevent a late native acknowledgement resurrecting erased
+cursor state. Clearing the cursor does **not** cancel server-side operations.
+
+`scripts/test-memory-pressure-runtime.cjs` and
+`scripts/test-operation-stream-endurance.cjs` run inside the existing
+Merge Readiness check beside the offline transactional suite. These
+simulate OS warnings, clock rollback, failures, concurrent replays,
+native save races, and low-cadence marathon operation following.
+
+## Long-session preference, timer and build-observer hardening
+
+`utils/usePersistentState.ts` now fences late hydration against user edits,
+serializes writes by storage key across hook remounts and flushes unsaved
+debounced edits on unmount. Oversized/unserializable preference payloads are
+refused rather than poisoning previously stored preferences. This helper is
+only for bounded UI settings, not canonical game/AI checkpoints.
+
+`utils/safeTimers.ts` suspends intervals in background and rearms the same
+owned interval on foreground without duplicates. Async callbacks cannot
+overlap, rejected callbacks are contained, completed timeouts no longer
+remain in the hook registry, and an install/uninstall path owns the native
+listener. Native intervals are capped at 1000 live registrations.
+
+`utils/useNetworkStatus.ts` runs no redundant heartbeat when native NetInfo
+or web connectivity events are available. In fallback mode probes own a
+deadline, are nonoverlapping, and ignore stale responses after backgrounding
+or unmounting. This observes reachability, not authoritative game-job state.
+
+`src/product/buildJobLifecycle.ts` can observe multi-hour builds without
+an arbitrary default step count. An explicit maxChecks remains an optional
+monitoring budget. Transient status transport failures retry a bounded number
+of times and end as *disconnected*, **not** a backend build failure.
+Backend reported failure, cancellation and completion remain separate.
+
+The existing Merge Readiness job includes three new fault-injection suites:
+`test-persistent-preferences-endurance.cjs`,
+`test-build-observer-endurance.cjs`, and
+`test-timer-resume-endurance.cjs`. No additional workflow is introduced.
+
+## Shared native storage memory budget and reachability regression
+
+`safeStorage` retains at most 1,048,576 UTF-16 characters in its fast-read
+mirror and refuses individual values above 65,536 characters for mirroring;
+those values still remain native-stored. Eviction, replacement, removal,
+version rollover and global shedding keep accounting consistent. RootLayout
+sheds the mirror on OS memory pressure, fencing stale native read results.
+
+`scripts/test-native-mirror-memory.cjs` simulates oversized values,
+thousands of keys, late reads, rollovers and memory pressure.
+`scripts/test-connectivity-probe.cjs` tests stuck endpoint deadlines and
+background/foreground cancellation. Both run inside the existing
+Merge Readiness check and stability test command, not as new workflows.
+
+## Week/month work-cycle recovery receipts (sixth stability pass)
+
+`services/monthCycleLedger.ts` contains a 128-slot, alternating-write,
+checksummed and per-key serialized client observation registry, bounded to
+128 records / 128 KiB per namespace. This persists backend operation IDs
+and verified replay cursors across app restarts, without treating observation
+as server execution or a completion credential. Work remains registered for
+more than a year unless explicitly dismissed; terminal receipts can be
+trimmed after 180 days. Every job has a durable observation revision that
+rejects older network responses, including callbacks arriving within the
+same millisecond.
+
+`services/monthCycleRecovery.ts` reconciles due jobs only when invoked by
+the active app. It uses at most 32 receipts per pass, 1-4 network workers,
+per-attempt deadlines and capped retry backoff. It never creates a
+background service, renews an authorization, restarts a job or performs a
+mutating backend request.
+
+`services/monthCycleStudioAdapter.ts` and
+`services/monthCycleBuildAdapter.ts` integrate the existing governed,
+read-only status APIs, and `OperationBrowserSession.resumeDurable()` enrolls
+a canonical operation before replay. `monthCycleNative.ts` uses the
+existing AsyncStorage adapter.
+
+See `MONTH_CYCLE_RECOVERY.md` for a grounded runbook, backend authority
+boundaries, and remaining multi-day server/device certification. The same
+fast Merge Readiness test job now runs the month-cycle ledger (24 cases),
+recovery (16 cases), and integration (14 cases) suites, with no new
+workflow or CI queue burden.
+
+### Foreground reconciliation ownership
+
+`monthCycleForeground.ts` adds one explicitly owned, low-duty foreground
+driver. It schedules one due reconciliation at first active mount, at bounded
+cadence while the app is active (default 15 minutes), and after a
+background-to-foreground transition. It removes its timer and OS subscription
+on dispose, and signals the recovery worker to stop on background. This is
+not an OS background service and cannot promise to run after process exit.
+
+`monthCycleNative.ts` supplies the React Native AppState adapter.
+`test-month-cycle-foreground.cjs` (9 cases) exercises lifecycle bounce,
+stale observations, timer ownership, deadline policy and exception isolation
+in the same existing Merge Readiness test step.
