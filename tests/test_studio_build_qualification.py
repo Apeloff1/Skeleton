@@ -74,6 +74,8 @@ NES_SYMBOLS = (
     "al 000007 .GemsRemaining\n"
     "al 000008 .GameWon\n"
     "al 000009 .GameLost\n"\n    "al 000015 .ScoreHigh\n"
+    "al 000016 .TurnCount\n"
+    "al 000017 .TurnCountHigh\n"
 ).encode("ascii")
 
 
