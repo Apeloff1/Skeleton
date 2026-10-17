@@ -310,6 +310,72 @@ def _content_for_training(path: Path, *, sha: str, core: Any) -> Any:
 
 
 
+
+def _verify_existing_q_receipt(
+    path: Path, *, source_sha: str, size: int, grant: dict[str, Any],
+    approvals_digest: str, registry_digest: str,
+) -> str:
+    """Fail closed when an existing receipt is not the exact audited source.
+
+    Existence alone is not a successful training outcome. The candidate's
+    underlying policy and source episodes are revalidated before reuse, even
+    when neural training was not requested. No ROM or core is reexecuted here.
+    """
+    from skeleton.jeeves.game_learning import _digest
+    from skeleton.jeeves.game_emulator_neural_world import verify_neural_training_sources
+
+    identity = _regular_identity(path)
+    if identity[2] > 32 * 1024 * 1024:
+        raise RomStudyError("saved ROM training receipt exceeds verification budget")
+    with path.open("rb") as stream:
+        raw = stream.read(32 * 1024 * 1024 + 1)
+    if len(raw) != identity[2] or _regular_identity(path) != identity:
+        raise RomStudyError("saved training receipt changed while revalidating")
+    try:
+        doc = json.loads(raw)
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise RomStudyError("saved ROM receipt is invalid JSON") from exc
+    if (type(doc) is not dict
+            or raw != _canonical(doc) + b"\\n"
+            or doc.get("schema_version") != BATCH_SCHEMA
+            or doc.get("training_kind") != "actual_replay_audited_tabular_q_policy"
+            or doc.get("source_sha256") != source_sha
+            or doc.get("source_size_bytes") != size
+            or doc.get("core_id") != grant["core_id"]
+            or doc.get("target_id") != grant["target_id"]
+            or doc.get("approval_manifest_sha256") != approvals_digest
+            or doc.get("registry_digest") != registry_digest
+            or doc.get("neural_weights_updated") != 0
+            or doc.get("production_weights_modified") is not False
+            or doc.get("model_promotion_authorized") is not False):
+        raise RomStudyError("existing receipt disagrees with approved training identity")
+    report = doc.get("candidate_evidence")
+    if type(report) is not dict or type(report.get("policy_snapshot")) is not dict:
+        raise RomStudyError("existing policy evidence or learned Q snapshot is missing")
+    lineage = report.get("source_lineage")
+    if (type(lineage) is not dict
+            or lineage.get("rights_acknowledged") is not True
+            or lineage.get("source_sha256") != source_sha
+            or lineage.get("rights_review_id") != grant["rights"]["review_id"]
+            or lineage.get("rights_basis") != grant["rights"]["rights_basis"]
+            or lineage.get("approvals_manifest_sha256") != approvals_digest
+            or lineage.get("core_id") != grant["core_id"]
+            or lineage.get("target_id") != grant["target_id"]):
+        raise RomStudyError("saved receipt has different source or rights lineage")
+    policy = report["policy_snapshot"]
+    evidence = {key: value for key, value in report.items()
+                if key != "policy_snapshot"}
+    evidence["policy_snapshot_digest"] = policy.get("snapshot_digest")
+    evidence["evidence_digest"] = _digest(evidence)
+    validated, _, _, _ = verify_neural_training_sources(evidence, policy)
+    if (len(validated) != report.get("actual_training_steps")
+            or type(report.get("actual_q_table_updates")) is not int
+            or report["actual_q_table_updates"] <= 0
+            or report.get("actual_neural_parameter_updates") != 0):
+        raise RomStudyError("saved Q training episode/update accounting is inconsistent")
+    return _hash(raw)
+
+
 def train_neural_candidate(
     q_receipt_path: Path, output_dir: Path, *,
     seed: int = 0, width: int = 12, epochs: int = 6,
@@ -477,7 +543,13 @@ def train_page(
             filename = "rom-" + identity[:16] + "-" + run_identity[:16] + ".json"
             target = output_dir / filename
             if target.exists() or target.is_symlink():
+                summary["receipt_sha256"] = _verify_existing_q_receipt(
+                    target, source_sha=identity, size=row["size_bytes"],
+                    grant=grant, approvals_digest=approvals_digest,
+                    registry_digest=registry.registry_digest,
+                )
                 summary["state"] = "previous_receipt_exists_not_reexecuted"
+                summary["prior_training_receipt_verified"] = True
                 summary["receipt_name"] = filename
                 if train_neural:
                     try:
