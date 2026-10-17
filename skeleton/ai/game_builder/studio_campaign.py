@@ -191,6 +191,20 @@ def _verify_target(root: Path, expected_project: str, expected_target: str,
         raise StudioCampaignError("source target is missing Godot engine")
     if not (root / "assets/tiles/runtime.bin").is_file():
         raise StudioCampaignError("source target is missing genuine encoded sprite tiles")
+    if expected_target in (
+        "nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
+    ):
+        from .studio_native_source_media_parity import (
+            NativeMediaSourceError, inspect_native_source_media,
+        )
+        try:
+            media = inspect_native_source_media(root, target=expected_target)
+        except NativeMediaSourceError as exc:
+            raise StudioCampaignError(
+                "native sprites/audio code differs from original authored media"
+            ) from exc
+        if not media["console_assembly_data_verified"]:
+            raise StudioCampaignError("source-only native media was not independently checked")
     if record.get("native_binary_compiled") is not False:
         raise StudioCampaignError("source campaign cannot imply an executed console build")
     return record
