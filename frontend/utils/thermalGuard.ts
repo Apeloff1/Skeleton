@@ -47,6 +47,8 @@ class StaggerQueue {
   private generation = 0;
   // Share the same promise for queued AND actively executing work.
   private readonly pending = new Map<string, Promise<unknown>>();
+  private sequence = 0;
+  private destroyed = false;
   private readonly MAX_QUEUE_LENGTH = 256;
   private maxConcurrent: number;
   private baseDelayMs: number;
@@ -71,8 +73,10 @@ class StaggerQueue {
   }
 
   /** Add a request to the stagger queue */
-  enqueue<T>(id: string, fn: () => Promise<T>, priority = 5): Promise<T> {
-    const existing = this.pending.get(id);
+  enqueue<T>(id: string, fn: () => Promise<T>, priority = 5, dedupe = true): Promise<T> {
+    if (this.destroyed) return Promise.reject(new Error('Thermal queue destroyed'));
+    const requestId = dedupe ? id : `${id}#${++this.sequence}`;
+    const existing = this.pending.get(requestId);
     if (existing) return existing as Promise<T>;
 
     // Refuse additional work at saturation instead of retaining an unbounded
@@ -83,17 +87,19 @@ class StaggerQueue {
 
     const promise = new Promise<T>((resolve, reject) => {
       this.queue.push({
-        id, fn, resolve, reject,
+        id: requestId, fn, resolve, reject,
         priority: Number.isFinite(priority) ? priority : 5,
         timestamp: Date.now(),
       });
       this.queue.sort((a, b) => a.priority - b.priority);
       void this.process();
     });
-    this.pending.set(id, promise);
+    this.pending.set(requestId, promise);
     // No unhandled rejection from the cleanup observer; identity guards
     // against a replacement with the same key after cancellation.
-    const release = () => { if (this.pending.get(id) === promise) this.pending.delete(id); };
+    const release = () => {
+      if (this.pending.get(requestId) === promise) this.pending.delete(requestId);
+    };
     void promise.then(release, release);
     return promise;
   }
@@ -106,6 +112,12 @@ class StaggerQueue {
       case 'hot': this.currentDelayMs = this.baseDelayMs * 3; break;
       case 'critical': this.currentDelayMs = this.baseDelayMs * 6; break;
     }
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.flush();
   }
 
   setMaxConcurrent(n: number) {
@@ -169,53 +181,74 @@ interface CacheEntry {
   data: any;
   timestamp: number;
   ttl: number;
+  chars: number;
 }
 
 class DeduplicationCache {
   private cache = new Map<string, CacheEntry>();
   private maxEntries: number;
+  private readonly MAX_ENTRY_CHARS = 128 * 1024;
+  private readonly MAX_TOTAL_CHARS = 4 * 1024 * 1024;
+  private retainedChars = 0;
 
   constructor(maxEntries = 100) {
     this.maxEntries = maxEntries;
   }
 
   get size() { return this.cache.size; }
+  get bytesApproximate() { return this.retainedChars * 2; }
+
+  private remove(key: string) {
+    const existing = this.cache.get(key);
+    if (existing) this.retainedChars = Math.max(0, this.retainedChars - existing.chars);
+    this.cache.delete(key);
+  }
 
   get(key: string): any | null {
     const entry = this.cache.get(key);
     if (!entry) return null;
-    if (Date.now() - entry.timestamp > entry.ttl) {
-      this.cache.delete(key);
+    const age = Date.now() - entry.timestamp;
+    if (age < 0 || age > entry.ttl) {
+      this.remove(key);
       return null;
     }
+    // Touch the key so capacity eviction chooses the least recently used.
+    this.cache.delete(key);
+    this.cache.set(key, entry);
     return entry.data;
   }
 
   set(key: string, data: any, ttlMs = 5000) {
-    // Evict oldest if at capacity
-    if (this.cache.size >= this.maxEntries) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey) this.cache.delete(oldestKey);
+    if (!Number.isFinite(ttlMs) || ttlMs <= 0) return;
+    let chars: number;
+    try { chars = typeof data === 'string' ? data.length : JSON.stringify(data).length; }
+    catch { return; }
+    if (!Number.isFinite(chars) || chars > this.MAX_ENTRY_CHARS) return;
+    this.remove(key);
+    this.cache.set(key, { data, timestamp: Date.now(), ttl: Math.min(60_000, ttlMs), chars });
+    this.retainedChars += chars;
+    while (this.cache.size > this.maxEntries || this.retainedChars > this.MAX_TOTAL_CHARS) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest === undefined) break;
+      this.remove(oldest);
     }
-    this.cache.set(key, { data, timestamp: Date.now(), ttl: ttlMs });
   }
 
-  /** Purge expired entries */
   purge(): number {
     const now = Date.now();
     let purged = 0;
     for (const [key, entry] of this.cache) {
-      if (now - entry.timestamp > entry.ttl) {
-        this.cache.delete(key);
+      if (now < entry.timestamp || now - entry.timestamp > entry.ttl) {
+        this.remove(key);
         purged++;
       }
     }
     return purged;
   }
 
-  /** Full clear */
   clear() {
     this.cache.clear();
+    this.retainedChars = 0;
   }
 }
 
@@ -286,6 +319,8 @@ export class ThermalGuard {
   private _isCharging: boolean = false;
   private _appInBackground: boolean = false;
   private _purgeTimer: ReturnType<typeof setInterval> | null = null;
+  private _destroyed = false;
+  private _lastActivityRecalculation = 0;
   private _listeners: Set<(state: ThermalState) => void> = new Set();
 
   constructor() {
@@ -302,14 +337,17 @@ export class ThermalGuard {
 
   /** Subscribe to thermal state changes */
   subscribe(listener: (state: ThermalState) => void): () => void {
+    if (this._destroyed) return () => {};
     this._listeners.add(listener);
-    return () => this._listeners.delete(listener);
+    return () => { this._listeners.delete(listener); };
   }
 
   private _notify() {
     const state = this.getState();
     for (const listener of this._listeners) {
-      listener(state);
+      try { listener(state); } catch {
+        // One broken UI observer cannot crash the thermal control plane.
+      }
     }
   }
 
@@ -337,16 +375,27 @@ export class ThermalGuard {
 
   /** Record user activity (call on interactions, navigations, etc.) */
   recordActivity() {
+    if (this._destroyed) return;
     this.activity.record();
+    const now = Date.now();
+    // Burst throttling must respond during a session, not 30 seconds later.
+    // Recompute at most once a second to avoid O(n²) input-path work.
+    if (now - this._lastActivityRecalculation >= 1_000) {
+      this._lastActivityRecalculation = now;
+      this._recalculate();
+    }
   }
 
   /** Staggered fetch with dedup + thermal awareness */
   async fetch<T>(
     key: string,
     fetcher: () => Promise<T>,
-    options?: { priority?: number; cacheTtlMs?: number; skipCache?: boolean }
+    options?: { priority?: number; cacheTtlMs?: number; skipCache?: boolean; dedupe?: boolean }
   ): Promise<T> {
-    const { priority = 5, cacheTtlMs = 5000, skipCache = false } = options || {};
+    if (this._destroyed) throw new Error('Thermal guard destroyed');
+    // A key alone cannot prove a mutating operation is safe to deduplicate.
+    // Cache and coalescing are explicit opt-ins from read-only callers.
+    const { priority = 5, cacheTtlMs = 0, skipCache = false, dedupe = false } = options || {};
 
     // Check dedup cache first
     if (!skipCache) {
@@ -355,7 +404,7 @@ export class ThermalGuard {
     }
 
     try {
-      const result = await this.queue.enqueue(key, fetcher, priority);
+      const result = await this.queue.enqueue(key, fetcher, priority, dedupe);
       if (Number.isFinite(cacheTtlMs) && cacheTtlMs > 0) {
         this.cache.set(key, result, Math.min(cacheTtlMs, 60_000));
       }
@@ -462,8 +511,11 @@ export class ThermalGuard {
 
   /** Cleanup */
   destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
     if (this._purgeTimer) clearInterval(this._purgeTimer);
-    this.queue.flush();
+    this._purgeTimer = null;
+    this.queue.destroy();
     this.cache.clear();
     this._listeners.clear();
   }
