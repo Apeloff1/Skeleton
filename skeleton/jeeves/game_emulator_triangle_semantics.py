@@ -1,0 +1,195 @@
+"""Bridge measured emulator evidence into Jeeves' existing semantic lens plane.
+
+The canonical semantic registry contains substantially more operators than
+the eight deterministic training measurements. Route up to 43 of those authored
+operators for each native episode; never conflate a lens question with a new
+pixel, reward, video interpretation, or independent training example.
+"""
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Any
+
+from .game_learning import _digest
+
+SCHEMA = "skeleton.jeeves.game_triangle_semantic_lens_routes.v1"
+SEMANTIC_LENS_BUDGET = 43
+
+
+class TriangleSemanticError(ValueError):
+    """Canonical Jeeves lens routing or source evidence contract differs."""
+
+
+@lru_cache(maxsize=1)
+def _canonical_router():
+    from skeleton.jeeves.agent.semantic_maximal import (
+        MaximalLensRouter, MaximalSemanticRegistry,
+    )
+
+    catalog = MaximalSemanticRegistry()
+    router = MaximalLensRouter(catalog)
+    if len(catalog.all()) < SEMANTIC_LENS_BUDGET:
+        raise TriangleSemanticError("Jeeves semantic catalog has fewer than 43 lenses")
+    # Identity commits the actual upstream lens keys and complete semantics,
+    # not a local forked list of vaguely similar categories.
+    identities = [
+        {
+            "key": spec.key, "family": spec.family.value,
+            "role": spec.role.value, "description": spec.description,
+            "cues": list(spec.activation_cues), "asks": list(spec.asks),
+            "predicts": spec.predicts, "failure_mode": spec.failure_mode,
+            "minimum_observations": spec.minimum_observations,
+            "pairwise": spec.pairwise, "sequential": spec.sequential,
+            "rare": spec.rare,
+        }
+        for spec in catalog.all()
+    ]
+    return router, _digest(identities), len(identities)
+
+
+def _source_observations(episode: dict[str, Any]):
+    from skeleton.jeeves.agent.semantic_lenses import SemanticObservation
+
+    trace = episode["source_trace_sha256"]
+    receipt = episode["source_receipt_sha256"]
+    measured = episode["grounded_lens_evidence"]
+    companion = episode["companion_viewing"]
+    play = episode["ai_playing"]
+    repeat = episode["repetition"]
+    # These are references to source-measured native quantities, not generated
+    # narrative details or transcribed third-party ROM audiovisual material.
+    content = [
+        (
+            "visual",
+            "Actual native video frame pixels, visual change, frames and color "
+            f"inspection: {companion['native_rgb24_frames_optically_inspected']} "
+            f"RGB observations with frame sequence {companion['frame_sequence_sha256']}. "
+            "Visual content semantics and character identity remain unknown.",
+            ("visual", "frame", "pixel", "color", "film", "camera", "scene", "observation"),
+        ),
+        (
+            "audio",
+            "Measured native audio waveform RMS and ambience with audio "
+            f"sequence {companion['audio_sequence_sha256']}. "
+            "No score, dialogue, emotional music or speech semantics were measured.",
+            ("audio", "sound", "music", "measurement", "signal"),
+        ),
+        (
+            "control",
+            "Actual gameplay controller input actions and policy sequence "
+            f"{measured['controller_action']['action_sequence_sha256']}; "
+            f"{play['actual_native_steps']} real action transitions and "
+            f"{play['actual_q_table_updates']} tabular Q-policy updates. "
+            "Player intention and user enjoyment were not observed.",
+            ("game", "player", "controller", "input", "action", "policy", "movement"),
+        ),
+        (
+            "reward",
+            "Measured reward and consequence sequence "
+            f"{measured['reward_and_consequence']['measured_reward_sequence_sha256']}. "
+            "Success, quality and player enjoyment are not established by reward alone.",
+            ("reward", "consequence", "outcome", "feedback", "risk", "goal"),
+        ),
+        (
+            "temporal",
+            f"Reverse replays executed {repeat['replayed_native_steps']} native steps "
+            f"with {repeat['reverse_checkpoint_count']} checked checkpoints, "
+            "not new independent observations. Temporal replay is not evidence "
+            "of novel game history or scene continuity.",
+            ("time", "temporal", "repeat", "replay", "sequence", "memory", "continuity"),
+        ),
+        (
+            "counterfactual",
+            f"Counterfactual probes {play['counterfactual_native_probes']} "
+            f"and controller-only probes {play['controller_only_probes']} "
+            "inspect alternate actions. Their simulations do not establish causal "
+            "effects or produce independent training samples.",
+            ("causal", "counterfactual", "simulate", "alternative", "uncertainty",
+             "adversarial", "system", "hypothesis"),
+        ),
+    ]
+    return tuple(
+        SemanticObservation(
+            observation_id=f"{trace}:{name}", content=statement, position=i,
+            source="verified_native_emulator_training_triangle",
+            evidence_ids=(trace, receipt), tags=tags,
+        )
+        for i, (name, statement, tags) in enumerate(content)
+    )
+
+
+def route_episode_semantic_lenses(episode: dict[str, Any], *,
+                                 max_lenses: int = SEMANTIC_LENS_BUDGET
+                                 ) -> dict[str, Any]:
+    """Select real Jeeves lens definitions from six actual native evidence views."""
+    if type(max_lenses) is not int or not 1 <= max_lenses <= SEMANTIC_LENS_BUDGET:
+        raise TriangleSemanticError("semantic route budget must be 1..43")
+    if (type(episode) is not dict
+            or type(episode.get("grounded_lens_evidence")) is not dict
+            or type(episode.get("companion_viewing")) is not dict
+            or type(episode.get("ai_playing")) is not dict
+            or type(episode.get("repetition")) is not dict):
+        raise TriangleSemanticError("semantic routing requires source-audited episode")
+    router, catalog_digest, catalog_count = _canonical_router()
+    observations = _source_observations(episode)
+    selection = router.select_maximal(
+        observations, max_lenses=max_lenses, max_per_family=5,
+        minimum_rare_when_supported=3,
+    )
+    if not selection.lenses or len(selection.lenses) > max_lenses:
+        raise TriangleSemanticError("canonical semantic router selection outside policy")
+    route: list[dict[str, Any]] = []
+    for spec in selection.lenses:
+        score = selection.activation_scores.get(spec.key)
+        if type(score) not in (int, float) or not 0 <= score <= 1:
+            raise TriangleSemanticError("semantic lens activation lacks native router score")
+        route.append({
+            "lens_key": spec.key,
+            "lens_family": spec.family.value,
+            "lens_role": spec.role.value,
+            "activation_score": round(float(score), 6),
+            "question": spec.asks[0] if spec.asks else spec.description,
+            "prediction_to_test": spec.predicts,
+            "failure_mode": spec.failure_mode,
+            "rare": bool(spec.rare),
+            "observation_count_required": spec.minimum_observations,
+            "state": "routed_interpretive_question_unanswered",
+            "new_independent_evidence": 0,
+            "training_ground_truth_label_available": False,
+        })
+    keys = [row["lens_key"] for row in route]
+    if len(keys) != len(set(keys)):
+        raise TriangleSemanticError("a lens was selected twice for the same native evidence")
+    report = {
+        "schema_version": SCHEMA,
+        "source_native_trace_sha256": episode["source_trace_sha256"],
+        "source_native_receipt_sha256": episode["source_receipt_sha256"],
+        "canonical_registry": "skeleton.jeeves.agent.semantic_maximal.MaximalSemanticRegistry",
+        "canonical_catalog_sha256": catalog_digest,
+        "canonical_catalog_lens_count": catalog_count,
+        "requested_max_lenses": max_lenses,
+        "actually_routed_lenses": len(route),
+        "selection_is_dynamic_not_a_claim_of_exactly_43_catalog_lenses": True,
+        "source_evidence_observation_count": len(observations),
+        "observation_fingerprints": [obs.fingerprint for obs in observations],
+        "evidence_owner": "existing_eight_measured_native_lenses",
+        "factual_assertions_authorized": False,
+        "causal_assertions_authorized": False,
+        "additional_native_training_examples": 0,
+        "routes": route,
+    }
+    report["route_digest"] = _digest(report)
+    return report
+
+
+def verify_episode_semantic_lenses(episode: dict[str, Any], saved: Any) -> None:
+    """Re-route from canonical authored modules and compare exact source custody."""
+    if type(saved) is not dict or saved.get("route_digest") != _digest({
+        k: v for k, v in saved.items() if k != "route_digest"
+    }):
+        raise TriangleSemanticError("saved semantic lens route receipt digest differs")
+    expected = route_episode_semantic_lenses(
+        episode, max_lenses=saved.get("requested_max_lenses"),
+    )
+    if saved != expected:
+        raise TriangleSemanticError("semantic lens route no longer matches source or catalog")
