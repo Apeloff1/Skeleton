@@ -30,6 +30,7 @@ CONTENT_KEYS = (
     "economy",
     "combat_design",
     "narrative",
+    "longform",
     "animation",
     "vfx",
     "physics",
@@ -88,6 +89,11 @@ def test_golden_brief_builds_and_runs_core_loop(item, built):
     assert content["schema_version"] == "skeleton.game_content_bundle.v1"
     for key in CONTENT_KEYS:
         assert content[key], key
+    assert content["longform"]["completed"] is True
+    assert content["longform"]["chapters"] == 8
+    assert content["longform"]["beat_count"] == 24
+    assert content["longform"]["ending_id"] == "return"
+    assert content["narrative"][0]["id"] == "hook-0"
     assert result["core_loop"]["passed"] is True
     assert result["marker"] == execute_core_loop(content, spec["genre"])
     assert result["check"]["ok"] is True
