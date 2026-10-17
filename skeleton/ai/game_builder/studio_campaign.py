@@ -17,7 +17,8 @@ import tempfile
 
 from .contracts import canonical_digest
 from .native_game_cli import _NATIVE, build_game
-from .studio_asset_pipeline import ArtDirection
+from .studio_asset_pipeline import ArtDirection, _palette
+from .studio_sprite_authoring import import_artist_sprite_png
 from .rights_evidence import read_rights_evidence
 from .studio_campaign_lock import campaign_lock
 
@@ -48,6 +49,9 @@ class CampaignOrder:
     health: int = 4
     theme: str = "forest"
     art: ArtDirection = ArtDirection()
+    artist_png: str | None = None
+    artist_sha256: str | None = None
+    artist_quantization: str = "nearest"
 
     def __post_init__(self) -> None:
         if type(self.project_id) is not str or not self.project_id:
@@ -65,9 +69,21 @@ class CampaignOrder:
             raise StudioCampaignError("original authored identity statements required")
         if type(self.rights_document) is not str or not self.rights_document:
             raise StudioCampaignError("existing local documentary rights reference required")
+        if (self.artist_png is None) != (self.artist_sha256 is None):
+            raise StudioCampaignError("artist atlas and exact SHA must be supplied together")
+        if self.artist_quantization not in {"nearest", "ordered4", "exact"}:
+            raise StudioCampaignError("unsupported 2bpp artist palette conversion")
 
     def identity(self) -> str:
         documentary = read_rights_evidence(self.rights_document)
+        if self.artist_png is not None:
+            artwork_path = Path(self.artist_png)
+            if (artwork_path.is_symlink() or not artwork_path.is_file()
+                    or artwork_path.stat().st_size > 1024 * 1024):
+                raise StudioCampaignError("original artist atlas must be a bounded real image")
+            source = artwork_path.read_bytes()
+            if sha256(source).hexdigest() != self.artist_sha256:
+                raise StudioCampaignError("authored sprite PNG changed since campaign approval")
         return canonical_digest({
             "schema": SCHEMA,
             "project_id": self.project_id, "title": self.title,
@@ -77,6 +93,8 @@ class CampaignOrder:
             "creative_identity": list(self.creative_identity),
             "world": [self.width, self.height, self.levels, self.collectibles,
                       self.hazards, self.health, self.theme],
+            "artist_sha256": self.artist_sha256,
+            "artist_quantization": self.artist_quantization,
             "art": {
                 "style": self.art.style, "contrast": self.art.contrast,
                 "seed": self.art.seed, "animation_frames": self.art.animation_frames,
@@ -262,6 +280,14 @@ def _run_campaign_unlocked(order: CampaignOrder, destination: str | Path, *,
             state["completed"][target] = proof["receipt_digest"]
     state["revision"] += 1
     _atomic_json(root / "index.json", state)
+    artist_atlas = None
+    if order.artist_png is not None:
+        artist_atlas = import_artist_sprite_png(
+            Path(order.artist_png).read_bytes(),
+            expected_sha256=order.artist_sha256,
+            palette=_palette(order.theme, order.art.contrast),
+            quantization=order.artist_quantization, authorized=True,
+        )
     attempts = 0
     for target in order.targets:
         if target in state["completed"]:
@@ -281,6 +307,7 @@ def _run_campaign_unlocked(order: CampaignOrder, destination: str | Path, *,
                 creative_identity=order.creative_identity,
                 output=stage / "game", authorized=True,
                 studio_art=order.art, theme=order.theme,
+                artist_atlas=artist_atlas,
             )
             if (built["world_digest"] != built["engine_sources"]["world_digest"]
                     or built["native_binary_built"] is not False
