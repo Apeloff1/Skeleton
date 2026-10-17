@@ -705,6 +705,12 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
             "real_emulator_evidence_digest": (
                 emulator["evidence_digest"] if emulator else None
             ),
+            "native_cpu_checkpoint_digest": (
+                emulator["run"]["checkpoint_digest"] if emulator else None
+            ),
+            "native_cpu_checkpoint_samples": (
+                emulator["run"]["sampled_checkpoints"] if emulator else 0
+            ),
             "browser_javascript_evidence_digest": (
                 browser["evidence_digest"] if browser else None
             ),
@@ -724,6 +730,9 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
         "targets_with_exact_source": campaign["targets_with_verified_source"],
         "native_rom_machine_code_playthroughs_verified": sum(
             row["real_emulator_evidence_digest"] is not None for row in by_target
+        ),
+        "native_cpu_checkpoint_samples_verified": sum(
+            row["native_cpu_checkpoint_samples"] for row in by_target
         ),
         "native_roms_structurally_verified": sum(
             row["native_binary_evidence_digest"] is not None for row in by_target
