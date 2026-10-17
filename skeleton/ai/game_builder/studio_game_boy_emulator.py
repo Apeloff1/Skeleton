@@ -23,6 +23,7 @@ from .studio_build_qualification import (
 from .studio_runtime_qualification import _inputs as _engine_inputs
 from .studio_native_replay_telemetry import (
     selected_checkpoints, make_checkpoint, validate_checkpoints, NativeCheckpointError,
+    reference_cpu_checkpoints,
 )
 
 SCHEMA = "skeleton.game_builder.game_boy_emulator_playthrough.v1"
@@ -160,6 +161,12 @@ def qualify_game_boy_emulator(
     rom_sha = sha256(rom).hexdigest()
     sym_sha = sha256(sym).hexdigest()
     proof_sha = sha256(proof).hexdigest()
+    try:
+        reference = reference_cpu_checkpoints(engine_source)
+    except (OSError, ValueError) as exc:
+        raise GameBoyEmulationError("canonical Python source replay is inconsistent") from exc
+    if reference["world_digest"] != world or reference["proof_sha256"] != proof_sha:
+        raise GameBoyEmulationError("reference sample source does not match generated game")
     actions = gameplay["actions"]
     expected = gameplay["final_state"]
     if (not isinstance(actions, list)
@@ -248,6 +255,7 @@ def qualify_game_boy_emulator(
                     sampled_events, actions=len(actions),
                     source_world=world, source_proof=proof_sha,
                     expected_final=expected,
+                    expected_samples=reference["samples"],
                 )
             except NativeCheckpointError:
                 return _receipt(
