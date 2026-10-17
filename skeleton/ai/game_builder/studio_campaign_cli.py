@@ -15,26 +15,26 @@ from .studio_campaign import CampaignOrder, inspect_campaign, run_campaign
 
 def parse_campaign_order_file(path: Path) -> CampaignOrder:
     """Parse the exact original production schema used by both operator CLIs."""
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        if type(raw) is not dict or raw.get("schema") != "skeleton.game_builder.studio_campaign_order.v1":
-            raise ValueError("typed original campaign order schema required")
-        allowed = {
-            "schema", "project_id", "title", "seed", "targets",
-            "source_basis", "rights_document", "creative_identity",
-            "width", "height", "levels", "collectibles", "hazards",
-            "health", "theme", "art",
-        }
-        if set(raw) - allowed:
-            raise ValueError("unknown campaign order parameters")
-        art = raw.pop("art", {})
-        raw.pop("schema")
-        if type(art) is not dict or set(art) - set(ArtDirection.__dataclass_fields__):
-            raise ValueError("unknown original art controls")
-        raw["targets"] = tuple(raw["targets"])
-        raw["creative_identity"] = tuple(raw["creative_identity"])
-        raw["art"] = ArtDirection(**art)
-        order = CampaignOrder(**raw)
-        return order
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if type(raw) is not dict or raw.get("schema") != "skeleton.game_builder.studio_campaign_order.v1":
+        raise ValueError("typed original campaign order schema required")
+    allowed = {
+        "schema", "project_id", "title", "seed", "targets",
+        "source_basis", "rights_document", "creative_identity",
+        "width", "height", "levels", "collectibles", "hazards",
+        "health", "theme", "art",
+    }
+    if set(raw) - allowed:
+        raise ValueError("unknown campaign order parameters")
+    art = raw.pop("art", {})
+    raw.pop("schema")
+    if type(art) is not dict or set(art) - set(ArtDirection.__dataclass_fields__):
+        raise ValueError("unknown original art controls")
+    raw["targets"] = tuple(raw["targets"])
+    raw["creative_identity"] = tuple(raw["creative_identity"])
+    raw["art"] = ArtDirection(**art)
+    order = CampaignOrder(**raw)
+    return order
 
 
 def main(argv: list[str] | None = None) -> int:
