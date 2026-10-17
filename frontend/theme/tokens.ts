@@ -14,7 +14,7 @@
  */
 import { Platform, TextStyle, ViewStyle } from 'react-native';
 
-export const palette = {
+const palette = {
   ink: {
     0: '#FFFFFF',
     50: '#F8FAFC',
@@ -52,7 +52,7 @@ export const palette = {
   info: { 400: '#60A5FA', 500: '#3B82F6', 600: '#2563EB' },
 } as const;
 
-export const colors = {
+const colors = {
   dark: {
     bg: palette.ink[950],
     bgElevated: palette.ink[900],
@@ -158,7 +158,7 @@ export const status = {
   meaning: { ok: 'good / friendly', warn: 'warning', bad: 'bad / hostile', info: 'info / neutral', idle: 'idle / unavailable' },
 } as const;
 
-export const gradients = {
+const gradients = {
   aurora: ['#1E1B4B', '#312E81', '#1E1B4B'] as const,
   auroraVivid: ['#8B5CF6', '#3B82F6', '#EC4899'] as const,
   brand: ['#7C3AED', '#A78BFA'] as const,
@@ -173,12 +173,12 @@ export const gradients = {
   glassStrong: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'] as const,
 } as const;
 
-export const spacing = { none: 0, xs: 4, sm: 8, md: 12, base: 16, lg: 20, xl: 24, '2xl': 32, '3xl': 40, '4xl': 56, '5xl': 72 } as const;
-export const radii = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 28, '3xl': 36, full: 9999, pill: 9999 } as const;
+const spacing = { none: 0, xs: 4, sm: 8, md: 12, base: 16, lg: 20, xl: 24, '2xl': 32, '3xl': 40, '4xl': 56, '5xl': 72 } as const;
+const radii = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 28, '3xl': 36, full: 9999, pill: 9999 } as const;
 
 const FONT_UI = Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }) as string;
 const FONT_MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string;
-export const typography = {
+const typography = {
   fontFamily: { ui: FONT_UI, mono: FONT_MONO },
   display: { fontFamily: FONT_UI, fontSize: 34, lineHeight: 40, fontWeight: '800', letterSpacing: -0.5 } as TextStyle,
   h1: { fontFamily: FONT_UI, fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.4 } as TextStyle,
@@ -198,7 +198,7 @@ export const typography = {
   buttonSm: { fontFamily: FONT_UI, fontSize: 12, lineHeight: 16, fontWeight: '700' } as TextStyle,
 } as const;
 
-export const elevation = {
+const elevation = {
   none: {} as ViewStyle,
   xs: Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.18, shadowRadius: 2 }, android: { elevation: 1 }, default: {} }) as ViewStyle,
   sm: Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.22, shadowRadius: 4 }, android: { elevation: 2 }, default: {} }) as ViewStyle,
@@ -209,7 +209,7 @@ export const elevation = {
   glowCyan: Platform.select({ ios: { shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.55, shadowRadius: 16 }, android: { elevation: 6 }, default: {} }) as ViewStyle,
 } as const;
 
-export const motion = {
+const motion = {
   duration: { instant: 0, micro: 80, fast: 150, base: 220, slow: 320, epic: 600 },
   easing: {
     standard: [0.4, 0, 0.2, 1] as [number, number, number, number],
@@ -219,8 +219,8 @@ export const motion = {
   },
 } as const;
 
-export const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
-export const hitSlop = { sm: { top: 6, left: 6, right: 6, bottom: 6 }, md: { top: 10, left: 10, right: 10, bottom: 10 }, lg: { top: 14, left: 14, right: 14, bottom: 14 } } as const;
+const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
+const hitSlop = { sm: { top: 6, left: 6, right: 6, bottom: 6 }, md: { top: 10, left: 10, right: 10, bottom: 10 }, lg: { top: 14, left: 14, right: 14, bottom: 14 } } as const;
 
 /**
  * HUD layout and timing rules (docs/UI_ART_KIT.md §3.1–3.5).
@@ -302,6 +302,13 @@ export const skinPalettes = [
 ] as const;
 export type SkinPaletteRow = (typeof skinPalettes)[number];
 
-const theme = { colors: colors.dark, gradients, spacing, radii, typography, elevation, motion, hitSlop, breathing, palette } as const;
+/**
+ * Default export. `colors` is the LIVE dark palette (skinStore mutates it in
+ * place); `colorModes` is the {dark, light} pair. Bindings that live on this
+ * object are deliberately NOT also named exports, so consumers read them as
+ * `theme.x` without tripping import/no-named-as-default-member (lint:ci).
+ * Named exports are reserved for values that are not on this object.
+ */
+const theme = { colors: colors.dark, colorModes: colors, gradients, spacing, radii, typography, elevation, motion, hitSlop, breathing, palette } as const;
 export type DesignTheme = typeof theme;
 export default theme;
