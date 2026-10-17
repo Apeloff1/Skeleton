@@ -165,7 +165,7 @@ export const typography = {
   buttonSm: { fontFamily: FONT_UI, fontSize: 12, lineHeight: 16, fontWeight: '700' } as TextStyle,
 } as const;
 
-const elevation = {
+export const elevation = {
   none: {} as ViewStyle,
   xs: Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.18, shadowRadius: 2 }, android: { elevation: 1 }, default: {} }) as ViewStyle,
   sm: Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.22, shadowRadius: 4 }, android: { elevation: 2 }, default: {} }) as ViewStyle,
@@ -176,7 +176,7 @@ const elevation = {
   glowCyan: Platform.select({ ios: { shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.55, shadowRadius: 16 }, android: { elevation: 6 }, default: {} }) as ViewStyle,
 } as const;
 
-const motion = {
+export const motion = {
   duration: { instant: 0, micro: 80, fast: 150, base: 220, slow: 320, epic: 600 },
   easing: {
     standard: [0.4, 0, 0.2, 1] as [number, number, number, number],
@@ -187,7 +187,7 @@ const motion = {
 } as const;
 
 export const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
-const hitSlop = { sm: { top: 6, left: 6, right: 6, bottom: 6 }, md: { top: 10, left: 10, right: 10, bottom: 10 }, lg: { top: 14, left: 14, right: 14, bottom: 14 } } as const;
+export const hitSlop = { sm: { top: 6, left: 6, right: 6, bottom: 6 }, md: { top: 10, left: 10, right: 10, bottom: 10 }, lg: { top: 14, left: 14, right: 14, bottom: 14 } } as const;
 
 const theme = { colors: colors.dark, gradients, spacing, radii, typography, elevation, motion, hitSlop, breathing, palette } as const;
 export type DesignTheme = typeof theme;
