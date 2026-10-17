@@ -57,3 +57,19 @@ TypeScript transpilation dependency. This adds no workflow and does not
 require the full Expo install. It is a focused runtime contract regression,
 not a substitute for `yarn typecheck`, `yarn lint:ci`, the installed
 application, or endurance/pressure E2E.
+
+## Marathon pressure regressions (network and thermal)
+
+The existing fast Merge Readiness job additionally runs
+`scripts/test-marathon-pressure.cjs` beside the lifecycle suite; no new
+workflow is created. The pressure suite checks explicit read-only
+coalescing, non-coalesced writes, cache memory admission, streaming response
+budgets, request-format isolation, safe fallback behavior for requests
+with custom headers, reset fencing, and thermal observer failure isolation.
+
+These checks are deterministic simulations. Release qualification still
+requires `yarn typecheck`, `yarn lint:ci`, a real native install and
+sustained device monitoring. A response body adapter that exposes only
+`.text()` cannot be prevented from buffering its full body internally;
+it is rejected after materialization if oversized. Streaming adapters
+enforce the limit before full buffering.
