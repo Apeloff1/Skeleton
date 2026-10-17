@@ -159,7 +159,7 @@ export class MonthCycleLedger {
         if (existing.kind !== kind) throw new Error('Work-cycle kind mismatch');
         return clone(existing);
       }
-      if (payload.records.length >= MAX_RECORDS) {
+      if (!existing && payload.records.length >= MAX_RECORDS) {
         // Never evict an active job to admit another one.
         throw new Error('Month-cycle registry saturated; archive completed receipts explicitly');
       }
@@ -169,7 +169,13 @@ export class MonthCycleLedger {
         status: 'observing', cursor: 0, firstSeenAt: at, lastSeenAt: at,
         nextCheckAt: at, failures: 0, terminalState: null,
       };
-      payload.records.push(record);
+      if (existing) {
+        // Reopening a completed/dismissed ID replaces its retired incarnation
+        // rather than creating duplicate keys in the durable registry.
+        payload.records[payload.records.indexOf(existing)] = record;
+      } else {
+        payload.records.push(record);
+      }
       return clone(record);
     });
   }
