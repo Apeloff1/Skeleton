@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from hashlib import sha256
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -20,10 +21,13 @@ from skeleton.ai.game_builder.studio_campaign import CampaignOrder, run_campaign
 from skeleton.ai.game_builder.studio_campaign_lock import StudioCampaignBusy, campaign_lock
 from skeleton.ai.game_builder.studio_campaign_assurance import (
     StudioAssuranceError, GATES, inspect_production_assurance, qualify_campaign_target,
+    qualify_campaign_emulator,
 )
 from skeleton.ai.game_builder.studio_e2e_observation import (
     observe_production_campaign,
 )
+from skeleton.ai.game_builder.studio_game_boy_emulator import _receipt as emulator_receipt
+from skeleton.ai.game_builder.studio_runtime_qualification import _inputs as engine_inputs
 
 
 def sample_rom() -> bytes:
@@ -148,6 +152,70 @@ class ProductionGateTests(unittest.TestCase):
         self.assertFalse(observation["learned_new_weights"])
         self.assertFalse(observation["release_ready"])
         self.assertFalse(observation["screen_or_video_recorded"])
+
+    def test_emulator_gate_requires_exact_machine_code_and_compiled_symbol_receipts(self):
+        run_campaign(self.order, self.root, authorized=True, max_targets=1)
+        rom = sample_rom()
+        def compiler(project, target, *, authorized, execute,
+                     output, output_symbols, timeout_seconds):
+            Path(output).write_bytes(rom)
+            Path(output_symbols).write_bytes(GB_SYMBOLS)
+            _, source = _verify_source(Path(project), target)
+            return _receipt(
+                target, source, available=True, invoked=True, built=True,
+                header=True, digest=sha256(rom).hexdigest(), size=len(rom),
+                symbol_sha256=sha256(GB_SYMBOLS).hexdigest(),
+            )
+        with patch(
+            "skeleton.ai.game_builder.studio_campaign_assurance.qualify_native_build",
+            side_effect=compiler,
+        ):
+            compiled = qualify_campaign_target(
+                self.order, self.root, "nintendo_game_boy",
+                authorized=True, execute=True,
+            )
+        self.assertTrue(compiled["native_rom_compiled"])
+        _, proof, world = engine_inputs(
+            self.root / "targets/nintendo_game_boy/engines",
+        )
+        fake_success = emulator_receipt(
+            "nintendo_game_boy", sha256(rom).hexdigest(),
+            sha256(GB_SYMBOLS).hexdigest(), world, sha256(proof).hexdigest(),
+            available=True, executed=True, full=True, won=True,
+            frames=1800, actions=len(json.loads(proof)["actions"]),
+            framebuffer="b" * 64,
+        )
+        with patch(
+            "skeleton.ai.game_builder.studio_campaign_assurance.qualify_game_boy_emulator",
+            return_value=fake_success,
+        ):
+            qualified = qualify_campaign_emulator(
+                self.order, self.root, "nintendo_game_boy",
+                authorized=True, execute=True,
+            )
+        self.assertTrue(qualified["machine_code_victory"])
+        report = inspect_production_assurance(self.order, self.root)
+        self.assertEqual(report["native_rom_machine_code_playthroughs_verified"], 1)
+        self.assertEqual(
+            report["targets"][0]["gates"]["emulator_playthrough_executed"]["status"],
+            "machine_code_controller_replay_verified",
+        )
+        self.assertEqual(
+            report["targets"][0]["gates"]["controller_response_verified"]["status"],
+            "machine_code_controller_replay_verified",
+        )
+        dragon = observe_production_campaign(
+            self.order, self.root, authorized=True,
+        )
+        self.assertEqual(dragon["actual_native_rom_victory_replays"], 1)
+        self.assertTrue(any(
+            row["kind"] == "studio.native_cpu_dpad_playthrough"
+            for row in dragon["observations"]
+        ))
+        compiled_sym = self.root / "qualifications/nintendo_game_boy/qualified.sym"
+        compiled_sym.write_text("not actually compiled symbols")
+        with self.assertRaises(StudioAssuranceError):
+            inspect_production_assurance(self.order, self.root)
 
     def test_negative_controller_rights_and_model_evidence_cannot_be_forged(self):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
