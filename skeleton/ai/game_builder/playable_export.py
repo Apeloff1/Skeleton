@@ -79,7 +79,7 @@ let ambience = null;
 const sounds = Object.create(null);
 const overlays = [];
 function startStudioMedia(){
- if(!STUDIO_MEDIA || typeof Audio === "undefined")return;
+ if(!STUDIO_MEDIA || !STUDIO_MEDIA.audio.ambient || typeof Audio === "undefined")return;
  if(!ambience){
   ambience = new Audio("data:audio/wav;base64,"+STUDIO_MEDIA.audio.ambient);
   ambience.loop = true;
