@@ -81,7 +81,10 @@ Implementation on this feature branch extends the operational proof chain beyond
 | PROD-012 | Existing native_game_cli integration | `--studio-assets` and style/contrast/animation flags, native and engine project source emission | Operator-invoked writing into a NEW source directory |
 | PROD-013 | Jeeves native source studio action | `game.console.catalog`, `game.console.source.stage` | Actual generated ASM/C staged through existing GameWorkspace CAS, human commit still required |
 | PROD-014 | Retain legacy behavior | Default native exporter output unchanged unless studio-art option supplied | Backwards-compatible optional tile_art parameter |
-| PROD-015 | Full asset and native E2E tests | `tests/test_jeeves_native_studio_art_e2e.py`, `tests/test_jeeves_console_source_stage_e2e.py` | Tests authored/registered, not yet run on exact head |
+| PROD-015 | PCM sound assets | Original synthesized 8kHz 16-bit mono WAV music/pickup/hazard cues, validated decodable media | Native and HTML5/Godot audio playback drivers not yet qualified |
+| PROD-016 | Original parallax and environmental effects | 0..3 RGBA overlay files plus real foliage/shadow tile transformations | Overlay files available; actual camera/parallax playback not wired |
+| PROD-017 | Source sprite animation | Browser interval and Godot frame-tick controller use generated frames and 1..24 FPS | Source integrated; target execution not observed |
+| PROD-018 | Full asset and native E2E tests | `tests/test_jeeves_native_studio_art_e2e.py`, `tests/test_jeeves_console_source_stage_e2e.py` | Tests authored/registered, not yet run on exact head |
 
 Run example, using the existing verified regular-file authorship-document intake (a referenced document is not independent ownership clearance):
 
@@ -89,18 +92,20 @@ Run example, using the existing verified regular-file authorship-document intake
 python -m skeleton.ai.game_builder.native_game_cli \
   --target nintendo_game_boy --basis bandai_wonderswan \
   --project-id originalconsole --title "Original Console Adventure" \
-  --seed 733 --width 11 --height 11 --levels 1 \
+  --seed 733 --theme ocean --width 11 --height 11 --levels 1 \
   --collectibles 1 --hazards 1 --health 4 \
   --rights-evidence /path/to/owned-authorship-document.txt \
   --identity "original-characters" \
   --identity "independent-mechanics" \
   --studio-assets --studio-style luminous \
   --studio-contrast high --studio-animation-frames 3 \
+  --studio-foliage 2 --studio-shadow 2 --studio-parallax-layers 2 \
+  --studio-music-density 3 --studio-animation-fps 8 \
   --authorize-original-homebrew \
   --output /path/to/new-project-directory
 ```
 
-The generated directory contains the target source entrypoint and build recipe, `assets/tiles/runtime.bin`, `assets/sprites/*.png`, `assets/previews/*.png`, `assets/metadata/{descriptors,manifest}.json`, and `engines/index.html`, `engines/tile-editor.html`, `engines/godot/**`, `engines/proof/**`, plus separate exact manifest receipts.
+The generated directory contains the target source entrypoint and build recipe, `assets/tiles/runtime.bin`, `assets/sprites/*.png`, `assets/previews/*.png`, `assets/metadata/{descriptors,manifest}.json`, and `assets/audio/*.wav`, `assets/parallax/*.png`, `engines/index.html`, `engines/tile-editor.html`, `engines/godot/**`, `engines/proof/**`, plus separate exact manifest receipts.
 
 For C64, DOS, Atari, Apple II, MSX, Spectrum, ColecoVision, Vectrex and desktop targets the original native-source generators work independently and the asset/engine outputs exist, but custom ROM tile integration is not claimed. This is an explicit backlog item.
 
