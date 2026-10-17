@@ -90,10 +90,12 @@ def native_lens_progress(
                 or receipt["native_model_generations_executed"] != 200):
             raise RomStudyError("finished 200-lens model review has another source or checkpoint")
         final_digest = receipt["semantic_review_digest"]
-        if len(progress) != 200:
+        if 0 < len(progress) < 200:
             raise RomStudyError(
-                "final 200-lens receipt cannot omit its immutable per-lens source journal"
+                "final 200-lens receipt conflicts with a partially committed journal"
             )
+        # Older fully verified receipts predate per-lens journaling. Accept
+        # their complete native inference custody without inventing a journal.
     questions = []
     for i, lens in enumerate(route["routes"]):
         questions.append({
@@ -118,10 +120,11 @@ def native_lens_progress(
         "local_semantic_model_sha256": runtime.model_digest,
         "lens_count": 200,
         "journal_entries_source_bound": len(progress),
-        "remaining_native_generations": 200 - len(progress),
-        "next_lens_index": len(progress) if len(progress) < 200 else None,
+        "remaining_native_generations": 0 if complete else 200 - len(progress),
+        "next_lens_index": len(progress) if not complete and len(progress) < 200 else None,
         "final_receipt_filename": final_name if complete else None,
         "final_receipt_sha256": final_digest,
+        "verified_legacy_final_receipt_without_journal": complete and len(progress) == 0,
         "progress_not_proof_of_native_model_replay": True,
         "native_model_generations_replayed_by_status_inspection": 0,
         "hypotheses_not_admitted_as_training_ground_truth": True,
