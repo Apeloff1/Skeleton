@@ -156,4 +156,3 @@ def test_recovery_never_replaces_symlink_or_existing_campaign(tmp_path):
         restore_studio_history(
             private, link, name="copy", identity=IDENTITY,
         )
-
