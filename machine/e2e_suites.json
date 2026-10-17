@@ -380,7 +380,9 @@
         "tests/test_studio_native_psg.py",
         "skeleton/ai/game_builder/studio_native_source_media_parity.py",
         "tests/test_studio_native_source_media_parity.py",
-        "tests/test_studio_campaign_e2e.py"
+        "tests/test_studio_campaign_e2e.py",
+        "skeleton/ai/game_builder/studio_specialized_e2e_runner.py",
+        "tests/test_studio_specialized_e2e_runner.py"
       ],
       "command": [
         "python",
@@ -406,7 +408,8 @@
         "tests/test_studio_native_console_animation_e2e.py",
         "tests/test_studio_native_psg.py",
         "tests/test_studio_native_source_media_parity.py",
-        "tests/test_studio_campaign_e2e.py"
+        "tests/test_studio_campaign_e2e.py",
+        "tests/test_studio_specialized_e2e_runner.py"
       ]
     }
   ]
