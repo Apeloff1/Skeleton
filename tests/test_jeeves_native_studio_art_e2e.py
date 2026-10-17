@@ -22,11 +22,10 @@ from skeleton.ai.game_builder.native_game_cli import build_game
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.port_planner import HomebrewSource
 from skeleton.ai.game_builder.studio_asset_pipeline import (
-    ArtDirection, CODECS, StudioArtError, export_studio_art, render_studio_art,
+    ArtDirection, StudioArtError, export_studio_art, render_studio_art,
 )
-from skeleton.jeeves.game_console_assets import (
-    decode_png, decode_tiles, png_rgba,
-)
+from skeleton.jeeves.game_console_assets import decode_png, decode_tiles
+from skeleton.ai.game_builder.contracts import canonical_digest
 
 
 def make_world():
@@ -130,9 +129,10 @@ class StudioProductionAssetTests(unittest.TestCase):
                     self.assertNotEqual(legacy.asm, built.asm)
                 record = json.loads(built.manifest_json)
                 self.assertTrue(record["custom_original_tile_pixels_in_native_source"])
-                self.assertEqual(record["generated_runtime_art_tile_digest"],
-                    __import__("skeleton.ai.game_builder.contracts", fromlist=["canonical_digest"])
-                    .canonical_digest([list(tile) for tile in art.runtime_tiles]))
+                self.assertEqual(
+                    record["generated_runtime_art_tile_digest"],
+                    canonical_digest([list(tile) for tile in art.runtime_tiles]),
+                )
                 self.assertNotEqual(legacy.content_digest, built.content_digest)
                 self.assertFalse(built.binary_compiled if hasattr(built, "binary_compiled")
                                  else built.rom_compiled if hasattr(built, "rom_compiled")
@@ -151,8 +151,6 @@ class StudioProductionAssetTests(unittest.TestCase):
         with self.assertRaises(NativeNESError):
             compile_native_nes(self.world, self.rights, authorized=True,
                                tile_art=((0,) * 64,))
-        for invalid in (ArtDirection(seed=0),):
-            self.assertIsInstance(invalid, ArtDirection)
         with self.assertRaises(StudioArtError):
             ArtDirection(animation_frames=999)
         with self.assertRaises(StudioArtError):
@@ -183,6 +181,19 @@ class StudioProductionAssetTests(unittest.TestCase):
                 self.assertEqual(manifest["pack_digest"], result["studio_assets"]["pack_digest"])
                 self.assertFalse(result["native_binary_built"])
                 self.assertFalse(result["emulator_verified"])
+                engines = result["engine_sources"]
+                self.assertIsNotNone(engines)
+                self.assertTrue(engines["browser_source_rendered"])
+                self.assertTrue(engines["godot4_source_rendered"])
+                self.assertTrue(engines["interactive_tile_editor_source"])
+                self.assertTrue(engines["actual_winning_python_replay"])
+                self.assertEqual(engines["world_digest"], result["world_digest"])
+                self.assertFalse(engines["godot_binary_executed"])
+                self.assertFalse(engines["runtime_uses_custom_asset_tiles"])
+                self.assertIn("<html", (folder / "engines/index.html").read_text().lower())
+                self.assertIn("extends Control", (
+                    folder / "engines/godot/scripts/main.gd").read_text())
+                self.assertTrue((folder / "engines/proof/verified_solution.json").is_file())
                 if target in {"nintendo_game_boy", "nintendo_famicom"}:
                     self.assertTrue(result["native_art_embedded"])
                 else:
