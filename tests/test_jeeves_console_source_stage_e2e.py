@@ -77,6 +77,19 @@ class JeevesConsoleSourceStageTests(unittest.TestCase):
                 result = self.call("game.console.source.stage", payload)["result"]
                 self.assertTrue(result["actual_native_source_generated"])
                 self.assertTrue(result["actual_sprite_pixels_embedded"])
+                if target in ("nintendo_game_boy", "nintendo_game_boy_color",
+                              "nintendo_famicom"):
+                    self.assertTrue(result["native_animation_source_integrated"])
+                    self.assertTrue(result["native_psg_audio_source_integrated"])
+                    self.assertEqual(result["animation_frame_count"], 3)
+                    self.assertEqual(result["native_animation_frame_delay"], 15)
+                    self.assertEqual(len(result["native_psg_score_digest"]), 64)
+                else:
+                    self.assertFalse(result["native_animation_source_integrated"])
+                    self.assertFalse(result["native_psg_audio_source_integrated"])
+                    self.assertIsNone(result["native_psg_score_digest"])
+                self.assertFalse(result["emulator_audio_executed"])
+                self.assertFalse(result["native_pcm_sound_equivalence_claimed"])
                 self.assertFalse(result["binary_compiled"])
                 self.assertFalse(result["rights_independently_verified"])
                 self.assertFalse(result["source_committed"])
@@ -93,6 +106,24 @@ class JeevesConsoleSourceStageTests(unittest.TestCase):
                 self.assertIn(marker, original["content"])
                 self.assertEqual(committed["sha256"], result["generated_source_sha256"])
                 self.assertEqual(original["version"]["sha256"], committed["sha256"])
+
+    def test_operator_can_adjust_real_native_music_and_sprite_timing(self):
+        request = {
+            **self.request(), "animation_fps": 10, "music_density": 0,
+        }
+        output = self.call("game.console.source.stage", request)["result"]
+        self.assertEqual(output["native_animation_frame_delay"], 6)
+        self.assertTrue(output["native_animation_source_integrated"])
+        self.assertFalse(output["native_psg_audio_source_integrated"])
+        self.assertFalse(output["binary_compiled"])
+        with self.assertRaises(ValueError):
+            self.call("game.console.source.stage", {
+                **request, "animation_fps": 0,
+            })
+        with self.assertRaises(ValueError):
+            self.call("game.console.source.stage", {
+                **request, "music_density": 5,
+            })
 
     def test_nonexistent_target_wrong_source_and_invalid_authority_fail_closed(self):
         with self.assertRaises(JeevesAppCapabilityError):
