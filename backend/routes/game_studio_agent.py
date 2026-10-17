@@ -139,7 +139,11 @@ async def dragon_observation(
         observe_goal,
     )
 
-    goal = await _call(agent.inspect(_scope(user), goal_id))
+    scope = _scope(user)
+    # The history owner also rechecks live source/Dragon evidence dependencies.
+    # Inspect alone authenticates the goal but not every revoked source pin.
+    await _call(agent.history(scope, goal_id, after=0, limit=1))
+    goal = await _call(agent.inspect(scope, goal_id))
     try:
         return observe_goal(goal, after=after, limit=limit)
     except StudioObservationError as exc:
