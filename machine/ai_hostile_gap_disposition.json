@@ -819,8 +819,10 @@
       "id": "G084",
       "severity": "P0",
       "title": "root signing/trust key compromise lacks explicit revoke, re-root and re-sign recovery",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "landed_unverified",
+      "implementation_refs": [
+        "skeleton/security/trust_root_recovery.py"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
