@@ -160,6 +160,7 @@ def triangle_campaign_page(
     semantic_all_runs: bool = False,
     semantic_seed: int = 0,
     semantic_tokens: int = 192,
+    semantic_lens_budget: int = 43,
 ) -> dict[str, Any]:
     """One bounded foreground page, with an independent review for eligible ROMs.
 
@@ -235,14 +236,15 @@ def triangle_campaign_page(
                                     critic_runtime=runtime,
                                     semantic_runtime=semantic_runtime,
                                     run_index=i, requested_keys=semantic_lens_keys,
-                                    seed=semantic_seed + i * 43,
+                                    seed=semantic_seed + i * semantic_lens_budget,
                                     max_new_tokens=semantic_tokens,
+                                    lens_budget=semantic_lens_budget,
                                 )
-                                if (examined["native_model_lens_generations"] != 43
+                                if (examined["native_model_lens_generations"] != semantic_lens_budget
                                         or examined["cue_supported_lenses"]
-                                        + examined["hypothesis_only_lenses"] != 43
+                                        + examined["hypothesis_only_lenses"] != semantic_lens_budget
                                         or examined["all_lens_interpretations_valid"] is not (
-                                            examined["source_referenced_interpretations"] == 43
+                                            examined["source_referenced_interpretations"] == semantic_lens_budget
                                         )):
                                     raise RomStudyError(
                                         "native 43-lens session count or semantic evidence custody differs"
@@ -259,11 +261,11 @@ def triangle_campaign_page(
                             item["semantic_failure_reason"] = str(exc)[:240]
                         else:
                             item["semantic_lens_review_state"] = (
-                                "43_lenses_native_executed_or_replayed"
-                                if all(row[5] == 43 for row in receipts)
+                                f"{semantic_lens_budget}_lenses_native_executed_or_replayed"
+                                if all(row[5] == semantic_lens_budget for row in receipts)
                                 else "incomplete_semantic_interpretations_retry_required"
                             )
-                            item["semantic_model_generations"] = 43 * len(receipts)
+                            item["semantic_model_generations"] = semantic_lens_budget * len(receipts)
                             item["semantic_episode_count"] = len(receipts)
                             item["native_cue_supported_lens_questions"] = sum(
                                 row[3] for row in receipts
@@ -338,6 +340,7 @@ def export_reviewed_candidate_corpus(
     requested_semantic_lens_keys: tuple[str, ...] = (),
     semantic_review_receipt: Path | None = None,
     semantic_runtime: Any | None = None,
+    semantic_lens_budget: int = 43,
 ) -> dict[str, Any]:
     """Replay the critic's real local checkpoint BEFORE exporting lens examples.
 
@@ -374,7 +377,7 @@ def export_reviewed_candidate_corpus(
         replayed_semantic = replay_native_semantic_lenses(
             evidence, triangle, review, native_semantic_review, semantic_runtime,
         )
-        if replayed_semantic["native_jeeves_semantic_model_generations_replayed"] != 43:
+        if replayed_semantic["native_jeeves_semantic_model_generations_replayed"] != semantic_lens_budget:
             raise RomStudyError("43 native semantic checkpoint generations were not reproduced")
     elif semantic_runtime is not None:
         raise RomStudyError("semantic checkpoint must accompany a saved 43-lens review")
@@ -382,6 +385,7 @@ def export_reviewed_candidate_corpus(
         evidence, triangle, review,
         requested_semantic_lens_keys=requested_semantic_lens_keys,
         semantic_inference_review=native_semantic_review,
+        semantic_lens_budget=semantic_lens_budget,
     )
     out = _private_output(output_dir)
     name = (
@@ -408,12 +412,12 @@ def export_reviewed_candidate_corpus(
         "state": state,
         "filename": name,
         "candidate_corpus_digest": candidate["candidate_corpus_digest"],
-        "verified_43_lens_native_inference_receipt": (
+        "verified_native_semantic_inference_receipt": (
             native_semantic_review["semantic_review_digest"]
             if native_semantic_review is not None else None
         ),
         "replayed_semantic_model_generations": (
-            43 if native_semantic_review is not None else 0
+            semantic_lens_budget if native_semantic_review is not None else 0
         ),
         "semantic_generated_hypotheses_used_as_labels": False,
         "unique_native_episodes": candidate["unique_independent_native_episodes"],
@@ -441,15 +445,23 @@ def load_operator_semantic_lens_set(path: Path) -> tuple[str, ...]:
     of scientific governance.
     """
     document, _ = read_receipt_document(path, max_bytes=32768)
-    from skeleton.jeeves.game_emulator_triangle_semantics import SEMANTIC_LENS_BUDGET
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+    )
     keys = document.get("lens_keys")
+    budget = len(keys) if type(keys) is list else 0
     if (set(document) != {"schema_version", "lens_keys"}
-            or document.get("schema_version") != "skeleton.jeeves.semantic_lens_set.v1"
-            or type(keys) is not list or len(keys) != SEMANTIC_LENS_BUDGET
+            or document.get("schema_version") != (
+                "skeleton.jeeves.semantic_lens_set.v2"
+                if budget == EXTENDED_SEMANTIC_LENS_BUDGET
+                else "skeleton.jeeves.semantic_lens_set.v1"
+            )
+            or type(keys) is not list
+            or budget not in (SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET)
             or any(type(key) is not str or key != key.casefold().strip() or not key
                    for key in keys)
-            or len(set(keys)) != SEMANTIC_LENS_BUDGET):
-        raise RomStudyError("operator lens-set manifest must name exactly 43 distinct canonical keys")
+            or len(set(keys)) != budget):
+        raise RomStudyError("operator lens-set manifest must name exactly 43 or 200 unique canonical keys")
     return tuple(keys)
 
 
@@ -457,16 +469,22 @@ def load_operator_semantic_lens_set(path: Path) -> tuple[str, ...]:
 def inspect_native_episode_lenses(
     rom_receipt: Path, *, source_sha256: str, run_index: int = 0,
     output_dir: Path | None = None,
+    lens_budget: int = 43,
 ) -> dict[str, Any]:
-    """Inspect and optionally freeze 43 actual canonical Jeeves lens keys.
+    """Inspect and optionally freeze 43 or 200 actual canonical Jeeves lens keys.
 
     Source and triangle are verified independently first. Manifest creation is
     operator-selected, create-only, and cannot change governance or infer game
     semantics. A saved lens set may be passed to export-triangle-corpus.
     """
     from skeleton.jeeves.game_emulator_triangle_semantics import (
-        SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+        SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+        route_episode_semantic_lenses,
     )
+    if type(lens_budget) is not int or lens_budget not in (
+        SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+    ):
+        raise RomStudyError("lens inspection requires a budget of 43 or 200")
     verified = verified_rom_receipt(
         rom_receipt, expected_source_sha256=source_sha256,
     )
@@ -481,13 +499,13 @@ def inspect_native_episode_lenses(
         raise RomStudyError("episode lens selection index is outside source runs")
     source = episodes[run_index]
     route = route_episode_semantic_lenses(
-        source, max_lenses=SEMANTIC_LENS_BUDGET,
+        source, max_lenses=lens_budget,
     )
     keys = [item["lens_key"] for item in route["routes"]]
-    if len(keys) != SEMANTIC_LENS_BUDGET or len(set(keys)) != len(keys):
-        raise RomStudyError("actual canonical Jeeves router did not select 43 unique lenses")
+    if len(keys) != lens_budget or len(set(keys)) != len(keys):
+        raise RomStudyError("actual canonical Jeeves router did not select the requested unique lenses")
     result = {
-        "state": "verified_43_canonical_jeeves_lens_questions",
+        "state": f"verified_{lens_budget}_canonical_jeeves_lens_questions",
         "source_sha256": source_sha256,
         "native_trace_sha256": source["source_trace_sha256"],
         "canonical_registry": route["canonical_registry"],
@@ -520,7 +538,11 @@ def inspect_native_episode_lenses(
     if output_dir is not None:
         target = _private_output(output_dir)
         manifest = {
-            "schema_version": "skeleton.jeeves.semantic_lens_set.v1",
+            "schema_version": (
+                "skeleton.jeeves.semantic_lens_set.v2"
+                if lens_budget == EXTENDED_SEMANTIC_LENS_BUDGET
+                else "skeleton.jeeves.semantic_lens_set.v1"
+            ),
             "lens_keys": keys,
         }
         name = (
@@ -544,8 +566,9 @@ def execute_native_43_lens_review(
     critic_runtime: Any, semantic_runtime: Any,
     run_index: int = 0, requested_keys: tuple[str, ...] = (),
     seed: int = 0, max_new_tokens: int = 192,
+    lens_budget: int = 43,
 ) -> dict[str, Any]:
-    """Actual, independently replayable 43-lens native LLM interpretation pass.
+    """Actual, independently replayable 43/200-lens native LLM interpretation pass.
 
     Before permitting interpretive model execution, the critic's prior three
     native generations are independently reproduced from its own checkpoint.
@@ -558,7 +581,12 @@ def execute_native_43_lens_review(
     )
     from skeleton.jeeves.game_emulator_triangle_semantics import (
         route_episode_semantic_lenses, SEMANTIC_LENS_BUDGET,
+        EXTENDED_SEMANTIC_LENS_BUDGET,
     )
+    if type(lens_budget) is not int or lens_budget not in (
+        SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+    ):
+        raise RomStudyError("native semantic inference requires exactly 43 or 200 lenses")
     checked = verified_rom_receipt(
         rom_receipt, expected_source_sha256=source_sha256,
     )
@@ -581,7 +609,7 @@ def execute_native_43_lens_review(
         raise RomStudyError("43-lens review index outside native evidence")
     source = episodes[run_index]
     route = route_episode_semantic_lenses(
-        source, max_lenses=SEMANTIC_LENS_BUDGET, requested_keys=requested_keys,
+        source, max_lenses=lens_budget, requested_keys=requested_keys,
     )
     semantic_runtime.assert_model_unchanged()
     identity = hashlib.sha256(json.dumps({
@@ -593,7 +621,7 @@ def execute_native_43_lens_review(
         "seed": seed, "max_new_tokens": max_new_tokens,
     }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     name = (
-        "semantic-43-native-" + source_sha256[:16] + "-"
+        f"semantic-{lens_budget}-native-" + source_sha256[:16] + "-"
         + identity[:32] + ".json"
     )
     target = _private_output(output_dir) / name
@@ -603,7 +631,8 @@ def execute_native_43_lens_review(
         if (prior["model_sha256"] != semantic_runtime.model_digest
                 or prior["requested_seed"] != seed
                 or prior["requested_max_new_tokens"] != max_new_tokens
-                or prior["canonical_route_sha256"] != route["route_digest"]):
+                or prior["canonical_route_sha256"] != route["route_digest"]
+                or prior.get("lens_budget", SEMANTIC_LENS_BUDGET) != lens_budget):
             raise RomStudyError("saved 43-lens native model or routing identity differs")
         replayed = replay_native_semantic_lenses(
             evidence, triangle, review, prior, semantic_runtime,
@@ -611,23 +640,24 @@ def execute_native_43_lens_review(
         digest = prior["semantic_review_digest"]
         count = replayed["native_jeeves_semantic_model_generations_replayed"]
         structured = prior["source_bound_interpretations"]
-        state = ("verified_43_native_lens_generations_replayed"
+        state = (f"verified_{lens_budget}_native_lens_generations_replayed"
                  if prior["all_semantic_interpretations_valid"]
-                 else "replayed_43_native_generations_incomplete_interpretations")
+                 else f"replayed_{lens_budget}_native_generations_incomplete_interpretations")
     else:
         fresh = run_native_semantic_lenses(
             evidence, triangle, review, semantic_runtime,
             run_index=run_index, requested_keys=requested_keys,
             seed=seed, max_new_tokens=max_new_tokens,
+            lens_budget=lens_budget,
         )
         verify_native_semantic_lenses(evidence, triangle, review, fresh)
         _save_new(target, fresh)
         digest = fresh["semantic_review_digest"]
         count = fresh["native_model_generations_executed"]
         structured = fresh["source_bound_interpretations"]
-        state = ("executed_43_native_lens_generations_requires_adjudication"
+        state = (f"executed_{lens_budget}_native_lens_generations_requires_adjudication"
                  if fresh["all_semantic_interpretations_valid"]
-                 else "executed_43_native_generations_incomplete_interpretations")
+                 else f"executed_{lens_budget}_native_generations_incomplete_interpretations")
     return {
         "state": state,
         "filename": name,
@@ -638,11 +668,11 @@ def execute_native_43_lens_review(
         "independent_adversarial_model_sha256": critic_runtime.model_digest,
         "native_model_lens_generations": count,
         "source_referenced_interpretations": structured,
-        "lens_interpretations_incomplete": SEMANTIC_LENS_BUDGET - structured,
-        "all_lens_interpretations_valid": structured == SEMANTIC_LENS_BUDGET,
+        "lens_interpretations_incomplete": lens_budget - structured,
+        "all_lens_interpretations_valid": structured == lens_budget,
         "cue_supported_lenses": route["actual_cue_supported_lenses"],
         "hypothesis_only_lenses": (
-            SEMANTIC_LENS_BUDGET - route["actual_cue_supported_lenses"]
+            lens_budget - route["actual_cue_supported_lenses"]
         ),
         "native_observation_cue_links": route[
             "positively_supported_native_observation_links"

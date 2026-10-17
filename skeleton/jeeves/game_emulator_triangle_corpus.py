@@ -17,7 +17,8 @@ from .game_emulator_triangle import LENSES, verify_training_triangle
 from .game_emulator_triangle_native_reviewer import verify_native_adversarial_review
 from .game_learning import _digest
 from .game_emulator_triangle_semantics import (
-    SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+    SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+    route_episode_semantic_lenses,
 )
 
 SCHEMA = "skeleton.jeeves.game_triangle_candidate_corpus.v2"
@@ -33,12 +34,17 @@ def compile_triangle_candidate_corpus(
     reviewed: dict[str, Any], *,
     requested_semantic_lens_keys: Sequence[str] = (),
     semantic_inference_review: dict[str, Any] | None = None,
+    semantic_lens_budget: int = SEMANTIC_LENS_BUDGET,
 ) -> dict[str, Any]:
     """Construct data *candidates* for the existing Jeeves corpus governance.
 
     The real native model's generation must additionally be replayed with
     the actual local checkpoint by the operator before this is stored.
     """
+    if type(semantic_lens_budget) is not int or semantic_lens_budget not in (
+        SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+    ):
+        raise TriangleCorpusError("canonical semantic corpus budget must be 43 or 200")
     verify_training_triangle(evidence, triangle)
     verify_native_adversarial_review(evidence, triangle, reviewed)
     if reviewed.get("structured_source_bound_passes") != 3:
@@ -68,11 +74,13 @@ def compile_triangle_candidate_corpus(
         # run must never be represented as a fully reviewed 43-lens candidate.
         if (semantic_inference_review.get("all_semantic_interpretations_valid") is not True
                 or type(semantic_inference_review.get("source_bound_interpretations")) is not int
-                or semantic_inference_review["source_bound_interpretations"] != SEMANTIC_LENS_BUDGET
+                or semantic_inference_review["source_bound_interpretations"] != semantic_lens_budget
                 or semantic_inference_review.get("native_model_generations_executed")
-                != SEMANTIC_LENS_BUDGET):
+                != semantic_lens_budget
+                or semantic_inference_review.get("lens_budget", SEMANTIC_LENS_BUDGET)
+                != semantic_lens_budget):
             raise TriangleCorpusError(
-                "all 43 canonical semantic interpretations must be source-linked before corpus export"
+                "all selected canonical semantic interpretations must be source-linked before corpus export"
             )
         if tuple(semantic_inference_review["requested_lens_keys"]) != tuple(requested_semantic_lens_keys):
             raise TriangleCorpusError("verified 43-lens model run selected another lens set")
@@ -87,7 +95,7 @@ def compile_triangle_candidate_corpus(
         seen.add(trace)
         measured = episode["grounded_lens_evidence"]
         routed = route_episode_semantic_lenses(
-            episode, max_lenses=SEMANTIC_LENS_BUDGET,
+            episode, max_lenses=semantic_lens_budget,
             requested_keys=requested_semantic_lens_keys,
         )
         if routed["source_native_trace_sha256"] != trace:
@@ -174,7 +182,7 @@ def compile_triangle_candidate_corpus(
             "semantic_review_sha256": semantic_inference_review["semantic_review_digest"],
             "model_sha256": semantic_inference_review["model_sha256"],
             "source_bound_hypotheses": semantic_inference_review["source_bound_interpretations"],
-            "exact_43_checkpoint_generations_verified": True,
+            "exact_checkpoint_generations_verified": semantic_lens_budget,
             "hypotheses_are_ground_truth_labels": False,
             "human_adjudication_still_required": True,
         }
@@ -196,7 +204,7 @@ def compile_triangle_candidate_corpus(
         "unique_independent_native_episodes": len(seen),
         "total_lens_candidate_views": len(rows),
         "views_per_original_episode": len(LENSES),
-        "canonical_semantic_lens_selection_budget": SEMANTIC_LENS_BUDGET,
+        "canonical_semantic_lens_selection_budget": semantic_lens_budget,
         "operator_requested_semantic_lens_keys": list(requested_semantic_lens_keys),
         "semantic_lens_selection_digest": _digest([
             [route["native_trace_sha256"], route["semantic_route_digest"]]
@@ -233,5 +241,6 @@ def verify_triangle_candidate_corpus(
         evidence, triangle, reviewed,
         requested_semantic_lens_keys=candidate.get("operator_requested_semantic_lens_keys", ()),
         semantic_inference_review=semantic_inference_review,
+        semantic_lens_budget=candidate.get("canonical_semantic_lens_selection_budget", SEMANTIC_LENS_BUDGET),
     ):
         raise TriangleCorpusError("candidate training corpus no longer matches measured source")
