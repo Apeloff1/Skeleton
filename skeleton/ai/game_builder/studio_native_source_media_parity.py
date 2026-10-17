@@ -138,11 +138,10 @@ def inspect_native_source_media(project: str | Path, *, target: str) -> dict:
         ".byte " if nes else "    db "
     ) + ", ".join(f"${number:02X}" for number in high)
     _exact_region(source, "OriginalMusicLow:\n", "\nOriginalMusicHigh:", low_line)
-    _exact_region(
-        source, "OriginalMusicHigh:\n",
-        "\nNMI:" if nes else '\nSECTION "Pixel Art", ROM0',
-        high_line,
-    )
+    if (source.count("OriginalMusicHigh:\n") != 1
+            or source.split("OriginalMusicHigh:\n", 1)[1].splitlines()[0].strip()
+            != high_line.strip()):
+        raise NativeMediaSourceError("native music high-register table changed")
     if nes:
         if (f"AUDIO_ENABLED = {int(density > 0)}\n" not in source
                 or f"MUSIC_FRAME_DELAY = {programmed['frames_per_note']}\n" not in source):
