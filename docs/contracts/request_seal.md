@@ -69,3 +69,13 @@ the primary secret and the keyring are empty (`load_keyring()` empty). Covered b
 Use the reference minting algorithm above (or `mint_seal` server-side for
 internal callers). Send `x-gf-seal` and an `x-request-id` on every call; on 401
 re-mint once; on 503 surface "seal unavailable" (server misconfiguration).
+
+## App routes need BOTH seal and session
+
+`/api/v1/projects*` (skeleton.projects.v1, mounted in `create_app`) sits behind
+`install_gate`, so `x-gf-seal` is required first (fail-closed: missing/bad seal →
+`401 {"error":"invalid_seal"}`, no key → `503 seal_unavailable`). The seal attests
+the calling client/service. The handler then requires an end-user session,
+`Authorization: Bearer <session token>`. A missing or invalid session returns
+`401 {"error":{"type":"ProjectContractError","code":"PROJECT.UNAUTHENTICATED",...}}`.
+actor_id and tenant_id come from the session on the server side, never from the body.
