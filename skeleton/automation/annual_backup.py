@@ -272,6 +272,34 @@ def restore_annual_snapshot(folder: Path, label: str, destination: Path) -> dict
             raise AnnualBackupError("restored SQLite bytes differ from sealed archive")
         if _check_database(stage) != verified["table_counts"]:
             raise AnnualBackupError("restored SQLite journal chain differs from snapshot")
+        # A historical lease or grant MUST NOT become usable just because a
+        # file was restored. Preserve receipt chains but fence every worker
+        # generation and expire each legacy authority. Only independent
+        # operator-approved renew_authority() can resume nonterminal jobs.
+        with sqlite3.connect(str(stage), timeout=5) as restored_db:
+            restored_db.execute("PRAGMA journal_mode=DELETE")
+            restored_db.execute(
+                "UPDATE annual_productions SET "
+                "authority_expires_at=0, lease_epoch=lease_epoch+1, "
+                "lease_token_digest=NULL, lease_worker=NULL, "
+                "lease_expires_at=NULL, "
+                "status=CASE WHEN status IN ('completed','failed','cancelled') "
+                "THEN status ELSE 'waiting' END"
+            )
+        if _check_database(stage) != verified["table_counts"]:
+            raise AnnualBackupError("fenced restoration changed chain or table inventory")
+        with sqlite3.connect(
+            "file:" + __import__("urllib.parse", fromlist=["quote"]).quote(
+                str(stage), safe="/"
+            ) + "?mode=ro&immutable=1", uri=True,
+        ) as restored_db:
+            if restored_db.execute(
+                "SELECT count(*) FROM annual_productions WHERE "
+                "authority_expires_at!=0 OR lease_token_digest IS NOT NULL "
+                "OR lease_worker IS NOT NULL OR lease_expires_at IS NOT NULL"
+            ).fetchone()[0]:
+                raise AnnualBackupError("historical worker/grant fencing failed")
+        restored_digest, restored_size = _sha_file(stage)
         if verify_annual_snapshot(folder, label) != verified:
             raise AnnualBackupError("backup changed while restoring a new database")
         if any(p.exists() or p.is_symlink() for p in (
@@ -293,6 +321,9 @@ def restore_annual_snapshot(folder: Path, label: str, destination: Path) -> dict
             **verified,
             "backup_restored": True,
             "independent_database_copy": True,
+            "restored_database_sha256": restored_digest,
+            "restored_database_bytes": restored_size,
+            "historic_leases_and_grants_fenced": True,
             "workers_started": False,
             "old_worker_leases_validated_for_reuse": False,
             "new_operator_authorization_required": True,
