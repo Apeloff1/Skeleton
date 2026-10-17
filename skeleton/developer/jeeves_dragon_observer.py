@@ -139,6 +139,10 @@ def _observations(root: Path, policy: dict[str, Any],
         if (event["schema"] != EVENT_SCHEMA or event["sequence"] != index
             or event["policy_sha256"] != production._digest(policy)
             or event["previous_sha256"] != previous
+            or not isinstance(event["actor"], str)
+            or not isinstance(event["phase"], str)
+            or not isinstance(event["action"], str)
+            or not isinstance(event["outcome"], str)
             or event["actor"] not in ACTORS or event["phase"] not in PHASES
             or event["action"] not in ACTIONS or event["outcome"] not in OUTCOMES
             or not isinstance(event["evidence_sha256"], str)
@@ -153,6 +157,8 @@ def _observations(root: Path, policy: dict[str, Any],
             if (type(seq) is not int or not 1 <= seq <= len(source)
                 or event["source_event_sha256"] != source[seq - 1]["digest"]
                 or event["evidence_sha256"] != source[seq - 1]["evidence_sha256"]
+                or not isinstance(event["gate"], str)
+                or event["gate"] not in _GATE_PHASE
                 or event["gate"] != source[seq - 1]["gate"]
                 or event["outcome"] != source[seq - 1]["outcome"]
                 or event["action"] != "quality_gate"
@@ -185,7 +191,8 @@ def _append(root: Path, policy: dict[str, Any], current: list[dict[str, Any]],
             *, actor: str, phase: str, action: str, outcome: str,
             evidence_sha256: str, trust: str, source_sequence: int | None = None,
             source_event_sha256: str | None = None, gate: str | None = None) -> dict[str, Any]:
-    if (actor not in ACTORS or phase not in PHASES or action not in ACTIONS
+    if (not all(isinstance(value, str) for value in (actor, phase, action, outcome))
+        or actor not in ACTORS or phase not in PHASES or action not in ACTIONS
         or outcome not in OUTCOMES or not isinstance(evidence_sha256, str)
         or HEX.fullmatch(evidence_sha256) is None):
         raise WitnessError("instrumentation requires allowed actor, phase, action, outcome, SHA-256")
