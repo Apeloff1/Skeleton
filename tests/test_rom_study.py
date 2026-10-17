@@ -647,3 +647,66 @@ def test_fleet_neural_candidate_cross_source_mismatch_fails_closed(
     assert rejected["totals"]["verified_q_policy_sources"] == 0
     assert rejected["totals"]["verified_neural_candidate_sources"] == 0
     assert rejected["totals"]["invalid_or_stale_receipt_sources"] == 1
+
+
+
+def test_frozen_inventory_large_cursor_does_not_rebuild_full_name_list(tmp_path, monkeypatch):
+    """Cursor lookups must be logarithmic, not one full scan per page."""
+    from skeleton.ai.training import rom_inventory_snapshot as frozen
+
+    class NoLinearIteration(list):
+        def __iter__(self):
+            raise AssertionError("frozen inventory paging iterated all ROM names")
+
+    root = tmp_path / "library"
+    root.mkdir()
+    rows = NoLinearIteration([
+        {
+            "relative_path": f"{i:05d}.gb", "file_sha256": "a" * 64,
+            "size_bytes": 17, "extension": ".gb",
+        }
+        for i in range(16384)
+    ])
+    snapshot = {
+        "schema_version": frozen.SCHEMA,
+        "root": str(root),
+        "entries": rows,
+        "inventory_sha256": "b" * 64,
+    }
+    monkeypatch.setattr(frozen, "_stream_identity",
+                        lambda path, expected=None: (expected, 17, b""))
+    result = frozen.frozen_inventory_page(
+        snapshot, root=root, cursor="15000.gb", limit=2,
+    )
+    assert [r["relative_path"] for r in result["rows"]] == [
+        "15001.gb", "15002.gb",
+    ]
+    assert result["next_cursor"] == "15002.gb"
+    assert result["total_candidate_files"] == 16384
+
+
+def test_fleet_audit_reuses_canonical_index_across_pages(tmp_path, monkeypatch):
+    from skeleton.ai.training import rom_fleet_audit as audit
+    from skeleton.ai.training.rom_inventory_snapshot import freeze_rom_inventory
+
+    root, _, _ = _roms(tmp_path)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    snapshot = freeze_rom_inventory(root, private)
+    approvals = private / "rights.json"
+    approvals.write_text(json.dumps({
+        "schema_version": rom.APPROVAL_SCHEMA,
+        "roms": [],
+    }))
+    actual_index = audit._source_index
+    calls = []
+    def recorded_index(frozen):
+        calls.append(len(frozen["entries"]))
+        return actual_index(frozen)
+    monkeypatch.setattr(audit, "_source_index", recorded_index)
+    result = audit.audit_fleet_all(
+        root, Path(snapshot["manifest_path"]), approvals, private, limit=1,
+    )
+    assert result["pages_audited"] == 2
+    assert result["totals"]["rights_review_required"] == 2
+    assert calls == [2]

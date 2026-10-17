@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Mapping
 
 from .rom_inventory_snapshot import frozen_inventory_page, load_frozen_inventory
 from .rom_study import (
@@ -20,17 +20,21 @@ _MAX_CANDIDATES_PER_SOURCE = 128
 _RECEIPT_NAME = re.compile(r"rom-[0-9a-f]{16}-[0-9a-f]{16}\.json\Z")
 
 
+def _source_index(snapshot: Mapping[str, Any]) -> dict[str, str]:
+    """Index first source occurrence once for an entire immutable fleet sweep."""
+    source_paths: dict[str, str] = {}
+    for row in snapshot["entries"]:
+        source_paths.setdefault(row["file_sha256"], row["relative_path"])
+    return source_paths
+
+
 def _audit_loaded(root: Path, snapshot: dict[str, Any],
                   approved: dict[str, dict[str, Any]], approval_sha: str,
-                  receipts_dir: Path, *, cursor: str | None, limit: int) -> dict[str, Any]:
-    """Read-only page verifier using an already authenticated frozen census."""
+                  receipts_dir: Path, *, cursor: str | None, limit: int,
+                  source_index: Mapping[str, str]) -> dict[str, Any]:
+    """Read-only page verifier using a precomputed canonical source index."""
     page = frozen_inventory_page(snapshot, root=root, cursor=cursor, limit=limit)
     entries: list[dict[str, Any]] = []
-    unique_in_snapshot = {}
-    for item in snapshot["entries"]:
-        identity = item["file_sha256"]
-        if identity not in unique_in_snapshot:
-            unique_in_snapshot[identity] = item["relative_path"]
     counts = {
         "candidate_files": 0, "distinct_sources_in_page": 0,
         "verified_q_policy_sources": 0,
@@ -51,9 +55,9 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
             counts["source_identity_changed"] += 1
             entries.append(entry)
             continue
-        if unique_in_snapshot[digest] != name:
+        if source_index[digest] != name:
             entry["status"] = "duplicate_source_inventory_alias"
-            entry["canonical_relative_path"] = unique_in_snapshot[digest]
+            entry["canonical_relative_path"] = source_index[digest]
             counts["duplicates_not_retrained"] += 1
             entries.append(entry)
             continue
@@ -168,7 +172,8 @@ def audit_fleet_page(root: Path, snapshot_file: Path, approvals_file: Path,
     approved, approval_sha = _load_approvals(approvals_file)
     receipts_dir = _private_output(receipts_dir)
     return _audit_loaded(root, snapshot, approved, approval_sha,
-                         receipts_dir, cursor=cursor, limit=limit)
+                         receipts_dir, cursor=cursor, limit=limit,
+                         source_index=_source_index(snapshot))
 
 
 def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
@@ -184,6 +189,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
     snapshot = load_frozen_inventory(snapshot_file, root=root)
     approved, approval_sha = _load_approvals(approvals_file)
     receipts_dir = _private_output(receipts_dir)
+    source_index = _source_index(snapshot)
     totals: dict[str, int] = {}
     by_target_core: dict[str, dict[str, Any]] = {}
     pages = 0
@@ -191,7 +197,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
     while True:
         page = _audit_loaded(
             root, snapshot, approved, approval_sha, receipts_dir,
-            cursor=cursor, limit=limit,
+            cursor=cursor, limit=limit, source_index=source_index,
         )
         for key, count in page["page_counts"].items():
             totals[key] = totals.get(key, 0) + count

@@ -6,7 +6,6 @@ still exist unchanged. No ROM bytes leave the machine or enter the manifest.
 """
 from __future__ import annotations
 
-from bisect import bisect_right
 from hashlib import sha256
 import json
 import os
@@ -173,8 +172,20 @@ def frozen_inventory_page(snapshot: Mapping[str, Any], *, root: Path,
     if cursor is not None:
         _relative(cursor)
     entries = snapshot["entries"]
-    names = [row["relative_path"] for row in entries]
-    start = bisect_right(names, cursor) if cursor is not None else 0
+    # Entries were checked for strictly sorted unique names at manifest load.
+    # A whole-library name projection for *every* page makes a year-long
+    # 100,000-ROM sweep quadratic in inventory size. Instead, binary-search
+    # the existing immutable entry list in logarithmic comparisons.
+    start = 0
+    if cursor is not None:
+        left, right = 0, len(entries)
+        while left < right:
+            middle = (left + right) // 2
+            if entries[middle]["relative_path"] <= cursor:
+                left = middle + 1
+            else:
+                right = middle
+        start = left
     page = entries[start:start + limit]
     results = []
     for entry in page:
