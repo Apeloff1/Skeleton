@@ -666,3 +666,27 @@ python -m skeleton.ai.game_builder.studio_execution_campaign_cli \
 ```
 
 No always-on CI workflow was added, because the repository has already been constrained to minimize CI congestion. The manually selectable existing specialized suite lists all relevant offline source-contract tests. **Test registration is not a claim that the suite was run or passed.**
+
+
+## M261–M280: independent native media source execution-path integrity
+
+This tranche addresses a concrete risk discovered in M201–M260: the source producer could emit genuine multi-frame animation and original console PSG note tables, while **a later source mutation disables the update loop, sound boot, or gameplay-event triggers**. An assembly file and a separately signed artwork manifest may each be internally consistent without being mutually consistent or functionally wired. Successful compilation and a valid cartridge header also do not prove that native music or animation is active.
+
+`studio_native_source_media_parity.py` is a read-only, bounded independent preflight covering the original GB, Game Boy Color and NES builds. It inspects the **actual generated source project**, checks the independently verified browser/Godot sprite asset equivalence and canonical original world digest, decodes the current console native tile codec, and verifies that the first hero animation frame is the original tile-five sprite. It recomputes every additional encoded assembly animation frame using the canonical RGBDS/ca65 source owners and compares the exact contents of the cartridge's assembly tile section. It independently derives source frame counts and 60Hz tick cadence from the art direction instead of trusting the source manifest alone.
+
+The preflight also regenerates the original console-local PSG score from the browser game's source theme and authored seed/intensity. It checks the actual eight-note APU low/high register tables, score digest, native on/off controls, frame cadence, and the **complete body of all three game-event audio routines**. An inserted early return, altered pitch, missing console APU startup, skipped animation/music update, duplicate pickup/hazard/goal trigger or replaced driver body is rejected. Game Boy Color's legitimate palette initialization does not affect the music-table check.
+
+The same independent check now runs through two authority boundaries: `studio_campaign._verify_target` for source publication, resume and immutable campaign inspection, and `studio_build_qualification._verify_source` before *direct* RGBDS/ca65 compilation of source bundles declaring native animation/PSG capability. The canonical `studio_campaign_assurance` report exposes the source-parity receipt, actual original hero frame count and source PSG score digest. These are labeled source evidence; actual emulator audio/video, physical sound and release readiness remain unverified.
+
+New `tests/test_studio_native_source_media_parity.py` creates real homebrew GB, GBC and NES source bundles and tests source parity, muted games, incorrect targets, altered original music tables, wrong animation frames, missing audio initialization and silent driver bypass. `tests/test_studio_campaign_e2e.py` now deliberately forges new target-tree and campaign index hashes after mutating the real pickup/goal audio assembly, then requires the independent source preflight to reject the project. Tests and executable source were committed, but specialized exact-head E2E has **not yet been run or demonstrated passing**.
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_native_source_media_parity.py \
+  tests/test_studio_campaign_e2e.py \
+  tests/test_studio_native_console_animation_e2e.py \
+  tests/test_studio_native_psg.py \
+  tests/test_studio_campaign_assurance_e2e.py
+```
+
+Open qualification dependencies remain real RGBDS/cc65 builds, actual PyBoy/FCEUX gameplay, CPU/PPU/LCD/audio measurement, first install, hardware controller/device rendering and long-duration production. Neither a source manifest nor this preflight proves that an APU waveform or frame appeared during a true compiled cartridge run.
