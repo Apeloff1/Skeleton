@@ -2,7 +2,7 @@
 
 Uses SQLite's online backup API so WAL-backed production rows and receipts are
 captured in ONE consistent database image, without copying a live .db file.
-No restore, runtime execution or authority renewal is performed here.
+Snapshot creation and restoration never run workers or renew authority.
 """
 from __future__ import annotations
 
@@ -235,5 +235,67 @@ def snapshot_annual_production(store: AnnualProductionStore, folder: Path,
             finally:
                 os.close(dir_fd)
         return verify_annual_snapshot(folder, label)
+    finally:
+        stage.unlink(missing_ok=True)
+
+
+def restore_annual_snapshot(folder: Path, label: str, destination: Path) -> dict[str, Any]:
+    """Copy a verified SQLite archive into a NEW independent, offline database.
+
+    This never revives leases, starts Jeeves/Dragon/Builder workers, extends a
+    grant, nor overwrites existing production. The destination is exposed only
+    after full SQLite and chained-receipt validation of an independently
+    copied image. An exclusive hard link publishes a COPY, never the source.
+    """
+    folder = _private_folder(Path(folder))
+    verified = verify_annual_snapshot(folder, label)
+    destination = Path(destination)
+    if not destination.is_absolute() or destination.suffix != ".db":
+        raise AnnualBackupError("restore requires a new absolute .db destination")
+    parent = _private_folder(destination.parent)
+    if any(p.exists() or p.is_symlink() for p in (
+            destination, parent / (destination.name + "-wal"),
+            parent / (destination.name + "-shm"),
+            parent / (destination.name + "-journal"))):
+        raise AnnualBackupError("restoration must not replace a live database or sidecar")
+    fd, temporary = tempfile.mkstemp(prefix=".annual-restore-", suffix=".tmp", dir=parent)
+    stage = Path(temporary)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            with (folder / (label + ".db")).open("rb") as source:
+                for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    output.write(chunk)
+            output.flush()
+            os.fsync(output.fileno())
+        digest, size = _sha_file(stage)
+        if digest != verified["sha256"] or size != verified["bytes"]:
+            raise AnnualBackupError("restored SQLite bytes differ from sealed archive")
+        if _check_database(stage) != verified["table_counts"]:
+            raise AnnualBackupError("restored SQLite journal chain differs from snapshot")
+        if verify_annual_snapshot(folder, label) != verified:
+            raise AnnualBackupError("backup changed while restoring a new database")
+        if any(p.exists() or p.is_symlink() for p in (
+                destination, parent / (destination.name + "-wal"),
+                parent / (destination.name + "-shm"),
+                parent / (destination.name + "-journal"))):
+            raise AnnualBackupError("live restore destination appeared during copy")
+        try:
+            os.link(stage, destination, follow_symlinks=False)
+        except FileExistsError as exc:
+            raise AnnualBackupError("restore destination appeared during publication") from exc
+        if os.name == "posix":
+            parent_fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(parent_fd)
+            finally:
+                os.close(parent_fd)
+        return {
+            **verified,
+            "backup_restored": True,
+            "independent_database_copy": True,
+            "workers_started": False,
+            "old_worker_leases_validated_for_reuse": False,
+            "new_operator_authorization_required": True,
+        }
     finally:
         stage.unlink(missing_ok=True)
