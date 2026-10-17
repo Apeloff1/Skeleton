@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from .studio_campaign_cli import parse_campaign_order_file
+from .studio_native_correction_triage import triage_native_gameplay
 from .studio_dragon_learning_bridge import (
     propose_dragon_operational_lessons,
     review_dragon_operational_lesson,
@@ -25,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     actions = parser.add_mutually_exclusive_group(required=True)
     actions.add_argument("--propose", action="store_true")
     actions.add_argument("--inspect-reviewed", action="store_true")
+    actions.add_argument("--triage-native", action="store_true")
     actions.add_argument("--review-candidate")
     parser.add_argument("--decision", choices=(
         "approve_for_reviewed_knowledge", "reject", "needs_more_evidence",
@@ -41,6 +43,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.propose:
             result = propose_dragon_operational_lessons(
                 order, args.campaign, authorized=True, limit=args.limit,
+            )
+        elif args.triage_native:
+            result = triage_native_gameplay(
+                order, args.campaign, authorized=True,
             )
         elif args.inspect_reviewed:
             result = inspect_dragon_reviewed_lessons(
