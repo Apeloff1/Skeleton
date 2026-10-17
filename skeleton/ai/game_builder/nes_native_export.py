@@ -24,6 +24,7 @@ _ASM = r"""; Original world-specific NES NROM-256 homebrew, ca65/ld65.
 .res 8, 0
 
 .segment "ZEROPAGE"
+.exportzp Level, PlayerX, PlayerY, Health, Score, GemsRemaining, GameWon, GameLost
 Level: .res 1
 PlayerX: .res 1
 PlayerY: .res 1
