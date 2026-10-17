@@ -18,7 +18,9 @@ import ScreenGuard from '../components/withScreenGuard';
 import { ToastHost } from '../components/Toast';
 import { ActionSheetHost } from '../components/ActionSheet';
 import { traceStep, traceStepSync, installCrashTrace } from '../utils/bootTracer';
-import { installMemoryGuard } from '../utils/memoryGuard';
+import { installMemoryGuard, registerMemoryShedder } from '../utils/memoryGuard';
+import { clearMemCache } from '../utils/resilientNet';
+import { purgeThermalCachesIfPresent } from '../utils/thermalGuard';
 import { installGlobalGuards } from '../utils/globalGuards';
 import { installAppStateGuard } from '../utils/safeTimers';
 import { loadFeatureFlags } from '../utils/featureFlags';
@@ -60,6 +62,13 @@ export default function RootLayout() {
     try { installAppStateGuard(); } catch {}
     try { installGlobalErrorHandlers(); } catch {}
 
+    // Drop only regenerable in-memory caches on OS memory pressure; never
+    // clear durable project, checkpoint, or learned model state.
+    const disposeNetworkShedder = registerMemoryShedder('network-cache', clearMemCache);
+    const disposeThermalShedder = registerMemoryShedder(
+      'thermal-cache', purgeThermalCachesIfPresent,
+    );
+
     // Device connectivity is observed immediately by StabilityBanner. Delay
     // server polling so it does not compete with the launcher for cold-start
     // CPU, timers, or network sockets.
@@ -74,6 +83,8 @@ export default function RootLayout() {
     return () => {
       clearTimeout(heartbeatTimer);
       stopTunnelHeartbeat();
+      disposeNetworkShedder();
+      disposeThermalShedder();
     };
   }, []);
 
