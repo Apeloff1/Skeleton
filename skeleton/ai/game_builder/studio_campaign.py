@@ -292,10 +292,11 @@ def _run_campaign_unlocked(order: CampaignOrder, destination: str | Path, *,
     if (root / "targets").is_symlink() or (root / ".staging").is_symlink():
         raise StudioCampaignError("campaign staging and target roots cannot be links")
     state = _index(root, identity, order)
+    previously_recovered = state.get("aborted_owned_stages_recovered", 0)
+    if type(previously_recovered) is not int or previously_recovered < 0:
+        raise StudioCampaignError("invalid prior production recovery counter")
     recovered = _reclaim_aborted_stages(root)
-    state["aborted_owned_stages_recovered"] = (
-        int(state.get("aborted_owned_stages_recovered", 0)) + recovered
-    )
+    state["aborted_owned_stages_recovered"] = previously_recovered + recovered
     # Require valid source receipts before trusting an indexed completion.
     for target in order.targets:
         source = root / "targets" / target
