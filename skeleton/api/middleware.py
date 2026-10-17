@@ -164,6 +164,7 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/capabilities", "capabilities"),
     ("/api/v1/interface", "interface"),
     ("/api/v1/auth", "auth"),
+    ("/api/v1/projects", "projects"),
     ("/api/v1/cortex", "cognition"),
     ("/api/v1/health", "observability"),
     ("/api/v1/metrics", "observability"),
