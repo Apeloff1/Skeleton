@@ -64,14 +64,27 @@ def _validated_native_failure_events(run: dict, targets: tuple[str, ...]) -> lis
     classifications = ("verified", "blocked", "unsupported")
     required = ("target", "stage", "status", "blocker")
     stage_ids = ("source", "rom", "emulator", "browser", "godot", "canvas")
+    requested = run.get("requested_stages")
+    if (type(requested) is not list or not requested
+            or len(set(requested)) != len(requested)
+            or any(stage not in stage_ids for stage in requested)
+            or requested != sorted(requested, key=stage_ids.index)):
+        raise StudioQualificationHistoryError("invalid original studio execution stage order")
     counts = {status: 0 for status in classifications}
+    seen = set()
     failures: list[dict] = []
     for event in events:
         if (type(event) is not dict or any(key not in event for key in required)
                 or event["target"] not in targets
-                or event["stage"] not in stage_ids
-                or event["status"] not in counts):
-            raise StudioQualificationHistoryError("E2E report contains an untyped target or stage")
+                or event["stage"] not in requested
+                or event["status"] not in counts
+                or (event["target"], event["stage"]) in seen
+                or (event["status"] == "verified" and event["blocker"] is not None)
+                or (event["status"] != "verified" and (
+                    type(event["blocker"]) is not str
+                    or not 1 <= len(event["blocker"]) <= 256))):
+            raise StudioQualificationHistoryError("E2E report contains a false or repeated stage")
+        seen.add((event["target"], event["stage"]))
         counts[event["status"]] += 1
         issue = event.get("first_cpu_divergence")
         if issue is None:
