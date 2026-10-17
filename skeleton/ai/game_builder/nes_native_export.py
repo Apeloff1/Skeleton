@@ -551,6 +551,7 @@ SpawnYs:
 __START_Y__
 __MAPS__
 
+.export OriginalMusicLow, OriginalMusicHigh
 OriginalMusicLow:
 __MUSIC_LOW__
 OriginalMusicHigh:
