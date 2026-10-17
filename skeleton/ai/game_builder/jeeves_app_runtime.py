@@ -156,6 +156,7 @@ ACTION_DEFS = (
     ("game.compile.native", "Actually compile original browser plus Godot source with bounded replay proof", "simulate", True),
     ("game.console.catalog", "List real console native source and sprite integration targets", "read", False),
     ("game.console.source.stage", "Generate authentic console assembly/C and stage one exact source for human approval", "propose", True),
+    ("game.console.source.stage.artwork", "Compile six exact original 8x8 sprite tile arrays into reviewed native console source", "propose", True),
     ("game.mirror.review", "Run original game browser/native replay plus the independent adversarial mirror", "simulate", True),
     ("tool.fabric", "Inspect actual game tool contracts versus executable handlers", "read", False),
     ("tool.plan", "Validate a finite typed Jeeves tool plan without executing it", "plan", True),
@@ -444,22 +445,25 @@ def _compile_original_game(project,args,mode):
     return {**body,"digest":canonical_digest(body)}
 
 
-def _stage_console_art_source(workspace, project, args):
+def _stage_console_art_source(workspace, project, args, *, with_artist=False):
     """Generate actual original native ROM source, then stage through CAS review.
 
     No toolchain, shell, network or unchecked artifact commit. The operator
     supplies an authorship-document digest as a *reference*, not as proof of
     independently adjudicated IP rights. One source file per reviewed edit.
     """
-    _exact(args, (
+    fields = (
         "intent", "target", "source_platform", "rights_evidence_sha256",
         "creative_identity", "style", "contrast", "animation_frames",
         "source_file", "expected_sha256", "reason",
-    ), "original native source production")
+    )
+    _exact(args, (*fields, "artist_tiles") if with_artist else fields,
+           "original native source production")
     from .playable_world import GameBuildIntent, generate_playable_world
     from .port_planner import HomebrewSource
     from .platform_registry import default_registry
-    from .studio_asset_pipeline import ArtDirection, render_studio_art
+    from .studio_asset_pipeline import ArtDirection, render_studio_art, _palette
+    from .studio_sprite_authoring import typed_artist_tiles
     from .game_boy_native_export import compile_native_game_boy
     from .game_boy_color_native_export import compile_native_game_boy_color
     from .nes_native_export import compile_native_nes
@@ -501,7 +505,16 @@ def _stage_console_art_source(workspace, project, args):
         animation_frames=args["animation_frames"], seed=intent.seed,
     )
     world = generate_playable_world(intent, authorized=True)
-    pack = render_studio_art(world, target=target, direction=art, authorized=True)
+    artist_atlas = (
+        typed_artist_tiles(
+            args["artist_tiles"], palette=_palette(intent.theme, art.contrast),
+            authorized=True,
+        ) if with_artist else None
+    )
+    pack = render_studio_art(
+        world, target=target, direction=art, authorized=True,
+        artist_atlas=artist_atlas,
+    )
     if target == "nintendo_game_boy":
         native = compile_native_game_boy(world, rights, authorized=True, tile_art=pack.runtime_tiles)
         text = native.asm
@@ -545,6 +558,7 @@ def _stage_console_art_source(workspace, project, args):
         "generated_source_file": path,
         "generated_source_sha256": sha256(text.encode("utf-8")).hexdigest(),
         "art_pack_digest": pack.digest,
+        "artist_sprite_pixel_digest": artist_atlas.digest if artist_atlas else None,
         "native_tile_art_digest": expected_art,
         "sprite_preview_count": len(world.levels),
         "animation_frame_count": art.animation_frames,
@@ -831,6 +845,8 @@ def dispatch_app_action(workspace,project,action,args,*,authorized=False):
         }
     elif action=="game.console.source.stage":
         result=_stage_console_art_source(workspace,project,args)
+    elif action=="game.console.source.stage.artwork":
+        result=_stage_console_art_source(workspace,project,args,with_artist=True)
     elif action=="game.mirror.review":
         result=_compile_original_game(project,args,"mirror")
     elif action=="forge.graph":
