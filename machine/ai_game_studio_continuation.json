@@ -2168,5 +2168,132 @@
       "model_weights_changed_here": false,
       "studio_release_qualified": false
     }
+  },
+  "jeeves_native_suite_execution_integrity_extension": {
+    "status": "committed_operator_runner_and_source_patch_unexecuted_specialized_suite",
+    "tranche": "M281-M300",
+    "milestones": [
+      {
+        "id": "M281",
+        "name": "Fix exact assembly label parsing so Tiles and AnimationTiles cannot collide",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M282",
+        "name": "Preserve separate verification of base six sprites and appended animation frames",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M283",
+        "name": "Reject duplicated, renamed or changed assembly regions with dedicated regression",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M284",
+        "name": "Create explicit local-only operator-owned native source-test execution entrypoint",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M285",
+        "name": "Allow exactly the canonical registered offline specialized suite, never shell commands",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M286",
+        "name": "Require operator execution consent separate from merely inspecting source",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M287",
+        "name": "Require all registered input and test files exist, with bounded sizes and no symlinks",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M288",
+        "name": "Constrain source-test runtime, interpreter arguments and local plugin loading",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M289",
+        "name": "Bind source-contract results to a digest of the exact checked code inventory",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M290",
+        "name": "Bind specialized test receipts to their original registered command and timeout policy",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M291",
+        "name": "Reject passing verdict if source or execution policy changed during testing",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M292",
+        "name": "Exclusively publish source-contract receipt outside repository; forbid overwrite",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M293",
+        "name": "Keep native emulator, real audio/video and release claims false in source-test receipt",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M294",
+        "name": "Test authorization refusal, command injection, linked file, timeout, drift and false success",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M295",
+        "name": "Execute all 18 registered native focused tests on actual branch checkout",
+        "state": "pending_operator_execution"
+      },
+      {
+        "id": "M296",
+        "name": "Repair concrete failing specialized tests against runtime reports until passing",
+        "state": "pending_real_test_results"
+      },
+      {
+        "id": "M297",
+        "name": "Build and run real RGBDS GB/GBC compiled cartridges",
+        "state": "not_verified"
+      },
+      {
+        "id": "M298",
+        "name": "Build and run real NES ca65/ld65/FCEUX cartridge and original game soundtrack",
+        "state": "not_verified"
+      },
+      {
+        "id": "M299",
+        "name": "Qualify first install, audio, video, controller devices and complete playable game",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M300",
+        "name": "Demonstrate and sign off extended Jeeves/Builder/Dragon production endurance",
+        "state": "not_qualified"
+      }
+    ],
+    "code_owners": [
+      "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+      "skeleton/ai/game_builder/studio_specialized_e2e_runner.py",
+      "tests/test_studio_native_source_media_parity.py",
+      "tests/test_studio_specialized_e2e_runner.py",
+      "machine/e2e_suites.json"
+    ],
+    "evidence": {
+      "exact_assembly_labels_checked_without_substring_alias": true,
+      "registered_specialized_test_files": 18,
+      "runner_requires_explicit_operator_consent": true,
+      "tests_never_executed_automatically_by_commits": true,
+      "test_run_binds_source_and_registry_policy": true,
+      "test_result_saved_to_new_external_receipt_only": true,
+      "specialized_test_suite_actually_executed_in_this_session": false,
+      "existing_mainline_CI_success_not_a_full_gameplay_claim": true,
+      "first_real_native_ROM_victory_this_session": false,
+      "native_speaker_or_PPU_playback_this_session": false,
+      "installer_and_model_training_completed": false,
+      "studio_release_signed_off": false
+    }
   }
 }
