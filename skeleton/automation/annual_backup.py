@@ -1,0 +1,163 @@
+"""Crash-safe, create-only SQLite backup and offline verification for annual work.
+
+Uses SQLite's online backup API so WAL-backed production rows and receipts are
+captured in ONE consistent database image, without copying a live .db file.
+No restore, runtime execution or authority renewal is performed here.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import sqlite3
+import stat
+import tempfile
+from typing import Any
+
+from .annual_production import AnnualProductionStore
+
+_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
+MAX_BACKUP_BYTES = 4 * 1024**3
+
+
+class AnnualBackupError(ValueError):
+    """A backup image, publication, custody or verification check failed."""
+
+
+def _private_folder(folder: Path) -> Path:
+    if not folder.is_absolute() or not folder.is_dir() or folder.is_symlink():
+        raise AnnualBackupError("existing absolute backup directory required")
+    if os.name == "posix":
+        mode = folder.stat().st_mode
+        if mode & 0o077 or folder.stat().st_uid != os.geteuid():
+            raise AnnualBackupError("backup directory must be owned and mode 0700")
+    return folder
+
+
+def _sha_file(path: Path) -> tuple[str, int]:
+    if path.is_symlink() or not path.is_file():
+        raise AnnualBackupError("backup must be a regular, non-symlinked file")
+    before = path.stat()
+    if not stat.S_ISREG(before.st_mode) or not 1 <= before.st_size <= MAX_BACKUP_BYTES:
+        raise AnnualBackupError("backup image exceeds bounded read capacity")
+    digest = hashlib.sha256()
+    size = 0
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+            size += len(chunk)
+    after = path.stat()
+    if (size != before.st_size or before.st_ino != after.st_ino
+            or before.st_size != after.st_size
+            or before.st_mtime_ns != after.st_mtime_ns):
+        raise AnnualBackupError("backup image changed during verification")
+    return digest.hexdigest(), size
+
+
+def _check_database(path: Path) -> dict[str, Any]:
+    # Read an immutable snapshot; never try a live WAL sidecar recovery here.
+    from urllib.parse import quote
+    uri = "file:" + quote(str(path), safe="/") + "?mode=ro&immutable=1"
+    with sqlite3.connect(uri, uri=True, timeout=5) as db:
+        integrity = db.execute("PRAGMA integrity_check").fetchone()
+        if integrity != ("ok",) or db.execute("PRAGMA foreign_key_check").fetchone():
+            raise AnnualBackupError("SQLite image failed integrity or FK validation")
+        names = {row[0] for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )}
+        expected = {
+            "annual_productions", "annual_checkpoint_receipts",
+            "annual_authority_rotations",
+        }
+        if not expected <= names:
+            raise AnnualBackupError("required annual production tables are missing")
+        counts = {}
+        for name in sorted(expected):
+            counts[name] = db.execute("SELECT count(*) FROM " + name).fetchone()[0]
+    return counts
+
+
+def verify_annual_snapshot(folder: Path, label: str) -> dict[str, Any]:
+    """Check create-only manifest, exact bytes and consistent relational image."""
+    folder = _private_folder(Path(folder))
+    if not isinstance(label, str) or not _LABEL.fullmatch(label):
+        raise AnnualBackupError("invalid backup identity")
+    db_file = folder / (label + ".db")
+    manifest_file = folder / (label + ".json")
+    if manifest_file.is_symlink() or not manifest_file.is_file():
+        raise AnnualBackupError("backup manifest is missing or unsafe")
+    if manifest_file.stat().st_size > 8192:
+        raise AnnualBackupError("backup manifest exceeds bounded size")
+    try:
+        manifest = json.loads(manifest_file.read_bytes())
+    except (ValueError, UnicodeError) as exc:
+        raise AnnualBackupError("backup manifest is invalid") from exc
+    if (type(manifest) is not dict or set(manifest) != {
+            "schema", "label", "sha256", "bytes", "table_counts"}
+            or manifest["schema"] != "skeleton.annual-production.backup.v1"
+            or manifest["label"] != label):
+        raise AnnualBackupError("backup manifest schema differs")
+    digest, size = _sha_file(db_file)
+    if digest != manifest["sha256"] or size != manifest["bytes"]:
+        raise AnnualBackupError("backup bytes differ from sealed manifest")
+    counts = _check_database(db_file)
+    if counts != manifest["table_counts"]:
+        raise AnnualBackupError("backup table inventory changed")
+    return {"verified": True, "label": label, "sha256": digest,
+            "bytes": size, "table_counts": counts,
+            "worker_execution_or_authority_renewal": False}
+
+
+def snapshot_annual_production(store: AnnualProductionStore, folder: Path,
+                               *, label: str) -> dict[str, Any]:
+    """Online snapshot; never overwrite a previous image or manifest.
+
+    A crash can leave an unsealed orphan .db. The label then cannot be reused;
+    an operator must reconcile it, rather than silently replacing evidence.
+    """
+    if not isinstance(store, AnnualProductionStore):
+        raise AnnualBackupError("canonical annual production store required")
+    folder = _private_folder(Path(folder))
+    if not isinstance(label, str) or not _LABEL.fullmatch(label):
+        raise AnnualBackupError("invalid backup label")
+    target = folder / (label + ".db")
+    seal = folder / (label + ".json")
+    if any(p.exists() or p.is_symlink() for p in (target, seal)):
+        raise AnnualBackupError("backup label already exists; never overwrite")
+    fd, temporary = tempfile.mkstemp(prefix=".annual-backup-", suffix=".tmp", dir=folder)
+    stage = Path(temporary)
+    os.close(fd)
+    try:
+        with sqlite3.connect(str(store.path), timeout=10) as source:
+            with sqlite3.connect(str(stage), timeout=10) as destination:
+                source.backup(destination, pages=256, sleep=0.05)
+        counts = _check_database(stage)
+        digest, size = _sha_file(stage)
+        with stage.open("rb") as stream:
+            os.fsync(stream.fileno())
+        try:
+            os.link(stage, target, follow_symlinks=False)
+        except FileExistsError as exc:
+            raise AnnualBackupError("backup target appeared during publication") from exc
+        record = {
+            "schema": "skeleton.annual-production.backup.v1",
+            "label": label, "sha256": digest,
+            "bytes": size, "table_counts": counts,
+        }
+        raw = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        mfd = os.open(seal, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(mfd, "wb") as output:
+            output.write(raw)
+            output.flush()
+            os.fsync(output.fileno())
+        if os.name == "posix":
+            dir_fd = os.open(folder, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        return verify_annual_snapshot(folder, label)
+    finally:
+        stage.unlink(missing_ok=True)
