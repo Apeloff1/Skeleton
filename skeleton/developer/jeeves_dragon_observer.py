@@ -159,7 +159,7 @@ def _observations(root: Path, policy: dict[str, Any],
                 or event["phase"] != _GATE_PHASE[event["gate"]]
                 or event["actor"] != _gate_actor(event["gate"])):
                 raise WitnessError("Dragon witness no longer matches canonical production evidence")
-        elif event["trust"] == "unverified_operator_telemetry":
+        elif event["trust"] in {"unverified_operator_telemetry", "observed_cli_result"}:
             if (event["source_sequence"] is not None
                 or event["source_event_sha256"] is not None
                 or event["gate"] is not None):
@@ -296,6 +296,10 @@ def status(root: Path) -> dict[str, Any]:
         "outcome_counts": dict(sorted(by_outcome.items())),
         "canonical_production_observations": len(observed),
         "unverified_action_observations": len(events) - len(observed),
+        "instrumented_cli_observations": sum(
+            e["trust"] == "observed_cli_result" for e in events),
+        "operator_claims": sum(
+            e["trust"] == "unverified_operator_telemetry" for e in events),
         "pending_source_events": len(source) - len(observed),
         "last_observer_sha256": events[-1]["digest"] if events else production._digest(policy),
         "production": {
@@ -373,3 +377,52 @@ def revoke(root: Path) -> dict[str, Any]:
     return {"ok": True, "action": "dragon-observe-revoke",
             "derived_observer_data_erased": True, "production_ledger_preserved": True,
             "observation_can_resume": False}
+
+def observe_cli_result(root: Path, *, command: str, result: dict[str, Any]) -> dict[str, Any] | None:
+    """Observe actual Jeeves/Builder CLI returns when prior opt-in exists.
+
+    Only the SHA-256 of the returned object is retained. We neither intercept
+    message bodies nor claim that a successful return proves the side effect.
+    If consent has been revoked the witness remains permanently silent.
+    """
+    if not isinstance(command, str) or not isinstance(result, dict):
+        raise WitnessError("a typed Jeeves action and result are required")
+    if command.startswith("dragon-observe-"):
+        return None
+    parent = production._safe_folder(root, create=False)
+    if (parent / "dragon_observer_revoked.json").exists():
+        return None
+    policy_path = parent / "dragon_observer" / "policy.json"
+    if not policy_path.exists():
+        return None
+    policy = _policy(root)
+    original = _source_events(root, policy)
+    current = _observations(root, policy, original)
+    if command.startswith("dragon-"):
+        actor, phase = "dragon", "learning"
+    elif command.startswith("director-"):
+        actor, phase = "director", "world"
+    elif command in {"propose", "plan", "context", "queue"}:
+        actor, phase = "jeeves", "vision"
+    elif command in {"review", "benchmark", "benchmark-matrix", "asset-gate"}:
+        actor, phase = "reviewer", "review"
+    else:
+        actor, phase = "builder", "assembly"
+    action = (
+        command if command in ACTIONS else
+        "playtest" if "playthrough" in command or "smoke" in command else
+        "evaluate" if "audit" in command or "verify" in command else
+        "tool_result"
+    )
+    outcome = "failed" if result.get("ok") is False else (
+        "passed" if result.get("ok") is True else "in_progress")
+    event = _append(
+        root, policy, current, actor=actor, phase=phase, action=action,
+        outcome=outcome, evidence_sha256=production._digest(result),
+        trust="observed_cli_result",
+    )
+    return {"ok": True, "sequence": event["sequence"],
+            "event_sha256": event["digest"],
+            "actual_cli_return_observed": True,
+            "side_effect_independently_verified": False,
+            "raw_content_retained": False}
