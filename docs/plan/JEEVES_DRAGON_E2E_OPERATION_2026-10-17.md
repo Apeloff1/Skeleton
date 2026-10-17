@@ -84,6 +84,7 @@ Implementation on this feature branch extends the operational proof chain beyond
 | PROD-015 | PCM sound assets | Original synthesized 8kHz 16-bit mono WAV music/pickup/hazard cues, validated decodable media | Native and HTML5/Godot audio playback drivers not yet qualified |
 | PROD-016 | Original parallax and environmental effects | 0..3 RGBA overlay files plus real foliage/shadow tile transformations | Overlay files available; actual camera/parallax playback not wired |
 | PROD-017 | Source sprite animation | Browser interval and Godot frame-tick controller use generated frames and 1..24 FPS | Source integrated; target execution not observed |
+| PROD-018 | Recoverable game publication | Complete native+browser/Godot+sprites/audio/media bundle is staged in a same-parent temporary directory and renamed after success | Late asset-fault injection proves no partial output, no automatic publishing to a store |
 | PROD-018 | Full asset and native E2E tests | `tests/test_jeeves_native_studio_art_e2e.py`, `tests/test_jeeves_console_source_stage_e2e.py` | Tests authored/registered, not yet run on exact head |
 
 Run example, using the existing verified regular-file authorship-document intake (a referenced document is not independent ownership clearance):
