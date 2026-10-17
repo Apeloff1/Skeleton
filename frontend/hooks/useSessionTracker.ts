@@ -131,64 +131,8 @@ export const useSessionTracker = (userId: string = 'default_user'): UseSessionTr
     return settled;
   }, [userId]);
 
-  const startSession = useCallback(async (
-    moduleId: string,
-    sessionType: SessionType = 'reading',
-  ): Promise<SessionStartResponse | null> => {
-    cancelDelayedProgress();
-    const epoch = ++sessionEpochRef.current;
-    lastProgressUpdateRef.current = 0;
-    pendingProgressRef.current = null;
-    liveSessionRef.current = INITIAL_SESSION;
-    if (mountedRef.current) setSession(INITIAL_SESSION);
-    let response: SessionStartResponse | null = null;
-    try {
-      response = await synergyService.startSession(userId, moduleId, sessionType);
-    } catch (error) {
-      console.error('Failed to start session:', error);
-    }
-    if (!mountedRef.current || epoch !== sessionEpochRef.current) return null;
-
-    const started: SessionState = {
-      active: true, moduleId, sessionType, startTime: Date.now(), progress: 0,
-      emotionalContext: response ? {
-        emotion: response.emotional_context?.detected_emotion ?? 'neutral',
-        stressLevel: response.emotional_context?.stress_level ?? 0,
-      } : null,
-      contentAdaptations: response?.content_adaptations ?? [],
-      tips: response?.tips ?? ['Ready to learn!'],
-    };
-    liveSessionRef.current = started;
-    setSession(started);
-    return response;
-  }, [userId, cancelDelayedProgress]);
-
-  const updateProgress = useCallback(async (progress: number, emotionalState?: string) => {
-    const current = liveSessionRef.current;
-    if (!mountedRef.current || !current.active || !Number.isFinite(progress)) return;
-    const updated = { ...current, progress: Math.max(0, Math.min(100, progress)) };
-    liveSessionRef.current = updated;
-    setSession(updated);
-
-    const elapsed = Date.now() - lastProgressUpdateRef.current;
-    if (elapsed >= PROGRESS_INTERVAL_MS) {
-      cancelDelayedProgress();
-      lastProgressUpdateRef.current = Date.now();
-      await queueProgress(updated, sessionEpochRef.current, emotionalState);
-      return;
-    }
-    cancelDelayedProgress();
-    const epoch = sessionEpochRef.current;
-    progressTimerRef.current = setTimeout(() => {
-      progressTimerRef.current = null;
-      if (!mountedRef.current || epoch !== sessionEpochRef.current ||
-          !liveSessionRef.current.active) return;
-      lastProgressUpdateRef.current = Date.now();
-      void queueProgress(liveSessionRef.current, epoch, emotionalState);
-    }, PROGRESS_INTERVAL_MS - elapsed);
-  }, [cancelDelayedProgress, queueProgress]);
-
-  const endSession = useCallback(async () => {
+  const finishCurrentSession = useCallback(async (invalidatePending: boolean) => {
+    if (invalidatePending) sessionEpochRef.current++;
     if (endingRef.current) return endingRef.current;
     const final = liveSessionRef.current;
     if (!mountedRef.current || !final.active || !final.moduleId || !final.startTime) return;
@@ -215,6 +159,74 @@ export const useSessionTracker = (userId: string = 'default_user'): UseSessionTr
       if (endingRef.current === task) endingRef.current = null;
     }
   }, [userId, cancelDelayedProgress]);
+
+  const endSession = useCallback(async () => {
+    await finishCurrentSession(true);
+  }, [finishCurrentSession]);
+
+  const startSession = useCallback(async (
+    moduleId: string,
+    sessionType: SessionType = 'reading',
+  ): Promise<SessionStartResponse | null> => {
+    // Changing modules must not abandon a previous session's final save.
+    // The new start is fenced immediately; concurrent starts retain only the
+    // newest intent. Avoid an async yield when there is nothing to finish.
+    const epoch = ++sessionEpochRef.current;
+    if (liveSessionRef.current.active || endingRef.current) {
+      await finishCurrentSession(false);
+      if (!mountedRef.current || epoch !== sessionEpochRef.current) return null;
+    }
+    cancelDelayedProgress();
+    lastProgressUpdateRef.current = 0;
+    pendingProgressRef.current = null;
+    liveSessionRef.current = INITIAL_SESSION;
+    if (mountedRef.current) setSession(INITIAL_SESSION);
+    let response: SessionStartResponse | null = null;
+    try {
+      response = await synergyService.startSession(userId, moduleId, sessionType);
+    } catch (error) {
+      console.error('Failed to start session:', error);
+    }
+    if (!mountedRef.current || epoch !== sessionEpochRef.current) return null;
+
+    const started: SessionState = {
+      active: true, moduleId, sessionType, startTime: Date.now(), progress: 0,
+      emotionalContext: response ? {
+        emotion: response.emotional_context?.detected_emotion ?? 'neutral',
+        stressLevel: response.emotional_context?.stress_level ?? 0,
+      } : null,
+      contentAdaptations: response?.content_adaptations ?? [],
+      tips: response?.tips ?? ['Ready to learn!'],
+    };
+    liveSessionRef.current = started;
+    setSession(started);
+    return response;
+  }, [userId, cancelDelayedProgress, finishCurrentSession]);
+
+  const updateProgress = useCallback(async (progress: number, emotionalState?: string) => {
+    const current = liveSessionRef.current;
+    if (!mountedRef.current || !current.active || !Number.isFinite(progress)) return;
+    const updated = { ...current, progress: Math.max(0, Math.min(100, progress)) };
+    liveSessionRef.current = updated;
+    setSession(updated);
+
+    const elapsed = Date.now() - lastProgressUpdateRef.current;
+    if (elapsed >= PROGRESS_INTERVAL_MS) {
+      cancelDelayedProgress();
+      lastProgressUpdateRef.current = Date.now();
+      await queueProgress(updated, sessionEpochRef.current, emotionalState);
+      return;
+    }
+    cancelDelayedProgress();
+    const epoch = sessionEpochRef.current;
+    progressTimerRef.current = setTimeout(() => {
+      progressTimerRef.current = null;
+      if (!mountedRef.current || epoch !== sessionEpochRef.current ||
+          !liveSessionRef.current.active) return;
+      lastProgressUpdateRef.current = Date.now();
+      void queueProgress(liveSessionRef.current, epoch, emotionalState);
+    }, PROGRESS_INTERVAL_MS - elapsed);
+  }, [cancelDelayedProgress, queueProgress]);
 
   const logAIInteraction = useCallback(async (type: string, prompt: string, response: string) => {
     if (!mountedRef.current) return;
