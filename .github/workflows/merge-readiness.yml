@@ -57,7 +57,7 @@ jobs:
         if: steps.frontend.outputs.run == 'true'
         run: npm install --prefix "$RUNNER_TEMP/stability-typescript" --ignore-scripts --no-audit --no-fund --no-save --no-package-lock typescript@5.9.3
       - name: Verify year-scale Jeeves Builder Dragon SQLite recovery
-        run: python -m unittest discover -s tests -p 'test_annual_production.py' -v
+        run: python -m unittest discover -s tests -p 'test_annual_*.py' -v
       - name: Execute reconciled startup safety regressions
         if: steps.frontend.outputs.run == 'true'
         working-directory: frontend
