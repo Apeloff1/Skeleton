@@ -12,6 +12,12 @@ subscribes the sink to any publisher that offers ``subscribe``.
 The hub owns the delivered ``id``: producer envelopes are re-sequenced onto
 the hub's single stream so ``/api/v1/events`` has one resume cursor. The
 producer's own (per-channel) id is preserved as ``payload.source_id``.
+
+Access binding (Jenkins S1-1): the owner principal and tenant are read from
+the producer envelope's top-level ``actor_id``/``owner``/``principal`` and
+``tenant_id``/``tenant`` fields (set by the server-side jobs service), never
+from ``payload``, and handed to the hub as hub-side metadata. Events with
+no owner are only visible to job-grant holders.
 """
 
 from __future__ import annotations
@@ -59,6 +65,13 @@ def _ident(value: Any) -> Optional[str]:
         return None
 
 
+def _owner(value: Any) -> Optional[str]:
+    if value is None or isinstance(value, (bool, Mapping, list, tuple)):
+        return None
+    text = str(value).strip()
+    return text[:512] or None
+
+
 class HubJobEventSink:
     """``JobEventPublisher`` that re-sequences producer envelopes into the hub.
 
@@ -92,6 +105,8 @@ class HubJobEventSink:
                 payload,
                 job_id=_ident(_field(event, "job_id")),
                 correlation_id=_ident(_field(event, "correlation_id")),
+                owner=_owner(_field(event, "actor_id", "owner", "principal")),
+                tenant=_owner(_field(event, "tenant_id", "tenant")),
             )
         except (EnvelopeError, RealtimeSecretError, RuntimeError, ValueError, TypeError):
             self.rejected += 1
