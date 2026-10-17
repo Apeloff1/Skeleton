@@ -93,7 +93,7 @@ class NativeGodotRuntimeTests(unittest.TestCase):
         self.assertTrue(result["godot_headless_gameplay_executed"])
         report = inspect_production_assurance(self.order, self.campaign)
         self.assertEqual(report["godot_headless_playthroughs_verified"], 1)
-        self.assertEqual(report["checked_gates"], 8)
+        self.assertEqual(report["checked_gates"], 9)
         self.assertEqual(
             report["targets"][0]["gates"]["godot_headless_playthrough_executed"]["status"],
             "godot_gameplay_executed",
