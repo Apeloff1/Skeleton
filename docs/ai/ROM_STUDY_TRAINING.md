@@ -155,3 +155,15 @@ a fine-tuned transformer.
   goals and transfer across titles need independent held-out testing.
 - Do not commit proprietary game images, BIOS, copied source, training
   manifests bearing sensitive private paths, or raw gameplay assets to Git.
+
+### Reusing a prior ROM training receipt
+
+The training batch no longer accepts an existing `rom-*.json` filename as
+proof of a trained Q policy. Before returning
+`previous_receipt_exists_not_reexecuted`, it now validates canonical
+receipt bytes, source SHA-256 and size, exact reviewed rights and core
+bindings, saved Q-policy snapshot and replay episode/step accounting.
+A damaged or mismatched prior candidate is blocked, not falsely counted as
+a reusable training success. This is verification of existing evidence,
+**not** new native gameplay, model training, legal approval, neural
+promotion or checkpoint-backed Jeeves transformer gain.
