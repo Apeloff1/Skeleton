@@ -183,7 +183,7 @@ class ProductionGateTests(unittest.TestCase):
             sha256(GB_SYMBOLS).hexdigest(), world, sha256(proof).hexdigest(),
             available=True, executed=True, full=True, won=True,
             frames=1800, actions=len(json.loads(proof)["actions"]),
-            framebuffer="b" * 64,
+            framebuffer="b" * 64, checkpoint="c" * 64, sampled=1,
         )
         with patch(
             "skeleton.ai.game_builder.studio_campaign_assurance.qualify_game_boy_emulator",
