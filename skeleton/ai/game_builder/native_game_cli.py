@@ -111,6 +111,20 @@ def build_game(
         if studio_art is not None else None
     )
     tile_art = art_pack.runtime_tiles if art_pack is not None else None
+    hero_frames = None
+    animation_delay = 12
+    if art_pack is not None and target in (
+        "nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
+    ):
+        from skeleton.jeeves.game_console_assets import decode_tiles
+        hero_frames = decode_tiles(
+            dict(art_pack.files)["tiles/hero_animation.bin"],
+            art_pack.codec,
+        )
+        if (not 1 <= len(hero_frames) <= 4
+                or hero_frames[0] != art_pack.runtime_tiles[5]):
+            raise ValueError("native hero frames differ from original authored sprite")
+        animation_delay = max(2, min(60, round(60 / art_pack.direction.animation_fps)))
     engine_package = None
     if art_pack is not None:
         # Existing canonical browser/Godot source owners, not a substitute
@@ -142,17 +156,26 @@ def build_game(
         output = staging_parent / "payload"
         kind = _NATIVE[target]
         if kind == "gb_rgbds":
-            project = compile_native_game_boy(world, source, authorized=True, tile_art=tile_art)
+            project = compile_native_game_boy(
+                world, source, authorized=True, tile_art=tile_art,
+                hero_frames=hero_frames, animation_delay=animation_delay,
+            )
             folder = export_native_game_boy(project, output, authorized=True)
             artifact_type = "native_game_boy_rgbds_6502free_rom_source"
             digest = project.content_digest
         elif kind == "cgb_rgbds":
-            project = compile_native_game_boy_color(world, source, authorized=True, tile_art=tile_art)
+            project = compile_native_game_boy_color(
+                world, source, authorized=True, tile_art=tile_art,
+                hero_frames=hero_frames, animation_delay=animation_delay,
+            )
             folder = export_native_game_boy_color(project, output, authorized=True)
             artifact_type = "native_cgb_rgb555_rgbds_rom_source"
             digest = project.content_digest
         elif kind == "nes_ca65":
-            project = compile_native_nes(world, source, authorized=True, tile_art=tile_art)
+            project = compile_native_nes(
+                world, source, authorized=True, tile_art=tile_art,
+                hero_frames=hero_frames, animation_delay=animation_delay,
+            )
             folder = export_native_nes(project, output, authorized=True)
             artifact_type = "native_nes_6502_ca65_nrom_source"
             digest = project.content_digest
