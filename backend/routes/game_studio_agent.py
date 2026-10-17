@@ -1,7 +1,7 @@
 """Authenticated request-driven Jeeves studio assistant goals."""
 
 from typing import Literal
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field, model_validator
 from core import game_studio_agent as agent
 from routes.game_learning import Request, WriteRequest, _call, _scope
@@ -121,6 +121,30 @@ async def list_goals(project_id: str, user=Depends(get_current_user)):
 @router.get("/goals/{goal_id}")
 async def get_goal(goal_id: str, user=Depends(get_current_user)):
     return {"goal": await _call(agent.inspect(_scope(user), goal_id))}
+
+@router.get("/goals/{goal_id}/dragon-observation")
+async def dragon_observation(
+    goal_id: str,
+    after: int = Query(default=0, ge=0, le=16),
+    limit: int = Query(default=8, ge=1, le=16),
+    user=Depends(get_current_user),
+):
+    """Owner-scoped verified journal projection, not screen recording or learning.
+
+    Keep scope, source permissions and history integrity in the canonical
+    application owner. No untrusted client may submit Dragon observations.
+    """
+    from skeleton.ai.game_builder.studio_e2e_observation import (
+        StudioObservationError,
+        observe_goal,
+    )
+
+    goal = await _call(agent.inspect(_scope(user), goal_id))
+    try:
+        return observe_goal(goal, after=after, limit=limit)
+    except StudioObservationError as exc:
+        raise HTTPException(status_code=503, detail="Studio observation evidence unavailable") from exc
+
 
 
 @router.post("/goals/{goal_id}/advance")
