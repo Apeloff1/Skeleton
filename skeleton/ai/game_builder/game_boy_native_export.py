@@ -77,6 +77,7 @@ Boot:
     ld [GameWon], a
     ld [GameLost], a
     ld [Score], a
+    ld [ScoreHigh], a
     ld [Cooldown], a
     ld a, START_HEALTH
     ld [Health], a
@@ -316,8 +317,13 @@ TryMove:
     dec a
     ld [GemsRemaining], a
     ld a, [Score]
-    inc a
+    add 10
     ld [Score], a
+    jr nc, .gemScoreFinished
+    ld a, [ScoreHigh]
+    inc a
+    ld [ScoreHigh], a
+.gemScoreFinished:
     ret
 .notGem:
     cp TILE_HAZARD
@@ -335,15 +341,23 @@ TryMove:
     ld a, [GemsRemaining]
     or a
     ret nz
+    ld a, [Score]
+    add 100
+    ld [Score], a
+    jr nc, .goalScoreFinished
+    ld a, [ScoreHigh]
+    inc a
+    ld [ScoreHigh], a
+.goalScoreFinished:
     ld a, [Level]
     inc a
+    ld [Level], a
     cp LEVEL_COUNT
     jr c, .nextLevel
     ld a, 1
     ld [GameWon], a
     ret
 .nextLevel:
-    ld [Level], a
     call LoadLevel
     ret
 
@@ -370,6 +384,7 @@ NextY: ds 1
 Cooldown: ds 1
 Health: ds 1
 Score: ds 1
+ScoreHigh: ds 1
 GemsRemaining: ds 1
 GameWon: ds 1
 GameLost: ds 1
