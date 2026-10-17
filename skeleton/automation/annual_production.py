@@ -363,8 +363,9 @@ class AnnualProductionStore:
         at = _clock(time.time() if now is None else now)
         with self._tx() as db:
             row = self._require(db, claim, at)
-            if row["sequence"] == 0 or row["checkpoint_digest"] is None:
-                raise ProductionConflict("cannot declare success without durable checkpoint")
+            if state == "completed" and (row["sequence"] == 0 or
+                                         row["checkpoint_digest"] is None):
+                raise ProductionConflict("cannot declare completion without durable checkpoint")
             # The caller must verify evidence with the subsystem's canonical
             # owner. Digest format validation does not prove the artifact.
             db.execute("""UPDATE annual_productions SET status=?,
