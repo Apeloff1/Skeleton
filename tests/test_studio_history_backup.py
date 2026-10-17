@@ -1,6 +1,8 @@
 """Offline qualification backup checks with synthetic game-run receipts only."""
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from skeleton.ai.game_builder.studio_campaign_lock import campaign_lock
@@ -156,3 +158,34 @@ def test_recovery_never_replaces_symlink_or_existing_campaign(tmp_path):
         restore_studio_history(
             private, link, name="copy", identity=IDENTITY,
         )
+
+def test_operator_cli_snapshot_verify_and_new_campaign_restore(tmp_path, capsys):
+    from scripts.studio_history_recovery import main
+    source = tmp_path / "source"
+    source.mkdir()
+    head(source, chain(1, 3, None))
+    backup = tmp_path / "private"
+    backup.mkdir(mode=0o700)
+    recovered = tmp_path / "new-campaign"
+    assert main([
+        "snapshot", "--source", str(source),
+        "--archive-dir", str(backup), "--name", "snap",
+        "--identity", IDENTITY,
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["verified"]
+    assert main([
+        "verify", "--archive-dir", str(backup),
+        "--name", "snap", "--identity", IDENTITY,
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["verified"]
+    assert main([
+        "restore", "--archive-dir", str(backup),
+        "--name", "snap", "--identity", IDENTITY,
+        "--destination", str(recovered),
+    ]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["backup_restored"] is True
+    assert report["restored_history_revalidated"] is True
+    assert report["operator_reauthorization_required"] is True
+    assert (recovered / "qualification_history.json").is_file()
+
