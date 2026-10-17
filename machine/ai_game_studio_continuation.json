@@ -1309,5 +1309,133 @@
       "No physical gamepad, speaker, GPU, installer-first-launch or multi-month endurance is verified"
     ],
     "focused_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_cpu_reference_dragon_triage_extension": {
+    "status": "committed_source_not_real_native_execution_qualified",
+    "tranche": "M161-M180",
+    "code_owners": [
+      "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
+      "skeleton/ai/game_builder/studio_native_correction_triage.py",
+      "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+      "skeleton/ai/game_builder/studio_nes_emulator.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_dragon_lessons_cli.py"
+    ],
+    "milestones": [
+      {
+        "id": "M161",
+        "name": "Bind sampled native CPU state to exact regenerated authored Python world",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M162",
+        "name": "Rebuild full original level layout from game intent and verify browser geometry",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M163",
+        "name": "Replay original source action trace independently rather than trust submitted final state",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M164",
+        "name": "Require every sampled x/y, level, score, health and collectibles match canonical transition",
+        "state": "source_integrated_pending_actual_emulator"
+      },
+      {
+        "id": "M165",
+        "name": "Export 16-bit attempted D-pad controller-turn counter in GB/GBC source engine",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M166",
+        "name": "Export 16-bit attempted D-pad controller-turn counter in NES 6502 source engine",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M167",
+        "name": "Include invalid/wall directional attempts in native action-count proof",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M168",
+        "name": "Verify actual input count after final GB/GBC/NES victory rather than relying on coordinates",
+        "state": "source_integrated_pending_actual_emulator"
+      },
+      {
+        "id": "M169",
+        "name": "Require both high/low action-counter symbols in actual compiler linkers",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M170",
+        "name": "Add exact action-boundary field-level diff for first native CPU mismatch",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M171",
+        "name": "Transport mismatch into real E2E stage blockers",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M172",
+        "name": "Reject duplicated stage entries and conflicting history status counts",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M173",
+        "name": "Append first native CPU diagnostic digest into current source-bound history",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M174",
+        "name": "Expose Dragon read-only correction proposals specific to movement, collision and scoring",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M175",
+        "name": "Expose Dragon corrective proposals for native controller cadence and high-byte rollover",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M176",
+        "name": "Block stale correction triage when game source or assurance receipt changed",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M177",
+        "name": "Add operator CLI switch to triage native gameplay, with explicit authorization",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M178",
+        "name": "Add reference-playthrough, synthetic CPU divergence, and fraud-path regression suite",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M179",
+        "name": "Execute and certify real compiled native cartridge with full per-action CPU parity",
+        "state": "not_verified"
+      },
+      {
+        "id": "M180",
+        "name": "Qualify fully integrated long-duration Jeeves/Builder/Dragon production and all platform releases",
+        "state": "not_qualified"
+      }
+    ],
+    "runtime_evidence": {
+      "reviewed_underyling_source_commit_required": true,
+      "first_native_actual_cpu_sample_this_session": false,
+      "first_real_6502_or_GB_ROM_victory_this_session": false,
+      "installed_emulator_execution_verified": false,
+      "independent_python_replay_source_added": true,
+      "synthetic_fixture_regressions_written": true,
+      "debugger_source_tampering_rejected": true,
+      "Dragon_trained_model_weights": false,
+      "physical_console_tested": false,
+      "six_month_endurance_verified": false
+    },
+    "specialist_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
