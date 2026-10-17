@@ -119,6 +119,21 @@ def test_unreviewed_sdk_inventory_never_trainable(tmp_path):
     assert not entries[digest]["trainable"]
 
 
+def test_nonconsole_sdk_requires_explicit_kind(tmp_path):
+    path, digest, _ = _sources(tmp_path)
+    doc = json.loads(path.read_text())
+    doc["sdks"][0]["sdk_kind"] = "graphics"
+    doc["sdks"][0]["target_ids"] = []
+    _write(path, doc)
+    receipt, entries = validate_sources(path)
+    assert receipt["admitted_documents"] == 1
+    assert entries[digest]["sdk_kind"] == "graphics"
+    doc["sdks"][0]["sdk_kind"] = "made_up_domain"
+    _write(path, doc)
+    with pytest.raises(SDKStudyError, match="unknown SDK family"):
+        validate_sources(path)
+
+
 def test_symlink_and_traversal_blocked(tmp_path):
     path, _, sdk = _sources(tmp_path)
     (sdk / "link.md").symlink_to(sdk / "README.md")

@@ -33,6 +33,8 @@ MAX_DOCS = 512
 MAX_DOC_BYTES = 512 * 1024
 MAX_TOTAL_BYTES = 16 * 1024 * 1024
 MAX_REVIEW = 2048
+SDK_KINDS = frozenset(("console", "engine", "graphics", "audio", "mobile",
+                       "web", "ai", "tooling", "desktop", "embedded", "other"))
 
 
 class SDKStudyError(ValueError):
@@ -162,11 +164,16 @@ def validate_sources(manifest_path: Path) -> tuple[dict[str, Any], dict[str, dic
         version = sdk.get("version")
         if not isinstance(version, str) or not 1 <= len(version) <= 128:
             raise SDKStudyError("SDK version must be explicit")
-        targets = sdk.get("target_ids")
-        if (not isinstance(targets, list) or not targets
-                or len(targets) != len(set(map(str, targets)))
+        kind = sdk.get("sdk_kind", "console")
+        if kind not in SDK_KINDS:
+            raise SDKStudyError("unknown SDK family")
+        targets = sdk.get("target_ids", [])
+        if (not isinstance(targets, list)
+                or (kind == "console" and not targets)
+                or any(not isinstance(t, str) for t in targets)
+                or len(targets) != len(set(targets))
                 or any(t not in known_targets for t in targets)):
-            raise SDKStudyError("SDK target must occur in the canonical target catalog")
+            raise SDKStudyError("declared console targets must be canonical; other SDKs may use an empty target list")
         root = _root(sdk.get("root"))
         rights = sdk.get("rights")
         if not isinstance(rights, dict):
@@ -207,7 +214,7 @@ def validate_sources(manifest_path: Path) -> tuple[dict[str, Any], dict[str, dic
             if expected in entries:
                 raise SDKStudyError("SDK source digest reused across declarations")
             entries[expected] = {
-                "sdk_id": ident, "version": version,
+                "sdk_id": ident, "sdk_kind": kind, "version": version,
                 "document": rel, "source_project_id": "sdk." + ident,
                 "rights": rights, "trainable": admitted,
                 "target_ids": tuple(targets),

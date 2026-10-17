@@ -14,6 +14,8 @@ five separate states.
 python -m scripts.training.sdk_study inventory > /private/sdk-target-census.json
 ```
 
+For non-console SDKs (engine, graphics, audio, mobile, web, AI, tooling, desktop, embedded or other), add an explicit \`sdk_kind\` and \`target_ids: []\` in the source manifest. Such bundles are still verified against their exact installed documentation and receive no invented console adapter state. The census itself only claims full coverage of the **canonical console-target list**, not all third-party SDKs existing in the world.
+
 The census reports *every* target in
 `skeleton.ai.webcrawler.dragon_native_targets.target_catalog`, with native,
 toolchain-adapter, licensed and historical status; declared SDK/toolchain name;
