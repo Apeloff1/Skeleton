@@ -60,11 +60,13 @@ class RealNESCPUReplayTests(unittest.TestCase):
                 make_checkpoint(1, {
                     "Level": 0, "PlayerX": 2, "PlayerY": 4,
                     "Health": 4, "Score": 0, "ScoreHigh": 0,
+                    "TurnCount": 1, "TurnCountHigh": 0,
                     "GemsRemaining": 1, "GameWon": 0, "GameLost": 0,
                 }),
                 make_checkpoint(2, {
                     "Level": 1, "PlayerX": 2, "PlayerY": 3,
                     "Health": 4, "Score": 1, "ScoreHigh": 0,
+                    "TurnCount": 2, "TurnCountHigh": 0,
                     "GemsRemaining": 0, "GameWon": 1, "GameLost": 0,
                 }),
             ],
@@ -124,12 +126,12 @@ class RealNESCPUReplayTests(unittest.TestCase):
             self.assertTrue((Path(cwd) / "original.nes").exists())
             self.assertFalse((Path(cwd) / "original.nes").is_symlink())
             (Path(cwd) / "replay-result.txt").write_text(
-                "NES_REPLAY_V1 150 2 1 2 3 4 1 0 0 1 0"
+                "NES_REPLAY_V1 150 2 1 2 3 4 1 0 2 0 0 1 0"
             )
             (Path(cwd) / "framebuffer.gd").write_bytes(b"GDREAL" + bytes(300))
             (Path(cwd) / "cpu-snapshots.txt").write_text(
-                "1 0 2 4 4 0 0 1 0 0" + chr(10)
-                + "2 1 2 3 4 1 0 0 1 0" + chr(10)
+                "1 0 2 4 4 0 0 1 0 1 0 0" + chr(10)
+                + "2 1 2 3 4 1 0 2 0 0 1 0" + chr(10)
             )
             return subprocess.CompletedProcess(args, 0, None, None)
         with patch("skeleton.ai.game_builder.studio_nes_emulator.shutil.which",
@@ -156,7 +158,7 @@ class RealNESCPUReplayTests(unittest.TestCase):
             "skeleton.ai.game_builder.studio_nes_emulator.subprocess.run",
             side_effect=lambda args, *, cwd, **k: (
                 (Path(cwd) / "replay-result.txt").write_text(
-                    "NES_REPLAY_V1 150 2 1 2 3 0 1 0 0 0 1"
+                    "NES_REPLAY_V1 150 2 1 2 3 0 1 0 2 0 0 0 1"
                 ) and subprocess.CompletedProcess(args, 0, None, None)
             ),
         ):
