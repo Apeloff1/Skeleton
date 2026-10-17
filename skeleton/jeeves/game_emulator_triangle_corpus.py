@@ -10,6 +10,7 @@ input but never copied into target labels. This does not run transformer SGD.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Any
 
 from .game_emulator_triangle import LENSES, verify_training_triangle
@@ -29,7 +30,8 @@ class TriangleCorpusError(ValueError):
 
 def compile_triangle_candidate_corpus(
     evidence: dict[str, Any], triangle: dict[str, Any],
-    reviewed: dict[str, Any],
+    reviewed: dict[str, Any], *,
+    requested_semantic_lens_keys: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Construct data *candidates* for the existing Jeeves corpus governance.
 
@@ -65,6 +67,7 @@ def compile_triangle_candidate_corpus(
         measured = episode["grounded_lens_evidence"]
         routed = route_episode_semantic_lenses(
             episode, max_lenses=SEMANTIC_LENS_BUDGET,
+            requested_keys=requested_semantic_lens_keys,
         )
         if routed["source_native_trace_sha256"] != trace:
             raise TriangleCorpusError("canonical semantic route changed native source")
@@ -73,12 +76,19 @@ def compile_triangle_candidate_corpus(
             "native_trace_sha256": trace,
             "canonical_catalog_sha256": routed["canonical_catalog_sha256"],
             "semantic_route_digest": routed["route_digest"],
+            "semantic_governance_fingerprint": routed["governance_fingerprint"],
+            "selection_mode": routed["selection_mode"],
             "router_observation_fingerprints": routed["observation_fingerprints"],
             "semantic_questions": [{
                 "lens_key": view["lens_key"],
                 "family": view["lens_family"],
                 "activation_score": view["activation_score"],
                 "question": view["question"],
+                "governance_grade": view["governance_grade"],
+                "governance_fingerprint": view["governance_fingerprint"],
+                "factual_claims_allowed": False,
+                "causal_claims_allowed": False,
+                "interpretive_question_not_training_ground_truth": True,
                 "state": "not_measured_pending_independent_review",
                 "factual_label_available": False,
             } for view in routed["routes"]],
@@ -137,8 +147,14 @@ def compile_triangle_candidate_corpus(
         "total_lens_candidate_views": len(rows),
         "views_per_original_episode": len(LENSES),
         "canonical_semantic_lens_selection_budget": SEMANTIC_LENS_BUDGET,
+        "operator_requested_semantic_lens_keys": list(requested_semantic_lens_keys),
+        "semantic_lens_selection_digest": _digest([
+            [route["native_trace_sha256"], route["semantic_route_digest"]]
+            for route in semantic_routes
+        ]),
         "routed_semantic_lens_questions": total_semantic_routes,
         "semantic_questions_are_not_supervised_labels": True,
+        "semantic_lens_activations_do_not_create_reward_or_weight_updates": True,
         "native_semantic_catalog": "skeleton.jeeves.agent.semantic_maximal",
         "semantic_routes_per_episode": semantic_routes,
         "same_source_total_weight_per_episode": 1.0,
@@ -162,5 +178,8 @@ def verify_triangle_candidate_corpus(
         k: v for k, v in candidate.items() if k != "candidate_corpus_digest"
     }):
         raise TriangleCorpusError("candidate corpus digest differs")
-    if candidate != compile_triangle_candidate_corpus(evidence, triangle, reviewed):
+    if candidate != compile_triangle_candidate_corpus(
+        evidence, triangle, reviewed,
+        requested_semantic_lens_keys=candidate.get("operator_requested_semantic_lens_keys", ()),
+    ):
         raise TriangleCorpusError("candidate training corpus no longer matches measured source")
