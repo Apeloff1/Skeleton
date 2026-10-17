@@ -58,6 +58,24 @@ class SDKCustodyDriftTests(unittest.TestCase):
         with self.assertRaises(SDKStudyError):
             build({"a" * 64: fixture(), "b" * 64: fixture()})
 
+    def test_self_rehashed_malformed_record_still_fails_closed(self):
+        from skeleton.ai.training.sdk_custody_drift import _digest
+        old = build({"a" * 64: fixture()})
+        for field, value in (
+            ("trainable", "yes"),
+            ("rights_review_digest", "not-a-sha"),
+            ("target_ids", ["game_boy", "game_boy"]),
+        ):
+            forged = copy.deepcopy(old)
+            forged["documents"][0][field] = value
+            forged["snapshot_digest"] = _digest({
+                key: value for key, value in forged.items()
+                if key != "snapshot_digest"
+            })
+            with self.subTest(field=field):
+                with self.assertRaises(SDKStudyError):
+                    compare_custody(old, forged)
+
     def test_added_removed_document_never_reuses_unreviewed_source(self):
         original = build({"a" * 64: fixture()})
         extra = fixture()
