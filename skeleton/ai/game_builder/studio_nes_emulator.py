@@ -22,6 +22,9 @@ import tempfile
 from .contracts import canonical_digest
 from .studio_build_qualification import _header, _regular, parse_nes_labels
 from .studio_runtime_qualification import _inputs
+from .studio_native_replay_telemetry import (
+    selected_checkpoints, parse_nes_samples, validate_checkpoints, NativeCheckpointError,
+)
 
 SCHEMA = "skeleton.game_builder.nes_cpu_ppu_playthrough.v1"
 _ACTIONS = frozenset(("up", "down", "left", "right"))
@@ -47,6 +50,8 @@ class NESReplayResult:
     frame_count: int
     action_count: int
     ppu_frame_sha256: str | None
+    checkpoint_digest: str | None
+    sampled_checkpoints: int
     cpu_state: dict | None
     blocker: str | None
     receipt_digest: str
@@ -64,6 +69,8 @@ class NESReplayResult:
             "machine_code_victory": self.machine_code_victory,
             "frame_count": self.frame_count, "action_count": self.action_count,
             "ppu_frame_sha256": self.ppu_frame_sha256,
+            "checkpoint_digest": self.checkpoint_digest,
+            "sampled_checkpoints": self.sampled_checkpoints,
             "cpu_state": self.cpu_state,
             "blocker": self.blocker,
             "physical_controller_verified": False,
@@ -80,7 +87,8 @@ class NESReplayResult:
 def _receipt(rom: str, symbols: str, world: str, proof: str, *,
              available: bool, executed: bool = False, replay: bool = False,
              victory: bool = False, frames: int = 0, actions: int = 0,
-             image: str | None = None, state: dict | None = None,
+             image: str | None = None, checkpoint: str | None = None,
+             sampled: int = 0, state: dict | None = None,
              blocker: str | None = None) -> NESReplayResult:
     body = {
         "schema": SCHEMA, "target": "nintendo_famicom",
@@ -89,6 +97,7 @@ def _receipt(rom: str, symbols: str, world: str, proof: str, *,
         "emulator_available": available, "emulator_executed": executed,
         "cpu_input_replay_executed": replay, "machine_code_victory": victory,
         "frame_count": frames, "action_count": actions, "ppu_frame_sha256": image,
+        "checkpoint_digest": checkpoint, "sampled_checkpoints": sampled,
         "cpu_state": state, "blocker": blocker,
         "physical_controller_verified": False,
         "physical_console_verified": False,
@@ -98,7 +107,7 @@ def _receipt(rom: str, symbols: str, world: str, proof: str, *,
     }
     return NESReplayResult(
         rom, symbols, world, proof, available, executed, replay, victory,
-        frames, actions, image, state, blocker, canonical_digest(body),
+        frames, actions, image, checkpoint, sampled, state, blocker, canonical_digest(body),
     )
 
 
@@ -112,11 +121,16 @@ def _script(actions: list[str], labels: dict[str, int],
         raise NativeNESEmulationError("bounded, exact canonical input data required")
     names = ",".join('"' + action + '"' for action in actions)
     refs = ",".join(f"{name}=0x{labels[name]:02X}" for name in _FIELDS)
+    sample_set = ",".join(
+        f"[{index}]=true" for index in selected_checkpoints(len(actions))
+    )
     # The actual FCEUX memory/joypad/framebuffer APIs are documented in
     # https://fceux.com/web/help/LuaFunctionsList.html.
     return """
 local actions = {""" + names + """}
 local ram = {""" + refs + """}
+local chosen = {""" + sample_set + """}
+local snapshots = io.open("cpu-snapshots.txt", "wb")
 local total = 0
 local maximum = """ + str(max_frames) + """
 local function advance(count)
@@ -136,8 +150,17 @@ if ok then
     if not ok then break end
     ok = advance(12)
     if not ok then break end
+    if chosen[_] and snapshots ~= nil then
+      local values = {_, memory.readbyte(ram.Level),
+        memory.readbyte(ram.PlayerX), memory.readbyte(ram.PlayerY),
+        memory.readbyte(ram.Health), memory.readbyte(ram.Score),
+        memory.readbyte(ram.ScoreHigh), memory.readbyte(ram.GemsRemaining),
+        memory.readbyte(ram.GameWon), memory.readbyte(ram.GameLost)}
+      snapshots:write(table.concat(values," "),string.char(10))
+    end
   end
 end
+if snapshots ~= nil then snapshots:close() end
 joypad.set(1, {up=false,down=false,left=false,right=false})
 if ok then
   local outcome = io.open("replay-result.txt", "wb")
@@ -290,11 +313,35 @@ def qualify_nes_cpu_ppu(
             and state["Health"] == expected["health"]
             and state["Score"] + 256 * state["ScoreHigh"] == expected["score"]
         )
+        if not victory:
+            return _receipt(
+                romhash, symhash, world, proofhash, available=True, executed=True,
+                replay=True, victory=False, frames=frames, actions=count,
+                image=image, state=state,
+                blocker="nes_machine_code_diverged_from_reference_replay",
+            )
+        try:
+            samples = parse_nes_samples(
+                _regular(scratch / "cpu-snapshots.txt", 48_000), len(actions),
+            )
+            checked = validate_checkpoints(
+                samples, actions=len(actions),
+                source_world=world, source_proof=proofhash,
+                expected_final=expected,
+            )
+        except (OSError, ValueError, NativeCheckpointError):
+            return _receipt(
+                romhash, symhash, world, proofhash, available=True, executed=True,
+                replay=True, victory=False, frames=frames, actions=count,
+                image=image, state=state,
+                blocker="nes_cpu_intermediate_checkpoint_mismatch",
+            )
         return _receipt(
-            romhash, symhash, world, proofhash,
-            available=True, executed=True, replay=True, victory=victory,
+            romhash, symhash, world, proofhash, available=True, executed=True,
+            replay=True, victory=True,
             frames=frames, actions=count, image=image, state=state,
-            blocker=None if victory else "nes_machine_code_diverged_from_reference_replay",
+            checkpoint=checked["checkpoint_digest"],
+            sampled=checked["sampled_boundaries"], blocker=None,
         )
 
 
