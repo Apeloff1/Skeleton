@@ -96,6 +96,10 @@ for (const [flow, href] of [
       // The factory is also a React Native Web Modal, mounted in a portal.
       // Verify its actual controls instead of requiring children inside #root.
       await expect(page.getByText('Game Factory', { exact: true }).first()).toBeVisible();
+    } else if (href === '/galaxy') {
+      // Galaxy Studio lives in an RN Web modal portal, not necessarily #root.
+      await expect(page.getByTestId('galaxy-studio-modal-root')).toBeVisible();
+      await expect(page.getByTestId('galaxy-studio-close-button')).toBeVisible();
     } else {
       await expectRendered(page);
     }
