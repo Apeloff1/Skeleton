@@ -1185,5 +1185,129 @@
     "suites": [
       "jeeves-native-cartridge-emulator-full-e2e"
     ]
+  },
+  "jeeves_native_action_reference_e2e_extension": {
+    "status": "source_changes_committed_exact_head_runtime_tests_pending",
+    "tranche": "M141-M160",
+    "owner_files": [
+      "skeleton/ai/game_builder/game_boy_native_export.py",
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
+      "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+      "skeleton/ai/game_builder/studio_nes_emulator.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py"
+    ],
+    "milestones": [
+      {
+        "id": "M141",
+        "name": "Regenerate exact canonical original game from the embedded signed intent",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M142",
+        "name": "Fail closed if regenerated world digest differs from game bundle",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M143",
+        "name": "Verify browser level maps and collectible geometry against regenerated Python world",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M144",
+        "name": "Replay every controller action through canonical Python advance semantics",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M145",
+        "name": "Check reference terminal coordinates, health, score, turns and status against signed trace",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M146",
+        "name": "Derive bounded native CPU checkpoints from real Python game transitions",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M147",
+        "name": "Compare actual emulator X/Y and collectible state at each sampled action",
+        "state": "source_implemented_pending_execution"
+      },
+      {
+        "id": "M148",
+        "name": "Compare actual intermediate native level, health and 16-bit score against reference",
+        "state": "source_implemented_pending_execution"
+      },
+      {
+        "id": "M149",
+        "name": "Increment real native 16-bit turn counter for accepted directional attempts",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M150",
+        "name": "Count blocked-wall controller attempts without fabricating player movement",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M151",
+        "name": "Require RGBDS/ld65 labels for low/high turn bytes",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M152",
+        "name": "Read full actual GB/GBC/NES turn count from CPU memory and enforce each action boundary",
+        "state": "source_implemented_pending_execution"
+      },
+      {
+        "id": "M153",
+        "name": "Reject premature GameWon, missing move, duplicate move or impossible native state",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M154",
+        "name": "Identify first sampled CPU divergence using bounded field-level diagnostic report",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M155",
+        "name": "Bind runtime CPU divergence to operator-visible E2E blocked events",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M156",
+        "name": "Persist first mismatch into digest-linked, source-validated longform run history",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M157",
+        "name": "Reject forged duplicates, inconsistent run counts and malformed CPU diagnostic evidence",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M158",
+        "name": "Regression-test regenerated multilevel original game and source/CPC anti-tamper paths",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M159",
+        "name": "Verify actual emitted ROM action count and complete reference parity in installed PyBoy/FCEUX",
+        "state": "not_verified"
+      },
+      {
+        "id": "M160",
+        "name": "Qualify release after multi-console full playthrough, hardware inspection and multi-month endurance",
+        "state": "not_qualified"
+      }
+    ],
+    "evidence_limits": [
+      "Regenerated Python source is independently executed; native CPU memory is only actually observed when PyBoy/FCEUX is installed and approved",
+      "16-bit turn counters include directional attempts that hit a wall; no native replay can qualify without consuming the full trace",
+      "First-divergence reports show only bounded original game CPU fields and are a repair diagnostic, not verified knowledge promotion",
+      "No native compilation or actual GB/GBC/NES emulator victory was executed in this connector-only development pass",
+      "No physical gamepad, speaker, GPU, installer-first-launch or multi-month endurance is verified"
+    ],
+    "focused_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
