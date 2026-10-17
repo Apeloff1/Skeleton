@@ -533,5 +533,135 @@
       "signed_vendor_sdk_distributed": false
     },
     "local_authority": "Source generation, native compilation and private artist pixels require explicit permission; no unreviewed shell, vendor binaries, background recording or implicit training."
+  },
+  "jeeves_runtime_cross_engine_milestone_extension": {
+    "status": "implementation_candidate_exact_runtime_validation_pending",
+    "tranche": "M41-M60",
+    "owner_files": [
+      "skeleton/ai/game_builder/studio_browser_probe.js",
+      "skeleton/ai/game_builder/studio_runtime_qualification.py",
+      "skeleton/ai/game_builder/studio_godot_qualification.py",
+      "skeleton/ai/game_builder/studio_pixel_parity.py",
+      "skeleton/ai/game_builder/studio_dragon_canvas_capture.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py"
+    ],
+    "milestones": [
+      {
+        "id": "M41",
+        "goal": "Execute actual generated HTML5 game JS to Python winning proof",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M42",
+        "goal": "Exercise actual Canvas2D sprite drawing routines and animation ticks",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M43",
+        "goal": "Exercise actual browser keyboard and onscreen directional inputs",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M44",
+        "goal": "Validate undo and restart UI replay semantics",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M45",
+        "goal": "Refuse stale/falsified browser game or proof source",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M46",
+        "goal": "Execute the original Godot 4 generated source and full replay headlessly",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M47",
+        "goal": "Copy Godot source into isolated temporary project to preserve immutable source",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M48",
+        "goal": "Crosscheck Godot source identity, replay, sprite hash and action count",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M49",
+        "goal": "Pixel-compare native console tile bytes with browser/Godot source and atlas PNG",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M50",
+        "goal": "Check four-index palette fidelity and individual real sprite animation frames",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M51",
+        "goal": "Make each runtime proof a separate source-revision-bound campaign qualification gate",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M52",
+        "goal": "Expose runtime qualification in operator CLI and Dragon evidence projection",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M53",
+        "goal": "Consent-gated real Chromium canvas-only image capture of generated games",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M54",
+        "goal": "Capture bounded gameplay frames from original winning controller replay",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M55",
+        "goal": "Retain PNG source-bound evidence, image SHA256 and opt-in local capture receipt",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M56",
+        "goal": "Refuse automatic promotion of Dragon visual observations into weights/almanacs",
+        "state": "implemented_boundaries"
+      },
+      {
+        "id": "M57",
+        "goal": "Qualify screenshots with independent actual browser, framebuffer inspection and display comparison",
+        "state": "partially_implemented"
+      },
+      {
+        "id": "M58",
+        "goal": "Build full native console emulator playthrough, controller and visual output parity",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M59",
+        "goal": "Link visual AI direction, scene editor, NPC/quests/audio/cinematics into true end-to-end game production",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M60",
+        "goal": "Long-term durable model-guided supervised studio and reviewed Dragon learning",
+        "state": "not_qualified"
+      }
+    ],
+    "proof_limits": [
+      "Node VM uses real generated JS with stub DOM/Canvas command recorder, not a browser screenshot",
+      "Godot replay is actual headless binary execution only if Godot 4 is installed and operator opts in",
+      "Canvas capture uses a real headless browser only when Playwright and Chromium are present and the operator explicitly authorizes original-game-only recording",
+      "Generated screenshots never record user desktop and do not constitute learned weights or review-approved Dragon knowledge",
+      "A Python winning trace does not substitute actual interactive hardware playthrough, native ROM compilation, signed packaging or completed game QA",
+      "No runtime actually launched by GitHub tool calls in this session; offline tests are authored but not measured passed"
+    ],
+    "suite": "jeeves-cross-engine-executable-gameplay",
+    "tests": [
+      "tests/test_studio_browser_runtime_e2e.py",
+      "tests/test_studio_godot_runtime_e2e.py",
+      "tests/test_studio_pixel_parity_e2e.py",
+      "tests/test_studio_dragon_canvas_capture.py"
+    ]
   }
 }
