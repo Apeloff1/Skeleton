@@ -56,7 +56,15 @@ For a canonical producer execution slice with a synchronized Dragon journal:
 python -m skeleton dev game jeeves dragon-observe-cycle --project ./original-world --gate source_integrity --passes 2
 python -m skeleton dev game jeeves dragon-observe-sync --project ./original-world --page-size 256
 python -m skeleton dev game jeeves dragon-observe-lessons --project ./original-world --page 0 --page-size 64
+python -m skeleton dev game jeeves dragon-observe-trace --project ./original-world --page 0 --page-size 64 --actor builder
+python -m skeleton dev game jeeves dragon-observe-coverage --project ./original-world
 ```
+
+The trace includes only observed actor, phase, event status, evidence digest,
+linkage and timestamp; it never reconstructs private model responses.
+The coverage report enumerates every required production gate, expected
+independent evaluator, attempt count, Dragon-observed count, last result, and
+the next concrete verifier integration step. It does not pass any missing gate.
 
 Production-cycle still owns evaluations. Each invocation is bounded to
 1–8 scrutiny passes, but the project may resume for further slices indefinitely.
