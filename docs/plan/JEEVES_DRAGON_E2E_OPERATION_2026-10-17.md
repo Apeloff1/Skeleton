@@ -789,3 +789,35 @@ python -m skeleton.ai.game_builder.studio_execution_campaign_cli \
 ```
 
 **The newly authored regression tests have not been independently run or confirmed passing.** Measured year-long continuous production, crash/power-loss fault injection, backup/restore, first-install, actual emulator game playthrough, audio/video comparison and hardware release certification are all still outstanding. No new always-on CI workflow, automatic runtime restarter or autonomous model-training task is being asserted.
+
+
+## M281–M322: actual compiled-original-music PRG/ROM0 proof and machine-code sound cues
+
+This tranche closes the gap between *music appearing in assembly source* and the same original music actually surviving console compilation. Existing source-authorship checks, exported sprite frames and valid cartridge headers are not sufficient to establish that either the emitted frequency tables or sound-effect routines are present and correct in the compiled binary.
+
+### M281–M308 — binary-level GB/CGB/NES sound production assurance
+
+`studio_compiled_psg_parity.py` derives the exact original eight-note PSG arrangement from the **generated authored world**, source art direction/seed, and the bounded intensity level. It then reads true toolchain symbols instead of guessing offsets or scanning for a convenient matching byte pattern.
+
+- **Game Boy and Game Boy Color:** The actual RGBLINK ROM0 `OriginalMusicLow` and `OriginalMusicHigh` label addresses must describe exactly two adjacent eight-byte arrays inside the fixed cartridge code bank. The 16 bytes in the actual published ROM must match the score's exact SM83 sound-register timer bytes.
+- **NES:** The true ca65/ld65 VICE export map binds the same tables to PRG CPU addresses. This adapter requires the original NROM-256 **two-bank 32KB** PRG layout, translates fixed `$8000–$FFF9` CPU addresses into the actual iNES PRG location, and excludes the interrupt vectors and CHR bank. Altered arrangement bytes, wrong mapper/bank layout, bad symbol positions and duplicated entries fail closed.
+- **Original gameplay sound effects:** The three required `SoundPickup`, `SoundHazard`, and `SoundGoal` linker labels are independently required for every console. The RGBDS byte verifier checks the actual compiled SM83 `LD A`, conditional sound guard, `LDH [$FF18/$FF19]`, sound frequency and return opcodes. The NES verifier checks the actual 6502 `LDA`, conditional branch, `STA $4006/$4007`, `ORA` and return opcodes. There are no dynamic code injections or arbitrary memory locations. Missing effects, misordered routines, disabled guards, changed note bytes, substituted APU destinations or other opcode changes are rejected, even if the ROM header and original art remain valid.
+- **Crash/production safety:** Both `qualify_campaign_target()` and the independent `_qualification_receipt()` recheck the actual compiled score and cue bytecode. A failed new audio attestation reclaims only the owned *unqualified* cartridge and linker map after checking the just-produced ROM identity. Passing builds contain `compiled_original_psg_evidence_digest` in their digest-linked qualification receipt, and the long-running campaign assurance counts only independently revalidated compiled sound sources.
+
+### Dragon, Jeeves and source-bound longform history
+
+`studio_production_blocker_taxonomy.py` classifies `compiled_original_psg_music_mismatch` as a distinct **compiled-audio fault**, not a sprite failure, an emulator victory or a hardware sound-quality result. The bounded category is available to Dragon's read-only current-source correction triage, without inserting untrusted compiler logs, sound samples, arbitrary external audio or auto-promoted weights. `studio_e2e_observation.py`, `studio_execution_campaign.py` and `studio_execution_history.py` now include separate source/compiled audio counts, retaining `actual_native_psg_hardware_audio_verified: false`.
+
+### Test coverage and limits
+
+The specialized suite registers `tests/test_studio_compiled_psg_parity.py` and revised original GB/GBC/NES campaign tests. The synthetic ROM fixtures now contain original byte-identical note tables and precisely encoded SM83/6502 gameplay effect routines, plus the real required linker-map symbol shapes. Negative tests modify both low/high melody bytes and multiple instruction positions inside **each** sound cue, alter linker bank/adjacency, try to overlap the NES vectors, and verify rejection plus owned-output rollback. Additional tests ensure Dragon classifies the new audio failure rather than misrepresenting it as an emulator playthrough.
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_compiled_psg_parity.py \
+  tests/test_studio_campaign_assurance_e2e.py \
+  tests/test_studio_nes_campaign_e2e.py \
+  tests/test_studio_production_blocker_taxonomy.py
+```
+
+**Qualification remains deliberately strict:** A verified compiled audio byte sequence is *not* a sound capture. Real RGBDS/ca65 compilation, running all games in PyBoy/FCEUX, measuring note frequencies and mix/envelopes, hearing event-triggered audio under gameplay, hardware controller/speaker checks, first-install, release licensing, and production endurance have **not** been established by this source/fixture pass. The offline PSG audition-preview component was not delivered in this tranche. Do not equate authored or compiled tests with a fully playable, audible and independently verified console game.
