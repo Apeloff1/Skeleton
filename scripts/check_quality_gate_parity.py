@@ -14,7 +14,6 @@ RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
 # command lines so local execution may use ``python -m`` while CI can invoke a
 # console script from its pinned environment.
 SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
-    ("Ruff lint", "ruff check . --output-format=github"),
     ("architecture boundary scanner", "check_architecture_boundaries.py"),
     ("architecture boundary regression", "test_architecture_boundaries.py"),
     ("provider runtime boundary scanner", "check_provider_runtime_boundary.py"),
@@ -92,6 +91,7 @@ def active_text(text: str) -> str:
 def main() -> int:
     local = active_text(read("scripts/quality-gates.sh"))
     ci = active_text(read(".github/workflows/backend-quality.yml"))
+    ci_cd = active_text(read(".github/workflows/ci.yml"))
     precommit = active_text(read(".pre-commit-config.yaml"))
     requirements_dev = {
         line.strip()
@@ -108,10 +108,19 @@ def main() -> int:
         if marker not in ci:
             failures.append(f"Backend Quality CI missing {label}: {marker}")
 
+    if "ruff check . --output-format=github" not in local:
+        failures.append("local quality gate missing Ruff lint: ruff check . --output-format=github")
+    if "ruff check . --output-format=github" not in ci_cd:
+        failures.append("CI/CD Backend Lint must own ruff check . --output-format=github")
+    if "ruff check . --output-format=github" in ci:
+        failures.append("Backend Quality repeats CI/CD Backend Lint ruff check")
+
     if "python -m compileall -q backend" not in local:
         failures.append("local quality gate must compile the full backend tree")
-    if "python -m compileall -q ." not in ci:
-        failures.append("Backend Quality CI must compile the full backend tree")
+    if "python -m compileall -q ." not in ci_cd:
+        failures.append("CI/CD Backend Lint must compile the backend tree")
+    if "name: Syntax check (full backend)" in ci:
+        failures.append("Backend Quality repeats CI/CD Backend Lint compileall")
 
     if "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" not in local or "--noconftest" not in local:
         failures.append("local focused regressions must run with pytest plugin/conftest isolation")
