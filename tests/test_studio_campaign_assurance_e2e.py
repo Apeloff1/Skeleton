@@ -30,8 +30,11 @@ from skeleton.ai.game_builder.studio_game_boy_emulator import _receipt as emulat
 from skeleton.ai.game_builder.studio_runtime_qualification import _inputs as engine_inputs
 
 
-def sample_rom() -> bytes:
+def sample_rom(tiles: bytes) -> bytes:
+    if len(tiles) != 96:
+        raise ValueError("six original 2bpp sprites required")
     data = bytearray(32768)
+    data[0x0200:0x0260] = tiles
     checksum = 0
     for item in data[0x134:0x14D]:
         checksum = (checksum - item - 1) & 255
@@ -43,6 +46,7 @@ GB_SYMBOLS = (
     "00:c000 Level\\n00:c001 PlayerX\\n00:c002 PlayerY\\n"
     "00:c006 Health\\n00:c007 Score\\n00:c008 GemsRemaining\\n"
     "00:c009 GameWon\\n00:c00a GameLost\\n00:c00b ScoreHigh\\n00:c00c TurnCount\\n00:c00d TurnCountHigh\\n"
+    "00:0200 Tiles\\n00:0260 TilesEnd\\n"
 ).replace(chr(92) + "n", chr(10)).encode("ascii")
 
 
@@ -98,7 +102,9 @@ class ProductionGateTests(unittest.TestCase):
 
     def test_structural_rom_qualification_requires_real_bound_source(self):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
-        rom = sample_rom()
+        rom = sample_rom((
+            self.root / "targets/nintendo_game_boy/assets/tiles/runtime.bin"
+        ).read_bytes())
 
         def simulated_compiler(project, target, *, authorized, execute,
                                output, output_symbols, timeout_seconds):
@@ -155,7 +161,9 @@ class ProductionGateTests(unittest.TestCase):
 
     def test_emulator_gate_requires_exact_machine_code_and_compiled_symbol_receipts(self):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
-        rom = sample_rom()
+        rom = sample_rom((
+            self.root / "targets/nintendo_game_boy/assets/tiles/runtime.bin"
+        ).read_bytes())
         def compiler(project, target, *, authorized, execute,
                      output, output_symbols, timeout_seconds):
             Path(output).write_bytes(rom)
@@ -254,7 +262,9 @@ class ProductionGateTests(unittest.TestCase):
 
     def test_qualified_rom_tampering_never_survives_gate_inspection(self):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
-        rom = sample_rom()
+        rom = sample_rom((
+            self.root / "targets/nintendo_game_boy/assets/tiles/runtime.bin"
+        ).read_bytes())
 
         def fake_compiler(project, target, *, authorized, execute, output,
                           output_symbols, timeout_seconds):
