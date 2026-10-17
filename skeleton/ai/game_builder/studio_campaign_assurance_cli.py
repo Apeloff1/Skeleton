@@ -16,6 +16,7 @@ from .studio_campaign_assurance import (
     qualify_campaign_godot,
 )
 from .studio_e2e_observation import observe_production_campaign
+from .studio_pixel_parity import inspect_cross_engine_pixels
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     command.add_argument("--target", help="specific canonical console ROM target to compile")
     command.add_argument("--browser-target", help="execute native generated HTML5 JavaScript winning replay")
     command.add_argument("--godot-target", help="execute canonical headless Godot 4 winning replay")
+    command.add_argument("--pixel-parity-target", help="inspect exact original sprite bytes across all engine sources")
     parser.add_argument("--execute-build", action="store_true")
     parser.add_argument("--authorize-local-operation", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=45)
@@ -40,6 +42,13 @@ def main(argv: list[str] | None = None) -> int:
         order = parse_campaign_order_file(args.order)
         if args.inspect:
             output = inspect_production_assurance(order, args.campaign)
+        elif args.pixel_parity_target:
+            if args.pixel_parity_target not in order.targets:
+                parser.error("pixel parity target is not in original campaign")
+            # The parity tool scans the generated output, not a model narrative.
+            output = inspect_cross_engine_pixels(
+                args.campaign / "targets" / args.pixel_parity_target
+            )
         elif args.dragon_observe:
             output = observe_production_campaign(
                 order, args.campaign, authorized=True,
