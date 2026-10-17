@@ -522,3 +522,51 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 All these additions are in source control. Specialized exact-head E2E execution remains pending; no green result for the new source should be inferred from older CI runs.
+
+
+## M141–M180: original Python-game reference, exact native input accounting and Dragon repair triage
+
+### Build the independent reference, not just a plausible CPU ending (M141–M148)
+
+`studio_native_replay_telemetry.py` now rereads the canonical generated HTML5 game's embedded immutable intent and the release-manifest-bound winning action proof. It regenerates the actual authored Python game via `generate_playable_world()`, verifies its digest and **every original level's rows/start/exit/collectible positions**, then steps the entire original controller trace through the Python `advance()` implementation.
+
+At each deterministic sampled action boundary (all actions for traces up to 128, at most 128 across longer runs) the reference records exactly what a compiled ROM should expose: CPU level counter, true player X/Y, health, 16-bit score, remaining collectibles, victory/loss flags and action counter. Actual PyBoy or FCEUX memory is then required to match **every sampled field** of this independently regenerated reference, not merely avoid impossible health/score jumps or end at the goal.
+
+The previously authored game export cannot silently change its levels while retaining a passing reference; the checker rejects source/world mismatches, renamed or corrupted intent, different final score, different final action count and incomplete replay.
+
+### Count every directional attempt, including wall collisions (M149–M153)
+
+Original GB/GBC RGBDS and NES ca65 source both now maintain `TurnCount` + `TurnCountHigh` in the game CPU state. The counter increments whenever an actual D-pad action enters the tile movement/collision operation, including actions blocked by walls. It uses an explicit carry into the high byte, so a long game does not roll over after 255 turns. Both toolchain symbol-map qualifiers require the actual source labels, and the native adapters compare the true combined count to the controller trace after every observed boundary and at the final winning ROM state.
+
+This is important because a correct final location can be reached even when a controller device lost, repeated or failed to consume some moves. A successful game must consume the complete authored action trace. It still does not certify physical USB controller latency or real console electronics.
+
+### Actionable Dragon correction without unreviewed self-training (M154–M178)
+
+`first_cpu_divergence()` returns the first sampled source-versus-emulator state discrepancy, with a bounded set of changed CPU fields and exact observed/reference values. GB/GBC and NES emulation failure receipts now carry this diagnostic. `studio_execution_campaign.py` passes it into the E2E operator report. The crash-safe, chain-linked `studio_execution_history.py` stores the first mismatch digest/category/action after revalidating the full current source and refusing duplicated or fabricated stage counts.
+
+`studio_native_correction_triage.py` adds a **read-only Dragon bridge** that maps the first actual mismatch to a precise investigation: D-pad/collision code, 16-bit score carries, hazard damage, collectible consumption, level transitions, or victory/loss conditions. It may suggest a concrete regression check but **never edits code, watches user applications, trains weights, authorizes replay retries or auto-promotes knowledge**. If the source or assurance digest has changed since the last recorded run, the bridge emits zero current repair proposals. The operator command is:
+
+```bash
+python -m skeleton.ai.game_builder.studio_dragon_lessons_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --triage-native --authorize-local-operation
+```
+
+Regression tests cover generated three-level Python games, scores above 255, source-map integrity, corrupted intermediate positions, mocked NES/GB CPU replay, mismatched input counts, forged E2E history entries, current-only Dragon triage and the full report-to-triage handoff.
+
+### Runtime blockers M179–M180
+
+This is source implementation and specialized tests, **not** a measured successful native emulation run. An operator still needs to compile and play real original GB/GBC/NES cartridges with installed RGBDS, ca65/ld65, PyBoy/FCEUX; verify the exact script/controller timing and recorded CPU states; execute real browser/Godot end-to-end; then qualify physical devices, graphical/audio parity, first-install and sustained multi-month production. No model checkpoint weight update or release signoff is claimed.
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_native_python_reference_e2e.py \
+  tests/test_studio_native_replay_telemetry.py \
+  tests/test_studio_native_score_parity.py \
+  tests/test_studio_game_boy_emulator_e2e.py \
+  tests/test_studio_nes_emulator_e2e.py \
+  tests/test_studio_native_correction_triage.py \
+  tests/test_studio_execution_history_e2e.py
+```
+
+The 180 milestones in this plan are **work and verification objectives**, not a claim that 180 release features have passed native E2E.
