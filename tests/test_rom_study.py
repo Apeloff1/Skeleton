@@ -396,3 +396,93 @@ def test_disc_approval_cannot_omit_companion_digest(tmp_path):
     bundle, reader = operator_directory_content(root, "test.cue")
     assert bundle.bundle_digest
     assert len(bundle.files) == 2
+
+
+
+def test_fleet_audit_rights_pending_and_duplicate_not_counted(tmp_path):
+    from skeleton.ai.training.rom_inventory_snapshot import freeze_rom_inventory
+    from skeleton.ai.training.rom_fleet_audit import audit_fleet_page
+    root, first, _ = _roms(tmp_path)
+    (root / "duplicate.gb").write_bytes(first.read_bytes())
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    frozen = freeze_rom_inventory(root, private)
+    approvals = private / "approvals.json"
+    approvals.write_text(json.dumps({
+        "schema_version": rom.APPROVAL_SCHEMA,
+        "roms": [],
+    }))
+    report = audit_fleet_page(
+        root, Path(frozen["manifest_path"]), approvals, private,
+    )
+    counts = report["page_counts"]
+    assert counts["candidate_files"] == 3
+    assert counts["distinct_sources_in_page"] == 2
+    assert counts["duplicates_not_retrained"] == 1
+    assert counts["rights_review_required"] == 2
+    assert counts["verified_q_policy_sources"] == 0
+    assert report["production_jeeves_weights_modified"] is False
+
+
+def test_fleet_audit_verifies_matching_approval_and_snapshot(tmp_path, monkeypatch):
+    from skeleton.ai.training.rom_inventory_snapshot import (
+        freeze_rom_inventory, load_frozen_inventory,
+    )
+    from skeleton.ai.training.rom_fleet_audit import audit_fleet_page
+    root, first, _ = _roms(tmp_path)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    freeze = freeze_rom_inventory(root, private)
+    snapshot = load_frozen_inventory(Path(freeze["manifest_path"]), root=root)
+    approvals, _ = _approvals(tmp_path, first)
+    _fake_training(tmp_path, monkeypatch, updates=4)
+    measured = rom.train_page(
+        root, approvals, private, limit=2,
+        inventory_snapshot=snapshot, runs=1, steps=4,
+    )
+    assert measured["q_policy_training_completed"] == 1
+    report = audit_fleet_page(
+        root, Path(freeze["manifest_path"]), approvals, private, limit=2,
+    )
+    assert report["page_counts"]["verified_q_policy_sources"] == 1
+    assert report["page_counts"]["rights_review_required"] == 1
+    assert report["source_execution_coverage_pct"] == 50.0
+    row = next(item for item in report["rows"] if item["relative_path"] == "a.gb")
+    assert row["status"] == "verified_q_policy_updated"
+    assert row["max_q_updates_single_run"] == 4
+    assert row["neural_candidate_trained"] is False
+    # The receipt existed, but updated approval is not silently accepted.
+    approvals.write_text(json.dumps({
+        "schema_version": rom.APPROVAL_SCHEMA,
+        "roms": [],
+    }))
+    changed = audit_fleet_page(
+        root, Path(freeze["manifest_path"]), approvals, private,
+    )
+    assert changed["page_counts"]["verified_q_policy_sources"] == 0
+
+
+def test_fleet_audit_rejects_tampered_receipt(tmp_path, monkeypatch):
+    from skeleton.ai.training.rom_inventory_snapshot import (
+        freeze_rom_inventory, load_frozen_inventory,
+    )
+    from skeleton.ai.training.rom_fleet_audit import audit_fleet_page
+    root, first, _ = _roms(tmp_path)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    freeze = freeze_rom_inventory(root, private)
+    snap = load_frozen_inventory(Path(freeze["manifest_path"]), root=root)
+    approvals, _ = _approvals(tmp_path, first)
+    _fake_training(tmp_path, monkeypatch, updates=3)
+    rom.train_page(root, approvals, private, runs=1, steps=4,
+                   inventory_snapshot=snap)
+    receipt = next(private.glob("rom-*.json"))
+    payload = json.loads(receipt.read_text())
+    payload["candidate_evidence"]["actual_q_table_updates"] = 9000
+    receipt.write_text(json.dumps(payload) + "\n")
+    report = audit_fleet_page(
+        root, Path(freeze["manifest_path"]), approvals, private,
+    )
+    assert report["page_counts"]["verified_q_policy_sources"] == 0
+    assert report["page_counts"]["invalid_or_stale_receipt_sources"] == 1
+    assert report["production_jeeves_weights_modified"] is False
