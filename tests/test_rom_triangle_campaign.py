@@ -821,3 +821,72 @@ def test_full_200_campaign_defaults_to_every_native_episode_when_model_is_select
     )
     assert backwards_compatible.semantic_lens_count == 43
     assert backwards_compatible.semantic_all_runs is False
+
+
+def test_complete_200_lens_native_inference_receipts_cover_every_catalog_key(monkeypatch):
+    """Fixture runtime checks wiring; this is NOT a live checkpoint test."""
+    import json
+    from types import SimpleNamespace
+    from skeleton.ai.model_runtime import native_llm_runtime
+    from skeleton.jeeves import game_emulator_triangle_semantic_inference as inference
+
+    source = _complete_200_native_episode()
+    evidence = {"report_digest": "1" * 64}
+    triangle = {
+        "triangle_digest": "2" * 64,
+        "episode_lens_references": [source],
+    }
+    critic = {
+        "review_digest": "3" * 64,
+        "structured_source_bound_passes": 3,
+    }
+    monkeypatch.setattr(inference, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(inference, "verify_native_adversarial_review", lambda *a: None)
+    class ContractMockNativeModel:
+        model_digest = "4" * 64
+        def __init__(self):
+            self.calls = 0
+        def assert_model_unchanged(self):
+            pass
+        def generate(self, prompt, config):
+            self.calls += 1
+            payload = json.loads(prompt.split("\n")[-1])
+            raw = json.dumps({
+                "lens_key": payload["lens_key"],
+                "native_trace_sha256": payload["native_trace_sha256"],
+                "hypothesis": "An unverified native action pattern may exist.",
+                "falsifier": "Measure independent gameplay episodes with this operator.",
+                "epistemic_state": "unverified_hypothesis",
+            }, sort_keys=True)
+            receipt = {
+                "seed": config.seed,
+                "model_digest": self.model_digest,
+                "output_digest": "5" * 64,
+                "request_digest": "6" * 64,
+            }
+            return SimpleNamespace(
+                text=raw, generated_ids=(1,),
+                replay_receipt=SimpleNamespace(to_dict=lambda: receipt),
+                to_record=lambda: {
+                    **receipt,
+                    "generated_token_ids": [1],
+                    "checkpoint_digest": "7" * 64,
+                },
+            )
+    monkeypatch.setattr(native_llm_runtime, "NativeLLMRuntime", ContractMockNativeModel)
+    runtime = ContractMockNativeModel()
+    result = inference.run_native_semantic_lenses(
+        evidence, triangle, critic, runtime, lens_budget=200,
+        max_new_tokens=64,
+    )
+    assert runtime.calls == 200
+    assert result["native_model_generations_executed"] == 200
+    assert result["source_bound_interpretations"] == 200
+    assert result["all_semantic_lenses_executed"] is True
+    assert result["semantic_hypotheses_admitted_as_ground_truth"] is False
+    assert result["production_jeeves_weight_updates"] == 0
+    from skeleton.jeeves.agent.lens_system import LensCatalog
+    assert {entry["lens_key"] for entry in result["entries"]} == {
+        lens.lens_id for lens in LensCatalog().all()
+    }
+    inference.verify_native_semantic_lenses(evidence, triangle, critic, result)
