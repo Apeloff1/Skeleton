@@ -10,7 +10,7 @@ from __future__ import annotations
 from .contracts import canonical_digest
 
 FIELDS = ("Level", "PlayerX", "PlayerY", "Health", "Score", "ScoreHigh",
-          "GemsRemaining", "GameWon", "GameLost")
+          "TurnCount", "TurnCountHigh", "GemsRemaining", "GameWon", "GameLost")
 SCHEMA = "skeleton.game_builder.native_cpu_checkpoints.v1"
 _MAX = 128
 _LINE = re.compile(r"([0-9]{1,5})(?: ([0-9]{1,3})){9}\Z")
@@ -97,6 +97,7 @@ def reference_cpu_checkpoints(engine_source: str | "Path") -> dict:
             "Level": state.level_index + (1 if state.status == "won" else 0),
             "PlayerX": state.x, "PlayerY": state.y, "Health": state.health,
             "Score": score & 0xFF, "ScoreHigh": score >> 8,
+            "TurnCount": state.steps & 0xFF, "TurnCountHigh": state.steps >> 8,
             "GemsRemaining": (len(world.levels[state.level_index].collectibles)
                                - len(state.collected)),
             "GameWon": int(state.status == "won"),
@@ -198,6 +199,9 @@ def validate_checkpoints(
     for row in rows:
         state = row["state"]
         score = state["Score"] + 256 * state["ScoreHigh"]
+        turns = state["TurnCount"] + 256 * state["TurnCountHigh"]
+        if turns != row["action"]:
+            raise NativeCheckpointError("cartridge failed to consume each directional input")
         if state["GameLost"] != 0 or state["GameWon"] != (1 if row["action"] == actions else 0):
             raise NativeCheckpointError("machine code lost or declared victory prematurely")
         if state["Health"] <= 0:
