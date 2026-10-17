@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from hashlib import sha256
 import os
 import shutil
 import tempfile
@@ -229,6 +230,32 @@ def build_game(
             export_studio_art(art_pack, folder, authorized=True)
             if art_pack is not None else None
         )
+        # Source attestation binds exact bytes, world identity, source manifest
+        # and art to the local build qualifier. This is NOT a license or code
+        # safety certification; it is a reproducibility/integrity receipt.
+        source_inputs = {}
+        for original_name in ("main.asm", "main.s", "nes.cfg", "game.asm",
+                              "game.c", "Makefile", "manifest.json"):
+            item = folder / original_name
+            if item.is_file() and not item.is_symlink():
+                source_inputs[original_name] = sha256(item.read_bytes()).hexdigest()
+        attestation_body = {
+            "schema": "skeleton.game_builder.source_attestation.v1",
+            "target": target, "project_id": source.project_id,
+            "world_digest": world.digest, "reference_replay_digest": proof.digest,
+            "input_files": dict(sorted(source_inputs.items())),
+            "source_content_digest": digest,
+            "studio_art_pack_digest": art_pack.digest if art_pack is not None else None,
+            "rights_independently_verified": False,
+            "binary_compiled": False,
+        }
+        from .contracts import canonical_digest
+        attestation = {**attestation_body,
+                       "attestation_digest": canonical_digest(attestation_body)}
+        with (folder / "source_attestation.json").open("xb") as attestation_file:
+            attestation_file.write(
+                (json.dumps(attestation, sort_keys=True, indent=2) + "\n").encode("utf-8")
+            )
         # Publish one complete game with source, engine and media receipts.
         # A partial source or failed render never becomes the destination.
         if destination.exists() or destination.is_symlink():
