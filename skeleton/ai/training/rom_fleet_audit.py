@@ -7,6 +7,7 @@ filename or per replay, and existing receipts remain immutable.
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import re
 from typing import Any, Mapping
 
@@ -17,7 +18,33 @@ from .rom_study import (
 
 SCHEMA = "skeleton.jeeves.rom_fleet_audit.v1"
 _MAX_CANDIDATES_PER_SOURCE = 128
+_MAX_INDEXED_RECEIPTS = 250_000
 _RECEIPT_NAME = re.compile(r"rom-[0-9a-f]{16}-[0-9a-f]{16}\.json\Z")
+_SHA_PREFIX = re.compile(r"[0-9a-f]{16}\Z")
+
+
+def _receipt_index(root: Path) -> dict[str, tuple[Path, ...]]:
+    """Enumerate receipt filenames once, then reuse exact candidates by source prefix.
+
+    Listing names is not an evidence check. _audit_loaded still validates each
+    matching candidate's source hash, policy, approval and neural report.
+    """
+    grouped: dict[str, list[Path]] = {}
+    total = 0
+    try:
+        with os.scandir(root) as directory:
+            for candidate in directory:
+                name = candidate.name
+                if (not name.startswith("rom-") or not name.endswith(".json")
+                        or len(name) < 25 or not _SHA_PREFIX.fullmatch(name[4:20])):
+                    continue
+                total += 1
+                if total > _MAX_INDEXED_RECEIPTS:
+                    raise RomStudyError("ROM receipt directory exceeds single-sweep indexing capacity")
+                grouped.setdefault(name[4:20], []).append(root / name)
+    except OSError as exc:
+        raise RomStudyError("ROM receipt directory cannot be safely inventoried") from exc
+    return {key: tuple(sorted(paths)) for key, paths in grouped.items()}
 
 
 def _source_index(snapshot: Mapping[str, Any]) -> dict[str, str]:
@@ -31,7 +58,8 @@ def _source_index(snapshot: Mapping[str, Any]) -> dict[str, str]:
 def _audit_loaded(root: Path, snapshot: dict[str, Any],
                   approved: dict[str, dict[str, Any]], approval_sha: str,
                   receipts_dir: Path, *, cursor: str | None, limit: int,
-                  source_index: Mapping[str, str]) -> dict[str, Any]:
+                  source_index: Mapping[str, str],
+                  receipt_index: Mapping[str, tuple[Path, ...]]) -> dict[str, Any]:
     """Read-only page verifier using a precomputed canonical source index."""
     page = frozen_inventory_page(snapshot, root=root, cursor=cursor, limit=limit)
     entries: list[dict[str, Any]] = []
@@ -75,8 +103,8 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
             counts["source_identity_changed"] += 1
             entries.append(entry)
             continue
-        pattern = "rom-" + digest[:16] + "-*.json"
-        options = sorted(receipts_dir.glob(pattern))
+        # Pre-indexed candidates: no O(receipt_count) directory scan per ROM.
+        options = receipt_index.get(digest[:16], ())
         if len(options) > _MAX_CANDIDATES_PER_SOURCE:
             entry["status"] = "receipt_capacity_exceeded"
             counts["invalid_or_stale_receipt_sources"] += 1
@@ -173,7 +201,8 @@ def audit_fleet_page(root: Path, snapshot_file: Path, approvals_file: Path,
     receipts_dir = _private_output(receipts_dir)
     return _audit_loaded(root, snapshot, approved, approval_sha,
                          receipts_dir, cursor=cursor, limit=limit,
-                         source_index=_source_index(snapshot))
+                         source_index=_source_index(snapshot),
+                         receipt_index=_receipt_index(receipts_dir))
 
 
 def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
@@ -190,6 +219,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
     approved, approval_sha = _load_approvals(approvals_file)
     receipts_dir = _private_output(receipts_dir)
     source_index = _source_index(snapshot)
+    receipt_index = _receipt_index(receipts_dir)
     totals: dict[str, int] = {}
     by_target_core: dict[str, dict[str, Any]] = {}
     pages = 0
@@ -198,6 +228,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
         page = _audit_loaded(
             root, snapshot, approved, approval_sha, receipts_dir,
             cursor=cursor, limit=limit, source_index=source_index,
+            receipt_index=receipt_index,
         )
         for key, count in page["page_counts"].items():
             totals[key] = totals.get(key, 0) + count

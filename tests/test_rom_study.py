@@ -710,3 +710,49 @@ def test_fleet_audit_reuses_canonical_index_across_pages(tmp_path, monkeypatch):
     assert result["pages_audited"] == 2
     assert result["totals"]["rights_review_required"] == 2
     assert calls == [2]
+
+
+
+def test_fleet_audit_indexes_receipt_directory_once_across_pages(tmp_path, monkeypatch):
+    from skeleton.ai.training import rom_fleet_audit as audit
+    from skeleton.ai.training.rom_inventory_snapshot import freeze_rom_inventory
+
+    root, _, _ = _roms(tmp_path)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    frozen = freeze_rom_inventory(root, private)
+    approval = private / "rights.json"
+    approval.write_text(json.dumps({
+        "schema_version": rom.APPROVAL_SCHEMA,
+        "roms": [],
+    }))
+    original_index = audit._receipt_index
+    calls = []
+
+    def indexed_once(directory):
+        calls.append(str(directory))
+        return original_index(directory)
+
+    monkeypatch.setattr(audit, "_receipt_index", indexed_once)
+    report = audit.audit_fleet_all(
+        root, Path(frozen["manifest_path"]), approval, private,
+        limit=1,
+    )
+    assert report["pages_audited"] == 2
+    assert len(calls) == 1
+    assert report["totals"]["rights_review_required"] == 2
+
+
+def test_fleet_receipt_index_preserves_malformed_source_candidates(tmp_path):
+    from skeleton.ai.training.rom_fleet_audit import _receipt_index
+    output = tmp_path / "private"
+    output.mkdir(mode=0o700)
+    source_prefix = "b" * 16
+    (output / f"rom-{source_prefix}-{'c' * 16}.json").write_text("{}")
+    (output / f"rom-{source_prefix}-not-a-hash.json").write_text("{}")
+    (output / "not-a-receipt.json").write_text("{}")
+    indexed = _receipt_index(output)
+    # The per-receipt verifier rejects malformed candidate names as evidence.
+    assert len(indexed[source_prefix]) == 2
+    assert all(path.name.startswith("rom-" + source_prefix)
+               for path in indexed[source_prefix])
