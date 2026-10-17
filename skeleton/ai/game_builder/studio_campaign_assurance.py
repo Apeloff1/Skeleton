@@ -601,6 +601,7 @@ def qualify_campaign_emulator(
                 "emulator_available": result.emulator_available,
                 "emulator_executed": result.emulator_executed,
                 "blocker": result.blocker,
+                "first_cpu_divergence": result.first_divergence,
                 "physical_controller_verified": False,
             }
         body = {
