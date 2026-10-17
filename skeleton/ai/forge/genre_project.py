@@ -37,6 +37,12 @@ func _load(path: String):
 	return parsed
 
 func _marker(genre: String, content: Dictionary) -> String:
+	var story = content.get("longform", {})
+	if typeof(story) == TYPE_DICTIONARY and not story.is_empty():
+		if story.get("completed", false) != true:
+			return "unfinished"
+		if str(story.get("ending_id", "")) == "":
+			return "unfinished"
 	var player_hp = int(content.get("player_hp", 100))
 	var economy = content.get("economy", {})
 	if typeof(economy) != TYPE_DICTIONARY:
@@ -113,6 +119,10 @@ def execute_core_loop(content: Mapping[str, Any], genre: str) -> str:
     """Run the genre core loop and return its marker (no ``CORE_LOOP_OK`` prefix)."""
     if not isinstance(content, Mapping):
         raise ValueError("content bundle must be a mapping")
+    story = content.get("longform")
+    if isinstance(story, Mapping) and story:
+        if story.get("completed") is not True or not str(story.get("ending_id") or ""):
+            return "unfinished"
     player_hp = _as_int(content.get("player_hp"), 100)
     economy = content.get("economy") if isinstance(content.get("economy"), Mapping) else {}
     gold = _as_int(economy.get("starting_balance"), 0)
