@@ -271,6 +271,9 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                     page_size=args.page_size if args.page_size is not None else 64,
                 )
             return witness.revoke(root)
+        if (args.consent or any(value is not None for value in (
+                args.actor, args.phase, args.event, args.outcome))):
+            raise ValueError("observer instrumentation flags require a dragon-observe action")
         live_actions = {
             "director-session-begin": {"action", "source", "session"},
             "director-session-status": {"action", "session"},
