@@ -144,15 +144,41 @@ def _verify_source(project: Path, target: str) -> tuple[dict[str, bytes], str]:
              manifest.get("target_platform", manifest.get("target")))
     expected = expected or manifest.get("platform")
     if expected != target:
-        # Canonical GB/NES source may use another legacy field spelling.
-        if target not in json.dumps(manifest, sort_keys=True):
-            raise NativeBuildQualificationError("manifest does not bind target platform")
+        raise NativeBuildQualificationError("manifest does not bind exact target platform")
     files = {}
     for name in (adapter[0], *adapter[1], "manifest.json"):
         files[name] = _regular(project / name, MAX_SOURCE_BYTES)
+    signed = _regular(project / "source_attestation.json", MAX_SOURCE_BYTES)
+    try:
+        attestation = json.loads(signed)
+    except (ValueError, UnicodeError) as exc:
+        raise NativeBuildQualificationError("source attestation is invalid") from exc
+    if (type(attestation) is not dict
+            or attestation.get("schema") != "skeleton.game_builder.source_attestation.v1"
+            or attestation.get("target") != target
+            or not isinstance(attestation.get("input_files"), dict)
+            or attestation.get("binary_compiled") is not False):
+        raise NativeBuildQualificationError("original source attestation is missing or mismatched")
+    index = attestation["input_files"]
+    allowed = {adapter[0], *adapter[1], "Makefile", "manifest.json"}
+    if not set(files).issubset(index) or not set(index).issubset(allowed):
+        raise NativeBuildQualificationError("source attestation file inventory differs")
+    for name, expected_sha in index.items():
+        if (type(expected_sha) is not str or len(expected_sha) != 64
+                or any(c not in "0123456789abcdef" for c in expected_sha)):
+            raise NativeBuildQualificationError("source attestation contains invalid digest")
+        data = files.get(name)
+        if data is None:
+            data = _regular(project / name, MAX_SOURCE_BYTES)
+        if sha256(data).hexdigest() != expected_sha:
+            raise NativeBuildQualificationError("source file changed since native export")
+    if canonical_digest({k: v for k, v in attestation.items()
+                         if k != "attestation_digest"}) != attestation.get("attestation_digest"):
+        raise NativeBuildQualificationError("original source attestation receipt corrupted")
     source_digest = canonical_digest({
         "target": target,
         "sources": {name: sha256(data).hexdigest() for name, data in sorted(files.items())},
+        "source_attestation": sha256(signed).hexdigest(),
     })
     return files, source_digest
 
@@ -255,10 +281,19 @@ def qualify_native_build(
             return _receipt(target, source_digest, available=True, invoked=invoked,
                             blocker="compiled_cartridge_failed_header_or_extent",
                             versions=versions)
-        with destination.open("xb") as handle:
-            handle.write(rom)
-            handle.flush()
-            os.fsync(handle.fileno())
+        # Stage verified ROM bytes, then atomically hard-link exclusively
+        # into an as-yet nonexistent output. Concurrent writers cannot replace
+        # a previously published image and failed writes leave no partial ROM.
+        fd, candidate = tempfile.mkstemp(prefix=".skeleton-rom-", dir=destination.parent)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(rom)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.link(candidate, destination)
+        finally:
+            if os.path.exists(candidate):
+                os.unlink(candidate)
         digest = sha256(rom).hexdigest()
         return _receipt(target, source_digest, available=True, invoked=True,
                         built=True, header=True, digest=digest, size=len(rom),
