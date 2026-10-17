@@ -18,6 +18,7 @@ REQUIRED_NEEDS = (
     "integration_smoke",
     "quality_security",
     "pr_automation",
+    "ci",
 )
 PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_pr_automation.py",
