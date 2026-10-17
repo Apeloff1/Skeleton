@@ -436,10 +436,13 @@ def test_positive_bar_accepts_a_perfect_score_and_requires_a_real_boot():
 
 def test_gameforge_lane_collects_the_studio_suite():
     root = Path(__file__).resolve().parents[2]
-    workflow = (root / ".github" / "workflows-archive" / "ci.yml").read_text(encoding="utf-8")
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     start = workflow.index('name: "Skeleton GameForge"')
-    job = workflow[start:workflow.index("java-accelerators:", start)]
-    assert "skeleton/testing/test_game_studio_swarm.py" in job
+    job = workflow[start:workflow.index('name: "Java Batch Accelerators"', start)]
+    listed = job.index("skeleton/testing/test_game_studio_swarm.py")
+    godot = job.index("Install Godot 4.4.1")
+    booted = job.index("skeleton/testing/test_game_studio_swarm.py", godot)
+    assert listed < godot < booted
 
 
 def test_fast_benchmark_scores_studio_against_the_bare_builder(tmp_path: Path):
