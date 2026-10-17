@@ -396,3 +396,52 @@ def test_dragon_temporal_optics_detects_changed_tiles_without_extra_steps():
     assert second["changed_native_rgb_tile_fraction"] == 1.0
     assert second["candidate_full_frame_transition"] is True
     assert second["new_native_steps_for_observation"] == 0
+
+def test_native_reviewer_replay_requires_actual_checkpoint(monkeypatch):
+    from skeleton.jeeves.game_emulator_triangle_native_reviewer import (
+        replay_native_adversarial_review,
+    )
+    with pytest.raises(ValueError, match="real local checkpoint"):
+        replay_native_adversarial_review(_report(), build_training_triangle(_report()),
+                                         {}, object())
+
+
+def test_temporal_optics_refuse_wrong_prior_native_frame():
+    from skeleton.jeeves.game_emulator_dragon_observer import (
+        observe_native_frame, observe_native_frame_with_cursor,
+    )
+    class Native:
+        def inspect_frame(self):
+            return {
+                "schema_version": "skeleton.game.native_frame_inspection.v1",
+                "pixel_sha256": "a" * 64,
+                "full_resolution_tile_hashes": True,
+                "tile_color_statistics_are_sampled": True,
+                "native_frames_executed_for_inspection": 0,
+                "width": 1, "height": 1, "total_tiles": 1,
+                "tiles": [{
+                    "samples": 64,
+                    "sampled_rgb_mean": [64.0, 128.0, 192.0],
+                    "sampled_luminance_range": [92, 92],
+                    "sampled_dark_count": 0, "sampled_bright_count": 0,
+                    "tile_rgb_sha256": "d" * 64,
+                }],
+            }
+    source = _report(count=2)
+    for index, receipt in enumerate(source["audited_run_receipts"]):
+        optical = observe_native_frame(
+            Native(), expected_frame_sha256="a" * 64,
+        )
+        if index == 1:
+            optical, _ = observe_native_frame_with_cursor(
+                Native(), expected_frame_sha256="a" * 64,
+                previous_cursor=("b" * 64, 1, 1, ("d" * 64,)),
+            )
+        receipt["modalities"][0]["actual_frame_sha256"] = "a" * 64
+        receipt["modalities"][0]["dragon_optical"] = optical
+        receipt["receipt_digest"] = _digest({
+            k: v for k, v in receipt.items() if k != "receipt_digest"
+        })
+    _reseal_report(source)
+    with pytest.raises(TrainingTriangleError, match="temporal cursor"):
+        build_training_triangle(source)

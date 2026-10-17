@@ -165,6 +165,14 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
             visual.append(sensor["measured_visual_change"])
         _require(optical_sources in (0, steps),
                  "a native Dragon optical capture cannot be silently partial")
+        if optical_sources:
+            for sequence, sensor in enumerate(modalities):
+                prior_sha = (
+                    None if sequence == 0
+                    else modalities[sequence - 1]["actual_frame_sha256"]
+                )
+                _require(sensor["dragon_optical"]["previous_native_frame_sha256"] == prior_sha,
+                         "Dragon native RGB temporal cursor lost real frame order")
         seen_frames.update(frames)
         counter = row.get("counterfactual_probes")
         controllers = row.get("multi_controller_probes")

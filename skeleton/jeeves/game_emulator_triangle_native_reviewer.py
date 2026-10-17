@@ -221,3 +221,64 @@ def verify_native_adversarial_review(
         validated += row["interpretation"]["status"] == "schema_and_source_reference_validated"
     _require(review.get("structured_source_bound_passes") == validated,
              "reviewer structured finding count differs")
+
+def replay_native_adversarial_review(
+    evidence: dict[str, Any], triangle: dict[str, Any],
+    review: dict[str, Any], runtime: Any,
+) -> dict[str, Any]:
+    """Actually re-run all stored reviewer generations with the pinned checkpoint.
+
+    No stored hash alone proves that any language model ran. A valid replay
+    requires the canonical runtime to reproduce each recorded token sequence,
+    output digest and rendered response from its immutable current weights.
+    This never calls hosted models and never updates parameters.
+    """
+    from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+    from skeleton.ai.model_runtime.runtime_contracts import (
+        GenerationConfig, ReplayReceipt,
+    )
+    _require(isinstance(runtime, NativeLLMRuntime),
+             "a real local checkpoint runtime is required for red-team replay")
+    verify_native_adversarial_review(evidence, triangle, review)
+    runtime.assert_model_unchanged()
+    _require(runtime.model_digest == review["independent_local_transformer_sha256"],
+             "reviewer checkpoint is not the originally recorded local model")
+    details = []
+    for i, (attack, part) in enumerate(zip(ATTACKS, review["passes"], strict=True)):
+        original = part["native_inference_receipt"]
+        try:
+            replay_receipt = ReplayReceipt(**original)
+        except (ValueError, TypeError) as exc:
+            raise NativeTriangleReviewError("stored native replay receipt invalid") from exc
+        prompt = _prompt(triangle, attack)
+        config = GenerationConfig(
+            max_new_tokens=review["requested_max_new_tokens"],
+            seed=review["requested_seed"] + i, temperature=0.7, top_p=0.9,
+        )
+        reproduced = runtime.replay(replay_receipt, prompt, config)
+        runtime.assert_model_unchanged()
+        _require(
+            reproduced.text == part["response"]
+            and reproduced.replay_receipt.to_dict() == original
+            and reproduced.to_record() == part["native_inference_record"],
+            "native adversarial review replay changed text, tokens or checkpoint identity"
+        )
+        details.append({
+            "attack": attack,
+            "replayed_request_sha256": part["prompt_sha256"],
+            "reproduced_native_output_sha256": part["model_response_sha256"],
+            "same_tokens_and_model_state": True,
+        })
+    result = {
+        "schema_version": SCHEMA,
+        "source_review_sha256": review["review_digest"],
+        "source_triangle_sha256": triangle["triangle_digest"],
+        "reviewer_model_sha256": runtime.model_digest,
+        "native_generations_replayed": len(details),
+        "replays": details,
+        "production_weights_modified": False,
+        "game_success_verified": False,
+        "review_judgments_fact_checked": False,
+    }
+    result["replay_digest"] = _digest(result)
+    return result

@@ -21,6 +21,11 @@ from skeleton.ai.training.rom_fleet_audit import audit_fleet_page, audit_fleet_a
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="operation", required=True)
+    status = commands.add_parser(
+        "triangle-status", help="verify a native ROM training triangle without loading model weights"
+    )
+    status.add_argument("--receipt", required=True, type=Path)
+    status.add_argument("--source-sha256", required=True)
     inventory = commands.add_parser("inventory", help="read-only ROM inventory")
     inventory.add_argument("--root", required=True, type=Path)
     inventory.add_argument("--cursor")
@@ -76,6 +81,35 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "triangle-status":
+            from skeleton.ai.training.rom_study import (
+                _safe_path, verified_rom_receipt,
+            )
+            from skeleton.jeeves.game_emulator_triangle import verify_training_triangle
+            verified = verified_rom_receipt(
+                args.receipt, expected_source_sha256=args.source_sha256,
+            )
+            import hashlib
+            source = _safe_path(args.receipt)
+            raw = source.read_bytes()
+            if hashlib.sha256(raw).hexdigest() != verified["receipt_sha256"]:
+                raise RomStudyError("ROM training receipt changed since verification")
+            document = json.loads(raw)
+            evidence = document["candidate_evidence"]
+            triangle = document["training_triangle"]
+            verify_training_triangle(evidence, triangle)
+            print(json.dumps({
+                "state": "triangle_native_evidence_verified",
+                "receipt_sha256": verified["receipt_sha256"],
+                "source_sha256": args.source_sha256,
+                "triangle_digest": triangle["triangle_digest"],
+                "vertices": triangle["vertices"],
+                "source_diversity": triangle["source_diversity"],
+                "adversarial_challenges": len(triangle["adversarial_challenge_queue"]),
+                "real_semantic_media_witness_verified": False,
+                "production_jeeves_weight_updates": 0,
+            }, sort_keys=True))
+            return 0
         if args.operation == "review-triangle":
             import hashlib
             from skeleton.ai.training.rom_study import (
@@ -84,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
             from skeleton.jeeves.game_emulator_triangle import verify_training_triangle
             from skeleton.jeeves.game_emulator_triangle_native_reviewer import (
                 run_native_adversarial_review, verify_native_adversarial_review,
+                replay_native_adversarial_review,
             )
             from skeleton.ai.model_runtime.offline_chat import load_offline_engine
             verified = verified_rom_receipt(
@@ -115,9 +150,17 @@ def main(argv: list[str] | None = None) -> int:
                         or record["requested_seed"] != args.seed
                         or record["requested_max_new_tokens"] != args.max_new_tokens):
                     raise RomStudyError("prior adversarial review model or run configuration differs")
-                print(json.dumps({"state": "previous_verified_native_model_review",
-                                  "filename": destination.name,
-                                  "review_digest": record["review_digest"]}, sort_keys=True))
+                replayed = replay_native_adversarial_review(
+                    evidence, triangle, record, runtime,
+                )
+                print(json.dumps({
+                    "state": "previous_review_replayed_with_real_native_model",
+                    "filename": destination.name,
+                    "review_digest": record["review_digest"],
+                    "native_generations_replayed": replayed["native_generations_replayed"],
+                    "replay_digest": replayed["replay_digest"],
+                    "production_jeeves_weight_updates": 0,
+                }, sort_keys=True))
                 return 0
             record = run_native_adversarial_review(
                 evidence, triangle, runtime, seed=args.seed,
