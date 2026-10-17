@@ -1,403 +1,451 @@
-"""Rights-gated ROM fleet intake and replay-verified candidate training.
+"""ROM-wide local inventory and rights-gated *actual* emulator policy training.
 
-One explicitly approved local ROM at a time, using existing canonical emulator
-and learning owners. Unsupported or unreviewed ROMs are reported, not silently
-trained on a simulation. No ROM is copied to outputs and no production Jeeves
-weights are loaded or changed.
+Inventory never downloads ROMs, infers rights, executes an image or loads an
+untrusted emulator.  Only a separately approved libretro core may execute exact
+operator-authorized content inside the existing isolated host.  The existing
+Jeeves emulator lab trains a *tabular Q policy*, not speaking model weights.
 """
 from __future__ import annotations
 
-from hashlib import sha256
+import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import stat
 from typing import Any, Callable
 
-SCHEMA = "skeleton.jeeves.rom_fleet_manifest.v1"
-REPORT_SCHEMA = "skeleton.jeeves.rom_fleet_training.v1"
-_SHA = re.compile(r"[0-9a-f]{64}\Z")
-_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{2,127}\Z")
-_EXT = {
-    ".gb": "game_boy", ".gbc": "game_boy_color",
-    ".nes": "nes", ".sfc": "snes", ".smc": "snes",
-    ".md": "genesis", ".gen": "genesis", ".smd": "genesis",
-    ".sms": "master_system", ".gg": "game_gear",
-    ".gba": "game_boy_advance", ".nds": "nintendo_ds",
-    ".z64": "nintendo_64", ".n64": "nintendo_64", ".v64": "nintendo_64",
-    ".lnx": "lynx", ".a78": "atari_7800", ".pbp": "psp",
-}
-MAX_FILES = 16384
-MAX_DEPTH = 12
-MAX_BLOB = 64 * 1024 * 1024
-INLINE_ROM_BYTES = 2 * 1024 * 1024
-MAX_MANIFEST = 8 * 1024 * 1024
+INVENTORY_SCHEMA = "skeleton.jeeves.rom_inventory.v1"
+APPROVAL_SCHEMA = "skeleton.jeeves.rom_training_approval.v1"
+BATCH_SCHEMA = "skeleton.jeeves.rom_training_batch.v1"
+MAX_FILES = 100_000
+MAX_DIRS = 10_000
+MAX_PAGE = 128
+MAX_APPROVALS = 20_000
+MAX_LOCAL_ROM = 2 * 1024**3
+MAX_REVIEW_BYTES = 4 * 1024 * 1024
+_SHA = re.compile(r"^[0-9a-f]{64}$")
+_SAFE_NAME = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,127}$")
+_DISC_DESCRIPTORS = {".cue", ".ccd", ".gdi", ".m3u", ".toc", ".mds"}
+_AMBIGUOUS = {".bin", ".rom", ".exe", ".com", ".iso", ".img", ".zip"}
 
 
-class RomFleetError(ValueError):
-    pass
+class RomStudyError(ValueError):
+    """Insufficient identity, review, native readiness or resource authority."""
 
 
-def _digest(raw: bytes) -> str:
-    return sha256(raw).hexdigest()
+def _hash(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
 
 
-def _json_bytes(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"),
-                       ensure_ascii=False, allow_nan=False) + "\n").encode()
+def _canonical(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, allow_nan=False).encode("utf-8")
 
 
-def _read(path: Path, cap: int) -> bytes:
-    """No followed symlinks, device files, growing inputs or changed inode."""
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
-    with os.fdopen(os.open(path, flags), "rb") as f:
-        before = os.fstat(f.fileno())
-        if not stat.S_ISREG(before.st_mode) or not 1 <= before.st_size <= cap:
-            raise RomFleetError("ROM/document is not a bounded regular file")
-        data = f.read(cap + 1)
-        after = os.fstat(f.fileno())
-        current = os.stat(path, follow_symlinks=False)
-        identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
-        if len(data) != before.st_size or identity(before) != identity(after) or identity(after) != identity(current):
-            raise RomFleetError("ROM/document changed while being read")
-        return data
+def _safe_path(path: Path, *, directory: bool = False) -> Path:
+    if not path.is_absolute() or ".." in path.parts:
+        raise RomStudyError("operator ROM path must be absolute without traversal")
+    if not path.exists() and not path.is_symlink():
+        raise RomStudyError("operator ROM path is unavailable")
+    for item in (path, *path.parents):
+        if item.is_symlink():
+            raise RomStudyError("operator ROM path cannot traverse symlinks")
+    if directory and not path.is_dir():
+        raise RomStudyError("operator ROM collection is not a directory")
+    return path
 
 
-def _root(directory: Path) -> Path:
-    if not directory.is_absolute() or not directory.is_dir():
-        raise RomFleetError("ROM root must be an explicit existing absolute directory")
-    cursor = directory
-    while cursor != cursor.parent:
-        if cursor.is_symlink():
-            raise RomFleetError("ROM root cannot traverse symlinks")
-        cursor = cursor.parent
-    return directory
+def _regular_identity(path: Path) -> tuple[int, int, int, int, int]:
+    path = _safe_path(path)
+    info = path.stat(follow_symlinks=False)
+    if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= MAX_LOCAL_ROM:
+        raise RomStudyError("ROM candidate is not a bounded regular file")
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
-def _safe(root: Path, rel: Any) -> Path:
-    if (not isinstance(rel, str) or not 1 <= len(rel) <= 512
-            or rel.startswith("/") or "\\" in rel
-            or any(t in ("", ".", "..") or t.startswith(".") for t in rel.split("/"))):
-        raise RomFleetError("ROM path must be an ordinary safe relative name")
-    cur = root
-    for part in rel.split("/"):
-        cur = cur / part
-        if cur.is_symlink():
-            raise RomFleetError("ROM path traverses a symlink")
-    if not cur.resolve().is_relative_to(root.resolve()):
-        raise RomFleetError("ROM path escapes operator root")
-    return cur
+def _stream_identity(path: Path, *, expected: str | None = None,
+                     include_prefix: bool = False) -> tuple[str, int, bytes]:
+    before = _regular_identity(path)
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    fd = os.open(path, flags)
+    try:
+        if _stat_tuple(os.fstat(fd)) != before:
+            raise RomStudyError("ROM identity changed before reading")
+        digest, prefix, count = hashlib.sha256(), bytearray(), 0
+        with os.fdopen(os.dup(fd), "rb") as reader:
+            while chunk := reader.read(1024 * 1024):
+                count += len(chunk)
+                if count > before[2]:
+                    raise RomStudyError("ROM identity changed during hashing")
+                digest.update(chunk)
+                if include_prefix and len(prefix) < 65536:
+                    prefix.extend(chunk[:65536 - len(prefix)])
+        if (count != before[2] or _stat_tuple(os.fstat(fd)) != before
+                or _regular_identity(path) != before):
+            raise RomStudyError("ROM identity changed during hashing")
+        actual = digest.hexdigest()
+        if expected is not None and actual != expected:
+            raise RomStudyError("ROM SHA-256 differs from operator-approved source")
+        return actual, count, bytes(prefix)
+    finally:
+        os.close(fd)
 
 
-def _target(path: str) -> str | None:
-    return _EXT.get(Path(path).suffix.casefold())
+def _stat_tuple(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
-def discover(directory: Path) -> dict[str, Any]:
-    """Scan every bounded eligible single-file ROM under the explicitly selected root.
+def _recognized_extensions() -> frozenset[str]:
+    from skeleton.jeeves.game_emulator_catalog import (
+        _CORE_TARGET_GROUPS, emulator_content_extensions,
+    )
+    extensions = set()
+    for core_id in _CORE_TARGET_GROUPS:
+        extensions.update(emulator_content_extensions(core_id))
+    return frozenset(extensions)
 
-    Archives and disc bundles are not silently extracted or truncated. They
-    need the canonical streamed-content admission separately.
-    """
-    root = _root(directory)
-    from skeleton.jeeves.game_emulator_catalog import canonical_targets
 
-    known = canonical_targets()
-    results: list[dict[str, Any]] = []
-    queue = [(root, 0)]
-    visited = 0
-    while queue:
-        folder, depth = queue.pop()
-        if depth > MAX_DEPTH:
-            raise RomFleetError("ROM directory depth exceeds scan capacity")
-        with os.scandir(folder) as listing:
-            entries = sorted(list(listing), key=lambda item: item.name)
-        for entry in entries:
-            visited += 1
-            if visited > MAX_FILES:
-                raise RomFleetError("ROM directory exceeds 16384 entries")
-            if entry.is_symlink():
-                raise RomFleetError("ROM directory contains symlink; explicit owner review required")
-            if entry.is_dir(follow_symlinks=False):
-                queue.append((Path(entry.path), depth + 1))
+def inventory_page(root: Path, *, cursor: str | None = None,
+                   limit: int = 64) -> dict[str, Any]:
+    """Deterministic bounded page with a continuation cursor; never reads content into RAM."""
+    if type(limit) is not int or not 1 <= limit <= MAX_PAGE:
+        raise RomStudyError("ROM census page size exceeds 1..128")
+    root = _safe_path(root, directory=True)
+    if cursor is not None and (not isinstance(cursor, str) or not cursor or len(cursor) > 4096
+                               or cursor.startswith("/") or ".." in PurePosixPath(cursor).parts):
+        raise RomStudyError("invalid ROM inventory continuation cursor")
+    extensions = _recognized_extensions()
+    candidates: list[str] = []
+    dirs = 0
+
+    def failed(exc: OSError) -> None:
+        raise RomStudyError("ROM inventory cannot read an operator directory") from exc
+
+    for base, folders, files in os.walk(root, topdown=True, followlinks=False, onerror=failed):
+        dirs += 1
+        if dirs > MAX_DIRS:
+            raise RomStudyError("ROM inventory directory budget exceeded; scan separate roots")
+        directory = Path(base)
+        _safe_path(directory, directory=True)
+        folders[:] = sorted(name for name in folders if not (directory / name).is_symlink())
+        for name in files:
+            path = directory / name
+            if path.is_symlink():
                 continue
-            if not entry.is_file(follow_symlinks=False):
-                raise RomFleetError("ROM directory contains nonregular entries")
-            relative = Path(entry.path).relative_to(root).as_posix()
-            target = _target(relative)
-            if target is None:
+            if path.suffix.lower() not in extensions:
                 continue
-            size = entry.stat(follow_symlinks=False).st_size
-            record: dict[str, Any] = {
-                "rom_id": "rom." + _digest(relative.encode())[:20],
-                "path": relative, "target_id": target,
-                "bytes": size,
-                "sha256": None,
-                "eligibility": "unverified",
-                "rights": {
-                    "training_permitted": False,
-                    "human_reviewed": False,
-                },
-            }
-            if target not in known:
-                record["eligibility"] = "unknown_canonical_target"
-            elif not 1 <= size <= MAX_BLOB:
-                record["eligibility"] = "oversized_or_empty"
-            else:
-                record["sha256"] = _digest(_read(_safe(root, relative), MAX_BLOB))
-                record["eligibility"] = (
-                    "eligible_for_rights_review"
-                    if size <= INLINE_ROM_BYTES else "requires_streamed_content_adapter"
-                )
-            results.append(record)
+            candidates.append(path.relative_to(root).as_posix())
+            if len(candidates) > MAX_FILES:
+                raise RomStudyError("ROM inventory file ceiling exceeded; partition roots")
+    candidates.sort()
+    start = 0
+    if cursor is not None:
+        from bisect import bisect_right
+        start = bisect_right(candidates, cursor)
+    page = candidates[start:start + limit]
+    results = []
+    for relative in page:
+        path = root / relative
+        try:
+            digest, size, _ = _stream_identity(path)
+            state = ("requires_companion_bundle" if path.suffix.lower() in _DISC_DESCRIPTORS
+                     else "requires_explicit_platform" if path.suffix.lower() in _AMBIGUOUS
+                     else "requires_operator_approval")
+            results.append({
+                "relative_path": relative, "file_sha256": digest, "size_bytes": size,
+                "extension": path.suffix.lower(), "state": state,
+                "authorized_for_training": False, "emulator_execution_checked": False,
+            })
+        except (OSError, RomStudyError) as exc:
+            results.append({
+                "relative_path": relative, "state": "identity_unavailable",
+                "failure_type": type(exc).__name__, "authorized_for_training": False,
+                "emulator_execution_checked": False,
+            })
+    next_cursor = page[-1] if start + len(page) < len(candidates) and page else None
     return {
-        "schema_version": SCHEMA,
-        "root": str(root),
-        "roms": sorted(results, key=lambda x: x["path"]),
-        "inventory_count": len(results),
-        "training_executed": False,
-        "production_jeeves_weights_modified": False,
-        "note": "Operator must supply individual rights review; extension suffix is only a format hint.",
+        "schema_version": INVENTORY_SCHEMA,
+        "root": str(root), "total_candidate_files": len(candidates),
+        "candidate_extensions": len(extensions), "cursor": cursor,
+        "next_cursor": next_cursor, "rows": results,
+        "finished": next_cursor is None,
+        "rom_bytes_exported": False, "training_executed": False,
     }
 
 
-def validate_manifest(manifest_path: Path) -> tuple[Path, list[dict[str, Any]], str]:
-    source = _read(manifest_path, MAX_MANIFEST)
+def _load_approvals(path: Path) -> tuple[dict[str, dict[str, Any]], str]:
+    path = _safe_path(path)
+    before = _regular_identity(path)
+    if before[2] > MAX_REVIEW_BYTES:
+        raise RomStudyError("ROM training approval registry exceeds capacity")
+    with path.open("rb") as stream:
+        raw = stream.read(MAX_REVIEW_BYTES + 1)
+    if len(raw) != before[2] or _regular_identity(path) != before:
+        raise RomStudyError("ROM training approval registry changed during load")
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise RomStudyError("duplicate approval JSON property")
+            result[key] = value
+        return result
     try:
-        data = json.loads(source.decode("utf-8"))
-    except (UnicodeError, ValueError) as exc:
-        raise RomFleetError("ROM fleet manifest is not JSON") from exc
-    from skeleton.jeeves.game_emulator_catalog import canonical_targets
-    known = canonical_targets()
-    rows = data.get("roms") if isinstance(data, dict) else None
-    if (not isinstance(data, dict) or data.get("schema_version") != SCHEMA
-            or not isinstance(rows, list) or len(rows) > MAX_FILES
-            or data.get("training_executed") is not False
-            or data.get("production_jeeves_weights_modified") is not False):
-        raise RomFleetError("ROM fleet inventory is malformed or claims unproven training")
-    root = _root(Path(data.get("root", "")))
-    seen = set()
-    for row in rows:
-        if not isinstance(row, dict):
-            raise RomFleetError("ROM row must be an object")
-        relative = row.get("path")
-        path = _safe(root, relative)
-        target = row.get("target_id")
-        if target not in known or target != _target(relative):
-            raise RomFleetError("ROM type does not match canonical target")
-        ident = row.get("rom_id")
-        if (not isinstance(ident, str) or not _ID.fullmatch(ident) or ident in seen
-                or relative in seen):
-            raise RomFleetError("duplicate or invalid ROM identity")
-        seen.update((ident, relative))
-        digest = row.get("sha256")
-        if digest is not None and (not isinstance(digest, str) or not _SHA.fullmatch(digest)):
-            raise RomFleetError("invalid ROM SHA-256")
-        rights = row.get("rights")
-        if not isinstance(rights, dict):
-            raise RomFleetError("ROM rights record missing")
-        if rights.get("training_permitted") is True:
-            if (rights.get("human_reviewed") is not True
-                    or any(not isinstance(rights.get(k), str) or len(rights[k].strip()) < 5
-                           for k in ("rights_holder", "rights_basis", "review_id"))
-                    or not rights["rights_basis"].startswith(("original:", "license:", "public-domain:"))):
-                raise RomFleetError("ROM train permission requires independent human rights review")
-            if digest is None or not 1 <= row.get("bytes", 0) <= MAX_BLOB:
-                raise RomFleetError("approved ROM requires fingerprinted bounded bytes")
-        if not path.is_file():
-            raise RomFleetError("ROM input vanished since catalog")
-    return root, rows, _digest(source)
+        value = json.loads(raw, object_pairs_hook=pairs,
+                           parse_constant=lambda _: (_ for _ in ()).throw(
+                               RomStudyError("nonfinite training approval")))
+    except (UnicodeError, ValueError, RecursionError) as exc:
+        raise RomStudyError("invalid ROM training approval JSON") from exc
+    if (not isinstance(value, dict) or set(value) != {"schema_version", "roms"}
+            or value["schema_version"] != APPROVAL_SCHEMA
+            or not isinstance(value["roms"], list) or len(value["roms"]) > MAX_APPROVALS):
+        raise RomStudyError("ROM approval schema or entry count invalid")
+    approved = {}
+    for item in value["roms"]:
+        if not isinstance(item, dict) or set(item) != {
+            "sha256", "target_id", "core_id", "rights", "content_size_bytes"
+        }:
+            raise RomStudyError("ROM approval record schema differs")
+        identity = item["sha256"]
+        if not isinstance(identity, str) or not _SHA.fullmatch(identity) or identity in approved:
+            raise RomStudyError("invalid or duplicated ROM approval identity")
+        if (type(item["content_size_bytes"]) is not int
+                or not 1 <= item["content_size_bytes"] <= MAX_LOCAL_ROM):
+            raise RomStudyError("ROM approval needs exact admitted byte count")
+        for field in ("target_id", "core_id"):
+            if (not isinstance(item[field], str)
+                    or not _SAFE_NAME.fullmatch(item[field])):
+                raise RomStudyError("ROM approval target/core identity invalid")
+        rights = item["rights"]
+        if not isinstance(rights, dict) or set(rights) != {
+            "rights_holder", "rights_basis", "review_id",
+            "training_permitted", "human_reviewed"
+        }:
+            raise RomStudyError("ROM approval requires exact rights declaration")
+        if rights["training_permitted"] is not True or rights["human_reviewed"] is not True:
+            raise RomStudyError("unapproved ROMs cannot enter the training approval registry")
+        if (any(not isinstance(rights.get(key), str) or len(rights[key].strip()) < 5
+                for key in ("rights_holder", "rights_basis", "review_id"))
+                or not rights["rights_basis"].startswith(
+                    ("license:", "original:", "public-domain:"))):
+            raise RomStudyError("ROM training permission needs independently reviewed rights basis")
+        approved[identity] = item
+    return approved, _hash(raw)
 
 
-def _write_new(path: Path, payload: Any) -> None:
-    if path.is_symlink() or path.exists() or not path.parent.is_dir():
-        raise RomFleetError("output must be an unused regular path under an existing folder")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(path, flags, 0o600)
+def _private_output(root: Path) -> Path:
+    if root.is_symlink() or not root.is_absolute() or not root.is_dir():
+        raise RomStudyError("ROM training output must be an existing absolute private directory")
+    root = _safe_path(root, directory=True)
+    info = root.stat()
+    if info.st_uid != os.geteuid() or info.st_mode & 0o077:
+        raise RomStudyError("ROM training output requires mode 0700 and current user ownership")
+    return root
+
+
+def _save_new(path: Path, document: dict[str, Any]) -> str:
+    raw = _canonical(document) + b"\n"
+    if len(raw) > 32 * 1024 * 1024:
+        raise RomStudyError("ROM training evidence exceeds the receipt storage limit")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
     try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(_json_bytes(payload))
-            f.flush()
-            os.fsync(f.fileno())
+        with os.fdopen(fd, "wb") as target:
+            target.write(raw)
+            target.flush()
+            os.fsync(target.fileno())
     except BaseException:
         path.unlink(missing_ok=True)
         raise
+    return _hash(raw)
 
 
-def _request(row: dict[str, Any], rom: bytes, steps: int):
-    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
-    from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry
-    from skeleton.jeeves.game_rom_runtime import inspect_dmg_cartridge
-
-    target = row["target_id"]
-    filename = Path(row["path"]).name
-    if target == "game_boy":
-        try:
-            inspect_dmg_cartridge(rom)
-        except ValueError:
-            pass  # An unsupported DMG mapper may still run on an approved real core.
-        else:
-            return GameEnvironmentRequest(
-                target_id="game_boy", kind="builtin", rom_source=rom,
-                max_steps=steps, filename=filename,
-            )
-    registry = GameEmulatorRegistry.from_environment()
-    approved = registry.resolve(target)
-    return GameEnvironmentRequest(
-        target_id="emulator:" + target, kind="libretro", rom_source=rom,
-        max_steps=steps, filename=filename,
-        core_id=approved.core_id, registry_digest=registry.registry_digest,
+def _content_for_training(path: Path, *, sha: str, core: Any) -> Any:
+    """Produce a privately materialized canonical content bundle; no source execution."""
+    from skeleton.jeeves.game_emulator_catalog import (
+        GameContentBundle, GameContentReference, load_game_content_for_core,
     )
+    from skeleton.jeeves.game_emulator_host import prepare_emulator_content
+
+    actual, size, prefix = _stream_identity(path, expected=sha, include_prefix=True)
+    if size <= 16 * 1024 * 1024:
+        # The canonical loader validates ZIP expansion and native core archive handling.
+        before = _regular_identity(path)
+        content = path.read_bytes()
+        if _hash(content) != sha or _regular_identity(path) != before:
+            raise RomStudyError("ROM changed before bounded core admission")
+        bundle = load_game_content_for_core(core, content, path.name,
+                                            expected_source_digest=sha)
+        return prepare_emulator_content(bundle)
+    if size > MAX_LOCAL_ROM or path.suffix.lower() in {".zip", ".dosz", *_DISC_DESCRIPTORS}:
+        raise RomStudyError("large archives and multi-file discs require explicit existing bundle admission")
+    reference = GameContentReference(
+        path.name, size, sha, "operator-local://rom-training/" + sha, prefix,
+    )
+    bundle = GameContentBundle(path.name, {path.name: reference}, actual)
+    expected = _regular_identity(path)
+
+    def reader(item: Any):
+        if item != reference or _regular_identity(path) != expected:
+            raise RomStudyError("ROM reference or file changed before streaming")
+        digest, count = hashlib.sha256(), 0
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            if _stat_tuple(os.fstat(fd)) != expected:
+                raise RomStudyError("ROM identity changed before streaming")
+            with os.fdopen(os.dup(fd), "rb") as stream:
+                while chunk := stream.read(1024 * 1024):
+                    count += len(chunk)
+                    digest.update(chunk)
+                    if count > expected[2]:
+                        raise RomStudyError("ROM grew during streaming")
+                    yield chunk
+            if (count != expected[2] or digest.hexdigest() != sha
+                    or _stat_tuple(os.fstat(fd)) != expected
+                    or _regular_identity(path) != expected):
+                raise RomStudyError("ROM changed during streaming materialization")
+        finally:
+            os.close(fd)
+
+    return prepare_emulator_content(bundle, reader=reader)
 
 
-def _split_evidence(result: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Exactly the canonical CLI handoff to the neural trainer."""
-    from skeleton.jeeves.game_learning import _digest as canonical_digest
-
-    policy = result["policy_snapshot"]
-    evidence = {key: value for key, value in result.items() if key != "policy_snapshot"}
-    evidence["policy_snapshot_digest"] = policy["snapshot_digest"]
-    evidence["evidence_digest"] = canonical_digest(evidence)
-    return policy, evidence
-
-
-def train_one(
-    row: dict[str, Any], *, root: Path, seed: int,
-    max_runs: int, steps: int, neural: bool,
+def train_page(
+    root: Path, approvals_path: Path, output_dir: Path, *,
+    cursor: str | None = None, limit: int = 32,
+    runs: int = 12, steps: int = 24, seed: int = 0,
     cancel: Callable[[], bool] | None = None,
-) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any] | None, dict[str, Any]]:
-    """Actually run independent native Q training and optionally MLP SGD."""
-    from skeleton.jeeves.game_emulator_training_lab import EmulatorLabConfig, run_emulator_training_lab
-    from skeleton.jeeves.game_emulator_neural_world import NeuralWorldConfig, train_neural_world_from_evidence
+) -> dict[str, Any]:
+    """Run every eligible ROM on this page; persist per-ROM results before continuing.
 
-    if row["rights"].get("training_permitted") is not True:
-        raise RomFleetError("ROM training was not approved")
-    raw = _read(_safe(root, row["path"]), INLINE_ROM_BYTES)
-    if len(raw) != row["bytes"] or _digest(raw) != row["sha256"]:
-        raise RomFleetError("ROM bytes changed after operator rights approval")
-    request = _request(row, raw, steps)
-    provenance = {
-        "rights_acknowledged": True,
-        "rights_review_id": row["rights"]["review_id"],
-        "rights_basis": row["rights"]["rights_basis"],
-        "source": "operator_approved_local_rom",
-        "rom_digest": row["sha256"],
-        "target_id": row["target_id"],
-        "executable_core_kind": request.kind,
-    }
-    config = EmulatorLabConfig(
-        max_runs=max_runs, steps_per_run=steps,
-        stagnation_runs=10, checkpoint_stride=min(4, steps),
-        counterfactual_actions=2, boomerang_interval=4,
-        boomerang_retained=4, heldout_episodes=2, seed=seed,
+    A page may include blocked/unlicensed/unsupported files. These are audited,
+    NEVER silently treated as completed. Reissue with the next_cursor to continue.
+    """
+    from skeleton.jeeves.game_emulator_catalog import (
+        GameEmulatorRegistry, emulator_content_admission,
     )
-    report = run_emulator_training_lab(
-        request, source_lineage=provenance, config=config,
-        policy_id="rom-fleet-" + row["rom_id"].replace(".", "-"),
-        cancel=cancel,
+    from skeleton.jeeves.game_emulator_training_lab import (
+        EmulatorLabConfig, run_emulator_training_lab,
     )
-    policy, evidence = _split_evidence(report)
-    model, model_report = (None, None)
-    if neural:
-        model, model_report = train_neural_world_from_evidence(
-            evidence, policy,
-            config=NeuralWorldConfig(seed=seed, width=16, epochs=4),
-            cancel=cancel,
-        )
-    summary = {
-        "rom_id": row["rom_id"], "rom_sha256": row["sha256"],
-        "target_id": row["target_id"], "status": "trained_candidate_only",
-        "actual_q_updates": report["actual_q_table_updates"],
-        "real_emulator_steps": report["actual_training_steps"],
-        "audited_runs": report["run_count"],
-        "report_digest": report["report_digest"],
-        "neural_optimizer_steps": model["real_optimizer_steps"] if model is not None else 0,
-        "neural_candidate_digest": model["model_digest"] if model is not None else None,
-        "neural_qualified": model_report["candidate_status"] if model_report is not None else None,
-        "production_jeeves_weight_updates": 0,
-        "automatic_promotion": False,
-    }
-    return policy, evidence, model, {"summary": summary, "neural_report": model_report}
+    from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
 
-
-def train_all(manifest_path: Path, output_dir: Path, *,
-              seed: int = 0, max_runs: int = 12, steps: int = 12,
-              neural: bool = False, cancel: Callable[[], bool] | None = None) -> dict[str, Any]:
-    if (type(seed) is not int or not 0 <= seed < 2**63
-            or type(max_runs) is not int or not 10 <= max_runs <= 64
-            or type(steps) is not int or not 4 <= steps <= 64
-            or max_runs * steps > 4096):
-        raise RomFleetError("fleet per-ROM training budget invalid")
-    if output_dir.is_symlink() or not output_dir.is_dir():
-        raise RomFleetError("outputs require an existing private directory")
-    root, rows, manifest_sha = validate_manifest(manifest_path)
-    if (output_dir.resolve().is_relative_to(root.resolve())
-            or root.resolve().is_relative_to(output_dir.resolve())
-            or manifest_path.resolve().parent == output_dir.resolve()):
-        raise RomFleetError("training outputs must not overlap ROMs or rights manifest")
+    if (type(runs) is not int or not 1 <= runs <= 32
+            or type(steps) is not int or not 1 <= steps <= 128
+            or type(seed) is not int or not 0 <= seed <= 2**63 - 1):
+        raise RomStudyError("bounded ROM training runs/steps/seed required")
+    page = inventory_page(root, cursor=cursor, limit=limit)
+    approvals, approvals_digest = _load_approvals(approvals_path)
+    output_dir = _private_output(output_dir)
+    registry = GameEmulatorRegistry.from_environment()
     results: list[dict[str, Any]] = []
-    trained_digests: set[str] = set()
-    for index, row in enumerate(rows):
-        identity = row["rom_id"]
+    for row in page["rows"]:
         if cancel is not None and cancel():
-            raise RomFleetError("fleet cancelled before next ROM")
-        if row["rights"].get("training_permitted") is not True:
-            results.append({"rom_id": identity, "status": "not_authorized", "trained": False})
+            raise RomStudyError("ROM training campaign cancelled at a page boundary")
+        identity = row.get("file_sha256")
+        summary = {"relative_path": row["relative_path"],
+                   "source_sha256": identity, "state": "not_admitted"}
+        if not identity:
+            summary["state"] = "source_identity_unavailable"
+            results.append(summary)
             continue
-        if row["bytes"] > INLINE_ROM_BYTES:
-            results.append({"rom_id": identity, "status": "streamed_adapter_required", "trained": False})
+        grant = approvals.get(identity)
+        if grant is None:
+            summary["state"] = "no_training_rights_review"
+            results.append(summary)
             continue
-        if row["sha256"] in trained_digests:
-            results.append({"rom_id": identity, "status": "duplicate_rom_covered_by_prior_candidate",
-                            "trained": False, "covered": True})
+        if grant["content_size_bytes"] != row["size_bytes"]:
+            summary["state"] = "approval_content_size_mismatch"
+            results.append(summary)
             continue
-        paths = {
-            kind: output_dir / (identity + "-" + kind + ".json")
-            for kind in ("policy", "evidence", "neural", "receipt")
-        }
-        if any(path.exists() or path.is_symlink() for path in paths.values()):
-            results.append({"rom_id": identity, "status": "output_collision", "trained": False})
+        if row["extension"] in _DISC_DESCRIPTORS:
+            summary["state"] = "explicit_multifile_bundle_required"
+            results.append(summary)
             continue
+        # File extension hints cannot authorize an emulator without an approved
+        # exact core binding. The worker repeats all content and firmware checks.
         try:
-            policy, evidence, model, details = train_one(
-                row, root=root, seed=(seed + index) % (2**63), max_runs=max_runs,
-                steps=steps, neural=neural, cancel=cancel,
+            core = registry.resolve_core(grant["core_id"])
+            if grant["target_id"] not in core.target_ids:
+                raise RomStudyError("ROM approval target not covered by approved core")
+            admission = emulator_content_admission(core.core_id)
+            if row["extension"] not in admission["admitted_entrypoint_extensions"]:
+                raise RomStudyError("ROM extension has no approved core entrypoint")
+            run_identity = _hash(_canonical({
+                "source_sha256": identity, "grant": grant,
+                "approvals_manifest_sha256": approvals_digest,
+                "registry_digest": registry.registry_digest,
+                "runs": runs, "steps": steps, "seed": seed,
+            }))
+            filename = "rom-" + identity[:16] + "-" + run_identity[:16] + ".json"
+            target = output_dir / filename
+            if target.exists() or target.is_symlink():
+                summary["state"] = "previous_receipt_exists_not_reexecuted"
+                summary["receipt_name"] = filename
+                results.append(summary)
+                continue
+            prepared = _content_for_training(
+                _safe_path(Path(page["root"]) / row["relative_path"]),
+                sha=identity, core=core,
             )
-            # Never write a success summary unless all its artifacts exist.
-            _write_new(paths["policy"], policy)
-            _write_new(paths["evidence"], evidence)
-            if model is not None:
-                _write_new(paths["neural"], model)
-            receipt = details["summary"] | {
-                "manifest_sha256": manifest_sha,
-                "dataset_privacy": "local_only",
-                "rom_bytes_exported": 0,
-                "neural_report": details["neural_report"],
+            try:
+                request = GameEnvironmentRequest(
+                    kind="libretro", target_id=grant["target_id"],
+                    core_id=core.core_id, registry_digest=registry.registry_digest,
+                    content=prepared.as_dict(), filename=Path(row["relative_path"]).name,
+                    max_steps=steps,
+                )
+                config = EmulatorLabConfig(
+                    max_runs=runs, steps_per_run=steps, stagnation_runs=10, seed=seed,
+                )
+                evidence = run_emulator_training_lab(
+                    request, config=config,
+                    policy_id="rom-training-" + identity[:16],
+                    source_lineage={
+                        "rights_acknowledged": True, "source_sha256": identity,
+                        "rights_review_id": grant["rights"]["review_id"],
+                        "rights_basis": grant["rights"]["rights_basis"],
+                        "core_id": core.core_id, "target_id": grant["target_id"],
+                        "approvals_manifest_sha256": approvals_digest,
+                    },
+                    cancel=cancel,
+                )
+            finally:
+                prepared.close()
+            receipt = {
+                "schema_version": BATCH_SCHEMA, "source_sha256": identity,
+                "source_size_bytes": row["size_bytes"], "target_id": grant["target_id"],
+                "core_id": core.core_id, "registry_digest": registry.registry_digest,
+                "approval_manifest_sha256": approvals_digest,
+                "training_kind": "actual_replay_audited_tabular_q_policy",
+                "neural_weights_updated": 0, "production_weights_modified": False,
+                "model_promotion_authorized": False,
+                "candidate_evidence": evidence,
             }
-            _write_new(paths["receipt"], receipt)
-            trained_digests.add(row["sha256"])
-            results.append({"rom_id": identity, "status": "candidate_written",
-                            "trained": True, "covered": True,
-                            "q_updates": receipt["actual_q_updates"],
-                            "neural_steps": receipt["neural_optimizer_steps"],
-                            "receipt": str(paths["receipt"])})
-        except (OSError, ValueError, RuntimeError, ImportError) as exc:
-            # Do not describe failures as trained or overwrite any partial
-            # owner-controlled outputs. Operator reconciles partial results.
-            results.append({"rom_id": identity, "status": "blocked",
-                            "trained": False, "failure_type": type(exc).__name__,
-                            "reason": str(exc)[:400]})
+            receipt_digest = _save_new(target, receipt)
+            summary.update({
+                "state": "q_policy_trained_with_receipt",
+                "actual_q_table_updates": evidence["actual_q_table_updates"],
+                "measured_steps": evidence["actual_training_steps"],
+                "receipt_name": filename, "receipt_sha256": receipt_digest,
+            })
+        except (ValueError, OSError, RuntimeError, ImportError) as exc:
+            summary["state"] = "emulator_training_blocked"
+            summary["failure_type"] = type(exc).__name__
+            summary["failure_reason"] = str(exc)[:200]
+        results.append(summary)
     return {
-        "schema_version": REPORT_SCHEMA,
-        "source_manifest_sha256": manifest_sha,
-        "roms_discovered": len(rows),
-        "roms_authorized": sum(r["rights"].get("training_permitted") is True for r in rows),
-        "roms_trained": sum(r.get("trained") is True for r in results),
-        "roms_covered": sum(r.get("covered") is True for r in results),
-        "actual_q_updates": sum(r.get("q_updates", 0) for r in results),
-        "actual_neural_steps": sum(r.get("neural_steps", 0) for r in results),
-        "per_rom_results": results,
-        "production_jeeves_weight_updates": 0,
-        "production_promotion": False,
+        "schema_version": BATCH_SCHEMA,
+        "inventory_cursor": page["cursor"], "next_cursor": page["next_cursor"],
+        "finished_inventory": page["finished"],
+        "inventory_candidates": page["total_candidate_files"],
+        "approval_manifest_sha256": approvals_digest,
+        "page_results": results,
+        "q_policy_training_completed": sum(
+            row["state"] == "q_policy_trained_with_receipt" for row in results),
+        "blocked_or_unreviewed": sum(
+            row["state"] not in ("q_policy_trained_with_receipt",
+                                 "previous_receipt_exists_not_reexecuted")
+            for row in results),
+        "actual_jeeves_weight_training": False,
+        "production_weights_modified": False,
+        "rom_content_exported": False,
     }
