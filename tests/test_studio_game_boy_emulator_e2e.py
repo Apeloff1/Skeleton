@@ -15,7 +15,7 @@ import unittest
 from unittest.mock import patch
 
 from skeleton.ai.game_builder.studio_build_qualification import (
-    NativeBuildQualificationError, parse_game_boy_symbols,
+    parse_game_boy_symbols,
 )
 from skeleton.ai.game_builder.studio_game_boy_emulator import (
     GameBoyEmulationError, _receipt, qualify_game_boy_emulator,
