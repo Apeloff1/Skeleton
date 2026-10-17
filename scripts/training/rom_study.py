@@ -75,6 +75,28 @@ def parser() -> argparse.ArgumentParser:
                        help="also train a checkpointed candidate neural world model from replay evidence")
     train.add_argument("--neural-epochs", type=int, default=4)
     train.add_argument("--neural-width", type=int, default=8)
+    triangle = commands.add_parser(
+        "train-triangle",
+        help="one-command approved native gameplay, Dragon inspection, and local adversarial review",
+    )
+    triangle.add_argument("--root", required=True, type=Path)
+    triangle.add_argument("--approvals", required=True, type=Path)
+    triangle.add_argument("--output-dir", required=True, type=Path)
+    triangle.add_argument("--reviewer-checkpoint", required=True, type=Path)
+    triangle.add_argument("--snapshot", required=True, type=Path,
+                          help="hash-pinned frozen inventory for efficient restartable campaigns")
+    triangle.add_argument("--cursor")
+    triangle.add_argument("--limit", type=int, default=32)
+    triangle.add_argument("--max-pages", type=int, default=1,
+                          help="0 runs all frozen pages in the foreground")
+    triangle.add_argument("--runs", type=int, default=12)
+    triangle.add_argument("--steps", type=int, default=24)
+    triangle.add_argument("--seed", type=int, default=0)
+    triangle.add_argument("--neural-world", action="store_true")
+    triangle.add_argument("--neural-epochs", type=int, default=4)
+    triangle.add_argument("--neural-width", type=int, default=8)
+    triangle.add_argument("--review-seed", type=int, default=0)
+    triangle.add_argument("--review-tokens", type=int, default=160)
     return root
 
 
@@ -82,21 +104,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         if args.operation == "triangle-status":
-            from skeleton.ai.training.rom_study import (
-                _safe_path, verified_rom_receipt,
+            from skeleton.ai.training.rom_triangle_campaign import (
+                read_receipt_document,
             )
+            from skeleton.ai.training.rom_study import verified_rom_receipt
             from skeleton.jeeves.game_emulator_triangle import verify_training_triangle
             verified = verified_rom_receipt(
                 args.receipt, expected_source_sha256=args.source_sha256,
             )
-            import hashlib
-            source = _safe_path(args.receipt)
-            raw = source.read_bytes()
-            if hashlib.sha256(raw).hexdigest() != verified["receipt_sha256"]:
+            document, digest = read_receipt_document(args.receipt)
+            if digest != verified["receipt_sha256"]:
                 raise RomStudyError("ROM training receipt changed since verification")
-            document = json.loads(raw)
-            evidence = document["candidate_evidence"]
-            triangle = document["training_triangle"]
+            evidence, triangle = document["candidate_evidence"], document["training_triangle"]
             verify_training_triangle(evidence, triangle)
             print(json.dumps({
                 "state": "triangle_native_evidence_verified",
@@ -111,71 +130,15 @@ def main(argv: list[str] | None = None) -> int:
             }, sort_keys=True))
             return 0
         if args.operation == "review-triangle":
-            import hashlib
-            from skeleton.ai.training.rom_study import (
-                _hash, _private_output, _safe_path, _save_new, verified_rom_receipt,
-            )
-            from skeleton.jeeves.game_emulator_triangle import verify_training_triangle
-            from skeleton.jeeves.game_emulator_triangle_native_reviewer import (
-                run_native_adversarial_review, verify_native_adversarial_review,
-                replay_native_adversarial_review,
-            )
             from skeleton.ai.model_runtime.offline_chat import load_offline_engine
-            verified = verified_rom_receipt(
+            from skeleton.ai.training.rom_triangle_campaign import review_one_receipt
+            runtime = load_offline_engine(args.reviewer_checkpoint).runtime
+            result = review_one_receipt(
                 args.receipt, expected_source_sha256=args.source_sha256,
+                output_dir=args.output_dir, runtime=runtime,
+                seed=args.seed, max_new_tokens=args.max_new_tokens,
             )
-            source_path = _safe_path(args.receipt)
-            source_raw = source_path.read_bytes()
-            if _hash(source_raw) != verified["receipt_sha256"]:
-                raise RomStudyError("ROM training receipt changed after independent verification")
-            source = json.loads(source_raw)
-            evidence, triangle = source["candidate_evidence"], source["training_triangle"]
-            verify_training_triangle(evidence, triangle)
-            output_dir = _private_output(args.output_dir)
-            # Checkpoint admission uses existing canonical native runtime,
-            # without reaching a hosted provider or editing production weights.
-            reviewer_engine = load_offline_engine(args.reviewer_checkpoint)
-            runtime = reviewer_engine.runtime
-            fingerprint = hashlib.sha256(json.dumps({
-                "receipt": verified["receipt_sha256"], "model": runtime.model_digest,
-                "seed": args.seed, "tokens": args.max_new_tokens,
-            }, sort_keys=True).encode()).hexdigest()
-            destination = output_dir / (
-                "triangle-review-" + args.source_sha256[:16] + "-" + fingerprint[:24] + ".json"
-            )
-            if destination.exists() or destination.is_symlink():
-                record = json.loads(_safe_path(destination).read_bytes())
-                verify_native_adversarial_review(evidence, triangle, record)
-                if (record["independent_local_transformer_sha256"] != runtime.model_digest
-                        or record["requested_seed"] != args.seed
-                        or record["requested_max_new_tokens"] != args.max_new_tokens):
-                    raise RomStudyError("prior adversarial review model or run configuration differs")
-                replayed = replay_native_adversarial_review(
-                    evidence, triangle, record, runtime,
-                )
-                print(json.dumps({
-                    "state": "previous_review_replayed_with_real_native_model",
-                    "filename": destination.name,
-                    "review_digest": record["review_digest"],
-                    "native_generations_replayed": replayed["native_generations_replayed"],
-                    "replay_digest": replayed["replay_digest"],
-                    "production_jeeves_weight_updates": 0,
-                }, sort_keys=True))
-                return 0
-            record = run_native_adversarial_review(
-                evidence, triangle, runtime, seed=args.seed,
-                max_new_tokens=args.max_new_tokens,
-            )
-            verify_native_adversarial_review(evidence, triangle, record)
-            _save_new(destination, record)
-            print(json.dumps({
-                "state": "native_model_review_executed_requires_manual_adjudication",
-                "filename": destination.name,
-                "review_digest": record["review_digest"],
-                "passes_executed": record["passes_executed"],
-                "structured_source_bound_passes": record["structured_source_bound_passes"],
-                "production_jeeves_weight_updates": 0,
-            }, sort_keys=True))
+            print(json.dumps(result, sort_keys=True))
             return 0
         if args.operation == "inspect-bundle":
             from skeleton.jeeves.game_emulator_operator_content import (
@@ -233,6 +196,38 @@ def main(argv: list[str] | None = None) -> int:
         if type(args.max_pages) is not int or not 0 <= args.max_pages <= 100_000:
             raise RomStudyError("max_pages must be 0 (whole inventory) or 1..100000")
         cursor, pages = args.cursor, 0
+        if args.operation == "train-triangle":
+            from skeleton.ai.model_runtime.offline_chat import load_offline_engine
+            from skeleton.ai.training.rom_triangle_campaign import triangle_campaign_page
+            runtime = load_offline_engine(args.reviewer_checkpoint).runtime
+            while True:
+                result = triangle_campaign_page(
+                    args.root, args.approvals, args.output_dir, runtime,
+                    cursor=cursor, limit=args.limit, runs=args.runs,
+                    steps=args.steps, seed=args.seed,
+                    neural_world=args.neural_world,
+                    neural_epochs=args.neural_epochs,
+                    neural_width=args.neural_width,
+                    inventory_snapshot=frozen,
+                    review_seed=args.review_seed,
+                    review_tokens=args.review_tokens,
+                )
+                pages += 1
+                print(json.dumps({
+                    **result, "page_number": pages,
+                    "model_digest": runtime.model_digest,
+                    "next_cursor_is_safe_to_advance": (
+                        result["review_failures_needing_retry"] == 0
+                    ),
+                }, sort_keys=True), flush=True)
+                if result["review_failures_needing_retry"]:
+                    # Do not advance a batch past failed/unstored independent
+                    # reviews. Reissue with the SAME cursor; create-only
+                    # gameplay receipts prevent duplicate policy training.
+                    return 3
+                cursor = result["next_cursor"]
+                if cursor is None or (args.max_pages and pages >= args.max_pages):
+                    return 0
         while True:
             result = train_page(
                 args.root, args.approvals, args.output_dir, cursor=cursor,
