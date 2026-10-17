@@ -257,21 +257,23 @@ class ProjectsClient:
         build_id: str,
         *,
         poll_seconds: float = 1.0,
-        timeout_seconds: float | None = None,
+        timeout_seconds: float = 600.0,
         cancel: CancelToken | None = None,
         sleep: Callable[[float], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> ProjectBuild:
         """Poll until ``succeeded|failed|cancelled``; raises on timeout/cancel."""
+        if timeout_seconds is None or isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be a positive number (default 600)")
         nap = sleep or self._gw._sleep
-        deadline = None if timeout_seconds is None else clock() + timeout_seconds
+        deadline = clock() + timeout_seconds
         while True:
             if cancel is not None:
                 cancel.raise_if_cancelled()
             build = self.get_build(project_id, build_id, cancel=cancel)
             if build.is_terminal:
                 return build
-            if deadline is not None and clock() >= deadline:
+            if clock() >= deadline:
                 raise SkeletonTimeoutError(
                     f"build {build_id} not terminal (status={build.status})"
                 )

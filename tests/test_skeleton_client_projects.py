@@ -187,3 +187,18 @@ def test_projects_routes_exist_in_4097_router():
     }
     for method, path in projects_mod.SDK_ROUTES:
         assert (method, re.sub(r"\{[^}]+\}", "{}", path)) in backend, f"{method} {path}"
+
+
+def test_wait_build_default_timeout_and_validation():
+    import inspect
+
+    pc = _client(lambda r: httpx.Response(200, json=_build("running")))
+    assert inspect.signature(pc.wait_build).parameters["timeout_seconds"].default == 600.0
+    for bad in (None, 0, -5):
+        with pytest.raises(ValueError):
+            pc.wait_build("p1", "b1", timeout_seconds=bad)
+    t = [0.0]
+    with pytest.raises(SkeletonTimeoutError):
+        pc.wait_build("p1", "b1", poll_seconds=100,
+                      sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
+    assert t[0] >= 600
