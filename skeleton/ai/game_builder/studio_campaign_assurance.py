@@ -21,6 +21,7 @@ from .studio_campaign import (
 )
 from .studio_campaign_lock import campaign_lock
 from .studio_runtime_qualification import _inputs as _browser_inputs, qualify_browser_gameplay
+from .studio_godot_qualification import godot_inputs, qualify_godot_headless
 
 SCHEMA = "skeleton.game_builder.production_assurance.v1"
 QUALIFICATION_SCHEMA = "skeleton.game_builder.campaign_rom_evidence.v1"
@@ -35,6 +36,7 @@ GATES = (
     "native_rom_compiled",
     "cartridge_structure_checked",
     "browser_javascript_playthrough_executed",
+    "godot_headless_playthrough_executed",
     "emulator_playthrough_executed",
     "controller_response_verified",
     "visual_and_audio_runtime_qualified",
@@ -45,6 +47,7 @@ GATES = (
 )
 SOURCE_GATES = frozenset(GATES[:7])
 BROWSER_GATE = "browser_javascript_playthrough_executed"
+GODOT_GATE = "godot_headless_playthrough_executed"
 NATIVE_GATES = frozenset(GATES[7:9])
 
 
@@ -265,6 +268,88 @@ def qualify_campaign_browser(
                 "graphical_browser_pixels_verified": False}
 
 
+def _godot_receipt(root: Path, target: str, source_identity: str) -> dict | None:
+    base = root / "qualifications" / target
+    record_path = base / "godot_qualification.json"
+    if not record_path.exists():
+        return None
+    if base.is_symlink() or record_path.is_symlink():
+        raise StudioAssuranceError("Godot evidence may not be a symlink")
+    record = _load_json(record_path)
+    if (record.get("schema") != "skeleton.game_builder.campaign_godot_evidence.v1"
+            or record.get("target") != target
+            or record.get("source_identity") != source_identity
+            or canonical_digest({k: v for k, v in record.items()
+                                 if k != "evidence_digest"}) != record.get("evidence_digest")):
+        raise StudioAssuranceError("Godot evidence differs from current campaign")
+    proof = record.get("runtime")
+    if (not isinstance(proof, dict)
+            or proof.get("engine_executed") is not True
+            or proof.get("game_winning_replay_verified") is not True
+            or proof.get("graphical_framebuffer_verified") is not False
+            or canonical_digest({k: v for k, v in proof.items()
+                                 if k != "receipt_digest"}) != proof.get("receipt_digest")):
+        raise StudioAssuranceError("Godot execution record lacks a valid winning proof")
+    try:
+        _, world, steps, current = godot_inputs(root / "targets" / target / "engines")
+    except (ValueError, OSError) as exc:
+        raise StudioAssuranceError("qualified native engine sources no longer valid") from exc
+    if (proof.get("world_digest") != world
+            or proof.get("source_identity") != current
+            or proof.get("action_count") != steps):
+        raise StudioAssuranceError("Godot replay was executed for a different source")
+    return record
+
+
+def qualify_campaign_godot(
+    order: CampaignOrder, root: str | Path, target: str, *,
+    authorized: bool, execute: bool, timeout_seconds: int = 45,
+) -> dict:
+    """Run real Godot headless replay without modifying immutable project source."""
+    if authorized is not True:
+        raise PermissionError("actual Godot binary invocation requires operator authority")
+    if execute is not True:
+        raise StudioAssuranceError("Godot runtime needs explicit execute intent")
+    if not isinstance(order, CampaignOrder) or target not in order.targets:
+        raise StudioAssuranceError("original campaign target required")
+    base = Path(root)
+    with campaign_lock(base):
+        campaign = _inspect_campaign_unlocked(order, base)
+        if target not in campaign["completed_targets"]:
+            raise StudioAssuranceError("Godot source must exist before replay")
+        earlier = _godot_receipt(base, target, campaign["identity"])
+        if earlier is not None:
+            return {"target": target, "already_qualified": True,
+                    "godot_headless_gameplay_executed": True,
+                    "evidence_digest": earlier["evidence_digest"]}
+        result = qualify_godot_headless(
+            base / "targets" / target / "engines", authorized=True,
+            execute=True, timeout_seconds=timeout_seconds,
+        )
+        evidence = result.as_receipt()
+        if not result.game_winning_replay_verified:
+            return {"target": target, "godot_headless_gameplay_executed": False,
+                    "failure": result.failure, "godot_available": result.godot_available,
+                    "graphical_framebuffer_verified": False}
+        folder = base / "qualifications" / target
+        if folder.is_symlink():
+            raise StudioAssuranceError("qualification target path is unsafe")
+        folder.mkdir(parents=True, exist_ok=True)
+        body = {
+            "schema": "skeleton.game_builder.campaign_godot_evidence.v1",
+            "source_identity": campaign["identity"], "target": target,
+            "runtime": evidence, "graphical_framebuffer_verified": False,
+            "native_export_signed": False, "release_authorized": False,
+        }
+        record = {**body, "evidence_digest": canonical_digest(body)}
+        _atomic_json(folder / "godot_qualification.json", record)
+        _godot_receipt(base, target, campaign["identity"])
+        return {"target": target, "already_qualified": False,
+                "godot_headless_gameplay_executed": True,
+                "evidence_digest": record["evidence_digest"],
+                "graphical_framebuffer_verified": False}
+
+
 def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict:
     """Recheck real on-disk campaign artifacts and exact qualified binaries.
 
@@ -287,16 +372,20 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                 )
             binary = None
             browser = None
+            godot = None
             if source_receipt is not None:
                 if target in _BUILD_ADAPTERS:
                     binary = _qualification_receipt(base, target, campaign["identity"])
                 browser = _browser_receipt(base, target, campaign["identity"])
+                godot = _godot_receipt(base, target, campaign["identity"])
             gates = {}
             for gate in GATES:
                 if gate in SOURCE_GATES and source_receipt is not None:
                     status, reason = "artifact_integrity_checked", None
                 elif gate in NATIVE_GATES and binary is not None:
                     status, reason = "binary_structure_checked", None
+                elif gate == GODOT_GATE and godot is not None:
+                    status, reason = "godot_gameplay_executed", None
                 elif gate == BROWSER_GATE and browser is not None:
                     status, reason = "javascript_gameplay_executed", None
                 elif gate in NATIVE_GATES and target not in _BUILD_ADAPTERS:
@@ -307,7 +396,7 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                         else "independent_runtime_or_approval_evidence_required"
                     )
                 gates[gate] = {"status": status, "blocker": reason}
-                if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed"}:
+                if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed", "godot_gameplay_executed"}:
                     passed += 1
             by_target.append({
                 "target": target,
@@ -319,6 +408,9 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                 ),
                 "browser_javascript_evidence_digest": (
                     browser["evidence_digest"] if browser else None
+                ),
+                "godot_headless_evidence_digest": (
+                    godot["evidence_digest"] if godot else None
                 ),
                 "gates": gates,
                 "release_ready": False,
@@ -333,6 +425,9 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
             "targets_with_exact_source": campaign["targets_with_verified_source"],
             "native_roms_structurally_verified": sum(
                 row["native_binary_evidence_digest"] is not None for row in by_target
+            ),
+            "godot_headless_playthroughs_verified": sum(
+                row["godot_headless_evidence_digest"] is not None for row in by_target
             ),
             "browser_javascript_playthroughs_verified": sum(
                 row["browser_javascript_evidence_digest"] is not None for row in by_target
@@ -351,6 +446,6 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
 
 __all__ = [
     "StudioAssuranceError", "GATES", "qualify_campaign_target",
-    "qualify_campaign_browser",
+    "qualify_campaign_browser", "qualify_campaign_godot",
     "inspect_production_assurance",
 ]
