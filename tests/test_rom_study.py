@@ -170,7 +170,10 @@ def test_batch_uses_existing_lab_and_distinguishes_real_updates(
     # Existing identical receipt is independently checked before skipping.
     later = rom.train_page(root, approvals, out, limit=2, runs=1, steps=4)
     prior = next(r for r in later["page_results"] if r["relative_path"] == "a.gb")
-    assert prior["state"] == "previous_verified_receipt_no_reexecution"
+    # The fake training fixture cannot forge a fully audited Q receipt:
+    # production reuse MUST now reject it instead of skipping real execution.
+    assert prior["state"] == "emulator_training_blocked"
+    assert prior["failure_type"] == "RomStudyError"
     assert len(called) == 1
 
 

@@ -754,3 +754,9 @@ generations. It does **not** execute or replay the language model; only the
 actual `execute-200-lenses`/foreground campaign resume path can establish
 replay fidelity. Legacy complete native inference receipts created before
 per-lens journaling remain readable, explicitly identified as such.
+
+### Separate, audited shadow-model training after native Q-policy completion
+
+Use `python scripts/training/rom_study.py train-shadow-world --receipt /private/rom-....json --output-dir /private --seed 0 --width 12 --epochs 6` to optimize only a **shadow numerical next-telemetry model**. No training happens until all source episodes, replay receipts and the saved Q snapshot satisfy the separate neural-sample admission threshold. The source Q receipt is immutable; the optimizer writes a create-only `rom-world-...` candidate, validates the independent holdout and refuses unverified preexisting candidate files. Native game success, production transformer weights, legal authorization for new ROMs and platform fidelity are **not** certified by this operation.
+
+Existing `train-all` cached Q receipts additionally undergo an independent full Q/rights/episode/parameter ledger check. A legacy or synthetic partial report is blocked instead of being reported as `previous_verified_receipt_no_reexecution`.
