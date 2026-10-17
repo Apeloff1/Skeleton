@@ -357,6 +357,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                                    "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                                    "production-status", "production-cycle", "production-training",
+                                                   "dragon-observe-start", "dragon-observe-sync", "dragon-observe-status",
+                                                   "dragon-observe-cycle", "dragon-observe-action", "dragon-observe-lessons", "dragon-observe-revoke",
                                                    "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "direction-campaign-reopen", "p0-acceptance",
                                                    "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                                    "upscale-foliage", "upscale-animation", "upscale-shadow",
@@ -419,6 +421,11 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--page", type=int)
     jeeves.add_argument("--page-size", type=int)
     jeeves.add_argument("--repair-generated", action="store_true")
+    jeeves.add_argument("--consent", action="store_true")
+    jeeves.add_argument("--actor")
+    jeeves.add_argument("--phase")
+    jeeves.add_argument("--event")
+    jeeves.add_argument("--outcome")
     jeeves.add_argument("--pattern", choices=("wind", "breathe", "bob", "shimmer", "water"))
     jeeves.add_argument("--frames", type=int)
     jeeves.add_argument("--frame-height", type=int)
@@ -482,6 +489,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
                                 ("--gate", options.gate),
+                                ("--actor", options.actor), ("--phase", options.phase),
+                                ("--event", options.event), ("--outcome", options.outcome),
                                 ("--page", options.page),
                                 ("--page-size", options.page_size),
                                 ("--pattern", options.pattern),
@@ -512,6 +521,8 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                 command.append("--dry-run")
             if options.repair_generated:
                 command.append("--repair-generated")
+            if options.consent:
+                command.append("--consent")
             return run_jeeves_game_cli(command, _project(options.project))
         if options.action == "catalog":
             from skeleton.forge.eras import list_eras
