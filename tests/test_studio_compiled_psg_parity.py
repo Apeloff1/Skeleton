@@ -118,6 +118,8 @@ class OriginalCompiledPSGTests(unittest.TestCase):
                         rom, symbols, source, target=target,
                     )
                     self.assertEqual(evidence["notes_verified"], 8)
+                    self.assertEqual(evidence["gameplay_sound_cue_routines_verified"], 3)
+                    self.assertEqual(len(evidence["compiled_gameplay_cues_sha256"]), 64)
                     self.assertEqual(evidence["source_score_digest"], score.digest)
                     self.assertEqual(evidence["verified_note_table_sha256"],
                                      __import__("hashlib").sha256(raw).hexdigest())
@@ -146,6 +148,46 @@ class OriginalCompiledPSGTests(unittest.TestCase):
                         inspect_compiled_psg(
                             bytes(changed), symbols, source, target=target,
                         )
+
+    def test_compiled_sound_machine_code_must_match_all_three_original_game_events(self):
+        for target in ("nintendo_game_boy", "nintendo_game_boy_color",
+                       "nintendo_famicom"):
+            with self.subTest(target=target):
+                source = self.source(target, 3)
+                score = console_psg_registers(
+                    compose_native_psg("forest", 733, 3), target,
+                )
+                rom, symbols, _ = cartridge(
+                    target, bytes((*score["notes_low"], *score["notes_high"])),
+                    density=3,
+                )
+                length = 17 if target == "nintendo_famicom" else 15
+                first = 16 + 0x130 if target == "nintendo_famicom" else 0x2A0
+                for index in range(3):
+                    for at in (0, 1, 3, 5, length - 1):
+                        forged = bytearray(rom)
+                        forged[first + index * length + at] ^= 1
+                        with self.subTest(cue=index, opcode=at):
+                            with self.assertRaises(CompiledPSGError):
+                                inspect_compiled_psg(
+                                    bytes(forged), symbols, source, target=target,
+                                )
+
+    def test_generated_native_cue_opcode_layout_is_platform_specific(self):
+        # Independent instruction-level assertions, not merely a copy of
+        # the expected score table or a digest of a synthetic ROM.
+        gb = _effect_bytes(
+            "nintendo_game_boy", enabled=True, low=0x34, high=0x04,
+        )
+        self.assertEqual(gb, bytes.fromhex(
+            "3E 01 B7 C8 3E 34 E0 18 3E 04 F6 80 E0 19 C9"
+        ))
+        nes = _effect_bytes(
+            "nintendo_famicom", enabled=True, low=0x34, high=0x04,
+        )
+        self.assertEqual(nes, bytes.fromhex(
+            "A9 01 F0 0C A9 34 8D 06 40 A9 04 09 10 8D 07 40 60"
+        ))
 
     def test_wrong_symbol_bank_duplicate_missing_or_overlapping_tables_fail(self):
         source = self.source("nintendo_game_boy", 2)
