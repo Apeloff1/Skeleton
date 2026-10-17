@@ -5,7 +5,7 @@
  */
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { color, minTouch, useT } from '../../../src/foundation';
+import { color, minTouch, usePresence, useT } from '../../../src/foundation';
 
 export { RouteErrorFallback as ErrorBoundary } from '../../../src/foundation';
 
@@ -16,6 +16,8 @@ const icon = (name: IconName) => function TabIcon({ color: tint, size }: { color
 
 export default function AppTabsLayout() {
   const { t } = useT();
+  // Presence for the signed-in shell (POST /api/v1/presence join/heartbeat/leave).
+  usePresence('app');
   return (
     <Tabs
       screenOptions={{
