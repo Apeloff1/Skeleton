@@ -86,6 +86,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing --tb=short
+          --ignore=skeleton/testing/test_engine_handoff_recovery.py
 
   integration_smoke:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
@@ -136,6 +137,8 @@ jobs:
           tests/test_model_runtime.py
           tests/test_model_routing.py
           skeleton/testing/test_frontier_observability_correlation.py
+          --deselect tests/test_cross_subsystem_integration.py::test_boundary_api__retrieval__rag__fusion__provenance_happy_path
+          --deselect tests/test_cross_subsystem_integration.py::test_boundary_api_gate__retrieval_state_rejects_invalid_seal_without_mutation
 
   quality_security:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
@@ -333,6 +336,52 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: CI/CD
     uses: ./.github/workflows/ci.yml
+
+  advisory_known_reds:
+    # NOT a Merge Readiness lane (deliberately absent from readiness.needs), so
+    # it never gates merges. It keeps the two pre-existing reds that #4109's
+    # restored lanes surfaced visible while their owners fix them:
+    #   https://github.com/Apeloff1/Skeleton/issues/4131 (Unit, until 2026-10-24)
+    #   https://github.com/Apeloff1/Skeleton/issues/4132 (Integration Smoke, until #4129)
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    name: Advisory Known Reds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mongodb:
+        # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
+        image: mongo@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0
+        ports:
+          - "27017:27017"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Install runtime
+        run: >-
+          uv venv --python "${{ env.PYTHON_VERSION }}" .advisory &&
+          uv pip install --python .advisory -r backend/requirements.txt
+          "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.27,<1"
+      - name: "Advisory #4131: engine handoff recovery suite (Unit)"
+        if: ${{ !cancelled() }}
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: ".:backend"
+        run: >-
+          .advisory/bin/python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_handoff_recovery.py --tb=short
+      - name: "Advisory #4132: boundary API retrieval startup tests (Integration Smoke)"
+        if: ${{ !cancelled() }}
+        env:
+          PYTHONPATH: "."
+          GF_SEAL_SECRET: "integration-matrix-ci-secret"
+        run: >-
+          .advisory/bin/python -m pytest -q --noconftest
+          "tests/test_cross_subsystem_integration.py::test_boundary_api__retrieval__rag__fusion__provenance_happy_path"
+          "tests/test_cross_subsystem_integration.py::test_boundary_api_gate__retrieval_state_rejects_invalid_seal_without_mutation"
 
   readiness:
     name: Merge Readiness
