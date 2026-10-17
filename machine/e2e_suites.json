@@ -187,6 +187,28 @@
         "-vv",
         "backend/tests/test_iteration_79_galaxy_studio_full_e2e.py"
       ]
+    },
+    {
+      "id": "jeeves-dragon-game-observation",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 540,
+      "required_files": [
+        "tests/test_jeeves_game_e2e_observation.py",
+        "skeleton/ai/game_builder/studio_e2e_observation.py",
+        "skeleton/ai/game_builder/studio_execution_plane.py",
+        "backend/routes/game_studio_agent.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_jeeves_game_e2e_observation.py"
+      ]
     }
   ]
 }
