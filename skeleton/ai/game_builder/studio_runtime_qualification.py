@@ -38,6 +38,10 @@ class BrowserReplayQualification:
     canvas_draw_calls: int
     sprite_draws_exercised: bool
     animation_tick_exercised: bool
+    keyboard_input_verified: bool
+    onscreen_button_input_verified: bool
+    undo_replay_verified: bool
+    restart_verified: bool
     failure: str | None
     receipt_digest: str
 
@@ -53,6 +57,10 @@ class BrowserReplayQualification:
             "canvas_draw_calls": self.canvas_draw_calls,
             "sprite_draws_exercised": self.sprite_draws_exercised,
             "animation_tick_exercised": self.animation_tick_exercised,
+            "keyboard_input_verified": self.keyboard_input_verified,
+            "onscreen_button_input_verified": self.onscreen_button_input_verified,
+            "undo_replay_verified": self.undo_replay_verified,
+            "restart_verified": self.restart_verified,
             "graphical_browser_pixels_verified": False,
             "godot_executable_tested": False,
             "controller_hardware_tested": False,
@@ -67,7 +75,7 @@ class BrowserReplayQualification:
 def _receipt(world: str, html: str, proof: str, *, available: bool,
              executed: bool = False, won: bool = False, draws: int = 0,
              sprites: bool = False, frames: bool = False,
-             failure: str | None = None) -> BrowserReplayQualification:
+             controls: bool = False, failure: str | None = None) -> BrowserReplayQualification:
     body = {
         "schema": SCHEMA,
         "world_digest": world, "html_sha256": html, "proof_sha256": proof,
@@ -75,6 +83,10 @@ def _receipt(world: str, html: str, proof: str, *, available: bool,
         "winning_replay_verified": won, "canvas_draw_calls": draws,
         "sprite_draws_exercised": sprites,
         "animation_tick_exercised": frames,
+        "keyboard_input_verified": controls,
+        "onscreen_button_input_verified": controls,
+        "undo_replay_verified": controls,
+        "restart_verified": controls,
         "graphical_browser_pixels_verified": False,
         "godot_executable_tested": False,
         "controller_hardware_tested": False,
@@ -82,7 +94,7 @@ def _receipt(world: str, html: str, proof: str, *, available: bool,
     }
     return BrowserReplayQualification(
         world, html, proof, available, executed, won, draws, sprites, frames,
-        failure, canonical_digest(body),
+        controls, controls, controls, controls, failure, canonical_digest(body),
     )
 
 
@@ -177,6 +189,10 @@ def qualify_browser_gameplay(
             or result.get("executed") is not True or result.get("result") != "won"
             or result.get("source_sha256") != html_digest
             or result.get("proof_sha256") != proof_digest
+            or any(result.get(key) is not True for key in (
+                "keyboard_input_verified", "onscreen_button_input_verified",
+                "undo_replay_verified", "restart_verified",
+            ))
             or result.get("source_world_digest") != world
             or type(result.get("canvas_draw_calls")) is not int
             or not 0 < result["canvas_draw_calls"] <= 50_000_000):
@@ -187,6 +203,7 @@ def qualify_browser_gameplay(
         won=True, draws=result["canvas_draw_calls"],
         sprites=result.get("original_sprites_drawn") is True,
         frames=result.get("original_animation_tick_exercised") is True,
+        controls=True,
     )
 
 
