@@ -20,6 +20,7 @@ import { ActionSheetHost } from '../components/ActionSheet';
 import { traceStep, traceStepSync, installCrashTrace } from '../utils/bootTracer';
 import { installMemoryGuard, uninstallMemoryGuard, registerMemoryShedder } from '../utils/memoryGuard';
 import { clearMemCache } from '../utils/resilientNet';
+import { shedSafeStorageMirror } from '../utils/safeStorage';
 import { purgeThermalCachesIfPresent } from '../utils/thermalGuard';
 import { installGlobalGuards } from '../utils/globalGuards';
 import { installAppStateGuard, uninstallAppStateGuard } from '../utils/safeTimers';
@@ -69,6 +70,9 @@ export default function RootLayout() {
     const disposeThermalShedder = registerMemoryShedder(
       'thermal-cache', purgeThermalCachesIfPresent,
     );
+    const disposeStorageMirror = registerMemoryShedder(
+      'native-read-mirror', shedSafeStorageMirror,
+    );
 
     // Device connectivity is observed immediately by StabilityBanner. Delay
     // server polling so it does not compete with the launcher for cold-start
@@ -86,6 +90,7 @@ export default function RootLayout() {
       stopTunnelHeartbeat();
       disposeNetworkShedder();
       disposeThermalShedder();
+      disposeStorageMirror();
       // React dev remounts must release the native observers as well as
       // their timers. Root effect re-installs both guards on next mount.
       uninstallAppStateGuard();
