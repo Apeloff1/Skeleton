@@ -161,6 +161,7 @@ def run_studio_execution_campaign(
         if stage == "source" or halted:
             continue
         for target in order.targets:
+            outcome = None
             if target not in completed:
                 status, blocker = "blocked", "original_source_missing"
                 digest = None
@@ -182,6 +183,10 @@ def run_studio_execution_campaign(
             entries.append({
                 "target": target, "stage": stage, "status": status,
                 "blocker": blocker, "evidence_digest": digest,
+                "first_cpu_divergence": (
+                    outcome.get("first_cpu_divergence")
+                    if stage == "emulator" and outcome is not None else None
+                ),
             })
             if policy.stop_after_blocker and status != "verified":
                 halted = True
