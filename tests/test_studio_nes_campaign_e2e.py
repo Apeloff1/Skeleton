@@ -13,6 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from skeleton.ai.game_builder.studio_native_psg import compose_native_psg, console_psg_registers
+from skeleton.ai.game_builder.studio_compiled_psg_parity import _effect_bytes
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_build_qualification import (
     _receipt as native_receipt, _verify_source,
@@ -41,6 +42,9 @@ NES_LABELS = (
     "al 000017 .TurnCountHigh\n"
     "al 008100 .OriginalMusicLow\n"
     "al 008108 .OriginalMusicHigh\n"
+    "al 008130 .SoundPickup\n"
+    "al 008141 .SoundHazard\n"
+    "al 008152 .SoundGoal\n"
 ).encode("ascii")
 
 
@@ -53,6 +57,13 @@ def ines_rom(tiles: bytes, animation: bytes):
         compose_native_psg("forest", 733, 0), "nintendo_famicom",
     )
     prg[0x100:0x110] = bytes((*song["notes_low"], *song["notes_high"]))
+    for index in range(3):
+        start = 0x130 + 17 * index
+        prg[start:start + 17] = _effect_bytes(
+            "nintendo_famicom", enabled=False,
+            low=song["events_low"][index],
+            high=song["events_high"][index],
+        )
     return (
         b"NES\x1a" + bytes([2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         + bytes(prg) + char + bytes(8192 - len(char))
