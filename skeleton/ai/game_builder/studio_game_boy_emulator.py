@@ -13,7 +13,6 @@ from hashlib import sha256
 import importlib.util
 import json
 from pathlib import Path
-import shutil
 import tempfile
 from time import monotonic
 
@@ -120,7 +119,7 @@ def _frame_hash(emulator: object) -> str:
 
 
 def qualify_game_boy_emulator(
-    project: str | Path, *,
+    project: str | Path, *, engine_source: str | Path,
     target: str, authorized: bool, execute: bool,
     timeout_seconds: int = 90, max_frames: int = 260_000,
 ) -> GameBoyEmulationResult:
@@ -143,7 +142,7 @@ def qualify_game_boy_emulator(
         sym = _regular(symbol_path, 128_000)
         _header("gbc" if target.endswith("_color") else "gb", rom)
         labels = parse_game_boy_symbols(sym)
-        html, proof, world = _engine_inputs(root / "engines")
+        html, proof, world = _engine_inputs(Path(engine_source))
         gameplay = json.loads(proof)
     except (OSError, ValueError, UnicodeError) as exc:
         raise GameBoyEmulationError("actual native ROM/symbol/proof is not current") from exc
