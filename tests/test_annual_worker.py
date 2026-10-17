@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
+import importlib.util
 import tempfile
 import unittest
 
@@ -13,9 +14,23 @@ from skeleton.automation.annual_production import (
 from skeleton.automation.annual_worker import (
     AnnualWorkRunner, VerifiedWork,
 )
-from skeleton.jeeves.annual_production import make_jeeves_annual_runner
 from skeleton.automation.builder_annual_production import make_builder_annual_runner
-from skeleton.ai.webcrawler.dragon_annual_production import make_dragon_annual_runner
+
+# The frontend fast-gate installs no optional Jeeves/Dragon runtime
+# dependencies. Load these tiny adapter files in isolation while still
+# exercising their real shared worker and production store contracts.
+def load_adapter(path, function):
+    file = Path(__file__).resolve().parents[1] / path
+    spec = importlib.util.spec_from_file_location("annual_test_" + function, file)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, function)
+
+make_jeeves_annual_runner = load_adapter(
+    "skeleton/jeeves/annual_production.py", "make_jeeves_annual_runner")
+make_dragon_annual_runner = load_adapter(
+    "skeleton/ai/webcrawler/dragon_annual_production.py",
+    "make_dragon_annual_runner")
 
 D = lambda s: sha256(s.encode()).hexdigest()
 T0 = 1_800_000_000.0

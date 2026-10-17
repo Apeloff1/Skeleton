@@ -99,7 +99,7 @@ class AnnualAuthorityTests(unittest.TestCase):
 
     def test_shorter_renewal_is_rejected(self):
         with self.assertRaises(ProductionConflict):
-            self.renew(expiry=T0+180*DAY)
+            self.renew(now=T0+10,expiry=T0+180*DAY)
 
     def test_identical_grant_identity_cannot_be_reused_for_fake_extension(self):
         with self.assertRaises(ValueError):
