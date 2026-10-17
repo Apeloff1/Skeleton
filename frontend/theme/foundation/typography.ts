@@ -3,7 +3,9 @@
  * including the HUD `metric` / `label` roles, plus HUD tier mapping (§3.2–3.3).
  */
 import type { TextStyle } from 'react-native';
-import { hud, typography as tokenTypography } from '../tokens';
+import tokens, { hud } from '../tokens';
+
+const { typography: tokenTypography } = tokens;
 
 export const fontFamily = tokenTypography.fontFamily;
 
