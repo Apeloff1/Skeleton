@@ -769,12 +769,12 @@ test('session progress coalesces many unsent snapshots into the newest value', a
     await settle();
     assert.equal(calls.length, 1);
     calls[0].resolve({ progress_updated: true, xp_earned: 0, new_achievements: [] });
-    await Promise.all([first, ...pending]);
     await settle();
     assert.equal(calls.length, 2);
     assert.deepEqual(calls.map(call => call.progress), [1, 30]);
-    const ending = hook.endSession();
     calls[1].resolve({ progress_updated: true, xp_earned: 0, new_achievements: [] });
+    await Promise.all([first, ...pending]);
+    const ending = hook.endSession();
     await settle();
     assert.equal(calls.length, 3);
     calls[2].resolve({ progress_updated: true, xp_earned: 0, new_achievements: [] });
