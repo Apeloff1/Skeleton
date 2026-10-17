@@ -682,10 +682,17 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
         emulator = None
         art_parity = None
         canvas = None
+        native_media = None
         if source_receipt is not None:
             if target in _BUILD_ADAPTERS:
                 binary = _qualification_receipt(base, target, campaign["identity"])
             art_parity = inspect_cross_engine_pixels(source)
+            if target in (
+                "nintendo_game_boy", "nintendo_game_boy_color",
+                "nintendo_famicom",
+            ):
+                from .studio_native_source_media_parity import inspect_native_source_media
+                native_media = inspect_native_source_media(source, target=target)
             emulator = (_emulator_receipt(base, target, campaign["identity"])
                         if target in ("nintendo_game_boy", "nintendo_game_boy_color",
                                       "nintendo_famicom") else None)
@@ -728,6 +735,16 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
             "cross_engine_pixel_parity_digest": (
                 art_parity["receipt_digest"] if art_parity else None
             ),
+            "native_animation_audio_source_parity_digest": (
+                native_media["source_media_digest"] if native_media else None
+            ),
+            "native_hero_frames_in_assembly": (
+                native_media["original_hero_frame_count"] if native_media else 0
+            ),
+            "native_psg_score_source_digest": (
+                native_media["native_psg_score_digest"] if native_media else None
+            ),
+            "native_audio_emulator_verified": False,
             "generated_canvas_evidence_digest": (
                 canvas["capture_digest"] if canvas else None
             ),
@@ -768,6 +785,13 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
         ),
         "native_roms_structurally_verified": sum(
             row["native_binary_evidence_digest"] is not None for row in by_target
+        ),
+        "original_console_media_sources_independently_checked": sum(
+            row["native_animation_audio_source_parity_digest"] is not None
+            for row in by_target
+        ),
+        "original_console_animation_frames_in_source": sum(
+            row["native_hero_frames_in_assembly"] for row in by_target
         ),
         "generated_game_canvas_captures_verified": sum(
             row["generated_canvas_evidence_digest"] is not None for row in by_target
