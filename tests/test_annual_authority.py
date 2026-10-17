@@ -111,7 +111,8 @@ class AnnualAuthorityTests(unittest.TestCase):
         self.db.checkpoint(lease,sequence=1,state_digest=D("state"),
                            evidence_digest=D("evidence"),now=T0+1)
         self.db.terminal(lease,state="completed",
-                         verified_evidence_digest=D("release"),now=T0+2)
+                         verified_evidence_digest=D("release"),
+                         verify_evidence=lambda *_: True, now=T0+2)
         with self.assertRaises(ProductionConflict): self.renew()
         self.assertEqual(self.db.read("world-1").status,"completed")
 

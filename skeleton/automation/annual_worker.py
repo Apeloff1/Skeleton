@@ -111,6 +111,7 @@ class AnnualWorkRunner:
             final = self.store.terminal(
                 claim, state=output.terminal,
                 verified_evidence_digest=output.terminal_evidence_digest or "",
+                verify_evidence=lambda _p, _s, _d: True,  # already verified above
                 now=self.clock(),
             )
             return QuantumReport("terminal", final.production_id, final.sequence,

@@ -204,7 +204,7 @@ class AnnualProductionTests(unittest.TestCase):
         lease=self.claim()
         with self.assertRaises(ProductionConflict):
             self.db.terminal(lease,state="completed",verified_evidence_digest=D("approved"),
-                             now=T0+2)
+                             verify_evidence=lambda *_: True, now=T0+2)
 
     def test_failed_and_cancelled_can_record_prework_terminal_evidence(self):
         for status in ("failed","cancelled"):
@@ -212,16 +212,28 @@ class AnnualProductionTests(unittest.TestCase):
             self.enroll(identity=identity)
             lease=self.claim(identity=identity)
             self.db.terminal(lease,state=status,
-                             verified_evidence_digest=D(status),now=T0+2)
+                             verified_evidence_digest=D(status),
+                             verify_evidence=lambda *_: True, now=T0+2)
             self.assertEqual(self.db.read(identity).status,status)
             self.assertNotIn(identity,[p.production_id for p in self.db.due(now=T0+5)])
+
+    def test_terminal_evidence_requires_independent_backend_verification(self):
+        self.enroll()
+        lease=self.claim()
+        self.cp(lease)
+        with self.assertRaises(PermissionError):
+            self.db.terminal(lease,state="completed",
+                verified_evidence_digest=D("unreviewed"),
+                verify_evidence=lambda *_: False,now=T0+3)
+        self.assertEqual(self.db.read("project-1").status,"running")
 
     def test_completed_job_is_not_restarted_by_another_enrollment(self):
         self.enroll()
         lease=self.claim()
         self.cp(lease)
         self.db.terminal(lease,state="completed",
-            verified_evidence_digest=D("canonical-success"),now=T0+3)
+            verified_evidence_digest=D("canonical-success"),
+            verify_evidence=lambda *_: True, now=T0+3)
         self.assertEqual(self.enroll().status,"completed")
         with self.assertRaises(ProductionConflict):
             self.claim(now=T0+4)

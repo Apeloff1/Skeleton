@@ -373,18 +373,22 @@ class AnnualProductionStore:
             return self._state(self._row(db, claim.production_id))
 
     def terminal(self, claim: Claim, *, state: str, verified_evidence_digest: str,
+                 verify_evidence: Callable[[str, str, str], bool],
                  now: float | None = None) -> ProductionState:
         if state not in TERMINAL:
             raise ValueError("terminal requires explicit verified status")
         evidence = _digest(verified_evidence_digest, "terminal evidence")
+        if not callable(verify_evidence) or verify_evidence(
+                claim.production_id, state, evidence) is not True:
+            raise PermissionError("canonical terminal evidence not verified")
         at = _clock(time.time() if now is None else now)
         with self._tx() as db:
             row = self._require(db, claim, at)
             if state == "completed" and (row["sequence"] == 0 or
                                          row["checkpoint_digest"] is None):
                 raise ProductionConflict("cannot declare completion without durable checkpoint")
-            # The caller must verify evidence with the subsystem's canonical
-            # owner. Digest format validation does not prove the artifact.
+            # The caller supplies a trusted verifier against canonical
+            # backend evidence, not a digest or client status label alone.
             db.execute("""UPDATE annual_productions SET status=?,
                 terminal_evidence_digest=?, lease_token_digest=NULL, lease_worker=NULL,
                 lease_expires_at=NULL, updated_at=? WHERE production_id=?""",

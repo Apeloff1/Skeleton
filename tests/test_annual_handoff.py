@@ -124,7 +124,8 @@ class AnnualHandoffTests(unittest.TestCase):
         self.checkpoint("dragon")
         self.checkpoint("jeeves")
         self.db.terminal(self.token,state="completed",
-            verified_evidence_digest=D("complete"),now=T0+3)
+            verified_evidence_digest=D("complete"),
+            verify_evidence=lambda *_: True, now=T0+3)
         with self.assertRaises(ProductionConflict):
             self.send(now=T0+4)
 
