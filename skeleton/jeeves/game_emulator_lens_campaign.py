@@ -149,3 +149,35 @@ def audit_lens_campaign(
     }
     outcome["audit_digest"] = _digest(outcome)
     return outcome
+
+
+
+def assemble_source_pinned_lens_campaign(
+    source_report: dict[str, Any], *, page_size: int = 64,
+) -> dict[str, Any]:
+    """Build + independently reconstruct the entire canonical lens catalog.
+
+    The bounded iterator does not persist review tasks, observe screenshots,
+    synthesize independent Dragon testimony, or update model parameters.
+    Every generated page is re-derived from the original source report before
+    its digest can contribute to the final read-only campaign projection.
+    """
+    if type(page_size) is not int or not 1 <= page_size <= 512:
+        raise LensCampaignError("full lens campaign requires page size 1..512")
+    validate_training_receipts(source_report)
+    pages = []
+    cursor = 0
+    while True:
+        if len(pages) >= MAX_CAMPAIGN_PAGES:
+            raise LensCampaignError("canonical lens catalog exceeds bounded review pages")
+        page = review_verified_training_report(
+            source_report, offset=cursor, limit=page_size,
+        )
+        pages.append(page)
+        next_offset = page.get("next_offset")
+        if next_offset is None:
+            break
+        if type(next_offset) is not int or next_offset <= cursor:
+            raise LensCampaignError("canonical review pagination stalled or moved backward")
+        cursor = next_offset
+    return audit_lens_campaign(pages, source_report=source_report)
