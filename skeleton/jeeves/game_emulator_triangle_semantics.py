@@ -146,13 +146,30 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         catalog = {spec.key: spec for spec in router.registry.all()}
         if any(key not in catalog for key in requested_keys):
             raise TriangleSemanticError("requested lens missing from canonical Jeeves registry")
+        # Operator pinning chooses WHICH lenses, not how strongly the
+        # evidence activates them. Re-run Jeeves' own router to obtain scores
+        # and enforce the canonical per-family and observation requirements.
+        # The old path gave every requested lens 1.0, manufacturing evidence
+        # support for lenses whose cues had never appeared in gameplay.
+        eligible = router.select(
+            observations, requested=requested_keys, max_lenses=max_lenses,
+            max_per_family=20, perpendicular=False,
+        )
+        eligible_by_key = {spec.key: spec for spec in eligible.lenses}
+        if set(eligible_by_key) != set(requested_keys):
+            raise TriangleSemanticError(
+                "operator-selected lenses exceed native observation or diversity limits"
+            )
         selected = tuple(catalog[key] for key in requested_keys)
         selection = LensSelection(
             lenses=selected,
-            activation_scores={spec.key: 1.0 for spec in selected},
+            activation_scores={
+                spec.key: eligible.activation_scores[spec.key]
+                for spec in selected
+            },
             families=tuple(sorted({spec.family for spec in selected},
                                   key=lambda family: family.value)),
-            perpendicular=True,
+            perpendicular=False,
         )
     else:
         selection = router.select_maximal(
@@ -178,7 +195,16 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         if (decision is None or decision.factual_assertion_authorized
                 or decision.causal_assertion_authorized):
             raise TriangleSemanticError("canonical semantic lens lacks safe governance decision")
+        cues = tuple(
+            cue for cue in spec.activation_cues
+            if cue and cue in " ".join(
+                obs.content + " " + " ".join(obs.tags) for obs in observations
+            ).casefold()
+        )
         route.append({
+            "matched_native_observation_cues": list(cues),
+            "cue_support_present": bool(cues),
+            "operator_requested_not_evidence": bool(requested_keys),
             "governance_grade": decision.grade.value,
             "governance_fingerprint": decision.fingerprint,
             "factual_claims_allowed": False,
@@ -219,6 +245,11 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         "factual_assertions_authorized": False,
         "causal_assertions_authorized": False,
         "additional_native_training_examples": 0,
+        "actual_cue_supported_lenses": sum(item["cue_support_present"] for item in route),
+        "operator_selected_lenses_without_cue_support": sum(
+            item["operator_requested_not_evidence"]
+            and not item["cue_support_present"] for item in route
+        ),
         "routes": route,
     }
     report["route_digest"] = _digest(report)
