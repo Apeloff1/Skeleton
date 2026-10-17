@@ -139,3 +139,29 @@ document requires review before corpus reuse. No raw SDK docs are copied
 into the comparison. These SHA-256 identity pins are **not** external
 authenticity signatures, and the diff does not execute SDKs or update Jeeves
 production model weights.
+
+
+### Joint SDK/ROM custody review and terminal gating (follow-on)
+
+`audit_joint_learning_custody` rechecks two already-validated, redacted
+SDK snapshot versions using `compare_custody`, and independently enumerates
+the operator's frozen ROM inventory, current local rights manifest and saved
+fleet training receipts using `audit_fleet_all`. The report does not contain
+SDK source material or any ROM bytes. Command:
+
+```bash
+python -m scripts.training.joint_learning_custody \
+  --sdk-before /private/sdk-before.json --sdk-after /private/sdk-after.json \
+  --rom-root /private/roms --frozen-inventory /private/rom-inventory.json \
+  --rom-approvals /private/rights.json --rom-receipts /private/receipts
+```
+
+Separate conditions identify SDK changes requiring operator reapproval,
+rights-pending ROM sources, missing or corrupt receipts, and incomplete
+multi-page fleet scans. The computed custody SHA-256 is a data checksum,
+not a legal signature, independent native replay or production promotion
+permit. Genuine Q-policy training is distinct from shadow numeric prediction
+and from changing Jeeves' serving transformer weights. Neither a green
+report nor full inventory coverage authorizes a model release. Synthetic
+integration checks: `python -m pytest -q --noconftest
+tests/test_joint_learning_custody.py tests/test_sdk_custody_drift.py`.
