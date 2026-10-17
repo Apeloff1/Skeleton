@@ -732,3 +732,87 @@ test('safe GET can retry a transient response without replaying mutations', asyn
     global.fetch = previous;
   }
 });
+
+test('session progress coalesces many unsent snapshots into the newest value', async () => {
+  const h = reactHarness();
+  const calls = [];
+  const service = {
+    startSession: async (_user, moduleId) => ({
+      session_started: true, module_id: moduleId,
+      emotional_context: { detected_emotion: 'neutral', stress_level: 0.2 },
+      content_adaptations: [], tips: [],
+    }),
+    updateProgress: (_user, _moduleId, progress) => new Promise(resolve => {
+      calls.push({ progress, resolve });
+    }),
+    logAIInteraction: async () => ({ logged: true }),
+  };
+  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+    react: h.react, '../services/synergy': { synergyService: service },
+  });
+  const hook = useSessionTracker('person');
+  h.mount();
+  const originalNow = Date.now;
+  let clock = 1_800_000_000_000;
+  Date.now = () => clock;
+  try {
+    await hook.startSession('book');
+    const first = hook.updateProgress(1);
+    await settle();
+    assert.equal(calls.length, 1);
+    const pending = [];
+    for (let progress = 2; progress <= 30; progress++) {
+      clock += 6_000;
+      pending.push(hook.updateProgress(progress));
+    }
+    // A slow backend leaves exactly one request active, not 29 queued POSTs.
+    await settle();
+    assert.equal(calls.length, 1);
+    calls[0].resolve({ progress_updated: true, xp_earned: 0, new_achievements: [] });
+    await Promise.all([first, ...pending]);
+    await settle();
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls.map(call => call.progress), [1, 30]);
+    const ending = hook.endSession();
+    calls[1].resolve({ progress_updated: true, xp_earned: 0, new_achievements: [] });
+    await settle();
+    assert.equal(calls.length, 3);
+    calls[2].resolve({ progress_updated: true, xp_earned: 0, new_achievements: [] });
+    await ending;
+    assert.equal(calls[2].progress, 30);
+  } finally {
+    Date.now = originalNow;
+    h.unmount();
+  }
+});
+
+test('Synergy service aborts stuck session network I/O within its finite budget', async () => {
+  const { synergyService } = loadTS('services/synergy.ts', {
+    '../utils/apiBase': { API_BASE: 'https://backend.test' },
+  });
+  const previousFetch = global.fetch;
+  const previousSet = global.setTimeout;
+  const previousClear = global.clearTimeout;
+  const previousError = console.error;
+  let timeoutHandler = null;
+  let timeoutCleared = false;
+  global.setTimeout = callback => { timeoutHandler = callback; return 456; };
+  global.clearTimeout = () => { timeoutCleared = true; };
+  global.fetch = (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(new Error('abort requested')));
+  });
+  console.error = () => {};
+  try {
+    const job = synergyService.updateProgress('person', 'book', 20, 5);
+    assert.equal(typeof timeoutHandler, 'function');
+    timeoutHandler();
+    const result = await job;
+    assert.equal(result.progress_updated, false);
+    assert.equal(timeoutCleared, true);
+  } finally {
+    global.fetch = previousFetch;
+    global.setTimeout = previousSet;
+    global.clearTimeout = previousClear;
+    console.error = previousError;
+  }
+});
