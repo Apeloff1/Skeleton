@@ -43,6 +43,6 @@ flowchart TB
 | API | `ApiErrorBoundary` and `skeleton.api.errors` | `create_app`. |
 | Projects | `skeleton.contracts.projects` (`skeleton.projects.v1` at `1.1.0`) | `/api/v1/projects` inside `create_app`, behind `install_gate`. Resources match the #4097 `ProjectOut` and `BuildOut`. `POST /builds` starts a build and returns `execution_id`. |
 
-Cortex HTTP, including `/api/v1/secrets`, stays unmounted. `reject_cortex_secret_routes` walks nested routers and refuses startup if a secrets path is registered.
+Cortex HTTP, including `/api/v1/secrets`, stays unmounted. `reject_cortex_secret_routes` refuses startup if a secrets path is registered. Unwrapping FastAPI included routers is the Internal Systems guard fix, not this change.
 
 Provider SDKs are not imported from these components. Credential-bearing model calls stay in `skeleton/provider_runtime.py`.
