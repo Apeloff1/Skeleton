@@ -70,6 +70,24 @@ jobs:
         env:
           NODE_PATH: ${{ runner.temp }}/stability-typescript/node_modules
         run: node --test scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs scripts/test-offline-cache-integrity.cjs scripts/test-memory-pressure-runtime.cjs scripts/test-operation-stream-endurance.cjs scripts/test-persistent-preferences-endurance.cjs scripts/test-build-observer-endurance.cjs scripts/test-timer-resume-endurance.cjs scripts/test-connectivity-probe.cjs scripts/test-native-mirror-memory.cjs scripts/test-month-cycle-ledger.cjs scripts/test-month-cycle-recovery.cjs scripts/test-month-cycle-integration.cjs scripts/test-month-cycle-foreground.cjs
+      - name: Execute app-foundation regressions
+        if: steps.frontend.outputs.run == 'true'
+        working-directory: frontend
+        shell: bash
+        env:
+          NODE_PATH: ${{ runner.temp }}/stability-typescript/node_modules
+        run: |
+          shopt -s nullglob
+          tests=(scripts/app-foundation/*.test.cjs)
+          if [ ! -d scripts/app-foundation ]; then
+            echo '::notice::frontend/scripts/app-foundation not present on this ref; app-foundation regressions skipped'
+            exit 0
+          fi
+          if [ ${#tests[@]} -eq 0 ]; then
+            echo '::error::frontend/scripts/app-foundation exists but contains no *.test.cjs files'
+            exit 1
+          fi
+          node --test "${tests[@]}"
       - name: Record fast-gate policy
         run: |
           echo '## Fast Merge Readiness' >> "$GITHUB_STEP_SUMMARY"

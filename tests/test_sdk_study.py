@@ -134,6 +134,20 @@ def test_nonconsole_sdk_requires_explicit_kind(tmp_path):
         validate_sources(path)
 
 
+def test_private_key_documents_still_rejected(tmp_path):
+    # Built by concatenation so the repository secret scanner does not flag
+    # this fixture; the bytes written are the real PEM private-key header.
+    marker = "-----BEGIN " + "PRIVATE KEY-----"
+    path, _, sdk = _sources(tmp_path)
+    raw = ("Original notes\n" + marker + "\nnot-a-real-key\n").encode("utf-8")
+    (sdk / "README.md").write_bytes(raw)
+    source = json.loads(path.read_text())
+    source["sdks"][0]["documents"][0]["sha256"] = sha256(raw).hexdigest()
+    _write(path, source)
+    with pytest.raises(SDKStudyError, match="prohibited secret"):
+        validate_sources(path)
+
+
 def test_symlink_and_traversal_blocked(tmp_path):
     path, _, sdk = _sources(tmp_path)
     (sdk / "link.md").symlink_to(sdk / "README.md")

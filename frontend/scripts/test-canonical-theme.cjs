@@ -1,4 +1,5 @@
 'use strict';
+/* global __dirname */
 /** Execute token/skin source without a live React Native runtime. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -32,7 +33,9 @@ function transpile(relative, imports = {}) {
 }
 
 const tokens = transpile('theme/tokens.ts');
-const skins = transpile('theme/skins.ts');
+const skins = transpile('theme/skins.ts', { './tokens': tokens });
+// Bindings on the default theme object are not duplicated as named exports.
+const T = tokens.default;
 const roles = transpile('constants/themes.ts', { '../theme/tokens': tokens });
 
 function luminance(hex) {
@@ -50,13 +53,13 @@ function contrast(a, b) {
 }
 
 test('canonical tokens contain correct cyan, roles and legible brand text', () => {
-  assert.equal(tokens.palette.cyan[400], '#22D3EE');
-  assert.equal(tokens.palette.blue[400], '#3B82F6');
-  assert.equal(tokens.colors.dark.accentCyan, '#22D3EE');
-  assert.equal(tokens.typography.metric.fontSize, 24);
-  assert.equal(tokens.typography.label.fontSize, 12);
-  assert.ok(contrast(tokens.colors.dark.onPrimary, tokens.colors.dark.primary) >= 4.5);
-  assert.ok(contrast(tokens.colors.light.onPrimary, tokens.colors.light.primary) >= 4.5);
+  assert.equal(T.palette.cyan[400], '#22D3EE');
+  assert.equal(T.palette.blue[400], '#3B82F6');
+  assert.equal(T.colorModes.dark.accentCyan, '#22D3EE');
+  assert.equal(T.typography.metric.fontSize, 24);
+  assert.equal(T.typography.label.fontSize, 12);
+  assert.ok(contrast(T.colorModes.dark.onPrimary, T.colorModes.dark.primary) >= 4.5);
+  assert.ok(contrast(T.colorModes.light.onPrimary, T.colorModes.light.primary) >= 4.5);
 });
 
 test('30 skins have RGBA soft fill and contrast-aware primary foreground', () => {
@@ -78,16 +81,16 @@ test('30 skins have RGBA soft fill and contrast-aware primary foreground', () =>
 });
 
 test('legacy light and dark roles read canonical and active skin values', () => {
-  assert.equal(roles.themes.light.background, tokens.colors.light.bg);
-  assert.equal(roles.themes.light.primary, tokens.colors.light.primary);
-  assert.equal(roles.themes.dark.background, tokens.colors.dark.bg);
+  assert.equal(roles.themes.light.background, T.colorModes.light.bg);
+  assert.equal(roles.themes.light.primary, T.colorModes.light.primary);
+  assert.equal(roles.themes.dark.background, T.colorModes.dark.bg);
   const skin = skins.SKIN_BY_ID.hyperwave;
   Object.assign(tokens.default.colors, skin.colors);
   assert.equal(roles.themes.dark.primary, skin.colors.primary);
   assert.equal(roles.darkTheme.primary, skin.colors.primary);
   assert.equal(roles.themes.dark.background, skin.colors.bg);
   assert.equal(roles.themes.dark.accent, skin.colors.accentCyan);
-  assert.equal(roles.themes.light.primary, tokens.colors.light.primary);
+  assert.equal(roles.themes.light.primary, T.colorModes.light.primary);
 });
 
 test('Deluxe cards and Forge status colors follow skin transitions without stale captures', () => {
