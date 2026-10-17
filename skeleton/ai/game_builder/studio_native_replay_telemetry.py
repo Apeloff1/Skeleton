@@ -43,10 +43,86 @@ def make_checkpoint(index: int, state: dict) -> dict:
     return {"action": index, "state": {key: state[key] for key in FIELDS}}
 
 
+def reference_cpu_checkpoints(engine_source: str | "Path") -> dict:
+    """Rebuild actual signed Python world and independently replay all actions.
+
+    This never guesses world geometry from graphics or trusts a browser-saved
+    final state. The original seed/intent, regenerated world digest, embedded
+    level maps and each canonical Python game transition must agree.
+    """
+    from pathlib import Path
+    import json
+    from .studio_runtime_qualification import _inputs
+    from .studio_pixel_parity import _game_json
+    from .playable_world import GameBuildIntent, generate_playable_world
+    from .playable_simulation import initial_state, advance
+
+    html, proof, identity = _inputs(Path(engine_source))
+    game = _game_json(html.decode("utf-8"))
+    data = json.loads(proof)
+    try:
+        intent = GameBuildIntent(**game["intent"])
+        world = generate_playable_world(intent, authorized=True)
+        levels = [
+            {
+                "width": level.width, "height": level.height,
+                "rows": list(level.rows), "start": list(level.start),
+                "exit": list(level.exit),
+                "collectibles": [list(position) for position in level.collectibles],
+            }
+            for level in world.levels
+        ]
+    except (ValueError, TypeError, KeyError, PermissionError) as exc:
+        raise NativeCheckpointError("original source world cannot regenerate") from exc
+    if (world.digest != identity or game.get("world_digest") != identity
+            or game.get("levels") != levels
+            or data.get("world_digest") != identity):
+        raise NativeCheckpointError("authored world and generated game sources diverged")
+    actions = data.get("actions")
+    if (type(actions) is not list or not actions
+            or len(actions) > 20_000 or
+            any(action not in ("up", "down", "left", "right") for action in actions)):
+        raise NativeCheckpointError("original controller trace is not a bounded action list")
+    indices = set(selected_checkpoints(len(actions)))
+    state = initial_state(world, authorized=True)
+    expected = []
+    for index, action in enumerate(actions, 1):
+        state = advance(world, state, action, authorized=True)
+        if index not in indices:
+            continue
+        score = state.score
+        if not 0 <= score <= 65535:
+            raise NativeCheckpointError("game score exceeds two-byte cartridge capability")
+        expected.append(make_checkpoint(index, {
+            "Level": state.level_index + (1 if state.status == "won" else 0),
+            "PlayerX": state.x, "PlayerY": state.y, "Health": state.health,
+            "Score": score & 0xFF, "ScoreHigh": score >> 8,
+            "GemsRemaining": (len(world.levels[state.level_index].collectibles)
+                               - len(state.collected)),
+            "GameWon": int(state.status == "won"),
+            "GameLost": int(state.status == "lost"),
+        }))
+    final = data.get("final_state")
+    if (type(final) is not dict or state.status != "won"
+            or final.get("status") != state.status
+            or final.get("level_index") != state.level_index
+            or final.get("x") != state.x or final.get("y") != state.y
+            or final.get("health") != state.health
+            or final.get("score") != state.score
+            or final.get("steps") != state.steps):
+        raise NativeCheckpointError("Python canonical replay does not match signed game proof")
+    return {
+        "world_digest": identity,
+        "proof_sha256": __import__("hashlib").sha256(proof).hexdigest(),
+        "action_count": len(actions),
+        "samples": expected,
+    }
+
+
 def validate_checkpoints(
     samples: list[dict] | tuple[dict, ...], *,
     actions: int, source_world: str, source_proof: str,
-    expected_final: dict,
+    expected_final: dict, expected_samples: list[dict] | None = None,
 ) -> dict:
     selected = selected_checkpoints(actions)
     hexdigits = frozenset("0123456789abcdef")
@@ -63,6 +139,12 @@ def validate_checkpoints(
     rows = [make_checkpoint(row["action"], row["state"]) for row in samples]
     if tuple(row["action"] for row in rows) != selected:
         raise NativeCheckpointError("missing, duplicated or reordered CPU samples")
+    if expected_samples is not None:
+        if (type(expected_samples) is not list
+                or len(expected_samples) != len(rows)
+                or any(make_checkpoint(check["action"], check["state"]) != actual
+                       for check, actual in zip(expected_samples, rows))):
+            raise NativeCheckpointError("emulator CPU state diverged from real Python action replay")
     prev = None
     for row in rows:
         state = row["state"]
@@ -128,5 +210,6 @@ def parse_nes_samples(raw: bytes, actions: int) -> list[dict]:
 
 __all__ = [
     "NativeCheckpointError", "SCHEMA", "FIELDS", "selected_checkpoints",
-    "make_checkpoint", "validate_checkpoints", "parse_nes_samples",
+    "make_checkpoint", "reference_cpu_checkpoints",
+    "validate_checkpoints", "parse_nes_samples",
 ]
