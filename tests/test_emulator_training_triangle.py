@@ -522,5 +522,5 @@ def test_real_canonical_semantic_router_does_not_claim_new_training_weights():
     one = route_episode_semantic_lenses(episode, max_lenses=1)
     assert one["actually_routed_lenses"] == 1
     assert one["routes"][0]["new_independent_evidence"] == 0
-    with pytest.raises(TriangleSemanticError, match="1..43"):
-        route_episode_semantic_lenses(episode, max_lenses=44)
+    with pytest.raises(TriangleSemanticError, match="1..200"):
+        route_episode_semantic_lenses(episode, max_lenses=201)

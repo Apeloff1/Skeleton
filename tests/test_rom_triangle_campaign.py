@@ -296,7 +296,7 @@ def test_strict_43_key_operator_manifest(tmp_path):
         "schema_version": "skeleton.jeeves.semantic_lens_set.v1",
         "lens_keys": keys[:-1] + [keys[0]],
     }), encoding="utf-8")
-    with pytest.raises(RomStudyError, match="43 distinct"):
+    with pytest.raises(RomStudyError, match="43 or 200"):
         load_operator_semantic_lens_set(source)
 
 
