@@ -1,0 +1,170 @@
+name: App Foundation E2E
+
+# Brings up the canonical docker-compose stack (mongo + skeleton + backend +
+# production frontend), runs the #4098 Tier 2 live flow against the backend,
+# then drives the exported web app with headless Playwright (chromium).
+# Uses ephemeral credentials generated per run (no repository secrets), no
+# paid services. Not a required check.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "skeleton/**"
+      - "Dockerfile"
+      - "Dockerfile.dockerignore"
+      - "docker-compose.yml"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "tests/e2e/**"
+      - ".github/workflows/app-foundation-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "skeleton/**"
+      - "Dockerfile"
+      - "Dockerfile.dockerignore"
+      - "docker-compose.yml"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "tests/e2e/**"
+      - ".github/workflows/app-foundation-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-foundation-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stack-e2e:
+    name: App Foundation E2E (stack + Playwright)
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      COMPOSE_PROJECT_NAME: skeleton-e2e
+      BACKEND_PORT: "8001"
+      SKELETON_PORT: "8010"
+      FRONTEND_PORT: "3000"
+      FRONTEND_BUILD_TARGET: production
+      FRONTEND_CONTAINER_PORT: "8080"
+      ENVIRONMENT: development
+      GAMEFORGE_AUTH_ENFORCE: "true"
+      SKIP_HEAVY_SEED: "true"
+      CURIOSITY_IDLE_ENABLED: "false"
+      MONGO_INITDB_ROOT_USERNAME: admin
+      SKELETON_E2E_BASE_URL: http://127.0.0.1:8001
+      SKELETON_E2E_WEB_URL: http://localhost:3000
+      PLAYWRIGHT_VERSION: "1.56.1"
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Generate ephemeral stack credentials
+        run: |
+          set -euo pipefail
+          gen() { openssl rand -hex 32; }
+          mongo_pw="$(gen)"
+          for name in JWT_SECRET GAMEFORGE_JWT_SECRET GF_SEAL_SECRET GF_KEYHOLDER_SEED SKELETON_MASTER_SECRET SKL_ENGINE_SERVICE_TOKEN; do
+            value="$(gen)"
+            echo "::add-mask::${value}"
+            echo "${name}=${value}" >> "$GITHUB_ENV"
+          done
+          echo "::add-mask::${mongo_pw}"
+          {
+            echo "MONGO_INITDB_ROOT_PASSWORD=${mongo_pw}"
+            echo "MONGO_URL=mongodb://admin:${mongo_pw}@mongo:27017/tutolage?authSource=admin"
+            echo "SKL_MONGO_URI=mongodb://admin:${mongo_pw}@mongo:27017/skeleton?authSource=admin"
+          } >> "$GITHUB_ENV"
+
+      - name: Validate compose configuration
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Build stack images
+        timeout-minutes: 30
+        run: docker compose -f docker-compose.yml build skeleton backend frontend
+
+      - name: Start stack
+        run: docker compose -f docker-compose.yml up -d mongo skeleton backend frontend
+
+      - name: Wait for backend /api/health and frontend /healthz
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          wait_for() {
+            local url="$1" label="$2"
+            for _ in $(seq 1 180); do
+              if curl --fail --silent --show-error --max-time 5 "$url" >/dev/null 2>&1; then
+                echo "$label ready: $url"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "::error::$label did not become healthy at $url"
+            return 1
+          }
+          wait_for "${SKELETON_E2E_BASE_URL}/api/health" backend
+          wait_for "${SKELETON_E2E_WEB_URL}/healthz" frontend
+          docker compose -f docker-compose.yml ps
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Tier 2 live app-foundation flow (#4098)
+        timeout-minutes: 15
+        working-directory: frontend
+        env:
+          SKELETON_E2E_MAX_CHECKS: "150"
+        run: |
+          set -euo pipefail
+          suite=scripts/test-app-foundation-flows.mjs
+          if [ ! -f "$suite" ]; then
+            echo "::notice::$suite is not on this ref yet (lands with #4098); Tier 2 skipped."
+            exit 0
+          fi
+          node --test --test-reporter=spec "$suite"
+
+      - name: Install Playwright (isolated, no lockfile changes)
+        working-directory: tests/e2e
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts "@playwright/test@${PLAYWRIGHT_VERSION}"
+          npx --no-install playwright install --with-deps chromium
+
+      - name: Playwright browser cases
+        timeout-minutes: 15
+        working-directory: tests/e2e
+        run: npx --no-install playwright test --config playwright.config.mjs
+
+      - name: Upload Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-foundation-e2e-playwright
+          path: |
+            tests/e2e/playwright-report/
+            tests/e2e/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml ps || true
+          docker compose -f docker-compose.yml logs --no-color --tail=400 skeleton backend frontend mongo || true
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose -f docker-compose.yml down -v --remove-orphans || true
