@@ -78,6 +78,7 @@ export interface OperationBrowserSessionOptions {
   consumerId: string;
   replayLimit?: number;
   pollMs?: number;
+  maxPollMs?: number;
   maxResyncAttempts?: number;
   initialState?: OperationClientState;
   onState?: (state: OperationClientState) => void;
@@ -152,10 +153,13 @@ export class OperationBrowserSession {
   readonly cursorStore: OperationSessionCursorStore;
   readonly replayLimit: number;
   readonly pollMs: number;
+  readonly maxPollMs: number;
   readonly maxResyncAttempts: number;
   readonly onState?: (state: OperationClientState) => void;
 
   private current: OperationClientState | null;
+  private epoch = 0;
+  private pendingReplay: Promise<OperationClientState> | null = null;
 
   constructor(
     operationId: string,
@@ -174,6 +178,9 @@ export class OperationBrowserSession {
     this.cursorStore = cursorStore;
     this.replayLimit = boundedInteger(options.replayLimit, 64, 1, 512);
     this.pollMs = boundedInteger(options.pollMs, 750, 100, 60_000);
+    this.maxPollMs = Math.max(
+      this.pollMs, boundedInteger(options.maxPollMs, 10_000, 100, 60_000),
+    );
     this.maxResyncAttempts = boundedInteger(
       options.maxResyncAttempts,
       2,
@@ -197,7 +204,8 @@ export class OperationBrowserSession {
 
   private publish(state: OperationClientState): OperationClientState {
     this.current = state;
-    this.onState?.(state);
+    // Observers are optional UI projections, never operation authorities.
+    try { this.onState?.(state); } catch { /* isolate consumer */ }
     return state;
   }
 
@@ -218,8 +226,21 @@ export class OperationBrowserSession {
     );
   }
 
-  async replayOnce(signal?: AbortSignal): Promise<OperationClientState> {
+  replayOnce(signal?: AbortSignal): Promise<OperationClientState> {
+    if (this.pendingReplay) return this.pendingReplay;
+    const generation = this.epoch;
+    const work = this.performReplayOnce(signal, generation);
+    this.pendingReplay = work;
+    const release = () => {
+      if (this.pendingReplay === work) this.pendingReplay = null;
+    };
+    void work.then(release, release);
+    return work;
+  }
+
+  private async performReplayOnce(signal: AbortSignal | undefined, generation: number): Promise<OperationClientState> {
     let state = await this.baseState();
+    if (generation !== this.epoch) return this.current ?? state;
     if (signal?.aborted) {
       return this.publish({
         ...state,
@@ -228,13 +249,20 @@ export class OperationBrowserSession {
       });
     }
 
-    const response = await this.transport.replay(
-      this.operationId,
-      this.consumerId,
-      state.lastSequence,
-      this.replayLimit,
-      signal,
-    );
+    let response: Awaited<ReturnType<OperationSessionTransport['replay']>>;
+    try {
+      response = await this.transport.replay(
+        this.operationId, this.consumerId, state.lastSequence,
+        this.replayLimit, signal,
+      );
+    } catch {
+      if (generation !== this.epoch) return this.current ?? state;
+      return this.publish({
+        ...state, connection: signal?.aborted ? 'idle' : 'error',
+        error: signal?.aborted ? 'aborted' : 'replay_transport_unavailable',
+      });
+    }
+    if (generation !== this.epoch) return this.current ?? state;
 
     if (!response.ok) {
       if (response.replayGap) {
@@ -261,11 +289,13 @@ export class OperationBrowserSession {
 
     if (next.lastSequence !== state.lastSequence) {
       try {
+        if (generation !== this.epoch || signal?.aborted) return this.current ?? state;
         await this.cursorStore.save(
           this.operationId,
           this.consumerId,
           next.lastSequence,
         );
+        if (generation !== this.epoch) return this.current ?? state;
       } catch {
         return this.publish({
           ...next,
@@ -275,12 +305,19 @@ export class OperationBrowserSession {
       }
     }
 
-    const ack = await this.transport.acknowledge(
-      this.operationId,
-      this.consumerId,
-      next.lastSequence,
-      signal,
-    );
+    let ack: Awaited<ReturnType<OperationSessionTransport['acknowledge']>>;
+    try {
+      ack = await this.transport.acknowledge(
+        this.operationId, this.consumerId, next.lastSequence, signal,
+      );
+    } catch {
+      if (generation !== this.epoch) return this.current ?? state;
+      return this.publish({
+        ...next, connection: signal?.aborted ? 'idle' : 'error',
+        error: signal?.aborted ? 'aborted' : 'cursor_ack_unavailable',
+      });
+    }
+    if (generation !== this.epoch) return this.current ?? state;
     if (!ack.ok) {
       if (signal?.aborted || ack.error === 'aborted') {
         return this.publish({
@@ -318,11 +355,17 @@ export class OperationBrowserSession {
         });
       }
 
-      const snapshot = await this.transport.resync(
-        this.operationId,
-        this.consumerId,
-        signal,
-      );
+      let snapshot: OperationSessionResyncSnapshot | null = null;
+      try {
+        snapshot = await this.transport.resync(
+          this.operationId, this.consumerId, signal,
+        );
+      } catch {
+        return this.publish({
+          ...last, connection: signal?.aborted ? 'idle' : 'error',
+          error: signal?.aborted ? 'aborted' : 'authoritative_resync_unavailable',
+        });
+      }
       if (!validResyncSnapshot(this.operationId, snapshot)) {
         return this.publish({
           ...last,
@@ -389,6 +432,7 @@ export class OperationBrowserSession {
   async follow(signal?: AbortSignal): Promise<OperationClientState> {
     let state = await this.baseState();
     let resyncAttempts = 0;
+    let idleRounds = 0;
     this.publish(state);
 
     while (!state.terminal && !signal?.aborted) {
@@ -419,11 +463,16 @@ export class OperationBrowserSession {
       }
 
       if (state.lastSequence === before) {
+        // An idle multi-hour operation should not issue the same status
+        // request every 750ms for its entire lifetime. New events immediately
+        // reset the backoff so progress remains responsive.
+        idleRounds = Math.min(10, idleRounds + 1);
+        const delay = Math.min(this.maxPollMs, this.pollMs * (2 ** Math.min(6, idleRounds - 1)));
         try {
-          await wait(this.pollMs, signal);
-        } catch {
-          break;
-        }
+          await wait(delay, signal);
+        } catch { break; }
+      } else {
+        idleRounds = 0;
       }
     }
 
@@ -431,10 +480,13 @@ export class OperationBrowserSession {
   }
 
   async cancel(signal?: AbortSignal): Promise<OperationSessionCancelResult> {
-    return this.transport.cancel(this.operationId, signal);
+    try { return await this.transport.cancel(this.operationId, signal); }
+    catch { return { ok: false, error: signal?.aborted ? 'aborted' : 'cancel_transport_unavailable' }; }
   }
 
   async clearCursor(): Promise<void> {
+    this.epoch++;
+    this.pendingReplay = null;
     await this.cursorStore.clear(this.operationId, this.consumerId);
     this.current = createOperationClientState(this.operationId);
     this.publish(this.current);
