@@ -180,6 +180,22 @@ def _verify_source(project: Path, target: str) -> tuple[dict[str, bytes], str]:
     if canonical_digest({k: v for k, v in attestation.items()
                          if k != "attestation_digest"}) != attestation.get("attestation_digest"):
         raise NativeBuildQualificationError("original source attestation receipt corrupted")
+    # Rich studio sources must prove that actual sprites and APU data in
+    # emitted assembly match the independently authored media, even when this
+    # compiler adapter is invoked directly outside the campaign runner.
+    if (target in ("nintendo_game_boy", "nintendo_game_boy_color",
+                   "nintendo_famicom")
+            and (manifest.get("native_hero_animation_digest") is not None
+                 or manifest.get("native_psg_score_digest") is not None)):
+        from .studio_native_source_media_parity import (
+            NativeMediaSourceError, inspect_native_source_media,
+        )
+        try:
+            inspect_native_source_media(project, target=target)
+        except NativeMediaSourceError as exc:
+            raise NativeBuildQualificationError(
+                "native source media is inconsistent with original gameplay assets"
+            ) from exc
     source_digest = canonical_digest({
         "target": target,
         "sources": {name: sha256(data).hexdigest() for name, data in sorted(files.items())},
