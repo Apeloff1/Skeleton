@@ -16,7 +16,7 @@ from skeleton.ai.game_builder.studio_execution_campaign import (
 )
 from skeleton.ai.game_builder.studio_execution_history import (
     StudioQualificationHistoryError, record_execution_run,
-    inspect_execution_history,
+    inspect_execution_history, validate_stage_evidence,
 )
 
 
@@ -134,6 +134,43 @@ class EnduranceProductionHistoryTests(unittest.TestCase):
             record_execution_run(
                 self.order, self.campaign, forged, authorized=True,
             )
+
+    def test_even_rehashed_fake_success_cannot_claim_independent_stage_evidence(self):
+        actual = self.source_attempt(limit=2)
+        from skeleton.ai.game_builder.studio_campaign_assurance import (
+            inspect_production_assurance,
+        )
+        assurance = inspect_production_assurance(self.order, self.campaign)
+        validate_stage_evidence(actual["events"], assurance)
+        for mutation in ("false_source_hash", "unsupported_rom_success", "fake_browser_success"):
+            with self.subTest(mutation=mutation):
+                forged = dict(actual)
+                events = [dict(event) for event in actual["events"]]
+                if mutation == "false_source_hash":
+                    events[0]["source_receipt_digest"] = "f" * 64
+                elif mutation == "unsupported_rom_success":
+                    events.append({
+                        "target": self.order.targets[0], "stage": "rom",
+                        "status": "verified", "blocker": None,
+                        "evidence_digest": "a" * 64,
+                    })
+                else:
+                    events.append({
+                        "target": self.order.targets[0], "stage": "browser",
+                        "status": "verified", "blocker": None,
+                        "evidence_digest": "b" * 64,
+                    })
+                forged["events"] = events
+                forged["total_stage_attempts"] = len(events)
+                forged["verified_stage_attempts"] = len(events)
+                forged["run_digest"] = canonical_digest({
+                    key: value for key, value in forged.items()
+                    if key != "run_digest"
+                })
+                with self.assertRaises(StudioQualificationHistoryError):
+                    record_execution_run(
+                        self.order, self.campaign, forged, authorized=True,
+                    )
 
     def test_hash_chain_rejects_modified_events_and_unauthorized_appends(self):
         attempt = self.source_attempt(limit=2)
