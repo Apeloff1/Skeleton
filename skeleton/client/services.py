@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Mapping
+from urllib.parse import quote
 
 from skeleton.client.gateway import GatewayClient
 
@@ -19,7 +20,7 @@ class ServicesClient:
     def execute(self, command: str, body: Mapping[str, Any] | None = None) -> Any:
         return self._gw._json(
             "POST",
-            f"/api/v1/commands/execute/{command}",
+            f"/api/v1/commands/execute/{quote(command, safe='')}",
             json=dict(body or {}),
         )
 
