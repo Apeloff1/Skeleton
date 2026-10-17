@@ -303,3 +303,43 @@ test('a fetch shim that ignores AbortSignal cannot prevent clear from settling',
     assert.equal(called, 2);
   } finally { global.fetch = oldFetch; }
 });
+
+test('cache clear fails closed if an unresponsive native write cannot drain', async () => {
+  const { storage, map } = makeStorage();
+  map.set('@tutolage_cache_version', '2026-SOTA-v2');
+  map.set('@tutolage_manifest', JSON.stringify(manifest({ books: 1 })));
+  map.set('@tutolage_offline_books_meta',
+    JSON.stringify({ total: 1, chunks: 1, cachedAt: new Date().toISOString() }));
+  map.set('@tutolage_offline_books_0', JSON.stringify([{ id: 'saved' }]));
+  const originalSet = storage.setItem;
+  let storageBlocked = false;
+  storage.setItem = (key, value) => {
+    if (key.endsWith('/books_0')) {
+      storageBlocked = true;
+      return new Promise(() => {}); // native promise never acknowledges
+    }
+    return originalSet(key, value);
+  };
+  const app = service(storage);
+  const previousFetch = global.fetch;
+  const previousTimer = global.setTimeout;
+  const previousClear = global.clearTimeout;
+  global.fetch = mockNetwork(manifest({ books: 1 })).fetcher;
+  try {
+    app.syncAllOfflineData();
+    for (let i = 0; i < 20 && !storageBlocked; i++) await settle();
+    assert.equal(storageBlocked, true);
+    global.setTimeout = (fn, ms) => {
+      if (ms === 5000) queueMicrotask(fn);
+      return 1;
+    };
+    global.clearTimeout = () => {};
+    await assert.rejects(app.clearOfflineCache(), /still draining/);
+    assert.equal(await app.isCacheValid(), true, 'prior committed cache survives');
+    assert.deepEqual(await app.getCachedCollection('books'), [{ id: 'saved' }]);
+  } finally {
+    global.fetch = previousFetch;
+    global.setTimeout = previousTimer;
+    global.clearTimeout = previousClear;
+  }
+});
