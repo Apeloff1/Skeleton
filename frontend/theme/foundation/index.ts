@@ -16,7 +16,7 @@
  *  same (mode, skin, options) returns the same object reference.
  */
 import type { TextStyle, ViewStyle } from 'react-native';
-import { gradients } from '../tokens';
+import tokens from '../tokens';
 import {
   LEGACY_CYAN_BLUE, ramps, roles, STATUS_GLYPH, statusRoles, TEXT_USAGE, TRUE_CYAN,
   type ColorMode, type ColorRoles, type StatusKey, type StatusRole,
@@ -29,6 +29,8 @@ import { ICON_SQUARE_RADIUS, legacyRadius, radius } from './radius';
 import { DEFAULT_SKIN, ON_PRIMARY_BY_SKIN, SKIN_IDS, isSkinId, skinOverrides } from './skins';
 import { breathing, hitSlop, hudSafeZone, spacing, touch } from './spacing';
 import { fontFamily, hudType, LARGE_TEXT, typeScale, TYPE_ROLES, type TypeRole } from './typography';
+
+const { gradients } = tokens;
 
 export * from './color';
 export * from './contrast';
@@ -154,4 +156,3 @@ export function getTheme(mode: ThemeMode, skinId?: string | null, options: GetTh
   return resolved;
 }
 
-export default foundation;
