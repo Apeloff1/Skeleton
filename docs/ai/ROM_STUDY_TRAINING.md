@@ -221,4 +221,3 @@ stay in the original native sample corpus, and heldout data stays excluded.
 Corrupted/mismatched triangles invalidate previously saved real lab receipts,
 rather than letting a fabricated review certify training or promotion.
 This mechanism does not update the production Jeeves language model.
-
