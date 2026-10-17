@@ -150,6 +150,18 @@ def verify_annual_snapshot(folder: Path, label: str) -> dict[str, Any]:
         raise AnnualBackupError("invalid backup identity")
     db_file = folder / (label + ".db")
     manifest_file = folder / (label + ".json")
+    # An offline, sealed SQLite image MUST NOT have WAL/SHM/journal sidecars.
+    # immutable=1 ignores a WAL; silently accepting one would allow a changed
+    # logical database to pass verification against the old main-file bytes.
+    if any(
+        sidecar.exists() or sidecar.is_symlink()
+        for sidecar in (
+            folder / (label + ".db-wal"),
+            folder / (label + ".db-shm"),
+            folder / (label + ".db-journal"),
+        )
+    ):
+        raise AnnualBackupError("offline snapshot has unsealed SQLite sidecars")
     if manifest_file.is_symlink() or not manifest_file.is_file():
         raise AnnualBackupError("backup manifest is missing or unsafe")
     if manifest_file.stat().st_size > 8192:
