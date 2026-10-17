@@ -172,3 +172,28 @@ def test_bad_flags_and_corrupt_event_types_cannot_bypass_validation(tmp_path):
     corrupt["digest"] = production._digest({k: v for k, v in corrupt.items() if k != "digest"})
     event_path.write_text(json.dumps(corrupt))
     assert not cli(root, "dragon-observe-status")["ok"]
+
+
+def test_operator_trace_and_quality_coverage_do_not_claim_game_completion(tmp_path):
+    root = workspace(tmp_path)
+    assert cli(root, "dragon-observe-start", "--consent")["ok"]
+    cli(root, "production-status")
+    assert cli(root, "dragon-observe-action", "--actor", "dragon",
+               "--phase", "learning", "--event", "study",
+               "--outcome", "in_progress", "--evidence", "c" * 64)["ok"]
+    trace = cli(root, "dragon-observe-trace", "--page-size", "1")
+    assert trace["total"] == 2 and len(trace["items"]) == 1
+    assert trace["next_page"] == 1
+    assert trace["raw_prompts_or_media_included"] is False
+    assert cli(root, "dragon-observe-trace", "--page", "1",
+               "--page-size", "1")["items"][0]["actor"] == "dragon"
+    filtered = cli(root, "dragon-observe-trace", "--actor", "jeeves")
+    assert filtered["total"] == 0
+    assert not cli(root, "dragon-observe-trace", "--phase", "unknown")["ok"]
+    cover = cli(root, "dragon-observe-coverage")
+    assert cover["required_gates"] == len(production.REQUIRED_GATES)
+    assert cover["remaining_gates"] == len(production.REQUIRED_GATES)
+    assert cover["qualified_gates"] == 0
+    assert "full_playthrough" in cover["unimplemented_independent_evaluators"]
+    assert cover["project_complete"] is False
+    assert cover["automatic_pass_or_release"] is False
