@@ -14,7 +14,7 @@
  */
 import { Platform, TextStyle, ViewStyle } from 'react-native';
 
-export const palette = {
+const palette = {
   ink: {
     0: '#FFFFFF',
     50: '#F8FAFC',
@@ -52,7 +52,7 @@ export const palette = {
   info: { 400: '#60A5FA', 500: '#3B82F6', 600: '#2563EB' },
 } as const;
 
-export const colors = {
+const colors = {
   dark: {
     bg: palette.ink[950],
     bgElevated: palette.ink[900],
@@ -125,6 +125,39 @@ export const colors = {
 
 export type Theme = typeof colors.dark;
 
+/**
+ * Immutable canonical role sets. src/utils/skinStore.ts mutates `theme.colors`
+ * (the same object as `colors.dark`) when a skin is applied; this snapshot is
+ * taken at module evaluation, before any skin, so consumers that need the
+ * canonical kit (theme/foundation getTheme) never see a skin leak.
+ */
+export const canonicalColors = {
+  dark: Object.freeze({ ...colors.dark }),
+  light: Object.freeze({ ...colors.light }),
+} as const;
+
+/**
+ * Text-usage rules per role (docs/UI_ART_KIT.md §2.5 "Rules from the table"):
+ * body = may carry body text (>= 4.5:1 on bg); large = large text / icons /
+ * dividers only (>= 3:1); never = must never carry information.
+ */
+export const textUsage = {
+  dark: { text: 'body', textMuted: 'body', textDim: 'large', textDisabled: 'never', primaryText: 'body', success: 'body', warning: 'body', danger: 'body', info: 'body', accentPink: 'body' },
+  light: { text: 'body', textMuted: 'body', textDim: 'body', textDisabled: 'never', primaryText: 'body', success: 'large', warning: 'large', danger: 'body', accentGold: 'never' },
+} as const;
+
+/**
+ * HUD status pairing: colour + glyph + shape, never hue alone
+ * (docs/UI_ART_KIT.md §3.4, docs/UI_ART_HUD_SEMANTIC.md §2). ok/warn/bad/idle
+ * are the Forge cockpit TONE_GLYPH set; info adds `i`.
+ */
+export const status = {
+  glyph: { ok: '✓', warn: '!', bad: '✕', info: 'i', idle: '○' },
+  shape: { ok: 'solid', warn: 'triangle-dashed', bad: 'diamond', info: 'circle-outline', idle: 'hollow' },
+  opacity: { ok: 1, warn: 1, bad: 1, info: 1, idle: 0.5 },
+  meaning: { ok: 'good / friendly', warn: 'warning', bad: 'bad / hostile', info: 'info / neutral', idle: 'idle / unavailable' },
+} as const;
+
 const gradients = {
   aurora: ['#1E1B4B', '#312E81', '#1E1B4B'] as const,
   auroraVivid: ['#8B5CF6', '#3B82F6', '#EC4899'] as const,
@@ -140,12 +173,12 @@ const gradients = {
   glassStrong: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'] as const,
 } as const;
 
-export const spacing = { none: 0, xs: 4, sm: 8, md: 12, base: 16, lg: 20, xl: 24, '2xl': 32, '3xl': 40, '4xl': 56, '5xl': 72 } as const;
-export const radii = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 28, '3xl': 36, full: 9999, pill: 9999 } as const;
+const spacing = { none: 0, xs: 4, sm: 8, md: 12, base: 16, lg: 20, xl: 24, '2xl': 32, '3xl': 40, '4xl': 56, '5xl': 72 } as const;
+const radii = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 28, '3xl': 36, full: 9999, pill: 9999 } as const;
 
 const FONT_UI = Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }) as string;
 const FONT_MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string;
-export const typography = {
+const typography = {
   fontFamily: { ui: FONT_UI, mono: FONT_MONO },
   display: { fontFamily: FONT_UI, fontSize: 34, lineHeight: 40, fontWeight: '800', letterSpacing: -0.5 } as TextStyle,
   h1: { fontFamily: FONT_UI, fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.4 } as TextStyle,
@@ -186,9 +219,96 @@ const motion = {
   },
 } as const;
 
-export const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
+const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
 const hitSlop = { sm: { top: 6, left: 6, right: 6, bottom: 6 }, md: { top: 10, left: 10, right: 10, bottom: 10 }, lg: { top: 14, left: 14, right: 14, bottom: 14 } } as const;
 
-const theme = { colors: colors.dark, gradients, spacing, radii, typography, elevation, motion, hitSlop, breathing, palette } as const;
+/**
+ * HUD layout and timing rules (docs/UI_ART_KIT.md §3.1–3.5).
+ * Safe zones are fractions of the screen; durations reference `motion`.
+ */
+export const hud = {
+  safeZone: { titleSafe: 0.05, actionSafe: 0.025, thumbZone: 0.4, centreClear: 0.4 },
+  minMovingTextSize: 14,
+  motion: {
+    stateIn: motion.duration.fast,
+    stateOut: motion.duration.base,
+    press: motion.duration.micro,
+    pressScale: 0.97,
+    shimmer: motion.duration.slow,
+    ambientFade: motion.duration.slow * 10,
+    maxFlashesPerSecond: 3,
+    maxPulsingPerTier: 1,
+  },
+  glowMaxPerScreen: 1,
+} as const;
+
+/** Iconography grid, stroke and size table (docs/UI_ART_ICONOGRAPHY.md §1–5). */
+export const iconography = {
+  grid: {
+    artboard: 24, padding: 2, liveArea: 20,
+    keylines: { circle: 20, square: 18, portrait: { width: 16, height: 20 }, landscape: { width: 20, height: 16 } },
+    squareCornerRadius: 2, opticalShiftX: 0.5, viewBox: '0 0 24 24',
+  },
+  sizes: [16, 20, 24, 32, 48] as const,
+  spec: {
+    16: { stroke: 1.5, padding: 1, minTouch: null, use: 'inline with caption/body, table status' },
+    20: { stroke: 1.75, padding: 1.5, minTouch: 44, use: 'list rows, buttons with body label' },
+    24: { stroke: 2, padding: 2, minTouch: 44, use: 'default; tab bar, toolbar, HUD contextual' },
+    32: { stroke: 2.5, padding: 2.5, minTouch: 48, use: 'HUD critical, empty states' },
+    48: { stroke: 3, padding: 4, minTouch: null, use: 'feature tiles, onboarding, results' },
+  },
+  strokeStyle: { strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none', stroke: 'currentColor' },
+  domains: ['nav', 'hud', 'forge', 'status', 'action', 'social', 'store'] as const,
+} as const;
+
+/**
+ * 30 runtime skins (moved here from theme/skins.ts so this file is the single
+ * edit point). Row: id, name, emoji, bg, bgElevated, primary, primaryHover,
+ * accentCyan, accentPink, accentGold. theme/skins.ts derives bgSubtle,
+ * onPrimary, primarySoft and borderFocus from these rows.
+ */
+export const DEFAULT_SKIN_ID = 'hyperwave';
+export const skinPalettes = [
+  ['hyperwave', 'Hyperwave', '🌌', '#0b0820', '#15103a', '#c026d3', '#e879f9', '#3B82F6', '#f472b6', '#fbbf24'],
+  ['midnight', 'Midnight', '🌑', '#070910', '#10131f', '#3b82f6', '#60a5fa', '#60A5FA', '#818cf8', '#fcd34d'],
+  ['aurora', 'Aurora', '🌠', '#04130f', '#082018', '#10b981', '#34d399', '#3B82F6', '#a3e635', '#fde047'],
+  ['ember', 'Ember', '🔥', '#170a06', '#23110a', '#f97316', '#fb923c', '#fbbf24', '#f87171', '#fde68a'],
+  ['forest', 'Forest', '🌲', '#08120b', '#0e1d13', '#22c55e', '#4ade80', '#60A5FA', '#a3e635', '#facc15'],
+  ['mono', 'Mono', '⬜', '#0a0a0a', '#161616', '#d4d4d4', '#fafafa', '#a3a3a3', '#737373', '#e5e5e5'],
+  ['sakura', 'Sakura', '🌸', '#1a0d14', '#26121d', '#ec4899', '#f472b6', '#f9a8d4', '#c084fc', '#fbcfe8'],
+  ['oceanic', 'Oceanic', '🌊', '#04121a', '#072030', '#3B82F6', '#60A5FA', '#3B82F6', '#60A5FA', '#93C5FD'],
+  ['neon', 'Neon', '💚', '#060d06', '#0c180c', '#84cc16', '#a3e635', '#3B82F6', '#f0abfc', '#fde047'],
+  ['sunset', 'Sunset', '🌇', '#1a0a0f', '#27101a', '#fb7185', '#fda4af', '#fb923c', '#c084fc', '#fcd34d'],
+  ['glacier', 'Glacier', '🧊', '#080f17', '#0e1a26', '#93C5FD', '#BFDBFE', '#93C5FD', '#c4b5fd', '#DBEAFE'],
+  ['vapor', 'Vapor', '🪐', '#0f0a1a', '#1a1130', '#a78bfa', '#c4b5fd', '#3B82F6', '#f0abfc', '#fde68a'],
+  ['goldnoir', 'Gold Noir', '🪙', '#0c0a06', '#17130a', '#f5c451', '#fcd34d', '#d4a373', '#fbbf24', '#fde68a'],
+  ['matrix', 'Matrix', '🟩', '#020a04', '#06140a', '#22c55e', '#4ade80', '#16a34a', '#15803d', '#86efac'],
+  ['crimson', 'Crimson', '🩸', '#150407', '#23070c', '#ef4444', '#f87171', '#fb7185', '#fb923c', '#fca5a5'],
+  ['lavender', 'Lavender', '💜', '#100c1a', '#1b1430', '#8b5cf6', '#a78bfa', '#c4b5fd', '#f0abfc', '#ddd6fe'],
+  ['coffee', 'Coffee', '☕', '#120c08', '#1e150d', '#b45309', '#d97706', '#f59e0b', '#a16207', '#fcd34d'],
+  ['arctic', 'Arctic', '❄️', '#0a0f14', '#121b24', '#60A5FA', '#93C5FD', '#BFDBFE', '#c4b5fd', '#DBEAFE'],
+  ['toxic', 'Toxic', '☢️', '#0a0f02', '#141d06', '#a3e635', '#bef264', '#3B82F6', '#f0abfc', '#fde047'],
+  ['royal', 'Royal', '👑', '#080a1a', '#0f1330', '#6366f1', '#818cf8', '#3B82F6', '#c084fc', '#fbbf24'],
+  ['peach', 'Peach', '🍑', '#1a0f0a', '#281913', '#fb923c', '#fdba74', '#f472b6', '#fcd34d', '#fed7aa'],
+  ['slate', 'Slate', '🪨', '#0a0c0f', '#141820', '#64748b', '#94a3b8', '#60A5FA', '#a78bfa', '#cbd5e1'],
+  ['mint', 'Mint', '🌿', '#06120e', '#0b1f18', '#60A5FA', '#93C5FD', '#3B82F6', '#a3e635', '#BFDBFE'],
+  ['blood', 'Blood Moon', '🌕', '#140505', '#220909', '#dc2626', '#ef4444', '#f97316', '#a855f7', '#fbbf24'],
+  ['cyber', 'Cyber', '🤖', '#080612', '#100c22', '#2563EB', '#3B82F6', '#e879f9', '#f0abfc', '#fde047'],
+  ['dune', 'Dune', '🏜️', '#120e07', '#1f180d', '#d97706', '#f59e0b', '#fbbf24', '#ea580c', '#fde68a'],
+  ['nebula', 'Nebula', '✨', '#0b0718', '#150e2c', '#a855f7', '#c084fc', '#3B82F6', '#f472b6', '#fcd34d'],
+  ['rosegold', 'Rose Gold', '🌹', '#160c0f', '#23131a', '#fda4af', '#fecdd3', '#f9a8d4', '#fbbf24', '#fde68a'],
+  ['obsidian', 'Obsidian', '⬛', '#050507', '#0d0d12', '#818cf8', '#a5b4fc', '#60A5FA', '#c084fc', '#e5e7eb'],
+  ['citrus', 'Citrus', '🍋', '#0f1003', '#1b1d06', '#eab308', '#facc15', '#84cc16', '#f97316', '#fde047'],
+] as const;
+export type SkinPaletteRow = (typeof skinPalettes)[number];
+
+/**
+ * Default export. `colors` is the LIVE dark palette (skinStore mutates it in
+ * place); `colorModes` is the {dark, light} pair. Bindings that live on this
+ * object are deliberately NOT also named exports, so consumers read them as
+ * `theme.x` without tripping import/no-named-as-default-member (lint:ci).
+ * Named exports are reserved for values that are not on this object.
+ */
+const theme = { colors: colors.dark, colorModes: colors, gradients, spacing, radii, typography, elevation, motion, hitSlop, breathing, palette } as const;
 export type DesignTheme = typeof theme;
 export default theme;

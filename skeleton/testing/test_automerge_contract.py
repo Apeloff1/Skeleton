@@ -12,8 +12,10 @@ from scripts.check_automerge_contract import (
     MODULES,
     PACKAGE,
     REQUIRED_RECONCILE_PERMISSIONS,
+    REQUIRED_WORKFLOW_TRIGGERS,
     ROOT,
     WORKFLOW,
+    _PIPE_TO_SHELL,
     _cross_file_findings,
     _defined_symbols,
     _imports,
@@ -131,8 +133,30 @@ def test_active_policy_disables_review_gates():
     assert 'AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "false"' in reconcile
 
 
-def test_workflow_has_periodic_reconciliation_trigger():
-    assert "schedule:" in _workflow_text()
+def test_periodic_schedule_is_optional():
+    """The schedule sweep was removed by CI fanout reduction; it must not be required."""
+    assert "schedule:" not in REQUIRED_WORKFLOW_TRIGGERS
+    text = _workflow_text()
+    without = "\n".join(
+        line for line in text.splitlines() if "schedule:" not in line and "cron:" not in line
+    )
+    assert _workflow_findings(without) == []
+    with_schedule = text.replace(
+        "\nconcurrency:", '\n  schedule:\n    - cron: "8 3 * * *"\n\nconcurrency:', 1
+    )
+    assert _workflow_findings(with_schedule) == []
+
+
+def test_missing_workflow_run_trigger_is_rejected():
+    text = _workflow_text().replace("workflow_run:", "workflow_xrun:")
+    codes = {f.code for f in _workflow_findings(text)}
+    assert "missing-trigger" in codes
+
+
+def test_missing_merge_readiness_wake_source_is_rejected():
+    text = _workflow_text().replace('"Merge Readiness"', '"Something Else"')
+    codes = {f.code for f in _workflow_findings(text)}
+    assert "missing-wake-source" in codes
 
 
 def test_workflow_wakes_on_merge_readiness_completion():
@@ -175,8 +199,8 @@ def test_workflow_installs_pytest_before_test_run():
         "persist-credentials: true",
         "permissions: write-all",
         "permissions: read-all",
-        "curl | sh",
-        "wget | sh",
+        "curl " + _PIPE_TO_SHELL,
+        "wget " + _PIPE_TO_SHELL,
         "sudo ",
     ],
 )

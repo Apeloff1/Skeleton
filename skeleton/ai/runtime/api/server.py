@@ -1071,6 +1071,10 @@ def create_app() -> Any:
         body_limits=_gate_body_limits(),
     )
     install_gate(app, policy=gate_policy)
+    # #3622 follow-up (TD: create_app is the only HTTP entry): fold a registered
+    # agent_edge gateway in behind the same install_gate stack.
+    from skeleton.api.agent_edge_mount import install_registered_agent_edge
+    install_registered_agent_edge(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS
     # admits a browser origin; protected commands still need engine authority.
     app.add_middleware(

@@ -3,8 +3,10 @@
  * console hooks into ForgeCockpitView, and handles cross-panel handoffs.
  */
 import React from 'react';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex } from '../questionnaire';
 import { baseEra } from '../eras';
+import { planStatus } from '../plan';
 import { cockpitScreenReducer, composeSummaryOf, consoleFailures, initialScreenState, tabBadges, type CockpitTab } from '../cockpitScreen';
 import { useCockpitConsole } from '../consoleHooks';
 import { useForgeCatalog, useForgeRun, useLiveCompose, useNow } from '../hooks';
@@ -23,6 +25,10 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
   const run = useForgeRun();
   const consoleState = useCockpitConsole();
   const now = useNow(run.phase === 'running');
+  const reduceMotion = useReduceMotion();
+  const plan = planStatus(run.payload, run.phase === 'running');
+  const openPlan = React.useCallback(() => dispatchScreen({ type: 'tab', tab: 'plan' }), []);
+  const hasPlan = Boolean(run.payload?.build_plan);
 
   const startRun = React.useCallback((req: RunRequest) => {
     dispatchScreen({ type: 'runStarted' });
@@ -42,6 +48,7 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
     consoleErrors: consoleFailures(consoleState.entries),
     questionnaireStep: stepIndex(q.step),
     questionnaireSteps: STEPS.length,
+    planState: plan.state,
   });
 
   return (
@@ -50,6 +57,7 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
       tab={screen.tab}
       onTab={(tab) => dispatchScreen({ type: 'tab', tab })}
       badges={badges}
+      reduceMotion={reduceMotion}
       notice={!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null}
       questionnaire={{
         state: q,
@@ -61,6 +69,17 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
         onForge: startRun,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
+        onViewPlan: hasPlan ? openPlan : undefined,
+      }}
+      plan={{
+        payload: run.payload,
+        eras: catalog.eras,
+        pinnedEra: q.options.era,
+        running: run.phase === 'running',
+        error: run.phase === 'error' ? run.error : null,
+        onViewEra: (era) => dispatchScreen({ type: 'viewEra', era: baseEra(era) ?? era }),
+        onViewRun: () => dispatchScreen({ type: 'tab', tab: 'run' }),
+        onBack: () => dispatchScreen({ type: 'tab', tab: 'build' }),
       }}
       compose={{
         vision: q.vision,
@@ -77,6 +96,7 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
         onCancel: run.cancel,
         onRetry: () => startRun(run.request ?? buildRunRequest(q)),
         onViewEra: (era) => dispatchScreen({ type: 'viewEra', era: baseEra(era) ?? era }),
+        onViewPlan: openPlan,
       }}
       eras={{
         eras: catalog.eras,
@@ -91,6 +111,7 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
           dispatchQ({ type: 'setOption', key: 'era', value: era });
           dispatchScreen({ type: 'useEra', era });
         },
+        onViewPlan: hasPlan ? openPlan : undefined,
       }}
       console={{
         entries: consoleState.entries,

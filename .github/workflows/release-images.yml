@@ -1,0 +1,111 @@
+name: Release Images
+
+# Tag-triggered release: verifies the tag matches the canonical version
+# ([project].version in the root pyproject.toml), generates the
+# changelog section, then builds and pushes backend + frontend images to GHCR.
+# Auth is the built-in GITHUB_TOKEN only (packages: write); nothing else is required.
+# workflow_dispatch builds both images without pushing (dry run).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      BACKEND_IMAGE: ghcr.io/apeloff1/skeleton-backend
+      FRONTEND_IMAGE: ghcr.io/apeloff1/skeleton-frontend
+      PUSH: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Resolve version and verify no drift
+        id: version
+        shell: bash
+        run: |
+          version="$(python -c 'import sys; sys.path.insert(0, "scripts"); import check_version_drift as d; print(d.read_version())')"
+          if [ "$PUSH" = "true" ]; then
+            python scripts/check_version_drift.py --tag "$GITHUB_REF_NAME"
+          else
+            python scripts/check_version_drift.py
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog section
+        shell: bash
+        run: |
+          python scripts/generate_changelog.py --version "${{ steps.version.outputs.version }}" --to HEAD > "$RUNNER_TEMP/CHANGELOG_SECTION.md"
+          cat "$RUNNER_TEMP/CHANGELOG_SECTION.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Log in to GHCR
+        if: env.PUSH == 'true'
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+      - name: Build backend image
+        shell: bash
+        run: |
+          docker buildx create --use --name release >/dev/null
+          out=$([ "$PUSH" = "true" ] && echo "--push" || echo "--load")
+          docker buildx build $out \
+            --file backend/Dockerfile --target production \
+            --build-arg "APP_VERSION=${{ steps.version.outputs.version }}" \
+            --build-arg "VCS_REF=${GITHUB_SHA}" \
+            --tag "$BACKEND_IMAGE:${{ steps.version.outputs.version }}" \
+            --tag "$BACKEND_IMAGE:latest" \
+            .
+
+      - name: Smoke-test backend image metadata
+        if: env.PUSH != 'true'
+        shell: bash
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          test "$(docker image inspect "$BACKEND_IMAGE:$v" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')" = "$v"
+          docker image inspect "$BACKEND_IMAGE:$v" --format '{{ range .Config.Env }}{{ println . }}{{ end }}' | grep -qx "APP_VERSION=$v"
+          test "$(docker image inspect "$BACKEND_IMAGE:$v" --format '{{ .Config.User }}')" = "appuser"
+
+      - name: Build frontend image
+        shell: bash
+        run: |
+          out=$([ "$PUSH" = "true" ] && echo "--push" || echo "--load")
+          docker buildx build $out \
+            --file frontend/Dockerfile --target production \
+            --build-arg "APP_VERSION=${{ steps.version.outputs.version }}" \
+            --build-arg "VCS_REF=${GITHUB_SHA}" \
+            --tag "$FRONTEND_IMAGE:${{ steps.version.outputs.version }}" \
+            --tag "$FRONTEND_IMAGE:latest" \
+            frontend
+
+      - name: Record published images
+        shell: bash
+        run: |
+          {
+            echo "## Images"
+            echo "- \`$BACKEND_IMAGE:${{ steps.version.outputs.version }}\` (pushed: $PUSH)"
+            echo "- \`$FRONTEND_IMAGE:${{ steps.version.outputs.version }}\` (pushed: $PUSH)"
+          } >> "$GITHUB_STEP_SUMMARY"
