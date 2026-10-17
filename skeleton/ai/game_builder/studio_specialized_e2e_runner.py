@@ -48,9 +48,10 @@ def _regular(root: Path, name: str, *, budget: int = 4_000_000) -> bytes:
         raise SpecializedTestError("native test source inaccessible") from exc
 
 
-def _registered_suite(root: Path) -> tuple[tuple[str, ...], tuple[str, ...], int]:
+def _registered_suite(root: Path) -> tuple[tuple[str, ...], tuple[str, ...], int, str]:
     registry_path = root / "machine/e2e_suites.json"
-    if registry_path.is_symlink() or not registry_path.is_file():
+    if (registry_path.is_symlink() or (root / "machine").is_symlink()
+            or not registry_path.is_file()):
         raise SpecializedTestError("canonical suite registry missing or linked")
     try:
         if not 0 < registry_path.stat().st_size <= 2_000_000:
@@ -84,7 +85,7 @@ def _registered_suite(root: Path) -> tuple[tuple[str, ...], tuple[str, ...], int
         raise SpecializedTestError("suite tests must be unique registered local files")
     for file in required:
         _regular(root, file)
-    return tuple(tests), tuple(required), timeout
+    return tuple(tests), tuple(required), timeout, canonical_digest(suite)
 
 
 def _fingerprint(root: Path, names: tuple[str, ...]) -> str:
@@ -145,7 +146,7 @@ def run_registered_native_e2e(
     destination = destination.absolute()
     if project == destination or project in destination.parents:
         raise SpecializedTestError("test receipts must not modify the checked source tree")
-    tests, files, suite_timeout = _registered_suite(project)
+    tests, files, suite_timeout, suite_digest = _registered_suite(project)
     original_digest = _fingerprint(project, files)
     effective_timeout = min(timeout_seconds, suite_timeout)
     start = monotonic()
@@ -153,13 +154,15 @@ def run_registered_native_e2e(
         state, code, stdout_size, stderr_size = _execute(
             project, tests, effective_timeout, Path(tmp),
         )
-        source_changed = _fingerprint(project, files) != original_digest
+        source_changed = (_fingerprint(project, files) != original_digest
+                          or _registered_suite(project)[3] != suite_digest)
         result = {
             "schema": SCHEMA,
             "suite": SUITE_ID,
             "selected_test_files": len(tests),
             "registered_source_files": len(files),
             "source_fingerprint": original_digest,
+            "registered_execution_policy_digest": suite_digest,
             "source_changed_during_execution": source_changed,
             "timeout_seconds": effective_timeout,
             "elapsed_milliseconds": int((monotonic() - start) * 1000),
