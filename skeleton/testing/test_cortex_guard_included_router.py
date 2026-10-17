@@ -170,3 +170,30 @@ def test_host_routes_are_walked_and_opaque_host_fails():
 
     with pytest.raises(RuntimeError, match="uninspectable"):
         reject_cortex_secret_routes(Starlette(routes=[Host("x.example.com", app=opaque)]))
+
+
+def test_included_nested_secrets_raises_secrets_error_not_uninspectable():
+    # Required regression: lazy _IncludedRouter must be expanded, so the guard
+    # reports the specific cortex-secrets violation rather than "uninspectable".
+    outer = APIRouter(prefix="/api/v1")
+    outer.include_router(_secrets_router())
+    app = FastAPI()
+    app.include_router(outer)
+    with pytest.raises(RuntimeError) as exc:
+        reject_cortex_secret_routes(app)
+    msg = str(exc.value)
+    assert "unchartered cortex secrets HTTP route is forbidden" in msg
+    assert "uninspectable" not in msg
+
+
+def test_included_health_router_is_allowed():
+    health = APIRouter()
+
+    @health.get("/health")
+    def h():  # pragma: no cover
+        return {"ok": True}
+
+    app = FastAPI()
+    app.include_router(health, prefix="/api/v1")
+    reject_cortex_secret_routes(app)  # must not raise
+    assert "/api/v1/health" in iter_route_paths(app)
