@@ -290,3 +290,62 @@ test('mobile throttle treats invalid limits as bounded and ignores work after un
   ui.throttle(() => calls++, 0);
   assert.equal(calls, 1);
 });
+
+test('session request timeout remains active while JSON parsing stalls', async () => {
+  const { synergyService } = loadTS('services/synergy.ts', {
+    '../utils/apiBase': { API_BASE: 'https://backend.test' },
+  });
+  const originalFetch = global.fetch;
+  const originalSet = global.setTimeout;
+  const originalClear = global.clearTimeout;
+  const originalError = console.error;
+  let fireTimeout, cleared = false, jsonStarted = false;
+  global.setTimeout = fn => { fireTimeout = fn; return 900; };
+  global.clearTimeout = () => { cleared = true; };
+  global.fetch = async (_url, options) => ({
+    ok: true, status: 200, headers: { get: () => null },
+    json: () => new Promise((_resolve, reject) => {
+      jsonStarted = true;
+      options.signal.addEventListener('abort', () => reject(new Error('timeout during body')));
+    }),
+  });
+  console.error = () => {};
+  try {
+    const work = synergyService.updateProgress('learner', 'chapter', 40, 10);
+    await settle();
+    assert.equal(jsonStarted, true);
+    assert.equal(cleared, false);
+    fireTimeout();
+    const result = await work;
+    assert.equal(result.progress_updated, false);
+    assert.equal(cleared, true);
+  } finally {
+    global.fetch = originalFetch;
+    global.setTimeout = originalSet;
+    global.clearTimeout = originalClear;
+    console.error = originalError;
+  }
+});
+
+test('session service refuses declared oversized JSON before parsing', async () => {
+  const { synergyService } = loadTS('services/synergy.ts', {
+    '../utils/apiBase': { API_BASE: 'https://backend.test' },
+  });
+  const originalFetch = global.fetch;
+  const originalError = console.error;
+  let parsed = false;
+  global.fetch = async () => ({
+    ok: true, status: 200,
+    headers: { get: () => String(5 * 1024 * 1024) },
+    json: async () => { parsed = true; return {}; },
+  });
+  console.error = () => {};
+  try {
+    const result = await synergyService.updateProgress('learner', 'chapter', 40, 10);
+    assert.equal(parsed, false);
+    assert.equal(result.progress_updated, false);
+  } finally {
+    global.fetch = originalFetch;
+    console.error = originalError;
+  }
+});
