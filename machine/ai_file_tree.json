@@ -979,6 +979,12 @@
           "mode": "compatibility_facade",
           "facade_required_import": "from skeleton.security.injection_corpus import",
           "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "trust_root_recovery.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.security.trust_root_recovery import",
+          "note": "G084 trust-root recovery stays owned by skeleton/security. The AI tree re-exports it and holds no second revocation ledger."
         }
       ],
       "move_tags": [

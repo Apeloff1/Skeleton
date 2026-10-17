@@ -1,8 +1,8 @@
-"""Local game-development workspace commands over the canonical GameForge pipeline.
+"""Local game-development workspace commands.
 
-This is a developer transport, not a second game engine or state authority.
-Only a local operator may choose filesystem destinations. The existing forge
-projector, source-manifest, and Godot playtest own execution and evidence.
+``build`` is a transport over ``build_playable_game``, the same executor as
+``python -m skeleton game``. It is not a second GameForge pipeline. Only a
+local operator may choose filesystem destinations.
 """
 from __future__ import annotations
 
@@ -260,22 +260,27 @@ def _build(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     config = _load(root)
     if (root / "build").is_symlink() or (root / "build" / "godot").is_symlink():
         _fail("refusing symlinked build output")
-    from skeleton.context.pipeline import GameForgeRun
+    from skeleton.forge.game_builder import build_playable_game
     try:
-        response = GameForgeRun.live().execute(
-            config["vision"], era=config["era"], archetype=config["archetype"],
-            project_root=str(root / "build" / "godot"), target="godot",
-            overwrite=args.overwrite, playtest=args.playtest,
+        response = build_playable_game(
+            config["vision"],
+            era=config["era"],
+            archetype=config["archetype"],
             repair_mode=args.repair_mode,
+            playtest_mode=args.playtest,
+            out=str(root / "build" / "godot"),
+            overwrite=args.overwrite,
         )
     except (OSError, ValueError) as exc:
         raise GameCLIError(f"GameForge build rejected: {exc}") from exc
-    return {"ok": bool(response.get("succeeded")), "action": "build", "project": str(root),
+    project = response.get("project") if isinstance(response.get("project"), dict) else {}
+    receipt = project.get("source_sha256")
+    return {"ok": bool(response.get("ok")), "action": "build", "project": str(root),
             "output": str(root / "build" / "godot"),
-            "source_manifest": response.get("source_manifest"),
+            "source_manifest": {"sha256": receipt} if receipt else None,
             "playtest": response.get("playtest"),
-            "failed_stages": [s for s in (response.get("run") or {}).get("stages", [])
-                              if s.get("status") == "FAILED"]}
+            "marker": response.get("marker"),
+            "failed_stages": [] if response.get("ok") else [response.get("error") or "build failed"]}
 
 
 def _verify(root: Path, args: argparse.Namespace) -> dict[str, Any]:

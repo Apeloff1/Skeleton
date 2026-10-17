@@ -37,9 +37,28 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
-from skeleton.app.offline_grounding import (
-    audit_answer_citations, grounded_request_digest, prepare_evidence,
+from skeleton.app.offline_background_job import LocalJobRejected, LocalReferenceJob
+from skeleton.app.offline_reference_read import (
+    LocalReferenceRead, ReferenceReadConflict, ReferenceReadDenied,
+    ReferenceReadRejected,
 )
+from skeleton.app.offline_reference_write import (
+    LocalReferenceWrite, ReferenceWriteConflict, ReferenceWriteDenied,
+    ReferenceWriteRejected,
+)
+from skeleton.app.offline_grounding import (
+    audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
+    prepare_evidence,
+)
+
+
+def _audit_pair(text: str, evidence: dict[str, Any] | None) -> dict[str, Any]:
+    if evidence is None:
+        return {"citation_audit": None, "faithfulness": None}
+    return {
+        "citation_audit": audit_answer_citations(text, evidence),
+        "faithfulness": audit_answer_faithfulness(text, evidence),
+    }
 
 
 MAX_JSON_BYTES = 16 * 1024 * 1024
@@ -128,6 +147,9 @@ class OfflineHTTPApplication:
             self.knowledge = OfflineKnowledgeLibrary(
                 self._store, self.model_digest, self.tokenizer_digest
             )
+            self.reference_reads = LocalReferenceRead(self.knowledge)
+            self.reference_writes = LocalReferenceWrite(self.knowledge)
+            self.reference_jobs = LocalReferenceJob(self.knowledge)
         except BaseException:
             self._store.close()
             raise
@@ -286,7 +308,7 @@ class OfflineHTTPApplication:
                     "output_tokens": receipt.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
                     "evidence": evidence,
-                    "citation_audit": audit_answer_citations(receipt.text, evidence) if evidence else None,
+                    **_audit_pair(receipt.text, evidence),
                 },
             }
         if observed is not None:
@@ -346,10 +368,7 @@ class OfflineHTTPApplication:
                     "output_tokens": replay.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
                     "evidence": previous[replay.revision - 1],
-                    "citation_audit": (
-                        audit_answer_citations(replay.text, previous[replay.revision - 1])
-                        if previous[replay.revision - 1] is not None else None
-                    ),
+                    **_audit_pair(replay.text, previous[replay.revision - 1]),
                 }
             manifest = None
             if grounded:
@@ -397,10 +416,7 @@ class OfflineHTTPApplication:
                 "output_tokens": receipt.generated_tokens,
                 "replayed": False, "model_digest": self.model_digest,
                 "evidence": committed_evidence,
-                "citation_audit": (
-                    audit_answer_citations(receipt.text, committed_evidence)
-                    if committed_evidence is not None else None
-                ),
+                **_audit_pair(receipt.text, committed_evidence),
             }
 
     def dispatch(self, method: str, path: str,
@@ -447,6 +463,66 @@ class OfflineHTTPApplication:
                 _fields(body, {"title", "text"}, {"title", "text"})
                 item = self.knowledge.add_text(body["title"], body["text"])
                 return (200 if item["reused"] else 201), item
+        if path == "/v1/tools/reference-read" and method == "POST":
+            _fields(body, {"query", "granted", "request_id"}, {"query", "granted", "request_id"})
+            try:
+                return 200, self.reference_reads.read(
+                    body["query"], body["request_id"], granted=body["granted"],
+                )
+            except ReferenceReadDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except ReferenceReadConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from exc
+            except ReferenceReadRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from exc
+        if path == "/v1/tools/reference-write" and method == "POST":
+            _fields(
+                body,
+                {"title", "text", "request_id", "approved", "approval_ref"},
+                {"title", "text", "request_id", "approved"},
+            )
+            try:
+                return 200, self.reference_writes.write(
+                    body["title"], body["text"], body["request_id"],
+                    approved=body["approved"], approval_ref=body.get("approval_ref"),
+                )
+            except ReferenceWriteDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except ReferenceWriteConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from exc
+            except ReferenceWriteRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from exc
+        if path == "/v1/tools/reference-write/rollback" and method == "POST":
+            _fields(body, {"request_id", "approved"}, {"request_id", "approved"})
+            try:
+                return 200, self.reference_writes.rollback(
+                    body["request_id"], approved=body["approved"],
+                )
+            except ReferenceWriteDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except ReferenceWriteRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from exc
+        if path == "/v1/agents/reference-job" and method == "POST":
+            _fields(
+                body,
+                {"goal", "request_id", "granted", "allow_writes", "title", "text", "approval_ref"},
+                {"goal", "request_id", "granted", "allow_writes"},
+            )
+            try:
+                return 200, self.reference_jobs.run(
+                    body["goal"], body["request_id"],
+                    granted=body["granted"], allow_writes=body["allow_writes"],
+                    title=body.get("title"), text=body.get("text"),
+                    approval_ref=body.get("approval_ref"),
+                )
+            except ReferenceReadDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except ReferenceWriteDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except (ReferenceReadConflict, ReferenceWriteConflict) as exc:
+                raise OfflineHTTPError(409, str(exc)) from exc
+            except (ReferenceReadRejected, ReferenceWriteRejected, LocalJobRejected) as exc:
+                raise OfflineHTTPError(400, str(exc)) from exc
         if path == "/v1/knowledge/search" and method == "POST":
             _fields(body, {"query", "limit"}, {"query"})
             return 200, {"hits": self.knowledge.search(
@@ -519,14 +595,16 @@ class OfflineHTTPApplication:
                 ]
                 if len(answers) != len(evidence):
                     raise RuntimeContractError("conversation evidence count drift")
+                audits = [
+                    _audit_pair(answer, item)
+                    for answer, item in zip(answers, evidence)
+                ]
                 return 200, {
                     "session_id": sid, "revision": stored.revision,
                     "messages": stored.transcript.to_list(),
                     "evidence": evidence,
-                    "citation_audits": [
-                        audit_answer_citations(answer, item) if item else None
-                        for answer, item in zip(answers, evidence)
-                    ],
+                    "citation_audits": [item["citation_audit"] for item in audits],
+                    "faithfulness_audits": [item["faithfulness"] for item in audits],
                 }
             if method == "DELETE":
                 with self._turn_lock:

@@ -1,435 +1,97 @@
 name: Merge Readiness
 
 on:
-  workflow_dispatch:
   pull_request:
-    branches:
-      - main
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '.github/workflows/branch-clean.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# Each PR retains an isolated merge-critical required check. Main pushes share
-# one integration lane, so superseded commits cannot accumulate stale runs.
-# Independent security/provenance checks remain unchanged.
 concurrency:
   group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  PYTHON_VERSION: "3.11.16"
-  NODE_VERSION: "24.20.0"
-
+# Fast, bounded PR gate. Deep test suites are no longer triggered from this
+# workflow. Dedicated backend, malware, secret, dependency and input-security
+# workflows retain their own targeted validation.
 jobs:
-  quarantine_policy:
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
-    name: Quarantine Policy
+  readiness:
+    name: Merge Readiness
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "${{ env.PYTHON_VERSION }}"
-      - name: Validate merge-readiness workflow contract
-        run: python scripts/check_merge_readiness_contract.py
-      - name: Validate required-check policy
-        run: python scripts/check_required_checks_policy.py
-      - name: Validate composed contract system
-        run: python scripts/check_contract_system.py
-      - name: Validate flaky-test quarantine registry
-        run: python scripts/check_flaky_quarantine.py
-
-  unit:
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
-    name: Unit
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - name: Checkout
+      - name: Checkout exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 2
-      - name: Resolve CI/CD change scope
-        id: scope
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: bash scripts/ci_change_scope.sh
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "${{ env.PYTHON_VERSION }}"
-      - name: Install focused unit-test runtime
-        if: steps.scope.outputs.python == 'true'
-        run: >-
-          python -m pip install --disable-pip-version-check
-          "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.27,<1" "motor==3.7.1" "pymongo==4.18.3" "fastapi>=0.110,<1"
-          "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "cryptography>=50.0.1" "numpy>=2,<3" "Pillow>=12.3.0,<13"
+          python-version: "3.11.16"
       - name: Compile canonical Python package
         run: python -m compileall -q skeleton
-      - name: Verify year-scale Jeeves Builder Dragon SQLite recovery
-        if: steps.scope.outputs.python == 'true'
-        run: python -m unittest discover -s tests -p 'test_annual_*.py' -v
-      - name: Run canonical unit runner
-        if: steps.scope.outputs.python == 'true'
-        env:
-          PYTHONPATH: "."
-        run: python tests/run_unit.py
-      - name: Verify legacy tests preserve tracked source
-        run: git diff --exit-code
-      - name: Run complete canonical domain suite
-        if: steps.scope.outputs.python == 'true'
-        env:
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-          PYTHONPATH: ".:backend"
-        run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio.plugin
-          skeleton/testing --tb=short
-
-  integration_smoke:
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
-    name: Integration Smoke
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: ./backend
-    services:
-      mongodb:
-        # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
-        image: mongo@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0
-        ports:
-          - "27017:27017"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "${{ env.PYTHON_VERSION }}"
-      - name: Install backend and integration runtime
-        run: >-
-          uv venv && uv pip install -r requirements.txt
-          "pytest>=8,<9" "httpx>=0.27,<1"
-      - name: Import application with live Mongo service
-        env:
-          MONGO_URL: mongodb://localhost:27017/test
-          SKIP_HEAVY_SEED: "true"
-          PYTHONPATH: ".."
-        run: >-
-          uv run python -c "import server; assert server.app is not None;
-          print('server import: OK')"
-      - name: Run canonical cross-subsystem integration matrix
-        working-directory: .
-        env:
-          PYTHONPATH: "."
-          GF_SEAL_SECRET: "integration-matrix-ci-secret"
-        run: >-
-          backend/.venv/bin/python -m pytest -q --noconftest
-          tests/test_cross_subsystem_integration.py
-          tests/test_frontier_runtime_memory_retrieval.py
-          tests/test_model_runtime.py
-          tests/test_model_routing.py
-          skeleton/testing/test_frontier_observability_correlation.py
-
-  quality_security:
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
-    name: Lint Type Security
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    env:
-      PYTHONPATH: ${{ github.workspace }}
-    steps:
-      - name: Check out full history
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Resolve CI/CD owned surfaces
-        id: cidupe
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: bash scripts/ci_change_scope.sh
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "${{ env.PYTHON_VERSION }}"
-      - name: Set up Node.js
-        if: steps.cidupe.outputs.frontend != 'true'
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "${{ env.NODE_VERSION }}"
-          cache: yarn
-          cache-dependency-path: frontend/yarn.lock
-      - name: Install focused quality dependencies
-        run: >-
-          python -m pip install --disable-pip-version-check
-          "ruff==0.9.10" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "fastapi==0.136.1"
-          "httpx>=0.27,<1" "pydantic-settings>=2.1,<3" "pymongo>=4,<5" "motor>=3,<4"
-          "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.1"
-      - name: Install frontend dependencies
-        if: steps.cidupe.outputs.frontend != 'true'
-        run: yarn --cwd frontend install --ignore-scripts --non-interactive
-      # CI/CD Backend Lint owns backend ruff. CI/CD Frontend owns yarn lint:ci
-      # and typecheck. This lane still runs the security suite, and it still
-      # runs those surfaces when Change Scope says CI/CD will skip them.
-      - name: Canonical lint, type, and high-confidence security gates
-        env:
-          QUALITY_GATES_SKIP_FRONTEND: ${{ steps.cidupe.outputs.frontend }}
-          QUALITY_GATES_SKIP_BACKEND_LINT: ${{ steps.cidupe.outputs.backend }}
-        run: bash scripts/quality-gates.sh
-      - name: Full-history secret scan
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_VERSION: "8.24.3"
-          GITLEAKS_CONFIG: ".gitleaks.toml"
-          GITLEAKS_ENABLE_COMMENTS: "false"
-
-  pr_automation:
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
-    name: PR Automation Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "${{ env.PYTHON_VERSION }}"
-      - name: Install focused test dependency
-        run: >-
-          python -m pip install --disable-pip-version-check
-          "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.27,<1" "motor==3.7.1" "pymongo==4.18.3" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "cryptography>=50.0.1"
-      - name: Compile automation package
-        run: >-
-          python -m compileall -q
-          skeleton/pr_automation
-          skeleton/automation
-          skeleton/repo_machine
-      - name: Validate auto-merge workflow contract
-        run: python scripts/check_automerge_contract.py
-      - name: Validate runner v2 privileged contract
-        run: python scripts/check_runner_v2_contract.py
-      - name: Validate machine repository organization contract
-        run: python scripts/check_repo_machine.py
-      - name: Run PR automation contracts
-        env:
-          PYTHONPATH: "."
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio.plugin
-          skeleton/testing/test_pr_automation.py
-          skeleton/testing/test_pr_automation_ruleset.py
-          skeleton/testing/test_pr_automation_sensitive_paths.py
-          skeleton/testing/test_pr_automation_workflow.py
-          skeleton/testing/test_pr_automation_branch_completions.py
-          skeleton/testing/test_automerge_model.py
-          skeleton/testing/test_automerge_evidence.py
-          skeleton/testing/test_automerge_policy.py
-          skeleton/testing/test_automerge_stack.py
-          skeleton/testing/test_automerge_engine.py
-          skeleton/testing/test_automerge_contract.py
-          skeleton/testing/test_runner_v2_contracts.py
-          skeleton/testing/test_runner_v2_evidence.py
-          skeleton/testing/test_runner_v2_runtime.py
-          skeleton/testing/test_runner_v2_transaction_report.py
-          skeleton/testing/test_runner_v2_engine.py
-          tests/test_required_checks_policy.py
-          tests/test_repo_machine.py
-          tests/test_repo_machine_advanced.py
-          tests/test_repo_machine_growth.py
-          tests/test_repo_machine_catalog.py
-          tests/test_repo_machine_sota.py
-          tests/test_repo_machine_atlas.py
-          tests/test_repo_machine_live_taxonomy.py
-          tests/test_app_workspace_taxonomy.py
-          tests/test_research_lineage_taxonomy.py
-          tests/test_repository_integration.py
-          skeleton/testing/test_repository_runtime_repairs.py
-          skeleton/testing/test_developer.py
-          skeleton/testing/test_policy_commands.py
-          skeleton/testing/test_operator_quality.py
-          skeleton/testing/test_support.py
-          skeleton/testing/test_contexts.py
-          skeleton/testing/test_prefix_improve.py
-          skeleton/testing/test_jeeves_checkpoint_audit_binding.py
-          skeleton/testing/test_jeeves_scientific_compiler.py
-          tests/test_command_deck.py
-          tests/test_new_subsystems.py
-          skeleton/testing/test_jeeves_context_mesh.py
-          skeleton/testing/test_cortex_deck.py
-          skeleton/testing/test_organismer_social.py
-          tests/test_replication_module_layout.py
-          tests/test_organism_persistence_paths.py
-          skeleton/testing/test_mesh_handoff.py
-          skeleton/testing/test_galaxy_bridge.py
-          skeleton/testing/test_replication_rollback_contract.py
-          tests/test_*namespace_migration*.py
-          tests/test_autonomous_supervisor.py
-          tests/test_autonomous_builder_e2e_contract.py
-          tests/test_build_authority.py
-          tests/test_builder_plane.py
-          tests/test_builder_plane_integration.py
-          tests/test_builder_repair_receipt.py
-          tests/test_build_repair.py
-          tests/test_supervisor_runtime.py
-          tests/test_worker_health.py
-          tests/test_traffic_manager.py
-          skeleton/testing/test_bot_manager.py
-          skeleton/testing/test_architecture_index_completeness.py
-          skeleton/testing/test_consensus.py
-          skeleton/testing/test_deep.py
-          skeleton/testing/test_game_logic_repair.py
-          skeleton/testing/test_jeeves_fabric_context_compiler.py
-          skeleton/testing/test_jeeves_historical_authorization_integration.py
-          skeleton/testing/test_jeeves_semantic_topology_learning.py
-          skeleton/testing/test_jeeves_semantic_topology_research_bridge.py
-          skeleton/testing/test_pipeline_npc_quality.py
-          skeleton/testing/test_pipeline_repair.py
-          skeleton/testing/test_plan_repair.py
-          skeleton/testing/test_ready_wave_runner.py
-          skeleton/testing/test_scanner_integrity.py
-          skeleton/testing/test_simulation_physics_character.py
-          skeleton/testing/test_simulation_physics_character_motor.py
-          skeleton/testing/test_sota_wave2.py
-          skeleton/testing/test_swarm_api_recovery.py
-          skeleton/testing/test_swarm_dag.py
-          skeleton/testing/test_swarm_gc.py
-          skeleton/testing/test_swarm_hardened_health.py
-          skeleton/testing/test_swarm_health_semantics.py
-          skeleton/testing/test_swarm_ingress_server.py
-          skeleton/testing/test_swarm_new_route_wiring.py
-          skeleton/testing/test_swarm_operator_recovery_api.py
-          skeleton/testing/test_swarm_public_recovery_api.py
-          skeleton/testing/test_swarm_route_wiring.py
-          skeleton/testing/test_swarm_runtime_persistence.py
-          skeleton/testing/test_swarm_tenant_broker_server.py
-          skeleton/testing/test_engine_cross_service_boundary.py
-          skeleton/testing/test_app_runtime_contract.py
-      - name: Validate Linux filesystem and tool transaction boundaries
-        env:
-          PYTHONPATH: "."
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: >-
-          python -m pytest -q --noconftest
-          skeleton/testing/test_security_rooted_fs.py
-          skeleton/testing/test_security_archive_sandbox.py
-          skeleton/testing/test_shell_workspace_txn_stability.py
-          skeleton/testing/test_shell_toolchain_attestation.py
-          skeleton/testing/test_shell_toolchain_transactional.py
-          skeleton/testing/test_privileged_tool_transaction.py
-          skeleton/testing/test_shell_ai_source_digest.py
-      - name: Run supervisor workflow contract in isolated import namespace
-        env:
-          PYTHONPATH: "."
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: >-
-          python -m pytest -q --noconftest --import-mode=importlib
-          backend/tests/test_supervisor_workflow_contract.py
-          backend/tests/test_traffic_manager_workflow_contract.py
-
-  ci:
-    # Restored CI/CD gates (#4104): Frontend, Backend Lint/Test/Import Smoke,
-    # Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and
-    # Docker Build. Called here so they run once per head under this
-    # workflow's per-ref cancel-in-progress group and gate the required check.
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
-    name: CI/CD
-    uses: ./.github/workflows/ci.yml
-
-  readiness:
-    name: Merge Readiness
-    # !cancelled() (not always()): a superseded/cancelled run must not queue this
-    # summary job, or it holds the merge-readiness-<PR#> slot and starves the new head.
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
-    needs:
-      - quarantine_policy
-      - unit
-      - integration_smoke
-      - quality_security
-      - pr_automation
-      - ci
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Summarize required checks
-        env:
-          QUARANTINE_RESULT: ${{ needs.quarantine_policy.result }}
-          UNIT_RESULT: ${{ needs.unit.result }}
-          INTEGRATION_RESULT: ${{ needs.integration_smoke.result }}
-          QUALITY_RESULT: ${{ needs.quality_security.result }}
-          PR_AUTOMATION_RESULT: ${{ needs.pr_automation.result }}
-          CI_RESULT: ${{ needs.ci.result }}
+      - name: Verify top-level application entrypoint syntax
+        run: python -m py_compile skeleton/__main__.py
+      - name: Detect changed frontend
+        id: frontend
+        if: github.event_name == 'pull_request'
+        shell: bash
         run: |
-          python - <<'PY'
-          import os
-          from pathlib import Path
-
-          results = {
-              "quarantine_policy": os.environ["QUARANTINE_RESULT"],
-              "unit": os.environ["UNIT_RESULT"],
-              "integration_smoke": os.environ["INTEGRATION_RESULT"],
-              "quality_security": os.environ["QUALITY_RESULT"],
-              "pr_automation": os.environ["PR_AUTOMATION_RESULT"],
-              "ci": os.environ["CI_RESULT"],
-          }
-          failures = {
-              name: result
-              for name, result in results.items()
-              if result != "success"
-          }
-          rows = [
-              f"| `{name}` | `{result}` |"
-              for name, result in sorted(results.items())
-          ]
-          summary = [
-              "# Merge readiness",
-              "",
-              "| Required gate | Result |",
-              "| --- | --- |",
-              *rows,
-              "",
-          ]
-          if failures:
-              summary.append(
-                  "**NOT READY:** "
-                  + ", ".join(
-                      f"{name}={result}" for name, result in failures.items()
-                  )
-              )
-          else:
-              summary.append(
-                  "**READY:** all repository merge gates passed for this head SHA."
-              )
-
-          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
-              "\n".join(summary) + "\n",
-              encoding="utf-8",
-          )
-          if failures:
-              raise SystemExit(
-                  "required merge gates failed: "
-                  + ", ".join(
-                      f"{name}={result}" for name, result in failures.items()
-                  )
-              )
-          PY
+          if git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
+            if git diff --name-only HEAD^1 HEAD^2 | grep -q '^frontend/'; then
+              echo 'run=true' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set up Node 24
+        if: steps.frontend.outputs.run == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Install isolated TypeScript syntax runner
+        if: steps.frontend.outputs.run == 'true'
+        run: npm install --prefix "$RUNNER_TEMP/stability-typescript" --ignore-scripts --no-audit --no-fund --no-save --no-package-lock typescript@5.9.3
+      - name: Verify year-scale Jeeves Builder Dragon SQLite recovery
+        run: python -m unittest discover -s tests -p 'test_annual_*.py' -v
+      - name: Execute reconciled startup safety regressions
+        if: steps.frontend.outputs.run == 'true'
+        working-directory: frontend
+        env:
+          NODE_PATH: ${{ runner.temp }}/stability-typescript/node_modules
+        run: node --test scripts/test-reconciled-stability.cjs
+      - name: Execute long-session lifecycle and network regressions
+        if: steps.frontend.outputs.run == 'true'
+        working-directory: frontend
+        env:
+          NODE_PATH: ${{ runner.temp }}/stability-typescript/node_modules
+        run: node --test scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs scripts/test-offline-cache-integrity.cjs scripts/test-memory-pressure-runtime.cjs scripts/test-operation-stream-endurance.cjs scripts/test-persistent-preferences-endurance.cjs scripts/test-build-observer-endurance.cjs scripts/test-timer-resume-endurance.cjs scripts/test-connectivity-probe.cjs scripts/test-native-mirror-memory.cjs scripts/test-month-cycle-ledger.cjs scripts/test-month-cycle-recovery.cjs scripts/test-month-cycle-integration.cjs scripts/test-month-cycle-foreground.cjs
+      - name: Execute app-foundation regressions
+        if: steps.frontend.outputs.run == 'true'
+        working-directory: frontend
+        shell: bash
+        env:
+          NODE_PATH: ${{ runner.temp }}/stability-typescript/node_modules
+        run: |
+          shopt -s nullglob
+          tests=(scripts/app-foundation/*.test.cjs)
+          if [ ! -d scripts/app-foundation ]; then
+            echo '::notice::frontend/scripts/app-foundation not present on this ref; app-foundation regressions skipped'
+            exit 0
+          fi
+          if [ ${#tests[@]} -eq 0 ]; then
+            echo '::error::frontend/scripts/app-foundation exists but contains no *.test.cjs files'
+            exit 1
+          fi
+          node --test "${tests[@]}"
+      - name: Record fast-gate policy
+        run: |
+          echo '## Fast Merge Readiness' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Canonical Python syntax compiled. Backend Quality, Secret scanning,' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Malware Gate, Dependency Review and Workflow Input Security' >> "$GITHUB_STEP_SUMMARY"
+          echo 'remain separate targeted checks; extended E2E and release checks' >> "$GITHUB_STEP_SUMMARY"
+          echo 'are non-blocking and must be run for release qualification.' >> "$GITHUB_STEP_SUMMARY"

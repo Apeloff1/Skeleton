@@ -11,3 +11,14 @@ export function useReducedMotion():boolean{
  },[]);
  return reduced;
 }
+/** Honor the operating system's screen reader so decorative motion can yield to text. */
+export function useScreenReader():boolean{
+ const [enabled,setEnabled]=useState(false);
+ useEffect(()=>{
+  let mounted=true;
+  AccessibilityInfo.isScreenReaderEnabled().then(value=>{if(mounted)setEnabled(value)}).catch(()=>{});
+  const subscription=AccessibilityInfo.addEventListener('screenReaderChanged',setEnabled);
+  return()=>{mounted=false;subscription.remove()};
+ },[]);
+ return enabled;
+}

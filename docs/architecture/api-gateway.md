@@ -6,7 +6,7 @@
 
 - `FastAPI(title="Skeleton API", version="16.0.0")`
 - `RuntimeServiceLifecycle("skeleton")` on `app.state.runtime_lifecycle`; `RuntimeAdmissionMiddleware` rejects traffic until ready, exempting `/api/v1/health`.
-- Routers mounted at `/api/v1`: `routes.router`, `command_routes`, 12 `swarm_*_routes`, `engine_routes`. `cockpit.router` is mounted at root (`/cockpit`).
+- Routers mounted at `/api/v1`: `routes.router`, `command_routes`, 12 `swarm_*_routes`, `engine_routes`. `cockpit.router` is mounted at root (`/cockpit`). This is the `create_app` list. The dev harness in `skeleton/deploy/harness.py` mounts `routes.router` and `command_routes` and leaves the GameForge sidecar unmounted. Projects routes at `/api/v1/projects` arrive with #4097; the contract is [contracts/projects.md](contracts/projects.md). Playable builds from the CLI, `POST /api/v1/game/build`, `/gameforge/run`, and the Projects `game.build` worker all call `build_playable_game` (#4119).
 - Inline routes: `GET /` and `GET /cortex/status`.
 - `install_gate(app, policy=GatePolicy(open_prefixes=..., body_limits=...))`.
 - Startup: Genesis boot (if needed) → governance → artifact store → retrieval index → engine execution service → Mongo memory writer (if `SKL_MONGO_URI`) → `recover_engine_executions()` → `mark_ready`.
