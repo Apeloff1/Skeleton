@@ -45,6 +45,7 @@ PROJECT_ERROR_NOT_FOUND = "PROJECT.NOT_FOUND"  # 404
 PROJECT_ERROR_BUILD_CONFLICT = "PROJECT.BUILD_CONFLICT"  # 409
 PROJECT_ERROR_NAME_CONFLICT = "PROJECT.NAME_CONFLICT"  # 409
 PROJECT_ERROR_UNAVAILABLE = "PROJECT.UNAVAILABLE"  # 503
+PROJECT_ERROR_IDEMPOTENCY_MISMATCH = "PROJECT.IDEMPOTENCY_MISMATCH"  # 409
 PROJECT_ERROR_STATUS: dict[str, int] = {
     PROJECT_ERROR_INVALID: 400,
     PROJECT_ERROR_UNAUTHENTICATED: 401,
@@ -52,6 +53,7 @@ PROJECT_ERROR_STATUS: dict[str, int] = {
     PROJECT_ERROR_BUILD_CONFLICT: 409,
     PROJECT_ERROR_NAME_CONFLICT: 409,
     PROJECT_ERROR_UNAVAILABLE: 503,
+    PROJECT_ERROR_IDEMPOTENCY_MISMATCH: 409,
 }
 
 PROJECT_STATUSES = frozenset({"draft", "active", "archived"})
@@ -190,6 +192,27 @@ class ProjectPage:
 
 
 @dataclass(frozen=True, slots=True)
+class ProjectBuildPage:
+    """Build list page: items (newest first) plus ``next_cursor``.
+
+    Iterable, sized and indexable so callers that treated ``list_builds()`` as a
+    list keep working.
+    """
+
+    items: tuple[ProjectBuild, ...]
+    next_cursor: str | None = None
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    def __getitem__(self, index):
+        return self.items[index]
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectBuild:
     """``Build`` (``execution_id`` == ``build_id``; ``replayed`` on idempotent replay)."""
 
@@ -257,6 +280,18 @@ def _items(data: Any) -> list[Any]:
     if isinstance(data, Mapping) and isinstance(data.get("items"), list):
         return data["items"]
     return []
+
+
+def _page_params(limit: int | None, cursor: str | None) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+    if limit is not None:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("limit must be an int in 1..100")
+        params["limit"] = limit
+    if cursor is not None:
+        _check_len("cursor", cursor, lo=1, hi=512)
+        params["cursor"] = cursor
+    return params
 
 
 class ProjectsClient:
@@ -389,14 +424,7 @@ class ProjectsClient:
 
     def list(self, *, limit: int | None = None, cursor: str | None = None) -> ProjectPage:
         """GET {base}?limit=1..100&cursor= -> items + next_cursor."""
-        params: dict[str, Any] = {}
-        if limit is not None:
-            if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
-                raise ValueError("limit must be an int in 1..100")
-            params["limit"] = limit
-        if cursor is not None:
-            _check_len("cursor", cursor, lo=1, hi=512)
-            params["cursor"] = cursor
+        params = _page_params(limit, cursor)
         data = self._call("GET", self.base_path, params=params or None, idempotent=True)
         items = tuple(Project.from_dict(p) for p in _items(data))
         nxt = data.get("next_cursor") if isinstance(data, Mapping) else None
@@ -452,9 +480,18 @@ class ProjectsClient:
             )
         )
 
-    def list_builds(self, project_id: str) -> list[ProjectBuild]:
-        data = self._call("GET", f"{self.base_path}/{_seg(project_id)}/builds", idempotent=True)
-        return [ProjectBuild.from_dict(b) for b in _items(data)]
+    def list_builds(
+        self, project_id: str, *, limit: int | None = None, cursor: str | None = None
+    ) -> ProjectBuildPage:
+        """GET {base}/{id}/builds?limit=1..100&cursor= -> items (newest first) + next_cursor."""
+        params = _page_params(limit, cursor)
+        data = self._call(
+            "GET", f"{self.base_path}/{_seg(project_id)}/builds",
+            params=params or None, idempotent=True,
+        )
+        items = tuple(ProjectBuild.from_dict(b) for b in _items(data))
+        nxt = data.get("next_cursor") if isinstance(data, Mapping) else None
+        return ProjectBuildPage(items=items, next_cursor=_opt_str(nxt))
 
     def get_build(
         self, project_id: str, build_id: str, *, cancel: CancelToken | None = None
