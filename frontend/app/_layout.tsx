@@ -18,11 +18,11 @@ import ScreenGuard from '../components/withScreenGuard';
 import { ToastHost } from '../components/Toast';
 import { ActionSheetHost } from '../components/ActionSheet';
 import { traceStep, traceStepSync, installCrashTrace } from '../utils/bootTracer';
-import { installMemoryGuard, registerMemoryShedder } from '../utils/memoryGuard';
+import { installMemoryGuard, uninstallMemoryGuard, registerMemoryShedder } from '../utils/memoryGuard';
 import { clearMemCache } from '../utils/resilientNet';
 import { purgeThermalCachesIfPresent } from '../utils/thermalGuard';
 import { installGlobalGuards } from '../utils/globalGuards';
-import { installAppStateGuard } from '../utils/safeTimers';
+import { installAppStateGuard, uninstallAppStateGuard } from '../utils/safeTimers';
 import { loadFeatureFlags } from '../utils/featureFlags';
 import { FeatureFlagProvider } from '../src/feature-flags';
 import { StabilityBanner } from '../src/components/StabilityBanner';
@@ -59,6 +59,7 @@ export default function RootLayout() {
     // These observers are independent: failure to install one must not
     // prevent the others or crash the initial React commit.
     try { installGlobalGuards(); } catch {}
+    try { installMemoryGuard(); } catch {}
     try { installAppStateGuard(); } catch {}
     try { installGlobalErrorHandlers(); } catch {}
 
@@ -85,6 +86,10 @@ export default function RootLayout() {
       stopTunnelHeartbeat();
       disposeNetworkShedder();
       disposeThermalShedder();
+      // React dev remounts must release the native observers as well as
+      // their timers. Root effect re-installs both guards on next mount.
+      uninstallAppStateGuard();
+      uninstallMemoryGuard();
     };
   }, []);
 
