@@ -41,11 +41,13 @@ NES_LABELS = (
 ).encode("ascii")
 
 
-def ines_rom(tiles: bytes):
+def ines_rom(tiles: bytes, animation: bytes):
     assert len(tiles) == 96
+    assert len(animation) == 48 and animation[:16] == tiles[80:96]
+    char = tiles + animation[16:]
     return (
         b"NES\x1a" + bytes([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-        + bytes(16384) + tiles + bytes(8192 - len(tiles))
+        + bytes(16384) + char + bytes(8192 - len(char))
     )
 
 class OriginalNESCampaignGatesTests(unittest.TestCase):
@@ -69,7 +71,10 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
 
     def compile_fixture(self):
         original = (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes()
-        rom = ines_rom(original)
+        rom = ines_rom(
+            original,
+            (self.campaign / "targets/nintendo_famicom/assets/tiles/hero_animation.bin").read_bytes(),
+        )
         def assembler(project, target, *, authorized, execute, output,
                       output_symbols, timeout_seconds):
             self.assertEqual(target, "nintendo_famicom")
@@ -150,7 +155,8 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
 
     def test_wrong_compiled_chr_pixels_never_publish_a_qualified_nes(self):
         corrupted = bytearray(ines_rom(
-            (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes()
+            (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes(),
+            (self.campaign / "targets/nintendo_famicom/assets/tiles/hero_animation.bin").read_bytes(),
         ))
         start = 16 + 16384
         corrupted[start] ^= 0xFF
@@ -191,7 +197,8 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
         del html
         failure = nes_receipt(
             sha256(ines_rom(
-                (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes()
+                (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes(),
+                (self.campaign / "targets/nintendo_famicom/assets/tiles/hero_animation.bin").read_bytes(),
             )).hexdigest(), sha256(NES_LABELS).hexdigest(),
             world, sha256(proof).hexdigest(), available=False,
             blocker="fceux_not_installed",
