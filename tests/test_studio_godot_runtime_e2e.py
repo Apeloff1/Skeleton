@@ -5,8 +5,6 @@ separate installed-Godot test runs the real binary whenever available.
 """
 from __future__ import annotations
 
-from hashlib import sha256
-import json
 from pathlib import Path
 import shutil
 import subprocess
