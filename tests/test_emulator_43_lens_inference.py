@@ -174,3 +174,38 @@ def test_cli_provides_two_distinct_checkpoint_selection_fields():
     assert args.operation == "execute-43-lenses"
     assert args.max_new_tokens == 192
     assert args.critic_checkpoint != args.semantic_checkpoint
+
+
+def test_unstructured_lens_response_is_kept_for_replay_not_certified(monkeypatch):
+    evidence, triangle, critic, Model = _fixture(monkeypatch)
+    original = Model.generate
+
+    def one_unstructured_result(self, prompt, config):
+        result = original(self, prompt, config)
+        if len(self.calls) == 17:
+            return SimpleNamespace(
+                text="UNSTRUCTURED_REAL_GENERATION",
+                generated_ids=result.generated_ids,
+                replay_receipt=result.replay_receipt,
+                to_record=result.to_record,
+            )
+        return result
+
+    monkeypatch.setattr(Model, "generate", one_unstructured_result)
+    receipt = lens_inference.run_native_semantic_lenses(
+        evidence, triangle, critic, Model(), max_new_tokens=80,
+    )
+    assert receipt["native_model_generations_executed"] == 43
+    assert receipt["source_bound_interpretations"] == 42
+    assert receipt["all_semantic_lenses_executed"] is True
+    assert receipt["all_semantic_interpretations_valid"] is False
+    assert receipt["entries"][16]["interpretation"]["status"].startswith("manual_review_required")
+    lens_inference.verify_native_semantic_lenses(evidence, triangle, critic, receipt)
+
+    falsified = deepcopy(receipt)
+    falsified["all_semantic_interpretations_valid"] = True
+    falsified["semantic_review_digest"] = _digest({
+        k: v for k, v in falsified.items() if k != "semantic_review_digest"
+    })
+    with pytest.raises(ValueError, match="completeness"):
+        lens_inference.verify_native_semantic_lenses(evidence, triangle, critic, falsified)
