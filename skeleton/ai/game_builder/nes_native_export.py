@@ -15,6 +15,7 @@ from .game_boy_native_export import _PIXELS, _TILE_INDEX
 from .playable_world import PlayableWorld
 from .playable_simulation import demonstrate_solvable
 from .port_planner import HomebrewSource, PortMode, PortRequest, compile_port
+from .studio_native_psg import NativePSGScore, console_psg_registers
 
 _MAX_WIDTH, _MAX_HEIGHT = 31, 29
 
@@ -48,6 +49,8 @@ TurnCount: .res 1
 TurnCountHigh: .res 1
 AnimTick: .res 1
 AnimFrame: .res 1
+MusicTick: .res 1
+MusicIndex: .res 1
 
 ; $0200-$02FF is hardware sprite DMA page.
 ; $0300-$06BF is a deterministic 960-byte shadow name table.
@@ -57,6 +60,8 @@ MAZE_HEIGHT = __HEIGHT__
 LEVEL_COUNT = __LEVEL_COUNT__
 ANIM_COUNT = __ANIM_COUNT__
 ANIM_DELAY = __ANIM_DELAY__
+AUDIO_ENABLED = __AUDIO_ENABLED__
+MUSIC_FRAME_DELAY = __MUSIC_DELAY__
 GEMS_PER_LEVEL = __GEMS__
 START_HEALTH = __HEALTH__
 MAP_RAM = $0300
@@ -94,11 +99,14 @@ Reset:
     sta TurnCountHigh
     sta AnimTick
     sta AnimFrame
+    sta MusicTick
+    sta MusicIndex
     sta Cooldown
     lda #START_HEALTH
     sta Health
     jsr UploadPalette
     jsr LoadLevel
+    jsr InitOriginalAudio
     lda #$00
     sta $2000
     lda #$1E
@@ -106,6 +114,7 @@ Reset:
 
 MainLoop:
     jsr WaitFrame
+    jsr TickOriginalMusic
     jsr PollPad
     jsr UpdateSprite
     lda #$00
@@ -217,6 +226,76 @@ LoadLevel:
     sta $2005
     lda #$1E
     sta $2001
+    rts
+
+InitOriginalAudio:
+    lda #AUDIO_ENABLED
+    beq @audioDisabled
+    lda #$03
+    sta $4015
+    lda #$BF
+    sta $4000
+    sta $4004
+    lda #$08
+    sta $4001
+    sta $4005
+@audioDisabled:
+    rts
+
+TickOriginalMusic:
+    lda #AUDIO_ENABLED
+    beq @musicOff
+    lda MusicTick
+    clc
+    adc #1
+    cmp #MUSIC_FRAME_DELAY
+    bcc @saveTick
+    lda #0
+    sta MusicTick
+    lda MusicIndex
+    clc
+    adc #1
+    and #7
+    sta MusicIndex
+    tax
+    lda OriginalMusicLow,x
+    sta $4002
+    lda OriginalMusicHigh,x
+    sta $4003
+    rts
+@saveTick:
+    sta MusicTick
+@musicOff:
+    rts
+
+SoundPickup:
+    lda #AUDIO_ENABLED
+    beq @silent
+    lda #__SFX_PICKUP_LOW__
+    sta $4006
+    lda #__SFX_PICKUP_HIGH__
+    sta $4007
+@silent:
+    rts
+
+SoundHazard:
+    lda #AUDIO_ENABLED
+    beq @silent
+    lda #__SFX_HAZARD_LOW__
+    sta $4006
+    lda #__SFX_HAZARD_HIGH__
+    sta $4007
+@silent:
+    rts
+
+SoundGoal:
+    lda #AUDIO_ENABLED
+    beq @silent
+    lda #__SFX_GOAL_LOW__
+    sta $4006
+    lda #__SFX_GOAL_HIGH__
+    sta $4007
+@silent:
     rts
 
 UpdateSprite:
@@ -404,11 +483,14 @@ TryMove:
     bcc @gemScored
     inc ScoreHigh
 @gemScored:
+    jsr SoundPickup
     rts
 @hazard:
     cmp #3
     bne @goal
     dec Health
+    jsr SoundHazard
+    lda Health
     bne @blocked
     lda #1
     sta GameLost
@@ -425,6 +507,7 @@ TryMove:
     bcc @goalScored
     inc ScoreHigh
 @goalScored:
+    jsr SoundGoal
     inc Level
     lda Level
     cmp #LEVEL_COUNT
@@ -463,6 +546,11 @@ __START_X__
 SpawnYs:
 __START_Y__
 __MAPS__
+
+OriginalMusicLow:
+__MUSIC_LOW__
+OriginalMusicHigh:
+__MUSIC_HIGH__
 
 NMI:
     rti
@@ -574,6 +662,7 @@ def compile_native_nes(
     tile_art: tuple[tuple[int, ...], ...] | None = None,
     hero_frames: tuple[tuple[int, ...], ...] | None = None,
     animation_delay: int = 12,
+    psg_score: NativePSGScore | None = None,
 ) -> NativeNESSourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("native NES homebrew source needs explicit authorization")
@@ -599,6 +688,12 @@ def compile_native_nes(
         if tile_art is None or hero_frames[0] != tile_art[5]:
             raise NativeNESError("original NES animation must start at authored player sprite")
     frames = hero_frames if hero_frames is not None else ()
+    if psg_score is not None and not isinstance(psg_score, NativePSGScore):
+        raise NativeNESError("native audio requires typed original PSG score")
+    if psg_score is not None and psg_score.theme != world.intent.theme:
+        raise NativeNESError("NES music and authored game theme differ")
+    sound = (console_psg_registers(psg_score, "nintendo_famicom")
+             if psg_score is not None else None)
     maps = []
     for level in world.levels:
         rows = []
@@ -621,6 +716,24 @@ def compile_native_nes(
         "__TILES__": _nes_chr(tile_art),
         "__ANIM_COUNT__": str(len(frames) if frames else 1),
         "__ANIM_DELAY__": str(animation_delay),
+        "__AUDIO_ENABLED__": str(int(sound is not None and sound["enabled"])),
+        "__MUSIC_DELAY__": str(sound["frames_per_note"] if sound else 24),
+        "__MUSIC_LOW__": ".byte " + ", ".join(
+            f"${value:02X}" for value in (
+                sound["notes_low"] if sound else (0,) * 8
+            )
+        ),
+        "__MUSIC_HIGH__": ".byte " + ", ".join(
+            f"${value:02X}" for value in (
+                sound["notes_high"] if sound else (0,) * 8
+            )
+        ),
+        "__SFX_PICKUP_LOW__": str(sound["events_low"][0] if sound else 0),
+        "__SFX_PICKUP_HIGH__": str(sound["events_high"][0] if sound else 0),
+        "__SFX_HAZARD_LOW__": str(sound["events_low"][1] if sound else 0),
+        "__SFX_HAZARD_HIGH__": str(sound["events_high"][1] if sound else 0),
+        "__SFX_GOAL_LOW__": str(sound["events_low"][2] if sound else 0),
+        "__SFX_GOAL_HIGH__": str(sound["events_high"][2] if sound else 0),
         "__ANIMATION_TILES__": (
             _hero_frame_chr(frames[1:]) if len(frames) > 1
             else "; single original player sprite"
@@ -692,6 +805,10 @@ def compile_native_nes(
         manifest["native_hero_animation_digest"] = canonical_digest(
             [list(frame) for frame in frames]
         )
+    manifest["original_native_psg_integrated"] = bool(sound and sound["enabled"])
+    manifest["native_psg_score_digest"] = psg_score.digest if psg_score else None
+    manifest["native_psg_hardware_audio_played"] = False
+    manifest["native_psg_not_pcm_identity"] = True
     manifest_json = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     digest = sha256((asm + "\0" + _LINKER + "\0" + _MAKEFILE + "\0" + manifest_json).encode()).hexdigest()
     return NativeNESSourceProject(asm, _LINKER, _MAKEFILE, manifest_json, digest)
