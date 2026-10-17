@@ -108,9 +108,14 @@ def capture_generated_game(
                     section = actions[position:checkpoint]
                     final = page.evaluate(script, section)
                     position = checkpoint
-                    screenshot = page.locator("#screen").screenshot(
-                        type="png", timeout=timeout_seconds * 1000,
+                    # Capture exact intrinsic canvas pixels, not a responsive
+                    # CSS-scaled element screenshot. This preserves the
+                    # original 24px grid for objective pixel comparisons.
+                    encoded = page.locator("#screen").evaluate(
+                        "(canvas) => canvas.toDataURL('image/png').split(',')[1]"
                     )
+                    import base64
+                    screenshot = base64.b64decode(encoded, validate=True)
                     dimensions = _png_geometry(screenshot)
                     files[f"frame_{index:02d}.png"] = screenshot
                     if (type(final.get("level")) is not int
