@@ -550,3 +550,22 @@ and operator-run, not a hidden background recording or automatic weight
 promotion process. Even a completed 43-lens pass creates hypotheses and
 falsification prompts, **not 43 new independent samples**, new reward labels
 or trained Jeeves production weights.
+
+#### Actual observation support for the 43 lenses
+
+The canonical lexical router now receives **positive native measurements
+only**. It no longer interprets warnings such as "no dialogue" or "no scene
+semantics" as evidence that a dialogue, music, camera or scene was observed.
+Missing RGB tile inspection and absent counterfactual probes are explicitly
+reported as missing modalities, not silently supplied as lens evidence.
+
+Each routed canonical Jeeves lens retains a separate
+`native_evidence_support_class`:
+`measured_native_cue_present` or
+`hypothesis_only_without_matching_native_cue`. The latter may still issue
+a diagnostic question, but may not produce a factual training label,
+promote confidence, or imply that native video, characters or narration
+were recognized. The 43-lens model prompt and candidate corpus carry
+this distinction, and `triangle-lenses` reports supported versus
+hypothesis-only counts. Existing semantic-routing artifacts are
+source/catalog-bound and must be regenerated after routing-policy changes.

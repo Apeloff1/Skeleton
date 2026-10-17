@@ -93,6 +93,8 @@ def compile_triangle_candidate_corpus(
                 "lens_key": view["lens_key"],
                 "family": view["lens_family"],
                 "activation_score": view["activation_score"],
+                "native_evidence_support_class": view["native_evidence_support_class"],
+                "matched_native_observation_cues": view["matched_native_observation_cues"],
                 "question": view["question"],
                 "governance_grade": view["governance_grade"],
                 "governance_fingerprint": view["governance_fingerprint"],

@@ -94,3 +94,47 @@ def test_edited_semantic_route_fails_against_original_catalog_and_episode():
     })
     with pytest.raises(TriangleSemanticError, match="no longer matches"):
         verify_episode_semantic_lenses(episode, altered)
+
+
+def test_absent_pixel_and_counterfactual_modalities_do_not_activate_semantic_cues():
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        _source_observations,
+    )
+    episode = _episode()
+    episode["companion_viewing"]["native_rgb24_frames_optically_inspected"] = 0
+    episode["ai_playing"]["counterfactual_native_probes"] = 0
+    obs = _source_observations(episode)
+    assert len(obs) == 6
+    assert "pixel" not in obs[0].tags
+    assert "color" not in obs[0].tags
+    assert "music" not in obs[1].tags
+    assert "camera" not in obs[0].content.casefold()
+    assert "scene" not in obs[0].content.casefold()
+    assert "simulation" not in obs[-1].tags
+    assert "counterfactual" not in obs[-1].tags
+    assert all(item.metadata["semantic_game_footage_interpretation_available"] is False
+               for item in obs)
+    result = route_episode_semantic_lenses(episode)
+    assert result["actually_routed_lenses"] == 43
+    assert result["native_rgb24_frames_measured"] == 0
+    assert result["native_counterfactual_probes_measured"] == 0
+    assert result["unobserved_semantics_cannot_activate_lens_cues"] is True
+    assert all(item["semantic_media_interpretation_verified"] is False
+               for item in result["routes"])
+    assert sum(item["cue_support_present"] for item in result["routes"]) == (
+        result["actual_cue_supported_lenses"]
+    )
+    verify_episode_semantic_lenses(episode, result)
+
+
+def test_cue_evidence_classes_are_source_bound_and_do_not_create_training_labels():
+    episode = _episode()
+    route = route_episode_semantic_lenses(episode)
+    assert route["native_rgb24_frames_measured"] == 3
+    assert set(row["native_evidence_support_class"] for row in route["routes"]) <= {
+        "measured_native_cue_present", "hypothesis_only_without_matching_native_cue",
+    }
+    assert all(row["new_independent_evidence"] == 0
+               and row["training_ground_truth_label_available"] is False
+               for row in route["routes"])
+    verify_episode_semantic_lenses(episode, route)

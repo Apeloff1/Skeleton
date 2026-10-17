@@ -459,11 +459,19 @@ def inspect_native_episode_lenses(
         "catalog_sha256": route["canonical_catalog_sha256"],
         "governance_fingerprint": route["governance_fingerprint"],
         "router_selection_sha256": route["route_digest"],
+        "cue_supported_lenses": route["actual_cue_supported_lenses"],
+        "hypothesis_only_lenses": (
+            route["actually_routed_lenses"] - route["actual_cue_supported_lenses"]
+        ),
+        "native_rgb24_frames_measured": route["native_rgb24_frames_measured"],
+        "unobserved_semantics_cannot_activate_lens_cues": True,
         "selected_lenses": [{
             "key": item["lens_key"],
             "family": item["lens_family"],
             "governance_grade": item["governance_grade"],
             "question": item["question"],
+            "native_evidence_support_class": item["native_evidence_support_class"],
+            "matched_native_observation_cues": item["matched_native_observation_cues"],
             "factual_claims_allowed": False,
         } for item in route["routes"]],
         "independent_new_gameplay_episodes_from_semantic_lenses": 0,
