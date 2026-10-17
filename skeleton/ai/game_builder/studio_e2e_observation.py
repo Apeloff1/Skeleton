@@ -279,6 +279,9 @@ def observe_production_campaign(
             for row in report["targets"]
         ),
         "rom_structurally_checked_count": report["native_roms_structurally_verified"],
+        "compiled_original_psg_tables_checked": (
+            report["compiled_original_psg_tables_verified"]
+        ),
         "actual_native_rom_victory_replays": report["native_rom_machine_code_playthroughs_verified"],
         "actual_native_cpu_checkpoint_samples": report["native_cpu_checkpoint_samples_verified"],
         "original_native_animation_audio_sources_checked": (
