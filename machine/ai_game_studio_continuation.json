@@ -2034,5 +2034,139 @@
       "release_signed": false
     },
     "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_independent_native_media_controlflow_extension": {
+    "tranche": "M281-M300",
+    "status": "code_committed_source_only_exact_head_specialist_tests_and_emulators_not_executed",
+    "source_owners": [
+      "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_campaign.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py"
+    ],
+    "regression_owners": [
+      "tests/test_studio_native_source_media_parity.py",
+      "tests/test_studio_campaign_e2e.py",
+      "tests/test_studio_execution_campaign_e2e.py",
+      "tests/test_studio_execution_history_e2e.py"
+    ],
+    "milestones": [
+      {
+        "id": "M281",
+        "name": "Compare all six original indexed background/hero tiles against exact GB/GBC/NES emitted planar assembly",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M282",
+        "name": "Regenerate original hero animation from source assets and verify assembly frame inventory",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M283",
+        "name": "Reconstruct original eight-note PSG score and verify native music register data tables",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M284",
+        "name": "Verify authentic game-loop animation/music update calls and audio boot initialization",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M285",
+        "name": "Reject original-game SFX trigger deletion, duplication and inserted premature returns",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M286",
+        "name": "Enforce independent source-art and source-audio checks on campaign publish and resume",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M287",
+        "name": "Enforce same independent source-media contract on direct native ROM compiler preflight",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M288",
+        "name": "Add deterministic native media digest, verified source-frame counts to canonical assurance",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M289",
+        "name": "Surface source-media receipts to the Jeeves E2E operator summary and durable journal",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M290",
+        "name": "Surface independently checked media source counts to Dragon read-only production observation",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M291",
+        "name": "Add source/world/animation/music/SFX adversarial mutation tests and rehashed receipt tests",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M292",
+        "name": "Add real source and durable-history regression coverage of authenticated media receipt propagation",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M293",
+        "name": "Run the full focused 17-test native console source-media suite on exact branch head",
+        "state": "not_verified"
+      },
+      {
+        "id": "M294",
+        "name": "Run real GB/CGB RGBDS compilation and dual emulation with visible authored animation",
+        "state": "not_verified"
+      },
+      {
+        "id": "M295",
+        "name": "Run real NES cc65 compilation and FCEUX input/PPU animation validation",
+        "state": "not_verified"
+      },
+      {
+        "id": "M296",
+        "name": "Capture and independently classify real hardware/emulator PSG melody and three cues",
+        "state": "not_verified"
+      },
+      {
+        "id": "M297",
+        "name": "Measure synchronized controller/video/audio behavior during extended replay",
+        "state": "not_verified"
+      },
+      {
+        "id": "M298",
+        "name": "Verify all native platform builds, rights, first-install and offline distribution",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M299",
+        "name": "Measure multi-week production recovery across crash/reboot and damaged build scenarios",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M300",
+        "name": "Qualify six-month/year Jeeves–Builder–Dragon production and formal release signoff",
+        "state": "not_qualified"
+      }
+    ],
+    "verification": {
+      "implemented_source_paths": 12,
+      "test_files_registered_in_native_special_suite": 17,
+      "source_static_contract_checked_during_resumable_campaign": true,
+      "source_static_contract_checked_during_native_build": true,
+      "source_status_separated_from_runtime_and_audio_pass": true,
+      "tests_executed_and_confirmed_passing_here": false,
+      "native_ROM_emulators_executed_here": false,
+      "physical_controller_video_audio_verified_here": false,
+      "full_game_production_duration_certified": false,
+      "model_weights_changed_here": false,
+      "studio_release_qualified": false
+    }
   }
 }
