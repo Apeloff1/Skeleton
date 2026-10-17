@@ -27,12 +27,17 @@ class SkeletonHTTPError(SkeletonClientError):
         *,
         url: str = "",
         body: Any = None,
+        code: str | None = None,
     ) -> None:
         super().__init__(f"{status_code} {message} ({url})")
         self.status_code = status_code
         self.message = message
         self.url = url
         self.body = body
+        if code is None and isinstance(body, dict) and isinstance(body.get("detail"), str):
+            code = body["detail"]
+        #: Machine-readable error code from ``{"detail": "<code>"}`` bodies.
+        self.code = code
 
 
 class SkeletonCancelledError(SkeletonClientError):
@@ -41,3 +46,7 @@ class SkeletonCancelledError(SkeletonClientError):
 
 class SkeletonSealConfigError(SkeletonClientError):
     """Request seal cannot be minted locally or the server has no seal secret."""
+
+
+class SkeletonSessionConfigError(SkeletonClientError):
+    """No app session token configured (``session_token=`` / SKELETON_SESSION_TOKEN)."""
