@@ -106,6 +106,10 @@ def parser() -> argparse.ArgumentParser:
     corpus.add_argument("--source-sha256", required=True)
     corpus.add_argument("--reviewer-checkpoint", required=True, type=Path)
     corpus.add_argument("--output-dir", required=True, type=Path)
+    corpus.add_argument(
+        "--semantic-lens-set", type=Path,
+        help="optional strict JSON manifest pinning exactly 43 keys from existing Jeeves catalog",
+    )
     return root
 
 
@@ -115,13 +119,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "export-triangle-corpus":
             from skeleton.ai.model_runtime.offline_chat import load_offline_engine
             from skeleton.ai.training.rom_triangle_campaign import (
-                export_reviewed_candidate_corpus,
+                export_reviewed_candidate_corpus, load_operator_semantic_lens_set,
+            )
+            keys = (
+                load_operator_semantic_lens_set(args.semantic_lens_set)
+                if args.semantic_lens_set is not None else ()
             )
             runtime = load_offline_engine(args.reviewer_checkpoint).runtime
             result = export_reviewed_candidate_corpus(
                 args.receipt, args.review_receipt,
                 source_sha256=args.source_sha256,
                 output_dir=args.output_dir, runtime=runtime,
+                requested_semantic_lens_keys=keys,
             )
             print(json.dumps(result, sort_keys=True))
             return 0

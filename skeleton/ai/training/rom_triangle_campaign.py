@@ -238,6 +238,7 @@ def triangle_campaign_page(
 def export_reviewed_candidate_corpus(
     rom_receipt: Path, reviewer_receipt: Path, *,
     source_sha256: str, output_dir: Path, runtime: Any,
+    requested_semantic_lens_keys: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Replay the critic's real local checkpoint BEFORE exporting lens examples.
 
@@ -260,11 +261,15 @@ def export_reviewed_candidate_corpus(
     replay = replay_native_adversarial_review(evidence, triangle, review, runtime)
     if replay["native_generations_replayed"] != 3:
         raise RomStudyError("all independent model passes must replay before corpus export")
-    candidate = compile_triangle_candidate_corpus(evidence, triangle, review)
+    candidate = compile_triangle_candidate_corpus(
+        evidence, triangle, review,
+        requested_semantic_lens_keys=requested_semantic_lens_keys,
+    )
     out = _private_output(output_dir)
     name = (
         "triangle-corpus-" + source_sha256[:16] + "-"
-        + review["review_digest"][:24] + ".json"
+        + review["review_digest"][:16] + "-"
+        + candidate["semantic_lens_selection_digest"][:16] + ".json"
     )
     target = out / name
     if target.exists() or target.is_symlink():
@@ -280,9 +285,33 @@ def export_reviewed_candidate_corpus(
         "candidate_corpus_digest": candidate["candidate_corpus_digest"],
         "unique_native_episodes": candidate["unique_independent_native_episodes"],
         "correlated_lens_views": candidate["total_lens_candidate_views"],
+        "canonical_semantic_questions": candidate["routed_semantic_lens_questions"],
+        "semantic_questions_are_not_training_labels": True,
+        "semantic_catalog": candidate["native_semantic_catalog"],
+        "semantic_lens_selection_digest": candidate["semantic_lens_selection_digest"],
         "same_source_total_weight_per_episode": 1.0,
         "native_reviewer_generations_replayed": 3,
         "source_rom_training_rights_acknowledged": True,
         "candidate_still_requires_jeeves_corpus_admission": True,
         "production_jeeves_optimizer_steps": 0,
     }
+
+
+def load_operator_semantic_lens_set(path: Path) -> tuple[str, ...]:
+    """Read an exact 43-key selection; absent files never cause fallback routing.
+
+    This is a human-authored selection of canonical Jeeves lens *keys*, not
+    executable code, training evidence, a model checkpoint or an override
+    of scientific governance.
+    """
+    document, _ = read_receipt_document(path, max_bytes=32768)
+    from skeleton.jeeves.game_emulator_triangle_semantics import SEMANTIC_LENS_BUDGET
+    keys = document.get("lens_keys")
+    if (set(document) != {"schema_version", "lens_keys"}
+            or document.get("schema_version") != "skeleton.jeeves.semantic_lens_set.v1"
+            or type(keys) is not list or len(keys) != SEMANTIC_LENS_BUDGET
+            or any(type(key) is not str or key != key.casefold().strip() or not key
+                   for key in keys)
+            or len(set(keys)) != SEMANTIC_LENS_BUDGET):
+        raise RomStudyError("operator lens-set manifest must name exactly 43 distinct canonical keys")
+    return tuple(keys)
