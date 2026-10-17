@@ -5,13 +5,14 @@ Contract: Internal Systems seal contract, documented in
 branch yet).
 
 The seal is a bearer-style expiring token, not a per-request signature. The
-wire form mirrors the server helper ``skeleton.api.hmac_seal.mint_seal``
-byte-for-byte, but is minted locally with ``hmac``/``hashlib`` so this client
-package never imports upward into ``skeleton.api`` (architecture boundary).
-Round-trip tests against the server ``verify_seal`` keep the two in lockstep.
-The secret comes from ``seal_secret=`` or the ``GF_SEAL_SECRET`` env var
-(falling back to the first ``GF_SEAL_KEYRING`` entry, as the server does); it
-and the token are never logged or put in reprs.
+SDK must not import ``skeleton.api`` (architecture boundary: client code may not
+depend upward on the server API layer, which also pulls in FastAPI), so the
+minting below is a stdlib-only mirror of :func:`skeleton.api.hmac_seal.mint_seal`.
+``tests/test_skeleton_client_seal_parity.py`` asserts byte-for-byte parity with
+the server helper and round-trips through the real ``verify_seal`` so the wire
+form never diverges. The secret comes from ``seal_secret=``, ``GF_SEAL_SECRET``
+or (fallback) the first ``GF_SEAL_KEYRING`` entry; it and the token are never
+logged or put in reprs.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ import re
 import threading
 import time
 import uuid
-from typing import Callable
+from typing import Callable, Dict, Optional
 
 from skeleton.client.errors import SkeletonSealConfigError
 
@@ -32,21 +33,13 @@ REQUEST_ID_HEADER = "x-request-id"
 DEFAULT_TTL_SECS = 300
 REMINT_MARGIN_SECS = 30
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
-_SECRET_ENV = "GF_SEAL_SECRET"
-_KEYRING_ENV = "GF_SEAL_KEYRING"
+_ENV_SECRET = "GF_SEAL_SECRET"
+_ENV_KEYRING = "GF_SEAL_KEYRING"
 
 
-def new_request_id() -> str:
-    return uuid.uuid4().hex[:16]
-
-
-def valid_request_id(value: str) -> bool:
-    return isinstance(value, str) and bool(_REQUEST_ID_RE.fullmatch(value))
-
-
-def _parse_keyring(raw: str | None) -> dict[str, bytes]:
-    """Parse ``kid=secret[,kid=secret...]`` exactly like the server keyring."""
-    out: dict[str, bytes] = {}
+def _parse_keyring(raw: Optional[str]) -> Dict[str, bytes]:
+    """Mirror of the server keyring parser: ``kid=secret[,kid=secret...]``."""
+    out: Dict[str, bytes] = {}
     if not raw:
         return out
     for part in raw.split(","):
@@ -61,34 +54,27 @@ def _parse_keyring(raw: str | None) -> dict[str, bytes]:
     return out
 
 
-def _load_keyring(secret: str | None) -> dict[str, bytes]:
-    ring = _parse_keyring(os.environ.get(_KEYRING_ENV))
-    primary = secret if secret is not None else os.environ.get(_SECRET_ENV)
+def _load_keyring(secret: Optional[str]) -> Dict[str, bytes]:
+    ring = _parse_keyring(os.environ.get(_ENV_KEYRING))
+    primary = secret if secret is not None else os.environ.get(_ENV_SECRET)
     if primary:
         ring = {"default": primary.encode("utf-8"), **{k: v for k, v in ring.items() if k != "default"}}
     return ring
 
 
-def _mint_key(secret: str | None) -> bytes | None:
-    """Pick the mint key the server would: primary secret, else first ring key."""
-    ring = _load_keyring(secret)
-    if not ring:
-        return None
-    return ring.get("default") or next(iter(ring.values()))
-
-
-def mint_seal_token(
+def mint_seal(
     attester: str,
-    ttl_secs: int = DEFAULT_TTL_SECS,
+    ttl_secs: int,
     *,
-    secret: str | None = None,
-    principal: str | None = None,
-    now: float | None = None,
-) -> str | None:
-    """Mint an ``x-gf-seal`` value; ``None`` when no secret/keyring is available.
+    secret: Optional[str] = None,
+    principal: Optional[str] = None,
+    now: Optional[float] = None,
+) -> Optional[str]:
+    """Stdlib mirror of ``skeleton.api.hmac_seal.mint_seal`` (same wire, same key choice).
 
     Without ``principal``: ``{attester}.{expiry}.{hex_hmac_sha256(attester|expiry)}``.
     With ``principal``: ``{principal}.{attester}.{expiry}.{hex_hmac_sha256(principal.attester.expiry)}``.
+    Returns ``None`` when no secret or keyring is available.
     """
     if not attester:
         return None
@@ -97,26 +83,32 @@ def mint_seal_token(
     expiry = int(now if now is not None else time.time()) + ttl_secs
 
     if principal:
-        key = _mint_key(secret)
-        if key is None:
+        ring = _load_keyring(secret)
+        if not ring:
             return None
+        key = ring.get("default") or next(iter(ring.values()))
         payload = f"{principal}.{attester}.{expiry}".encode("utf-8")
-        sig = hmac.new(key, payload, hashlib.sha256).hexdigest()
-        return f"{principal}.{attester}.{expiry}.{sig}"
+        return f"{principal}.{attester}.{expiry}.{hmac.new(key, payload, hashlib.sha256).hexdigest()}"
 
     if secret is not None:
-        resolved: str | None = secret or None
+        resolved = secret or None
     else:
-        resolved = os.environ.get(_SECRET_ENV) or None
-    if resolved:
-        key = resolved.encode("utf-8")
-    else:
-        key = _mint_key("")
-        if key is None:
+        resolved = os.environ.get(_ENV_SECRET) or None
+    if not resolved:
+        ring = _load_keyring("")
+        if not ring:
             return None
+        resolved = (ring.get("default") or next(iter(ring.values()))).decode("utf-8")
     msg = f"{attester}|{expiry}".encode("utf-8")
-    sig = hmac.new(key, msg, hashlib.sha256).hexdigest()
-    return f"{attester}.{expiry}.{sig}"
+    return f"{attester}.{expiry}.{hmac.new(resolved.encode('utf-8'), msg, hashlib.sha256).hexdigest()}"
+
+
+def new_request_id() -> str:
+    return uuid.uuid4().hex[:16]
+
+
+def valid_request_id(value: str) -> bool:
+    return isinstance(value, str) and bool(_REQUEST_ID_RE.fullmatch(value))
 
 
 class RequestSealer:
@@ -141,7 +133,7 @@ class RequestSealer:
             raise SkeletonSealConfigError(f"ttl_secs must be an int > {REMINT_MARGIN_SECS}")
         self._attester = attester
         self._principal = principal
-        self._secret = seal_secret  # None -> read GF_SEAL_SECRET / GF_SEAL_KEYRING at mint time
+        self._secret = seal_secret  # None -> server helper reads GF_SEAL_SECRET
         self._ttl = ttl_secs
         self._clock = clock
         self._lock = threading.Lock()
@@ -152,7 +144,7 @@ class RequestSealer:
         return f"RequestSealer(attester={self._attester!r}, principal={self._principal!r}, ttl_secs={self._ttl})"
 
     def _mint(self, now: float) -> str:
-        token = mint_seal_token(
+        token = mint_seal(
             self._attester, self._ttl, secret=self._secret, principal=self._principal, now=now
         )
         if not token:
