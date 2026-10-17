@@ -67,7 +67,7 @@ export function useMobileOptimization() {
   // Update metrics on dimension change
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', () => {
-      setMetrics(getScreenMetrics());
+      if (mountedRef.current) setMetrics(getScreenMetrics());
     });
 
     return () => subscription.remove();
@@ -142,8 +142,10 @@ export function useMobileOptimization() {
   // Throttled operations
   const throttleRef = useRef<number>(0);
   const throttle = useCallback((callback: () => void, limit: number = 100) => {
+    if (!mountedRef.current) return;
+    const boundedLimit = Number.isFinite(limit) ? Math.max(0, Math.min(limit, 60_000)) : 100;
     const now = Date.now();
-    if (now - throttleRef.current >= limit) {
+    if (now - throttleRef.current >= boundedLimit) {
       throttleRef.current = now;
       callback();
     }

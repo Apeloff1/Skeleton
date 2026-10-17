@@ -39,7 +39,9 @@ function isBatteryCharging(state: Battery.BatteryState): boolean {
 }
 
 export function usePowerAwareness() {
-  const [state, setState] = useState<PowerState>(DEFAULT_STATE);
+  const [state, setState] = useState<PowerState>(() => ({
+    ...DEFAULT_STATE, appState: AppState.currentState || 'active',
+  }));
 
   const updatePerformanceMode = useCallback((level: number, charging: boolean) => {
     if (!validBatteryLevel(level)) return;
@@ -117,16 +119,22 @@ export function usePowerAwareness() {
   }, [updatePerformanceMode]);
 
   const getAnimationDuration = useCallback((baseDuration: number) => {
-    if (state.shouldReduceAnimations) return 0;
-    if (state.performanceMode === 'powersaver') return baseDuration * 0.5;
-    return baseDuration;
-  }, [state.shouldReduceAnimations, state.performanceMode]);
+    if (!Number.isFinite(baseDuration) || baseDuration <= 0) return 0;
+    if (state.appState !== 'active' || state.shouldReduceAnimations) return 0;
+    const base = Math.min(60_000, baseDuration);
+    return state.performanceMode === 'powersaver' ? base * 0.5 : base;
+  }, [state.shouldReduceAnimations, state.performanceMode, state.appState]);
 
   const getPollingInterval = useCallback((baseInterval: number) => {
-    if (state.shouldReducePolling) return baseInterval * 3;
-    if (state.performanceMode === 'powersaver') return baseInterval * 2;
-    return baseInterval;
-  }, [state.shouldReducePolling, state.performanceMode]);
+    // Never return Infinity or a huge timer value: React Native timers can
+    // overflow and unexpectedly spin at millisecond cadence.
+    const base = Number.isFinite(baseInterval)
+      ? Math.max(250, Math.min(300_000, baseInterval)) : 12_000;
+    if (state.appState !== 'active') return Math.max(60_000, base);
+    const multiplier = state.shouldReducePolling ? 3
+      : state.performanceMode === 'powersaver' ? 2 : 1;
+    return Math.min(300_000, base * multiplier);
+  }, [state.shouldReducePolling, state.performanceMode, state.appState]);
 
   return { ...state, getAnimationDuration, getPollingInterval };
 }

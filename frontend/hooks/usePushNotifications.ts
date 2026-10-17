@@ -85,7 +85,20 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
  * every notification would delete unrelated user/app reminders.
  * Persist the replacement ID before cancelling the old ID.
  */
-export async function scheduleDailyReminder(): Promise<void> {
+let reminderInFlight: Promise<void> | null = null;
+
+// Repeated taps while a native scheduling call is pending cannot create
+// multiple recurring notifications. The lease clears on either outcome.
+export function scheduleDailyReminder(): Promise<void> {
+  if (reminderInFlight) return reminderInFlight;
+  const work = scheduleOwnedDailyReminder();
+  reminderInFlight = work;
+  const clear = () => { if (reminderInFlight === work) reminderInFlight = null; };
+  void work.then(clear, clear);
+  return work;
+}
+
+async function scheduleOwnedDailyReminder(): Promise<void> {
   const previousId = await AsyncStorage.getItem(DAILY_REMINDER_KEY);
   const newId = await Notifications.scheduleNotificationAsync({
     content: {
