@@ -59,9 +59,22 @@ class RealCartridgeReplayAdapterTests(unittest.TestCase):
         self.source.mkdir()
 
     def run_adapter(self, *, execute=True, timeout_seconds=90, max_frames=1200):
+        from skeleton.ai.game_builder.studio_native_replay_telemetry import make_checkpoint
+        reference = {
+            "world_digest": self.world,
+            "proof_sha256": sha256(self.proof).hexdigest(),
+            "samples": [make_checkpoint(1, {
+                "Level": 1, "PlayerX": 2, "PlayerY": 1,
+                "Health": 4, "Score": 0, "ScoreHigh": 0,
+                "GemsRemaining": 0, "GameWon": 1, "GameLost": 0,
+            })],
+        }
         with patch(
             "skeleton.ai.game_builder.studio_game_boy_emulator._engine_inputs",
             return_value=(b"html", self.proof, self.world),
+        ), patch(
+            "skeleton.ai.game_builder.studio_game_boy_emulator.reference_cpu_checkpoints",
+            return_value=reference,
         ):
             return qualify_game_boy_emulator(
                 self.root, engine_source=self.source,
