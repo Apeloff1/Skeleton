@@ -622,7 +622,8 @@ def _verify_existing_neural_candidate(
 
 def train_neural_candidate(
     q_receipt_path: Path, output_dir: Path, *,
-    seed: int = 0, width: int = 12, epochs: int = 6,
+    approvals_path: Path, seed: int = 0, width: int = 12,
+    epochs: int = 6,
 ) -> dict[str, Any]:
     """Fit actual *shadow world-model* parameters from audited ROM Q evidence.
 
@@ -657,6 +658,25 @@ def train_neural_candidate(
             or document.get("production_weights_modified") is not False
             or not isinstance(document.get("candidate_evidence"), dict)):
         raise RomStudyError("neural model requires a genuine source Q training receipt")
+    # Historical rights in a Q receipt are NOT sufficient authorization
+    # for a later, separate neural optimization. Re-read the CURRENT explicit
+    # operator review and pin its exact manifest hash and native core/target.
+    source_sha = document.get("source_sha256")
+    grants, approvals_digest = _load_approvals(approvals_path)
+    grant = grants.get(source_sha)
+    if (grant is None or document.get("approval_manifest_sha256") != approvals_digest
+            or document.get("source_size_bytes") != grant["content_size_bytes"]
+            or document.get("core_id") != grant["core_id"]
+            or document.get("target_id") != grant["target_id"]
+            or not isinstance(document.get("registry_digest"), str)):
+        raise RomStudyError("current source rights review does not admit shadow training")
+    independently_verified = _verify_existing_q_receipt(
+        q_receipt_path, source_sha=source_sha, size=grant["content_size_bytes"],
+        grant=grant, approvals_digest=approvals_digest,
+        registry_digest=document["registry_digest"],
+    )
+    if independently_verified != _hash(raw):
+        raise RomStudyError("ROM Q receipt changed before neural optimization")
     evidence_raw = document["candidate_evidence"]
     policy = evidence_raw.get("policy_snapshot")
     if not isinstance(policy, dict):
