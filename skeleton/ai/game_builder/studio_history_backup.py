@@ -12,6 +12,8 @@ import os
 from pathlib import Path
 import re
 import stat
+import shutil
+import tempfile
 
 from .studio_campaign_lock import campaign_lock
 from .studio_execution_history import _read_history
@@ -141,3 +143,78 @@ def snapshot_studio_history(source: Path, destination: Path, *,
             handle.flush()
             os.fsync(handle.fileno())
     return verify_studio_history_snapshot(destination, name=name, identity=identity)
+
+
+def restore_studio_history(snapshot_root: Path, destination: Path, *,
+                           name: str, identity: str) -> dict:
+    """Verify, restore and atomically publish a NEW game run journal directory.
+
+    Never writes over a live campaign, starts a native runtime, silently
+    authorizes a lease, or marks incomplete runs as qualified. A private
+    staging directory is destroyed on failure; the destination is exposed
+    only after independent archive-chain validation succeeds.
+    """
+    snapshot_root = _private(Path(snapshot_root))
+    destination = Path(destination)
+    if not destination.is_absolute() or not destination.name:
+        raise StudioHistoryBackupError("restore destination must be an absolute new directory")
+    parent = _private(destination.parent)
+    source = snapshot_root / name
+    evidence = verify_studio_history_snapshot(snapshot_root, name=name, identity=identity)
+    with campaign_lock(destination):
+        if destination.exists() or destination.is_symlink():
+            raise StudioHistoryBackupError("restoration cannot replace an existing campaign")
+        stage = Path(tempfile.mkdtemp(prefix=".studio-history-restore-", dir=parent))
+        try:
+            manifest = json.loads(_checked_bytes(
+                source / "snapshot_manifest.json", limit=131_072,
+            ))
+            for relative, digest in sorted(manifest["files"].items()):
+                original = source / relative
+                raw = _checked_bytes(original)
+                if _hash(raw) != digest:
+                    raise StudioHistoryBackupError("snapshot file changed during restoration")
+                published = stage / relative
+                published.parent.mkdir(mode=0o700, exist_ok=True)
+                fd = os.open(published, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(raw)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            try:
+                restored = _read_history(stage, identity)
+            except (ValueError, OSError) as exc:
+                raise StudioHistoryBackupError("restored journal chain is inconsistent") from exc
+            count = restored["_archive_stats"]["archive_entry_count"] + len(restored["entries"])
+            if count != evidence["historical_runs"]:
+                raise StudioHistoryBackupError("restored journal entry count differs")
+            # The sealed source must still agree immediately before publication.
+            if verify_studio_history_snapshot(
+                snapshot_root, name=name, identity=identity,
+            ) != evidence:
+                raise StudioHistoryBackupError("snapshot changed during restoration")
+            if destination.exists() or destination.is_symlink():
+                raise StudioHistoryBackupError("restore target appeared during copy")
+            os.rename(stage, destination)
+            if os.name == "posix":
+                try:
+                    fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                    try:
+                        os.fsync(fd)
+                    finally:
+                        os.close(fd)
+                except OSError:
+                    # The restored files are individually fsynced. Lack of
+                    # directory fsync support must not forge release status.
+                    pass
+        finally:
+            if stage.exists():
+                shutil.rmtree(stage)
+    return {
+        **evidence,
+        "backup_restored": True,
+        "restored_to_new_directory": True,
+        "campaign_started_or_resumed": False,
+        "operator_reauthorization_required": True,
+        "restored_history_revalidated": True,
+    }
