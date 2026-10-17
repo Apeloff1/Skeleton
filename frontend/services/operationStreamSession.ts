@@ -160,6 +160,9 @@ export class OperationBrowserSession {
   private current: OperationClientState | null;
   private epoch = 0;
   private pendingReplay: Promise<OperationClientState> | null = null;
+  // Physical cursor mutations are ordered even when a storage driver finishes
+  // after a caller has been aborted or its state generation was invalidated.
+  private cursorTail: Promise<void> = Promise.resolve();
 
   constructor(
     operationId: string,
@@ -209,8 +212,15 @@ export class OperationBrowserSession {
     return state;
   }
 
+  private enqueueCursorWrite<T>(action: () => Promise<T>): Promise<T> {
+    const job = this.cursorTail.then(action);
+    this.cursorTail = job.then(() => undefined, () => undefined);
+    return job;
+  }
+
   private async baseState(): Promise<OperationClientState> {
     if (this.current !== null) return this.current;
+    const generation = this.epoch;
     let cursor = 0;
     try {
       cursor = await this.cursorStore.load(
@@ -219,6 +229,10 @@ export class OperationBrowserSession {
       );
     } catch {
       cursor = 0;
+    }
+    // An in-flight load must not replace a new state published by clearCursor.
+    if (generation !== this.epoch || this.current !== null) {
+      return this.current ?? createOperationClientState(this.operationId);
     }
     if (!Number.isSafeInteger(cursor) || cursor < 0) cursor = 0;
     return this.publish(
@@ -290,11 +304,12 @@ export class OperationBrowserSession {
     if (next.lastSequence !== state.lastSequence) {
       try {
         if (generation !== this.epoch || signal?.aborted) return this.current ?? state;
-        await this.cursorStore.save(
-          this.operationId,
-          this.consumerId,
-          next.lastSequence,
-        );
+        await this.enqueueCursorWrite(async () => {
+          if (generation !== this.epoch) return;
+          await this.cursorStore.save(
+            this.operationId, this.consumerId, next.lastSequence,
+          );
+        });
         if (generation !== this.epoch) return this.current ?? state;
       } catch {
         return this.publish({
@@ -340,6 +355,7 @@ export class OperationBrowserSession {
     signal?: AbortSignal,
     maxAttempts = this.maxResyncAttempts,
   ): Promise<OperationClientState> {
+    const generation = this.epoch;
     const attempts = boundedInteger(maxAttempts, 1, 1, 5);
     let last = failOperationResync(
       createOperationClientState(this.operationId),
@@ -366,6 +382,9 @@ export class OperationBrowserSession {
           error: signal?.aborted ? 'aborted' : 'authoritative_resync_unavailable',
         });
       }
+      if (generation !== this.epoch) {
+        return this.current ?? createOperationClientState(this.operationId);
+      }
       if (!validResyncSnapshot(this.operationId, snapshot)) {
         return this.publish({
           ...last,
@@ -376,11 +395,13 @@ export class OperationBrowserSession {
 
       const floor = snapshot.resume_after_sequence;
       try {
-        await this.cursorStore.save(
-          this.operationId,
-          this.consumerId,
-          floor,
-        );
+        await this.enqueueCursorWrite(async () => {
+          if (generation !== this.epoch) return;
+          await this.cursorStore.save(this.operationId, this.consumerId, floor);
+        });
+        if (generation !== this.epoch) {
+          return this.current ?? createOperationClientState(this.operationId);
+        }
       } catch {
         return this.publish({
           ...last,
@@ -487,8 +508,12 @@ export class OperationBrowserSession {
   async clearCursor(): Promise<void> {
     this.epoch++;
     this.pendingReplay = null;
-    await this.cursorStore.clear(this.operationId, this.consumerId);
+    // Invalidate all in-flight network observations before clearing storage,
+    // and commit the clear AFTER any already-started native cursor write.
     this.current = createOperationClientState(this.operationId);
+    await this.enqueueCursorWrite(() => this.cursorStore.clear(
+      this.operationId, this.consumerId,
+    ));
     this.publish(this.current);
   }
 }
