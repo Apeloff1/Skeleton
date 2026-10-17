@@ -9,12 +9,13 @@ import type { RunPhase } from './hooks';
 import type { Tone } from './run';
 import type { ComposeResult } from './types';
 
-export const COCKPIT_TABS = ['build', 'compose', 'run', 'eras', 'console'] as const;
+export const COCKPIT_TABS = ['build', 'compose', 'plan', 'run', 'eras', 'console'] as const;
 export type CockpitTab = typeof COCKPIT_TABS[number];
 
 export const COCKPIT_TAB_LABELS: Record<CockpitTab, string> = {
   build: 'Questionnaire',
   compose: 'Compose graph',
+  plan: 'Build plan',
   run: 'Forge run',
   eras: 'Eras',
   console: 'Console',
@@ -23,6 +24,7 @@ export const COCKPIT_TAB_LABELS: Record<CockpitTab, string> = {
 export const COCKPIT_TAB_HINTS: Record<CockpitTab, string> = {
   build: 'Answer the guided brief and forge a game.',
   compose: 'See which systems your vision composes, live.',
+  plan: 'Read the plan Jeeves wrote, then open its era or the forge run.',
   run: 'Follow the ten-stage forge pipeline and its verify/repair loop.',
   eras: 'Browse and compare design eras; pin one into the forge.',
   console: 'Talk to the cockpit directly with verbs like STATUS or COMPOSE.',
@@ -32,6 +34,7 @@ export const COCKPIT_TAB_HINTS: Record<CockpitTab, string> = {
 const TAB_ALIASES: Record<string, CockpitTab> = {
   build: 'build', questionnaire: 'build', brief: 'build', q: 'build',
   compose: 'compose', graph: 'compose', blueprint: 'compose',
+  plan: 'plan', 'build-plan': 'plan', jeeves: 'plan',
   run: 'run', forge: 'run', 'forge-run': 'run', pipeline: 'run',
   eras: 'eras', era: 'eras', viewer: 'eras',
   console: 'console', cockpit: 'console', cli: 'console',
@@ -110,6 +113,8 @@ export interface TabSignals {
   consoleErrors?: number;
   questionnaireStep?: number;
   questionnaireSteps?: number;
+  /** Plan lifecycle from planStatus, when a run has been asked for. */
+  planState?: 'empty' | 'planning' | 'ready' | 'degraded' | 'failed';
 }
 
 export interface TabBadge {
@@ -150,10 +155,19 @@ export function tabBadges(state: CockpitScreenState, s: TabSignals): Record<Cock
   const console_: TabBadge = s.consoleErrors
     ? { text: String(s.consoleErrors), tone: 'bad', a11y: `${s.consoleErrors} failed commands` }
     : none;
-  return { build, compose, run, eras, console: console_ };
+  const plan: TabBadge = s.planState === 'planning'
+    ? { text: '…', tone: 'warn', a11y: 'planning' }
+    : s.planState === 'failed'
+      ? { text: '!', tone: 'bad', a11y: 'plan failed' }
+      : s.planState === 'degraded'
+        ? { text: '!', tone: 'warn', a11y: 'plan needs review' }
+        : s.planState === 'ready'
+          ? { text: '✓', tone: 'ok', a11y: 'plan ready' }
+          : none;
+  return { build, compose, plan, run, eras, console: console_ };
 }
 
-/** Accessible tab label: "Forge run, tab 3 of 5, forging". */
+/** Accessible tab label: "Forge run, tab 4 of 6, forging". */
 export function tabA11yLabel(tab: CockpitTab, badge: TabBadge): string {
   const i = COCKPIT_TABS.indexOf(tab) + 1;
   const base = `${COCKPIT_TAB_LABELS[tab]}, tab ${i} of ${COCKPIT_TABS.length}`;

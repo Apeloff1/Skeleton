@@ -22,29 +22,33 @@ function props(tab, extra = {}) {
     badges: m.tabBadges(screen, { runPhase: 'idle', erasCount: ERAS.length, questionnaireStep: 0, questionnaireSteps: q.STEPS.length }),
     questionnaire: { state: q.INITIAL_STATE, dispatch: () => {}, beats: q.FALLBACK_BEATS, eras: ERAS, generations: [], onForge: () => {} },
     compose: { vision: 'craft gear, survive the storm, stash and save', compose: { result: composeFixture, vision: 'craft gear, survive the storm, stash and save', loading: false, error: null }, editable: true },
-    run: { phase: 'done', payload: runFixture, startedAt: 0, finishedAt: 2300 },
-    eras: { eras: ERAS, resultEra: 'boomer_shooter' },
+    plan: { payload: runFixture, eras: ERAS, pinnedEra: 'boomer_shooter', onViewEra: () => {}, onViewRun: () => {}, onBack: () => {} },
+    run: { phase: 'done', payload: runFixture, startedAt: 0, finishedAt: 2300, onViewPlan: () => {}, onViewEra: () => {} },
+    eras: { eras: ERAS, resultEra: 'boomer_shooter', onViewPlan: () => {} },
     console: { entries: [], onSubmit: () => {} },
     ...extra,
   };
 }
 
-test('tab bar: five tabs, one selected, accessible labels with badges', () => {
+test('tab bar: six tabs, one selected, roving tab stop, accessible labels with badges', () => {
   const html = render(h(View, props('build')));
   assert.match(html, /role="tablist"/);
-  const tabs = attrs(html, 'aria-label').filter((l) => / tab \d of 5/.test(l));
+  const tabs = attrs(html, 'aria-label').filter((l) => / tab \d of 6/.test(l));
   assert.deepEqual(tabs, [
-    'Questionnaire, tab 1 of 5, step 1 of 5',
-    'Compose graph, tab 2 of 5',
-    'Forge run, tab 3 of 5',
-    'Eras, tab 4 of 5, 2 eras',
-    'Console, tab 5 of 5',
+    'Questionnaire, tab 1 of 6, step 1 of 5',
+    'Compose graph, tab 2 of 6',
+    'Build plan, tab 3 of 6',
+    'Forge run, tab 4 of 6',
+    'Eras, tab 5 of 6, 2 eras',
+    'Console, tab 6 of 6',
   ]);
+  assert.match(html, /data-testid="cockpit-tab-build"[^>]*tabindex="0"|tabindex="0"[^>]*data-testid="cockpit-tab-build"/);
+  assert.match(html, /data-testid="cockpit-tab-plan"[^>]*tabindex="-1"|tabindex="-1"[^>]*data-testid="cockpit-tab-plan"/);
   assert.equal((html.match(/aria-selected="true"/g) || []).length, 1);
   for (const t of m.COCKPIT_TABS) assert.match(html, new RegExp(`data-testid="cockpit-tab-${t}"`));
 });
 
-for (const tab of ['build', 'compose', 'run', 'eras', 'console']) {
+for (const tab of ['build', 'compose', 'plan', 'run', 'eras', 'console']) {
   test(`renders only the ${tab} panel`, () => {
     const html = render(h(View, props(tab)));
     assert.match(html, new RegExp(`data-testid="cockpit-panel-${tab}"`));
@@ -54,6 +58,26 @@ for (const tab of ['build', 'compose', 'run', 'eras', 'console']) {
     assert.match(text(html), new RegExp(m.COCKPIT_TAB_HINTS[tab].slice(0, 20).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 }
+
+test('plan tab shows the build plan and the paths onward', () => {
+  const html = render(h(View, props('plan')));
+  const t = text(html);
+  assert.match(t, /Slack is unknown because there was no prior walk/);
+  assert.match(html, /data-testid="plan-open-era"/);
+  assert.match(html, /data-testid="plan-open-run"/);
+  assert.match(html, /data-testid="plan-back"/);
+  assert.ok(attrs(html, 'aria-label').some((l) => l.startsWith('Build plan for Boomer Shooter') && l.includes('Slack unknown')));
+});
+
+test('tab arrows move across the designer flow and wrap', () => {
+  const view = load('src/skeletonForge/components/ForgeCockpitView.tsx');
+  assert.equal(view.cockpitTabMove('compose', { key: 'ArrowRight' }), 'plan');
+  assert.equal(view.cockpitTabMove('plan', { key: 'ArrowRight' }), 'run');
+  assert.equal(view.cockpitTabMove('console', { key: 'ArrowDown' }), 'build');
+  assert.equal(view.cockpitTabMove('build', { key: 'Home' }), null);
+  assert.equal(view.cockpitTabMove('eras', { key: 'End', ctrlKey: true }), 'console');
+  assert.equal(view.cockpitTabMove('plan', { key: 'Enter' }), null);
+});
 
 test('run tab shows forge results inside the cockpit', () => {
   const t = text(render(h(View, props('run'))));

@@ -9,12 +9,21 @@
  */
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { gridMove, readKey, rovingTabIndex, tabIndexProp, useRovingIndex, webKeyProps, type KeyEventLike } from '../a11y';
 import { featureMeta, humanize } from '../graph';
 import type { RunPhase } from '../hooks';
 import { formatElapsed, formatScore, pendingStages, summarizeRun, type StageView } from '../run';
 import type { RunPayload } from '../types';
 import { Banner, Button, Card, Meter, SectionTitle, StatusPill } from './primitives';
 import { C, TONE_COLOR, TONE_GLYPH } from './theme';
+
+/** Next pipeline-stage index. The track is a single column, so End jumps to the last stage. */
+export function stageKeyTarget(index: number, event: KeyEventLike, count: number): number | null {
+  const { key, ctrl } = readKey(event);
+  const next = gridMove(index, key, { cols: 1, count, ctrl });
+  if (next === null || next === index) return null;
+  return next;
+}
 
 export interface ForgeRunPanelProps {
   phase: RunPhase;
@@ -27,10 +36,14 @@ export interface ForgeRunPanelProps {
   onCancel?: () => void;
   onRetry?: () => void;
   onViewEra?: (era: string) => void;
+  /** Open the build-plan viewer. */
+  onViewPlan?: () => void;
+  /** Hide the running spinner; the status text stays. */
+  reduceMotion?: boolean;
   testID?: string;
 }
 
-export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onViewEra, testID }: ForgeRunPanelProps) {
+export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onViewEra, onViewPlan, reduceMotion = false, testID }: ForgeRunPanelProps) {
   const elapsed = startedAt != null ? (finishedAt ?? now) - startedAt : 0;
   const sum = React.useMemo(() => summarizeRun(payload), [payload]);
 
@@ -39,7 +52,8 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
       <View testID={testID}>
         <SectionTitle>⚒ Forge run</SectionTitle>
         <Card>
-          <Text style={st.idle}>No run yet. Finish the questionnaire and press “Forge it”. You will see each pipeline stage, the verify-and-repair loop, and the era and blueprint the forge chose.</Text>
+          <Text style={st.idle}>No run yet. Finish the questionnaire and press “Forge it”. You will see each pipeline stage, the verify-and-repair loop, and the era and blueprint the forge chose. The build plan and era viewer stay one step away.</Text>
+          {onViewPlan ? <View style={st.eraRow}><Button label="Open plan" tone="ghost" compact onPress={onViewPlan} a11yHint="Opens the build plan viewer" testID="run-view-plan" /></View> : null}
         </Card>
       </View>
     );
@@ -51,17 +65,18 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
   const headLabel = running ? `Forging… ${formatElapsed(elapsed)}` : phase === 'error' ? 'Run failed' : sum.succeeded ? `Forged in ${formatElapsed(elapsed)}` : 'Run finished with failures';
 
   return (
-    <View testID={testID}>
+    <View testID={testID} accessibilityState={{ busy: running }} aria-busy={running}>
       <SectionTitle hint={sum.runId ? `run ${sum.runId}` : undefined}>⚒ Forge run</SectionTitle>
       <Card>
         <View style={st.head} accessibilityLiveRegion="polite">
           <StatusPill tone={headTone} label={headLabel} testID="run-status" />
-          {running ? <ActivityIndicator color={C.accent} accessibilityLabel="Forge running" /> : null}
+          {running && !reduceMotion ? <ActivityIndicator color={C.accent} accessibilityLabel="Forge running" /> : null}
           <View style={{ flex: 1 }} />
           {running && onCancel ? <Button label="Cancel" tone="ghost" compact onPress={onCancel} testID="run-cancel" /> : null}
           {!running && onRetry ? <Button label="Run again" tone="secondary" compact onPress={onRetry} testID="run-retry" /> : null}
         </View>
         {phase === 'error' && error ? <Banner tone="bad" testID="run-error">{error}</Banner> : null}
+        {phase === 'error' && !payload && onViewPlan ? <Button label="View plan" tone="ghost" compact onPress={onViewPlan} testID="run-view-plan" /> : null}
         <Meter
           ratio={running ? 0 : sum.completed / Math.max(1, sum.total)}
           color={headTone === 'bad' ? C.red : C.green}
@@ -79,7 +94,8 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
             <Text style={st.kicker}>RESULTING ERA</Text>
             <View style={st.eraRow}>
               <Text style={st.era} accessibilityRole="header" testID="run-era">{sum.era ? humanize(sum.era) : '—'}</Text>
-              {sum.era && onViewEra ? <Button label="View era" tone="ghost" compact onPress={() => onViewEra(sum.era as string)} testID="run-view-era" /> : null}
+              {sum.era && onViewEra ? <Button label="View era" tone="ghost" compact onPress={() => onViewEra(sum.era as string)} a11yHint="Opens this era in the era viewer" testID="run-view-era" /> : null}
+              {onViewPlan ? <Button label="View plan" tone="ghost" compact onPress={onViewPlan} a11yHint="Opens the build plan for this run" testID="run-view-plan" /> : null}
             </View>
             <View style={st.facts}>
               <Fact k="Blueprint" v={sum.blueprintId ?? '—'} mono />
@@ -143,14 +159,38 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
 }
 
 function StageTrack({ stages, running }: { stages: StageView[]; running: boolean }) {
+  const [active, setActive] = useRovingIndex(stages.length);
+  const refs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const viaKey = React.useRef(false);
+  React.useEffect(() => {
+    if (!viaKey.current) return;
+    viaKey.current = false;
+    refs.current[active]?.focus?.();
+  }, [active]);
+  const onKey = (event: KeyEventLike) => {
+    const next = stageKeyTarget(active, event, stages.length);
+    if (next === null) return;
+    event.preventDefault?.();
+    viaKey.current = true;
+    setActive(next);
+  };
   return (
-    <View style={st.track} accessibilityRole="list" accessibilityLabel="Pipeline stages">
+    <View style={st.track} accessibilityRole="list" accessibilityLabel="Pipeline stages. Arrow keys move between stages.">
       {stages.map((s, i) => {
         const tone = running ? 'idle' : s.tone;
         const color = TONE_COLOR[tone];
         const status = running ? 'queued' : s.status;
         return (
-          <View key={s.name} style={st.stage} accessible accessibilityLabel={`Stage ${i + 1}, ${s.label}: ${status}${s.durationMs !== null && !running ? `, ${s.durationMs} milliseconds` : ''}${s.error ? `, error ${s.error}` : ''}`} testID={`stage-${s.name}`}>
+          <View
+            key={s.name}
+            ref={(n) => { refs.current[i] = n; }}
+            style={st.stage}
+            accessible
+            accessibilityLabel={`Stage ${i + 1}, ${s.label}: ${status}${s.durationMs !== null && !running ? `, ${s.durationMs} milliseconds` : ''}${s.error ? `, error ${s.error}` : ''}`}
+            {...tabIndexProp(rovingTabIndex(i, active))}
+            {...webKeyProps(onKey)}
+            testID={`stage-${s.name}`}
+          >
             <Text style={[st.stageDot, { color, borderColor: color }]} importantForAccessibility="no">{running ? '·' : TONE_GLYPH[tone]}</Text>
             <View style={{ flex: 1 }}>
               <Text style={st.stageName}>{s.label} <Text style={st.stageId}>{s.name}</Text></Text>

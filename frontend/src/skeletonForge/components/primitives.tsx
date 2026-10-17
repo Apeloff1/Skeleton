@@ -3,9 +3,10 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { tabIndexProp, webKeyProps, type KeyEventLike } from '../a11y';
 import type { Tone } from '../run';
 import { scaledText, useStudioA11y } from './a11yContext';
-import { C, RADIUS, TONE_COLOR, TONE_GLYPH, TOUCH } from './theme';
+import { C, RADIUS, TONE_COLOR, TONE_GLYPH, TOUCH, pressFeedback } from './theme';
 
 export function Card({ children, style, label, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; label?: string; testID?: string }) {
   return (
@@ -34,11 +35,15 @@ export interface ChipProps {
   disabled?: boolean;
   role?: 'radio' | 'button' | 'tab' | 'checkbox';
   a11yLabel?: string;
+  /** Roving tab stop on web; native keeps platform navigation. */
+  tabIndex?: 0 | -1;
+  onKeyDown?: (e: KeyEventLike) => void;
+  focusRef?: (node: { focus?: () => void } | null) => void;
   testID?: string;
 }
 
 /** Selectable pill; colour is never the only signal (✓ + aria state). */
-export function Chip({ label, selected = false, onPress, color = C.blue, disabled = false, role = 'radio', a11yLabel, testID }: ChipProps) {
+export function Chip({ label, selected = false, onPress, color = C.blue, disabled = false, role = 'radio', a11yLabel, tabIndex, onKeyDown, focusRef, testID }: ChipProps) {
   const a11y = useStudioA11y();
   const checked = role === 'radio' || role === 'checkbox' ? selected : undefined;
   return (
@@ -52,10 +57,13 @@ export function Chip({ label, selected = false, onPress, color = C.blue, disable
       aria-checked={checked}
       aria-selected={role === 'tab' ? selected : undefined}
       hitSlop={4}
+      ref={focusRef as React.Ref<React.ComponentRef<typeof Pressable>>}
+      {...webKeyProps(onKeyDown)}
+      {...tabIndexProp(tabIndex)}
       style={({ pressed }) => [
         s.chip,
         selected && { backgroundColor: color + '26', borderColor: color },
-        pressed && !disabled && !a11y.reduceMotion && s.pressed,
+        pressFeedback(pressed && !disabled, a11y.reduceMotion),
         disabled && s.disabled,
       ]}
     >
@@ -96,7 +104,7 @@ export function Button({
         compact && s.btnCompact,
         { backgroundColor: bg },
         tone === 'ghost' && s.btnGhost,
-        pressed && !(disabled || busy) && !a11y.reduceMotion && s.pressed,
+        pressFeedback(pressed && !(disabled || busy), a11y.reduceMotion),
         (disabled || busy) && s.disabled,
       ]}
     >
