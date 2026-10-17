@@ -12,7 +12,7 @@ import subprocess
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.studio_build_qualification import (
     NativeBuildQualificationError, _header, adapter_catalog, qualify_native_build,
-    parse_game_boy_symbols,
+    parse_game_boy_symbols, parse_nes_labels,
 )
 
 
@@ -63,6 +63,18 @@ RGBDS_SYMBOLS = ("; original WRAM symbols\\n"
                  "00:c000 Level\\n00:c001 PlayerX\\n00:c002 PlayerY\\n"
                  "00:c006 Health\\n00:c007 Score\\n00:c008 GemsRemaining\\n"
                  "00:c009 GameWon\\n00:c00a GameLost\\n").replace(chr(92) + "n", chr(10)).encode("ascii")
+
+
+NES_SYMBOLS = (
+    "al 000000 .Level\n"
+    "al 000001 .PlayerX\n"
+    "al 000002 .PlayerY\n"
+    "al 000005 .Health\n"
+    "al 000006 .Score\n"
+    "al 000007 .GemsRemaining\n"
+    "al 000008 .GameWon\n"
+    "al 000009 .GameLost\n"
+).encode("ascii")
 
 
 class NativeBuildQualificationTests(unittest.TestCase):
@@ -120,6 +132,8 @@ class NativeBuildQualificationTests(unittest.TestCase):
                     calls.append(args)
                     if args[0].endswith("rgblink"):
                         (Path(cwd) / "game.sym").write_bytes(RGBDS_SYMBOLS)
+                    if args[0].endswith("ld65"):
+                        (Path(cwd) / "game.sym").write_bytes(NES_SYMBOLS)
                     if args[0].endswith("ld65") or args[0].endswith("rgbfix"):
                         (Path(cwd) / romname).write_bytes(blob)
                     return subprocess.CompletedProcess(args, 0, b"ok", b"")
@@ -135,7 +149,7 @@ class NativeBuildQualificationTests(unittest.TestCase):
                     result = qualify_native_build(
                         project, target, authorized=True, execute=True,
                         output=destination,
-                        output_symbols=symbols if target != "nintendo_famicom" else None,
+                        output_symbols=symbols,
                     )
                 self.assertTrue(result.toolchain_available)
                 self.assertTrue(result.tools_invoked)
@@ -143,9 +157,11 @@ class NativeBuildQualificationTests(unittest.TestCase):
                 self.assertTrue(result.rom_header_verified)
                 self.assertEqual(result.binary_sha256, sha256(blob).hexdigest())
                 self.assertEqual(destination.read_bytes(), blob)
-                if target != "nintendo_famicom":
-                    self.assertEqual(symbols.read_bytes(), RGBDS_SYMBOLS)
-                    self.assertEqual(result.symbol_sha256, sha256(RGBDS_SYMBOLS).hexdigest())
+                expected_labels = (NES_SYMBOLS if target == "nintendo_famicom"
+                                   else RGBDS_SYMBOLS)
+                self.assertEqual(symbols.read_bytes(), expected_labels)
+                self.assertEqual(result.symbol_sha256,
+                                 sha256(expected_labels).hexdigest())
                 self.assertEqual(len(calls), 2 if target == "nintendo_famicom" else 3)
                 receipt = result.as_receipt()
                 self.assertFalse(receipt["emulator_playthrough_verified"])
@@ -183,6 +199,20 @@ class NativeBuildQualificationTests(unittest.TestCase):
         ):
             with self.subTest(data=data), self.assertRaises(NativeBuildQualificationError):
                 parse_game_boy_symbols(data)
+
+    def test_nes_linker_zeros_page_label_manifest_is_exact(self):
+        labels = parse_nes_labels(NES_SYMBOLS)
+        self.assertEqual(labels["GameWon"], 0x08)
+        self.assertEqual(labels["PlayerY"], 0x02)
+        for corrupt in (
+            NES_SYMBOLS.replace(b".GameWon", b".WrongName"),
+            NES_SYMBOLS.replace(b"000008 .GameWon", b"000009 .GameWon"),
+            NES_SYMBOLS + b"al 0000FF .Score\n",
+            NES_SYMBOLS.replace(b"000008 .GameWon", b"000108 .GameWon"),
+        ):
+            with self.subTest(corrupt=corrupt):
+                with self.assertRaises(NativeBuildQualificationError):
+                    parse_nes_labels(corrupt)
 
     def test_corrupt_cartridge_and_wrong_rights_target_are_rejected(self):
         for family, data in (("nes", b"BAD"), ("gb", bytes(32768)),
