@@ -142,8 +142,9 @@ def test_session_plans_and_reviews_builder_output(tmp_path: Path):
     assert calls["playtest_mode"] == "off"
     assert report.score["built"] == 1
     assert report.score["loop_works"] == 1
-    assert report.score["boots"] == 0
-    assert report.score["total"] < 1.0
+    assert report.score["spec_valid"] == 1
+    assert report.score["boots"] == "not_measured"
+    assert report.score["total"] == 1.0
     assert (tmp_path / ".studio" / "checkpoint.json").is_file()
     assert not (tmp_path / "playable.json").exists()
     assert "production" in report.artefacts["director"] or "pillar" in report.artefacts["director"]
@@ -333,14 +334,14 @@ def test_dry_run_does_not_call_the_builder(tmp_path: Path):
     assert not (tmp_path / "playable.json").exists()
 
 
-def test_budget_stops_before_the_builder(tmp_path: Path):
+def test_deadline_is_passed_into_the_builder(tmp_path: Path):
     clock = _Clock()
     clock.now = 0.0
-    called = {"builder": 0}
+    seen: dict[str, float] = {}
 
-    def builder(*args, **kwargs):
-        called["builder"] += 1
-        return {}
+    def builder(brief: str, *, planner, qa, playtest_mode: str, out: str, deadline_s: float):
+        seen["deadline_s"] = deadline_s
+        return _passing_builder(brief, planner=planner, qa=qa, playtest_mode=playtest_mode, out=out)
 
     session = StudioSession(
         BRIEF,
@@ -351,8 +352,8 @@ def test_budget_stops_before_the_builder(tmp_path: Path):
     )
     clock.now = 121.0
     report = session.run()
-    assert report.status == "budget"
-    assert called["builder"] == 0
+    assert seen["deadline_s"] == 0.0
+    assert report.status == "completed"
 
 
 def test_held_out_briefs_are_not_the_golden_set():
@@ -381,14 +382,92 @@ def test_negative_controls_score_low_without_a_builder():
     assert score["total"] <= 0.25
 
 
-def test_fast_benchmark_scores_real_builds_and_can_fail(tmp_path: Path):
+def test_successful_godot_log_scores_a_boot():
+    spec = compile_brief(BRIEF)
+    proof = "CORE_LOOP_OK genre=platformer marker=goal:2"
+    score = score_build(
+        {
+            "spec": spec,
+            "files": {"project.godot": "config_version=5\n"},
+            "file_names": ["project.godot"],
+            "check": {"ok": True, "problems": []},
+            "core_loop": {"passed": True, "marker": "goal:2"},
+            "playtest": {"passed": True, "status": "passed", "steps": [{"log_tail": proof + "\n"}]},
+            "proof": proof,
+        }
+    )
+    assert score["boots"] == 1
+    assert score["spec_valid"] == 1
+    assert score["total"] == 1.0
+
+
+def test_playtest_plan_requires_boot_when_godot_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from skeleton.automation.swarm.studio.eval import playtest_plan
+
+    binary = tmp_path / "godot"
+    binary.write_text("", encoding="utf-8")
+    monkeypatch.setenv("SKELETON_GODOT_BIN", str(binary))
+    mode, path = playtest_plan()
+    assert mode == "require"
+    assert path == str(binary)
+
+
+def test_positive_bar_accepts_a_perfect_score_and_requires_a_real_boot():
+    from skeleton.automation.swarm.studio.eval import _positive_ok
+
+    def case(boots):
+        score = {"built": 1, "boots": boots, "loop_works": 1, "spec_valid": 1, "total": 1.0}
+        return {
+            "expect_genre": "top_down_shooter",
+            "bare": {"build_ok": True, "genre": "top_down_shooter", "score": dict(score)},
+            "studio": {
+                "build_ok": True,
+                "genre": "top_down_shooter",
+                "score": dict(score),
+                "additions": {"production_notes": 1, "qa_review": 1},
+            },
+        }
+
+    assert _positive_ok(case("not_measured"), require_boot=False) is True
+    assert _positive_ok(case(1), require_boot=True) is True
+    assert _positive_ok(case(0), require_boot=True) is False
+    assert _positive_ok(case("not_measured"), require_boot=True) is False
+
+
+def test_gameforge_lane_collects_the_studio_suite():
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows-archive" / "ci.yml").read_text(encoding="utf-8")
+    start = workflow.index('name: "Skeleton GameForge"')
+    job = workflow[start:workflow.index("java-accelerators:", start)]
+    assert "skeleton/testing/test_game_studio_swarm.py" in job
+
+
+def test_fast_benchmark_scores_studio_against_the_bare_builder(tmp_path: Path):
+    from skeleton.automation.swarm.studio.eval import playtest_plan
+
     report = run_benchmark(fast=True, workspace_root=tmp_path)
+    case = report["cases"][0]
+    mode, _binary = playtest_plan()
     assert report["subset"] == "fast"
     assert report["ok"] is True
-    assert report["mean_total"] < 1.0
-    assert report["cases"][0]["score"]["boots"] == 0
-    assert report["cases"][0]["score"]["built"] == 1
-    assert all(case["score"]["total"] <= 0.25 for case in report["negatives"])
+    assert report["playtest_mode"] == mode
+    assert case["bare"]["score"]["built"] == 1
+    assert case["studio"]["score"]["built"] == 1
+    assert case["studio"]["additions"] == {"production_notes": 1, "qa_review": 1}
+    assert "total" in case["delta"]
+    assert case["delta"]["production_notes"] == 1
+    assert case["delta"]["qa_review"] == 1
+    if mode == "require":
+        assert case["bare"]["score"]["boots"] == 1
+        assert case["studio"]["score"]["boots"] == 1
+        assert case["delta"]["boots"] == 0
+    else:
+        assert mode == "off"
+        assert case["bare"]["score"]["boots"] == "not_measured"
+        assert case["studio"]["score"]["boots"] == "not_measured"
+        assert case["studio"]["score"]["total"] == 1.0
+        assert case["delta"]["boots"] == "not_measured"
+    assert all(item["score"]["total"] <= 0.25 for item in report["negatives"])
     from scripts.eval_game_studio_swarm import main
 
     assert main(["--fast", "--workspace", str(tmp_path / "cli")]) == 0

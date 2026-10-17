@@ -17,10 +17,11 @@ Levels covered by this package:
 - L07 recovery: resume restores every tracked file; finished roles are not repeated.
 - L08 observability: session events for waves, handoffs, QA, and repair requests.
 - L09 economics: tool calls, denied calls, waves, repairs, estimated units, 120s budget.
-- L10 evaluation: held-out briefs scored on builder output, plus negative controls.
+- L10 evaluation: held-out briefs scored for the studio and the bare builder, plus negative controls.
 - L11 rollback: ``StudioSession.rollback`` rewrites and deletes workspace files.
 - L12 operator controls: ``StudioControls`` waves, repairs, top_k, playtest mode, dry run.
-- L13 gap: headless boot stays at zero unless a Godot log contains ``CORE_LOOP_OK``.
+- L13 gap: boots is ``not_measured`` until a Godot playtest runs. A measured boot
+  is 1 only when the log contains ``CORE_LOOP_OK`` and the proof line.
   This package does not fork ``Forge.materialise``.
 """
 

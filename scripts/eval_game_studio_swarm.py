@@ -1,8 +1,10 @@
-"""Score held-out game briefs against build_playable_game.
+"""Score the studio swarm against the bare builder on held-out briefs.
 
-The fast subset is one held-out build plus the negative controls. Exit status
-is 0 only when positives clear the build/core-loop bar and negatives stay low.
-A perfect 1.0 mean is rejected: playtest-off runs cannot claim a Godot boot.
+The fast subset is one held-out brief plus the negative controls. Exit status
+is 0 when both the studio and the bare builder clear the build and core-loop
+bar, the studio attaches planner notes and a QA review, and negatives stay
+low. Boots is not_measured while playtest is off. When Godot is available the
+runs require a real boot.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from skeleton.automation.swarm.studio import run_benchmark
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the game-studio swarm benchmark.")
     parser.add_argument("--fast", action="store_true", help="Run only the small CI subset.")
-    parser.add_argument("--workspace", default=None, help="Unused. Kept so older invocations still parse.")
+    parser.add_argument("--workspace", default=None, help="Directory for studio eval workspaces.")
     args = parser.parse_args(argv)
     workspace = Path(args.workspace) if args.workspace else None
     report = run_benchmark(fast=args.fast, workspace_root=workspace)

@@ -84,6 +84,7 @@ jobs:
             skeleton/testing/test_swarm_forget_retention.py \
             skeleton/testing/test_server_recovery_health.py \
             skeleton/testing/test_server_swarm_bundle.py \
+            skeleton/testing/test_game_studio_swarm.py \
             skeleton/testing/test_swarm_operator_tenant_recovery.py \
             skeleton/testing/test_swarm_operator_retention_api.py \
             skeleton/testing/test_swarm_operator_cutover_fencing.py

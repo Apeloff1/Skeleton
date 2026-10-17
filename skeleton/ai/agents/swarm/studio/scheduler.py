@@ -8,6 +8,7 @@ wave, including files that changed after the snapshot and files created later.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import time
 from collections.abc import Callable, Mapping
@@ -48,7 +49,7 @@ SESSION_BUDGET_S = 120.0
 @dataclass
 class StudioControls:
     max_waves: int = 24
-    max_repairs: int = 2
+    max_repairs: int = 1
     top_k: int = 5
     dry_run: bool = False
     playtest_mode: str = "off"
@@ -57,8 +58,8 @@ class StudioControls:
     def __post_init__(self) -> None:
         if isinstance(self.max_waves, bool) or not isinstance(self.max_waves, int) or not 1 <= self.max_waves <= 24:
             raise ValueError("max_waves must be an integer from 1 to 24")
-        if isinstance(self.max_repairs, bool) or not isinstance(self.max_repairs, int) or not 0 <= self.max_repairs <= 2:
-            raise ValueError("max_repairs must be an integer from 0 to 2")
+        if isinstance(self.max_repairs, bool) or not isinstance(self.max_repairs, int) or not 0 <= self.max_repairs <= 1:
+            raise ValueError("max_repairs must be 0 or 1")
         if not isinstance(self.dry_run, bool):
             raise TypeError("dry_run must be a bool")
         if self.playtest_mode not in {"off", "auto", "require"}:
@@ -128,6 +129,7 @@ class StudioSession:
         self.waves_run = 0
         self._waves: list[dict[str, Any]] = []
         self._build: dict[str, Any] | None = None
+        self.build: dict[str, Any] | None = None
         self._phase = "new"
         self._last_report: StudioReport | None = None
         self.dag = SwarmDag()
@@ -152,9 +154,6 @@ class StudioSession:
         if self.rejected:
             self._persist()
             return self._finish("rejected")
-        if self._over_budget():
-            self._persist()
-            return self._finish("budget")
         self._ensure_tasks()
         self._drain(max_waves)
         self._persist()
@@ -162,18 +161,9 @@ class StudioSession:
             return self._finish("partial")
         if self.controls.dry_run:
             return self._finish("dry_run")
-        if self._over_budget():
-            return self._finish("budget")
         if self._build is None:
-            self._build = dict(
-                self._builder(
-                    self.brief_text,
-                    planner=self.as_planner,
-                    qa=self.as_qa,
-                    playtest_mode=self.controls.playtest_mode,
-                    out=str(self.workspace / "project"),
-                )
-            )
+            self._build = dict(self._call_builder())
+            self.build = self._build
             self._persist()
         return self._finish(self._status())
 
@@ -204,6 +194,7 @@ class StudioSession:
         self.memory = ProjectMemory(self.run_id or "studio", top_k=self.controls.top_k)
         self.memory.restore(list(chosen.get("memory") or []))
         self._build = None
+        self.build = None
         self.latest_playtest = None
         self._phase = "rolled_back"
         self._rebuild_dag()
@@ -212,9 +203,11 @@ class StudioSession:
         return self._finish("rolled_back")
 
     def as_planner(self, spec: Mapping[str, Any]) -> dict[str, Any]:
-        """Planner hook. Finished waves are not repeated."""
-        if self._over_budget():
-            return dict(spec)
+        """Planner hook. Finished waves are not repeated.
+
+        The hook runs after ``GameForgeRun`` has materialised, so these notes
+        enrich the committed spec. They do not steer materialise.
+        """
         if not self.tasks and isinstance(spec, Mapping):
             self.spec = dict(spec)
             self._ensure_tasks()
@@ -299,9 +292,6 @@ class StudioSession:
             raise ValueError("max_waves must be a positive integer")
         ran = 0
         while ran < limit:
-            if self._over_budget():
-                self._event("budget", "planning stopped at 120s")
-                break
             wave = self.dag.ready_wave()
             if not wave:
                 break
@@ -425,15 +415,26 @@ class StudioSession:
     def _plan_complete(self) -> bool:
         return bool(self.tasks) and all(task.id in self.artefacts for task in self.tasks)
 
-    def _over_budget(self) -> bool:
-        return (self._clock() - self._started) > self.controls.budget_s
+    def _remaining_s(self) -> float:
+        """Seconds left in the 120s budget. The builder enforces this deadline."""
+        elapsed = self._clock() - self._started
+        return max(0.0, self.controls.budget_s - elapsed)
+
+    def _call_builder(self) -> Mapping[str, Any]:
+        kwargs: dict[str, Any] = {
+            "planner": self.as_planner,
+            "qa": self.as_qa,
+            "playtest_mode": self.controls.playtest_mode,
+            "out": str(self.workspace / "project"),
+        }
+        if _accepts(self._builder, "deadline_s"):
+            kwargs["deadline_s"] = self._remaining_s()
+        return self._builder(self.brief_text, **kwargs)
 
     def _status(self) -> str:
         review = self.latest_playtest or {}
         if review.get("passed") is True:
             return "completed"
-        if self._build is None:
-            return "failed"
         return "failed"
 
     def _finish(self, status: str) -> StudioReport:
@@ -491,6 +492,16 @@ def _brief_text(raw: str | Mapping[str, Any]) -> str:
     raise ValueError("brief must be a string")
 
 
+def _accepts(fn: Callable[..., Any], name: str) -> bool:
+    try:
+        parameters = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
+    if name in parameters:
+        return True
+    return any(item.kind is inspect.Parameter.VAR_KEYWORD for item in parameters.values())
+
+
 def _default_builder(
     brief: str,
     *,
@@ -498,14 +509,19 @@ def _default_builder(
     qa: Callable[[Mapping[str, Any]], Mapping[str, Any]],
     playtest_mode: str,
     out: str,
+    deadline_s: float | None = None,
 ) -> dict[str, Any]:
     from skeleton.forge.game_builder import build_playable_game
 
-    return build_playable_game(
-        brief,
-        planner=planner,
-        qa=qa,
-        playtest_mode=playtest_mode,
-        out=out,
-        overwrite=True,
-    )
+    kwargs: dict[str, Any] = {
+        "planner": planner,
+        "qa": qa,
+        "playtest_mode": playtest_mode,
+        "out": out,
+        "overwrite": True,
+    }
+    if deadline_s is not None and _accepts(build_playable_game, "deadline_s"):
+        kwargs["deadline_s"] = deadline_s
+    elif deadline_s is not None and _accepts(build_playable_game, "deadline"):
+        kwargs["deadline"] = deadline_s
+    return build_playable_game(brief, **kwargs)
