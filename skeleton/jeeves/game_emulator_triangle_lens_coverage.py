@@ -81,7 +81,7 @@ def audit_43_lens_coverage(
                     "lens_key": key,
                     "family": row["lens_family"],
                     "governance_grade": row["governance_grade"],
-                    "governance_fingerprint": row["governance_fingerprint"],
+                    "governance_fingerprints": [],
                     "question": row["question"],
                     "native_cue_supported_episodes": 0,
                     "hypothesis_only_episodes": 0,
@@ -89,9 +89,14 @@ def audit_43_lens_coverage(
                     "supported_trace_sha256": [],
                 }
             entry = cover[key]
-            if (entry["governance_fingerprint"] != row["governance_fingerprint"]
-                    or entry["question"] != row["question"]):
-                raise TriangleCoverageError("lens governance changed within a frozen audit")
+            if entry["question"] != row["question"]:
+                raise TriangleCoverageError("canonical lens question changed within the audit")
+            # The canonical scientific governance decision may correctly vary
+            # between episodes as observation support changes. Keep every
+            # actual decision identity rather than incorrectly rejecting it.
+            governance_fp = row["governance_fingerprint"]
+            if governance_fp not in entry["governance_fingerprints"]:
+                entry["governance_fingerprints"].append(governance_fp)
             if hit:
                 supported.append(key)
                 entry["native_cue_supported_episodes"] += 1

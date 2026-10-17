@@ -577,3 +577,24 @@ the corresponding local model prompt and candidate corpus. Rehashing and
 substituting an unrelated frame or observation does not pass route replay.
 This is source attribution for *questions*, not a claim of semantic vision
 or an independent game sample.
+
+### Auditing all 43 authored lenses across gameplay episodes
+
+Use `triangle-lens-audit` to expose a **cross-episode 43-lens evidence
+matrix**, with canonical lens keys, governed lens questions, exact positive
+native observation cue counts, hypothesis-only cases, and suggested next
+measurements for missing optical frames or controller counterfactual probes.
+
+```sh
+python -m scripts.training.rom_study triangle-lens-audit \
+  --receipt /private/rom-receipts/rom-<source>-<run>.json \
+  --source-sha256 <full-64-character-source-digest> \
+  --start-episode 0 --limit 8
+```
+
+Supply `--semantic-lens-set /private/approved-lens-set.json` when a manually
+approved exact set of 43 keys is needed. Output is read-only and digest-pinned
+to the real source evidence and original Jeeves scientific governance.
+`next_episode_index` provides bounded pagination (maximum 16 episodes per
+request). The audit **does not** claim semantic inference, inspect unrecorded
+video, run a language model or inflate independent gameplay examples.

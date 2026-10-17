@@ -21,6 +21,15 @@ from skeleton.ai.training.rom_fleet_audit import audit_fleet_page, audit_fleet_a
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="operation", required=True)
+    coverage = commands.add_parser(
+        "triangle-lens-audit",
+        help="audit evidence support for all 43 canonical Jeeves lenses across native episodes",
+    )
+    coverage.add_argument("--receipt", required=True, type=Path)
+    coverage.add_argument("--source-sha256", required=True)
+    coverage.add_argument("--start-episode", type=int, default=0)
+    coverage.add_argument("--limit", type=int, default=8)
+    coverage.add_argument("--semantic-lens-set", type=Path)
     lenses = commands.add_parser(
         "triangle-lenses",
         help="inspect 43 canonical governed Jeeves lenses selected for a source episode",
@@ -163,6 +172,34 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "triangle-lens-audit":
+            from skeleton.ai.training.rom_triangle_campaign import (
+                read_receipt_document, load_operator_semantic_lens_set,
+            )
+            from skeleton.ai.training.rom_study import verified_rom_receipt
+            from skeleton.jeeves.game_emulator_triangle_lens_coverage import (
+                audit_43_lens_coverage, verify_43_lens_coverage,
+            )
+            verified = verified_rom_receipt(
+                args.receipt, expected_source_sha256=args.source_sha256,
+            )
+            document, digest = read_receipt_document(args.receipt)
+            if digest != verified["receipt_sha256"]:
+                raise RomStudyError("43-lens coverage source changed since audit")
+            pinned = (
+                load_operator_semantic_lens_set(args.semantic_lens_set)
+                if args.semantic_lens_set is not None else ()
+            )
+            report = audit_43_lens_coverage(
+                document["candidate_evidence"], document["training_triangle"],
+                start_episode=args.start_episode, limit=args.limit,
+                requested_keys=pinned,
+            )
+            verify_43_lens_coverage(
+                document["candidate_evidence"], document["training_triangle"], report,
+            )
+            print(json.dumps(report, sort_keys=True))
+            return 0
         if args.operation == "execute-43-lenses":
             from skeleton.ai.training.rom_triangle_campaign import (
                 execute_native_43_lens_review, load_operator_semantic_lens_set,
