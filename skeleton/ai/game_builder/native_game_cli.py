@@ -152,7 +152,7 @@ def build_game(
         artifact_type = "native_spectrum_48k_z80_tap_source"
         digest = project.content_digest
     elif kind in ("sms_sdcc_z80", "gg_sdcc_z80"):
-        project = compile_native_sega_8bit(world, source, target, authorized=True)
+        project = compile_native_sega_8bit(world, source, target, authorized=True, tile_art=tile_art)
         folder = export_native_sega_8bit(project, output, authorized=True)
         artifact_type = "native_sega_8bit_sdcc_vdp_original_game_source"
         digest = project.content_digest
@@ -172,7 +172,7 @@ def build_game(
         artifact_type = "native_vectrex_mc6809_vector_cartridge_source"
         digest = project.content_digest
     elif kind == "sms_z80asm":
-        project = compile_native_sms(world, source, authorized=True)
+        project = compile_native_sms(world, source, authorized=True, tile_art=tile_art)
         folder = export_native_sms(project, output, authorized=True)
         artifact_type = "native_sms_z80_mode4_32kb_cartridge_source"
         digest = project.content_digest
