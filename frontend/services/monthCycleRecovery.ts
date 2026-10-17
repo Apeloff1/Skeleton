@@ -69,10 +69,19 @@ async function observeBounded(
   });
   const timer = setTimeout(() => own.abort(), timeoutMs);
   try {
-    return await Promise.race([
+    const result: unknown = await Promise.race([
       Promise.resolve().then(() => worker(record, own.signal)),
       aborted,
     ]);
+    if (!result || typeof result !== 'object' ||
+        !('phase' in result)) return { phase: 'disconnected' };
+    const value = result as MonthCycleObservation;
+    if (!['running', 'disconnected', 'completed', 'failed', 'cancelled'].includes(value.phase) ||
+        (value.phase !== 'disconnected' && value.cursor !== undefined &&
+          (!Number.isSafeInteger(value.cursor) || value.cursor < 0))) {
+      return { phase: 'disconnected' };
+    }
+    return value;
   } catch {
     return signal.aborted ? null : { phase: 'disconnected' };
   } finally {

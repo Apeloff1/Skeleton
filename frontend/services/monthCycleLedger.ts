@@ -131,7 +131,16 @@ export class MonthCycleLedger {
         const next = { ...payload, revision: payload.revision + 1 };
         if (!clockValue(next.revision)) throw new Error('Ledger revision overflow');
         const writeKey = next.revision % 2 === 1 ? this.firstKey : this.secondKey;
-        await this.storage.setItem(writeKey, serialize(next));
+        const encoded = serialize(next);
+        await this.storage.setItem(writeKey, encoded);
+        // A native write acknowledgement is necessary but not sufficient:
+        // verify the exact slot before declaring its revision committed.
+        // If the storage adapter truncates/garbles the payload, the prior
+        // alternating slot remains the last known-good receipt.
+        const confirmed = await this.storage.getItem(writeKey);
+        if (confirmed !== encoded) {
+          throw new Error('Month-cycle durable write failed verification');
+        }
       }
       return result;
     } finally {
