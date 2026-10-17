@@ -321,12 +321,16 @@ export async function resilientFetch<T = any>(
   const hasHeaders = Object.keys(options.headers || {}).length > 0;
   const hosts = isGet && !hasHeaders ? configuredHosts : configuredHosts.slice(0, 1);
   const primaryUrl = resolveUrl(path, hosts[0]);
-  const key = cacheKey(method, primaryUrl, options.body) + (options.rawText ? ':raw' : ':json');
+  const maxResponseChars = boundedResponseChars(options.maxResponseChars);
+  // Deduplication/cache identity includes decode mode, response admission
+  // budget and failover ladder, not only the first URL.
+  const key = cacheKey(method, primaryUrl, options.body) +
+    (options.rawText ? ':raw:' : ':json:') + maxResponseChars + ':' +
+    _djb2(hosts.join('|'));
   const cfg = { ...DEFAULTS, ...options };
   const start = Date.now();
   const dedupe = isGet && cfg.dedupe && !hasHeaders && !options.signal;
   const wantsCache = isGet && cfg.cacheTtlMs > 0 && !hasHeaders;
-  const maxResponseChars = boundedResponseChars(options.maxResponseChars);
   const attemptsPerHost = 1 + boundedRetries(options.retries, method, false);
   let ownsProbe = false;
   let probeGeneration = 0;
@@ -486,7 +490,7 @@ export async function resilientFetch<T = any>(
           }
 
           // Write cache
-          if (wantsCache) {
+          if (wantsCache && BREAKER.generation === breakerGeneration) {
             const entry: CacheEntry = { data: parsed, ts: Date.now(), chars: text.length };
             _memSet(key, entry);
             if (cfg.persist) { persistSet(key, entry); /* fire-and-forget */ }
