@@ -85,8 +85,10 @@ function startStudioMedia(){
   ambience.loop = true;
  }
  ambience.volume = musicMuted ? 0 : musicVolume;
- const running = ambience.play();
- if(running && typeof running.catch === "function")running.catch(()=>{});
+ if(ambience.paused){
+  const running = ambience.play();
+  if(running && typeof running.catch === "function")running.catch(()=>{});
+ }
 }
 function playStudioCue(kind){
  if(!STUDIO_MEDIA || musicMuted || typeof Audio === "undefined")return;
