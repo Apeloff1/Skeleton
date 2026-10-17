@@ -12,27 +12,48 @@ import unittest
 from skeleton.ai.game_builder.native_game_cli import build_game
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_compiled_psg_parity import (
-    CompiledPSGError, inspect_compiled_psg,
+    CompiledPSGError, inspect_compiled_psg, _effect_bytes,
 )
 from skeleton.ai.game_builder.studio_native_psg import (
     compose_native_psg, console_psg_registers,
 )
 
 
-def cartridge(target: str, notes: bytes) -> tuple[bytes, bytes, int]:
+def cartridge(target: str, notes: bytes, *, density: int = 2) -> tuple[bytes, bytes, int]:
     if len(notes) != 16:
         raise ValueError("authored eight-note low/high tables required")
+    period = console_psg_registers(
+        compose_native_psg("forest", 733, density), target,
+    )
     if target == "nintendo_famicom":
         program = bytearray(32768)
         program[0x100:0x110] = notes
+        for index in range(3):
+            start = 0x130 + 17 * index
+            program[start:start + 17] = _effect_bytes(
+                target, enabled=density > 0,
+                low=period["events_low"][index],
+                high=period["events_high"][index],
+            )
         rom = (
             b"NES\x1a" + bytes((2, 1)) + bytes(10)
             + bytes(program) + bytes(8192)
         )
-        symbols = b"al 008100 .OriginalMusicLow\nal 008108 .OriginalMusicHigh\n"
+        symbols = (
+            b"al 008100 .OriginalMusicLow\nal 008108 .OriginalMusicHigh\n"
+            b"al 008130 .SoundPickup\nal 008141 .SoundHazard\n"
+            b"al 008152 .SoundGoal\n"
+        )
         return rom, symbols, 16 + 0x100
     program = bytearray(32768)
     program[0x280:0x290] = notes
+    for index in range(3):
+        start = 0x2A0 + 15 * index
+        program[start:start + 15] = _effect_bytes(
+            target, enabled=density > 0,
+            low=period["events_low"][index],
+            high=period["events_high"][index],
+        )
     if target == "nintendo_game_boy_color":
         program[0x143] = 0x80
     check = 0
@@ -41,7 +62,11 @@ def cartridge(target: str, notes: bytes) -> tuple[bytes, bytes, int]:
     program[0x14D] = check
     return (
         bytes(program),
-        b"00:0280 OriginalMusicLow\n00:0288 OriginalMusicHigh\n",
+        (
+            b"00:0280 OriginalMusicLow\n00:0288 OriginalMusicHigh\n"
+            b"00:02a0 SoundPickup\n00:02af SoundHazard\n"
+            b"00:02be SoundGoal\n"
+        ),
         0x280,
     )
 
@@ -88,7 +113,7 @@ class OriginalCompiledPSGTests(unittest.TestCase):
                     raw = bytes((
                         *registers["notes_low"], *registers["notes_high"],
                     ))
-                    rom, symbols, _ = cartridge(target, raw)
+                    rom, symbols, _ = cartridge(target, raw, density=density)
                     evidence = inspect_compiled_psg(
                         rom, symbols, source, target=target,
                     )
@@ -112,7 +137,7 @@ class OriginalCompiledPSGTests(unittest.TestCase):
                 rom, symbols, offset = cartridge(
                     target, bytes((
                         *registers["notes_low"], *registers["notes_high"],
-                    )),
+                    )), density=3,
                 )
                 for position in (0, 7, 8, 15):
                     changed = bytearray(rom)
