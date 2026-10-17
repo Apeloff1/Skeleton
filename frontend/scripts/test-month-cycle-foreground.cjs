@@ -74,7 +74,7 @@ test('cold foreground start schedules exactly one immediate bounded pass', async
     assert.equal([...f.timers.values()][0].ms, 15 * 60_000);
   } finally { driver.dispose(); f.restore(); }
 });
-test('inactive startup leaves the scheduler dormant until visible', () => {
+test('inactive startup leaves the scheduler dormant until visible', async () => {
   const f = fixture({ initial: 'background' });
   const driver = new MonthCycleForegroundDriver(f.platform, f.recovery);
   try {
