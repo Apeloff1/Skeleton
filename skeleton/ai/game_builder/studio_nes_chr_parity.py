@@ -40,13 +40,34 @@ def inspect_compiled_nes_chr(
     actual = rom[start:start + len(tiles)]
     if actual != tiles:
         raise NESCHRIntegrityError("compiled cartridge CHR pixels differ from generated NES art")
+    frames_path = Path(source_project) / "assets/tiles/hero_animation.bin"
+    verified_frames = 0
+    frame_digest = None
+    if frames_path.exists() or frames_path.is_symlink():
+        try:
+            frame_bytes = _regular(frames_path, 64)
+        except (OSError, ValueError) as exc:
+            raise NESCHRIntegrityError("original hero animation pack unavailable") from exc
+        if (not 16 <= len(frame_bytes) <= 64 or len(frame_bytes) % 16
+                or frame_bytes[:16] != tiles[80:96]):
+            raise NESCHRIntegrityError("frame zero and original NES CHR player differ")
+        last_frame = start + 96 + len(frame_bytes) - 16
+        if (last_frame > len(rom)
+                or rom[start + 96:last_frame] != frame_bytes[16:]):
+            raise NESCHRIntegrityError(
+                "actual NES CHR-ROM animated hero pixels differ from original frames"
+            )
+        verified_frames = len(frame_bytes) // 16
+        frame_digest = sha256(frame_bytes).hexdigest()
     evidence = {
         "schema": SCHEMA,
         "original_nes_rom_sha256": sha256(rom).hexdigest(),
         "chr_source_sha256": sha256(tiles).hexdigest(),
         "compiled_chr_six_tiles_sha256": sha256(actual).hexdigest(),
         "matched_semantic_tiles": 6,
-        "matched_indexed_pixels": 6 * 64,
+        "matched_indexed_pixels": 6 * 64 + max(0, verified_frames - 1) * 64,
+        "original_animation_frames_verified": verified_frames,
+        "original_animation_sha256": frame_digest,
         "ppu_runtime_pixels_verified": False,
         "physical_cartridge_verified": False,
         "release_authorized": False,
