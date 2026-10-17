@@ -10,7 +10,12 @@ import unittest
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.studio_native_correction_triage import triage_native_gameplay
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
-from skeleton.ai.game_builder.studio_campaign import CampaignOrder
+from skeleton.ai.game_builder.studio_campaign import CampaignOrder, _atomic_json
+from skeleton.ai.game_builder.studio_campaign_lock import campaign_lock
+from skeleton.ai.game_builder.studio_execution_history import (
+    ENTRY_SCHEMA, SCHEMA as HISTORY_SCHEMA,
+)
+from skeleton.ai.game_builder.studio_history_segments import SEGMENT_SIZE
 from skeleton.ai.game_builder.studio_execution_campaign import (
     ExecutionPolicy, run_studio_execution_campaign,
 )
@@ -192,6 +197,54 @@ class EnduranceProductionHistoryTests(unittest.TestCase):
             inspect_execution_history(
                 self.order, self.campaign, authorized=True,
             )
+
+    def test_actual_studio_65th_run_rotates_and_reuses_verified_history(self):
+        actual = self.source_attempt(limit=2)
+        report_digest = actual["assurance_report_digest"]
+        previous = None
+        archived_entries = []
+        for sequence in range(1, SEGMENT_SIZE + 1):
+            body = {
+                "schema": ENTRY_SCHEMA,
+                "sequence": sequence,
+                "campaign_identity": actual["campaign_identity"],
+                "run_digest": canonical_digest({"synthetic_history": sequence}),
+                "assurance_report_digest": report_digest,
+                "previous_entry_digest": previous,
+                "verified_stage_attempts": 2,
+                "blocked_stage_attempts": 0,
+                "unsupported_stage_attempts": 0,
+                "full_release_qualified": False,
+                "model_weights_updated": False,
+                "native_cpu_divergence_count": 0,
+            }
+            body["entry_digest"] = canonical_digest(body)
+            archived_entries.append(body)
+            previous = body["entry_digest"]
+        journal = {
+            "schema": HISTORY_SCHEMA,
+            "campaign_identity": actual["campaign_identity"],
+            "entries": archived_entries,
+        }
+        journal["history_digest"] = canonical_digest(journal)
+        with campaign_lock(self.campaign):
+            _atomic_json(self.campaign / "qualification_history.json", journal)
+        last = record_execution_run(
+            self.order, self.campaign, actual, authorized=True,
+        )
+        self.assertEqual(last["sequence"], SEGMENT_SIZE + 1)
+        self.assertEqual(last["previous_entry_digest"], previous)
+        status = inspect_execution_history(
+            self.order, self.campaign, authorized=True,
+        )
+        self.assertEqual(status["recorded_runs"], SEGMENT_SIZE + 1)
+        self.assertEqual(status["sealed_qualification_segments"], 1)
+        self.assertEqual(status["runs_without_recorded_blockers"], SEGMENT_SIZE + 1)
+        self.assertTrue(status["latest_still_matches_current_source"])
+        self.assertFalse(status["complete_game_release_certified"])
+        self.assertTrue(
+            (self.campaign / "qualification_history_segments/segment-00001.json").is_file()
+        )
 
     def test_repeatable_same_source_does_not_mean_full_game_release(self):
         first = self.source_attempt(limit=2)
