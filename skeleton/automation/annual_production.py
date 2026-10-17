@@ -273,6 +273,8 @@ class AnnualProductionStore:
             raise ProductionConflict("wrong production or grant authority")
         if row["status"] != "running":
             raise ProductionConflict("production not running")
+        if at < row["updated_at"]:
+            raise ProductionConflict("production clock moved backward")
         if row["authority_expires_at"] <= at:
             raise PermissionError("authorization expired; reapproval required")
         if (row["lease_epoch"] != claim.epoch or row["lease_worker"] != claim.worker or
