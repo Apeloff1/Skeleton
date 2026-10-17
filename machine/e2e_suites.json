@@ -290,7 +290,7 @@
       "id": "jeeves-cross-engine-executable-gameplay",
       "tier": "offline",
       "cwd": ".",
-      "timeout_seconds": 900,
+      "timeout_seconds": 1200,
       "required_files": [
         "skeleton/ai/game_builder/studio_browser_probe.js",
         "skeleton/ai/game_builder/studio_runtime_qualification.py",
@@ -299,7 +299,9 @@
         "skeleton/ai/game_builder/studio_campaign_assurance.py",
         "tests/test_studio_browser_runtime_e2e.py",
         "tests/test_studio_godot_runtime_e2e.py",
-        "tests/test_studio_pixel_parity_e2e.py"
+        "tests/test_studio_pixel_parity_e2e.py",
+        "skeleton/ai/game_builder/studio_dragon_canvas_capture.py",
+        "tests/test_studio_dragon_canvas_capture.py"
       ],
       "command": [
         "python",
@@ -311,7 +313,8 @@
         "--noconftest",
         "tests/test_studio_browser_runtime_e2e.py",
         "tests/test_studio_godot_runtime_e2e.py",
-        "tests/test_studio_pixel_parity_e2e.py"
+        "tests/test_studio_pixel_parity_e2e.py",
+        "tests/test_studio_dragon_canvas_capture.py"
       ]
     }
   ]
