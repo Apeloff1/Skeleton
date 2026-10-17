@@ -5,8 +5,8 @@ const { load } = require('./harness.cjs');
 const S = load('src/foundation/strings.ts');
 const A = load('src/foundation/a11y.ts');
 const RN = { Platform: { select: (o) => o.default } };
-const themeTokens = load('theme/tokens.ts', { 'react-native': RN });
-const T = load('src/foundation/tokens.ts', { '../../theme/tokens': themeTokens });
+const themeTokens = load('src/theme/tokens.ts', { 'react-native': RN });
+const T = load('src/foundation/tokens.ts', { '../theme/tokens': themeTokens });
 
 test('t() returns en strings and interpolates params', () => {
   assert.equal(S.t('app.name'), 'Skeleton');

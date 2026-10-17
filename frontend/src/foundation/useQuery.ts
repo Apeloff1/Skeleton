@@ -1,6 +1,9 @@
 /**
  * `useQuery` — cached, de-duplicated data fetching with uniform states.
  * Backed by the framework-free QueryCache in queryCache.ts.
+ *
+ * This hook does not open its own connection. Fetchers must call the single
+ * TypeScript HTTP transport in src/utils/apiClient.ts (`api` or `safeGetJson`).
  */
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { appQueryCache, QueryCache, QueryKey, QueryState, serializeKey, viewStateOf, ViewState } from './queryCache';

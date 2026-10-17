@@ -92,10 +92,10 @@ test('legacy light and dark roles read canonical and active skin values', () => 
 
 test('Deluxe cards and Forge status colors follow skin transitions without stale captures', () => {
   const deluxe = transpile('src/theme/deluxe.ts', {
-    '../../theme/tokens': tokens,
+    './tokens': tokens,
   });
   const forge = transpile('src/skeletonForge/components/theme.ts', {
-    '../../../theme/tokens': tokens,
+    '../../theme/tokens': tokens,
   });
   for (const id of ['hyperwave', 'oceanic', 'ember', 'lavender']) {
     const c = skins.SKIN_BY_ID[id].colors;
