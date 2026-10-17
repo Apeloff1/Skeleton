@@ -220,6 +220,9 @@ def run_studio_execution_campaign(
         "interrupted_after_blocker": halted,
         "events": entries,
         "native_roms_verified": report["native_roms_structurally_verified"],
+        "compiled_original_psg_tables_verified": (
+            report["compiled_original_psg_tables_verified"]
+        ),
         "compiled_cartridge_victories": report["native_rom_machine_code_playthroughs_verified"],
         "native_cpu_checkpoint_samples_verified": report["native_cpu_checkpoint_samples_verified"],
         "native_animation_audio_source_targets_checked": (
