@@ -69,7 +69,10 @@ class LensCampaignContract(unittest.TestCase):
 
     def test_full_campaign_assembles_all_lenses_for_varied_page_sizes(self):
         report = _synthetic_report()
-        for size in (1, 17, 37, 64, 256, 512):
+        from skeleton.jeeves.game_emulator_lens_campaign import MAX_CAMPAIGN_PAGES
+        total = _pages()[0]["catalog_lens_count"]
+        min_page = max(1, (total + MAX_CAMPAIGN_PAGES - 1) // MAX_CAMPAIGN_PAGES)
+        for size in sorted({min_page, 17, 37, 64, 256, 512}):
             with self.subTest(page_size=size):
                 assembled = assemble_source_pinned_lens_campaign(
                     report, page_size=size,
@@ -80,7 +83,7 @@ class LensCampaignContract(unittest.TestCase):
                     assembled["lens_count"], _pages()[0]["catalog_lens_count"],
                 )
                 self.assertFalse(assembled["production_model_promotion_authorized"])
-        for invalid in (0, -1, 513, True, 2.5):
+        for invalid in (0, -1, 513, True, 2.5, min_page - 1):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(LensCampaignError):
                     assemble_source_pinned_lens_campaign(report, page_size=invalid)
