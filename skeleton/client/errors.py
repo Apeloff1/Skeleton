@@ -37,3 +37,7 @@ class SkeletonHTTPError(SkeletonClientError):
 
 class SkeletonCancelledError(SkeletonClientError):
     """Operation was cancelled through a :class:`CancelToken`."""
+
+
+class SkeletonSealConfigError(SkeletonClientError):
+    """Request seal cannot be minted locally or the server has no seal secret."""
