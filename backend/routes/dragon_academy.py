@@ -145,12 +145,14 @@ def academy_status(owner: str = Depends(_principal)) -> dict:
 def crawler_feed(
     after_sequence: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=250),
+    last_event_digest: str | None = Query(default=None, max_length=64),
     owner: str = Depends(_principal),
 ) -> dict:
     with _lab() as (lab, _):
         try:
             feed = DragonSessionProjection(lab.db).read(
-                owner, authorized=True, after_sequence=after_sequence, limit=limit
+                owner, authorized=True, after_sequence=after_sequence, limit=limit,
+                expected_digest=last_event_digest,
             )
         except ValueError:
             raise HTTPException(status_code=409, detail="Crawler journal replay unavailable") from None

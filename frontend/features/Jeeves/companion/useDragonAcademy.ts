@@ -4,6 +4,7 @@
  * development deployments where some other routes allow anonymous access.
  */
 import {AppState,Platform} from 'react-native';
+import {usePowerAwareness} from '../../../hooks/usePowerAwareness';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import {API_BASE} from '../../../utils/apiBase';
@@ -53,6 +54,7 @@ export function useDragonAcademy(){
  const [demo,setDemo]=useState<DemoView|null>(null);
  const [telemetry,setTelemetry]=useState<CompanionTelemetry|undefined>();
  const journal=useRef<CompanionJournal>(EMPTY_COMPANION_JOURNAL);
+ const power=usePowerAwareness();
  const sessionRef=useRef<string|null>(null);
  const feedBusy=useRef(false);
  const alive=useRef(true);
@@ -103,10 +105,14 @@ export function useDragonAcademy(){
   if(feedBusy.current||!getAuthToken()||!['active','unknown'].includes(AppState.currentState))return;
   feedBusy.current=true;
   try{
+   const cursor=journal.current;
+   const digest=cursor.provenance?'&last_event_digest='+cursor.chainHead:'';
    const r=await api.get<CrawlFeed>(
-    PATH+'/crawler/feed?after_sequence='+journal.current.lastSequence+'&limit=100',
+    PATH+'/crawler/feed?after_sequence='+cursor.lastSequence+'&limit=100'+digest,
     {headers:authHeaders(),timeoutMs:8000,retries:0});
-   if(!alive.current||!r.ok||!r.data?.ok)return;
+   if(!alive.current)return;
+   if(r.status===409){journal.current=EMPTY_COMPANION_JOURNAL;return;}
+   if(!r.ok||!r.data?.ok)return;
    const f=r.data;
    if(!f.active||!f.session_id){
     sessionRef.current=null;journal.current=EMPTY_COMPANION_JOURNAL;
@@ -137,12 +143,12 @@ export function useDragonAcademy(){
  useEffect(()=>{
   alive.current=true;
   void load().then(pollCrawler);
-  const interval=setInterval(()=>void pollCrawler(),12000);
+  const interval=setInterval(()=>void pollCrawler(),power.shouldReducePolling?30000:12000);
   const listener=AppState.addEventListener('change',next=>{
    if(next==='active')void load().then(pollCrawler);
   });
   return()=>{alive.current=false;clearInterval(interval);listener.remove();};
- },[load,pollCrawler]);
+ },[load,pollCrawler,power.shouldReducePolling]);
  const mutate=useCallback(async(endpoint:string,body:object={})=>{
   if(inFlight.current||!authenticated||!getAuthToken())return;
   inFlight.current=true;setBusy(true);setError('');

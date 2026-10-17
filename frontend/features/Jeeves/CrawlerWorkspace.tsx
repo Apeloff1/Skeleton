@@ -11,6 +11,10 @@ import s, { colors } from './CrawlerWorkspace.styles';
 import CrawlerAutomationPanel from './CrawlerAutomationPanel';
 import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourceLibrary';
 import DragonKnowledgePanel from './DragonKnowledgePanel';
+import DragonCompanion from './companion/DragonCompanion';
+import { companionFromCapture, INITIAL_DRAGON_STATE } from './companion/dragonCompanionState';
+import { useReducedMotion } from './companion/useDragonMotion';
+import { usePowerAwareness } from '../../hooks/usePowerAwareness';
 
 function bytes(value: number): string { return value < 1024 ? `${value} B` : value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1048576).toFixed(1)} MB`; }
 function label(value: string): string { return value.replaceAll('_', ' '); }
@@ -30,7 +34,10 @@ function Button({ title, onPress, disabled = false }: { title: string; onPress: 
 }
 function CrawlerContent() {
   const router = useRouter(); const { width } = useWindowDimensions(); const auth = useStudioAuth();
-  const params = useLocalSearchParams<{ session?: string; pane?: string }>();
+  const params = useLocalSearchParams<{ session?: string; pane?: string; topics?: string }>();
+  const reducedMotion = useReducedMotion();
+  const power = usePowerAwareness();
+  const companionMotion = reducedMotion || power.shouldReduceAnimations ? 'off' as const : 'gentle' as const;
   const requestedSession = typeof params.session === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(params.session) ? params.session : null;
   const [pane, setPane] = useState<'capture' | 'review'>(params.pane === 'review' ? 'review' : 'capture');
   const [reviewDraft, setReviewDraft] = useState<CrawlPassageSelection | null>(null);
@@ -38,6 +45,13 @@ function CrawlerContent() {
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const choosePane = (value: 'capture' | 'review') => { setPane(value); router.setParams({ pane: value }); scroll.current?.scrollTo({ y: 0, animated: false }); };
   useEffect(() => { if (params.pane === 'capture' || params.pane === 'review') setPane(params.pane); }, [params.pane]);
+  const seededTopics = useRef(false);
+  useEffect(() => {
+    const raw = typeof params.topics === 'string' ? params.topics : '';
+    if (seededTopics.current || !/^[a-z0-9]+(?:[ ,][a-z0-9]+){0,15}$/.test(raw) || raw.length > 160) return;
+    seededTopics.current = true;
+    setTopics(raw);
+  }, [params.topics]);
   const [readiness, setReadiness] = useState<CrawlerReadiness | null>(null);
   const [sessions, setSessions] = useState<CrawlSession[]>([]); const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [active, setActive] = useState<CrawlSession | null>(null); const activeRef = useRef<CrawlSession | null>(null);
@@ -190,6 +204,7 @@ function CrawlerContent() {
         run={(name, operation, stop) => { void mutate(name, operation, false, stop); }} control={control} refresh={refreshActive}
         manual={() => { const id = active.session_id; const body = { idempotency_key: crawlRequestKey('run'), expected_version: active.version, max_steps: 4 }; void mutate('Run', signal => runCrawl(id, body, signal), true); }} />
       <View style={s.card}><Text style={s.heading}>Actual URL queue</Text>{active.queue.length ? active.queue.map((item, index) => <View key={`${item.url}-${index}`} style={s.check}><Text selectable style={s.message}>{item.url}</Text><Text style={s.small}>Depth {item.depth} · {item.attempts} attempts · {item.ready_at * 1000 <= Date.now() ? 'eligible now' : `next eligible ${new Date(item.ready_at * 1000).toLocaleTimeString()}`}</Text></View>) : <Text style={s.small}>No pending URL is listed in the current snapshot.</Text>}{active.frontier_count > active.queue.length && <Text style={s.small}>Showing the first {active.queue.length} of {active.frontier_count} queued URLs.</Text>}</View>
+      <View style={s.card}><Text style={s.heading}>Dragon on this crawl</Text><Text style={s.small}>The dragon watches recorded capture events. Capturing a page does not burn it into memory or train a model.</Text><DragonCompanion state={events.length ? companionFromCapture(events[events.length - 1].kind) : INITIAL_DRAGON_STATE} motion={companionMotion} reducedMotion={companionMotion === 'off'} /></View>
       <View style={s.card}><Text style={s.heading}>Recent crawl events</Text>{!!eventsError && <Text style={s.error}>Event refresh unavailable. {eventsError}</Text>}{truncatedEvents && <Text style={s.small}>The runtime retains a bounded event tail. Older events are unavailable; no history has been reconstructed.</Text>}{events.length ? [...events].reverse().map(event => <View key={event.sequence} style={s.check}><Text style={s.label}>{label(event.kind)}</Text><Text style={s.small}>{new Date(event.at * 1000).toLocaleTimeString()}{event.reason ? ` · ${label(event.reason)}` : ''}</Text>{event.url && <Text selectable style={s.small}>{event.url}</Text>}</View>) : <Text style={s.small}>{eventsObserved ? 'No event is recorded in the current bounded history.' : eventsError ? 'Recorded history is currently unavailable.' : 'Loading recorded history…'}</Text>}</View>
       <CrawlerSourceLibrary key={active.session_id + ':' + token.current} session={active} sources={sources} more={!!sourceCursor} busy={!!busy || running}
         refresh={refreshActive}
