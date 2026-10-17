@@ -7,10 +7,6 @@ Up to 128 observations per long game, every action for shorter games.
 """
 from __future__ import annotations
 
-from hashlib import sha256
-from pathlib import Path
-import re
-
 from .contracts import canonical_digest
 
 FIELDS = ("Level", "PlayerX", "PlayerY", "Health", "Score", "ScoreHigh",
