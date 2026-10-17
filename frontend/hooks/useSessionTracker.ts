@@ -52,6 +52,14 @@ export const useSessionTracker = (userId: string = 'default_user'): UseSessionTr
   const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastProgressUpdateRef = useRef(0);
   const progressQueueRef = useRef<Promise<void>>(Promise.resolve());
+  // Only the newest unsent snapshot is retained while a request is active.
+  // Long offline sessions therefore use O(1) pending progress memory.
+  const pendingProgressRef = useRef<{
+    snapshot: SessionState;
+    epoch: number;
+    emotionalState?: string;
+  } | null>(null);
+  const progressWorkerRef = useRef<Promise<void> | null>(null);
   const endingRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
@@ -59,6 +67,7 @@ export const useSessionTracker = (userId: string = 'default_user'): UseSessionTr
     return () => {
       mountedRef.current = false;
       sessionEpochRef.current++;
+      pendingProgressRef.current = null;
       if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
       progressTimerRef.current = null;
     };
@@ -71,33 +80,55 @@ export const useSessionTracker = (userId: string = 'default_user'): UseSessionTr
 
   // Serialize POSTs: a slower old progress response must not overtake the
   // final state of the same session on the wire.
-  const queueProgress = useCallback((snapshot: SessionState, epoch: number, emotionalState?: string) => {
+  const queueProgress = useCallback((
+    snapshot: SessionState, epoch: number, emotionalState?: string,
+  ): Promise<void> => {
     if (!snapshot.moduleId || !snapshot.startTime) return progressQueueRef.current;
-    const payload = { ...snapshot };
-    const task = progressQueueRef.current.then(async () => {
-      if (!mountedRef.current || epoch !== sessionEpochRef.current) return;
-      const seconds = Math.max(0, Math.floor((Date.now() - payload.startTime!) / 1000));
-      const result = await synergyService.updateProgress(
-        userId, payload.moduleId!, payload.progress, seconds, emotionalState,
-      );
-      if (!mountedRef.current || epoch !== sessionEpochRef.current || !result.progress_updated) return;
-      const xp = Number.isFinite(result.xp_earned) && result.xp_earned > 0
-        ? result.xp_earned : 0;
-      if (xp) setXpEarned(previous => previous + xp);
-      if (Array.isArray(result.new_achievements) && result.new_achievements.length) {
-        const gained: Achievement[] = result.new_achievements
-          .filter(item => item && typeof item.id === 'string' && Number.isFinite(item.xp))
-          .map(item => ({
-            id: item.id, name: item.name, xp: item.xp, tier: getTierFromXp(item.xp),
-          }));
-        if (gained.length) setAchievements(previous =>
-          [...previous, ...gained].slice(-MAX_ACHIEVEMENTS));
+    pendingProgressRef.current = { snapshot: { ...snapshot }, epoch, emotionalState };
+    if (progressWorkerRef.current) return progressWorkerRef.current;
+
+    const worker = (async () => {
+      while (pendingProgressRef.current) {
+        const pending = pendingProgressRef.current;
+        pendingProgressRef.current = null;
+        const { snapshot: payload } = pending;
+        if (!mountedRef.current || pending.epoch !== sessionEpochRef.current ||
+            !payload.moduleId || !payload.startTime) continue;
+        try {
+          const seconds = Math.max(0, Math.floor((Date.now() - payload.startTime) / 1000));
+          const result = await synergyService.updateProgress(
+            userId, payload.moduleId, payload.progress, seconds, pending.emotionalState,
+          );
+          if (!mountedRef.current || pending.epoch !== sessionEpochRef.current ||
+              !result.progress_updated) continue;
+          const xp = Number.isFinite(result.xp_earned) && result.xp_earned > 0
+            ? result.xp_earned : 0;
+          if (xp) setXpEarned(previous => previous + xp);
+          if (Array.isArray(result.new_achievements) && result.new_achievements.length) {
+            const gained: Achievement[] = result.new_achievements
+              .filter(item => item && typeof item.id === 'string' && Number.isFinite(item.xp))
+              .map(item => ({
+                id: item.id, name: item.name, xp: item.xp, tier: getTierFromXp(item.xp),
+              }));
+            if (gained.length) setAchievements(previous =>
+              [...previous, ...gained].slice(-MAX_ACHIEVEMENTS));
+          }
+        } catch (error) {
+          console.error('Failed to persist session progress:', error);
+        }
+      }
+    })();
+    const settled = worker.finally(() => {
+      progressWorkerRef.current = null;
+      // A new snapshot may arrive between draining and finalization.
+      if (pendingProgressRef.current && mountedRef.current) {
+        const next = pendingProgressRef.current;
+        void queueProgress(next.snapshot, next.epoch, next.emotionalState);
       }
     });
-    progressQueueRef.current = task.catch(error => {
-      console.error('Failed to persist session progress:', error);
-    });
-    return progressQueueRef.current;
+    progressWorkerRef.current = settled;
+    progressQueueRef.current = settled;
+    return settled;
   }, [userId]);
 
   const startSession = useCallback(async (
@@ -107,6 +138,7 @@ export const useSessionTracker = (userId: string = 'default_user'): UseSessionTr
     cancelDelayedProgress();
     const epoch = ++sessionEpochRef.current;
     lastProgressUpdateRef.current = 0;
+    pendingProgressRef.current = null;
     liveSessionRef.current = INITIAL_SESSION;
     if (mountedRef.current) setSession(INITIAL_SESSION);
     let response: SessionStartResponse | null = null;
@@ -161,6 +193,7 @@ export const useSessionTracker = (userId: string = 'default_user'): UseSessionTr
     const final = liveSessionRef.current;
     if (!mountedRef.current || !final.active || !final.moduleId || !final.startTime) return;
     cancelDelayedProgress();
+    pendingProgressRef.current = null;
     // Terminal locally before I/O: updates after this call cannot reschedule.
     liveSessionRef.current = INITIAL_SESSION;
     setSession(INITIAL_SESSION);
