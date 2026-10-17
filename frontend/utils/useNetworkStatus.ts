@@ -37,7 +37,8 @@ export function useNetworkStatus(): NetworkStatus {
   useEffect(() => {
     let disposed = false;
     let epoch = 0;
-    let appState: AppStateStatus = AppState.currentState || 'active';
+    let appState: AppStateStatus = AppState.currentState === 'background' ||
+      AppState.currentState === 'inactive' ? AppState.currentState : 'active';
     let unsubscribe: (() => void) | null = null;
     let appSubscription: { remove: () => void } | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;

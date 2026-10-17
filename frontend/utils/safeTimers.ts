@@ -22,7 +22,10 @@ interface Handle {
 }
 const registry = new Set<Handle>();
 const MAX_LIVE = 1000;
-let activeState: AppStateStatus = AppState.currentState || 'active';
+// RN can report "unknown" during native bridge startup. Until the OS
+// confirms an inactive/background state, allow foreground timer work.
+let activeState: AppStateStatus = AppState.currentState === 'background' ||
+  AppState.currentState === 'inactive' ? AppState.currentState : 'active';
 let subscription: { remove: () => void } | null = null;
 let installed = false;
 
@@ -123,6 +126,17 @@ export function safeTimerStats() {
 export function installAppStateGuard(): void {
   if (installed) return;
   try {
+    const current = AppState.currentState;
+    activeState = current === 'background' || current === 'inactive' ? current : 'active';
+    // Reconcile registrations created while the bridge was unavailable.
+    for (const handle of [...registry]) {
+      if (handle.kind !== 'interval') continue;
+      if (activeState === 'active') arm(handle);
+      else if (handle.raw !== null) {
+        clearInterval(handle.raw);
+        handle.raw = null;
+      }
+    }
     subscription = AppState.addEventListener('change', state => {
       activeState = state;
       for (const handle of [...registry]) {
@@ -146,7 +160,11 @@ export function uninstallAppStateGuard(): void {
   installed = false;
   // No more reliable native state events. Do not leave a stale inactive
   // state permanently suppressing future intervals after hot reload.
-  activeState = AppState.currentState || 'active';
+  activeState = AppState.currentState === 'background' ||
+    AppState.currentState === 'inactive' ? AppState.currentState : 'active';
+  if (activeState === 'active') {
+    for (const handle of [...registry]) if (handle.kind === 'interval') arm(handle);
+  }
 }
 /** Return a stable timer scope and cancel all owned tasks after unmount. */
 export function useSafeTimers() {
