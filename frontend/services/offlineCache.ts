@@ -184,8 +184,10 @@ async function downloadCollection(
         `${API}/api/academy/offline/dump/${encodeURIComponent(collection)}?skip=${skip}&limit=${PAGE_SIZE}`, signal,
       ) as { documents?: unknown; has_more?: unknown };
       const docs = page?.documents;
-      if (!Array.isArray(docs) || docs.length === 0 || docs.length > PAGE_SIZE ||
-          docs.length > totalDocs - skip) return false;
+      // The reader's chunk offsets are fixed at PAGE_SIZE; reject short
+      // nonterminal pages rather than silently shifting later offsets.
+      if (!Array.isArray(docs) ||
+          docs.length !== Math.min(PAGE_SIZE, totalDocs - skip)) return false;
       const chunk = JSON.stringify(docs);
       if (chunk.length > MAX_PAGE_CHARS) return false;
       if (signal.aborted) return false;
@@ -215,14 +217,16 @@ async function removeKeys(keys: string[]): Promise<void> {
     await AsyncStorage.multiRemove(keys.slice(i, i + 100));
   }
 }
-async function pruneGenerations(activeGeneration: string | null): Promise<void> {
+async function removeStagedGeneration(generation: string): Promise<void> {
   try {
+    const prefix = CACHE_PREFIX + 'g-' + generation + '/';
+    // A successful generation is authoritative after commit. Never delete it
+    // from an old cleanup callback; deleting another sync's staging is unsafe.
+    const current = await committed();
+    if (current?.generation === generation) return;
     const keys = await AsyncStorage.getAllKeys();
-    const prefix = CACHE_PREFIX + 'g-';
-    const keep = activeGeneration ? prefix + activeGeneration + '/' : null;
-    const orphaned = keys.filter(key => key.startsWith(prefix) && (!keep || !key.startsWith(keep)));
-    await removeKeys(orphaned);
-  } catch { /* opportunistic cleanup only; never affect commit success */ }
+    await removeKeys(keys.filter(key => key.startsWith(prefix)));
+  } catch { /* best effort */ }
 }
 
 async function runSync(onProgress?: (overall: OverallProgress) => void, signal?: AbortSignal): Promise<SyncResult> {
@@ -266,12 +270,10 @@ async function runSync(onProgress?: (overall: OverallProgress) => void, signal?:
   finally {
     signal?.removeEventListener('abort', onAbort);
     if (syncController === controller) syncController = null;
-    if (committedSuccessfully) void pruneGenerations(generation);
-    else {
-      // Cleanup of incomplete staging is best-effort and never deletes
-      // the previously committed generation.
-      void pruneGenerations((await committed().catch(() => null))?.generation ?? null);
-    }
+    // Do not delete a prior committed generation from a detached callback:
+    // older readers may have captured its pointer before this transaction.
+    // An incomplete staging namespace is always safe to remove by exact ID.
+    if (!committedSuccessfully) void removeStagedGeneration(generation);
   }
 }
 
