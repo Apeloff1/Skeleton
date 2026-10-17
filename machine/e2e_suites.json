@@ -364,7 +364,8 @@
         "skeleton/ai/game_builder/studio_execution_history.py",
         "tests/test_studio_execution_history_e2e.py",
         "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
-        "tests/test_studio_native_replay_telemetry.py"
+        "tests/test_studio_native_replay_telemetry.py",
+        "tests/test_studio_native_score_parity.py"
       ],
       "command": [
         "python",
@@ -381,7 +382,8 @@
         "tests/test_studio_nes_emulator_e2e.py",
         "tests/test_studio_nes_campaign_e2e.py",
         "tests/test_studio_execution_history_e2e.py",
-        "tests/test_studio_native_replay_telemetry.py"
+        "tests/test_studio_native_replay_telemetry.py",
+        "tests/test_studio_native_score_parity.py"
       ]
     }
   ]
