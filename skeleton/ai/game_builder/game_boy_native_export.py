@@ -488,6 +488,19 @@ def _tile_bytes(tile_art: tuple[tuple[int, ...], ...] | None = None) -> str:
     return "\n".join(lines)
 
 
+def _hero_frame_bytes(frames: tuple[tuple[int, ...], ...]) -> str:
+    """RGBDS 2bpp frame data, separate from first six semantic tiles."""
+    output = []
+    for index, tile in enumerate(frames):
+        output.append(f"; authored hero animation frame {index + 1}")
+        for row in range(8):
+            pixels = tile[row * 8:(row + 1) * 8]
+            low = sum((pixel & 1) << (7 - x) for x, pixel in enumerate(pixels))
+            high = sum(((pixel >> 1) & 1) << (7 - x) for x, pixel in enumerate(pixels))
+            output.append(f"    db ${low:02X}, ${high:02X}")
+    return "\n".join(output)
+
+
 def compile_native_game_boy(
     world: PlayableWorld, source: HomebrewSource, *, authorized: bool,
     tile_art: tuple[tuple[int, ...], ...] | None = None,
@@ -539,9 +552,10 @@ def compile_native_game_boy(
         "__TILE_BYTES__": _tile_bytes(tile_art),
         "__ANIM_COUNT__": str(len(frames) if frames else 1),
         "__ANIM_DELAY__": str(animation_delay),
-        "__ANIMATION_TILES__": _tile_bytes(
-            frames[1:] if frames else ()
-        ) if len(frames) > 1 else "    ; single original hero frame",
+        "__ANIMATION_TILES__": (
+            _hero_frame_bytes(frames[1:]) if len(frames) > 1
+            else "    ; single original hero frame"
+        ),
 
         "__MAP_POINTERS__": "\n".join(f"    dw LevelMap{i}" for i in range(len(world.levels))),
         "__START_X__": "    db " + ", ".join(str(level.start[0]) for level in world.levels),
