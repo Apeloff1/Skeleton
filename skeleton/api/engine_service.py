@@ -1153,14 +1153,32 @@ class SQLiteEngineSubmissionStore:
             try:
                 command_payload = json.loads(row["command_json"])
                 ack_payload = json.loads(row["ack_json"])
-            except json.JSONDecodeError as exc:
+                command = EngineExecutionCommand.from_dict(command_payload)
+                ack = self._ack_from_dict(ack_payload)
+            except (
+                json.JSONDecodeError,
+                EngineServiceError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 raise EngineServiceError(
                     "stored engine submission is corrupt"
                 ) from exc
+            if (
+                command.submission_digest != row["command_digest"]
+                or ack.execution_id != row["execution_id"]
+                or ack.execution_id != command.execution_request.execution_id
+                or ack.operation_id != command.operation.operation_id
+                or ack.trace_id != command.operation.trace_id
+            ):
+                raise EngineServiceError(
+                    "stored engine submission is corrupt"
+                )
             return _StoredSubmission(
                 principal=row["service_principal"],
-                command=EngineExecutionCommand.from_dict(command_payload),
-                ack=self._ack_from_dict(ack_payload),
+                command=command,
+                ack=ack,
             )
 
     def get_by_execution_id(
@@ -1204,7 +1222,7 @@ class SQLiteEngineSubmissionStore:
             try:
                 row = self._connection.execute(
                     """
-                    SELECT command_digest, ack_json
+                    SELECT command_digest, command_json, ack_json
                     FROM engine_submission
                     WHERE namespace = ?
                       AND service_principal = ?
@@ -1220,7 +1238,13 @@ class SQLiteEngineSubmissionStore:
                         stored_command = EngineExecutionCommand.from_dict(
                             stored_payload
                         )
-                    except (json.JSONDecodeError, EngineServiceError) as exc:
+                    except (
+                        json.JSONDecodeError,
+                        EngineServiceError,
+                        KeyError,
+                        TypeError,
+                        ValueError,
+                    ) as exc:
                         raise EngineServiceError(
                             "stored engine submission is corrupt"
                         ) from exc
@@ -2490,6 +2514,32 @@ class EngineExecutionService:
                 "engine execution belongs to a different actor or tenant"
             )
         handoff = stored.command.compiled_context
+        execution = self.repository.get(handoff.execution_id)
+        if (
+            execution.request.identity_digest
+            != stored.command.execution_request.identity_digest
+            or execution.operation_id != operation.operation_id
+        ):
+            raise EngineServiceError(
+                "stored engine execution binding is corrupt"
+            )
+        checkpoint = self.repository.latest_checkpoint(execution.execution_id)
+        if checkpoint is not None:
+            payload = checkpoint.payload
+            if not isinstance(payload, Mapping):
+                raise EngineServiceError(
+                    "stored engine checkpoint binding is corrupt"
+                )
+            if (
+                "context_digest" in payload
+                and payload.get("context_digest") != handoff.context_digest
+            ) or (
+                "tenant_id" in payload
+                and payload.get("tenant_id") != operation.tenant_id
+            ):
+                raise EngineServiceError(
+                    "stored engine checkpoint binding is corrupt"
+                )
         return {
             "operation_id": handoff.operation_id,
             "execution_id": handoff.execution_id,
