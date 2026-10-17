@@ -23,7 +23,7 @@ from .studio_build_qualification import (
 from .studio_runtime_qualification import _inputs as _engine_inputs
 from .studio_native_replay_telemetry import (
     selected_checkpoints, make_checkpoint, validate_checkpoints, NativeCheckpointError,
-    reference_cpu_checkpoints,
+    reference_cpu_checkpoints, first_cpu_divergence,
 )
 
 SCHEMA = "skeleton.game_builder.game_boy_emulator_playthrough.v1"
@@ -52,6 +52,7 @@ class GameBoyEmulationResult:
     framebuffer_sha256: str | None
     checkpoint_digest: str | None
     sampled_checkpoints: int
+    first_divergence: dict | None
     last_state: dict | None
     blocker: str | None
     receipt_digest: str
@@ -70,6 +71,7 @@ class GameBoyEmulationResult:
             "framebuffer_sha256": self.framebuffer_sha256,
             "checkpoint_digest": self.checkpoint_digest,
             "sampled_checkpoints": self.sampled_checkpoints,
+            "first_divergence": self.first_divergence,
             "last_state": self.last_state,
             "blocker": self.blocker,
             "physical_controller_verified": False,
@@ -87,8 +89,8 @@ def _receipt(target: str, rom: str, symbols: str, world: str, proof: str, *,
              available: bool, executed: bool = False, full: bool = False,
              won: bool = False, frames: int = 0, actions: int = 0,
              framebuffer: str | None = None, checkpoint: str | None = None,
-             sampled: int = 0, state: dict | None = None,
-             blocker: str | None = None) -> GameBoyEmulationResult:
+             sampled: int = 0, divergence: dict | None = None,
+             state: dict | None = None, blocker: str | None = None) -> GameBoyEmulationResult:
     body = {
         "schema": SCHEMA, "target": target, "rom_sha256": rom,
         "symbols_sha256": symbols, "world_digest": world,
@@ -97,6 +99,7 @@ def _receipt(target: str, rom: str, symbols: str, world: str, proof: str, *,
         "machine_code_victory": won, "frames_advanced": frames,
         "source_actions": actions, "framebuffer_sha256": framebuffer,
         "checkpoint_digest": checkpoint, "sampled_checkpoints": sampled,
+        "first_divergence": divergence,
         "last_state": state, "blocker": blocker,
         "physical_controller_verified": False,
         "emulator_audio_verified": False, "physical_console_verified": False,
@@ -104,7 +107,7 @@ def _receipt(target: str, rom: str, symbols: str, world: str, proof: str, *,
     }
     return GameBoyEmulationResult(
         target, rom, symbols, world, proof, available, executed, full, won,
-        frames, actions, framebuffer, checkpoint, sampled, state, blocker,
+        frames, actions, framebuffer, checkpoint, sampled, divergence, state, blocker,
         canonical_digest(body),
     )
 
@@ -262,7 +265,11 @@ def qualify_game_boy_emulator(
                     target, rom_sha, sym_sha, world, proof_sha,
                     available=True, executed=True, full=True, won=False,
                     frames=advanced, actions=len(actions), state=actual,
-                    framebuffer=frame, blocker="native_cpu_checkpoint_state_mismatch",
+                    framebuffer=frame,
+                    divergence=first_cpu_divergence(
+                        sampled_events, reference["samples"],
+                    ),
+                    blocker="native_cpu_checkpoint_state_mismatch",
                 )
             return _receipt(
                 target, rom_sha, sym_sha, world, proof_sha,
