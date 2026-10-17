@@ -335,6 +335,8 @@ def test_corpus_v3_tracks_real_43_lens_receipt_as_provenance_only(monkeypatch):
         "semantic_review_digest": "1" * 64,
         "model_sha256": "2" * 64,
         "source_bound_interpretations": 43,
+        "all_semantic_interpretations_valid": True,
+        "native_model_generations_executed": 43,
         "requested_lens_keys": [],
         "entries": [{
             "response": "UNTRUSTED_SEMANTIC_HYPOTHESIS_NOT_A_TARGET_LABEL",
@@ -396,6 +398,11 @@ def test_full_triangle_campaign_executes_43_per_source_episode(monkeypatch, tmp_
         return {
             "filename": "semantic-43-" + str(run_index) + ".json",
             "semantic_review_digest": f"{run_index + 1:064x}",
+            "native_model_lens_generations": 43,
+            "cue_supported_lenses": 20,
+            "hypothesis_only_lenses": 23,
+            "source_referenced_interpretations": 43,
+            "all_lens_interpretations_valid": True,
         }
 
     monkeypatch.setattr(campaign, "execute_native_43_lens_review", fake_semantic)
@@ -452,3 +459,97 @@ def test_campaign_cli_accepts_semantic_model_and_all_episode_mode():
     assert flags.semantic_all_runs is True
     assert flags.semantic_seed == 112
     assert flags.semantic_checkpoint.name == "semantic"
+
+
+def test_semantic_corpus_requires_all_43_source_linked_interpretations(monkeypatch):
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    from skeleton.jeeves import game_emulator_triangle_semantic_inference as infer
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", _fake_semantic_route)
+    monkeypatch.setattr(infer, "verify_native_semantic_lenses", lambda *a: None)
+    evidence, triangle, critic = _synthetic_corpus_inputs()
+    semantic = {
+        "source_native_trace_sha256": "d" * 64,
+        "canonical_route_sha256": _fake_semantic_route(
+            triangle["episode_lens_references"][0]
+        )["route_digest"],
+        "semantic_review_digest": "1" * 64,
+        "model_sha256": "2" * 64,
+        "requested_lens_keys": [],
+        "native_model_generations_executed": 43,
+        "source_bound_interpretations": 42,
+        "all_semantic_interpretations_valid": False,
+    }
+    with pytest.raises(corpus.TriangleCorpusError, match="all 43"):
+        corpus.compile_triangle_candidate_corpus(
+            evidence, triangle, critic, semantic_inference_review=semantic,
+        )
+    semantic["source_bound_interpretations"] = 43
+    semantic["all_semantic_interpretations_valid"] = True
+    semantic["native_model_generations_executed"] = 42
+    with pytest.raises(corpus.TriangleCorpusError, match="all 43"):
+        corpus.compile_triangle_candidate_corpus(
+            evidence, triangle, critic, semantic_inference_review=semantic,
+        )
+
+
+def test_campaign_retries_partial_43_lens_interpretations(monkeypatch, tmp_path):
+    monkeypatch.setattr(campaign, "train_page", lambda *a, **k: _page())
+    monkeypatch.setattr(campaign, "review_one_receipt", lambda *a, **k: {
+        "state": "new_local_adversarial_review_executed",
+        "review_receipt_name": "triangle-review-a.json",
+        "review_digest": "f" * 64,
+        "structured_source_bound_passes": 3,
+    })
+    monkeypatch.setattr(campaign, "read_receipt_document", lambda *a, **k: ({
+        "training_triangle": {"episode_lens_references": [{}]},
+    }, "c" * 64))
+    monkeypatch.setattr(campaign, "execute_native_43_lens_review", lambda *a, **k: {
+        "filename": "semantic-43-one-incomplete.json",
+        "semantic_review_digest": "e" * 64,
+        "native_model_lens_generations": 43,
+        "cue_supported_lenses": 10,
+        "hypothesis_only_lenses": 33,
+        "source_referenced_interpretations": 42,
+        "all_lens_interpretations_valid": False,
+    })
+    page = campaign.triangle_campaign_page(
+        tmp_path, tmp_path / "approvals.json", tmp_path / "receipts", object(),
+        semantic_runtime=object(),
+    )
+    assert page["review_failures_needing_retry"] == 1
+    assert page["semantic_lens_review_failures_needing_retry"] == 1
+    assert page["semantic_model_generations_executed_or_replayed"] == 43
+    assert page["rows"][0]["semantic_lens_review_state"] == (
+        "incomplete_semantic_interpretations_retry_required"
+    )
+    assert page["rows"][0]["structured_semantic_interpretations"] == 42
+
+
+def test_campaign_rejects_fake_43_lens_count(monkeypatch, tmp_path):
+    monkeypatch.setattr(campaign, "train_page", lambda *a, **k: _page())
+    monkeypatch.setattr(campaign, "review_one_receipt", lambda *a, **k: {
+        "state": "prior_local_adversarial_review_replayed",
+        "review_receipt_name": "triangle-review-a.json",
+        "review_digest": "f" * 64,
+        "structured_source_bound_passes": 3,
+    })
+    monkeypatch.setattr(campaign, "read_receipt_document", lambda *a, **k: ({
+        "training_triangle": {"episode_lens_references": [{}]},
+    }, "c" * 64))
+    monkeypatch.setattr(campaign, "execute_native_43_lens_review", lambda *a, **k: {
+        "filename": "bad-semantic.json",
+        "semantic_review_digest": "e" * 64,
+        "native_model_lens_generations": 40,
+        "cue_supported_lenses": 15,
+        "hypothesis_only_lenses": 28,
+        "source_referenced_interpretations": 43,
+        "all_lens_interpretations_valid": True,
+    })
+    page = campaign.triangle_campaign_page(
+        tmp_path, tmp_path / "approvals.json", tmp_path / "receipts", object(),
+        semantic_runtime=object(),
+    )
+    assert page["review_failures_needing_retry"] == 1
+    assert page["rows"][0]["semantic_lens_review_state"] == "blocked_retry_required"

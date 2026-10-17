@@ -63,6 +63,17 @@ def compile_triangle_candidate_corpus(
         verify_native_semantic_lenses(
             evidence, triangle, reviewed, semantic_inference_review,
         )
+        # Verified inference receipts may legitimately contain 43 model calls
+        # but only 42 or fewer parseable, source-linked hypotheses. A partial
+        # run must never be represented as a fully reviewed 43-lens candidate.
+        if (semantic_inference_review.get("all_semantic_interpretations_valid") is not True
+                or type(semantic_inference_review.get("source_bound_interpretations")) is not int
+                or semantic_inference_review["source_bound_interpretations"] != SEMANTIC_LENS_BUDGET
+                or semantic_inference_review.get("native_model_generations_executed")
+                != SEMANTIC_LENS_BUDGET):
+            raise TriangleCorpusError(
+                "all 43 canonical semantic interpretations must be source-linked before corpus export"
+            )
         if tuple(semantic_inference_review["requested_lens_keys"]) != tuple(requested_semantic_lens_keys):
             raise TriangleCorpusError("verified 43-lens model run selected another lens set")
     rows: list[dict[str, Any]] = []

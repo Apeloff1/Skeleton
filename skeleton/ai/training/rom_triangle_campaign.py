@@ -238,6 +238,15 @@ def triangle_campaign_page(
                                     seed=semantic_seed + i * 43,
                                     max_new_tokens=semantic_tokens,
                                 )
+                                if (examined["native_model_lens_generations"] != 43
+                                        or examined["cue_supported_lenses"]
+                                        + examined["hypothesis_only_lenses"] != 43
+                                        or examined["all_lens_interpretations_valid"] is not (
+                                            examined["source_referenced_interpretations"] == 43
+                                        )):
+                                    raise RomStudyError(
+                                        "native 43-lens session count or semantic evidence custody differs"
+                                    )
                                 receipts.append([
                                     i, examined["filename"], examined["semantic_review_digest"],
                                     examined["cue_supported_lenses"],
