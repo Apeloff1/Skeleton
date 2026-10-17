@@ -13,6 +13,7 @@ from .contracts import canonical_digest
 from .studio_campaign import CampaignOrder, _atomic_json, _load_json
 from .studio_campaign_assurance import _inspect_production_assurance_unlocked
 from .studio_campaign_lock import campaign_lock
+from .studio_production_blocker_taxonomy import classify_production_blockers
 
 SCHEMA = "skeleton.game_builder.studio_qualification_history.v1"
 ENTRY_SCHEMA = "skeleton.game_builder.studio_qualification_history_entry.v1"
@@ -183,6 +184,7 @@ def record_execution_run(
                                  if k != "run_digest"}) != run.get("run_digest")):
         raise StudioQualificationHistoryError("E2E run source receipt does not validate")
     native_failures = _validated_native_failure_events(run, order.targets)
+    classified = classify_production_blockers(run["events"], limit=16)
     root = Path(campaign)
     with campaign_lock(root):
         checked = _inspect_production_assurance_unlocked(order, root)
@@ -206,6 +208,9 @@ def record_execution_run(
             "unsupported_stage_attempts": run["unsupported_stage_attempts"],
             "native_cpu_divergence_count": len(native_failures),
             "first_native_cpu_divergence": native_failures[0] if native_failures else None,
+            "classified_stage_blockers": classified["findings"],
+            "unlisted_stage_blocker_categories": classified["omitted_after_limit"],
+            "blocker_classification_digest": classified["classification_digest"],
             "native_cartridge_victories": checked["native_rom_machine_code_playthroughs_verified"],
             "native_cpu_checkpoint_samples_verified": checked["native_cpu_checkpoint_samples_verified"],
             "actual_browser_replays": checked["browser_javascript_playthroughs_verified"],
@@ -247,6 +252,12 @@ def inspect_execution_history(
             ),
             "latest_cpu_divergence": (
                 rows[-1].get("first_native_cpu_divergence") if rows else None
+            ),
+            "latest_stage_blockers": (
+                rows[-1].get("classified_stage_blockers", []) if rows else []
+            ),
+            "latest_unlisted_blocker_categories": (
+                rows[-1].get("unlisted_stage_blocker_categories", 0) if rows else 0
             ),
             "latest_run_digest": rows[-1]["run_digest"] if rows else None,
             "latest_still_matches_current_source": (
