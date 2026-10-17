@@ -30,9 +30,8 @@ or a `skeleton.projects.v1` object (`title`, optional `summary`, `genre`,
 The route uses the forge charter. It does not write a server-side project
 directory; pass `--out` on the CLI for a directory. Inline `files` stop at 8 MiB.
 
-The build is kind `game.build` on the job queue. When
-`skeleton.app_services.job_api` imports (#4097), that module is the queue.
-Until then `skeleton/forge/game_build_queue.py` runs the same
+The build is kind `game.build` on the job queue. The canonical `skeleton.app_services.job_api` (merged in #4097) is the queue.
+A bounded local fallback in `skeleton/forge/game_build_queue.py` also implements the
 `enqueue` / `JobHandle` / `ctx.progress` contract in-process. The handler is
 `build_playable_game`. Planner and QA hooks match Milestone C (#4118,
 `fdb6f491f`): optional callables, no-op when omitted. A planner that changes
@@ -58,11 +57,14 @@ nothing imports the module. `Harness.serve` calls `create_app`.
 `playtest=require` fails the build unless Godot 4 boots the project and the
 core loop marker is in the engine log. Set `SKELETON_GODOT_BIN` when the
 binary is not on `PATH`. Golden briefs (top-down shooter, platformer, small
-roguelike RPG) run inside the Skeleton GameForge job of `.github/workflows/ci.yml`.
+roguelike RPG) have targeted tests. CI coverage is being restored separately
+by #4109 and extended by #4114; a local build must not be called fully
+verified until the relevant tests and Godot smoke pass.
 
 Still data, not a finished commercial game: sprites, meshes, audio, full
 input-driven play, multiplayer, and a driving simulation. The compiler is
 deterministic; it does not call a model provider.
+
 
 ## First install
 

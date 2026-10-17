@@ -1,0 +1,33 @@
+# Staging overlay: production image targets with ENVIRONMENT=staging.
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml --env-file deploy/environments/staging.env up -d
+# deploy/environments/staging.env is NOT committed; start from deploy/environments/backend.staging.env.example
+# and fill secrets from your secret store. backend/config/environment.py rejects
+# wildcard CORS, missing MONGO_URL, and short JWT_SECRET/OPS_TOKEN in staging.
+services:
+  backend:
+    build:
+      target: production
+      args:
+        APP_VERSION: ${APP_VERSION:-staging}
+    image: ghcr.io/apeloff1/skeleton-backend:${APP_VERSION:-staging}
+    environment:
+      - ENVIRONMENT=staging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_JSON=true
+      - METRICS_ENABLED=true
+      - APP_VERSION=${APP_VERSION:-staging}
+      - CORS_ORIGINS=${CORS_ORIGINS:?CORS_ORIGINS must list explicit https origins in staging}
+      - OPS_TOKEN=${OPS_TOKEN:?OPS_TOKEN must be set to a high-entropy value in staging}
+    ports: !override
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8001"
+  frontend:
+    build:
+      target: production
+      args:
+        EXPO_PUBLIC_BACKEND_URL: ${EXPO_PUBLIC_BACKEND_URL:?EXPO_PUBLIC_BACKEND_URL must be the public staging API URL}
+        EXPO_PUBLIC_SKELETON_URL: ${EXPO_PUBLIC_SKELETON_URL:?EXPO_PUBLIC_SKELETON_URL must be the public staging Skeleton URL}
+    image: ghcr.io/apeloff1/skeleton-frontend:${APP_VERSION:-staging}
+    environment:
+      - NODE_ENV=production
+    ports: !override
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:8080"

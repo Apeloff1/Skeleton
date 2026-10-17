@@ -19,7 +19,11 @@ test('renders an accessible card per era, sorted by name, with result/pinned bad
   assert.match(cards[1], /^Cozy Wholesome: .*trash time-to-kill unknown\. pinned\.$/);
   assert.match(text(html), /RESULT/);
   assert.match(text(html), /PINNED/);
-  assert.ok(attrs(html, 'aria-label').includes('3 eras'));
+  assert.ok(attrs(html, 'aria-label').includes('3 eras shown.'));
+  assert.match(html, /aria-live="polite"/);
+  assert.match(html, /data-testid="era-card-boomer_shooter"[^>]*tabindex="0"|tabindex="0"[^>]*data-testid="era-card-boomer_shooter"/);
+  assert.match(html, /data-testid="era-sort-name"[^>]*tabindex="0"|tabindex="0"[^>]*data-testid="era-sort-name"/);
+  assert.match(html, /tabindex="-1"/);
   assert.ok(attrs(html, 'aria-label').includes('Search eras'));
 });
 
@@ -41,6 +45,20 @@ test('error, loading and empty states', () => {
   assert.ok(attrs(loading, 'aria-label').includes('Loading eras'));
   const empty = render(h(EraViewer, { eras: [] }));
   assert.match(text(empty), /No eras available/);
+});
+
+test('era grid and sort keys, and the plan handoff', () => {
+  assert.deepEqual(mod.eraCardIntent(0, { key: 'ArrowDown' }, { cols: 1, count: 3 }), { move: 1 });
+  assert.deepEqual(mod.eraCardIntent(2, { key: 'ArrowDown' }, { cols: 1, count: 3 }), { move: 0 });
+  assert.deepEqual(mod.eraCardIntent(1, { key: 'ArrowDown' }, { cols: 3, count: 3 }), null);
+  assert.deepEqual(mod.eraCardIntent(0, { key: 'Escape' }, { cols: 1, count: 3 }), { dismiss: true });
+  assert.equal(mod.eraCardIntent(0, { key: 'Enter' }, { cols: 1, count: 3 }), null);
+  assert.equal(mod.eraSortIndex(0, { key: 'ArrowRight' }, 4), 1);
+  assert.equal(mod.eraSortIndex(3, { key: 'ArrowRight' }, 4), 0);
+  assert.equal(mod.eraSortIndex(1, { key: ' ' }, 4), null);
+  const html = render(h(EraViewer, { eras: ERAS, onViewPlan: () => {} }));
+  assert.match(html, /data-testid="era-view-plan"/);
+  assert.doesNotMatch(render(h(EraViewer, { eras: ERAS })), /data-testid="era-view-plan"/);
 });
 
 test('responsive columns', () => {

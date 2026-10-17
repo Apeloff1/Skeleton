@@ -563,6 +563,7 @@ class SMSSourceProject:
 
 def compile_native_sms(
     world: PlayableWorld, rights: HomebrewSource, *, authorized: bool,
+    tile_art: tuple[tuple[int, ...], ...] | None = None,
 ) -> SMSSourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("native SMS original authoring requires explicit authority")
@@ -585,6 +586,16 @@ def compile_native_sms(
         if len(values)!=world.intent.width*world.intent.height:
             raise SMSNativeError("SMS original world tiles do not match target geometry")
         source_maps.append("StageMap"+str(stage.index)+": db "+", ".join(str(x) for x in values))
+    graphics = _TILES
+    if tile_art is not None:
+        from skeleton.jeeves.game_console_assets import TileCodec, encode_tiles
+        if (type(tile_art) is not tuple or len(tile_art) != 6
+                or any(type(tile) is not tuple or len(tile) != 64
+                       or any(type(px) is not int or not 0 <= px <= 3 for px in tile)
+                       for tile in tile_art)):
+            raise SMSNativeError("Mode4 native art requires exactly six original 2bpp-derived tiles")
+        planar = encode_tiles(tile_art, TileCodec.SMS_4BPP)
+        graphics = tuple(tuple(planar[i:i + 32]) for i in range(0, len(planar), 32)) + _TILES[6:]
     replacements={
         "__WIDTH__":str(world.intent.width),
         "__HEIGHT__":str(world.intent.height),
@@ -594,7 +605,7 @@ def compile_native_sms(
         "__CRAM__":"    db "+", ".join(f"0{c:02X}h" for c in _CRAM),
         "__ART__":"\n".join(
             "    db "+", ".join(f"0{c:02X}h" for c in tile)
-            for tile in _TILES
+            for tile in graphics
         ),
         "__POINTERS__":"\n".join("    dw StageMap"+str(i) for i in range(len(world.levels))),
         "__START_X__":", ".join(str(s.start[0]) for s in world.levels),
@@ -606,7 +617,7 @@ def compile_native_sms(
         if asm.count(marker)!=1:
             raise SMSNativeError("SMS original Mode4 source template marker conflict")
         asm=asm.replace(marker,value)
-    manifest=json.dumps({
+    manifest_body={
         "schema":"skeleton.game_builder.native_sms_mode4_source.v1",
         "target_platform":"sega_master_system",
         "format":"sega_sms_z80_32kb_mode4_4bpp",
@@ -616,8 +627,8 @@ def compile_native_sms(
         "world_digest":world.digest,
         "original_reference_digest":reference.digest,
         "port_blueprint_digest":plan.digest,
-        "original_tile_count":len(_TILES),
-        "original_4bpp_art_digest":sha256(bytes(n for tile in _TILES for n in tile)).hexdigest(),
+        "original_tile_count":len(graphics),
+        "original_4bpp_art_digest":sha256(bytes(n for tile in graphics for n in tile)).hexdigest(),
         "original_rgb222_cram_digest":sha256(bytes(_CRAM)).hexdigest(),
         "screen":"32x24 Mode4 8x8 tiles",
         "joypad":"port DC active-low joypad1",
@@ -627,7 +638,14 @@ def compile_native_sms(
         "original_hardware_verified":False,
         "distribution_licensed":False,
         "rights_to_commercial_IP":False,
-    },sort_keys=True,indent=2)+"\n"
+    }
+    if tile_art is not None:
+        from .contracts import canonical_digest
+        manifest_body["generated_runtime_art_tile_digest"] = canonical_digest(
+            [list(tile) for tile in tile_art]
+        )
+        manifest_body["custom_original_tile_pixels_in_native_source"] = True
+    manifest = json.dumps(manifest_body, sort_keys=True, indent=2) + "\n"
     digest=sha256((asm+"\0"+_MAKEFILE+"\0"+_README+"\0"+manifest).encode()).hexdigest()
     return SMSSourceProject(asm,_MAKEFILE,_README,manifest,digest)
 

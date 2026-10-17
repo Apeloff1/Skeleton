@@ -69,6 +69,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     ENVIRONMENT=production \
     CORS_ORIGINS=https://cors.invalid
 
+# Release version (from the repo-root VERSION file, passed by the release
+# workflow). Exposed as APP_VERSION so /api/metrics codedock_build_info reports it.
+ARG APP_VERSION=dev
+ARG VCS_REF=unknown
+ENV APP_VERSION=$APP_VERSION
+LABEL org.opencontainers.image.version=$APP_VERSION \
+      org.opencontainers.image.revision=$VCS_REF \
+      org.opencontainers.image.source=https://github.com/Apeloff1/Skeleton \
+      org.opencontainers.image.title=skeleton-backend
+
 WORKDIR /app
 
 RUN addgroup -S -g 10001 appuser \

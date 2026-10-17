@@ -5,6 +5,10 @@ not know subsystem-specific schemas. ``CheckpointMigrator`` supplies the
 missing contract above storage: migrations are explicit, contiguous, bounded,
 and validated as finite JSON after every step so restart recovery fails closed
 instead of silently accepting partially migrated state.
+
+FROZEN (issue #4122): ``skeleton.state`` is frozen in place. New code must
+import only ``skeleton.persistence``; migration into the canonical package is
+tracked in issue #4122. Docstring-only notice: no behaviour change, no warning.
 """
 
 from __future__ import annotations

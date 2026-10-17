@@ -2,6 +2,7 @@
   "schema": "skeleton.ci.workflow_tiers.v1",
   "purpose": "fast iteration without falsely clearing specialized acceptance",
   "specialized_manual_only": [
+    "ci.yml",
     "app-assembly.yml",
     "arm64.yml",
     "ai-product-completion.yml",

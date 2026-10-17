@@ -185,3 +185,15 @@ real runs produce their exact-head receipts.
 
 The observer supplies visibility, not a guarantee of AAA craftsmanship or
 an excuse to waive the studio's immutable production requirements.
+
+### Source-linked Dragon repair/review queue
+
+After explicit observer consent, run the existing Jeeves game CLI action
+`dragon-observe-review-queue --page 0 --page-size 32` with
+`--project` set to the game workspace. The new action orders missing
+discipline evaluators, canonical failures, blocked checks, and unwitnessed
+canonical receipts. Follow `next_page` for bounded pagination.
+If `missed_witness_receipts` is nonzero, reconcile the canonical ledger
+with `dragon-observe-sync` before attempting a new quality check.
+The queue is read-only, records no screen/audio/chat, never upgrades an
+operator observation to canonical evidence, and grants no weight promotion.

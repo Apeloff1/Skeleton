@@ -1,3 +1,4 @@
+import pytest
 from dataclasses import dataclass
 from skeleton.ai.webcrawler.dragon_events import DragonEventStream
 from skeleton.ai.webcrawler.dragon_visual_state import visual_state
@@ -14,6 +15,11 @@ def test_fire_only_occurs_after_acceptance_when_observer_used_in_order():
  kinds=[x.kind for x in s.events];assert kinds==["frontier_discovered","acquisition_accepted","burn_started","burn_chunk","burn_chunk","burn_complete"]
  assert visual_state(s.events[-1]).label=="Extraction complete"
  assert visual_state(s.events[-1]).progress==1.0
+ sealed=o.distill(d,at=4,receipt_id="distill-1")
+ assert sealed.kind=="distill_complete" and sealed.payload["distilled"] is True
+ assert visual_state(sealed).label=="Distillation sealed"
+ with pytest.raises(ValueError):
+  o.distill(d,at=5,receipt_id="")
  # A completed burn event alone does not certify a separate index write.
 def test_graph_projection_tracks_real_event_state():
  s=DragonEventStream();g=CrawlGraphProjection()

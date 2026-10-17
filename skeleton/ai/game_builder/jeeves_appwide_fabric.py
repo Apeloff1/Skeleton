@@ -543,7 +543,7 @@ class JeevesAppwideRuntime:
                 "frontier_discovered","dragon_travel","visual_probe",
                 "robots_check","fetch_started","fetch_received",
                 "policy_rejected","acquisition_accepted","burn_started",
-                "burn_chunk","burn_complete","retry_wait","crawl_complete"):
+                "burn_chunk","burn_complete","distill_complete","retry_wait","crawl_complete"):
                 raise JeevesAppwideError("known dragon event only")
             v=visual_state(SimpleNamespace(kind=event))
             result={"pose":v.pose,"effect":v.effect,"label":v.label,

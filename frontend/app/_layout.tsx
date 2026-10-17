@@ -18,9 +18,12 @@ import ScreenGuard from '../components/withScreenGuard';
 import { ToastHost } from '../components/Toast';
 import { ActionSheetHost } from '../components/ActionSheet';
 import { traceStep, traceStepSync, installCrashTrace } from '../utils/bootTracer';
-import { installMemoryGuard } from '../utils/memoryGuard';
+import { installMemoryGuard, uninstallMemoryGuard, registerMemoryShedder } from '../utils/memoryGuard';
+import { clearMemCache } from '../utils/resilientNet';
+import { shedSafeStorageMirror } from '../utils/safeStorage';
+import { purgeThermalCachesIfPresent } from '../utils/thermalGuard';
 import { installGlobalGuards } from '../utils/globalGuards';
-import { installAppStateGuard } from '../utils/safeTimers';
+import { installAppStateGuard, uninstallAppStateGuard } from '../utils/safeTimers';
 import { loadFeatureFlags } from '../utils/featureFlags';
 import { FeatureFlagProvider } from '../src/feature-flags';
 import { StabilityBanner } from '../src/components/StabilityBanner';
@@ -28,6 +31,11 @@ import { installGlobalErrorHandlers } from '../src/utils/globalErrors';
 import { startTunnelHeartbeat, stopTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
 import { LocaleProvider } from '../src/i18n';
+
+// Route-level fallback: expo-router renders this for errors thrown by any
+// route without its own ErrorBoundary export (the class boundaries below
+// remain the last line of defence).
+export { RouteErrorFallback as ErrorBoundary } from '../src/foundation/RouteErrorFallback';
 
 // Auxiliary diagnostics may not make importing the app itself fatal.
 try { installCrashTrace(); } catch {}
@@ -57,8 +65,19 @@ export default function RootLayout() {
     // These observers are independent: failure to install one must not
     // prevent the others or crash the initial React commit.
     try { installGlobalGuards(); } catch {}
+    try { installMemoryGuard(); } catch {}
     try { installAppStateGuard(); } catch {}
     try { installGlobalErrorHandlers(); } catch {}
+
+    // Drop only regenerable in-memory caches on OS memory pressure; never
+    // clear durable project, checkpoint, or learned model state.
+    const disposeNetworkShedder = registerMemoryShedder('network-cache', clearMemCache);
+    const disposeThermalShedder = registerMemoryShedder(
+      'thermal-cache', purgeThermalCachesIfPresent,
+    );
+    const disposeStorageMirror = registerMemoryShedder(
+      'native-read-mirror', shedSafeStorageMirror,
+    );
 
     // Device connectivity is observed immediately by StabilityBanner. Delay
     // server polling so it does not compete with the launcher for cold-start
@@ -74,6 +93,13 @@ export default function RootLayout() {
     return () => {
       clearTimeout(heartbeatTimer);
       stopTunnelHeartbeat();
+      disposeNetworkShedder();
+      disposeThermalShedder();
+      disposeStorageMirror();
+      // React dev remounts must release the native observers as well as
+      // their timers. Root effect re-installs both guards on next mount.
+      uninstallAppStateGuard();
+      uninstallMemoryGuard();
     };
   }, []);
 

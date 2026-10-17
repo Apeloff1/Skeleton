@@ -965,7 +965,7 @@ The first pass found architectural families. The second pass attacks race window
 
 ### Second-pass closure rules
 
-- G084 is an additional P0: root-key compromise must have a tested revocation and trust-root replacement path.
+- G084 is an additional P0: root-key compromise must have a tested revocation and trust-root replacement path. The decision procedure is `skeleton/security/trust_root_recovery.py` (AI tree facade only). Landed implementation is not independent verification and does not mark the gap verified-closed.
 - Authorization/approval decisions bind the exact action digest and are revalidated at commit time.
 - Fetchers resolve/validate every redirect and final network target; DNS rebinding cannot bypass egress policy.
 - File extraction and path writes use canonicalized sandbox-relative paths and reject symlink/mount escapes.

@@ -1,0 +1,207 @@
+"""Native studio requires exact original sprite/audio assembly before ROM build.
+
+Uses actual generated original worlds and browser/Godot/asset packages, not an
+invented JSON report. No compiler, emulator, soundcard or release is claimed.
+"""
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+
+from skeleton.ai.game_builder.contracts import canonical_digest
+from skeleton.ai.game_builder.studio_build_qualification import (
+    NativeBuildQualificationError, _verify_source,
+)
+from skeleton.ai.game_builder.native_game_cli import build_game
+from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
+from skeleton.ai.game_builder.studio_native_source_media_parity import (
+    NativeMediaSourceError, inspect_native_source_media, _exact_region,
+)
+
+
+class TrueOriginalConsoleMediaSourceTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.rights = self.root / "original-author-evidence.txt"
+        self.rights.write_text(
+            "Original homebrew story, cast, game, tiles, music, animation and mechanics",
+            encoding="utf-8",
+        )
+
+    def generate(self, target, *, frames=3, density=3):
+        folder = self.root / target
+        receipt = build_game(
+            target=target, basis="bandai_wonderswan",
+            project_id="native-media-proof", title="Original Sound and Motion",
+            seed=733, width=11, height=11, levels=2,
+            collectibles=2, hazards=0, health=4,
+            rights_evidence=self.rights,
+            creative_identity=("original-characters", "independently-authored-sound"),
+            output=folder, authorized=True,
+            studio_art=ArtDirection(
+                seed=733, style="organic", animation_frames=frames,
+                animation_fps=8, music_density=density, parallax_layers=0,
+            ),
+        )
+        self.assertFalse(receipt["native_binary_built"])
+        return folder, receipt
+
+    def test_exact_assembly_labels_cannot_collide_with_longer_label_names(self):
+        source = (
+            "Tiles:\n"
+            "    db $11, $22\n"
+            "TilesEnd:\n"
+            "AnimationTiles:\n"
+            "    db $33, $44\n"
+            "AnimationTilesEnd:\n"
+        )
+        _exact_region(source, "Tiles:\n", "\nTilesEnd:", "    db $11, $22")
+        _exact_region(
+            source, "AnimationTiles:\n", "\nAnimationTilesEnd:",
+            "    db $33, $44",
+        )
+        for forged in (
+            source.replace("Tiles:\n", "TilesX:\n", 1),
+            source.replace("    db $11, $22", "    db $00, $22", 1),
+            source + "Tiles:\n    db $11, $22\n",
+        ):
+            with self.subTest(forged=forged):
+                with self.assertRaises(NativeMediaSourceError):
+                    _exact_region(
+                        forged, "Tiles:\n", "\nTilesEnd:",
+                        "    db $11, $22",
+                    )
+
+    def test_all_three_native_consoles_match_actual_source_music_and_animation(self):
+        for platform in (
+            "nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
+        ):
+            with self.subTest(platform=platform):
+                folder, built = self.generate(platform)
+                receipt = inspect_native_source_media(folder, target=platform)
+                self.assertTrue(receipt["console_assembly_data_verified"])
+                self.assertEqual(receipt["original_hero_frame_count"], 3)
+                self.assertEqual(receipt["native_animation_ticks_per_frame"], 8)
+                self.assertEqual(receipt["native_psg_score_digest"],
+                                 built["native_psg_score_digest"])
+                self.assertEqual(receipt["native_gameplay_cues"], 3)
+                self.assertEqual(receipt["native_music_notes"], 8)
+                self.assertTrue(receipt["native_psg_enabled"])
+                self.assertFalse(receipt["native_machine_code_executed"])
+                self.assertFalse(receipt["console_video_verified"])
+                self.assertFalse(receipt["audio_hardware_verified"])
+                self.assertEqual(len(receipt["source_media_digest"]), 64)
+
+    def test_static_frame_and_muted_original_sound_remain_explicit(self):
+        folder, built = self.generate(
+            "nintendo_game_boy", frames=1, density=0,
+        )
+        receipt = inspect_native_source_media(
+            folder, target="nintendo_game_boy",
+        )
+        self.assertEqual(receipt["original_hero_frame_count"], 1)
+        self.assertFalse(receipt["native_psg_enabled"])
+        self.assertFalse(built["native_psg_music_and_cues_source_integrated"])
+
+    def test_silent_source_mutations_fail_before_rom_compilation(self):
+        folder, _ = self.generate("nintendo_game_boy")
+        original = folder / "main.asm"
+        unmodified = original.read_text(encoding="utf-8")
+        swaps = (
+            ("DEF ANIM_COUNT EQU 3", "DEF ANIM_COUNT EQU 2"),
+            ("DEF MUSIC_FRAME_DELAY EQU 17", "DEF MUSIC_FRAME_DELAY EQU 18"),
+            ("AnimationTiles:\n", "AnimationTiles:\n    db $00, $00\n"),
+            ("Tiles:\n", "Tiles:\n    db $00, $00\n"),
+            ("OriginalMusicLow:\n", "OriginalMusicLow:\n    db $00\n"),
+            ("SoundPickup:\n", "SoundPickup:\n    ret\n"),
+            ("    call TickOriginalMusic\n",
+             "    ; intentionally bypass native original audio\n"),
+            ("    call AnimateHero\n",
+             "    ; intentionally bypass native sprite animation\n"),
+            ("    call InitOriginalAudio\n",
+             "    ; intentionally skip console APU setup\n"),
+        )
+        for before, after in swaps:
+            with self.subTest(before=before):
+                self.assertIn(before, unmodified)
+                original.write_text(
+                    unmodified.replace(before, after, 1), encoding="utf-8",
+                )
+                with self.assertRaises(NativeMediaSourceError):
+                    inspect_native_source_media(
+                        folder, target="nintendo_game_boy",
+                    )
+        original.write_text(unmodified, encoding="utf-8")
+        self.assertTrue(inspect_native_source_media(
+            folder, target="nintendo_game_boy",
+        )["console_assembly_data_verified"])
+
+    def test_sound_table_mutation_rejected_in_actual_nes_assembly(self):
+        folder, _ = self.generate("nintendo_famicom")
+        program = folder / "main.s"
+        original = program.read_text(encoding="utf-8")
+        self.assertIn("OriginalMusicHigh:\n", original)
+        self.assertIn("    jsr TickOriginalMusic\n", original)
+        self.assertIn("Tiles:\n", original)
+        program.write_text(
+            original.replace(
+                "OriginalMusicHigh:\n",
+                "OriginalMusicHigh:\n.byte $00, $01, $02\n", 1,
+            ), encoding="utf-8",
+        )
+        with self.assertRaises(NativeMediaSourceError):
+            inspect_native_source_media(folder, target="nintendo_famicom")
+
+    def test_forged_nes_background_tile_bytes_fail_before_native_qualification(self):
+        folder, _ = self.generate("nintendo_famicom")
+        program = folder / "main.s"
+        original = program.read_text(encoding="utf-8")
+        self.assertIn("Tiles:\n", original)
+        program.write_text(
+            original.replace("Tiles:\n", "Tiles:\n.byte $00\n", 1),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(NativeMediaSourceError, "source region"):
+            inspect_native_source_media(folder, target="nintendo_famicom")
+
+    def test_rehashed_source_attestation_cannot_qualify_disabled_apu_source(self):
+        target = "nintendo_game_boy"
+        folder, _ = self.generate(target)
+        program = folder / "main.asm"
+        original = program.read_text(encoding="utf-8")
+        self.assertIn("    call InitOriginalAudio\n", original)
+        program.write_text(
+            original.replace(
+                "    call InitOriginalAudio\n", "    ; disabled APU init\n", 1,
+            ), encoding="utf-8",
+        )
+        signed_file = folder / "source_attestation.json"
+        signed = json.loads(signed_file.read_text(encoding="utf-8"))
+        signed["input_files"]["main.asm"] = sha256(program.read_bytes()).hexdigest()
+        signed["attestation_digest"] = canonical_digest({
+            key: value for key, value in signed.items()
+            if key != "attestation_digest"
+        })
+        signed_file.write_text(
+            json.dumps(signed, sort_keys=True), encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            NativeBuildQualificationError, "native source media",
+        ):
+            _verify_source(folder, target)
+
+    def test_non_console_platforms_and_wrong_target_are_not_qualified(self):
+        folder, _ = self.generate("nintendo_game_boy")
+        for other in ("nintendo_famicom", "nintendo_switch", "", None):
+            with self.subTest(other=other):
+                with self.assertRaises(NativeMediaSourceError):
+                    inspect_native_source_media(folder, target=other)
+
+
+if __name__ == "__main__":
+    unittest.main()
