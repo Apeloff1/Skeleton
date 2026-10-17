@@ -102,7 +102,10 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
         ram = {
             "Level": final["level_index"] + 1,
             "PlayerX": final["x"], "PlayerY": final["y"],
-            "Health": final["health"], "Score": final["score"] % 256,\n            "ScoreHigh": final["score"] // 256,
+            "Health": final["health"], "Score": final["score"] % 256,
+            "ScoreHigh": final["score"] // 256,
+            "TurnCount": len(trace["actions"]) & 255,
+            "TurnCountHigh": len(trace["actions"]) >> 8,
             "GemsRemaining": 0, "GameWon": 1, "GameLost": 0,
         }
         fake = nes_receipt(
