@@ -37,6 +37,7 @@ def parser() -> argparse.ArgumentParser:
     lenses.add_argument("--receipt", required=True, type=Path)
     lenses.add_argument("--source-sha256", required=True)
     lenses.add_argument("--run-index", type=int, default=0)
+    lenses.add_argument("--lens-count", type=int, choices=(43, 200), default=43)
     lenses.add_argument(
         "--output-dir", type=Path,
         help="optionally create a pinned 43-lens JSON manifest for future candidate exports",
@@ -131,6 +132,7 @@ def parser() -> argparse.ArgumentParser:
     )
     triangle.add_argument("--semantic-seed", type=int, default=0)
     triangle.add_argument("--semantic-tokens", type=int, default=192)
+    triangle.add_argument("--semantic-lens-count", type=int, choices=(43, 200), default=43)
     corpus = commands.add_parser(
         "export-triangle-corpus",
         help="replay the independent critic and export weighted Jeeves candidate training views",
@@ -148,6 +150,7 @@ def parser() -> argparse.ArgumentParser:
         "--semantic-review-receipt", type=Path,
         help="optional actual 43-lens inference receipt to verify and reference in corpus v3",
     )
+    corpus.add_argument("--semantic-lens-count", type=int, choices=(43, 200), default=43)
     corpus.add_argument(
         "--semantic-checkpoint", type=Path,
         help="required with --semantic-review-receipt to replay all 43 model inferences",
@@ -166,6 +169,20 @@ def parser() -> argparse.ArgumentParser:
     native_semantics.add_argument("--run-index", type=int, default=0)
     native_semantics.add_argument("--seed", type=int, default=0)
     native_semantics.add_argument("--max-new-tokens", type=int, default=192)
+    native_200 = commands.add_parser(
+        "execute-200-lenses",
+        help="run 200 real source-bound governed Jeeves semantic lens model generations",
+    )
+    native_200.add_argument("--receipt", required=True, type=Path)
+    native_200.add_argument("--review-receipt", required=True, type=Path)
+    native_200.add_argument("--source-sha256", required=True)
+    native_200.add_argument("--critic-checkpoint", required=True, type=Path)
+    native_200.add_argument("--semantic-checkpoint", required=True, type=Path)
+    native_200.add_argument("--output-dir", required=True, type=Path)
+    native_200.add_argument("--semantic-lens-set", type=Path)
+    native_200.add_argument("--run-index", type=int, default=0)
+    native_200.add_argument("--seed", type=int, default=0)
+    native_200.add_argument("--max-new-tokens", type=int, default=192)
     return root
 
 
@@ -200,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(json.dumps(report, sort_keys=True))
             return 0
-        if args.operation == "execute-43-lenses":
+        if args.operation in ("execute-43-lenses", "execute-200-lenses"):
             from skeleton.ai.training.rom_triangle_campaign import (
                 execute_native_43_lens_review, load_operator_semantic_lens_set,
             )
@@ -218,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
                 semantic_runtime=semantic, run_index=args.run_index,
                 requested_keys=requested, seed=args.seed,
                 max_new_tokens=args.max_new_tokens,
+                lens_budget=(200 if args.operation == "execute-200-lenses" else 43),
             )
             print(json.dumps(result, sort_keys=True))
             return 0
@@ -228,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
             result = inspect_native_episode_lenses(
                 args.receipt, source_sha256=args.source_sha256,
                 run_index=args.run_index, output_dir=args.output_dir,
+                lens_budget=args.lens_count,
             )
             print(json.dumps(result, sort_keys=True))
             return 0
@@ -254,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
                 requested_semantic_lens_keys=keys,
                 semantic_review_receipt=args.semantic_review_receipt,
                 semantic_runtime=semantic_runtime,
+                semantic_lens_budget=args.semantic_lens_count,
             )
             print(json.dumps(result, sort_keys=True))
             return 0
@@ -398,6 +418,7 @@ def main(argv: list[str] | None = None) -> int:
                     semantic_all_runs=args.semantic_all_runs,
                     semantic_seed=args.semantic_seed,
                     semantic_tokens=args.semantic_tokens,
+                    semantic_lens_budget=args.semantic_lens_count,
                 )
                 pages += 1
                 print(json.dumps({
