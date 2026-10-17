@@ -8,6 +8,7 @@ from unittest.mock import patch
 import unittest
 
 from skeleton.ai.game_builder.contracts import canonical_digest
+from skeleton.ai.game_builder.studio_native_correction_triage import triage_native_gameplay
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_campaign import CampaignOrder
 from skeleton.ai.game_builder.studio_execution_campaign import (
@@ -112,6 +113,16 @@ class EnduranceProductionHistoryTests(unittest.TestCase):
             inspect_execution_history(self.order, self.campaign, authorized=True)
             ["recorded_cpu_divergence_events"], 2,
         )
+        dragon = triage_native_gameplay(
+            self.order, self.campaign, authorized=True,
+        )
+        self.assertTrue(dragon["latest_history_current"])
+        self.assertEqual(dragon["proposal_count"], 1)
+        self.assertEqual(dragon["proposals"][0]["first_mismatch_action"], 1)
+        self.assertEqual(dragon["proposals"][0]["category"],
+                         "directional_input_or_collision")
+        self.assertFalse(dragon["source_code_modified"])
+        self.assertFalse(dragon["model_weights_modified"])
         forged = dict(run)
         forged["events"] = [*run["events"], dict(run["events"][-1])]
         forged["total_stage_attempts"] += 1
