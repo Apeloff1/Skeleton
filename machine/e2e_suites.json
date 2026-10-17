@@ -384,7 +384,9 @@
         "skeleton/ai/game_builder/studio_specialized_e2e_runner.py",
         "tests/test_studio_specialized_e2e_runner.py",
         "skeleton/ai/game_builder/studio_history_segments.py",
-        "tests/test_studio_execution_history_segments.py"
+        "tests/test_studio_execution_history_segments.py",
+        "skeleton/ai/game_builder/studio_compiled_psg_parity.py",
+        "tests/test_studio_compiled_psg_parity.py"
       ],
       "command": [
         "python",
@@ -412,7 +414,8 @@
         "tests/test_studio_native_source_media_parity.py",
         "tests/test_studio_campaign_e2e.py",
         "tests/test_studio_specialized_e2e_runner.py",
-        "tests/test_studio_execution_history_segments.py"
+        "tests/test_studio_execution_history_segments.py",
+        "tests/test_studio_compiled_psg_parity.py"
       ]
     }
   ]
