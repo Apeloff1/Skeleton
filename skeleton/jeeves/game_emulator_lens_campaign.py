@@ -12,6 +12,7 @@ from typing import Any
 from .game_learning import _digest
 from .game_emulator_lens_review import (
     SCHEMA, EmulatorLensReviewError, _all_review_specs,
+    review_verified_training_report, validate_training_receipts,
 )
 
 MAX_CAMPAIGN_PAGES = 128
@@ -21,7 +22,9 @@ class LensCampaignError(EmulatorLensReviewError):
     """A lens page is missing, altered, repeated or has an untrusted outcome."""
 
 
-def audit_lens_campaign(pages: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def audit_lens_campaign(
+    pages: Sequence[dict[str, Any]], *, source_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Audit full ordered coverage, source pinning, page digests and open lanes.
 
     Review receipts are structurally checked but cannot independently prove that
@@ -55,9 +58,19 @@ def audit_lens_campaign(pages: Sequence[dict[str, Any]]) -> dict[str, Any]:
     seen = []
     counts: Counter[str] = Counter()
     page_digests = []
+    if source_report is not None:
+        validated = validate_training_receipts(source_report)
+        if validated["report_digest"] != source:
+            raise LensCampaignError("source report differs from reviewed campaign")
     for page in pages:
         if type(page) is not dict:
             raise LensCampaignError("each page must be a canonical object")
+        if source_report is not None:
+            expected = review_verified_training_report(
+                source_report, offset=len(seen), limit=page.get("page_size", 0),
+            )
+            if page != expected:
+                raise LensCampaignError("review page differs from exact source and catalog")
         reported_digest = page.get("review_digest")
         if (type(reported_digest) is not str
                 or reported_digest != _digest({
@@ -127,6 +140,7 @@ def audit_lens_campaign(pages: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "page_digests": page_digests,
         "family_counts": dict(sorted(counts.items())),
         "full_registered_catalog_covered": True,
+        "all_review_pages_reconstructed_from_source": source_report is not None,
         "independent_native_replay_verified": False,
         "independent_dragon_observations_verified": 0,
         "independent_adversarial_reviews_verified": 0,
