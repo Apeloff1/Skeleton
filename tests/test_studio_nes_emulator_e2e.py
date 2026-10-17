@@ -23,7 +23,7 @@ NES_LABELS = (
     "al 000006 .Score\n"
     "al 000007 .GemsRemaining\n"
     "al 000008 .GameWon\n"
-    "al 000009 .GameLost\n"
+    "al 000009 .GameLost\n"\n    "al 000015 .ScoreHigh\n"
 ).encode("ascii")
 
 
@@ -102,7 +102,7 @@ class RealNESCPUReplayTests(unittest.TestCase):
             self.assertTrue((Path(cwd) / "original.nes").exists())
             self.assertFalse((Path(cwd) / "original.nes").is_symlink())
             (Path(cwd) / "replay-result.txt").write_text(
-                "NES_REPLAY_V1 150 2 1 2 3 4 1 0 1 0"
+                "NES_REPLAY_V1 150 2 1 2 3 4 1 0 0 1 0"
             )
             (Path(cwd) / "framebuffer.gd").write_bytes(b"GDREAL" + bytes(300))
             return subprocess.CompletedProcess(args, 0, None, None)
@@ -130,7 +130,7 @@ class RealNESCPUReplayTests(unittest.TestCase):
             "skeleton.ai.game_builder.studio_nes_emulator.subprocess.run",
             side_effect=lambda args, *, cwd, **k: (
                 (Path(cwd) / "replay-result.txt").write_text(
-                    "NES_REPLAY_V1 150 2 1 2 3 0 1 0 0 1"
+                    "NES_REPLAY_V1 150 2 1 2 3 0 1 0 0 0 1"
                 ) and subprocess.CompletedProcess(args, 0, None, None)
             ),
         ):
