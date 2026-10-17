@@ -15,6 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project")
     parser.add_argument("--target")
     parser.add_argument("--output")
+    parser.add_argument("--output-symbols", help="new .sym output next to RGBDS ROM (GB/GBC only)")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=45)
     parser.add_argument("--authorize-local-build", action="store_true")
@@ -29,7 +30,8 @@ def main(argv: list[str] | None = None) -> int:
             args.project, args.target,
             authorized=args.authorize_local_build,
             execute=args.execute,
-            output=args.output, timeout_seconds=args.timeout_seconds,
+            output=args.output, output_symbols=args.output_symbols,
+            timeout_seconds=args.timeout_seconds,
         )
     except (NativeBuildQualificationError, PermissionError, OSError) as exc:
         print(json.dumps({"qualified": False, "error": str(exc)}, sort_keys=True))
