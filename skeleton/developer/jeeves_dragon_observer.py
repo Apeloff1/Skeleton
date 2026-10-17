@@ -147,6 +147,7 @@ def _observations(root: Path, policy: dict[str, Any],
             or event["action"] not in ACTIONS or event["outcome"] not in OUTCOMES
             or not isinstance(event["evidence_sha256"], str)
             or HEX.fullmatch(event["evidence_sha256"]) is None
+            or not isinstance(event["trust"], str)
             or not isinstance(event["at_utc"], str)
             or len(event["at_utc"]) > 64
             or production._digest({k: v for k, v in event.items() if k != "digest"})
