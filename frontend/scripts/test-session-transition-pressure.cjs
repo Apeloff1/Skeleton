@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -18,7 +19,7 @@ function loadTS(filename, mocks = {}) {
   });
   assert.equal((compilation.diagnostics || []).length, 0, filename);
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', compilation.outputText)(
+  compileFunction(compilation.outputText, ['require', 'module', 'exports'])(
     id => {
       assert.ok(Object.hasOwn(mocks, id), 'unexpected import ' + id);
       return mocks[id];
