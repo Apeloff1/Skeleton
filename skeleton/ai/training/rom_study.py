@@ -417,6 +417,74 @@ def _verify_existing_q_receipt(
     return _hash(raw)
 
 
+def _verify_existing_neural_candidate(
+    path: Path, *, source_sha: str, q_digest: str,
+    source_report_digest: str, policy_digest: str,
+) -> dict[str, Any]:
+    """Reaudit an existing shadow model before reporting candidate reuse.
+
+    Neither file presence nor a recomputed unkeyed SHA authenticates the
+    native runner. This checks the saved model's own structural contract,
+    exact Q ancestry, optimizer receipts and heldout identity.
+    """
+    from skeleton.jeeves.game_learning import _digest
+    from skeleton.jeeves.game_emulator_neural_world import (
+        validate_neural_world_checkpoint,
+    )
+
+    before = _regular_identity(path)
+    if before[2] > 32 * 1024 * 1024:
+        raise RomStudyError("saved neural candidate exceeds verification budget")
+    with path.open("rb") as source:
+        raw = source.read(32 * 1024 * 1024 + 1)
+    if len(raw) != before[2] or _regular_identity(path) != before:
+        raise RomStudyError("saved neural candidate changed during inspection")
+    try:
+        doc = json.loads(raw)
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise RomStudyError("saved neural candidate is invalid JSON") from exc
+    if (type(doc) is not dict or raw != _canonical(doc) + b"\n"
+            or set(doc) != {
+                "schema_version", "rom_sha256", "source_q_receipt_sha256",
+                "source_emulator_report_digest", "model",
+                "heldout_measurements", "production_jeeves_weights_updated",
+                "candidate_only_no_auto_promotion",
+            }
+            or doc["schema_version"] != "skeleton.jeeves.rom_neural_candidate.v1"
+            or doc["rom_sha256"] != source_sha
+            or doc["source_q_receipt_sha256"] != q_digest
+            or doc["source_emulator_report_digest"] != source_report_digest
+            or doc["production_jeeves_weights_updated"] is not False
+            or doc["candidate_only_no_auto_promotion"] is not True):
+        raise RomStudyError("neural candidate source or promotion authority differs")
+    model = doc["model"]
+    measurement = doc["heldout_measurements"]
+    if type(model) is not dict or type(measurement) is not dict:
+        raise RomStudyError("saved neural parameters or holdout report absent")
+    model_digest = validate_neural_world_checkpoint(model)
+    if (model.get("source_evidence_digest") != source_report_digest
+            or model.get("source_policy_snapshot_digest") != policy_digest
+            or model.get("real_optimizer_steps") != measurement.get("real_neural_optimizer_steps")
+            or measurement.get("parent_emulator_evidence_digest") != source_report_digest
+            or measurement.get("world_model_digest") != model_digest
+            or measurement.get("candidate_status") != model.get("measured_predictive_gate")
+            or measurement.get("production_model_promotion") is not False
+            or measurement.get("report_digest") != _digest({
+                key: value for key, value in measurement.items()
+                if key != "report_digest"
+            })):
+        raise RomStudyError("shadow model lacks original optimizer/heldout ancestry")
+    return {
+        "state": "previous_neural_candidate_verified_not_retrained",
+        "candidate_name": path.name,
+        "candidate_sha256": _hash(raw),
+        "model_digest": model_digest,
+        "heldout_status": measurement["candidate_status"],
+        "neural_training_reexecuted": False,
+        "production_weights_modified": False,
+    }
+
+
 def train_neural_candidate(
     q_receipt_path: Path, output_dir: Path, *,
     seed: int = 0, width: int = 12, epochs: int = 6,
@@ -481,10 +549,11 @@ def train_neural_candidate(
     name = "rom-world-" + source_sha[:16] + "-" + selection[:16] + ".json"
     destination = output_dir / name
     if destination.exists() or destination.is_symlink():
-        return {
-            "state": "previous_neural_candidate_receipt_exists",
-            "candidate_name": name, "neural_training_reexecuted": False,
-        }
+        return _verify_existing_neural_candidate(
+            destination, source_sha=source_sha, q_digest=_hash(raw),
+            source_report_digest=source_digest,
+            policy_digest=policy["snapshot_digest"],
+        )
     model, measurements = train_neural_world_from_evidence(
         evidence, policy, config=config,
     )
