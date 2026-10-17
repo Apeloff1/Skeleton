@@ -321,8 +321,8 @@ def _verify_existing_q_receipt(
     underlying policy and source episodes are revalidated before reuse, even
     when neural training was not requested. No ROM or core is reexecuted here.
     """
-    from skeleton.jeeves.game_learning import _digest
-    from skeleton.jeeves.game_emulator_neural_world import verify_neural_training_sources
+    from skeleton.jeeves.game_learning import _digest, GamePolicyLearner
+    from skeleton.jeeves.game_emulator_neural_world import _check_receipt
 
     identity = _regular_identity(path)
     if identity[2] > 32 * 1024 * 1024:
@@ -363,15 +363,56 @@ def _verify_existing_q_receipt(
             or lineage.get("target_id") != grant["target_id"]):
         raise RomStudyError("saved receipt has different source or rights lineage")
     policy = report["policy_snapshot"]
-    evidence = {key: value for key, value in report.items()
-                if key != "policy_snapshot"}
-    evidence["policy_snapshot_digest"] = policy.get("snapshot_digest")
-    evidence["evidence_digest"] = _digest(evidence)
-    validated, _, _, _ = verify_neural_training_sources(evidence, policy)
-    if (len(validated) != report.get("actual_training_steps")
-            or type(report.get("actual_q_table_updates")) is not int
-            or report["actual_q_table_updates"] <= 0
-            or report.get("actual_neural_parameter_updates") != 0):
+    if (report.get("report_digest") != _digest({
+            key: value for key, value in report.items() if key != "report_digest"
+    }) or report.get("status") not in (
+            "observed_q_and_visual_learning_plateau",
+            "budget_exhausted_before_saturation"
+    ) or report.get("actual_neural_parameter_updates") != 0
+            or policy.get("source_lineage") != lineage
+            or report.get("environment") != policy.get("environment")):
+        raise RomStudyError("saved training report, policy or runtime lineage differs")
+    # Validate the full Q table and episodes using the canonical policy owner.
+    # Unlike neural candidate admission, a genuine one-episode Q-only run
+    # remains reusable; it must not be rejected for lacking neural samples.
+    GamePolicyLearner.from_snapshot(
+        policy, expected_source_lineage=lineage,
+    )
+    receipts = report.get("audited_run_receipts")
+    episodes = policy.get("episodes")
+    if (type(receipts) is not list or not 1 <= len(receipts) <= 32
+            or type(episodes) is not list or len(episodes) != len(receipts)
+            or type(report.get("run_count")) is not int
+            or report["run_count"] != len(receipts)):
+        raise RomStudyError("saved Q training episode count is inconsistent")
+    traces = set()
+    total_steps, total_updates = 0, 0
+    for receipt, episode in zip(receipts, episodes, strict=True):
+        _check_receipt(receipt)
+        trace = receipt.get("trace_digest")
+        if (type(trace) is not str or not _SHA.fullmatch(trace)
+                or trace in traces or type(episode) is not dict
+                or episode.get("trace_digest") != trace
+                or episode.get("steps") != receipt["actual_steps"]
+                or episode.get("seed") != receipt.get("seed")):
+            raise RomStudyError("saved Q episode identity differs from replay receipts")
+        traces.add(trace)
+        total_steps += receipt["actual_steps"]
+        total_updates += receipt["actual_tabular_q_updates"]
+    dataset = report.get("neural_candidate_dataset")
+    if (type(dataset) is not dict
+            or dataset.get("training_executed") is not False
+            or dataset.get("weights_updated") != 0
+            or dataset.get("production_promotion_authorized") is not False
+            or dataset.get("train_only_no_heldout_examples") is not True
+            or type(dataset.get("candidate_samples")) is not list
+            or dataset.get("training_sample_count") != len(dataset["candidate_samples"])
+            or dataset.get("dataset_digest") != _digest(dataset["candidate_samples"])
+            or len(dataset["candidate_samples"]) != total_steps
+            or report.get("actual_training_steps") != total_steps
+            or report.get("actual_q_table_updates") != total_updates
+            or policy.get("committed_updates") != total_updates
+            or total_updates < 1):
         raise RomStudyError("saved Q training episode/update accounting is inconsistent")
     return _hash(raw)
 
