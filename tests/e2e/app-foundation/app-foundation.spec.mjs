@@ -87,7 +87,14 @@ for (const [flow, href] of [
     const errors = trackPageErrors(page);
     const res = await page.goto(href);
     expect(res && res.ok(), `${href} HTTP ${res && res.status()}`).toBeTruthy();
-    await expectRendered(page);
+    if (href === '/ai-game-generator') {
+      // React Native Web Modal uses a body-level portal, so #root may remain
+      // empty even when the generator is visibly mounted and interactive.
+      await expect(page.getByText('🎮 AI Game Generator', { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Close AI Game Generator' })).toBeVisible();
+    } else {
+      await expectRendered(page);
+    }
     expect(errors, errors.join('\n')).toEqual([]);
   });
 }
