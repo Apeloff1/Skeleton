@@ -139,6 +139,14 @@ def _fake_training(tmp_path, monkeypatch, *, updates: int):
         }
         return {**original, "report_digest": _digest(original)}
     monkeypatch.setattr(lab, "run_emulator_training_lab", fake_training)
+    # This fixture intentionally forges a MINIMAL lab summary to exercise
+    # page accounting. Tests using it mock the *independent* receipt proof
+    # only; separate integration tests run the real policy/receipt verifier.
+    from skeleton.ai.training import rom_fleet_audit as fleet
+    monkeypatch.setattr(
+        fleet, "_verify_existing_q_receipt",
+        lambda path, **kwargs: hashlib.sha256(path.read_bytes()).hexdigest(),
+    )
     return captured
 
 
