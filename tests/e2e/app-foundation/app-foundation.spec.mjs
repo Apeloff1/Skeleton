@@ -19,10 +19,10 @@ async function expectRendered(page) {
 }
 
 async function registerAccount(request) {
-  const email = `pw-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
+  const email = `pw-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
   const password = `Pw-${Math.random().toString(36).slice(2)}-pass`;
   const res = await request.post(`${API}/api/auth/register`, { data: { email, password } });
-  expect(res.ok(), `register HTTP ${res.status()}`).toBeTruthy();
+  expect(res.ok(), `register HTTP ${res.status()}: ${(await res.text()).slice(0, 600)}`).toBeTruthy();
   return { email, password };
 }
 
