@@ -5,7 +5,9 @@
   "item_count": 1000,
   "summary": {
     "reviewed": 69,
-    "deferred": 89,
+    "ready": 2,
+    "in-review": 57,
+    "deferred": 30,
     "catalogued": 842
   },
   "items": [
@@ -534,8 +536,8 @@
       "source": "p1_backlog",
       "title": "Reasoning, search and stopping policy registry",
       "prior": "blocked",
-      "disposition": "deferred",
-      "note": "P1 item classified"
+      "disposition": "ready",
+      "note": "Dependencies satisfied; moved to ready."
     },
     {
       "id": null,
@@ -566,8 +568,8 @@
       "source": "p1_backlog",
       "title": "Canonical privileged tool transaction and sandbox",
       "prior": "blocked",
-      "disposition": "deferred",
-      "note": "P1 item classified"
+      "disposition": "ready",
+      "note": "Dependencies satisfied; moved to ready."
     },
     {
       "id": null,
@@ -822,456 +824,456 @@
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-018",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-010",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-009",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DATA-010",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-008",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-009",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-AI-001",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-AI-002",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-AI-013",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-AI-030",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-001",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-020",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-005",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-006",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-007",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-024",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-AI-021",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DATA-009",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-001",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-011",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-015",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-016",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-018",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-HIST-SYS-020",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-025",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-AI-003",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-002",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-003",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-004",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-012",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-013",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-014",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-017",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-SEC-019",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-HIST-SYS-021",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-HIST-AI-002",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DIST-020",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DIST-021",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-HIST-SYS-003",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DATA-002",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DATA-007",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DIST-010",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DIST-027",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-005",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-010",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-029",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DATA-005",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-HIST-SYS-025",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-014",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-021",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-013",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DATA-001",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DATA-006",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DIST-007",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-EDGE-DIST-024",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "BL-EDGE-OBSCURE-007",
       "source": "registry",
       "title": "",
       "prior": "planned",
-      "disposition": "deferred",
-      "note": "registry planned item deferred pending owner"
+      "disposition": "in-review",
+      "note": "Moved from planned to in-review for owner."
     },
     {
       "id": "DERIVED-0000",

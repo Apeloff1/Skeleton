@@ -259,7 +259,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W00,WP-W01,WP-W13,WP-W14,WP-W15,WP-W20,WP-W27",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -273,7 +273,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:HIST-SYS-019",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source HIST-SYS-019.",
+      "reviewed_at": "2026-10-17T17:36:53.479638Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-018",
@@ -283,7 +285,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W07,WP-W08,WP-W10,WP-W14,WP-W17,WP-W20,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -297,7 +299,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-018",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-018.",
+      "reviewed_at": "2026-10-17T17:36:53.479644Z"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-010",
@@ -307,7 +311,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W00,WP-W01,WP-W10,WP-W14,WP-W20,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -320,7 +324,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-CONTRACT-010",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-CONTRACT-010.",
+      "reviewed_at": "2026-10-17T17:36:53.479646Z"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-009",
@@ -330,7 +336,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W00,WP-W01,WP-W10,WP-W18,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -342,7 +348,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-CONTRACT-009",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-CONTRACT-009.",
+      "reviewed_at": "2026-10-17T17:36:53.479646Z"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-010",
@@ -352,7 +360,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W07,WP-W14,WP-W19,WP-W20,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -364,7 +372,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DATA-010",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DATA-010.",
+      "reviewed_at": "2026-10-17T17:36:53.479647Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-008",
@@ -374,7 +384,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20,WP-W23,WP-W24,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -386,7 +396,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-008",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-008.",
+      "reviewed_at": "2026-10-17T17:36:53.479648Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-009",
@@ -396,7 +408,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20,WP-W22,WP-W24,WP-W27",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -408,7 +420,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-009",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-009.",
+      "reviewed_at": "2026-10-17T17:36:53.479649Z"
     },
     {
       "id": "BL-EDGE-EDGE-AI-001",
@@ -418,7 +432,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W10,WP-W14,WP-W17,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -429,7 +443,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-AI-001",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-AI-001.",
+      "reviewed_at": "2026-10-17T17:36:53.479650Z"
     },
     {
       "id": "BL-EDGE-EDGE-AI-002",
@@ -439,7 +455,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W10,WP-W13,WP-W14,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -450,7 +466,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-AI-002",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-AI-002.",
+      "reviewed_at": "2026-10-17T17:36:53.479651Z"
     },
     {
       "id": "BL-EDGE-EDGE-AI-013",
@@ -460,7 +478,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W10,WP-W14,WP-W20,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -471,7 +489,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-AI-013",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-AI-013.",
+      "reviewed_at": "2026-10-17T17:36:53.479652Z"
     },
     {
       "id": "BL-EDGE-EDGE-AI-030",
@@ -481,7 +501,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W11,WP-W14,WP-W20,WP-W26",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -492,7 +512,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-AI-030",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-AI-030.",
+      "reviewed_at": "2026-10-17T17:36:53.479653Z"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-001",
@@ -502,7 +524,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W01,WP-W18,WP-W20,WP-W22",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -513,7 +535,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-CONTRACT-001",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-CONTRACT-001.",
+      "reviewed_at": "2026-10-17T17:36:53.479655Z"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-020",
@@ -523,7 +547,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W00,WP-W01,WP-W20,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -534,7 +558,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-CONTRACT-020",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-CONTRACT-020.",
+      "reviewed_at": "2026-10-17T17:36:53.479656Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-005",
@@ -544,7 +570,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -555,7 +581,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-005",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-005.",
+      "reviewed_at": "2026-10-17T17:36:53.479657Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-006",
@@ -565,7 +593,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -576,7 +604,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-006",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-006.",
+      "reviewed_at": "2026-10-17T17:36:53.479671Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-007",
@@ -586,7 +616,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -597,7 +627,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-007",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-007.",
+      "reviewed_at": "2026-10-17T17:36:53.479673Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-024",
@@ -607,7 +639,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W10,WP-W13,WP-W14,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -618,7 +650,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-024",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-024.",
+      "reviewed_at": "2026-10-17T17:36:53.479675Z"
     },
     {
       "id": "BL-EDGE-EDGE-AI-021",
@@ -628,7 +662,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W06,WP-W20,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -638,7 +672,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-AI-021",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-AI-021.",
+      "reviewed_at": "2026-10-17T17:36:53.479675Z"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-009",
@@ -648,7 +684,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W07,WP-W08,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -658,7 +694,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DATA-009",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DATA-009.",
+      "reviewed_at": "2026-10-17T17:36:53.479676Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-001",
@@ -668,7 +706,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W14,WP-W20,WP-W27",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -678,7 +716,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-001",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-001.",
+      "reviewed_at": "2026-10-17T17:36:53.479677Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-011",
@@ -688,7 +728,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -698,7 +738,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-011",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-011.",
+      "reviewed_at": "2026-10-17T17:36:53.479678Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-015",
@@ -708,7 +750,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W02,WP-W20,WP-W21",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -718,7 +760,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-015",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-015.",
+      "reviewed_at": "2026-10-17T17:36:53.479679Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-016",
@@ -728,7 +772,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W02,WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -738,7 +782,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-016",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-016.",
+      "reviewed_at": "2026-10-17T17:36:53.479680Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-018",
@@ -748,7 +794,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20,WP-W24",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -758,7 +804,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-018",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-018.",
+      "reviewed_at": "2026-10-17T17:36:53.479680Z"
     },
     {
       "id": "BL-EDGE-HIST-SYS-020",
@@ -768,7 +816,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -778,7 +826,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:HIST-SYS-020",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source HIST-SYS-020.",
+      "reviewed_at": "2026-10-17T17:36:53.479681Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-025",
@@ -788,7 +838,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W10,WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -798,7 +848,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-025",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-025.",
+      "reviewed_at": "2026-10-17T17:36:53.479682Z"
     },
     {
       "id": "BL-EDGE-EDGE-AI-003",
@@ -808,7 +860,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W07,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -817,7 +869,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-AI-003",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-AI-003.",
+      "reviewed_at": "2026-10-17T17:36:53.479683Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-002",
@@ -827,7 +881,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -836,7 +890,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-002",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-002.",
+      "reviewed_at": "2026-10-17T17:36:53.479684Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-003",
@@ -846,7 +902,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -855,7 +911,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-003",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-003.",
+      "reviewed_at": "2026-10-17T17:36:53.479684Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-004",
@@ -865,7 +923,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -874,7 +932,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-004",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-004.",
+      "reviewed_at": "2026-10-17T17:36:53.479685Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-012",
@@ -884,7 +944,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -893,7 +953,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-012",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-012.",
+      "reviewed_at": "2026-10-17T17:36:53.479686Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-013",
@@ -903,7 +965,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -912,7 +974,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-013",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-013.",
+      "reviewed_at": "2026-10-17T17:36:53.479687Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-014",
@@ -922,7 +986,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -931,7 +995,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-014",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-014.",
+      "reviewed_at": "2026-10-17T17:36:53.479687Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-017",
@@ -941,7 +1007,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -950,7 +1016,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-017",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-017.",
+      "reviewed_at": "2026-10-17T17:36:53.479688Z"
     },
     {
       "id": "BL-EDGE-EDGE-SEC-019",
@@ -960,7 +1028,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -969,7 +1037,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-SEC-019",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-SEC-019.",
+      "reviewed_at": "2026-10-17T17:36:53.479689Z"
     },
     {
       "id": "BL-EDGE-HIST-SYS-021",
@@ -979,7 +1049,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W14,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -988,7 +1058,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:HIST-SYS-021",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source HIST-SYS-021.",
+      "reviewed_at": "2026-10-17T17:36:53.479689Z"
     },
     {
       "id": "BL-EDGE-HIST-AI-002",
@@ -998,7 +1070,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W01,WP-W11,WP-W12,WP-W13,WP-W17,WP-W25,WP-W26,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1013,7 +1085,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:HIST-AI-002",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source HIST-AI-002.",
+      "reviewed_at": "2026-10-17T17:36:53.479690Z"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-020",
@@ -1023,7 +1097,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W11,WP-W12,WP-W15,WP-W16,WP-W19,WP-W28,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1037,7 +1111,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DIST-020",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DIST-020.",
+      "reviewed_at": "2026-10-17T17:36:53.479691Z"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-021",
@@ -1047,7 +1123,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W11,WP-W12,WP-W13,WP-W16,WP-W18,WP-W19,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1061,7 +1137,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DIST-021",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DIST-021.",
+      "reviewed_at": "2026-10-17T17:36:53.479692Z"
     },
     {
       "id": "BL-EDGE-HIST-SYS-003",
@@ -1071,7 +1149,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W01,WP-W11,WP-W12,WP-W18,WP-W19,WP-W26",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1084,7 +1162,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:HIST-SYS-003",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source HIST-SYS-003.",
+      "reviewed_at": "2026-10-17T17:36:53.479692Z"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-002",
@@ -1094,7 +1174,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W20,WP-W25,WP-W27,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1106,7 +1186,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DATA-002",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DATA-002.",
+      "reviewed_at": "2026-10-17T17:36:53.479693Z"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-007",
@@ -1116,7 +1198,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W16,WP-W25,WP-W29,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1128,7 +1210,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DATA-007",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DATA-007.",
+      "reviewed_at": "2026-10-17T17:36:53.479694Z"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-010",
@@ -1138,7 +1222,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W14,WP-W18,WP-W19,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1150,7 +1234,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DIST-010",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DIST-010.",
+      "reviewed_at": "2026-10-17T17:36:53.479695Z"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-027",
@@ -1160,7 +1246,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W04,WP-W13,WP-W19,WP-W22,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1172,7 +1258,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DIST-027",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DIST-027.",
+      "reviewed_at": "2026-10-17T17:36:53.479695Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-005",
@@ -1182,7 +1270,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W05,WP-W11,WP-W13,WP-W19,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1194,7 +1282,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-005",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-005.",
+      "reviewed_at": "2026-10-17T17:36:53.479696Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-010",
@@ -1204,7 +1294,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W08,WP-W20,WP-W25,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1216,7 +1306,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-010",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-010.",
+      "reviewed_at": "2026-10-17T17:36:53.479697Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-029",
@@ -1226,7 +1318,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W00,WP-W03,WP-W25,WP-W27,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1238,7 +1330,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-029",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-029.",
+      "reviewed_at": "2026-10-17T17:36:53.479698Z"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-005",
@@ -1248,7 +1342,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W17,WP-W19,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1259,7 +1353,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DATA-005",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DATA-005.",
+      "reviewed_at": "2026-10-17T17:36:53.479698Z"
     },
     {
       "id": "BL-EDGE-HIST-SYS-025",
@@ -1269,7 +1365,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W00,WP-W18,WP-W25,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1280,7 +1376,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:HIST-SYS-025",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source HIST-SYS-025.",
+      "reviewed_at": "2026-10-17T17:36:53.479699Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-014",
@@ -1290,7 +1388,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W17,WP-W19,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1301,7 +1399,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-014",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-014.",
+      "reviewed_at": "2026-10-17T17:36:53.479700Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-021",
@@ -1311,7 +1411,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W05,WP-W06,WP-W21,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1322,7 +1422,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-021",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-021.",
+      "reviewed_at": "2026-10-17T17:36:53.479700Z"
     },
     {
       "id": "BL-EDGE-EDGE-CONTRACT-013",
@@ -1332,7 +1434,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W01,WP-W23,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1342,7 +1444,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-CONTRACT-013",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-CONTRACT-013.",
+      "reviewed_at": "2026-10-17T17:36:53.479701Z"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-001",
@@ -1352,7 +1456,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W07,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1362,7 +1466,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DATA-001",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DATA-001.",
+      "reviewed_at": "2026-10-17T17:36:53.479702Z"
     },
     {
       "id": "BL-EDGE-EDGE-DATA-006",
@@ -1372,7 +1478,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W25,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1382,7 +1488,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DATA-006",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DATA-006.",
+      "reviewed_at": "2026-10-17T17:36:53.479703Z"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-007",
@@ -1392,7 +1500,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W16,WP-W22,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1402,7 +1510,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DIST-007",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DIST-007.",
+      "reviewed_at": "2026-10-17T17:36:53.479703Z"
     },
     {
       "id": "BL-EDGE-EDGE-DIST-024",
@@ -1412,7 +1522,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W03,WP-W18",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1421,7 +1531,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:EDGE-DIST-024",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source EDGE-DIST-024.",
+      "reviewed_at": "2026-10-17T17:36:53.479704Z"
     },
     {
       "id": "BL-EDGE-OBSCURE-007",
@@ -1431,7 +1543,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W07,WP-W27",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "in-review",
       "priority_class": "P1",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -1440,7 +1552,9 @@
       ],
       "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
       "dedupe_key": "edge_case:OBSCURE-007",
-      "reviewed_pass": "2026-10-17"
+      "reviewed_pass": "2026-10-17",
+      "review_note": "Deferred-task pass: classified for owner review. Source OBSCURE-007.",
+      "reviewed_at": "2026-10-17T17:36:53.479705Z"
     }
   ]
 }
