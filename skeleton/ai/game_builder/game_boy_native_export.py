@@ -58,6 +58,8 @@ DEF TILE_COLLECTIBLE EQU 2
 DEF TILE_HAZARD EQU 3
 DEF TILE_GOAL EQU 4
 DEF TILE_PLAYER EQU 5
+DEF ANIM_COUNT EQU __ANIM_COUNT__
+DEF ANIM_DELAY EQU __ANIM_DELAY__
 DEF LEVEL_COUNT EQU __LEVEL_COUNT__
 DEF MAZE_WIDTH EQU __WIDTH__
 DEF MAZE_HEIGHT EQU __HEIGHT__
@@ -80,6 +82,8 @@ Boot:
     ld [ScoreHigh], a
     ld [TurnCount], a
     ld [TurnCountHigh], a
+    ld [AnimTick], a
+    ld [AnimFrame], a
     ld [Cooldown], a
     ld a, START_HEALTH
     ld [Health], a
@@ -97,7 +101,7 @@ Boot:
     jr nz, .clearOAM
     ld hl, TILE_VRAM_BASE
     ld de, Tiles
-    ld bc, TilesEnd-Tiles
+    ld bc, AnimationTilesEnd-Tiles
     call CopyBytes
     ld a, $E4
     ldh [rBGP], a
@@ -112,6 +116,7 @@ Boot:
 
 MainLoop:
     call WaitFrame
+    call AnimateHero
     ld a, [GameWon]
     or a
     jr nz, .win
@@ -203,6 +208,27 @@ LoadLevelWithoutWait:
     ld hl, TILEMAP
     ld bc, BG_BYTE_COUNT
     call CopyBytes
+    ret
+
+AnimateHero:
+    ld a, [AnimTick]
+    inc a
+    cp ANIM_DELAY
+    jr c, .saveTick
+    xor a
+    ld [AnimTick], a
+    ld a, [AnimFrame]
+    inc a
+    cp ANIM_COUNT
+    jr c, .saveFrame
+    xor a
+.saveFrame:
+    ld [AnimFrame], a
+    add TILE_PLAYER
+    ld [SPRITE_OAM_BASE+2], a
+    ret
+.saveTick:
+    ld [AnimTick], a
     ret
 
 DrawPlayer:
@@ -375,6 +401,9 @@ SECTION "Pixel Art", ROM0
 Tiles:
 __TILE_BYTES__
 TilesEnd:
+AnimationTiles:
+__ANIMATION_TILES__
+AnimationTilesEnd:
 
 SECTION "Game Maps", ROM0
 LevelMapPointers:
@@ -397,6 +426,8 @@ Score: ds 1
 ScoreHigh: ds 1
 TurnCount: ds 1
 TurnCountHigh: ds 1
+AnimTick: ds 1
+AnimFrame: ds 1
 GemsRemaining: ds 1
 GameWon: ds 1
 GameLost: ds 1
@@ -460,6 +491,8 @@ def _tile_bytes(tile_art: tuple[tuple[int, ...], ...] | None = None) -> str:
 def compile_native_game_boy(
     world: PlayableWorld, source: HomebrewSource, *, authorized: bool,
     tile_art: tuple[tuple[int, ...], ...] | None = None,
+    hero_frames: tuple[tuple[int, ...], ...] | None = None,
+    animation_delay: int = 12,
 ) -> GameBoySourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("Game Boy native homebrew export needs explicit authorization")
@@ -476,6 +509,17 @@ def compile_native_game_boy(
     if replay.world_digest != world.digest or replay.final_state.status != "won":
         raise GameBoySourceError("no deterministic safe-winning reference replay")
 
+    if type(animation_delay) is not int or not 2 <= animation_delay <= 60:
+        raise GameBoySourceError("native animation must use a bounded frame interval")
+    if hero_frames is not None:
+        if (type(hero_frames) is not tuple or not 1 <= len(hero_frames) <= 4
+                or any(type(tile) is not tuple or len(tile) != 64
+                       or any(type(px) is not int or not 0 <= px <= 3 for px in tile)
+                       for tile in hero_frames)):
+            raise GameBoySourceError("native hero animation needs 1-4 actual 8x8 2bpp frames")
+        if tile_art is None or hero_frames[0] != tile_art[5]:
+            raise GameBoySourceError("hero animation frame zero must match original tile atlas")
+    frames = hero_frames if hero_frames is not None else ()
     tables: list[str] = []
     for level in world.levels:
         rows = []
@@ -493,6 +537,12 @@ def compile_native_game_boy(
         "__HEALTH__": str(world.intent.starting_health),
         "__GEMS__": str(world.intent.collectibles_per_level),
         "__TILE_BYTES__": _tile_bytes(tile_art),
+        "__ANIM_COUNT__": str(len(frames) if frames else 1),
+        "__ANIM_DELAY__": str(animation_delay),
+        "__ANIMATION_TILES__": _tile_bytes(
+            frames[1:] if frames else ()
+        ) if len(frames) > 1 else "    ; single original hero frame",
+
         "__MAP_POINTERS__": "\n".join(f"    dw LevelMap{i}" for i in range(len(world.levels))),
         "__START_X__": "    db " + ", ".join(str(level.start[0]) for level in world.levels),
         "__START_Y__": "    db " + ", ".join(str(level.start[1]) for level in world.levels),
@@ -532,6 +582,14 @@ def compile_native_game_boy(
             [list(tile) for tile in tile_art]
         )
         manifest["custom_original_tile_pixels_in_native_source"] = True
+    manifest["native_hero_animation_frames"] = len(frames) if frames else 1
+    manifest["native_hero_animation_frame_delay"] = animation_delay
+    manifest["native_hero_animation_compiled"] = bool(frames and len(frames) > 1)
+    if frames:
+        from .contracts import canonical_digest
+        manifest["native_hero_animation_digest"] = canonical_digest(
+            [list(frame) for frame in frames]
+        )
     manifest_json = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     digest = sha256((asm + "\0" + _MAKEFILE + "\0" + manifest_json).encode()).hexdigest()
     return GameBoySourceProject(asm, _MAKEFILE, manifest_json, digest)
