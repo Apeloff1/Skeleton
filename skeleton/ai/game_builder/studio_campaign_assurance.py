@@ -27,6 +27,7 @@ from .studio_pixel_parity import inspect_cross_engine_pixels
 from .studio_game_boy_emulator import qualify_game_boy_emulator
 from .studio_nes_emulator import qualify_nes_cpu_ppu
 from .studio_nes_chr_parity import NESCHRIntegrityError, inspect_compiled_nes_chr
+from .studio_compiled_psg_parity import CompiledPSGError, inspect_compiled_psg
 from .studio_game_boy_rom_art_parity import (
     GameBoyROMArtError, inspect_compiled_game_boy_art,
 )
@@ -143,6 +144,13 @@ def _qualification_receipt(root: Path, target: str, source_identity: str) -> dic
                 raise StudioAssuranceError(
                     "actual handheld cartridge sprite bytes differ from source"
                 ) from exc
+    if _load_json(source / "manifest.json").get("native_psg_score_digest") is not None:
+        try:
+            inspect_compiled_psg(body, raw_symbols, source, target=target)
+        except CompiledPSGError as exc:
+            raise StudioAssuranceError(
+                "actual compiled cartridge's original PSG music differs from source"
+            ) from exc
     return record
 
 
@@ -234,6 +242,29 @@ def qualify_campaign_target(
                     "target": target, "native_rom_compiled": False,
                     "blocker": "compiled_nes_chr_original_art_mismatch",
                     "source_identity": identity, "model_training_performed": False,
+                }
+        source = base / "targets" / target
+        if _load_json(source / "manifest.json").get(
+            "native_psg_score_digest"
+        ) is not None:
+            try:
+                inspect_compiled_psg(
+                    _regular(output, 8 * 1024 * 1024),
+                    _regular(output.with_suffix(".sym"), 128_000),
+                    source, target=target,
+                )
+            except (CompiledPSGError, OSError, ValueError):
+                if sha256(_regular(output, 8 * 1024 * 1024)).hexdigest() != result.binary_sha256:
+                    raise StudioAssuranceError(
+                        "unexpected ROM mutation during audio verification"
+                    )
+                output.unlink()
+                output.with_suffix(".sym").unlink()
+                return {
+                    "target": target, "native_rom_compiled": False,
+                    "blocker": "compiled_original_psg_music_mismatch",
+                    "source_identity": identity,
+                    "model_training_performed": False,
                 }
         body = {
             "schema": QUALIFICATION_SCHEMA, "target": target,
