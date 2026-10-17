@@ -523,7 +523,30 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                 command.append("--repair-generated")
             if options.consent:
                 command.append("--consent")
-            return run_jeeves_game_cli(command, _project(options.project))
+            root = _project(options.project)
+            result = run_jeeves_game_cli(command, root)
+            # The CLI is the existing Jeeves transport: once an operator has
+            # opted in, witness its actual returns without storing prompts,
+            # files, tool arguments, chat, video, or model reasoning.
+            if not options.jeeves_action.startswith("dragon-observe-"):
+                from skeleton.developer.jeeves_dragon_observer import observe_cli_result
+                try:
+                    witness = observe_cli_result(
+                        root, command=options.jeeves_action, result=result,
+                    )
+                except (ValueError, OSError, TypeError) as exc:
+                    # A completed underlying effect is not rolled back by an
+                    # optional witness failure. Surface the observability loss.
+                    parent = root / ".jeeves" / "production" / "dragon_observer"
+                    if parent.exists():
+                        result["dragon_observer"] = {
+                            "ok": False, "observation_error": str(exc)[:250],
+                            "underlying_action_not_rolled_back": True,
+                        }
+                else:
+                    if witness is not None:
+                        result["dragon_observer"] = witness
+            return result
         if options.action == "catalog":
             from skeleton.forge.eras import list_eras
             from skeleton.forge.archetypes import default_library
