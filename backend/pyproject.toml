@@ -7,7 +7,7 @@
 
 [project]
 name = "tutolage"
-version = "15.0.0"
+version = "16.0.0"
 description = "Tutolage - Ultimate AI-Powered Learning & Game Development Platform"
 readme = "README.md"
 license = { text = "MIT" }
