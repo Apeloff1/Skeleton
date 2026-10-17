@@ -570,3 +570,41 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 The 180 milestones in this plan are **work and verification objectives**, not a claim that 180 release features have passed native E2E.
+
+
+## M181–M200: real artifact identity, GB/GBC compiled pixels and corrective blocker taxonomy
+
+### Release evidence must correspond to an independently checked artifact (M181–M185)
+
+The full studio operator-run pipeline previously tracked the general campaign identity as a source-stage receipt. It now resolves the **exact source target artifact digest** after independently inspecting the campaign and requires every claimed successful stage to match its separately verified source/ROM/emulator/browser/Godot/game-canvas digest. A locally recomputed E2E run checksum is insufficient proof that a stage occurred.
+
+The digest-linked longform history checks those stage-to-evidence bindings again while holding the campaign filesystem lock. A source-only pass cannot invent a ROM, JS playback, emulator victory, Godot completion or consent-bound screenshot by replacing a status flag. Tests explicitly forge and rehash these apparent successes and require the system to reject them.
+
+### Compiled Game Boy and Game Boy Color source-art integrity (M186–M193)
+
+NES compilation already extracts the actual iNES CHR sprite bank. The GB/GBC native assembler now has an equivalent compiled-ROM assurance: RGBLINK's own `Tiles` and `TilesEnd` symbol addresses must identify exactly 96 contiguous bytes in bank-0 ROM. These bytes must match the six original 2bpp tile assets generated for the game, byte for byte. No arbitrary ROM scan, approximate image match, wrong bank, guessed offset or decorative asset descriptor is accepted.
+
+`studio_game_boy_rom_art_parity.py` verifies these exact compiled bytes against the source producer. Every successful GB/GBC native build must pass this comparison before it becomes qualified. Future independent inspections recheck it; mutated ROMs, altered source tiles and incorrect linker maps fail even when the cartridge header checksum is valid. If the just-built ROM contains the wrong artwork, the locked build rejects and reclaims its own unpublished ROM/symbol pair, without overwriting a prior qualified artifact.
+
+The tests cover both DMG and GBC headers, correct linker address identity, invalid mappings, wrong sprite pixels and rollback after compiled-art divergence. All existing mocked GB production tests now embed the actual generated 2bpp tiles rather than zero-filled nominal cartridges.
+
+### More useful source-bound Dragon failure classification (M194–M198)
+
+`studio_production_blocker_taxonomy.py` classifies independently observed production problems into separate categories such as missing native compiler, missing PyBoy/FCEUX, compiled cartridge artwork mismatch, incorrect CPU-controller trace, browser or Godot execution gap, and absent generated canvas evidence. It stores only bounded, normalized classifications and suggested human investigations, **not raw subprocess output, secrets, user screens, model prompts or auto-executable repair instructions**.
+
+The hash-linked execution history retains a bounded number of these classifications. `studio_native_correction_triage.py` can now present specific review proposals for current-source game production; it suppresses duplicated CPU diagnostics and refuses to use stale history to recommend a correction. No model weights are trained, no arbitrary code is run and no source file is automatically modified.
+
+### Qualification and tests (M199–M200)
+
+The `jeeves-native-cartridge-emulator-full-e2e` specialized suite now includes compiled handheld-art parity, independent E2E stage receipts, intermediate CPU gameplay and source-current Dragon repair checks. It is registered without adding a new always-on CI workflow.
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_game_boy_rom_art_parity.py \
+  tests/test_studio_campaign_assurance_e2e.py \
+  tests/test_studio_execution_history_e2e.py \
+  tests/test_studio_production_blocker_taxonomy.py \
+  tests/test_studio_native_correction_triage.py
+```
+
+**Release status is still fail-closed.** An actual GB/GBC/NES cartridge compile and emulator victory, full browser/Godot runtime, physical controller, audio/GPU, first-install and six-month/year endurance require separately executed evidence and signoff. A generated code file or authored test must not be counted as an executed console game.
