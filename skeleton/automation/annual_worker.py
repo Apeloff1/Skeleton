@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+import time
 from typing import Callable
 
 from .annual_production import (
@@ -26,6 +27,7 @@ class WorkQuantum:
     last_checkpoint_digest: str | None
     last_receipt_digest: str | None
     claim: Claim
+    heartbeat: Callable[[int], Claim]
 
 @dataclass(frozen=True)
 class VerifiedWork:
@@ -50,7 +52,8 @@ class AnnualWorkRunner:
     """A backend-provided worker + verifier, not an independent AI model."""
 
     def __init__(self, store: AnnualProductionStore, *, system: str,
-                 worker: ExternalWorker, verify: ExternalVerifier):
+                 worker: ExternalWorker, verify: ExternalVerifier,
+                 clock: Callable[[], float] = time.time):
         if system not in {"jeeves", "builder", "dragon"}:
             raise ValueError("unknown production system")
         if not callable(worker) or not callable(verify):
@@ -59,16 +62,18 @@ class AnnualWorkRunner:
         self.system = system
         self.worker = worker
         self.verify = verify
+        self.clock = clock
 
     def run_one(self, production_id: str, *, owner: str, authority_digest: str,
-                now: float, lease_seconds: int = 120) -> QuantumReport:
+                lease_seconds: int = 120) -> QuantumReport:
+        started = self.clock()
         before = self.store.read(production_id)
         if before.system != self.system:
             raise ProductionConflict("runner not authorized for this subsystem")
         # Ensure the saved head and full ancestry have not been tampered with.
         self.store.verify_chain(production_id)
         claim = self.store.claim(production_id, worker=owner,
-                                 authority_digest=authority_digest, now=now,
+                                 authority_digest=authority_digest, now=started,
                                  lease_seconds=lease_seconds)
         stable = sha256(
             (production_id + ":" + str(before.sequence + 1)).encode("utf-8")
@@ -77,6 +82,7 @@ class AnnualWorkRunner:
             production_id, self.system, before.sequence + 1,
             "annual-quantum-sha256:" + stable,
             before.checkpoint_digest, before.last_receipt_digest, claim,
+            lambda ttl: self.store.heartbeat(claim, now=self.clock(), lease_seconds=ttl),
         )
         try:
             output = self.worker(quantum)
@@ -98,16 +104,16 @@ class AnnualWorkRunner:
         receipt = self.store.checkpoint(
             claim, sequence=quantum.sequence,
             state_digest=output.state_digest, evidence_digest=output.evidence_digest,
-            now=now,
+            now=self.clock(),
         )
         if output.terminal is not None:
             final = self.store.terminal(
                 claim, state=output.terminal,
                 verified_evidence_digest=output.terminal_evidence_digest or "",
-                now=now,
+                now=self.clock(),
             )
             return QuantumReport("terminal", final.production_id, final.sequence,
                                  receipt, output.terminal)
-        waiting = self.store.release(claim, now=now, retry_seconds=0)
+        waiting = self.store.release(claim, now=self.clock(), retry_seconds=0)
         return QuantumReport("checkpointed", waiting.production_id,
                              waiting.sequence, receipt, None)
