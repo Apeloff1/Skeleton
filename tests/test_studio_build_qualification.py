@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 import subprocess
 
+from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.studio_build_qualification import (
     NativeBuildQualificationError, _header, adapter_catalog, qualify_native_build,
 )
@@ -24,6 +25,22 @@ def make_project(root: Path, target: str) -> Path:
     )
     if target == "nintendo_famicom":
         (project / "nes.cfg").write_text("MEMORY {}\n")
+    files = {
+        name: sha256((project / name).read_bytes()).hexdigest()
+        for name in (entry, "manifest.json", *(("nes.cfg",) if target == "nintendo_famicom" else ()))
+    }
+    body = {
+        "schema": "skeleton.game_builder.source_attestation.v1",
+        "target": target, "project_id": "original-test",
+        "world_digest": "0" * 64,
+        "reference_replay_digest": "0" * 64,
+        "input_files": files, "source_content_digest": "0" * 64,
+        "studio_art_pack_digest": None,
+        "rights_independently_verified": False, "binary_compiled": False,
+    }
+    (project / "source_attestation.json").write_text(json.dumps({
+        **body, "attestation_digest": canonical_digest(body),
+    }))
     return project
 
 
