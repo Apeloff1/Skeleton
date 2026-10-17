@@ -1,0 +1,61 @@
+"""Inspect complete Jeeves production gates and explicitly qualify native ROMs.
+
+Inspection is read-only, including Dragon evidence. Compile mode requires both
+operator authorization and the separate --execute-build flag; never starts
+automatically or grants the Jeeves model an arbitrary process executor.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from .studio_campaign_cli import parse_campaign_order_file
+from .studio_campaign_assurance import (
+    inspect_production_assurance, qualify_campaign_target,
+)
+from .studio_e2e_observation import observe_production_campaign
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--order", type=Path, required=True)
+    parser.add_argument("--campaign", type=Path, required=True)
+    command = parser.add_mutually_exclusive_group(required=True)
+    command.add_argument("--inspect", action="store_true")
+    command.add_argument("--dragon-observe", action="store_true")
+    command.add_argument("--target", help="specific canonical console ROM target to compile")
+    parser.add_argument("--execute-build", action="store_true")
+    parser.add_argument("--authorize-local-operation", action="store_true")
+    parser.add_argument("--timeout-seconds", type=int, default=45)
+    parser.add_argument("--after", type=int, default=0)
+    parser.add_argument("--limit", type=int, default=16)
+    args = parser.parse_args(argv)
+    if not args.authorize_local_operation:
+        parser.error("explicit local operator authority required")
+    try:
+        order = parse_campaign_order_file(args.order)
+        if args.inspect:
+            output = inspect_production_assurance(order, args.campaign)
+        elif args.dragon_observe:
+            output = observe_production_campaign(
+                order, args.campaign, authorized=True,
+                after=args.after, limit=args.limit,
+            )
+        else:
+            if not args.execute_build:
+                parser.error("--target requires explicit --execute-build")
+            output = qualify_campaign_target(
+                order, args.campaign, args.target,
+                authorized=True, execute=True,
+                timeout_seconds=args.timeout_seconds,
+            )
+    except (OSError, ValueError, RuntimeError, PermissionError) as exc:
+        print(json.dumps({"success": False, "error": type(exc).__name__}, sort_keys=True))
+        return 2
+    print(json.dumps(output, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
