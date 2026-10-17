@@ -577,7 +577,7 @@ def _godot_with_studio_art(script: str) -> str:
     insertions = (
         (
             "var ready_to_play: bool = false",
-            "var ready_to_play: bool = false\nvar studio_tiles: Array = []\nvar studio_palette: Array = []",
+            "var ready_to_play: bool = false\\nvar studio_tiles: Array = []\\nvar studio_palette: Array = []\\nvar studio_frames: Array = []\\nvar sprite_frame_index: int = 0\\nvar sprite_fps: int = 4\\nvar sprite_time: float = 0.0",
         ),
         (
             "    ready_to_play = true\n    _reset()",
@@ -610,7 +610,16 @@ def _godot_with_studio_art(script: str) -> str:
         ),
         (
             "func _text(at: Vector2, message: String, font_size: int, ink: Color) -> void:",
-            """func _load_studio_art() -> void:
+            """func _process(delta: float) -> void:
+    if not ready_to_play or studio_frames.size() < 2:
+        return
+    sprite_time += minf(maxf(delta, 0.0), 0.25)
+    if sprite_time >= 1.0 / float(sprite_fps):
+        sprite_time = fmod(sprite_time, 1.0 / float(sprite_fps))
+        sprite_frame_index = (sprite_frame_index + 1) % studio_frames.size()
+        queue_redraw()
+
+func _load_studio_art() -> void:
     var source: String = FileAccess.get_file_as_string("res://studio_art.json")
     if source.is_empty() or source.length() > 16000:
         push_error("Original sprite asset document unavailable or oversized")
@@ -623,7 +632,11 @@ def _godot_with_studio_art(script: str) -> str:
         return
     studio_tiles = decoded["tiles"]
     studio_palette = decoded["palette"]
-    if studio_tiles.size() != 6 or studio_palette.size() != 4:
+    studio_frames = decoded["frames"]
+    sprite_fps = int(decoded["fps"])
+    if (studio_tiles.size() != 6 or studio_palette.size() != 4
+            or studio_frames.is_empty() or studio_frames.size() > 4
+            or sprite_fps < 1 or sprite_fps > 24):
         push_error("Original sprite tile/palette count differs")
         studio_tiles.clear()
         ready_to_play = false
@@ -633,6 +646,8 @@ func _draw_studio_tile(tile_index: int, rect: Rect2) -> void:
     if studio_tiles.is_empty() or tile_index < 0 or tile_index >= studio_tiles.size():
         return
     var pixels: Array = studio_tiles[tile_index]
+    if tile_index == 5 and not studio_frames.is_empty():
+        pixels = studio_frames[sprite_frame_index]
     if pixels.size() != 64:
         return
     var unit: Vector2 = rect.size / 8.0
@@ -701,6 +716,7 @@ def render_dual_runtime_package(
     rendered_art: dict | None = None
     if studio_art is not None:
         from .studio_asset_pipeline import StudioArtPack
+        from skeleton.jeeves.game_console_assets import decode_tiles
         if not isinstance(studio_art, StudioArtPack) or studio_art.world_digest != world.digest:
             raise DualRuntimeExportError("same-world original sprite pack required")
         studio_art.verify()
@@ -712,6 +728,10 @@ def render_dual_runtime_package(
             "pack_digest": studio_art.digest,
             "world_digest": world.digest,
             "tiles": [list(tile) for tile in studio_art.runtime_tiles],
+            "frames": [list(tile) for tile in decode_tiles(
+                dict(studio_art.files)["tiles/hero_animation.bin"], studio_art.codec,
+            )],
+            "fps": studio_art.direction.animation_fps,
             "palette": ["#" + item[:6] for item in descriptors["palette"]],
         }
         gd_script = _godot_with_studio_art(_GODOT_SCRIPT)
