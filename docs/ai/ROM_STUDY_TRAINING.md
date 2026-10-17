@@ -338,3 +338,33 @@ games, zero synthetic rewards, zero leaked heldout steps, and **zero
 production Jeeves SGD updates**. Raw critic prose is not accepted as a
 ground-truth label; this candidate must still pass the existing Jeeves
 human-reviewed corpus admission and actual checkpoint training gates.
+
+### Canonical Jeeves 43-lens semantic routing
+
+The repository already ships authored semantic lenses in
+`skeleton/jeeves/agent/semantic_lenses.py`, `semantic_frontier.py`,
+`semantic_extreme_lenses.py`, `semantic_research_lenses.py`,
+`semantic_plane_lenses.py`, and `semantic_depth_lenses.py`.
+`MaximalSemanticRegistry` is the canonical de-duplicated registry,
+not a new, competing game-specific list.
+
+The ROM study now uses **up to 43 of these real authored semantic lens
+definitions per native episode**, selected by the native maximal router
+from six separately source-bound observation summaries (visual, audio,
+controller, reward, time/replay and counterfactuals). Each routed lens
+preserves its original key, family, activation score, diagnostic question,
+failure mode, and catalog identity. Every selection can be deterministically
+reconstructed from the same native evidence.
+
+**Important:** the eight measured training lenses remain independent
+*measurement projections* and retain their existing normalized weight.
+The 43-budget semantic routing is an additional interpretive layer:
+film/cinema, gaming, narratology, causal, probability, computational,
+social, memory and other semantic operators generate questions and
+possible falsifiers. Their answers are **not fabricated from ROM hashes**.
+The candidate corpus embeds these questions with an explicit
+`not_measured_pending_independent_review` state, without marking them
+as supervised ground truth, extra native episodes, new Q updates, or
+production transformer steps. The exact number routed depends on
+applicability and the actual authored catalog; 43 is the selection budget,
+not an invented claim that the repository has only 43 lens definitions.

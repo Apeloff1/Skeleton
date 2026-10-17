@@ -1,6 +1,8 @@
 """Candidate Jeeves training-data views from verified emulator triangle evidence.
 
-Eight grounded lens questions are generated per independently measured native
+Eight measured views and up to 43 canonical semantic lens questions are
+created for each independently measured native episode. The semantic questions
+are not target labels. The measured views retain their original custody.
 episode. These are correlated views of ONE episode, NOT eight extra source
 games or eight independent rewards. The untrusted local LLM review is a gating
 input but never copied into target labels. This does not run transformer SGD.
@@ -13,6 +15,9 @@ from typing import Any
 from .game_emulator_triangle import LENSES, verify_training_triangle
 from .game_emulator_triangle_native_reviewer import verify_native_adversarial_review
 from .game_learning import _digest
+from .game_emulator_triangle_semantics import (
+    SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+)
 
 SCHEMA = "skeleton.jeeves.game_triangle_candidate_corpus.v1"
 MAX_VIEWS = 8192
@@ -49,6 +54,8 @@ def compile_triangle_candidate_corpus(
     if not 1 <= len(episodes) <= 1024 or len(episodes) * len(LENSES) > MAX_VIEWS:
         raise TriangleCorpusError("candidate training lens count exceeds bounds")
     rows: list[dict[str, Any]] = []
+    semantic_routes: list[dict[str, Any]] = []
+    total_semantic_routes = 0
     seen: set[str] = set()
     for episode in episodes:
         trace = episode["source_trace_sha256"]
@@ -56,6 +63,26 @@ def compile_triangle_candidate_corpus(
             raise TriangleCorpusError("repeated native episode cannot multiply independent examples")
         seen.add(trace)
         measured = episode["grounded_lens_evidence"]
+        routed = route_episode_semantic_lenses(
+            episode, max_lenses=SEMANTIC_LENS_BUDGET,
+        )
+        if routed["source_native_trace_sha256"] != trace:
+            raise TriangleCorpusError("canonical semantic route changed native source")
+        total_semantic_routes += routed["actually_routed_lenses"]
+        semantic_routes.append({
+            "native_trace_sha256": trace,
+            "canonical_catalog_sha256": routed["canonical_catalog_sha256"],
+            "semantic_route_digest": routed["route_digest"],
+            "router_observation_fingerprints": routed["observation_fingerprints"],
+            "semantic_questions": [{
+                "lens_key": view["lens_key"],
+                "family": view["lens_family"],
+                "activation_score": view["activation_score"],
+                "question": view["question"],
+                "state": "not_measured_pending_independent_review",
+                "factual_label_available": False,
+            } for view in routed["routes"]],
+        })
         if set(measured) != set(LENSES):
             raise TriangleCorpusError("all eight source-measured lenses are required")
         for lens in LENSES:
@@ -109,6 +136,11 @@ def compile_triangle_candidate_corpus(
         "unique_independent_native_episodes": len(seen),
         "total_lens_candidate_views": len(rows),
         "views_per_original_episode": len(LENSES),
+        "canonical_semantic_lens_selection_budget": SEMANTIC_LENS_BUDGET,
+        "routed_semantic_lens_questions": total_semantic_routes,
+        "semantic_questions_are_not_supervised_labels": True,
+        "native_semantic_catalog": "skeleton.jeeves.agent.semantic_maximal",
+        "semantic_routes_per_episode": semantic_routes,
         "same_source_total_weight_per_episode": 1.0,
         "additional_independent_gameplay_episodes_from_lenses": 0,
         "adversarial_generated_text_used_as_training_labels": False,
