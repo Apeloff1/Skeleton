@@ -19,6 +19,7 @@ export interface MonthCycleRecord {
   incarnation: string;
   status: MonthCycleStatus;
   cursor: number;
+  observationRevision: number;
   firstSeenAt: number;
   lastSeenAt: number;
   nextCheckAt: number;
@@ -59,7 +60,7 @@ function validRecord(r: unknown): r is MonthCycleRecord {
     ['studio', 'build', 'training', 'operation'].includes(x.kind) &&
     identity(x.incarnation, 96) &&
     ['observing', 'disconnected', 'terminal_observed', 'dismissed'].includes(x.status) &&
-    clockValue(x.cursor) && clockValue(x.firstSeenAt) &&
+    clockValue(x.cursor) && clockValue(x.observationRevision) && clockValue(x.firstSeenAt) &&
     clockValue(x.lastSeenAt) && clockValue(x.nextCheckAt) &&
     clockValue(x.failures) && x.failures <= 1000 &&
     (x.terminalState === null || ['completed', 'failed', 'cancelled'].includes(x.terminalState));
@@ -168,7 +169,7 @@ export class MonthCycleLedger {
       const record: MonthCycleRecord = {
         operationId, consumerId, kind,
         incarnation: (payload.revision + 1).toString(36) + ':' + at.toString(36),
-        status: 'observing', cursor: 0, firstSeenAt: at, lastSeenAt: at,
+        status: 'observing', cursor: 0, observationRevision: 0, firstSeenAt: at, lastSeenAt: at,
         nextCheckAt: at, failures: 0, terminalState: null,
       };
       payload.records.push(record);
@@ -176,7 +177,8 @@ export class MonthCycleLedger {
     });
   }
   async observe(
-    token: Pick<MonthCycleRecord, 'operationId' | 'consumerId' | 'incarnation'>,
+    token: Pick<MonthCycleRecord, 'operationId' | 'consumerId' | 'incarnation'> &
+      Partial<Pick<MonthCycleRecord, 'observationRevision'>>,
     input: { cursor?: number; phase: 'observing' | 'disconnected' | 'terminal_observed';
       terminalState?: 'completed' | 'failed' | 'cancelled'; nextCheckAt?: number; now?: number },
   ): Promise<MonthCycleRecord | null> {
@@ -199,10 +201,16 @@ export class MonthCycleLedger {
       );
       if (!record || record.status === 'dismissed' ||
           record.status === 'terminal_observed') return null;
+      // A response started before another foreground view committed a newer
+      // observation must not clobber that fresher state (ABA-safe within
+      // one operation incarnation, even when Date.now has millisecond ties).
+      if (token.observationRevision !== undefined &&
+          token.observationRevision !== record.observationRevision) return null;
       const cursor = input.cursor ?? record.cursor;
       // Ignore regressed confirmations, never move the durable replay cursor back.
       if (cursor < record.cursor) return clone(record);
       record.cursor = cursor;
+      record.observationRevision++;
       record.lastSeenAt = Math.max(record.lastSeenAt, now);
       record.nextCheckAt = due;
       record.status = input.phase;
@@ -221,6 +229,7 @@ export class MonthCycleLedger {
         x.consumerId === token.consumerId && x.incarnation === token.incarnation);
       if (!r || r.status === 'dismissed') return false;
       r.status = 'dismissed';
+      r.observationRevision++;
       r.lastSeenAt = Math.max(at, r.lastSeenAt);
       return true;
     });
