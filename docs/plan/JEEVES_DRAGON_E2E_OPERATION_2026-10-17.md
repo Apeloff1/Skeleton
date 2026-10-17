@@ -124,3 +124,83 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 Do not count tests as passing until they have actually run against the committed PR head.
+
+
+## Large milestones: durable console production and qualification
+
+This tranche adds working owners rather than an isolated proposal. Source exists on the feature branch; tests are registered but not yet proven passing on exact branch head.
+
+| Stage | Instrumental completion criterion | Implemented evidence | Outstanding independent proof |
+| --- | --- | --- | --- |
+| M21 Multi-target production | Build exact same game for several native consoles, preserve each platform-specific source | `studio_campaign.py`, typed `CampaignOrder` | Real multi-day production soak |
+| M22 Source identity | All targets must bind identical original game, approved document reference and art controls | SHA-based campaign identity, per-target immutable receipt | External IP rights clearance |
+| M23 Durable restart | Resume target N after fail/abort without rebuilding verified targets | Exact source checkpoint validation and incremental target loop | Machine-loss/reboot soak |
+| M24 Single producer | Reject concurrent operations against the same source campaign | Cross-platform process-lifetime lock; explicit busy error | Multi-host distributed lease |
+| M25 Interrupted staging | Reclaim only owned orphan temporary build directories on restart | Symlink refusal and directory-scoped recovery | Full unclean-power-cycle testing |
+| M26 Source/asset attestation | Record exact original C/ASM/config/manifest bytes | `source_attestation.json` and SHA-256 | Signed build provenance |
+| M27 Toolchain preflight | Identify usable fixed native compiler adapters | Explicit GB/GBC/NES adapters | Compiler installation/actual build |
+| M28 Toolchain containment | Fixed arguments, no generated Makefile or shell, overall timeout, output size bound | `studio_build_qualification.py` | Privileged OS sandbox/container |
+| M29 Real ROM structural validation | Inspect exact ROM header, size and CRC/checksum requirements after actual compilation | iNES and GB/GBC structural receipt logic | Emulator execution/functional game proof |
+| M30 ROM publication | Failed compilation must never publish a partial binary | New-path exclusive hardlink commit; no overwrite | Concurrent process + disk fault drill |
+| M31 Readiness gates | Source generation must not count as emulator/rights/release success | 16 explicit gates per console and 0% release qualification until independently proven | Runtime/QA approval |
+| M32 Dragon operational evidence | Dragon observes exact verified source/ROM milestones without raw code | Chained read-only source/binary observation | Consent-bound video, human/AI playback |
+| M33 Artist sprite ingestion | Import real original authored raster assets rather than only procedural placeholders | PNG 48x8, exact SHA, decoded RGBA, 2bpp palette converter | Large multi-frame sprites/atlas packing |
+| M34 Pixel-editable Jeeves | Conversational Jeeves can stage actual typed sprite pixels for native C/ASM code review | `game.console.source.stage.artwork` exact 6×64 payload | Full visual sprite editing UI |
+| M35 Artwork reproducibility | Replaying campaigns with the same artist input yields exact source-bound artwork | Artist SHA and quantization mode in order and manifest | Full asset edit history/version graph |
+| M36 Engine rendering | Browser/Godot source loads same authored palette/index pixels and animates | Exact pack-digest binding and generated raster routines | Real browser/Godot playthrough proof |
+| M37 Full audio/effects | Sound and parallax must be actually consumed during play | PCM/PNG asset generation | Native and engine audio playback, moving parallax |
+| M38 AI production supervisor | Observe model actions, source edits, game revisions and gate progress with evidence | Jeeves goal journal + Dragon source/ROM projection | Real checkpoint-inference marathon |
+| M39 Legal publishing | Licensed distribution approved only by rights and release owners | Explicit non-certification flags | Independent rights governance signoff |
+| M40 True release gate | Finished game requires compiled ROM, playable scene, controller, continuity and approval | Blocking gate projection | Not achieved |
+
+### Operator commands
+
+First write a typed campaign order as UTF-8 JSON. The order binds the project/seed, target list, original authorship documentation and optional original artist PNG + source SHA.
+
+```bash
+# Build one platform at a time, checkpointing exact source files.
+python -m skeleton.ai.game_builder.studio_campaign_cli \
+  --order original-campaign.json --output ./campaign \
+  --authorize-original-homebrew --max-targets 1
+
+# Resume without overwriting verified targets.
+python -m skeleton.ai.game_builder.studio_campaign_cli \
+  --order original-campaign.json --output ./campaign \
+  --resume --authorize-original-homebrew
+
+# Read exact source/binary QA gates (no compiler or emulator started).
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --inspect --authorize-local-operation
+
+# Independently opt in to a bounded GB, GBC or NES compilation.
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --target nintendo_game_boy --execute-build \
+  --authorize-local-operation
+
+# Inspect Dragon's digest-linked production observations, not video.
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --dragon-observe --authorize-local-operation
+```
+
+A source-only project has no qualified ROM. GB/GBC/NES structural compilation is conditional on installed approved toolchains, and none was launched through GitHub during this development session. Source receipts are SHA integrity references, not signed producer identities. All release gates remain blocked without independent native runtime, controller, performance, rights and human/Dragon review evidence.
+
+### Artist-provided sprite inputs
+
+An artist may provide an *original* 48×8 PNG containing six horizontally arranged 8×8 tile graphics (floor, wall, collectible, hazard, goal, hero). `--studio-artist-png` requires `--studio-artist-png-sha256` and `--studio-assets`. Colors are either exact to the selected game palette or converted deterministically with nearest/ordered 4×4 quantization. Partial transparency, mismatched source hashes, unknown palette data and oversized images are rejected, not silently resized. This pixel model is the current six-tile native engine envelope, not a purported full production sprite studio.
+
+Jeeves can also stage 6×64 indexed arrays with the explicitly distinct action `game.console.source.stage.artwork`; it generates the appropriate original console assembly/C with human-reviewed CAS submission. A proposal is not a source commit or release.
+
+### Focused validation, pending actual execution
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_build_qualification.py \
+  tests/test_studio_campaign_e2e.py \
+  tests/test_studio_campaign_assurance_e2e.py \
+  tests/test_studio_artist_sprite_e2e.py
+```
+
+The specialized suites above are registered in `machine/e2e_suites.json` without adding always-on workflow gates. Successful exact-head checks and real native toolchain/emulator tests must be collected before marking these milestones qualified.
