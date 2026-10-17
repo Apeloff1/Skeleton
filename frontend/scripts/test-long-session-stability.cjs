@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -19,7 +20,7 @@ function loadTS(filename, mocks = {}) {
   });
   assert.equal((output.diagnostics || []).length, 0, filename + ' syntax');
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', output.outputText)(
+  compileFunction(output.outputText, ['require', 'module', 'exports'])(
     id => {
       if (id === './requestRecoveryPolicy') return loadTS('utils/requestRecoveryPolicy.ts');
       assert.ok(Object.hasOwn(mocks, id), filename + ': unexpected import ' + id);
