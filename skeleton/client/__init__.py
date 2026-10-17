@@ -13,23 +13,42 @@ from skeleton.client.errors import (
     SkeletonClientError,
     SkeletonHTTPError,
     SkeletonSealConfigError,
+    SkeletonSessionConfigError,
     SkeletonTimeoutError,
     SkeletonTransportError,
 )
 from skeleton.client.gateway import GatewayClient
 from skeleton.client.memory import MemoryClient
+from skeleton.client.projects import (
+    PROJECTS_BASE_PATH,
+    Project,
+    ProjectBrief,
+    ProjectBuild,
+    ProjectBuildLink,
+    ProjectBuildPage,
+    ProjectPage,
+    ProjectsClient,
+)
 from skeleton.client.retry import RetryPolicy
 from skeleton.client.seal import RequestSealer
 from skeleton.client.services import ServicesClient
 from skeleton.client.streaming import StreamEvent
 
 __all__ = [
+    "PROJECTS_BASE_PATH",
     "AgentsClient",
     "AuthClient",
     "BuildsClient",
     "CancelToken",
     "GatewayClient",
     "MemoryClient",
+    "Project",
+    "ProjectBrief",
+    "ProjectBuild",
+    "ProjectBuildLink",
+    "ProjectBuildPage",
+    "ProjectPage",
+    "ProjectsClient",
     "RequestSealer",
     "RetryPolicy",
     "ServicesClient",
@@ -37,6 +56,7 @@ __all__ = [
     "SkeletonClientError",
     "SkeletonHTTPError",
     "SkeletonSealConfigError",
+    "SkeletonSessionConfigError",
     "SkeletonTimeoutError",
     "SkeletonTransportError",
     "StreamEvent",
