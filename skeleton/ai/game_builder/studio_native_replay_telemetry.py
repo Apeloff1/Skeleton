@@ -49,11 +49,17 @@ def validate_checkpoints(
     expected_final: dict,
 ) -> dict:
     selected = selected_checkpoints(actions)
+    hexdigits = frozenset("0123456789abcdef")
     if (type(samples) not in (list, tuple) or len(samples) != len(selected)
             or type(source_world) is not str or len(source_world) != 64
+            or set(source_world) - hexdigits
             or type(source_proof) is not str or len(source_proof) != 64
+            or set(source_proof) - hexdigits
             or type(expected_final) is not dict):
         raise NativeCheckpointError("source-bound exact replay checkpoint inventory required")
+    if any(type(row) is not dict or set(row) != {"action", "state"}
+           for row in samples):
+        raise NativeCheckpointError("sample rows must have exact action/CPU state fields")
     rows = [make_checkpoint(row["action"], row["state"]) for row in samples]
     if tuple(row["action"] for row in rows) != selected:
         raise NativeCheckpointError("missing, duplicated or reordered CPU samples")
