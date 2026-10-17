@@ -14,6 +14,10 @@ from .studio_campaign import CampaignOrder, _atomic_json, _load_json
 from .studio_campaign_assurance import _inspect_production_assurance_unlocked
 from .studio_campaign_lock import campaign_lock
 from .studio_production_blocker_taxonomy import classify_production_blockers
+from .studio_history_segments import (
+    SEGMENT_SIZE, MAX_SEGMENTS, StudioHistorySegmentError,
+    audit_segments, seal_full_heads, _validate_entry,
+)
 
 SCHEMA = "skeleton.game_builder.studio_qualification_history.v1"
 ENTRY_SCHEMA = "skeleton.game_builder.studio_qualification_history_entry.v1"
@@ -25,15 +29,20 @@ class StudioQualificationHistoryError(ValueError):
 
 
 def _read_history(root: Path, identity: str) -> dict:
+    """Verify both the current writable head and each sealed archive segment."""
     path = root / "qualification_history.json"
     if path.is_symlink():
         raise StudioQualificationHistoryError("qualification journal must never be a link")
     if not path.exists():
-        body = {
-            "schema": SCHEMA, "campaign_identity": identity,
-            "entries": [],
+        body = {"schema": SCHEMA, "campaign_identity": identity, "entries": []}
+        return {
+            **body, "history_digest": canonical_digest(body),
+            "_archive_stats": {
+                "archive_entry_count": 0, "archive_tip": None,
+                "archive_cpu_divergence_count": 0, "archive_unblocked_runs": 0,
+                "segments_used": 0, "segments_remaining": MAX_SEGMENTS,
+            },
         }
-        return {**body, "history_digest": canonical_digest(body)}
     raw = _load_json(path)
     if (raw.get("schema") != SCHEMA or raw.get("campaign_identity") != identity
             or type(raw.get("entries")) is not list
@@ -42,21 +51,19 @@ def _read_history(root: Path, identity: str) -> dict:
     if canonical_digest({k: v for k, v in raw.items()
                          if k != "history_digest"}) != raw.get("history_digest"):
         raise StudioQualificationHistoryError("stored qualification history modified")
-    previous = None
-    for index, entry in enumerate(raw["entries"]):
-        if (type(entry) is not dict or entry.get("schema") != ENTRY_SCHEMA
-                or entry.get("sequence") != index + 1
-                or entry.get("previous_entry_digest") != previous
-                or type(entry.get("run_digest")) is not str
-                or type(entry.get("assurance_report_digest")) is not str
-                or entry.get("full_release_qualified") is not False
-                or entry.get("model_weights_updated") is not False
-                or canonical_digest({k: v for k, v in entry.items()
-                                     if k != "entry_digest"}) != entry.get("entry_digest")):
-            raise StudioQualificationHistoryError("historical receipt chain is not canonical")
-        previous = entry["entry_digest"]
+    try:
+        stats = audit_segments(root, identity, raw.get("segments", []),
+                               entry_schema=ENTRY_SCHEMA)
+        previous = stats["archive_tip"]
+        for index, entry in enumerate(raw["entries"]):
+            previous = _validate_entry(
+                entry, stats["archive_entry_count"] + index + 1,
+                previous, ENTRY_SCHEMA, identity,
+            )
+    except StudioHistorySegmentError as exc:
+        raise StudioQualificationHistoryError("E2E history segment chain is not canonical") from exc
+    raw["_archive_stats"] = stats
     return raw
-
 
 _STAGE_EVIDENCE = {
     "source": ("source_receipt_digest", "source_receipt_digest"),
@@ -194,15 +201,19 @@ def record_execution_run(
             raise StudioQualificationHistoryError("run report is stale for this game version")
         history = _read_history(root, checked["campaign_identity"])
         entries = history["entries"]
+        archives = history.get("segments", [])
+        stats = history["_archive_stats"]
         if len(entries) >= _MAX_RUNS:
-            raise StudioQualificationHistoryError("bounded qualification history is full")
+            raise StudioQualificationHistoryError("bounded qualification history head is full")
         item = {
             "schema": ENTRY_SCHEMA,
-            "sequence": len(entries) + 1,
+            "sequence": stats["archive_entry_count"] + len(entries) + 1,
             "campaign_identity": checked["campaign_identity"],
             "run_digest": run["run_digest"],
             "assurance_report_digest": checked["report_digest"],
-            "previous_entry_digest": entries[-1]["entry_digest"] if entries else None,
+            "previous_entry_digest": (
+                entries[-1]["entry_digest"] if entries else stats["archive_tip"]
+            ),
             "verified_stage_attempts": run["verified_stage_attempts"],
             "blocked_stage_attempts": run["blocked_stage_attempts"],
             "unsupported_stage_attempts": run["unsupported_stage_attempts"],
@@ -226,10 +237,20 @@ def record_execution_run(
             "model_weights_updated": False,
         }
         item["entry_digest"] = canonical_digest(item)
+        try:
+            archives, writable = seal_full_heads(
+                root, checked["campaign_identity"], archives, entries,
+                entry_schema=ENTRY_SCHEMA,
+            )
+        except StudioHistorySegmentError as exc:
+            raise StudioQualificationHistoryError(
+                "cannot rotate fully verified E2E audit journal safely"
+            ) from exc
         updated = {
             "schema": SCHEMA,
             "campaign_identity": checked["campaign_identity"],
-            "entries": [*entries, item],
+            "entries": [*writable, item],
+            "segments": archives,
         }
         updated["history_digest"] = canonical_digest(updated)
         _atomic_json(root / "qualification_history.json", updated)
@@ -248,14 +269,19 @@ def inspect_execution_history(
         report = _inspect_production_assurance_unlocked(order, root)
         historical = _read_history(root, report["campaign_identity"])
         rows = historical["entries"]
+        archive = historical["_archive_stats"]
         return {
             "schema": SCHEMA,
             "campaign_identity": report["campaign_identity"],
             "current_assurance_report_digest": report["report_digest"],
             "history_digest": historical["history_digest"],
-            "recorded_runs": len(rows),
-            "recorded_cpu_divergence_events": sum(
-                entry.get("native_cpu_divergence_count", 0) for entry in rows
+            "recorded_runs": archive["archive_entry_count"] + len(rows),
+            "sealed_qualification_segments": archive["segments_used"],
+            "remaining_qualification_segment_capacity": archive["segments_remaining"],
+            "recorded_cpu_divergence_events": (
+                archive["archive_cpu_divergence_count"] + sum(
+                    entry.get("native_cpu_divergence_count", 0) for entry in rows
+                )
             ),
             "latest_cpu_divergence": (
                 rows[-1].get("first_native_cpu_divergence") if rows else None
