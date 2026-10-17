@@ -44,6 +44,11 @@ export const en = {
   'settings.all': 'All settings',
   'settings.language': 'Language',
   'settings.account': 'Account',
+  'home.builds': 'Live builds',
+  'home.noBuilds': 'No builds running right now.',
+  'live.connected': 'Live',
+  'live.offline': 'Live updates paused',
+  'live.lagged': 'Some live updates were skipped. Tap to dismiss.',
 } as const;
 
 export type StringKey = keyof typeof en;
@@ -90,6 +95,11 @@ export const nb: Partial<Dictionary> = {
   'settings.all': 'Alle innstillinger',
   'settings.language': 'Språk',
   'settings.account': 'Konto',
+  'home.builds': 'Bygg som kjører',
+  'home.noBuilds': 'Ingen bygg kjører akkurat nå.',
+  'live.connected': 'Direkte',
+  'live.offline': 'Direkteoppdateringer på pause',
+  'live.lagged': 'Noen direkteoppdateringer ble hoppet over. Trykk for å lukke.',
 };
 
 const dictionaries: Record<string, Partial<Dictionary>> = { en, nb };

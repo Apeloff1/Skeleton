@@ -38,8 +38,8 @@ export function useOverview(opts: UseOverviewOptions = {}) {
   const query = useQuery(overviewKey, fetchOverview, { enabled, staleTimeMs: Math.max(1_000, intervalMs || 15_000) });
   const { refetch } = query;
 
-  // TODO(realtime, slice 3): move live updates to useEventStream (SSE
-  // /api/v1/events, PR #4101); keep this REST poll only as the fallback.
+  // REST poll is the fallback; screens pass intervalMs=0 while the realtime
+  // stream (src/foundation/realtime) is open.
   useEffect(() => {
     if (!enabled || intervalMs <= 0) return;
     const timer = setInterval(() => { void refetch(); }, intervalMs);
