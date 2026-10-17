@@ -8,7 +8,6 @@ IP rights, approve publication, or treat Dragon notes as model improvements.
 from __future__ import annotations
 
 from hashlib import sha256
-import json
 from pathlib import Path
 
 from .contracts import canonical_digest
