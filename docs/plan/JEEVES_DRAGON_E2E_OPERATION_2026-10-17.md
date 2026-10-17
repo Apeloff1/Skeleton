@@ -284,3 +284,75 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 Tests requiring an external binary or Chromium may skip when it is absent. Such skips do not qualify that runtime. Source-generated tests and snapshot checks alone are not permission to merge or release. No new always-on CI workflow was added.
+
+
+## M61–M80: audible/visible original gameplay, controller handling and Dragon feedback
+
+This is an additional implementation pass on the same production branch, not a claim that all games/platforms are finished. Distinguish source-integrated functionality from execution or GPU/speaker/hardware validation.
+
+### Playable HTML5 music and environment (M61–M65)
+
+The generated HTML5 game now carries the actual original synthesized WAV media in its offline game-data payload. After a real directional gesture, ambient audio starts once; collectible and hazard encounters trigger their original sound cues. The playable page includes mute/unmute, music-level and effects-level controls. Game music stays optional. Browser Content Security Policy permits only embedded data media and imagery, not remote connections.
+
+Environment overlays use the original RGBA PNG layers produced with the game artwork, decode as offline data images and composite over real game tiles before the animated hero. Movement offsets successive layers to provide simple parallax. These are functional Canvas drawing paths, not sophisticated GPU shaders, compositing-grade smoke, lighting or real 3D scene systems.
+
+### Godot source integration (M66–M69)
+
+The Godot exporter copies the exact original `audio/{ambient,collectible,hazard}.wav` and `parallax/layer_NN.png` bytes into its project, hashes them into the engine release, and adds native GDScript `AudioStreamPlayer` playback source for music and event cues. Original environment overlays are loaded as textures and redrawn across the actual tile scene with movement-offset scrolling.
+
+Godot source replay qualification now stages these exact media resources in its isolated temporary project. Godot runtime audio import/playback, sound-device output, actual GPU frame parity and Godot editor correctness are still unqualified until a real engine run passes.
+
+### Three-way source-media parity (M70)
+
+Production assurance now fails if the browser's embedded PCM/PNG bytes differ from the asset producer's original files or from the Godot project. It checks original source audio assets, ambient, pickup and hazard WAV headers, per-layer PNG payloads, manifest SHA-256 and engine release identity. No byte-compatible but stylistically inconsistent media silently gets a passed digest.
+
+### Native browser controller parity (M71–M74)
+
+The HTML5 game implements the standard Gamepad API: left analog stick, D-pad directional movement, B undo and Start restart. An edge trigger prevents replay flooding when buttons are held. Existing keyboard and touchscreen buttons remain available below the game.
+
+The Node executable probe now installs a synthetic Gamepad API device, presses/repeats/releases an actual mapped button, checks one move per press, invokes undo and restart, and exercises actual generated audio and overlay renderer calls. The receipt separates these browser-method checks from physical controller verification and real audible media playback. No native emulator controller core is falsely reported as certified.
+
+### Dragon's corrective operational learning (M75–M77)
+
+`studio_dragon_learning_bridge.py` reads canonical per-target game production assurance and derives bounded improvement candidates when a stage is missing or blocked. Each candidate names a specific gate, target, blocker, proposed next check and exact current report/source digest. Raw model prompts, copyrighted game data, screenshots and third-party assets are not accepted into lessons.
+
+Human review is an explicit operator action. Accepted, rejected and needs-more-evidence decisions receive content-bound receipts stored outside the immutable source target. The operation locks the campaign, rereads the entire production-assurance digest and refuses changed ROM/runtime/art/scene evidence. An existing review cannot be overwritten by a revised claim.
+
+`studio_dragon_lessons_cli.py` exposes reviewable proposals and reviewed-draft inspection. This creates operational knowledge *drafts*, not trained weights or automatically promoted almanac entries. Independent rights and evaluation gates remain required.
+
+```bash
+# Generate bounded, exact-current improvement proposals.
+python -m skeleton.ai.game_builder.studio_dragon_lessons_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --propose --authorize-local-operation
+
+# Human approves ONE referenced proposal as a reviewed knowledge draft.
+python -m skeleton.ai.game_builder.studio_dragon_lessons_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --review-candidate <exact-candidate-sha256> \
+  --decision approve_for_reviewed_knowledge \
+  --reviewer-note "Independently reproduce this runtime blocker before promotion." \
+  --human-reviewed --authorize-local-operation
+
+# Inspect current, source-bound approved/rejected review drafts.
+python -m skeleton.ai.game_builder.studio_dragon_lessons_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --inspect-reviewed --authorize-local-operation
+```
+
+### M78–M80: explicit release blockers
+
+Native GB/GBC/NES assembly must actually run and pass emulator playthroughs with real controller layout and video/PPU evidence. Real sound-card and GPU output must be measured. Complete multi-platform cinematic, NPC/dialogue, longform canon, 2.5D/3D and advanced asset direction remain separate production requirements. Dragon's independently evaluated knowledge admission and checkpoint weight updates remain unimplemented rather than inferred from review drafts.
+
+### Updated specialized suites
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_playable_media_e2e.py \
+  tests/test_studio_browser_runtime_e2e.py \
+  tests/test_studio_godot_runtime_e2e.py \
+  tests/test_studio_pixel_parity_e2e.py \
+  tests/test_studio_dragon_learning_e2e.py
+```
+
+The new code and tests are committed but none is represented as a passing game E2E run. Exact-head GitHub checks and real installed native/browser/Godot runtimes are required before accepting any runtime qualification or game release.
