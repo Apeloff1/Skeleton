@@ -23,7 +23,7 @@ function fixture(overrides = {}) {
     ...overrides,
   };
   class Fence {
-    run(_keys, fn) { return Promise.resolve().then(fn); }
+    run(_keys, fn) { return Promise.resolve().then(fn).then(() => true, () => false); }
     isBusy() { return false; }
     pauseAndDrain() { return Promise.resolve(); }
     resume() {}
