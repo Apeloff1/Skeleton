@@ -19,7 +19,7 @@ function loadTS(filename, mocks = {}) {
   const mod = { exports: {} };
   new Function('require', 'module', 'exports', output.outputText)(
     id => {
-      if (id === './requestRecoveryPolicy') return loadTS('utils/requestRecoveryPolicy.ts');
+      if (id === './requestRecoveryPolicy') return loadTS('src/utils/requestRecoveryPolicy.ts');
       assert.ok(Object.hasOwn(mocks, id), filename + ' unexpected import ' + id);
       return mocks[id];
     },
@@ -29,7 +29,7 @@ function loadTS(filename, mocks = {}) {
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function net(storage = null, urls = ['https://primary.test', 'https://backup.test']) {
-  return loadTS('utils/resilientNet.ts', {
+  return loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': storage || {
       getItem: async () => null, setItem: async () => {},
     },
@@ -46,7 +46,7 @@ function reply(data, options = {}) {
 }
 
 test('duplicate mutation keys execute separately by default', async t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   let effects = 0;
@@ -57,7 +57,7 @@ test('duplicate mutation keys execute separately by default', async t => {
 });
 
 test('explicit read-only coalescing shares a single in-flight request', async t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   let effects = 0;
@@ -71,7 +71,7 @@ test('explicit read-only coalescing shares a single in-flight request', async t 
 });
 
 test('thermal cache enforces entry budget and refuses invalid TTL values', t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   guard.cache.set('oversized', 'x'.repeat(150 * 1024), 60_000);
@@ -88,7 +88,7 @@ test('thermal cache enforces entry budget and refuses invalid TTL values', t => 
 });
 
 test('thermal observers cannot crash peer listeners and guard destroy prevents new tasks', async () => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   let notifications = 0;
   guard.subscribe(() => { throw new Error('bad consumer'); });
@@ -102,7 +102,7 @@ test('thermal observers cannot crash peer listeners and guard destroy prevents n
 });
 
 test('thermal activity pressure recomputes during a sustained event burst', t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   const original = Date.now;

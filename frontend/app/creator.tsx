@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /creator — Creator Dashboard (DELUXE).
  * A premium command center: glass hero with Battle-Pass tier over a cinematic

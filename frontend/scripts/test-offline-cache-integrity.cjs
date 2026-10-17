@@ -70,7 +70,7 @@ function mockNetwork(m, opts = {}) {
   return { fetcher, calls };
 }
 function service(storage) {
-  return loadTS('services/offlineCache.ts', {
+  return loadTS('src/services/offlineCache.ts', {
     '../utils/apiBase': { API_BASE: 'https://academy.test' },
     '@react-native-async-storage/async-storage': storage,
   });

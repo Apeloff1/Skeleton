@@ -1,7 +1,7 @@
 import {describe, it} from 'node:test';
 import assert from 'node:assert/strict';
-import {EMPTY_WATCH_TIMELINE,ingestExplicitWatchSignal,ingestPlayerSnapshot} from '../features/Jeeves/companion/dragonWatchTimeline';
-import {signalFromPlayer} from '../features/Jeeves/companion/dragonPlayerBridge';
+import {EMPTY_WATCH_TIMELINE,ingestExplicitWatchSignal,ingestPlayerSnapshot} from '../src/features/Jeeves/companion/dragonWatchTimeline';
+import {signalFromPlayer} from '../src/features/Jeeves/companion/dragonPlayerBridge';
 describe('dragon video session integrity',()=>{
  const playing=(positionMs:number)=>({positionMs,durationMs:100000,playing:true,buffering:false,ended:false});
  it('deduplicates noisy playback updates in a one-second bucket',()=>{

@@ -26,7 +26,7 @@ import {
 import {
   loadLocalOverrides, setLocalOverride, clearLocalOverrides,
 } from '../src/feature-flags/overrides';
-import { toast } from '../components/Toast';
+import { toast } from '../src/components/AppToast';
 
 interface AuditRow { ts: number; name: string; action: string; diff: any; ip: string; user_agent: string; actor: string }
 

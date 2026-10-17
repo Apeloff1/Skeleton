@@ -4,7 +4,7 @@ const {
   SCENE_CHAT_HANDOFF_KEY, SCENE_CHAT_MAX_AGE_MS, SCENE_RECIPES,
   suggestedSceneRecipe, prepareSceneChatHandoff,
   readSceneChatHandoff, sceneHandoffItems,
-} = require('../../features/Jeeves/sceneHandoff.ts');
+} = require('../../src/features/Jeeves/sceneHandoff.ts');
 
 const NOW = Date.UTC(2026, 9, 13, 10);
 const values = (patch = {}) => ({

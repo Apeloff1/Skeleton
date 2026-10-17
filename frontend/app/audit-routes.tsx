@@ -19,9 +19,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { ROUTE_REGISTRY, getRoutesByCategory, getRouteCount, RouteEntry } from '../utils/routeRegistry';
-import { safeFetch } from '../utils/safeFetch';
-import { withScreenGuard } from '../components/withScreenGuard';
+import { ROUTE_REGISTRY, getRoutesByCategory, getRouteCount, RouteEntry } from '../src/utils/routeRegistry';
+import { safeFetch } from '../src/utils/apiClient';
+import { withScreenGuard } from '../src/components/withScreenGuard';
 
 type Status = 'unknown' | 'checking' | 'ok' | 'fail';
 

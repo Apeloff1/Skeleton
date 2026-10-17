@@ -7,7 +7,7 @@ const ts = require('typescript');
 
 function fixture() {
   const output = ts.transpileModule(
-    fs.readFileSync(path.join(__dirname, '../utils/safeTimers.ts'), 'utf8'),
+    fs.readFileSync(path.join(__dirname, '../src/utils/safeTimers.ts'), 'utf8'),
     { fileName: 'safeTimers.ts', compilerOptions: {
       module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
     }, reportDiagnostics: true },

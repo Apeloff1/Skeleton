@@ -1,9 +1,9 @@
 /**
  * Semantic foundation tokens derived from the canonical palette in
- * theme/tokens.ts. Never introduce raw hex values here; alias the palette.
+ * src/theme/tokens.ts. Never introduce raw hex values here; alias the palette.
  */
 import type { TextStyle } from 'react-native';
-import theme, { palette, spacing, radii, typography, breathing } from '../../theme/tokens';
+import theme, { palette, spacing, radii, typography, breathing } from '../theme/tokens';
 
 export const color = {
   bg: palette.ink[950],

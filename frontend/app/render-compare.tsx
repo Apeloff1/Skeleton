@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /render-compare — 🖼️ Side-by-side Worldforge render compare (big-win e).
  * Pick a mode/layer for each pane and compare the two extreme-pixel renders side by side.

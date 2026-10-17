@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/ReadingCorner/ReadingCornerModal'), 'ReadingCornerRoute', 'ReadingCornerModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/ReadingCorner/ReadingCornerModal'), 'ReadingCornerRoute', 'ReadingCornerModal');

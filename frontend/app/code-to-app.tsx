@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/CodeToApp/CodeToAppModal'), 'CodeToAppRoute', 'CodeToAppModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/CodeToApp/CodeToAppModal'), 'CodeToAppRoute', 'CodeToAppModal');

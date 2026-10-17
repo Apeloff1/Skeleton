@@ -70,7 +70,7 @@ test('ending while start is pending invalidates the late response', async () => 
     updateProgress: async () => ({ progress_updated: true, xp_earned: 0, new_achievements: [] }),
     logAIInteraction: async () => ({ logged: true }),
   };
-  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+  const { useSessionTracker } = loadTS('src/hooks/useSessionTracker.ts', {
     react: h.react, '../services/synergy': { synergyService: service },
   });
   const tracker = useSessionTracker('learner');
@@ -100,7 +100,7 @@ test('switching modules waits for prior final progress before starting the new o
     },
     logAIInteraction: async () => ({ logged: true }),
   };
-  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+  const { useSessionTracker } = loadTS('src/hooks/useSessionTracker.ts', {
     react: h.react, '../services/synergy': { synergyService: service },
   });
   const tracker = useSessionTracker('learner');
@@ -136,7 +136,7 @@ test('racing session switches finalize the previous module only once', async () 
     }),
     logAIInteraction: async () => ({ logged: true }),
   };
-  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+  const { useSessionTracker } = loadTS('src/hooks/useSessionTracker.ts', {
     react: h.react, '../services/synergy': { synergyService: service },
   });
   const tracker = useSessionTracker('learner');
@@ -163,7 +163,7 @@ test('unmount during module switching prevents any later local activation', asyn
     updateProgress: () => new Promise(resolve => { finish = resolve; }),
     logAIInteraction: async () => ({ logged: true }),
   };
-  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+  const { useSessionTracker } = loadTS('src/hooks/useSessionTracker.ts', {
     react: h.react, '../services/synergy': { synergyService: service },
   });
   const tracker = useSessionTracker('learner');
@@ -188,7 +188,7 @@ test('concurrent reminder scheduling only installs one recurring alarm', async (
     scheduleNotificationAsync: () => { scheduled++; return new Promise(resolve => { start = resolve; }); },
     cancelScheduledNotificationAsync: async () => {},
   };
-  const { scheduleDailyReminder } = loadTS('hooks/usePushNotifications.ts', {
+  const { scheduleDailyReminder } = loadTS('src/hooks/usePushNotifications.ts', {
     react: harness().react,
     'react-native': { Platform: { OS: 'web' } },
     'expo-device': { isDevice: false },
@@ -222,7 +222,7 @@ test('failed reminder scheduling releases the singleflight lock', async () => {
     cancelScheduledNotificationAsync: async () => {},
   };
   let stored = null;
-  const { scheduleDailyReminder } = loadTS('hooks/usePushNotifications.ts', {
+  const { scheduleDailyReminder } = loadTS('src/hooks/usePushNotifications.ts', {
     react: harness().react,
     'react-native': { Platform: { OS: 'web' } },
     'expo-device': { isDevice: false },
@@ -256,7 +256,7 @@ test('background power policy clamps timers to finite values', async () => {
     addBatteryLevelListener: () => ({ remove() {} }),
     addBatteryStateListener: () => ({ remove() {} }),
   };
-  const { usePowerAwareness } = loadTS('hooks/usePowerAwareness.ts', {
+  const { usePowerAwareness } = loadTS('src/hooks/usePowerAwareness.ts', {
     react: h.react, 'react-native': { AppState: app }, 'expo-battery': battery,
   });
   const power = usePowerAwareness();
@@ -273,7 +273,7 @@ test('background power policy clamps timers to finite values', async () => {
 
 test('mobile throttle treats invalid limits as bounded and ignores work after unmount', () => {
   const h = harness();
-  const { useMobileOptimization } = loadTS('hooks/useMobileOptimization.ts', {
+  const { useMobileOptimization } = loadTS('src/hooks/useMobileOptimization.ts', {
     react: h.react,
     'react-native': {
       Dimensions: { get: () => ({ width: 400, height: 800 }), addEventListener: () => ({ remove() {} }) },
@@ -292,7 +292,7 @@ test('mobile throttle treats invalid limits as bounded and ignores work after un
 });
 
 test('session request timeout remains active while JSON parsing stalls', async () => {
-  const { synergyService } = loadTS('services/synergy.ts', {
+  const { synergyService } = loadTS('src/services/synergy.ts', {
     '../utils/apiBase': { API_BASE: 'https://backend.test' },
   });
   const originalFetch = global.fetch;
@@ -328,7 +328,7 @@ test('session request timeout remains active while JSON parsing stalls', async (
 });
 
 test('session service refuses declared oversized JSON before parsing', async () => {
-  const { synergyService } = loadTS('services/synergy.ts', {
+  const { synergyService } = loadTS('src/services/synergy.ts', {
     '../utils/apiBase': { API_BASE: 'https://backend.test' },
   });
   const originalFetch = global.fetch;

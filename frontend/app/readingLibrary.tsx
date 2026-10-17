@@ -13,7 +13,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
-const ReadingLibraryModal = lazyDefault(() => import('../features/ReadingLibrary/ReadingLibraryModal').then((m) => ({ default: m.ReadingLibraryModal })));
+const ReadingLibraryModal = lazyDefault(() => import('../src/features/ReadingLibrary/ReadingLibraryModal').then((m) => ({ default: m.ReadingLibraryModal })));
 
 export default function ReadingLibraryRoute() {
   const router = useRouter();

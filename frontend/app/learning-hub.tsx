@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/LearningHub/LearningHubModal'), 'LearningHubRoute', 'LearningHubModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/LearningHub/LearningHubModal'), 'LearningHubRoute', 'LearningHubModal');

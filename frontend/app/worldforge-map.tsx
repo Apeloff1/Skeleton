@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /worldforge-map — interactive LOD "slippy map" explorer.
  * Streams chunked virtual-texture tiles from /stream/tile/{z}/{x}/{y}.png,

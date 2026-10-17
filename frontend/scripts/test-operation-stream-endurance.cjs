@@ -20,8 +20,8 @@ function loadTS(file, mocks = {}) {
   }, module, module.exports);
   return module.exports;
 }
-const reducer = loadTS('services/operationStreamReducer.ts');
-const { OperationBrowserSession } = loadTS('services/operationStreamSession.ts', {
+const reducer = loadTS('src/services/operationStreamReducer.ts');
+const { OperationBrowserSession } = loadTS('src/services/operationStreamSession.ts', {
   './operationStreamReducer.ts': reducer,
 });
 function operation(state = 'running') {
