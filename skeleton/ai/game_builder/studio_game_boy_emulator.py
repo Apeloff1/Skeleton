@@ -225,7 +225,7 @@ def qualify_game_boy_emulator(
                 and actual["PlayerX"] == expected["x"]
                 and actual["PlayerY"] == expected["y"]
                 and actual["Level"] == expected["level_index"] + 1
-                and actual["Score"] == expected["score"]
+                and actual["Score"] + 256 * actual["ScoreHigh"] == expected["score"]
                 and actual["Health"] == expected["health"]
             )
             frame = _frame_hash(emulator)
