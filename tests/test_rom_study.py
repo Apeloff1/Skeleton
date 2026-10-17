@@ -137,3 +137,26 @@ def test_missing_approved_core_is_blocked_not_train_success(tmp_path):
     result = train_all(path, output, max_runs=10, steps=4)
     assert result["roms_trained"] == 0
     assert result["per_rom_results"][0]["status"] == "blocked"
+
+
+def test_two_identical_roms_share_one_candidate(monkeypatch, tmp_path):
+    root, raw = _fixture(tmp_path)
+    (root / "second.gb").write_bytes(raw)
+    manifest = tmp_path / "roms.json"
+    manifest.write_text(json.dumps(discover(root)))
+    doc = _review(manifest, raw)
+    output = tmp_path / "out"
+    output.mkdir()
+    called = []
+    def fake_train(row, **kw):
+        called.append(row["rom_id"])
+        return ({"snapshot_digest": "a" * 64}, {"report_digest": "b" * 64}, None,
+                {"summary": {"rom_id": row["rom_id"], "rom_sha256": row["sha256"],
+                             "actual_q_updates": 3, "neural_optimizer_steps": 0},
+                 "neural_report": None})
+    monkeypatch.setattr("skeleton.ai.training.rom_study.train_one", fake_train)
+    result = train_all(manifest, output, max_runs=10, steps=4)
+    assert result["roms_authorized"] == 2
+    assert result["roms_trained"] == 1
+    assert result["roms_covered"] == 2
+    assert len(called) == 1

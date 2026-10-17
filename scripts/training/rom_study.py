@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
             # Any partial or blocked result is surfaced to the operator.
             # Per-ROM receipts are committed separately after actual training.
         print(json.dumps(summary, sort_keys=True, indent=2))
-        return 0 if summary.get("roms_trained", 0) == summary.get("roms_authorized", 0) else 2
+        return 0 if summary.get("roms_covered", 0) == summary.get("roms_authorized", 0) else 2
     except (RomFleetError, OSError, ValueError, RuntimeError, ImportError) as exc:
         print("ROM fleet blocked: " + type(exc).__name__ + ": " + str(exc),
               file=sys.stderr)

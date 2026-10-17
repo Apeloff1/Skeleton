@@ -177,7 +177,7 @@ def validate_manifest(manifest_path: Path) -> tuple[Path, list[dict[str, Any]], 
             or data.get("production_jeeves_weights_modified") is not False):
         raise RomFleetError("ROM fleet inventory is malformed or claims unproven training")
     root = _root(Path(data.get("root", "")))
-    seen, digests = set(), set()
+    seen = set()
     for row in rows:
         if not isinstance(row, dict):
             raise RomFleetError("ROM row must be an object")
@@ -194,10 +194,6 @@ def validate_manifest(manifest_path: Path) -> tuple[Path, list[dict[str, Any]], 
         digest = row.get("sha256")
         if digest is not None and (not isinstance(digest, str) or not _SHA.fullmatch(digest)):
             raise RomFleetError("invalid ROM SHA-256")
-        if digest is not None and digest in digests:
-            raise RomFleetError("duplicate ROM bytes require one canonical identity")
-        if digest is not None:
-            digests.add(digest)
         rights = row.get("rights")
         if not isinstance(rights, dict):
             raise RomFleetError("ROM rights record missing")
@@ -207,8 +203,8 @@ def validate_manifest(manifest_path: Path) -> tuple[Path, list[dict[str, Any]], 
                            for k in ("rights_holder", "rights_basis", "review_id"))
                     or not rights["rights_basis"].startswith(("original:", "license:", "public-domain:"))):
                 raise RomFleetError("ROM train permission requires independent human rights review")
-            if digest is None or not 1 <= row.get("bytes", 0) <= INLINE_ROM_BYTES:
-                raise RomFleetError("approved ROM requires a supported byte size and hash")
+            if digest is None or not 1 <= row.get("bytes", 0) <= MAX_BLOB:
+                raise RomFleetError("approved ROM requires fingerprinted bounded bytes")
         if not path.is_file():
             raise RomFleetError("ROM input vanished since catalog")
     return root, rows, _digest(source)
@@ -341,12 +337,20 @@ def train_all(manifest_path: Path, output_dir: Path, *,
             or manifest_path.resolve().parent == output_dir.resolve()):
         raise RomFleetError("training outputs must not overlap ROMs or rights manifest")
     results: list[dict[str, Any]] = []
+    trained_digests: set[str] = set()
     for index, row in enumerate(rows):
         identity = row["rom_id"]
         if cancel is not None and cancel():
             raise RomFleetError("fleet cancelled before next ROM")
         if row["rights"].get("training_permitted") is not True:
             results.append({"rom_id": identity, "status": "not_authorized", "trained": False})
+            continue
+        if row["bytes"] > INLINE_ROM_BYTES:
+            results.append({"rom_id": identity, "status": "streamed_adapter_required", "trained": False})
+            continue
+        if row["sha256"] in trained_digests:
+            results.append({"rom_id": identity, "status": "duplicate_rom_covered_by_prior_candidate",
+                            "trained": False, "covered": True})
             continue
         paths = {
             kind: output_dir / (identity + "-" + kind + ".json")
@@ -357,7 +361,7 @@ def train_all(manifest_path: Path, output_dir: Path, *,
             continue
         try:
             policy, evidence, model, details = train_one(
-                row, root=root, seed=seed + index, max_runs=max_runs,
+                row, root=root, seed=(seed + index) % (2**63), max_runs=max_runs,
                 steps=steps, neural=neural, cancel=cancel,
             )
             # Never write a success summary unless all its artifacts exist.
@@ -372,8 +376,9 @@ def train_all(manifest_path: Path, output_dir: Path, *,
                 "neural_report": details["neural_report"],
             }
             _write_new(paths["receipt"], receipt)
+            trained_digests.add(row["sha256"])
             results.append({"rom_id": identity, "status": "candidate_written",
-                            "trained": True,
+                            "trained": True, "covered": True,
                             "q_updates": receipt["actual_q_updates"],
                             "neural_steps": receipt["neural_optimizer_steps"],
                             "receipt": str(paths["receipt"])})
@@ -389,6 +394,7 @@ def train_all(manifest_path: Path, output_dir: Path, *,
         "roms_discovered": len(rows),
         "roms_authorized": sum(r["rights"].get("training_permitted") is True for r in rows),
         "roms_trained": sum(r.get("trained") is True for r in results),
+        "roms_covered": sum(r.get("covered") is True for r in results),
         "actual_q_updates": sum(r.get("q_updates", 0) for r in results),
         "actual_neural_steps": sum(r.get("neural_steps", 0) for r in results),
         "per_rom_results": results,

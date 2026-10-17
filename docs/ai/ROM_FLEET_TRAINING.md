@@ -76,8 +76,10 @@ A rejected predictive model remains a rejected candidate.
 
 Per-ROM output files preserve separate `*-policy.json`, `*-evidence.json`,
 optional `*-neural.json` and `*-receipt.json` files, written exclusively
-with 0600 permissions. A failed or unsupported ROM is reported as **blocked**,
-not included in successful totals. Existing outputs are never overwritten and
+with 0600 permissions. A failed or unsupported ROM is reported as **blocked** or as requiring the
+streamed adapter, not included in successful totals. Bit-identical duplicate
+ROMs share a previously trained candidate and count as covered, never as a
+fabricated second weight update. Existing outputs are never overwritten and
 the CLI reports a nonzero status if any approved ROM fails. No game binary is
 copied into output artifacts.
 
