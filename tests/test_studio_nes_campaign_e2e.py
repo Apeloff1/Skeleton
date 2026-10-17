@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
+from skeleton.ai.game_builder.studio_native_psg import compose_native_psg, console_psg_registers
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_build_qualification import (
     _receipt as native_receipt, _verify_source,
@@ -38,6 +39,8 @@ NES_LABELS = (
     "al 000015 .ScoreHigh\n"
     "al 000016 .TurnCount\n"
     "al 000017 .TurnCountHigh\n"
+    "al 008100 .OriginalMusicLow\n"
+    "al 008108 .OriginalMusicHigh\n"
 ).encode("ascii")
 
 
@@ -45,9 +48,14 @@ def ines_rom(tiles: bytes, animation: bytes):
     assert len(tiles) == 96
     assert len(animation) == 48 and animation[:16] == tiles[80:96]
     char = tiles + animation[16:]
+    prg = bytearray(16384)
+    song = console_psg_registers(
+        compose_native_psg("forest", 733, 0), "nintendo_famicom",
+    )
+    prg[0x100:0x110] = bytes((*song["notes_low"], *song["notes_high"]))
     return (
         b"NES\x1a" + bytes([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-        + bytes(16384) + char + bytes(8192 - len(char))
+        + bytes(prg) + char + bytes(8192 - len(char))
     )
 
 class OriginalNESCampaignGatesTests(unittest.TestCase):
