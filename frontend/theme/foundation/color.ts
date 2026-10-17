@@ -4,11 +4,11 @@
  * Read-only view over frontend/theme/tokens.ts — the single edit point for
  * token values. This module holds no colour literals.
  */
-import { canonicalColors, palette, status, textUsage } from '../tokens';
-import type { SkinColors } from '../skins';
+import tokens, { canonicalColors, status, textUsage } from '../tokens';
+
+const { palette } = tokens;
 
 export type ColorMode = 'dark' | 'light';
-export type { SkinColors };
 
 /** Palette ramps, re-exported from tokens.ts. */
 export const ramps = {
