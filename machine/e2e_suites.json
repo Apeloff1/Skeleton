@@ -366,7 +366,9 @@
         "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
         "tests/test_studio_native_replay_telemetry.py",
         "tests/test_studio_native_score_parity.py",
-        "tests/test_studio_native_python_reference_e2e.py"
+        "tests/test_studio_native_python_reference_e2e.py",
+        "skeleton/ai/game_builder/studio_native_correction_triage.py",
+        "tests/test_studio_native_correction_triage.py"
       ],
       "command": [
         "python",
@@ -385,7 +387,8 @@
         "tests/test_studio_execution_history_e2e.py",
         "tests/test_studio_native_replay_telemetry.py",
         "tests/test_studio_native_score_parity.py",
-        "tests/test_studio_native_python_reference_e2e.py"
+        "tests/test_studio_native_python_reference_e2e.py",
+        "tests/test_studio_native_correction_triage.py"
       ]
     }
   ]
