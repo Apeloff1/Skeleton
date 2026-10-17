@@ -101,9 +101,10 @@ class NativeBuildQualificationTests(unittest.TestCase):
                 destination = root / "verified.rom"
                 calls = []
 
-                def fake_run(args, *, cwd, shell, timeout, capture_output, check, env):
+                def fake_run(args, *, cwd, shell, timeout, stdout, stderr, check, env):
                     self.assertFalse(shell)
-                    self.assertTrue(capture_output)
+                    self.assertTrue(hasattr(stdout, "write"))
+                    self.assertEqual(stderr, subprocess.STDOUT)
                     self.assertFalse(check)
                     self.assertIn(timeout, range(1, 121))
                     self.assertTrue(str(args[0]).startswith("/opt/"))
