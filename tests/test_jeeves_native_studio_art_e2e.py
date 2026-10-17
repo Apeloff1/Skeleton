@@ -18,6 +18,10 @@ from skeleton.ai.game_builder.game_boy_color_native_export import compile_native
 from skeleton.ai.game_builder.nes_native_export import (
     NativeNESError, compile_native_nes, _nes_chr,
 )
+from skeleton.ai.game_builder.sega_8bit_native_export import (
+    compile_native_sega_8bit, _tiles as _sega_tiles,
+)
+from skeleton.ai.game_builder.sms_native_export import compile_native_sms
 from skeleton.ai.game_builder.native_game_cli import build_game
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.port_planner import HomebrewSource
@@ -98,14 +102,27 @@ class StudioProductionAssetTests(unittest.TestCase):
             replace(a, files=tuple(sorted(broken.items()))).verify()
 
     def test_generated_tiles_are_in_real_cartridge_source(self):
-        for target in ("nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom"):
+        for target in ("nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
+                       "sega_game_gear", "sega_master_system"):
             with self.subTest(target=target):
                 art = render_studio_art(
                     self.world, target=target,
                     direction=ArtDirection(style="luminous", seed=1897),
                     authorized=True,
                 )
-                if target == "nintendo_famicom":
+                if target == "sega_game_gear":
+                    built = compile_native_sega_8bit(
+                        self.world, self.rights, target, authorized=True, tile_art=art.runtime_tiles)
+                    legacy = compile_native_sega_8bit(
+                        self.world, self.rights, target, authorized=True)
+                    self.assertIn(_sega_tiles(art.runtime_tiles), built.game_c)
+                    self.assertNotEqual(legacy.game_c, built.game_c)
+                elif target == "sega_master_system":
+                    built = compile_native_sms(
+                        self.world, self.rights, authorized=True, tile_art=art.runtime_tiles)
+                    legacy = compile_native_sms(self.world, self.rights, authorized=True)
+                    self.assertNotEqual(legacy.asm, built.asm)
+                elif target == "nintendo_famicom":
                     built = compile_native_nes(
                         self.world, self.rights, authorized=True, tile_art=art.runtime_tiles
                     )
@@ -134,9 +151,11 @@ class StudioProductionAssetTests(unittest.TestCase):
                     canonical_digest([list(tile) for tile in art.runtime_tiles]),
                 )
                 self.assertNotEqual(legacy.content_digest, built.content_digest)
-                self.assertFalse(built.binary_compiled if hasattr(built, "binary_compiled")
-                                 else built.rom_compiled if hasattr(built, "rom_compiled")
-                                 else built.cartridge_built)
+                self.assertTrue(any(
+                    not value for name, value in vars(built).items()
+                    if name in {"binary_compiled", "rom_compiled", "cartridge_built",
+                                "native_cartridge_compiled"}
+                ))
 
     def test_native_cartridge_rejects_corrupt_art_and_unauthorized_creation(self):
         with self.assertRaises(PermissionError):
@@ -161,7 +180,8 @@ class StudioProductionAssetTests(unittest.TestCase):
             root = Path(temp)
             evidence = root / "authorship.txt"
             evidence.write_text("Original characters and homebrew project design")
-            for target in ("nintendo_game_boy", "nintendo_famicom", "sega_master_system"):
+            for target in ("nintendo_game_boy", "nintendo_famicom",
+                           "sega_master_system", "sega_game_gear", "dos_vga"):
                 folder = root / target
                 result = build_game(
                     target=target, basis="bandai_wonderswan",
@@ -194,7 +214,8 @@ class StudioProductionAssetTests(unittest.TestCase):
                 self.assertIn("extends Control", (
                     folder / "engines/godot/scripts/main.gd").read_text())
                 self.assertTrue((folder / "engines/proof/verified_solution.json").is_file())
-                if target in {"nintendo_game_boy", "nintendo_famicom"}:
+                if target in {"nintendo_game_boy", "nintendo_famicom",
+                              "sega_master_system", "sega_game_gear"}:
                     self.assertTrue(result["native_art_embedded"])
                 else:
                     self.assertFalse(result["native_art_embedded"])
