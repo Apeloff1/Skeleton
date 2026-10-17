@@ -598,3 +598,34 @@ to the real source evidence and original Jeeves scientific governance.
 `next_episode_index` provides bounded pagination (maximum 16 episodes per
 request). The audit **does not** claim semantic inference, inspect unrecorded
 video, run a language model or inflate independent gameplay examples.
+
+### Preserve the 43 lenses for **every** native gameplay episode
+
+The training campaign's `--semantic-all-runs` mode creates a separate
+native-model 43-lens review for each actual gameplay episode. The corpus
+exporter now accepts repeated `--semantic-review-receipt` arguments to
+retain **all** reviewed episodes rather than just episode zero:
+
+```sh
+python -m scripts.training.rom_study export-triangle-corpus \
+  --receipt /private/rom-receipts/gameplay.json \
+  --review-receipt /private/rom-receipts/critic.json \
+  --source-sha256 <full-source-sha256> \
+  --reviewer-checkpoint /private/models/critic.json \
+  --semantic-checkpoint /private/models/semantic.json \
+  --semantic-review-receipt /private/rom-receipts/semantic-episode-0.json \
+  --semantic-review-receipt /private/rom-receipts/semantic-episode-1.json \
+  --output-dir /private/rom-receipts
+```
+
+The same reviewer checkpoint **actually replays every saved model generation**
+before export. For multiple episodes, the new `triangle-corpus-v4-*.json`
+records one uniquely identified, route-matching and complete 43-lens review
+for **every** native episode, in original source order. Duplicate/missing
+episode reviews, stale canonical route hashes, mixed models, or partially
+structured hypotheses are rejected. Single-review v3 and observation-only
+v2 exports remain supported. This feature also recognizes the separately
+configured extended 200-lens budget when the installed canonical registry
+and corresponding model receipts support it. As before, the measured
+eight-lens Q-training evidence is not multiplied and none of the language
+model hypotheses are promoted to supervised truth labels.

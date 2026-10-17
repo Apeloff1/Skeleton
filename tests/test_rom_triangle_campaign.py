@@ -370,7 +370,7 @@ def test_cli_corpus_review_receipt_requires_checkpoint_pair():
         "--semantic-checkpoint", "/tmp/semantic-model.json",
         "--output-dir", "/tmp/private",
     ])
-    assert args.semantic_review_receipt.name == "semantic.json"
+    assert [path.name for path in args.semantic_review_receipt] == ["semantic.json"]
     assert args.semantic_checkpoint.name == "semantic-model.json"
 
 
@@ -553,3 +553,109 @@ def test_campaign_rejects_fake_43_lens_count(monkeypatch, tmp_path):
     )
     assert page["review_failures_needing_retry"] == 1
     assert page["rows"][0]["semantic_lens_review_state"] == "blocked_retry_required"
+
+
+def test_all_episode_semantic_corpus_v4_is_source_ordered_and_weight_stable(
+    monkeypatch,
+):
+    from copy import deepcopy
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    from skeleton.jeeves import game_emulator_triangle_semantic_inference as infer
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", _fake_semantic_route)
+    monkeypatch.setattr(infer, "verify_native_semantic_lenses", lambda *a: None)
+    evidence, triangle, critic = _synthetic_corpus_inputs()
+    second = deepcopy(triangle["episode_lens_references"][0])
+    second["source_trace_sha256"] = "1" * 64
+    second["source_receipt_sha256"] = "2" * 64
+    triangle["episode_lens_references"].append(second)
+    first_review = {
+        "source_native_trace_sha256": "d" * 64,
+        "canonical_route_sha256": "8" * 64,
+        "semantic_review_digest": "3" * 64,
+        "model_sha256": "9" * 64,
+        "source_bound_interpretations": 43,
+        "all_semantic_interpretations_valid": True,
+        "native_model_generations_executed": 43,
+        "requested_lens_keys": [],
+    }
+    second_review = {
+        **first_review,
+        "source_native_trace_sha256": "1" * 64,
+        "semantic_review_digest": "4" * 64,
+    }
+    multi = (second_review, first_review)
+    corpus_result = corpus.compile_triangle_candidate_corpus(
+        evidence, triangle, critic, semantic_inference_reviews=multi,
+    )
+    assert corpus_result["schema_version"].endswith("candidate_corpus.v4")
+    assert corpus_result["unique_independent_native_episodes"] == 2
+    assert corpus_result["total_lens_candidate_views"] == 16
+    assert corpus_result["same_source_total_weight_per_episode"] == 1.0
+    assert corpus_result["additional_independent_gameplay_episodes_from_lenses"] == 0
+    assert [
+        item["native_trace_sha256"]
+        for item in corpus_result["native_semantic_inference_references"]
+    ] == ["d" * 64, "1" * 64]
+    assert corpus_result["semantic_model_hypotheses_added_to_supervised_labels"] == 0
+    corpus.verify_triangle_candidate_corpus(
+        evidence, triangle, critic, corpus_result, semantic_inference_reviews=multi,
+    )
+    with pytest.raises(corpus.TriangleCorpusError, match="duplicate"):
+        corpus.compile_triangle_candidate_corpus(
+            evidence, triangle, critic,
+            semantic_inference_reviews=(first_review, first_review),
+        )
+
+
+def test_multi_episode_semantic_corpus_rejects_missing_or_incomplete_reviews(
+    monkeypatch,
+):
+    from copy import deepcopy
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    from skeleton.jeeves import game_emulator_triangle_semantic_inference as infer
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", _fake_semantic_route)
+    monkeypatch.setattr(infer, "verify_native_semantic_lenses", lambda *a: None)
+    evidence, triangle, critic = _synthetic_corpus_inputs()
+    other = deepcopy(triangle["episode_lens_references"][0])
+    other["source_trace_sha256"] = "1" * 64
+    triangle["episode_lens_references"].append(other)
+    review = {
+        "source_native_trace_sha256": "d" * 64,
+        "canonical_route_sha256": "8" * 64,
+        "semantic_review_digest": "3" * 64,
+        "model_sha256": "9" * 64,
+        "source_bound_interpretations": 43,
+        "all_semantic_interpretations_valid": True,
+        "native_model_generations_executed": 43,
+        "requested_lens_keys": [],
+    }
+    with pytest.raises(corpus.TriangleCorpusError, match="one review"):
+        corpus.compile_triangle_candidate_corpus(
+            evidence, triangle, critic, semantic_inference_reviews=(review,),
+        )
+    bad = {**review, "source_native_trace_sha256": "1" * 64,
+           "source_bound_interpretations": 42,
+           "all_semantic_interpretations_valid": False}
+    with pytest.raises(corpus.TriangleCorpusError, match="all canonical"):
+        corpus.compile_triangle_candidate_corpus(
+            evidence, triangle, critic, semantic_inference_reviews=(review, bad),
+        )
+
+
+def test_cli_repeats_one_semantic_receipt_per_native_episode():
+    from scripts.training.rom_study import parser
+    args = parser().parse_args([
+        "export-triangle-corpus", "--receipt", "/tmp/game.json",
+        "--review-receipt", "/tmp/critic.json", "--source-sha256", "f" * 64,
+        "--reviewer-checkpoint", "/tmp/critic-model",
+        "--semantic-review-receipt", "/tmp/semantic-episode-0.json",
+        "--semantic-review-receipt", "/tmp/semantic-episode-1.json",
+        "--semantic-checkpoint", "/tmp/semantic-model",
+        "--output-dir", "/tmp/out",
+    ])
+    assert len(args.semantic_review_receipt) == 2
+    assert args.semantic_review_receipt[1].name == "semantic-episode-1.json"
