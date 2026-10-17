@@ -890,3 +890,33 @@ def test_complete_200_lens_native_inference_receipts_cover_every_catalog_key(mon
         lens.lens_id for lens in LensCatalog().all()
     }
     inference.verify_native_semantic_lenses(evidence, triangle, critic, result)
+
+
+def test_candidate_corpus_provenance_names_actual_original_200_lens_catalog(monkeypatch):
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    evidence, triangle, review = _synthetic_corpus_inputs()
+    epi = triangle["episode_lens_references"][0]
+    measured = _complete_200_native_episode()
+    epi["companion_viewing"] = measured["companion_viewing"]
+    epi["ai_playing"] = measured["ai_playing"]
+    epi["repetition"] = measured["repetition"]
+    epi["grounded_lens_evidence"]["controller_action"] = (
+        measured["grounded_lens_evidence"]["controller_action"]
+    )
+    epi["grounded_lens_evidence"]["reward_and_consequence"] = (
+        measured["grounded_lens_evidence"]["reward_and_consequence"]
+    )
+    result = corpus.compile_triangle_candidate_corpus(
+        evidence, triangle, review, semantic_lens_budget=200,
+    )
+    owner = "skeleton.jeeves.agent.lens_system.LensCatalog"
+    assert result["native_semantic_catalog"] == owner
+    assert result["semantic_routes_per_episode"][0]["canonical_registry"] == owner
+    assert result["routed_semantic_lens_questions"] == 200
+    assert len(result["candidate_rows"]) == 8
+    assert result["production_jeeves_optimizer_steps"] == 0
+    corpus.verify_triangle_candidate_corpus(
+        evidence, triangle, review, result,
+    )

@@ -107,6 +107,10 @@ def compile_triangle_candidate_corpus(
         total_semantic_routes += routed["actually_routed_lenses"]
         semantic_routes.append({
             "native_trace_sha256": trace,
+            "canonical_registry": routed.get(
+                "canonical_registry",
+                "skeleton.jeeves.agent.semantic_maximal.MaximalSemanticRegistry",
+            ),
             "canonical_catalog_sha256": routed["canonical_catalog_sha256"],
             "semantic_route_digest": routed["route_digest"],
             "semantic_governance_fingerprint": routed["governance_fingerprint"],
@@ -247,7 +251,7 @@ def compile_triangle_candidate_corpus(
         "routed_semantic_lens_questions": total_semantic_routes,
         "semantic_questions_are_not_supervised_labels": True,
         "semantic_lens_activations_do_not_create_reward_or_weight_updates": True,
-        "native_semantic_catalog": "skeleton.jeeves.agent.semantic_maximal",
+        "native_semantic_catalog": semantic_routes[0]["canonical_registry"],
         "semantic_routes_per_episode": semantic_routes,
         "same_source_total_weight_per_episode": 1.0,
         "additional_independent_gameplay_episodes_from_lenses": 0,
