@@ -8,6 +8,10 @@ tile bytes are consumed by the GB/CGB/NES source emitters when opted in.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import BytesIO
+from math import pi, sin
+from struct import pack as pack_integer
+import wave
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -69,6 +73,11 @@ class ArtDirection:
     # These affect real generated pixels, not merely descriptor labels.
     outline: bool = True
     highlight: bool = True
+    foliage_density: int = 2
+    shadow_strength: int = 1
+    parallax_layers: int = 1
+    music_density: int = 2
+    animation_fps: int = 4
 
     def __post_init__(self) -> None:
         if self.style not in STYLES:
@@ -81,6 +90,14 @@ class ArtDirection:
             raise StudioArtError("art seed out of bounds")
         if type(self.outline) is not bool or type(self.highlight) is not bool:
             raise StudioArtError("art modifiers must be booleans")
+        for name, low, high in (
+            ("foliage_density", 0, 4), ("shadow_strength", 0, 3),
+            ("parallax_layers", 0, 3), ("music_density", 0, 4),
+            ("animation_fps", 1, 24),
+        ):
+            value = getattr(self, name)
+            if type(value) is not int or not low <= value <= high:
+                raise StudioArtError("invalid bounded original art control: " + name)
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +126,7 @@ class StudioArtPack:
         if len(paths) != len(set(paths)) or any(
             not isinstance(name, str) or not name or Path(name).is_absolute()
             or any(part in ("", ".", "..") for part in Path(name).parts)
-            or not name.startswith(("tiles/", "sprites/", "previews/", "metadata/"))
+            or not name.startswith(("tiles/", "sprites/", "previews/", "metadata/", "audio/", "parallax/"))
             for name in paths
         ):
             raise StudioArtError("invalid or duplicate art file path")
@@ -175,6 +192,14 @@ def _style_tile(name: str, direction: ArtDirection) -> tuple[int, ...]:
                     value = 1
             if not direction.highlight and value == 3 and name != "hero":
                 value = 2
+            if name == "floor" and direction.foliage_density > 0 and (
+                x * 11 + y * 7 + direction.seed
+            ) % (12 - direction.foliage_density * 2) == 0:
+                value = 2
+            if name == "wall" and direction.shadow_strength > 0 and (
+                y >= 8 - direction.shadow_strength or x == 7
+            ):
+                value = max(0, value - 1)
             values.append(value)
     return tuple(values)
 
@@ -222,6 +247,65 @@ def _preview(level, tiles, hero, palette) -> bytes:
     return png_rgba(bytes(framebuffer), width, height)
 
 
+def _environment_overlay(
+    world: PlayableWorld, palette: tuple[tuple[int, int, int, int], ...],
+    direction: ArtDirection, layer: int,
+) -> bytes:
+    """Original semi-transparent environmental imagery. Not native ROM VDP art."""
+    width = world.intent.width * 8
+    height = world.intent.height * 8
+    data = bytearray(width * height * 4)
+    for y in range(height):
+        for x in range(width):
+            line = (x * 17 + y * 11 + direction.seed + layer * 37) % 59
+            foliage = (x * (3 + layer) + y * 7 + direction.seed) % 31
+            if (direction.foliage_density and foliage < direction.foliage_density
+                    and y > height // (3 + layer)):
+                rgb = palette[2]
+                alpha = 80 + layer * 30
+            elif line == 0 and (y + layer * 4) % 13 < 3:
+                rgb = palette[1]
+                alpha = 46 + layer * 18
+            else:
+                continue
+            offset = (y * width + x) * 4
+            data[offset:offset + 4] = bytes((*rgb[:3], alpha))
+    return png_rgba(bytes(data), width, height)
+
+
+def _synthesized_wav(*, theme: str, seed: int, density: int, kind: str) -> bytes:
+    """Emit deterministic original PCM music/cues, without copyrighted samples."""
+    rate = 8000
+    count = rate * (4 if kind == "ambient" else 1)
+    roots = {"forest": 196, "ocean": 174, "desert": 220,
+             "space": 146, "arcade": 261}
+    notes = (0, 3, 5, 7, 10, 7, 5, 3)
+    root = roots[theme]
+    samples = bytearray()
+    for n in range(count):
+        step = (n // (rate // 4) + (seed % 8)) % len(notes)
+        tone = root * (2 ** (notes[step] / 12))
+        if kind == "collectible":
+            tone = root * 2 + (n // 1100) * 140
+        elif kind == "hazard":
+            tone = max(95, root - 40 - (n // 800) * 9)
+        second = tone * (1.5 if density > 1 else 1)
+        envelope = min(1.0, n / 200.0, (count - n) / 240.0)
+        amplitude = min(0.75, 0.13 + 0.09 * density)
+        phase = 2 * pi * tone * n / rate
+        overtone = sin(2 * pi * second * n / rate) if density > 1 else 0.0
+        signal = sin(phase) * 0.8 + overtone * 0.2
+        value = max(-32768, min(32767, int(32767 * amplitude * envelope * signal)))
+        samples.extend(pack_integer("<h", value))
+    output = BytesIO()
+    with wave.open(output, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        wav.writeframes(samples)
+    return output.getvalue()
+
+
 def render_studio_art(
     world: PlayableWorld, *, target: str, direction: ArtDirection, authorized: bool,
 ) -> StudioArtPack:
@@ -256,6 +340,17 @@ def render_studio_art(
         files[f"sprites/hero_frame_{i:02d}.png"] = png_rgba(_rgba(frame, palette), 8, 8)
     for level in world.levels:
         files[f"previews/level_{level.index:02d}.png"] = _preview(level, tiles, frames[0], palette)
+    if direction.parallax_layers:
+        for layer in range(direction.parallax_layers):
+            files[f"parallax/layer_{layer:02d}.png"] = _environment_overlay(
+                world, palette, direction, layer,
+            )
+    if direction.music_density:
+        for kind in ("ambient", "collectible", "hazard"):
+            files[f"audio/{kind}.wav"] = _synthesized_wav(
+                theme=world.intent.theme, seed=direction.seed,
+                density=direction.music_density, kind=kind,
+            )
 
     descriptors = {
         "schema_version": SCHEMA,
@@ -267,6 +362,12 @@ def render_studio_art(
         "style": direction.style,
         "contrast": direction.contrast,
         "seed": direction.seed,
+        "foliage_density": direction.foliage_density,
+        "shadow_strength": direction.shadow_strength,
+        "parallax_layers": direction.parallax_layers,
+        "music_density": direction.music_density,
+        "native_ambient_audio_integrated": False,
+        "native_parallax_runtime_integrated": False,
         "outline": direction.outline,
         "highlight": direction.highlight,
         "animation_frames": direction.animation_frames,
@@ -279,7 +380,7 @@ def render_studio_art(
             "tile_digest": canonical_digest(list(tiles[i])),
         } for i, name in enumerate(TILE_NAMES)],
         "animation": {
-            "sprite": "hero", "fps": 4,
+            "sprite": "hero", "fps": direction.animation_fps,
             "frames": [f"sprites/hero_frame_{i:02d}.png" for i in range(len(frames))],
             "native_animation_driver_integrated": False,
         },
@@ -302,6 +403,10 @@ def render_studio_art(
         "native_emulator_verified": False,
         "screen_preview_rendered": True,
         "animation_frames_rendered": len(frames),
+        "environment_overlay_layers_rendered": direction.parallax_layers,
+        "original_pcm_cues_generated": 3 if direction.music_density else 0,
+        "native_audio_driver_integrated": False,
+        "native_parallax_driver_integrated": False,
         "native_animation_driver_integrated": False,
         "files": entries,
     }
