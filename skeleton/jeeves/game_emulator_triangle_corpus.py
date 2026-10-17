@@ -1,0 +1,134 @@
+"""Candidate Jeeves training-data views from verified emulator triangle evidence.
+
+Eight grounded lens questions are generated per independently measured native
+episode. These are correlated views of ONE episode, NOT eight extra source
+games or eight independent rewards. The untrusted local LLM review is a gating
+input but never copied into target labels. This does not run transformer SGD.
+"""
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from .game_emulator_triangle import LENSES, verify_training_triangle
+from .game_emulator_triangle_native_reviewer import verify_native_adversarial_review
+from .game_learning import _digest
+
+SCHEMA = "skeleton.jeeves.game_triangle_candidate_corpus.v1"
+MAX_VIEWS = 8192
+
+
+class TriangleCorpusError(ValueError):
+    pass
+
+
+def compile_triangle_candidate_corpus(
+    evidence: dict[str, Any], triangle: dict[str, Any],
+    reviewed: dict[str, Any],
+) -> dict[str, Any]:
+    """Construct data *candidates* for the existing Jeeves corpus governance.
+
+    The real native model's generation must additionally be replayed with
+    the actual local checkpoint by the operator before this is stored.
+    """
+    verify_training_triangle(evidence, triangle)
+    verify_native_adversarial_review(evidence, triangle, reviewed)
+    if reviewed.get("structured_source_bound_passes") != 3:
+        raise TriangleCorpusError(
+            "all three adversarial challenges need validated source references"
+        )
+    lineage = evidence.get("source_lineage")
+    if (type(lineage) is not dict
+            or lineage.get("rights_acknowledged") is not True
+            or type(lineage.get("source_sha256")) is not str
+            or len(lineage["source_sha256"]) != 64
+            or type(lineage.get("rights_review_id")) is not str
+            or len(lineage["rights_review_id"].strip()) < 5):
+        raise TriangleCorpusError("operator-rights-cleared native source required")
+    episodes = triangle["episode_lens_references"]
+    if not 1 <= len(episodes) <= 1024 or len(episodes) * len(LENSES) > MAX_VIEWS:
+        raise TriangleCorpusError("candidate training lens count exceeds bounds")
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for episode in episodes:
+        trace = episode["source_trace_sha256"]
+        if trace in seen:
+            raise TriangleCorpusError("repeated native episode cannot multiply independent examples")
+        seen.add(trace)
+        measured = episode["grounded_lens_evidence"]
+        if set(measured) != set(LENSES):
+            raise TriangleCorpusError("all eight source-measured lenses are required")
+        for lens in LENSES:
+            payload = measured[lens]
+            if type(payload) is not dict:
+                raise TriangleCorpusError("candidate training lens lacks grounded numeric evidence")
+            # Neither original ROM bytes nor separately generated criticism are
+            # embedded in supervised target text. Numeric evidence is bounded.
+            source = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                                ensure_ascii=False, allow_nan=False)
+            if len(source.encode()) > 2000:
+                raise TriangleCorpusError("candidate source lens payload exceeds budget")
+            view_id = _digest([triangle["triangle_digest"], trace, lens])
+            row = {
+                "candidate_id": "game-triangle-" + view_id[:32],
+                "gameplay_trace_sha256": trace,
+                "source_receipt_sha256": episode["source_receipt_sha256"],
+                "verified_native_episode_steps": episode["unique_source_transitions"],
+                "lens": lens,
+                "prompt": (
+                    "Using only native emulator evidence from gameplay trace "
+                    + trace + ", report the measured " + lens.replace("_", " ")
+                    + " perspective. Do not infer a game victory, narrative or "
+                    "an unobserved mechanic. Quote the evidence as source data."
+                ),
+                "answer": (
+                    "Source-verified native emulator measurements for " + lens
+                    + ": " + source
+                    + ". Additional independent gameplay samples from this view: 0."
+                ),
+                "label_origin": "deterministic_native_evidence_projection",
+                "shared_source_group_sha256": trace,
+                "same_source_view_weight": {
+                    "numerator": 1, "denominator": len(LENSES),
+                },
+                "training_split": "candidate_train_only",
+                "not_for_heldout_evaluation": True,
+                "gameplay_success_claimed": False,
+                "training_effect_executed": False,
+            }
+            row["row_digest"] = _digest(row)
+            rows.append(row)
+    result = {
+        "schema_version": SCHEMA,
+        "source_emulator_report_sha256": evidence["report_digest"],
+        "source_training_triangle_sha256": triangle["triangle_digest"],
+        "native_adversarial_review_sha256": reviewed["review_digest"],
+        "source_rom_sha256": lineage["source_sha256"],
+        "operator_rights_review_id": lineage["rights_review_id"],
+        "source_native_episode_count": len(episodes),
+        "unique_independent_native_episodes": len(seen),
+        "total_lens_candidate_views": len(rows),
+        "views_per_original_episode": len(LENSES),
+        "same_source_total_weight_per_episode": 1.0,
+        "additional_independent_gameplay_episodes_from_lenses": 0,
+        "adversarial_generated_text_used_as_training_labels": False,
+        "heldout_native_evaluation_steps_imported": 0,
+        "reviewer_model_output_factually_adjudicated": False,
+        "operator_admission_to_jeeves_corpus_required": True,
+        "production_jeeves_optimizer_steps": 0,
+        "candidate_rows": rows,
+    }
+    result["candidate_corpus_digest"] = _digest(result)
+    return result
+
+
+def verify_triangle_candidate_corpus(
+    evidence: dict[str, Any], triangle: dict[str, Any],
+    reviewed: dict[str, Any], candidate: Any,
+) -> None:
+    if not isinstance(candidate, dict) or candidate.get("candidate_corpus_digest") != _digest({
+        k: v for k, v in candidate.items() if k != "candidate_corpus_digest"
+    }):
+        raise TriangleCorpusError("candidate corpus digest differs")
+    if candidate != compile_triangle_candidate_corpus(evidence, triangle, reviewed):
+        raise TriangleCorpusError("candidate training corpus no longer matches measured source")
