@@ -486,3 +486,39 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 These tests include synthetic FCEUX responses to exercise the assurance contracts. They are **not** evidence of a real FCEUX or PyBoy cartridge victory; real optional runtime tests, first-install verification, sustained endurance and game release gates require execution on an appropriately provisioned machine.
+
+
+## M121–M140: correct native gameplay rules and proof sampled input operation
+
+This pass uncovered a substantive defect in the original generated native game code: the Python game awards **10 points per crystal and 100 points per level goal**, while the earlier GB/GBC and NES assembly awarded one point per crystal and did not add the goal bonus. Any genuinely executed winning ROM would therefore fail the final score parity gate for reasons not related to emulator setup. The old 8-bit native score also overflowed for longer games.
+
+### Exact gameplay correction (M121–M130)
+
+The Game Boy/GBC and NES original world source now uses a two-byte, 16-bit score accumulator, initialized on game boot. Both engines add ten to the score on collectible pickup and 100 after an eligible goal. Carry propagation updates `ScoreHigh` so long multi-level original games can exceed 255 points without rolling over or rejecting valid progress. RGBDS and ld65 source-symbol verifiers require `ScoreHigh` alongside the existing main score and controller state. The native CPU-replay verifiers calculate actual combined score as `Score + 256 * ScoreHigh`.
+
+The GB engine now also commits the incremented `Level` in machine state on the final win, matching its own intermediate level transitions and the NES engine's native terminal convention. Emulator verification deliberately compares this native terminal counter to the zero-based Python final level index **plus one**. These source-code changes are committed, but real assembler execution and final CPU-parity signoff have not happened.
+
+### Intermediate actual CPU state evidence (M131–M138)
+
+`studio_native_replay_telemetry.py` introduces reproducible input-boundary checkpoints. For games up to 128 actions it records every post-input state; longer traces use at most 128 deterministic checkpoints including the first and last actions. Only exact 8-bit emulator-derived state fields are allowed: level, X/Y position, health, score low/high, gems remaining, victory and loss. The verifier fails closed on malformed, missing or reordered checkpoints, unexpected health healing, score decreases, impossible level jumps, early wins or losses, or mismatch to the canonical winning Python ending.
+
+The PyBoy adapter samples the *actual emulated RAM* after submitting directional controller events. The NES FCEUX script writes a bounded ASCII CPU checkpoint log from its actual `memory.readbyte` calls; its verifier validates every expected sample and combines it with the previously required PPU screenshot and final machine-code victory. Positive emulator receipts include a checkpoint digest and observed count, both now mandatory in the campaign gate. They are surfaced in Jeeves' assurance report, Dragon read-only observation projection, ordered execution runner and hash-linked qualification history.
+
+**Important:** These are sampled CPU checks, not frame-by-frame proof of all CPU instructions. A synthetic/mock checkpoint fixture is not evidence of real emulator operation. No physical controller or hardware-audio validation is implied, and no weight training has been authorized.
+
+### Outstanding runtime qualification (M139–M140)
+
+Run true RGBDS/cc65 builds and installed PyBoy/FCEUX against real generated multilevel games whose scores cross 255. Independently validate controller timing, actual machine frames, native sound, first installation and long-running crash/recovery boundaries before any platform is signed off. The source-level test suite now explicitly checks the 16-bit native templates and executes the genuine Python winning replay with a score above 255.
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_native_score_parity.py \
+  tests/test_studio_native_replay_telemetry.py \
+  tests/test_studio_build_qualification.py \
+  tests/test_studio_game_boy_emulator_e2e.py \
+  tests/test_studio_nes_emulator_e2e.py \
+  tests/test_studio_nes_campaign_e2e.py \
+  tests/test_studio_campaign_assurance_e2e.py
+```
+
+All these additions are in source control. Specialized exact-head E2E execution remains pending; no green result for the new source should be inferred from older CI runs.
