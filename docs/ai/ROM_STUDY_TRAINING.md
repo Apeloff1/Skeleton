@@ -406,3 +406,21 @@ Changing the selection or the upstream catalog changes the custody digest
 and creates a different candidate-corpus filename. The original source
 episode still contributes exactly one independent gameplay episode,
 regardless of the 43 semantic questions.
+
+You can inspect the **actual 43 selected lens keys, their families,
+governance grades and questions**, with independent source-receipt
+verification and without loading any language-model checkpoint:
+
+```sh
+python -m scripts.training.rom_study triangle-lenses \
+  --receipt /private/rom-receipts/rom-<source>-<run>.json \
+  --source-sha256 <full-source-sha256> --run-index 0 \
+  --output-dir /private/rom-receipts
+```
+
+Supplying `--output-dir` creates a strict, create-only
+`semantic-lens-set-*.json` manifest of those 43 canonical keys.
+That file can be reused through `--semantic-lens-set` at candidate
+export. Without `--output-dir`, the command is read-only. Selection
+always remains a set of **research questions rather than measured
+video semantics or ground-truth training labels**.

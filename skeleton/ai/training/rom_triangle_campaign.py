@@ -318,3 +318,77 @@ def load_operator_semantic_lens_set(path: Path) -> tuple[str, ...]:
             or len(set(keys)) != SEMANTIC_LENS_BUDGET):
         raise RomStudyError("operator lens-set manifest must name exactly 43 distinct canonical keys")
     return tuple(keys)
+
+
+
+def inspect_native_episode_lenses(
+    rom_receipt: Path, *, source_sha256: str, run_index: int = 0,
+    output_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Inspect and optionally freeze 43 actual canonical Jeeves lens keys.
+
+    Source and triangle are verified independently first. Manifest creation is
+    operator-selected, create-only, and cannot change governance or infer game
+    semantics. A saved lens set may be passed to export-triangle-corpus.
+    """
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+    )
+    verified = verified_rom_receipt(
+        rom_receipt, expected_source_sha256=source_sha256,
+    )
+    original, digest = read_receipt_document(rom_receipt)
+    if verified["receipt_sha256"] != digest:
+        raise RomStudyError("native lens inspection source changed after audit")
+    evidence = original.get("candidate_evidence")
+    triangle = original.get("training_triangle")
+    verify_training_triangle(evidence, triangle)
+    episodes = triangle["episode_lens_references"]
+    if type(run_index) is not int or not 0 <= run_index < len(episodes):
+        raise RomStudyError("episode lens selection index is outside source runs")
+    source = episodes[run_index]
+    route = route_episode_semantic_lenses(
+        source, max_lenses=SEMANTIC_LENS_BUDGET,
+    )
+    keys = [item["lens_key"] for item in route["routes"]]
+    if len(keys) != SEMANTIC_LENS_BUDGET or len(set(keys)) != len(keys):
+        raise RomStudyError("actual canonical Jeeves router did not select 43 unique lenses")
+    result = {
+        "state": "verified_43_canonical_jeeves_lens_questions",
+        "source_sha256": source_sha256,
+        "native_trace_sha256": source["source_trace_sha256"],
+        "canonical_registry": route["canonical_registry"],
+        "canonical_registry_lens_count": route["canonical_catalog_lens_count"],
+        "catalog_sha256": route["canonical_catalog_sha256"],
+        "governance_fingerprint": route["governance_fingerprint"],
+        "router_selection_sha256": route["route_digest"],
+        "selected_lenses": [{
+            "key": item["lens_key"],
+            "family": item["lens_family"],
+            "governance_grade": item["governance_grade"],
+            "question": item["question"],
+            "factual_claims_allowed": False,
+        } for item in route["routes"]],
+        "independent_new_gameplay_episodes_from_semantic_lenses": 0,
+        "semantic_model_inferences_executed": False,
+        "new_jeeves_weight_updates": 0,
+    }
+    if output_dir is not None:
+        target = _private_output(output_dir)
+        manifest = {
+            "schema_version": "skeleton.jeeves.semantic_lens_set.v1",
+            "lens_keys": keys,
+        }
+        name = (
+            "semantic-lens-set-" + source_sha256[:16] + "-"
+            + route["route_digest"][:16] + ".json"
+        )
+        path = target / name
+        if path.exists() or path.is_symlink():
+            saved, _ = read_receipt_document(path, max_bytes=32768)
+            if saved != manifest:
+                raise RomStudyError("prior lens-selection manifest differs")
+        else:
+            _save_new(path, manifest)
+        result["operator_manifest_name"] = name
+    return result

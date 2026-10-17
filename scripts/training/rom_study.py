@@ -21,6 +21,17 @@ from skeleton.ai.training.rom_fleet_audit import audit_fleet_page, audit_fleet_a
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="operation", required=True)
+    lenses = commands.add_parser(
+        "triangle-lenses",
+        help="inspect 43 canonical governed Jeeves lenses selected for a source episode",
+    )
+    lenses.add_argument("--receipt", required=True, type=Path)
+    lenses.add_argument("--source-sha256", required=True)
+    lenses.add_argument("--run-index", type=int, default=0)
+    lenses.add_argument(
+        "--output-dir", type=Path,
+        help="optionally create a pinned 43-lens JSON manifest for future candidate exports",
+    )
     status = commands.add_parser(
         "triangle-status", help="verify a native ROM training triangle without loading model weights"
     )
@@ -116,6 +127,16 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "triangle-lenses":
+            from skeleton.ai.training.rom_triangle_campaign import (
+                inspect_native_episode_lenses,
+            )
+            result = inspect_native_episode_lenses(
+                args.receipt, source_sha256=args.source_sha256,
+                run_index=args.run_index, output_dir=args.output_dir,
+            )
+            print(json.dumps(result, sort_keys=True))
+            return 0
         if args.operation == "export-triangle-corpus":
             from skeleton.ai.model_runtime.offline_chat import load_offline_engine
             from skeleton.ai.training.rom_triangle_campaign import (
