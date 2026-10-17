@@ -4,8 +4,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 import unittest
 
+from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_campaign import CampaignOrder
 from skeleton.ai.game_builder.studio_execution_campaign import (
@@ -77,6 +79,50 @@ class EnduranceProductionHistoryTests(unittest.TestCase):
         self.assertEqual(latest["recorded_runs"], 2)
         self.assertTrue(latest["latest_still_matches_current_source"])
         self.assertEqual(latest["runs_without_recorded_blockers"], 1)
+
+    def test_operator_history_keeps_first_bounded_native_cpu_failure_diagnostic(self):
+        # This is an explicitly synthetic failed emulator boundary, not a
+        # claimed execution of PyBoy or FCEUX on a compiled cartridge.
+        mismatch = {
+            "category": "cpu_state_diverged", "first_sample_index": 0,
+            "action": 1, "changed_fields": ["PlayerX"],
+            "expected": {"PlayerX": 2}, "observed": {"PlayerX": 3},
+        }
+        with patch(
+            "skeleton.ai.game_builder.studio_execution_campaign.qualify_campaign_emulator",
+            return_value={
+                "machine_code_victory": False,
+                "blocker": "native_cpu_checkpoint_state_mismatch",
+                "first_cpu_divergence": mismatch,
+            },
+        ):
+            run = run_studio_execution_campaign(
+                self.order, self.campaign,
+                policy=ExecutionPolicy(stages=("source", "emulator")),
+                authorized=True, execute=True,
+            )
+        self.assertEqual(run["blocked_stage_attempts"], 2)
+        recorded = record_execution_run(
+            self.order, self.campaign, run, authorized=True,
+        )
+        self.assertEqual(recorded["native_cpu_divergence_count"], 2)
+        self.assertEqual(recorded["first_native_cpu_divergence"]["first_action"], 1)
+        self.assertEqual(recorded["first_native_cpu_divergence"]["changed_fields"], ["PlayerX"])
+        self.assertEqual(
+            inspect_execution_history(self.order, self.campaign, authorized=True)
+            ["recorded_cpu_divergence_events"], 2,
+        )
+        forged = dict(run)
+        forged["events"] = [*run["events"], dict(run["events"][-1])]
+        forged["total_stage_attempts"] += 1
+        forged["blocked_stage_attempts"] += 1
+        forged["run_digest"] = canonical_digest({
+            key: value for key, value in forged.items() if key != "run_digest"
+        })
+        with self.assertRaises(StudioQualificationHistoryError):
+            record_execution_run(
+                self.order, self.campaign, forged, authorized=True,
+            )
 
     def test_hash_chain_rejects_modified_events_and_unauthorized_appends(self):
         attempt = self.source_attempt(limit=2)
