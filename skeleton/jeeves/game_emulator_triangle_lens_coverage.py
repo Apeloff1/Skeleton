@@ -12,7 +12,8 @@ from typing import Any
 
 from .game_emulator_triangle import verify_training_triangle
 from .game_emulator_triangle_semantics import (
-    SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+    SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+    route_episode_semantic_lenses,
 )
 from .game_learning import _digest
 
@@ -28,14 +29,17 @@ def audit_43_lens_coverage(
     evidence: dict[str, Any], triangle: dict[str, Any], *,
     start_episode: int = 0, limit: int = 8,
     requested_keys: Sequence[str] = (),
+    lens_budget: int = SEMANTIC_LENS_BUDGET,
 ) -> dict[str, Any]:
     """Route EXACTLY 43 governed questions for each admitted native episode."""
     verify_training_triangle(evidence, triangle)
     episodes = triangle["episode_lens_references"]
-    if (type(start_episode) is not int or not 0 <= start_episode < len(episodes)
+    if (type(lens_budget) is not int
+            or lens_budget not in (SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET)
+            or type(start_episode) is not int or not 0 <= start_episode < len(episodes)
             or type(limit) is not int or not 1 <= limit <= MAX_EPISODES_PER_PAGE
             or type(requested_keys) not in (tuple, list)
-            or len(requested_keys) not in (0, SEMANTIC_LENS_BUDGET)
+            or len(requested_keys) not in (0, lens_budget)
             or any(type(key) is not str or not key
                    or key != key.strip().casefold() for key in requested_keys)
             or len(set(requested_keys)) != len(requested_keys)):
@@ -46,13 +50,13 @@ def audit_43_lens_coverage(
     catalogue = None
     for i, episode in enumerate(selected, start_episode):
         route = route_episode_semantic_lenses(
-            episode, max_lenses=SEMANTIC_LENS_BUDGET,
+            episode, max_lenses=lens_budget,
             requested_keys=requested_keys,
         )
         lenses = route["routes"]
-        if (route["actually_routed_lenses"] != SEMANTIC_LENS_BUDGET
-                or len(lenses) != SEMANTIC_LENS_BUDGET
-                or len({x["lens_key"] for x in lenses}) != SEMANTIC_LENS_BUDGET
+        if (route["actually_routed_lenses"] != lens_budget
+                or len(lenses) != lens_budget
+                or len({x["lens_key"] for x in lenses}) != lens_budget
                 or route["source_native_trace_sha256"] != episode["source_trace_sha256"]
                 or route["source_native_receipt_sha256"] != episode["source_receipt_sha256"]
                 or route["factual_assertions_authorized"] is not False
@@ -109,7 +113,7 @@ def audit_43_lens_coverage(
             entry["native_observation_cue_links"] += len(
                 row["native_observation_cue_provenance"]
             )
-        if len(supported) + len(hypothesis_only) != SEMANTIC_LENS_BUDGET:
+        if len(supported) + len(hypothesis_only) != lens_budget:
             raise TriangleCoverageError("lens coverage count differs")
         visual = episode["companion_viewing"]["native_rgb24_frames_optically_inspected"]
         counter = episode["ai_playing"]["counterfactual_native_probes"]
@@ -128,7 +132,7 @@ def audit_43_lens_coverage(
             "source_receipt_sha256": episode["source_receipt_sha256"],
             "canonical_route_sha256": route["route_digest"],
             "governance_sha256": route["governance_fingerprint"],
-            "routed_lens_count": SEMANTIC_LENS_BUDGET,
+            "routed_lens_count": lens_budget,
             "cue_supported_lens_keys": supported,
             "hypothesis_only_lens_keys": hypothesis_only,
             "native_rgb24_optical_frames": visual,
@@ -164,6 +168,9 @@ def audit_43_lens_coverage(
         "operator_review_required_for_research": True,
         "production_jeeves_weight_updates": 0,
     }
+    if lens_budget != SEMANTIC_LENS_BUDGET:
+        report["schema_version"] = "skeleton.jeeves.game_triangle_200_lens_coverage.v1"
+        report["lens_budget"] = lens_budget
     report["audit_digest"] = _digest(report)
     return report
 
@@ -179,6 +186,7 @@ def verify_43_lens_coverage(
         evidence, triangle, start_episode=saved.get("start_episode"),
         limit=saved.get("requested_limit"),
         requested_keys=saved.get("operator_pinned_lens_keys"),
+        lens_budget=saved.get("lens_budget", SEMANTIC_LENS_BUDGET),
     )
     if saved != rebuilt:
         raise TriangleCoverageError("43-lens coverage is not reproducible against actual native evidence")

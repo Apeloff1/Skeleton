@@ -29,6 +29,7 @@ def parser() -> argparse.ArgumentParser:
     coverage.add_argument("--source-sha256", required=True)
     coverage.add_argument("--start-episode", type=int, default=0)
     coverage.add_argument("--limit", type=int, default=8)
+    coverage.add_argument("--lens-count", type=int, choices=(43, 200), default=43)
     coverage.add_argument("--semantic-lens-set", type=Path)
     lenses = commands.add_parser(
         "triangle-lenses",
@@ -211,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
                 document["candidate_evidence"], document["training_triangle"],
                 start_episode=args.start_episode, limit=args.limit,
                 requested_keys=pinned,
+                lens_budget=args.lens_count,
             )
             verify_43_lens_coverage(
                 document["candidate_evidence"], document["training_triangle"], report,
