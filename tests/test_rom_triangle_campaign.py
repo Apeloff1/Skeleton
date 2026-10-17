@@ -659,3 +659,36 @@ def test_cli_repeats_one_semantic_receipt_per_native_episode():
     ])
     assert len(args.semantic_review_receipt) == 2
     assert args.semantic_review_receipt[1].name == "semantic-episode-1.json"
+
+
+def test_200_semantic_questions_are_corpus_metadata_not_1600_supervised_samples(monkeypatch):
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+
+    def two_hundred_route(episode, *, max_lenses=43, requested_keys=()):
+        assert max_lenses == 200
+        assert not requested_keys
+        base = _fake_semantic_route(episode)
+        item = base["routes"][0]
+        base["routes"] = [
+            {**item, "lens_key": "author_canonical_" + str(i)}
+            for i in range(200)
+        ]
+        base["actually_routed_lenses"] = 200
+        return base
+
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", two_hundred_route)
+    source, triangle, review = _synthetic_corpus_inputs()
+    candidate = corpus.compile_triangle_candidate_corpus(
+        source, triangle, review, semantic_lens_budget=200,
+    )
+    assert candidate["canonical_semantic_lens_selection_budget"] == 200
+    assert candidate["routed_semantic_lens_questions"] == 200
+    assert len(candidate["semantic_routes_per_episode"][0]["semantic_questions"]) == 200
+    assert candidate["total_lens_candidate_views"] == 8
+    assert candidate["unique_independent_native_episodes"] == 1
+    assert candidate["additional_independent_gameplay_episodes_from_lenses"] == 0
+    assert candidate["semantic_questions_are_not_supervised_labels"] is True
+    assert candidate["production_jeeves_optimizer_steps"] == 0
+    corpus.verify_triangle_candidate_corpus(source, triangle, review, candidate)

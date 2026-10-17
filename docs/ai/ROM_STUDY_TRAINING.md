@@ -629,3 +629,55 @@ configured extended 200-lens budget when the installed canonical registry
 and corresponding model receipts support it. As before, the measured
 eight-lens Q-training evidence is not multiplied and none of the language
 model hypotheses are promoted to supervised truth labels.
+
+### Full 200-lens canonical Jeeves training triangle
+
+The original 43-lens mode is retained for existing replay receipts. The
+extended mode now routes **200 distinct definitions from the existing
+MaximalSemanticRegistry**, including authored base, frontier, deep, rare,
+research, plane and depth catalogs, under the same scientific governance. The
+source registry contains more than 200 definitions; this is a **200-lens
+per-episode execution budget**, not a claim that exactly 200 lenses exist in
+the entire application. A lens that lacks positive native cue support is an
+unverified question, *not* an observed game feature.
+
+Inspect and pin one episode's full selection with:
+
+```bash
+python -m scripts.training.rom_study triangle-lenses \
+  --receipt /private/rom-receipts/rom-source-run.json \
+  --source-sha256 <64-character-source-hash> \
+  --lens-count 200 --output-dir /private/rom-receipts
+```
+
+Audit the coverage of all 200 *routed questions* across up to 16 native
+episodes per page using `triangle-lens-audit --lens-count 200`.
+Each lens retains original catalog and scientific-governance identity,
+positive cue provenance, measurable coverage and missing-evidence status.
+
+Execute **200 actual local transformer generations** for an audited episode:
+
+```bash
+python -m scripts.training.rom_study execute-200-lenses \
+  --receipt /private/rom-receipts/rom-source-run.json \
+  --review-receipt /private/rom-receipts/triangle-review-source.json \
+  --source-sha256 <64-character-source-hash> \
+  --critic-checkpoint /private/models/critic.json \
+  --semantic-checkpoint /private/models/jeeves-semantic.json \
+  --output-dir /private/rom-receipts
+```
+
+The checkpoint must actually be installed. The first pass records 200
+model-generated hypotheses linked to exact native traces and questions; a
+repeat must reproduce all 200 stored generations. Critic review itself is
+replayed before semantic model execution. Invalid or unsupported hypotheses
+remain unverified and block supervised corpus admission.
+
+Run the longer foreground campaign with
+`train-triangle --semantic-checkpoint ... --semantic-lens-count 200
+--semantic-all-runs`, or use
+`export-triangle-corpus --semantic-lens-count 200` after a recorded and
+replayed 200-lens review. The original eight measured gameplay lenses remain
+the only eight numeric training-view rows per episode. All 200 semantic
+lenses are interpretive **questions**, not 200 independent games or newly
+measured target labels. Model promotions remain separately gated.
