@@ -157,8 +157,8 @@ def inspect_native_source_media(project: str | Path, *, target: str) -> dict:
             raise NativeMediaSourceError("native original sound-cue handler missing")
         segment = source.split(label + ":\n", 1)[1].split(ending + ":\n", 1)[0]
         if nes:
-            expected = (f"lda #${programmed['events_low'][index]:02X}\n    sta $4006",
-                        f"lda #${programmed['events_high'][index]:02X}\n    ora #$10\n    sta $4007")
+            expected = (f"lda #{programmed['events_low'][index]}\n    sta $4006",
+                        f"lda #{programmed['events_high'][index]}\n    ora #$10\n    sta $4007")
         else:
             expected = (f"ld a, {programmed['events_low'][index]}\n    ldh [rNR23], a",
                         f"ld a, {programmed['events_high'][index]}\n    or $80\n    ldh [rNR24], a")
@@ -168,7 +168,7 @@ def inspect_native_source_media(project: str | Path, *, target: str) -> dict:
     body = {
         "schema": SCHEMA, "target": target, "world_digest": world,
         "source_assembly_sha256": sha256(source_bytes).hexdigest(),
-        "source_pixel_parity_digest": parity.get("evidence_digest"),
+        "source_pixel_parity_digest": parity["receipt_digest"],
         "original_base_tiles_sha256": sha256(original).hexdigest(),
         "original_hero_frames_sha256": sha256(animated).hexdigest(),
         "original_hero_frame_count": len(frames),
