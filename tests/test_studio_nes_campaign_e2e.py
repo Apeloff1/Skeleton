@@ -38,9 +38,12 @@ NES_LABELS = (
 ).encode("ascii")
 
 
-def ines_rom():
-    return b"NES\x1a" + bytes([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) + bytes(24576)
-
+def ines_rom(tiles: bytes):
+    assert len(tiles) == 96
+    return (
+        b"NES\x1a" + bytes([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        + bytes(16384) + tiles + bytes(8192 - len(tiles))
+    )
 
 class OriginalNESCampaignGatesTests(unittest.TestCase):
     def setUp(self):
@@ -62,7 +65,8 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
         run_campaign(self.order, self.campaign, authorized=True)
 
     def compile_fixture(self):
-        rom = ines_rom()
+        original = (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes()
+        rom = ines_rom(original)
         def assembler(project, target, *, authorized, execute, output,
                       output_symbols, timeout_seconds):
             self.assertEqual(target, "nintendo_famicom")
@@ -145,7 +149,9 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
         )
         del html
         failure = nes_receipt(
-            sha256(ines_rom()).hexdigest(), sha256(NES_LABELS).hexdigest(),
+            sha256(ines_rom(
+                (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes()
+            )).hexdigest(), sha256(NES_LABELS).hexdigest(),
             world, sha256(proof).hexdigest(), available=False,
             blocker="fceux_not_installed",
         )
