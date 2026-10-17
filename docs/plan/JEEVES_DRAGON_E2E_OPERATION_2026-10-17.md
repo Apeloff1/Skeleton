@@ -427,3 +427,62 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 Synthetic/mocked native-emulator tests validate error paths and receipt contracts only; they do not qualify a real cartridge. An operator must install and execute real RGBDS, PyBoy and downstream runtimes on the generated original game before checking off runtime, completion or publishing criteria.
+
+
+## M101–M120: actual NES CPU/PPU path and durable production history
+
+### Native NES qualification (M101–M115)
+
+The existing NROM engine now exports the actual zero-page `Level`, `PlayerX`, `PlayerY`, `Health`, `Score`, `GemsRemaining`, `GameWon`, and `GameLost` labels. Its ca65/ld65 build produces `game.sym` using the linker `-Ln` format, and the native adapter requires the symbol file beside `qualified.rom`. The qualification path refuses duplicate, out-of-range or missing CPU state addresses, and binds the ROM and linker symbols to the source target via SHA-256.
+
+`studio_nes_emulator.py` is an operator-approved FCEUX 6502/PPU adapter, not a synthetic CPU emulator. It constructs a fixed Lua script from the *actual original-game canonical winning trace*, boots a private qualified ROM, delivers D-pad press/release events through FCEUX joypad APIs, advances real emulator frames, reads CPU zero-page memory via `memory.readbyte`, and records an emulated PPU image via `gui.gdscreenshot(true)`. A successful report requires the actual compiled ROM to finish with the original expected level, position, health, score, zero remaining collectibles, GameWon=1 and GameLost=0 **and** include a genuine emulator-produced framebuffer receipt. A missing/incompatible FCEUX runtime leaves the stage blocked, never passed. Some FCEUX builds are not fully headless; operators may need a controlled local display environment. These are not physical controllers, GPU quality certification or hardware audio measurements.
+
+`studio_nes_chr_parity.py` adds a separate independent compile-to-asset integrity guarantee: extract the first six indexed 2bpp tiles from the **actual iNES CHR ROM bank** and compare them byte-for-byte to the source-generated NES `assets/tiles/runtime.bin`. A cartridge whose CHR bytes do not match the studio artwork does not qualify even with a valid iNES header. The operator qualification workflow rejects the bad binary and reclaims the newly published unqualified ROM/symbol pair. Future inspection rechecks the compiled-asset parity after publication.
+
+The source-bound production assurance now accepts GB/GBC PyBoy or NES FCEUX CPU-gameplay receipts for the **emulated** playthrough/controller gates, never treating those receipts as physical console verification. Dragon can observe digest-linked native CPU input and machine-code victory evidence. The ordered full-studio E2E runner now attempts the NES emulator stage rather than declaring the platform unsupported.
+
+### Production history and long-duration qualification (M116–M120)
+
+`studio_execution_history.py` adds an atomic, bounded, append-only qualification attempt journal. Entries are created only after the full production report is revalidated **under the campaign OS lock**; each contains the exact current assurance digest, linked previous entry digest, run identity and counts of blocked, verified or unsupported stages. A previous run becomes visibly stale when a new game source, ROM or runtime receipt changes the canonical report. Edited history is rejected. There is no false assertion that a successful source-only pass is a verified game release.
+
+The normal `studio_execution_campaign_cli` now stores an E2E journal entry after each operator-authorized synchronous run. The same CLI supports `--inspect-history` for a read-only recheck. This is useful groundwork for days-to-months production, but a six-month/year endurance qualification, actual fault/reboot testing, GPU/audio/device checks and checkpoint model learning remain **unverified or unimplemented**.
+
+### Operator execution
+
+```bash
+# Compile exact original NES source and its ld65 labels:
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --target nintendo_famicom --execute-build --authorize-local-operation
+
+# Run actual 6502 FCEUX CPU/PPU, Lua D-pad replay and memory observation
+# only when a compatible local FCEUX build is installed and authorized:
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --emulator-target nintendo_famicom --execute-build \
+  --authorize-local-operation --timeout-seconds 90
+
+# Run a full explicit, receipt-backed original game production pass:
+python -m skeleton.ai.game_builder.studio_execution_campaign_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --stages source,rom,emulator,browser,godot \
+  --authorize-local-operation --execute-run
+
+# Read exact, chain-linked E2E history; this does not start a game:
+python -m skeleton.ai.game_builder.studio_execution_campaign_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --inspect-history --authorize-local-operation
+```
+
+### Focused regression suites
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_build_qualification.py \
+  tests/test_studio_nes_emulator_e2e.py \
+  tests/test_studio_nes_campaign_e2e.py \
+  tests/test_studio_execution_campaign_e2e.py \
+  tests/test_studio_execution_history_e2e.py
+```
+
+These tests include synthetic FCEUX responses to exercise the assurance contracts. They are **not** evidence of a real FCEUX or PyBoy cartridge victory; real optional runtime tests, first-install verification, sustained endurance and game release gates require execution on an appropriately provisioned machine.
