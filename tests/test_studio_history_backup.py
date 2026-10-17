@@ -1,8 +1,6 @@
 """Offline qualification backup checks with synthetic game-run receipts only."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from skeleton.ai.game_builder.studio_campaign_lock import campaign_lock
