@@ -17,6 +17,7 @@ from io import StringIO
 from pathlib import Path
 
 from skeleton.jeeves.game_learning import _digest
+from skeleton.jeeves.agent.lens_system import LensCatalog
 from skeleton.jeeves.game_emulator_training_lab import SCHEMA as TRAINING_SCHEMA
 from skeleton.jeeves.game_emulator_lens_review import (
     EmulatorLensReviewError,
@@ -65,7 +66,10 @@ class AllLensReviewContract(unittest.TestCase):
         report = _synthetic_report()
         first = review_verified_training_report(report)
         self.assertGreaterEqual(first["catalog_lens_count"], 200)
+        self.assertEqual(first["catalog_lens_count"],
+                         len(complete_lens_registry().all()) + len(LensCatalog().all()))
         expected = {spec.key for spec in complete_lens_registry().all()}
+        expected |= {"routing/" + spec.lens_id for spec in LensCatalog().all()}
         seen = set()
         page = first
         while True:
