@@ -5,7 +5,6 @@ DOM/Canvas is an instrumented fixture, not a graphical browser or hardware.
 """
 from __future__ import annotations
 
-from dataclasses import replace
 from hashlib import sha256
 import json
 from pathlib import Path
