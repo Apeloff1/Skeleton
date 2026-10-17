@@ -20,6 +20,7 @@ from .studio_campaign import (
     _atomic_json, _inspect_campaign_unlocked, _load_json, _verify_target,
 )
 from .studio_campaign_lock import campaign_lock
+from .studio_runtime_qualification import _inputs as _browser_inputs, qualify_browser_gameplay
 
 SCHEMA = "skeleton.game_builder.production_assurance.v1"
 QUALIFICATION_SCHEMA = "skeleton.game_builder.campaign_rom_evidence.v1"
@@ -33,6 +34,7 @@ GATES = (
     "exact_source_attestation",
     "native_rom_compiled",
     "cartridge_structure_checked",
+    "browser_javascript_playthrough_executed",
     "emulator_playthrough_executed",
     "controller_response_verified",
     "visual_and_audio_runtime_qualified",
@@ -42,6 +44,7 @@ GATES = (
     "release_signoff",
 )
 SOURCE_GATES = frozenset(GATES[:7])
+BROWSER_GATE = "browser_javascript_playthrough_executed"
 NATIVE_GATES = frozenset(GATES[7:9])
 
 
@@ -176,6 +179,92 @@ def qualify_campaign_target(
         }
 
 
+def _browser_receipt(root: Path, target: str, source_identity: str) -> dict | None:
+    folder = root / "qualifications" / target
+    record_path = folder / "browser_qualification.json"
+    if not record_path.exists():
+        return None
+    if record_path.is_symlink() or folder.is_symlink():
+        raise StudioAssuranceError("browser qualification contains a source symlink")
+    record = _load_json(record_path)
+    if (record.get("schema") != "skeleton.game_builder.campaign_browser_evidence.v1"
+            or record.get("target") != target
+            or record.get("source_identity") != source_identity):
+        raise StudioAssuranceError("browser runtime proof belongs to another campaign")
+    if canonical_digest({k: v for k, v in record.items()
+                         if k != "evidence_digest"}) != record.get("evidence_digest"):
+        raise StudioAssuranceError("browser evidence hash does not match")
+    proof = record.get("runtime")
+    if (type(proof) is not dict or proof.get("winning_replay_verified") is not True
+            or proof.get("javascript_executed") is not True
+            or proof.get("release_ready") is not False):
+        raise StudioAssuranceError("browser runtime gate lacks executed winning proof")
+    if canonical_digest({k: v for k, v in proof.items()
+                         if k != "receipt_digest"}) != proof.get("receipt_digest"):
+        raise StudioAssuranceError("browser execution receipt is corrupt")
+    try:
+        html, gameplay, world = _browser_inputs(root / "targets" / target / "engines")
+    except (OSError, ValueError) as exc:
+        raise StudioAssuranceError("qualified browser source is missing or changed") from exc
+    if (proof.get("world_digest") != world
+            or proof.get("html_sha256") != sha256(html).hexdigest()
+            or proof.get("proof_sha256") != sha256(gameplay).hexdigest()):
+        raise StudioAssuranceError("JS gameplay evidence bound to an old source revision")
+    return record
+
+
+def qualify_campaign_browser(
+    order: CampaignOrder, root: str | Path, target: str, *,
+    authorized: bool, execute: bool, timeout_seconds: int = 30,
+) -> dict:
+    """Run the exact generated JS gameplay trace, never simulate a real browser."""
+    if authorized is not True:
+        raise PermissionError("JS gameplay execution requires an operator decision")
+    if execute is not True:
+        raise StudioAssuranceError("actual JS execution needs explicit opt-in")
+    if not isinstance(order, CampaignOrder) or target not in order.targets:
+        raise StudioAssuranceError("original production target not in campaign")
+    base = Path(root)
+    with campaign_lock(base):
+        campaign = _inspect_campaign_unlocked(order, base)
+        if target not in campaign["completed_targets"]:
+            raise StudioAssuranceError("source must exist before JS execution")
+        earlier = _browser_receipt(base, target, campaign["identity"])
+        if earlier is not None:
+            return {"target": target, "already_qualified": True,
+                    "javascript_gameplay_executed": True,
+                    "evidence_digest": earlier["evidence_digest"]}
+        result = qualify_browser_gameplay(
+            base / "targets" / target / "engines",
+            authorized=True, execute=True, timeout_seconds=timeout_seconds,
+        )
+        evidence = result.as_receipt()
+        if not result.winning_replay_verified:
+            return {"target": target, "javascript_gameplay_executed": False,
+                    "failure": result.failure, "node_available": result.node_available,
+                    "graphical_browser_pixels_verified": False}
+        folder = base / "qualifications" / target
+        if folder.is_symlink():
+            raise StudioAssuranceError("qualification directory cannot be a symlink")
+        folder.mkdir(parents=True, exist_ok=True)
+        body = {
+            "schema": "skeleton.game_builder.campaign_browser_evidence.v1",
+            "source_identity": campaign["identity"],
+            "target": target,
+            "runtime": evidence,
+            "actual_graphical_browser_execution": False,
+            "native_godot_execution": False,
+            "release_authorized": False,
+        }
+        record = {**body, "evidence_digest": canonical_digest(body)}
+        _atomic_json(folder / "browser_qualification.json", record)
+        _browser_receipt(base, target, campaign["identity"])
+        return {"target": target, "already_qualified": False,
+                "javascript_gameplay_executed": True,
+                "evidence_digest": record["evidence_digest"],
+                "graphical_browser_pixels_verified": False}
+
+
 def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict:
     """Recheck real on-disk campaign artifacts and exact qualified binaries.
 
@@ -197,14 +286,19 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                     source, order.project_id, target, campaign["identity"],
                 )
             binary = None
-            if source_receipt is not None and target in _BUILD_ADAPTERS:
-                binary = _qualification_receipt(base, target, campaign["identity"])
+            browser = None
+            if source_receipt is not None:
+                if target in _BUILD_ADAPTERS:
+                    binary = _qualification_receipt(base, target, campaign["identity"])
+                browser = _browser_receipt(base, target, campaign["identity"])
             gates = {}
             for gate in GATES:
                 if gate in SOURCE_GATES and source_receipt is not None:
                     status, reason = "artifact_integrity_checked", None
                 elif gate in NATIVE_GATES and binary is not None:
                     status, reason = "binary_structure_checked", None
+                elif gate == BROWSER_GATE and browser is not None:
+                    status, reason = "javascript_gameplay_executed", None
                 elif gate in NATIVE_GATES and target not in _BUILD_ADAPTERS:
                     status, reason = "adapter_unavailable", "approved_native_toolchain_missing"
                 else:
@@ -213,7 +307,7 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                         else "independent_runtime_or_approval_evidence_required"
                     )
                 gates[gate] = {"status": status, "blocker": reason}
-                if status in {"artifact_integrity_checked", "binary_structure_checked"}:
+                if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed"}:
                     passed += 1
             by_target.append({
                 "target": target,
@@ -222,6 +316,9 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                 ),
                 "native_binary_evidence_digest": (
                     binary["evidence_digest"] if binary else None
+                ),
+                "browser_javascript_evidence_digest": (
+                    browser["evidence_digest"] if browser else None
                 ),
                 "gates": gates,
                 "release_ready": False,
@@ -237,6 +334,9 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
             "native_roms_structurally_verified": sum(
                 row["native_binary_evidence_digest"] is not None for row in by_target
             ),
+            "browser_javascript_playthroughs_verified": sum(
+                row["browser_javascript_evidence_digest"] is not None for row in by_target
+            ),
             "checked_gates": passed,
             "total_gates": count,
             "evidence_gate_coverage_percent": round(100 * passed / count, 2),
@@ -251,5 +351,6 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
 
 __all__ = [
     "StudioAssuranceError", "GATES", "qualify_campaign_target",
+    "qualify_campaign_browser",
     "inspect_production_assurance",
 ]
