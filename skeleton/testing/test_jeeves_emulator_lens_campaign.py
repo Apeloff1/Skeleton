@@ -37,6 +37,30 @@ class LensCampaignContract(unittest.TestCase):
         self.assertFalse(audit["independent_native_replay_verified"])
         self.assertEqual(audit, audit_lens_campaign(copy.deepcopy(pages)))
 
+    def test_source_reconstruction_rejects_rehashed_synthetic_review_claims(self):
+        report = _synthetic_report()
+        pages = _pages()
+        verified = audit_lens_campaign(pages, source_report=report)
+        self.assertTrue(verified["all_review_pages_reconstructed_from_source"])
+        self.assertFalse(verified["independent_native_replay_verified"])
+        forged = copy.deepcopy(pages)
+        forged[0]["reviews"][0]["jeeves_playback"]["task"] = "invented result"
+        from skeleton.jeeves.game_learning import _digest
+        forged[0]["review_digest"] = _digest({
+            key: value for key, value in forged[0].items()
+            if key != "review_digest"
+        })
+        # Self-consistent rehashing is not source authenticity.
+        with self.assertRaises(LensCampaignError):
+            audit_lens_campaign(forged, source_report=report)
+        forged[0]["source_report_digest"] = "a" * 64
+        forged[0]["review_digest"] = _digest({
+            key: value for key, value in forged[0].items()
+            if key != "review_digest"
+        })
+        with self.assertRaises(LensCampaignError):
+            audit_lens_campaign(forged, source_report=report)
+
     def test_missing_reordered_or_duplicate_page_rejected(self):
         pages = _pages()
         for bad in (pages[:-1], pages[1:], pages[:1] + pages[:1] + pages[1:],
