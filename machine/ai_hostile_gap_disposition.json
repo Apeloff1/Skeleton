@@ -1187,7 +1187,7 @@
     {
       "id": "G125",
       "severity": "P1",
-      "title": "production behavior→feedback→training loops can amplify popularity rather than correctness",
+      "title": "production behavior\u2192feedback\u2192training loops can amplify popularity rather than correctness",
       "status": "open",
       "implementation_refs": [],
       "evidence_refs": [],
