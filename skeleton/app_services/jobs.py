@@ -14,7 +14,7 @@ import time
 import uuid
 from typing import Any, Callable, Mapping, Optional, Sequence
 
-from skeleton.app_services.db import Database
+from skeleton.persistence.app_foundation.db import Database
 from skeleton.app_services.events import (
     JobEventPublisher,
     NullJobEventPublisher,

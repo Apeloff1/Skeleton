@@ -36,6 +36,7 @@ class Project:
     created_at: float
     updated_at: float
     settings: Mapping[str, Any] = field(default_factory=dict)
+    brief: str = ""
 
 
 @dataclass(frozen=True)
@@ -111,7 +112,7 @@ class SessionRepository(Protocol):
 @runtime_checkable
 class ProjectRepository(Protocol):
     def create_project(self, owner_id: str, name: str,
-                       settings: Optional[Mapping[str, Any]] = None) -> Project: ...
+                       settings: Optional[Mapping[str, Any]] = None, brief: str = "") -> Project: ...
     def get_project(self, project_id: str) -> Optional[Project]: ...
     def list_projects(self, owner_id: str) -> list[Project]: ...
     def update_settings(self, project_id: str, settings: Mapping[str, Any]) -> Project: ...

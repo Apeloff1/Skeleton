@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from skeleton.app_services.db import Database
+from skeleton.persistence.app_foundation.db import Database
 from skeleton.app_services.ports import Asset
 
 DEFAULT_MAX_BYTES = 256 * 1024 * 1024
