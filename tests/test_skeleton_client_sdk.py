@@ -1,0 +1,363 @@
+"""Tests for the app-foundation client SDK (auth, agents, builds, streaming)."""
+
+from __future__ import annotations
+
+import json
+import re
+
+import httpx
+import pytest
+
+from skeleton.client import (
+    AgentsClient,
+    AuthClient,
+    BuildsClient,
+    CancelToken,
+    GatewayClient,
+    RetryPolicy,
+    SkeletonCancelledError,
+    SkeletonClientError,
+    SkeletonHTTPError,
+    StreamEvent,
+)
+from skeleton.client import agents as agents_mod
+from skeleton.client import auth as auth_mod
+from skeleton.client import builds as builds_mod
+from skeleton.client.streaming import parse_ndjson_lines, parse_sse_lines
+
+
+def _gw(handler, *, sleeps=None, retry=None, headers=None):
+    sleeps = sleeps if sleeps is not None else []
+    return GatewayClient(
+        "http://test",
+        client=httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler), headers=headers or {}),
+        retry=retry or RetryPolicy(max_attempts=3, base_delay_seconds=0.1, max_delay_seconds=1.0),
+        sleep=sleeps.append,
+    )
+
+
+# --- backoff / Retry-After / cancellation -----------------------------------
+
+def test_backoff_sleeps_between_idempotent_retries():
+    hits = []
+    sleeps: list[float] = []
+
+    def handler(req):
+        hits.append(1)
+        return httpx.Response(503 if len(hits) < 3 else 200, json={"ok": True})
+
+    assert _gw(handler, sleeps=sleeps).health() == {"ok": True}
+    assert len(hits) == 3
+    assert sleeps == [pytest.approx(0.1), pytest.approx(0.2)]
+
+
+def test_non_idempotent_never_sleeps_or_retries():
+    sleeps: list[float] = []
+    gw = _gw(lambda r: httpx.Response(503, json={}), sleeps=sleeps)
+    with pytest.raises(SkeletonHTTPError):
+        AgentsClient(gw).register(["code"])
+    assert sleeps == []
+
+
+def test_retry_after_header_honoured_and_bounded():
+    hits = []
+    sleeps: list[float] = []
+
+    def handler(req):
+        hits.append(1)
+        if len(hits) == 1:
+            return httpx.Response(429, headers={"Retry-After": "0.5"})
+        if len(hits) == 2:
+            return httpx.Response(429, headers={"Retry-After": "120"})
+        return httpx.Response(200, json={})
+
+    _gw(handler, sleeps=sleeps).health()
+    assert sleeps == [pytest.approx(0.5), pytest.approx(1.0)]
+
+
+def test_retry_exhaustion_raises_last_error():
+    sleeps: list[float] = []
+    with pytest.raises(SkeletonHTTPError) as info:
+        _gw(lambda r: httpx.Response(502), sleeps=sleeps).health()
+    assert info.value.status_code == 502
+    assert len(sleeps) == 2
+
+
+def test_cancel_before_attempt():
+    tok = CancelToken()
+    tok.cancel("stop")
+    gw = _gw(lambda r: pytest.fail("should not send"))
+    with pytest.raises(SkeletonCancelledError, match="stop"):
+        AgentsClient(gw).get_task("t1", cancel=tok)
+    assert issubclass(SkeletonCancelledError, SkeletonClientError)
+
+
+def test_cancel_during_retry_sleep():
+    tok = CancelToken()
+    hits = []
+
+    def handler(req):
+        hits.append(1)
+        return httpx.Response(503)
+
+    gw = GatewayClient(
+        "http://test",
+        client=httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler)),
+        sleep=lambda d: tok.cancel(),
+    )
+    with pytest.raises(SkeletonCancelledError):
+        AgentsClient(gw).get_task("t1", cancel=tok)
+    assert len(hits) == 1
+
+
+def test_cancel_token_real_clock_wait_is_interruptible():
+    tok = CancelToken()
+    tok.cancel()
+    assert tok.wait(5) is True and tok.cancelled
+
+
+# --- auth ---------------------------------------------------------------------
+
+def test_auth_client_paths_and_callback_not_retried():
+    seen = []
+    sleeps: list[float] = []
+
+    def handler(req):
+        seen.append((req.method, req.url.path, dict(req.url.params)))
+        if req.url.path.endswith("/callback"):
+            return httpx.Response(503)
+        return httpx.Response(200, json={"path": req.url.path})
+
+    auth = AuthClient(_gw(handler, sleeps=sleeps))
+    auth.github_oauth_card()
+    auth.github_start()
+    auth.tokens_audit()
+    auth.token_audit("tok/1")
+    auth.authz_audit()
+    auth.authz_audit_row("deploy")
+    with pytest.raises(SkeletonHTTPError):
+        auth.github_callback("abc", state="s")
+    paths = [p for _, p, _ in seen]
+    assert "/api/v1/auth/github" in paths
+    assert "/api/v1/application/tokens/audit/tok%2F1" in [str(httpx.URL("http://t" + p).raw_path.decode()) for p in paths] or "/api/v1/application/tokens/audit/tok/1" in paths
+    assert seen[-1][2] == {"code": "abc", "state": "s"}
+    assert sleeps == []
+    with pytest.raises(ValueError):
+        auth.github_callback("")
+
+
+# --- agents -------------------------------------------------------------------
+
+def test_agents_client_calls():
+    seen = []
+
+    def handler(req):
+        body = json.loads(req.content) if req.content else None
+        seen.append((req.method, req.url.path, body, dict(req.url.params)))
+        if req.url.path == "/api/v1/swarm/agent":
+            return httpx.Response(200, json={"agent_id": "a1", "status": "registered"})
+        if req.url.path == "/api/v1/swarm/events":
+            return httpx.Response(200, json={"events": [{"timestamp": 1.0, "kind": "submit", "subject": "t1"}]})
+        return httpx.Response(200, json={"id": "x"})
+
+    agents = AgentsClient(_gw(handler))
+    assert agents.register(["code"], weight=2.0, metadata={"k": 1})["agent_id"] == "a1"
+    assert seen[0][2] == {"specialisations": ["code"], "weight": 2.0, "metadata": {"k": 1}}
+    agents.register_worker("w1", capabilities=["py"], capacity=2)
+    assert seen[-1][2] == {"worker_id": "w1", "capabilities": ["py"], "capacity": 2}
+    agents.heartbeat("w1")
+    agents.unregister_worker("w1", requeue=False)
+    assert seen[-1][:2] == ("DELETE", "/api/v1/swarm/workers/w1") and seen[-1][3] == {"requeue": "false"}
+    agents.submit_task("t1", {"a": 1}, priority=5)
+    agents.cancel_task("t1", "nope")
+    assert seen[-1][2] == {"reason": "nope"}
+    agents.revive_task("t1", reset_attempts=True)
+    agents.list_tasks(state="queued")
+    assert seen[-1][3]["state"] == "queued"
+    assert agents.events(limit=5)[0]["kind"] == "submit"
+    evs = list(agents.stream_events())
+    assert evs[0].ts == 1.0 and evs[0].raw["subject"] == "t1"
+
+
+# --- builds -------------------------------------------------------------------
+
+ENGINE_SNAPSHOT = {
+    "execution_id": "e1",
+    "events": [
+        {"event_id": "execution:e1:state", "sequence": 0, "type": "execution.state", "state": "running"},
+        {"event_id": "turn:t1", "sequence": 1, "type": "execution.turn", "turn": {}},
+    ],
+    "next_sequence": 2,
+}
+
+
+def test_builds_client_scoped_calls_and_headers():
+    seen = []
+
+    def handler(req):
+        body = json.loads(req.content) if req.content else None
+        seen.append((req.method, req.url.path, body, dict(req.url.params), req.headers))
+        if req.url.path.endswith("/events"):
+            return httpx.Response(200, json=ENGINE_SNAPSHOT)
+        if req.method == "POST" and req.url.path == "/api/v1/engine/executions":
+            return httpx.Response(202, json={"execution_id": "e1", "state": "accepted"})
+        return httpx.Response(200, json={"execution_state": "running"})
+
+    hdrs = BuildsClient.service_headers("tok", "svc")
+    builds = BuildsClient(_gw(handler, headers=hdrs), actor_id="u", tenant_id="t")
+    assert builds.submit({"op": 1})["execution_id"] == "e1"
+    assert seen[0][2] == {"actor_id": "u", "tenant_id": "t", "command": {"op": 1}}
+    assert seen[0][4]["authorization"] == "Bearer tok" and seen[0][4]["x-zaibatsu-attester"] == "svc"
+    builds.status("e1")
+    assert seen[-1][3] == {"actor_id": "u", "tenant_id": "t"}
+    builds.handoff("e1")
+    builds.cancel("e1", "user abort")
+    assert seen[-1][2]["reason"] == "user abort"
+    assert builds.events("e1")["next_sequence"] == 2
+    evs = list(builds.stream_events("e1"))
+    assert [e.type for e in evs] == ["execution.state", "execution.turn"]
+    assert evs[1].id == "turn:t1" and evs[1].sequence == 1
+    with pytest.raises(ValueError):
+        BuildsClient(_gw(handler), actor_id="", tenant_id="t")
+
+
+def test_builds_wait_polls_until_terminal_and_cancel():
+    states = iter(["queued", "running", "completed"])
+    naps: list[float] = []
+    gw = _gw(lambda r: httpx.Response(200, json={"execution_state": next(states)}))
+    builds = BuildsClient(gw, actor_id="u", tenant_id="t")
+    assert builds.wait("e1", poll_seconds=0.5, sleep=naps.append)["execution_state"] == "completed"
+    assert naps == [0.5, 0.5]
+
+    tok = CancelToken()
+    gw2 = _gw(lambda r: httpx.Response(200, json={"execution_state": "running"}))
+    with pytest.raises(SkeletonCancelledError):
+        BuildsClient(gw2, actor_id="u", tenant_id="t").wait("e1", cancel=tok, sleep=lambda s: tok.cancel())
+
+
+# --- streaming ---------------------------------------------------------------
+
+SSE_BODY = (
+    ": keep-alive\n\n"
+    "id: 7\nevent: progress\ndata: {\"v\":1,\"id\":\"ev7\",\"ts\":\"2026-10-17T16:00:00Z\",\"channel\":\"build\","
+    "\"type\":\"build.progress\",\"payload\":{\"pct\":40},\"job_id\":\"e1\",\"correlation_id\":\"c1\"}\n\n"
+    "data: {\"type\":\"heartbeat\"}\n\n"
+    "event: heartbeat\ndata: ping\n\n"
+    "id: 8\ndata: {\"type\":\"execution.result\",\n"
+    "data: \"sequence\":3}\n\n"
+)
+
+
+def test_sse_stream_envelope_heartbeats_and_last_event_id():
+    seen_headers = []
+
+    def handler(req):
+        seen_headers.append(req.headers)
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=SSE_BODY.encode())
+
+    builds = BuildsClient(_gw(handler), actor_id="u", tenant_id="t")
+    evs = list(builds.stream_events("e1", last_event_id="6"))
+    assert seen_headers[0]["last-event-id"] == "6"
+    assert len(evs) == 2
+    first = evs[0]
+    assert first.is_envelope_v1 and first.channel == "build" and first.v == 1
+    assert first.payload == {"pct": 40} and first.job_id == "e1" and first.correlation_id == "c1"
+    assert first.id == "ev7" and first.sse_id == "7" and first.sse_event == "progress"
+    assert evs[1].type == "execution.result" and evs[1].sequence == 3 and evs[1].id == "8"
+    assert not evs[1].is_envelope_v1
+
+
+def test_ndjson_stream_and_plain_list():
+    body = b'{"type":"a","id":1}\n\n{"type":"heartbeat"}\n{"type":"b"}\n'
+    gw = _gw(lambda r: httpx.Response(200, headers={"content-type": "application/x-ndjson"}, content=body))
+    evs = list(BuildsClient(gw, actor_id="u", tenant_id="t").stream_events("e1"))
+    assert [e.type for e in evs] == ["a", "b"] and evs[0].id == "1"
+
+    gw2 = _gw(lambda r: httpx.Response(200, json=[{"type": "x"}, {"type": "heartbeat"}]))
+    assert [e.type for e in BuildsClient(gw2, actor_id="u", tenant_id="t").stream_events("e1")] == ["x"]
+
+
+def test_stream_cancel_between_events():
+    tok = CancelToken()
+    lines = ['data: {"type":"a"}', "", 'data: {"type":"b"}', ""]
+    out = []
+    with pytest.raises(SkeletonCancelledError):
+        for ev in parse_sse_lines(lines, tok):
+            out.append(ev)
+            tok.cancel()
+    assert [e.type for e in out] == ["a"]
+    tok2 = CancelToken()
+    tok2.cancel()
+    with pytest.raises(SkeletonCancelledError):
+        list(parse_ndjson_lines(['{"type":"a"}'], tok2))
+
+
+def test_stream_retries_retryable_status_then_raises_http_error():
+    hits = []
+    sleeps: list[float] = []
+
+    def handler(req):
+        hits.append(1)
+        if len(hits) == 1:
+            return httpx.Response(503, headers={"Retry-After": "0.3"})
+        return httpx.Response(404, json={"detail": "unknown execution"})
+
+    with pytest.raises(SkeletonHTTPError) as info:
+        list(BuildsClient(_gw(handler, sleeps=sleeps), actor_id="u", tenant_id="t").stream_events("e1"))
+    assert info.value.status_code == 404 and sleeps == [pytest.approx(0.3)]
+
+
+def test_stream_event_fallback_raw():
+    ev = StreamEvent.from_obj("hello")
+    assert ev.raw == {"data": "hello"} and ev.type is None
+
+
+# --- route conformance (static, via individual APIRouter objects) ------------
+
+def _backend_routes() -> set[tuple[str, str]]:
+    from skeleton.api.engine_routes import router as engine_router
+    from skeleton.api.routes import router as main_router
+    from skeleton.api.swarm_routes import router as swarm_router
+
+    out: set[tuple[str, str]] = set()
+    for router in (main_router, engine_router, swarm_router):  # all mounted at /api/v1
+        for route in router.routes:
+            for method in getattr(route, "methods", None) or ():
+                out.add((method, "/api/v1" + route.path))
+    return out
+
+
+def _norm(path: str) -> str:
+    return re.sub(r"\{[^}]+\}", "{}", path)
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    list(auth_mod.SDK_ROUTES) + list(agents_mod.SDK_ROUTES) + list(builds_mod.SDK_ROUTES),
+)
+def test_sdk_routes_exist_in_backend(method, path):
+    backend = {(m, _norm(p)) for m, p in _backend_routes()}
+    assert (method, _norm(path)) in backend, f"{method} {path} not served by backend"
+
+
+def test_sdk_route_tables_match_calls():
+    """Every path the clients actually hit is declared in SDK_ROUTES."""
+    declared = {(m, _norm(p)) for m, p in auth_mod.SDK_ROUTES + agents_mod.SDK_ROUTES + builds_mod.SDK_ROUTES}
+    seen: set[tuple[str, str]] = set()
+
+    def handler(req):
+        seen.add((req.method, req.url.path))
+        return httpx.Response(200, json={"events": [], "execution_state": "completed", "agent_id": "a", "status": "ok"})
+
+    gw = _gw(handler)
+    a, ag, b = AuthClient(gw), AgentsClient(gw), BuildsClient(gw, actor_id="u", tenant_id="t")
+    a.github_oauth_card(); a.github_start(); a.github_callback("c"); a.tokens_audit(); a.token_audit("X")
+    a.authz_audit(); a.authz_audit_row("X")
+    ag.register(["x"]); ag.mesh_stats(); ag.status(); ag.list_workers(); ag.register_worker("X")
+    ag.get_worker("X"); ag.heartbeat("X"); ag.unregister_worker("X"); ag.list_tasks(); ag.submit_task("X")
+    ag.get_task("X"); ag.cancel_task("X"); ag.revive_task("X"); ag.events(); list(ag.stream_events())
+    b.submit({}); b.status("X"); b.handoff("X"); b.cancel("X"); b.events("X"); list(b.stream_events("X"))
+    b.wait("X")
+    norm_seen = {(m, re.sub(r"/X(?=/|$)", "/{}", p)) for m, p in seen}
+    assert norm_seen <= declared, norm_seen - declared
+    assert len(norm_seen) == len(declared)
