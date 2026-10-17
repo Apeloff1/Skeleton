@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .contracts import canonical_digest
-from .studio_campaign import _atomic_json, _load_json
+from .studio_campaign import _atomic_json, _canonical, _load_json
 
 SEGMENT_SIZE = 64
 MAX_SEGMENTS = 512
@@ -141,6 +141,10 @@ def seal_full_heads(root: Path, identity: str, segments: list[dict],
             "last_entry_digest": prior,
         }
         payload["segment_digest"] = canonical_digest(payload)
+        if len(_canonical(payload)) > 256_000:
+            raise StudioHistorySegmentError(
+                "sealed archive exceeds the bounded on-disk JSON reader budget"
+            )
         name = f"segment-{len(output) + 1:05d}.json"
         file = _directory(root, create=True) / name
         if file.exists() or file.is_symlink():
