@@ -16,7 +16,8 @@ from .game_learning import _digest
 from .game_emulator_triangle import verify_training_triangle
 from .game_emulator_triangle_native_reviewer import verify_native_adversarial_review
 from .game_emulator_triangle_semantics import (
-    SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+    SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+    route_episode_semantic_lenses,
 )
 
 SCHEMA = "skeleton.jeeves.game_triangle_semantic_inference.v1"
@@ -38,7 +39,8 @@ def _sha(value: Any) -> bool:
 
 def _admit(evidence: dict[str, Any], triangle: dict[str, Any],
            adversarial: dict[str, Any], run_index: int,
-           requested_keys: Sequence[str]) -> tuple[dict[str, Any], dict[str, Any]]:
+           requested_keys: Sequence[str], lens_budget: int = SEMANTIC_LENS_BUDGET
+           ) -> tuple[dict[str, Any], dict[str, Any]]:
     verify_training_triangle(evidence, triangle)
     verify_native_adversarial_review(evidence, triangle, adversarial)
     _require(adversarial["structured_source_bound_passes"] == 3,
@@ -48,11 +50,12 @@ def _admit(evidence: dict[str, Any], triangle: dict[str, Any],
              "native episode index outside verified trace boundary")
     source = episodes[run_index]
     route = route_episode_semantic_lenses(
-        source, max_lenses=SEMANTIC_LENS_BUDGET, requested_keys=requested_keys,
+        source, max_lenses=lens_budget, requested_keys=requested_keys,
     )
-    _require(route["actually_routed_lenses"] == SEMANTIC_LENS_BUDGET
-             and len(route["routes"]) == SEMANTIC_LENS_BUDGET,
-             "all forty-three source-bound Jeeves lenses must be routed")
+    _require(lens_budget in (SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET)
+             and route["actually_routed_lenses"] == lens_budget
+             and len(route["routes"]) == lens_budget,
+             "all requested source-bound Jeeves lenses must be routed")
     return source, route
 
 
@@ -146,16 +149,18 @@ def run_native_semantic_lenses(
     adversarial: dict[str, Any], runtime: Any, *,
     run_index: int = 0, requested_keys: Sequence[str] = (),
     seed: int = 0, max_new_tokens: int = 192,
+    lens_budget: int = SEMANTIC_LENS_BUDGET,
 ) -> dict[str, Any]:
-    """Perform precisely 43 real local model calls against one verified episode."""
+    """Perform 43 or 200 real local model calls against one verified episode."""
     from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 
     _require(isinstance(runtime, NativeLLMRuntime),
              "real installed native Jeeves lens model checkpoint required")
-    _require(type(seed) is int and 0 <= seed <= 2**63 - 1 - SEMANTIC_LENS_BUDGET
+    _require(lens_budget in (SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET)
+             and type(seed) is int and 0 <= seed <= 2**63 - 1 - lens_budget
              and type(max_new_tokens) is int and 32 <= max_new_tokens <= 512,
              "native semantic inference generation budget invalid")
-    source, route = _admit(evidence, triangle, adversarial, run_index, requested_keys)
+    source, route = _admit(evidence, triangle, adversarial, run_index, requested_keys, lens_budget)
     runtime.assert_model_unchanged()
     model = runtime.model_digest
     _require(_sha(model), "native semantic review model identity not admitted")
@@ -209,7 +214,7 @@ def run_native_semantic_lenses(
             x["interpretation"]["status"] == "source_referenced_interpretation_not_ground_truth"
             for x in entries
         ),
-        "all_semantic_lenses_executed": len(entries) == SEMANTIC_LENS_BUDGET,
+        "all_semantic_lenses_executed": len(entries) == lens_budget,
         "all_semantic_interpretations_valid": all(
             x["interpretation"]["status"] == "source_referenced_interpretation_not_ground_truth"
             for x in entries
@@ -222,6 +227,8 @@ def run_native_semantic_lenses(
         "operator_adjudication_required": True,
         "entries": entries,
     }
+    if lens_budget != SEMANTIC_LENS_BUDGET:
+        receipt["lens_budget"] = lens_budget
     receipt["semantic_review_digest"] = _digest(receipt)
     return receipt
 
@@ -232,9 +239,13 @@ def verify_native_semantic_lenses(
 ) -> None:
     """Reject rehashed mismatched lens identity, prompt, output or model custody."""
     _require(type(saved) is dict, "native semantic lens receipt missing")
+    lens_budget = saved.get("lens_budget", SEMANTIC_LENS_BUDGET)
+    _require(type(lens_budget) is int and lens_budget in (
+        SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET,
+    ), "saved native semantic lens budget is unsupported")
     source, route = _admit(
         evidence, triangle, adversarial, saved.get("source_run_index"),
-        saved.get("requested_lens_keys", ()),
+        saved.get("requested_lens_keys", ()), lens_budget,
     )
     _require(
         saved.get("schema_version") == SCHEMA
@@ -251,10 +262,10 @@ def verify_native_semantic_lenses(
         and saved.get("governance_fingerprint") == route["governance_fingerprint"]
         and _sha(saved.get("model_sha256"))
         and type(saved.get("requested_seed")) is int
-        and 0 <= saved["requested_seed"] <= 2**63 - 1 - SEMANTIC_LENS_BUDGET
+        and 0 <= saved["requested_seed"] <= 2**63 - 1 - lens_budget
         and type(saved.get("requested_max_new_tokens")) is int
         and 32 <= saved["requested_max_new_tokens"] <= 512
-        and saved.get("native_model_generations_executed") == SEMANTIC_LENS_BUDGET
+        and saved.get("native_model_generations_executed") == lens_budget
         and saved.get("all_semantic_lenses_executed") is True
         and type(saved.get("all_semantic_interpretations_valid")) is bool
         and saved.get("actual_native_gameplay_steps_added_by_lenses") == 0
@@ -266,8 +277,8 @@ def verify_native_semantic_lenses(
         "native semantic lens receipt violates verified source/governance boundary",
     )
     entries = saved.get("entries")
-    _require(type(entries) is list and len(entries) == SEMANTIC_LENS_BUDGET,
-             "native semantic model must execute exactly 43 lenses")
+    _require(type(entries) is list and len(entries) == lens_budget,
+             "native semantic model must execute every selected canonical lens")
     validated = 0
     for index, (entry, lens) in enumerate(zip(entries, route["routes"], strict=True)):
         _require(type(entry) is dict and entry.get("lens_key") == lens["lens_key"],
@@ -298,7 +309,7 @@ def verify_native_semantic_lenses(
         validated += entry["interpretation"]["status"] == "source_referenced_interpretation_not_ground_truth"
     _require(saved.get("source_bound_interpretations") == validated
              and saved["all_semantic_interpretations_valid"] is (
-                 validated == SEMANTIC_LENS_BUDGET
+                 validated == lens_budget
              ),
              "native semantic lens completeness or grounded references differ")
 
@@ -307,7 +318,7 @@ def replay_native_semantic_lenses(
     evidence: dict[str, Any], triangle: dict[str, Any],
     adversarial: dict[str, Any], saved: dict[str, Any], runtime: Any,
 ) -> dict[str, Any]:
-    """Actually reproduce 43 local checkpoint generations, not just JSON hashes."""
+    """Reproduce all selected local checkpoint generations, not just JSON hashes."""
     from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
     from skeleton.ai.model_runtime.runtime_contracts import ReplayReceipt
     _require(isinstance(runtime, NativeLLMRuntime),
@@ -316,7 +327,8 @@ def replay_native_semantic_lenses(
     _require(runtime.model_digest == saved["model_sha256"],
              "native semantic checkpoint differs from stored model identity")
     source, route = _admit(evidence, triangle, adversarial,
-                           saved["source_run_index"], saved["requested_lens_keys"])
+                           saved["source_run_index"], saved["requested_lens_keys"],
+                           saved.get("lens_budget", SEMANTIC_LENS_BUDGET))
     for index, (entry, lens) in enumerate(zip(saved["entries"], route["routes"], strict=True)):
         try:
             receipt = ReplayReceipt(**entry["native_inference_receipt"])
@@ -332,7 +344,7 @@ def replay_native_semantic_lenses(
                  "native semantic model replay does not reproduce checkpoint tokens and text")
     return {
         "source_semantic_review_sha256": saved["semantic_review_digest"],
-        "native_jeeves_semantic_model_generations_replayed": SEMANTIC_LENS_BUDGET,
+        "native_jeeves_semantic_model_generations_replayed": saved.get("lens_budget", SEMANTIC_LENS_BUDGET),
         "semantic_hypotheses_are_not_ground_truth": True,
         "production_jeeves_weight_updates": 0,
     }

@@ -15,6 +15,7 @@ from .game_learning import _digest
 
 SCHEMA = "skeleton.jeeves.game_triangle_semantic_lens_routes.v1"
 SEMANTIC_LENS_BUDGET = 43
+EXTENDED_SEMANTIC_LENS_BUDGET = 200
 
 
 class TriangleSemanticError(ValueError):
@@ -29,8 +30,8 @@ def _canonical_router():
 
     catalog = MaximalSemanticRegistry()
     router = MaximalLensRouter(catalog)
-    if len(catalog.all()) < SEMANTIC_LENS_BUDGET:
-        raise TriangleSemanticError("Jeeves semantic catalog has fewer than 43 lenses")
+    if len(catalog.all()) < EXTENDED_SEMANTIC_LENS_BUDGET:
+        raise TriangleSemanticError("Jeeves semantic catalog has fewer than 200 authored lenses")
     # Identity commits the actual upstream lens keys and complete semantics,
     # not a local forked list of vaguely similar categories.
     identities = [
@@ -145,8 +146,8 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
                                  requested_keys: Sequence[str] = (),
                                  ) -> dict[str, Any]:
     """Select real Jeeves lens definitions from six actual native evidence views."""
-    if type(max_lenses) is not int or not 1 <= max_lenses <= SEMANTIC_LENS_BUDGET:
-        raise TriangleSemanticError("semantic route budget must be 1..43")
+    if type(max_lenses) is not int or not 1 <= max_lenses <= EXTENDED_SEMANTIC_LENS_BUDGET:
+        raise TriangleSemanticError("semantic route budget must be 1..200")
     if (type(episode) is not dict
             or type(episode.get("grounded_lens_evidence")) is not dict
             or type(episode.get("companion_viewing")) is not dict
@@ -154,12 +155,12 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
             or type(episode.get("repetition")) is not dict):
         raise TriangleSemanticError("semantic routing requires source-audited episode")
     if (type(requested_keys) not in (list, tuple)
-            or len(requested_keys) not in (0, SEMANTIC_LENS_BUDGET)
+            or len(requested_keys) not in (0, SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET)
             or any(type(key) is not str or not key
                    or key != key.strip().casefold() for key in requested_keys)
             or len(set(requested_keys)) != len(requested_keys)
-            or (requested_keys and max_lenses != SEMANTIC_LENS_BUDGET)):
-        raise TriangleSemanticError("custom semantic lens allocation needs 43 unique canonical keys")
+            or (requested_keys and max_lenses != len(requested_keys))):
+        raise TriangleSemanticError("custom semantic lens allocation needs 43 or 200 unique canonical keys")
     router, catalog_digest, catalog_count = _canonical_router()
     observations = _source_observations(episode)
     if requested_keys:
@@ -194,11 +195,13 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         )
     else:
         selection = router.select_maximal(
-            observations, max_lenses=max_lenses, max_per_family=5,
+            observations, max_lenses=max_lenses,
+            max_per_family=(20 if max_lenses > SEMANTIC_LENS_BUDGET else 5),
             minimum_rare_when_supported=3,
         )
-    if max_lenses == SEMANTIC_LENS_BUDGET and len(selection.lenses) != SEMANTIC_LENS_BUDGET:
-        raise TriangleSemanticError("canonical registry did not supply the requested 43 lenses")
+    if (max_lenses in (SEMANTIC_LENS_BUDGET, EXTENDED_SEMANTIC_LENS_BUDGET)
+            and len(selection.lenses) != max_lenses):
+        raise TriangleSemanticError("canonical registry did not supply the requested number of governed lenses")
     # Apply Jeeves' existing scientific-governance profile. Selection is a
     # question-generation permission, never a factual or causal source.
     from skeleton.jeeves.agent.semantic_governance_bridge import SemanticGovernanceBridge
@@ -280,7 +283,7 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         "requested_max_lenses": max_lenses,
         "actually_routed_lenses": len(route),
         "operator_requested_lens_keys": list(requested_keys),
-        "selection_mode": "operator_exact_43" if requested_keys else "canonical_dynamic_router",
+        "selection_mode": (f"operator_exact_{max_lenses}" if requested_keys else "canonical_dynamic_router"),
         "governance_fingerprint": governance.fingerprint,
         "semantic_lenses_remain_hypotheses_not_source_evidence": True,
         "selection_is_dynamic_not_a_claim_of_exactly_43_catalog_lenses": True,
