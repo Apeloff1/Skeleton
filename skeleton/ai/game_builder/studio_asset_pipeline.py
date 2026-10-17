@@ -44,6 +44,7 @@ CODECS = {
 }
 NATIVE_EMBEDDED_TARGETS = frozenset({
     "nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
+    "sega_master_system", "sega_game_gear",
 })
 STYLES = frozenset({"etched", "luminous", "organic", "arcade"})
 PALETTES = {
@@ -189,7 +190,7 @@ def _animate_hero(base: tuple[int, ...], frame: int) -> tuple[int, ...]:
     if frame >= 2:
         # Wing/arm motion visible on frame 2 and frame 3.
         for x, y in ((1, 4), (6, 4), (1, 5), (6, 5)):
-            result[y * 8 + x] = 3 if frame == 2 else 1
+            result[y * 8 + x] = 1 if frame == 2 else 0
     return tuple(result)
 
 
