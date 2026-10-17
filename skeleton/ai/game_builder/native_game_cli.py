@@ -107,7 +107,16 @@ def build_game(
         playable = compile_original_game(intent, authorized=True)
         if playable.world.digest != world.digest or playable.proof.digest != proof.digest:
             raise ValueError("native and engine game worlds or playthrough proofs diverged")
-        engine_package = render_dual_runtime_package(playable, authorized=True)
+        # Preserve canonical winning gameplay while rerendering the same world
+        # with the precise original pixels used by console ROM source emitters.
+        from dataclasses import replace
+        from .playable_export import render_playable_world
+        playable = replace(playable, playable=render_playable_world(
+            world, studio_art=art_pack, authorized=True,
+        ))
+        engine_package = render_dual_runtime_package(
+            playable, authorized=True, studio_art=art_pack,
+        )
         if engine_package.manifest["world_digest"] != world.digest:
             raise ValueError("engine source manifests do not match native source")
     kind = _NATIVE[target]
@@ -196,7 +205,10 @@ def build_game(
             "actual_winning_python_replay": True,
             "godot_binary_executed": False,
             "hardware_qualified": False,
-            "runtime_uses_custom_asset_tiles": False,
+            "runtime_uses_custom_asset_tiles": True,
+            "actual_browser_sprite_rasterizer_embedded": True,
+            "godot_source_sprite_rasterizer_embedded": True,
+            "godot_sprite_renderer_executed": False,
         }
     art_receipt = (
         export_studio_art(art_pack, folder, authorized=True)
