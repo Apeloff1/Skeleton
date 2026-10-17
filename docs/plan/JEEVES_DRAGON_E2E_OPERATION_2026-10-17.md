@@ -204,3 +204,83 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 The specialized suites above are registered in `machine/e2e_suites.json` without adding always-on workflow gates. Successful exact-head checks and real native toolchain/emulator tests must be collected before marking these milestones qualified.
+
+
+## Cross-engine executable playthrough milestones M41–M60
+
+This tranche directly addresses the gap between “source exists” and “playable runtime has executed,” while retaining strict noncertification for everything still untested. All code is present on the PR branch; it has **not been executed in this GitHub-only session**.
+
+### M41–M45: real generated JavaScript game controls
+
+A separate actual JavaScript runner, `studio_browser_probe.js`, loads **the exact rendered HTML5 game's real JavaScript** into a bounded Node VM with a minimal instrumented DOM and Canvas2D recorder. It runs the canonical Python-winning sequence using the actual game's `takeTurn` source, compares final level/position/score/health/turns, checks actual pixel drawing calls and executes an animation tick. It additionally exercises the real event listeners for arrow-key movement, directional buttons, undo and restart. This is executable JavaScript parity, not a rendered Chromium framebuffer or a simulated third-party game.
+
+The operator CLI provides a separate `--browser-target` mode. Node absence and any mismatch leave the gate unqualified. Evidence is SHA-bound to actual released HTML, canonical proof JSON and campaign identity; editing source after verification invalidates the gate.
+
+### M46–M48: real Godot 4 headless playthrough
+
+The Godot qualification owner verifies exact scene, GDScript, world, proof and optional studio art files against the canonical release manifest; copies only those files into an isolated temporary project; then, **only with explicit operator execution authorization**, calls an installed Godot binary with `--headless --path <temporary source> -- --verify-proof`. It accepts the underlying `NATIVE_REPLAY_OK <world-digest> actions=<count>` marker only with an exit code of zero and matching action count. Godot writes to a bounded local log, not into the original source tree. Native Godot export/signing, GPU frame quality, real input devices and human gameplay remain unqualified.
+
+### M49–M52: exact content and runtime source integrity
+
+`studio_pixel_parity.py` verifies the actual 8×8 indexed pixel values from console 2bpp/4bpp bytes, the browser's embedded live data, the Godot art source, the generated PNG sprite atlas, palettes, animated frames, and every level preview's dimensions. It checks both art-pack and engine-release manifests. A mismatch makes the assurance inspection fail rather than producing a false passed percentage.
+
+The separate JavaScript and Godot execution receipts become independent production gates. They never imply another runtime has been tested, and Dragon receives only read-only source-bound hashes and named verification facts.
+
+### M53–M56: explicit Dragon visual observation of generated games
+
+`studio_dragon_canvas_capture.py` introduces an opt-in **actual local browser screenshot** of the *generated original game canvas only*. It requires both local operator authorization and separate explicit original-game capture consent. When Playwright and Chromium are installed, it launches an offline headless browser, replays actual DOM directional inputs, captures a bounded sequence of PNG frames, verifies real displayed victory, and writes an exact SHA-indexed frame manifest to a new private local output directory outside source control. Missing dependencies do **not** count as captured video.
+
+This records no desktop, user camera, web browsing or other applications. Recording does not authorize Dragon knowledge promotion, source/IP approval, model training, checkpoint tuning, or publication. The SHA-bound manifest is rechecked by the campaign assurance owner; tampered frame bytes or source changes fail the gate.
+
+### Remaining high-impact engineering milestones M57–M60
+
+- M57: measured Chromium/Godot pixel-to-pixel comparison (including shadow, color, anti-aliasing, canvas screenshot and GPU output).
+- M58: native cartridge compilation and emulator CPU/graphics/controller full-playthrough qualification on each supported console.
+- M59: true expansive game creation: scene graph editing, canon-bound longform story, quests, NPC behavior, multi-act dialogue, full cinematics, asset animation/lighting, audio integration and advanced 2.5D/3D engines.
+- M60: months-long persistent producer/Dragon/AI co-iteration with verified checkpoint resumes, bounded storage/capture controls, independent human review, weight-evaluation/rollback and full release evidence.
+
+### Exact operator commands
+
+```bash
+# Run the actual generated HTML5 JavaScript winning replay (Node required):
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --browser-target nintendo_game_boy --execute-build \
+  --authorize-local-operation
+
+# Run real Godot replay on an isolated engine copy (Godot 4 required):
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --godot-target nintendo_game_boy --execute-build \
+  --authorize-local-operation
+
+# Prove exact native console/HTML5/Godot sprite parity without execution:
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --pixel-parity-target nintendo_game_boy \
+  --authorize-local-operation
+
+# Capture original game-only canvas frames with explicit separate permission
+# (requires Playwright plus a local Chromium runtime):
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --canvas-target nintendo_game_boy --execute-build \
+  --consent-generated-game-canvas --authorize-local-operation
+
+# Inspect the now expanded source/runtime/canvas qualification gates:
+python -m skeleton.ai.game_builder.studio_campaign_assurance_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --inspect --authorize-local-operation
+```
+
+### Specialized E2E suite
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_browser_runtime_e2e.py \
+  tests/test_studio_godot_runtime_e2e.py \
+  tests/test_studio_pixel_parity_e2e.py \
+  tests/test_studio_dragon_canvas_capture.py
+```
+
+Tests requiring an external binary or Chromium may skip when it is absent. Such skips do not qualify that runtime. Source-generated tests and snapshot checks alone are not permission to merge or release. No new always-on CI workflow was added.
