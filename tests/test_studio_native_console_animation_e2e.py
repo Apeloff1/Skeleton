@@ -89,7 +89,11 @@ class ActualConsoleHeroAnimationTests(unittest.TestCase):
                     self.assertIn("ANIM_COUNT", source)
                     self.assertIn("ANIM_DELAY", source)
                     if count > 1:
-                        self.assertIn("hero animation frame 1", source)
+                        self.assertIn(
+                            "hero CHR animation frame 1" if target == "nintendo_famicom"
+                            else "hero animation frame 1",
+                            source,
+                        )
                         self.assertIn("AnimFrame", source)
                     self.assertFalse(manifest.get("emulator_verified", False))
                     self.assertFalse(manifest.get("cartridge_built", False))
