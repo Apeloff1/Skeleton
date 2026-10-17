@@ -4,8 +4,10 @@
  * Light: tokens.ts drop shadows.
  */
 import type { ViewStyle } from 'react-native';
-import { elevation, hud } from '../tokens';
+import tokens, { hud } from '../tokens';
 import type { ColorMode, ColorRoles } from './color';
+
+const { elevation } = tokens;
 
 export const shadows = elevation;
 export type ShadowKey = keyof typeof elevation;
