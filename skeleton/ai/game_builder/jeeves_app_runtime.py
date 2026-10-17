@@ -457,7 +457,11 @@ def _stage_console_art_source(workspace, project, args, *, with_artist=False):
         "creative_identity", "style", "contrast", "animation_frames",
         "source_file", "expected_sha256", "reason",
     )
-    _exact(args, (*fields, "artist_tiles") if with_artist else fields,
+    optional = tuple(
+        name for name in ("animation_fps", "music_density") if name in args
+    )
+    _exact(args, (*fields, *optional, "artist_tiles")
+           if with_artist else (*fields, *optional),
            "original native source production")
     from .playable_world import GameBuildIntent, generate_playable_world
     from .port_planner import HomebrewSource
@@ -503,6 +507,8 @@ def _stage_console_art_source(workspace, project, args, *, with_artist=False):
     art = ArtDirection(
         style=args["style"], contrast=args["contrast"],
         animation_frames=args["animation_frames"], seed=intent.seed,
+        animation_fps=args.get("animation_fps", 4),
+        music_density=args.get("music_density", 2),
     )
     world = generate_playable_world(intent, authorized=True)
     artist_atlas = (
@@ -515,15 +521,41 @@ def _stage_console_art_source(workspace, project, args, *, with_artist=False):
         world, target=target, direction=art, authorized=True,
         artist_atlas=artist_atlas,
     )
+    hero_frames = None
+    frame_delay = 12
+    psg = None
+    if target in ("nintendo_game_boy", "nintendo_game_boy_color",
+                  "nintendo_famicom"):
+        from skeleton.jeeves.game_console_assets import decode_tiles
+        from .studio_native_psg import compose_native_psg
+        hero_frames = decode_tiles(
+            dict(pack.files)["tiles/hero_animation.bin"], pack.codec,
+        )
+        if (len(hero_frames) != art.animation_frames
+                or hero_frames[0] != pack.runtime_tiles[5]):
+            raise JeevesAppCapabilityError("Jeeves generated mismatching native hero frames")
+        frame_delay = max(2, min(60, round(60 / art.animation_fps)))
+        psg = compose_native_psg(intent.theme, art.seed, art.music_density)
     if target == "nintendo_game_boy":
-        native = compile_native_game_boy(world, rights, authorized=True, tile_art=pack.runtime_tiles)
+        native = compile_native_game_boy(
+            world, rights, authorized=True, tile_art=pack.runtime_tiles,
+            hero_frames=hero_frames, animation_delay=frame_delay,
+            psg_score=psg,
+        )
         text = native.asm
     elif target == "nintendo_game_boy_color":
         native = compile_native_game_boy_color(
-            world, rights, authorized=True, tile_art=pack.runtime_tiles)
+            world, rights, authorized=True, tile_art=pack.runtime_tiles,
+            hero_frames=hero_frames, animation_delay=frame_delay,
+            psg_score=psg,
+        )
         text = native.asm
     elif target == "nintendo_famicom":
-        native = compile_native_nes(world, rights, authorized=True, tile_art=pack.runtime_tiles)
+        native = compile_native_nes(
+            world, rights, authorized=True, tile_art=pack.runtime_tiles,
+            hero_frames=hero_frames, animation_delay=frame_delay,
+            psg_score=psg,
+        )
         text = native.asm
     elif target == "sega_master_system":
         native = compile_native_sms(world, rights, authorized=True, tile_art=pack.runtime_tiles)
@@ -537,6 +569,13 @@ def _stage_console_art_source(workspace, project, args, *, with_artist=False):
     expected_art = canonical_digest([list(tile) for tile in pack.runtime_tiles])
     if manifest.get("generated_runtime_art_tile_digest") != expected_art:
         raise JeevesAppCapabilityError("native producer omitted or mutated original sprite pixels")
+    if psg is not None:
+        if (manifest.get("native_hero_animation_frames") != art.animation_frames
+                or manifest.get("native_hero_animation_frame_delay") != frame_delay
+                or manifest.get("native_psg_score_digest") != psg.digest
+                or manifest.get("original_native_psg_integrated")
+                != (psg.density > 0)):
+            raise JeevesAppCapabilityError("generated native animation/audio content lost")
     if len(text.encode("utf-8")) > 240_000:
         raise JeevesAppCapabilityError("generated native file exceeds reviewed source capacity")
     path = "game/native/" + target + "/" + targets[target]
@@ -562,6 +601,14 @@ def _stage_console_art_source(workspace, project, args, *, with_artist=False):
         "native_tile_art_digest": expected_art,
         "sprite_preview_count": len(world.levels),
         "animation_frame_count": art.animation_frames,
+        "native_animation_frame_delay": frame_delay if hero_frames else None,
+        "native_animation_source_integrated": bool(
+            hero_frames and len(hero_frames) > 1
+        ),
+        "native_psg_score_digest": psg.digest if psg else None,
+        "native_psg_audio_source_integrated": bool(psg and psg.density > 0),
+        "emulator_audio_executed": False,
+        "native_pcm_sound_equivalence_claimed": False,
         "actual_native_source_generated": True,
         "actual_sprite_pixels_embedded": True,
         "binary_compiled": False,
