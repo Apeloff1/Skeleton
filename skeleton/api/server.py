@@ -979,6 +979,19 @@ def _public_dev_surfaces_enabled() -> bool:
     }
 
 
+def _omnifabric_api_enabled() -> bool:
+    """OmniFabric HTTP surface toggle (default on).
+
+    ``SKELETON_OMNIFABRIC_API`` set to ``0``/``false``/``no``/``off`` keeps the
+    router unmounted. When mounted it sits behind the HMAC gate like every
+    other ``/api/v1`` route; it is never added to the open prefixes.
+    """
+
+    return os.environ.get("SKELETON_OMNIFABRIC_API", "1").strip().lower() not in {
+        "0", "false", "no", "off",
+    }
+
+
 def _canonical_memory_mongo_configured() -> bool:
     """Return whether the production canonical Mongo memory binding is configured."""
 
@@ -1064,6 +1077,12 @@ def create_app() -> Any:
     app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
     app.include_router(engine_router, prefix="/api/v1")
     app.include_router(cockpit_router)
+    if _omnifabric_api_enabled():
+        # Lazy import keeps the kernel OmniFabric service off the import path
+        # when the surface is disabled. Mounted before install_gate so the
+        # gate covers /api/v1/omnifabric/*. Cortex stays unmounted here.
+        from skeleton.api.omnifabric_routes import router as omnifabric_router
+        app.include_router(omnifabric_router, prefix="/api/v1")
 
     from skeleton.api.middleware import GatePolicy, install_gate
     gate_policy = GatePolicy(
