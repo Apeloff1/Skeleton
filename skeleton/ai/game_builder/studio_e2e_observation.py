@@ -123,7 +123,7 @@ def observe_goal(goal: Mapping, *, after: int = 0, limit: int = 8) -> dict:
     goal_id = _identifier(goal.get("goal_id"), "goal_id")
     project_id = _identifier(goal.get("project_id"), "project_id")
     status = goal.get("status")
-    if status not in _ALLOWED_STATUS:
+    if not isinstance(status, str) or status not in _ALLOWED_STATUS:
         raise StudioObservationError("invalid goal status")
     history_head = _sha(goal.get("history_digest"), "history digest")
     steps = goal.get("steps")
@@ -170,7 +170,7 @@ def observe_goal(goal: Mapping, *, after: int = 0, limit: int = 8) -> dict:
     if not isinstance(recovery, dict):
         raise StudioObservationError("invalid recovery projection")
     next_action = recovery.get("next_action")
-    if next_action not in {"retry", "advance", "wait", "inspect_dependency",
+    if not isinstance(next_action, (str, type(None))) or next_action not in {"retry", "advance", "wait", "inspect_dependency",
                            "resume", "inspect", "authorize", "stop", None}:
         next_action = "inspect"
 
@@ -194,7 +194,8 @@ def observe_goal(goal: Mapping, *, after: int = 0, limit: int = 8) -> dict:
         "game_qualified": False,
         "dragon_learning": {
             "mode": "observation_only",
-            "candidate_count": len([row for row in visible if row["kind"] == "builder.action_observed"]),
+            "candidate_count": 0,
+            "observed_action_count": len([row for row in visible if row["kind"] == "builder.action_observed"]),
             "promotion": "not_authorized",
             "model_training": "not_authorized",
             "screen_video": "not_captured",
@@ -212,9 +213,22 @@ def observe_tool_execution(outcome: object) -> dict:
 
     if not isinstance(outcome, ExecutionOutcome):
         raise StudioObservationError("actual local execution outcome required")
+    from .studio_execution_plane import EXECUTABLE_TOOLS
+
+    _sha(outcome.intent_digest, "intent digest")
+    _sha(outcome.plan_digest, "tool plan digest")
+    if len(outcome.receipts) > 32:
+        raise StudioObservationError("too many executed tool receipts")
     rows = []
+    previous_receipt = None
     previous = _digest({"intent_digest": outcome.intent_digest, "plan_digest": outcome.plan_digest})
-    for receipt in outcome.receipts:
+    for index, receipt in enumerate(outcome.receipts):
+        if (receipt.index != index or receipt.predecessor_digest != previous_receipt
+                or receipt.tool_id not in EXECUTABLE_TOOLS or receipt.status != "executed"):
+            raise StudioObservationError("tool execution receipt linkage or capability invalid")
+        _sha(receipt.output_digest, "tool output")
+        _sha(receipt.evidence_digest, "tool evidence")
+        previous_receipt = receipt.digest
         record = {
             "tool_id": receipt.tool_id,
             "receipt_digest": receipt.digest,
@@ -237,4 +251,15 @@ def observe_tool_execution(outcome: object) -> dict:
         "screen_video": "not_captured",
         "training": "not_authorized",
         "model_or_hardware_certification": False,
+        "e2e_evidence": {
+            "world_constructed": outcome.world is not None,
+            "winning_python_replay": bool(
+                outcome.project is not None
+                and outcome.project.proof.final_state.status == "won"
+            ),
+            "browser_source_compiled": outcome.project is not None,
+            "godot_source_generated": outcome.package is not None,
+            "adversarial_mirror_passed": bool(outcome.mirror and outcome.mirror.passed),
+            "source_exported": outcome.exported_path is not None,
+        },
     }
