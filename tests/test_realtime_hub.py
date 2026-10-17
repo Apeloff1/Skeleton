@@ -18,11 +18,13 @@ from skeleton.realtime import (
     attach_hub,
 )
 from skeleton.realtime.envelope import ControlEvent, RealtimeEvent
+from skeleton.realtime.hub import sealed_principal_authorizer
 from skeleton.realtime.sinks import JobEventPublisher
 
 
 def _hub(**kw):
     kw.setdefault("id_seed", 1000)
+    kw.setdefault("authorizer", sealed_principal_authorizer)
     return RealtimeHub(**kw)
 
 
@@ -32,9 +34,9 @@ def _events(frames):
 
 def test_single_monotonic_stream_across_channels():
     hub = _hub()
-    a = hub.publish("build", "build.started", {"n": 1}, job_id="job-1")
-    b = hub.publish("agent", "agent.step", {"n": 2})
-    c = hub.publish("build", "build.progress", {"n": 3}, job_id="job-1")
+    a = hub.publish("build", "build.started", {"n": 1}, job_id="job-1", owner="p")
+    b = hub.publish("agent", "agent.step", {"n": 2}, owner="p")
+    c = hub.publish("build", "build.progress", {"n": 3}, job_id="job-1", owner="p")
     assert [a.id, b.id, c.id] == ["1001", "1002", "1003"]
     assert hub.head_id == "1003"
 
@@ -50,16 +52,16 @@ def test_fanout_respects_channels_and_job_filter():
     hub = _hub()
     builds = hub.subscribe(["build"], principal="p")
     job = hub.subscribe(["build", "agent"], principal="p", job_id="job-2")
-    hub.publish("build", "build.log", {"line": "a"}, job_id="job-1")
-    hub.publish("agent", "agent.step", {"s": 1}, job_id="job-2")
-    hub.publish("build", "build.log", {"line": "b"}, job_id="job-2")
+    hub.publish("build", "build.log", {"line": "a"}, job_id="job-1", owner="p")
+    hub.publish("agent", "agent.step", {"s": 1}, job_id="job-2", owner="p")
+    hub.publish("build", "build.log", {"line": "b"}, job_id="job-2", owner="p")
     assert [e.payload for e in _events(builds.drain())] == [{"line": "a"}, {"line": "b"}]
     assert [e.type for e in _events(job.drain())] == ["agent.step", "build.log"]
 
 
 def test_resume_replays_missed_events_after_cursor():
     hub = _hub()
-    ids = [hub.publish("build", "build.progress", {"i": i}).id for i in range(5)]
+    ids = [hub.publish("build", "build.progress", {"i": i}, owner="p").id for i in range(5)]
     sub = hub.subscribe(["build"], principal="p", cursor=int(ids[1]))
     assert [e.id for e in _events(sub.drain())] == ids[2:]
     assert sub.replayed == 3
@@ -70,9 +72,9 @@ def test_resume_replays_missed_events_after_cursor():
 
 def test_aged_out_cursor_gets_stream_reset():
     hub = _hub(replay_capacity=3)
-    first = hub.publish("build", "build.progress", {}).id
+    first = hub.publish("build", "build.progress", {}, owner="p").id
     for _ in range(5):
-        hub.publish("build", "build.progress", {})
+        hub.publish("build", "build.progress", {}, owner="p")
     sub = hub.subscribe(["build"], principal="p", cursor=int(first))
     (frame,) = sub.drain()
     assert isinstance(frame, ControlEvent) and frame.type == "stream.reset"
@@ -83,9 +85,9 @@ def test_aged_out_cursor_gets_stream_reset():
 
 def test_cursor_from_previous_epoch_resets():
     old = _hub(id_seed=5000)
-    cursor = int(old.publish("build", "build.progress", {}).id)
+    cursor = int(old.publish("build", "build.progress", {}, owner="p").id)
     new = _hub(id_seed=9000)
-    new.publish("build", "build.progress", {})
+    new.publish("build", "build.progress", {}, owner="p")
     (frame, *_rest) = new.subscribe(["build"], principal="p", cursor=cursor).drain()
     assert frame.type == "stream.reset"
     ahead = _hub(id_seed=10).subscribe(["build"], principal="p", cursor=99)
@@ -95,7 +97,7 @@ def test_cursor_from_previous_epoch_resets():
 def test_overflow_drops_oldest_and_signals_lagged():
     hub = _hub(subscriber_queue=3)
     sub = hub.subscribe(["build"], principal="p")
-    published = [hub.publish("build", "build.log", {"i": i}).id for i in range(6)]
+    published = [hub.publish("build", "build.log", {"i": i}, owner="p").id for i in range(6)]
     frames = sub.drain()
     assert isinstance(frames[0], ControlEvent) and frames[0].type == "stream.lagged"
     assert frames[0].payload == {"dropped": 3, "resume_from": "1000"}
@@ -122,6 +124,7 @@ def test_secret_guard_redacts_keys_inline_credentials_and_token_shapes():
             "note": "password=hunter22",
             "ok": "compiled 12 files",
         },
+        owner="p",
     )
     flat = ev.to_json()
     assert fake_pat not in flat
@@ -134,7 +137,7 @@ def test_secret_guard_redacts_keys_inline_credentials_and_token_shapes():
 def test_secret_guard_reject_mode_refuses_publish():
     hub = _hub(guard=PayloadSecretGuard(mode="reject"))
     with pytest.raises(RealtimeSecretError):
-        hub.publish("agent", "agent.step", {"token": "abc123"})
+        hub.publish("agent", "agent.step", {"token": "abc123"}, owner="p")
     assert hub.head_id == "1000"
     assert hub.slo.snapshot()["counters"]["publish_rejected"] == 1
 
@@ -187,7 +190,7 @@ def test_publish_is_thread_safe_and_wakes_async_consumer():
 
         def worker():
             for i in range(50):
-                hub.publish("build", "build.progress", {"i": i})
+                hub.publish("build", "build.progress", {"i": i}, owner="p")
 
         t = threading.Thread(target=worker)
         t.start()
@@ -208,7 +211,7 @@ def test_slo_bridges_into_existing_metrics_collector():
     hub = _hub()
     hub.slo.bind_sink(metrics)
     hub.subscribe(["build"], principal="p")
-    hub.publish("build", "build.started", {})
+    hub.publish("build", "build.started", {}, owner="p")
     hub.slo.record_delivered("build", 12.5)
     snap = metrics.snapshot()
     assert any(k.startswith("realtime.events_published") for k in snap["counters"])
@@ -274,6 +277,6 @@ def test_aclose_ends_consumers():
         with pytest.raises(EOFError):
             await sub.next(timeout=1)
         with pytest.raises(RuntimeError):
-            hub.publish("build", "build.log", {})
+            hub.publish("build", "build.log", {}, owner="p")
 
     asyncio.run(scenario())

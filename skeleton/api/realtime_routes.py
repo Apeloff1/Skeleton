@@ -13,6 +13,13 @@ Auth reuses the existing gate: both prefixes are written gate domains, so the
 ``x-gf-seal`` HMAC seal is verified by ``RequestSealMiddleware`` and the
 verified principal arrives as ``x-zaibatsu-attester`` (``AuthMiddleware``).
 Handlers fail closed if that header is absent.
+
+Authorization (Jenkins S1-1): without ``job_id`` a caller only receives
+build/agent events whose hub-side owner is its own principal. With
+``job_id`` the caller must pass ``actor_id`` + ``tenant_id`` and the engine
+execution-events checks (service bearer token, verified attester,
+``engine:events`` grant, actor/tenant ownership) run via
+``engine_routes.authorize_execution_events`` before a job grant is issued.
 """
 
 from __future__ import annotations
@@ -70,11 +77,12 @@ def open_stream(
     job_id: Optional[str],
     cursor: Optional[int],
     max_events: Optional[int] = None,
+    job_grant: Optional[str] = None,
 ) -> StreamingResponse:
     """Subscribe and return the SSE response. Shared with filtered views."""
     hub = get_hub(request.app)
     try:
-        sub = hub.subscribe(channels, principal=principal, cursor=cursor, job_id=job_id)
+        sub = hub.subscribe(channels, principal=principal, cursor=cursor, job_id=job_id, job_grant=job_grant)
     except RealtimeAuthError:
         raise HTTPException(status_code=403, detail={"error": "channel_forbidden"}) from None
     except EnvelopeError as exc:
@@ -99,16 +107,30 @@ async def events_stream(
     job_id: Optional[str] = Query(default=None, max_length=128),
     cursor: Optional[str] = Query(default=None, max_length=32),
     max_events: Optional[int] = Query(default=None, ge=1, le=_MAX_EVENTS_CAP),
+    actor_id: Optional[str] = Query(default=None, min_length=1, max_length=512),
+    tenant_id: Optional[str] = Query(default=None, min_length=1, max_length=512),
     last_event_id: Optional[str] = Header(default=None, alias="last-event-id"),
     attester: Optional[str] = Header(default=None, alias="x-zaibatsu-attester"),
 ) -> StreamingResponse:
+    principal = _principal(attester)
+    wanted = _channels(channels)
+    parsed_cursor = _cursor(last_event_id, cursor)
+    job_grant: Optional[str] = None
+    if job_id is not None:
+        if not actor_id or not tenant_id:
+            raise HTTPException(status_code=422, detail={"error": "job_scope_required", "required": ["actor_id", "tenant_id"]})
+        from skeleton.api.engine_routes import authorize_execution_events
+
+        principal, _snapshot = authorize_execution_events(request, job_id, actor_id=actor_id, tenant_id=tenant_id)
+        job_grant = job_id
     return open_stream(
         request,
-        principal=_principal(attester),
-        channels=_channels(channels),
+        principal=principal,
+        channels=wanted,
         job_id=job_id,
-        cursor=_cursor(last_event_id, cursor),
+        cursor=parsed_cursor,
         max_events=max_events,
+        job_grant=job_grant,
     )
 
 
@@ -164,17 +186,22 @@ def execution_stream_or_none(request: Request, execution_id: str, *, principal: 
 
     Returns ``None`` (caller keeps its JSON response) unless the client asked
     for ``text/event-stream`` and a hub is mounted. Caller must have already
-    authorized access to ``execution_id``.
+    authorized access to ``execution_id`` (``authorize_execution_events``);
+    the stream gets a job grant for exactly that id. An empty principal is
+    denied (no shared fallback identity).
     """
     if not wants_event_stream(request):
         return None
     if getattr(getattr(request.app, "state", None), "realtime_hub", None) is None:
         return None
+    if not principal:
+        raise HTTPException(status_code=401, detail={"error": "seal_required"})
     return open_stream(
         request,
-        principal=principal or "engine-service",
+        principal=principal,
         channels=("build", "agent"),
         job_id=execution_id,
+        job_grant=execution_id,
         cursor=_cursor(request.headers.get("last-event-id"), request.query_params.get("cursor")),
     )
 
