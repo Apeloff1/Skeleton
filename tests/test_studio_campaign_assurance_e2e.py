@@ -35,6 +35,13 @@ def sample_rom() -> bytes:
     return bytes(data)
 
 
+GB_SYMBOLS = (
+    "00:c000 Level\\n00:c001 PlayerX\\n00:c002 PlayerY\\n"
+    "00:c006 Health\\n00:c007 Score\\n00:c008 GemsRemaining\\n"
+    "00:c009 GameWon\\n00:c00a GameLost\\n"
+).replace("\\\\n", "\\n").encode("ascii")
+
+
 class ProductionGateTests(unittest.TestCase):
     def setUp(self):
         self.tmp = TemporaryDirectory()
@@ -90,16 +97,18 @@ class ProductionGateTests(unittest.TestCase):
         rom = sample_rom()
 
         def simulated_compiler(project, target, *, authorized, execute,
-                               output, timeout_seconds):
+                               output, output_symbols, timeout_seconds):
             self.assertEqual(target, "nintendo_game_boy")
             self.assertTrue(authorized)
             self.assertTrue(execute)
             self.assertEqual(timeout_seconds, 45)
             Path(output).write_bytes(rom)
+            Path(output_symbols).write_bytes(GB_SYMBOLS)
             _, source = _verify_source(Path(project), target)
             return _receipt(target, source, available=True, invoked=True,
                             built=True, header=True,
-                            digest=sha256(rom).hexdigest(), size=len(rom))
+                            digest=sha256(rom).hexdigest(), size=len(rom),
+                            symbol_sha256=sha256(GB_SYMBOLS).hexdigest())
 
         with patch(
             "skeleton.ai.game_builder.studio_campaign_assurance.qualify_native_build",
@@ -179,12 +188,15 @@ class ProductionGateTests(unittest.TestCase):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
         rom = sample_rom()
 
-        def fake_compiler(project, target, *, authorized, execute, output, timeout_seconds):
+        def fake_compiler(project, target, *, authorized, execute, output,
+                          output_symbols, timeout_seconds):
             Path(output).write_bytes(rom)
+            Path(output_symbols).write_bytes(GB_SYMBOLS)
             _, digest = _verify_source(Path(project), target)
             return _receipt(target, digest, available=True, invoked=True,
                             built=True, header=True,
-                            digest=sha256(rom).hexdigest(), size=len(rom))
+                            digest=sha256(rom).hexdigest(), size=len(rom),
+                            symbol_sha256=sha256(GB_SYMBOLS).hexdigest())
 
         with patch(
             "skeleton.ai.game_builder.studio_campaign_assurance.qualify_native_build",
