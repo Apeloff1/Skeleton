@@ -13,6 +13,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
 
+from skeleton.ai.game_builder.studio_native_psg import compose_native_psg, console_psg_registers
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_build_qualification import (
     _receipt, _verify_source,
@@ -37,6 +38,11 @@ def sample_rom(tiles: bytes, animation: bytes) -> bytes:
     data = bytearray(32768)
     data[0x0200:0x0260] = tiles
     data[0x0260:0x0270] = animation[16:]
+    score = compose_native_psg("ocean", 733, 0)
+    registers = console_psg_registers(score, "nintendo_game_boy")
+    data[0x0280:0x0290] = bytes((
+        *registers["notes_low"], *registers["notes_high"]
+    ))
     checksum = 0
     for item in data[0x134:0x14D]:
         checksum = (checksum - item - 1) & 255
@@ -49,6 +55,7 @@ GB_SYMBOLS = (
     "00:c006 Health\\n00:c007 Score\\n00:c008 GemsRemaining\\n"
     "00:c009 GameWon\\n00:c00a GameLost\\n00:c00b ScoreHigh\\n00:c00c TurnCount\\n00:c00d TurnCountHigh\\n"
     "00:0200 Tiles\\n00:0260 TilesEnd\\n00:0260 AnimationTiles\\n00:0270 AnimationTilesEnd\\n"
+    "00:0280 OriginalMusicLow\\n00:0288 OriginalMusicHigh\\n"
 ).replace(chr(92) + "n", chr(10)).encode("ascii")
 
 
