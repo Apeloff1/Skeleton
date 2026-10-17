@@ -791,5 +791,137 @@
       "jeeves-cross-engine-executable-gameplay",
       "jeeves-dragon-reviewed-knowledge-gates"
     ]
+  },
+  "jeeves_native_emulator_and_full_game_execution_extension": {
+    "status": "source_integrated_pending_actual_toolchain_and_emulator_qualification",
+    "tranche": "M81-M100",
+    "owners": [
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_campaign_cli.py"
+    ],
+    "milestones": [
+      {
+        "id": "M81",
+        "name": "RGBDS linker generates exact assembler game state symbol map",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M82",
+        "name": "Fail-closed WRAM state symbol parser with canonical label set and address scope",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M83",
+        "name": "Distinct exclusive ROM and symbol publication with rollback of owned output",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M84",
+        "name": "ROM-qualified native SHA and symbol SHA integrity checked before emulation",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M85",
+        "name": "Operator-authorized real GB/GBC CPU emulation through installed PyBoy",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M86",
+        "name": "Real emulator directional input sends full original Python reference actions",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M87",
+        "name": "Read native machine-level WRAM victory/loss/level/position/score/health",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M88",
+        "name": "Compare final native game progress and collectibles against Python full replay",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M89",
+        "name": "Hash real emulated 160x144 LCD frame buffers for controlled game outcome evidence",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M90",
+        "name": "Bound ROM emulator CPU/time/frame budgets to prevent runaway playthroughs",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M91",
+        "name": "Run emulator against private temporary ROM copy rather than edit original project",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M92",
+        "name": "Differentiate synthetic/tested emulator inputs from physical controller qualification",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M93",
+        "name": "Separate native CPU victory and controller gates from compiled structural ROM gates",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M94",
+        "name": "Dragon reads exact native CPU/controller replay evidence without model-weight promotion",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M95",
+        "name": "CLI for bounded actual GB/GBC emulation under explicit local authorization",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M96",
+        "name": "Full synchronized source-ROM-emulator-browser-Godot campaign driver",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M97",
+        "name": "Per-target status, unsupported stages and stable attempt classifications",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M98",
+        "name": "Resume from source and runtime campaign receipts with stop-after-blocker option",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M99",
+        "name": "Full NES/other-console CPU/PPU native emulator adapter and verification",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M100",
+        "name": "Actual first-install compiled native game, emulator full victory and controller review",
+        "state": "not_qualified"
+      }
+    ],
+    "tests": [
+      "tests/test_studio_build_qualification.py",
+      "tests/test_studio_game_boy_emulator_e2e.py",
+      "tests/test_studio_campaign_assurance_e2e.py",
+      "tests/test_studio_execution_campaign_e2e.py"
+    ],
+    "runtime_qualification_state": {
+      "source_code_committed": true,
+      "actual_rgbds_rom_compilation_in_this_session": false,
+      "actual_PyBoy_cartridge_executed_in_this_session": false,
+      "GB_GBC_machine_code_win_verified_on_real_rom": false,
+      "NES_native_CPU_emulation_implemented": false,
+      "physical_controller_qualified": false,
+      "actual_gpu_audio_output_qualified": false,
+      "actual_source_to_release_pipeline_qualified": false,
+      "model_weights_updated": false,
+      "release_signoff": false
+    },
+    "e2e_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
