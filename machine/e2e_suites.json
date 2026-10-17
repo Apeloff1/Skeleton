@@ -285,6 +285,34 @@
         "--noconftest",
         "tests/test_studio_artist_sprite_e2e.py"
       ]
+    },
+    {
+      "id": "jeeves-cross-engine-executable-gameplay",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_browser_probe.js",
+        "skeleton/ai/game_builder/studio_runtime_qualification.py",
+        "skeleton/ai/game_builder/studio_godot_qualification.py",
+        "skeleton/ai/game_builder/studio_pixel_parity.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "tests/test_studio_browser_runtime_e2e.py",
+        "tests/test_studio_godot_runtime_e2e.py",
+        "tests/test_studio_pixel_parity_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_browser_runtime_e2e.py",
+        "tests/test_studio_godot_runtime_e2e.py",
+        "tests/test_studio_pixel_parity_e2e.py"
+      ]
     }
   ]
 }
