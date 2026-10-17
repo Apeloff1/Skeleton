@@ -14,7 +14,7 @@
  */
 import { Platform, TextStyle, ViewStyle } from 'react-native';
 
-export const palette = {
+const palette = {
   ink: {
     0: '#FFFFFF',
     50: '#F8FAFC',
@@ -52,7 +52,7 @@ export const palette = {
   info: { 400: '#60A5FA', 500: '#3B82F6', 600: '#2563EB' },
 } as const;
 
-export const colors = {
+const colors = {
   dark: {
     bg: palette.ink[950],
     bgElevated: palette.ink[900],
@@ -140,12 +140,12 @@ const gradients = {
   glassStrong: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'] as const,
 } as const;
 
-export const spacing = { none: 0, xs: 4, sm: 8, md: 12, base: 16, lg: 20, xl: 24, '2xl': 32, '3xl': 40, '4xl': 56, '5xl': 72 } as const;
-export const radii = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 28, '3xl': 36, full: 9999, pill: 9999 } as const;
+const spacing = { none: 0, xs: 4, sm: 8, md: 12, base: 16, lg: 20, xl: 24, '2xl': 32, '3xl': 40, '4xl': 56, '5xl': 72 } as const;
+const radii = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 28, '3xl': 36, full: 9999, pill: 9999 } as const;
 
 const FONT_UI = Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }) as string;
 const FONT_MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string;
-export const typography = {
+const typography = {
   fontFamily: { ui: FONT_UI, mono: FONT_MONO },
   display: { fontFamily: FONT_UI, fontSize: 34, lineHeight: 40, fontWeight: '800', letterSpacing: -0.5 } as TextStyle,
   h1: { fontFamily: FONT_UI, fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.4 } as TextStyle,
@@ -186,9 +186,9 @@ const motion = {
   },
 } as const;
 
-export const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
+const breathing = { gutter: 14, gutterLg: 18, rowGap: 12, rowGapLg: 16, sectionGap: 20, cardPadding: 14, cardGap: 12, minTouch: 44, minTouchSm: 38, safeBottomMin: 14, headerHeight: 56, rhythmText: 8 } as const;
 const hitSlop = { sm: { top: 6, left: 6, right: 6, bottom: 6 }, md: { top: 10, left: 10, right: 10, bottom: 10 }, lg: { top: 14, left: 14, right: 14, bottom: 14 } } as const;
 
-const theme = { colors: colors.dark, gradients, spacing, radii, typography, elevation, motion, hitSlop, breathing, palette } as const;
+const theme = { colors: colors.dark, colorModes: colors, gradients, spacing, radii, typography, elevation, motion, hitSlop, breathing, palette } as const;
 export type DesignTheme = typeof theme;
 export default theme;
