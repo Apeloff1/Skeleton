@@ -216,10 +216,25 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
         _require(trace in proofs and type(sequence) is int
                  and 1 <= sequence <= proofs[trace]["steps"]
                  and sample.get("seed") == proofs[trace]["seed"]
+                 and sample.get("environment_digest") ==
+                 report["environment"].get("environment_digest")
                  and sample.get("verified_training_projection_sha256") ==
                  proofs[trace]["projections"][sequence - 1]
                  and (trace, sequence) not in seen_samples,
                  "triangle duplicate, altered or cross-source episode sample")
+        _require(set(sample) == {
+            "trace_digest", "environment_digest", "seed", "sequence",
+            "verified_training_projection_sha256", "observation", "action",
+            "next_observation", "measured_reward", "measured_reward_components",
+            "terminated", "truncated", "source",
+        } and _digest({
+            "sequence": sequence, "observation": sample["observation"],
+            "action": sample["action"], "next_observation": sample["next_observation"],
+            "reward": sample["measured_reward"],
+            "reward_components": sample["measured_reward_components"],
+            "terminated": sample["terminated"], "truncated": sample["truncated"],
+        }) == sample["verified_training_projection_sha256"],
+                 "triangle source numeric features do not match native replay projection")
         seen_samples.add((trace, sequence))
     boomerangs = report.get("boomerang_replay_receipts")
     _require(type(boomerangs) is list and all(

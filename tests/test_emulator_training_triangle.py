@@ -29,7 +29,13 @@ def _report(*, count=2, same_frame=False, counterfactual=True):
     samples = []
     for i in range(count):
         trace = f"{i + 1:064x}"
-        projection = _digest(["real-native-projection", i])
+        numeric_projection = {
+            "sequence": 1, "observation": {"visual_change": 0.0},
+            "action": "right", "next_observation": {"visual_change": 0.75},
+            "reward": 0.2, "reward_components": {"progress": 0.2},
+            "terminated": False, "truncated": True,
+        }
+        projection = _digest(numeric_projection)
         frame = ("f" * 64 if same_frame else f"{i + 10:064x}")
         receipt = {
             "run_index": i, "angle": ["exploration", "adversarial"][i % 2],
@@ -64,6 +70,14 @@ def _report(*, count=2, same_frame=False, counterfactual=True):
             "sequence": 1,
             "seed": i + 100,
             "verified_training_projection_sha256": projection,
+            "environment_digest": environment["environment_digest"],
+            "observation": numeric_projection["observation"],
+            "action": numeric_projection["action"],
+            "next_observation": numeric_projection["next_observation"],
+            "measured_reward": numeric_projection["reward"],
+            "measured_reward_components": numeric_projection["reward_components"],
+            "terminated": numeric_projection["terminated"],
+            "truncated": numeric_projection["truncated"],
         })
     data = {
         "train_only_no_heldout_examples": True, "training_executed": False,
@@ -193,3 +207,12 @@ def test_native_receipt_revalidates_triangle_before_accepting_resume(tmp_path):
     _save_new(target, row)
     with pytest.raises(RomStudyError, match="training triangle"):
         verified_rom_receipt(target, expected_source_sha256=source_sha)
+
+def test_rehashed_numeric_change_cannot_bypass_replay_projection():
+    report = _report()
+    samples = report["neural_candidate_dataset"]["candidate_samples"]
+    samples[0]["measured_reward"] = 999.0
+    report["neural_candidate_dataset"]["dataset_digest"] = _digest(samples)
+    _reseal_report(report)
+    with pytest.raises(TrainingTriangleError, match="numeric features"):
+        build_training_triangle(report)
