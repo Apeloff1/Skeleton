@@ -12,6 +12,7 @@ import {
   failOperationResync,
   reduceOperationReplay,
 } from './operationStreamReducer.ts';
+import type { MonthCycleLedger } from './monthCycleLedger';
 import type {
   OperationCanonicalResult,
   OperationClientState,
@@ -448,6 +449,38 @@ export class OperationBrowserSession {
     const replayed = await this.replayOnce(signal);
     if (!replayed.resyncRequired) return replayed;
     return this.resync(signal);
+  }
+
+  /**
+   * Persist the operation identity BEFORE touching the network. If the app
+   * closes at any point, a later foreground recovery pass can enumerate this
+   * receipt and use the canonical replay API to verify its actual state.
+   * The cursor store remains authoritative for exact replay checkpoints.
+   */
+  async resumeDurable(
+    ledger: MonthCycleLedger, signal?: AbortSignal,
+  ): Promise<OperationClientState> {
+    const receipt = await ledger.enroll(this.operationId, this.consumerId, 'operation');
+    if (receipt.status === 'terminal_observed' || receipt.status === 'dismissed') {
+      // Terminal/dismissed operation is not secretly restarted by the client.
+      return this.current ?? this.baseState();
+    }
+    const observed = await this.resume(signal);
+    const now = Date.now();
+    const terminalState = observed.terminal && observed.contentReconciled &&
+      (observed.operationState === 'completed' ||
+        observed.operationState === 'failed' ||
+        observed.operationState === 'cancelled')
+      ? observed.operationState : null;
+    await ledger.observe(receipt, terminalState ? {
+      phase: 'terminal_observed', terminalState,
+      cursor: observed.lastSequence, now,
+    } : {
+      phase: observed.connection === 'error' || observed.resyncRequired ||
+        observed.connection === 'idle' ? 'disconnected' : 'observing',
+      cursor: observed.lastSequence, now, nextCheckAt: now + 5 * 60_000,
+    });
+    return observed;
   }
 
   async follow(signal?: AbortSignal): Promise<OperationClientState> {
