@@ -83,14 +83,177 @@ def _classify(module: str, prefixes: list[tuple[str, str]]) -> str | None:
     return matches[0][1]
 
 
-def _absolute_imports(tree: ast.AST) -> list[tuple[str, int]]:
+def _package_name(relative: str) -> str:
+    """Package used to resolve relative imports in ``relative``."""
+    module = _module_from_path(relative)
+    if module is None:
+        return ""
+    if relative.endswith("/__init__.py"):
+        return module
+    if "." not in module:
+        return ""
+    return module.rsplit(".", 1)[0]
+
+
+def _resolve_relative(package: str, level: int, module: str | None) -> str | None:
+    if level < 1:
+        return None
+    parts = [part for part in package.split(".") if part]
+    drop = level - 1
+    if drop > len(parts):
+        return None
+    base = parts[: len(parts) - drop]
+    if module:
+        base.extend(part for part in module.split(".") if part)
+    if not base:
+        return None
+    return ".".join(base)
+
+
+def _string_constant(node: ast.AST | None) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _call_string(node: ast.Call, index: int, keyword: str) -> str | None:
+    if len(node.args) > index:
+        return _string_constant(node.args[index])
+    for item in node.keywords:
+        if item.arg == keyword:
+            return _string_constant(item.value)
+    return None
+
+
+def _dynamic_importer_names(tree: ast.AST) -> tuple[set[str], set[str]]:
+    """Names bound to the importlib module and to importlib.import_module."""
+    modules: set[str] = set()
+    functions: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                bound = alias.asname or alias.name.split(".", 1)[0]
+                if alias.name == "importlib":
+                    modules.add(bound)
+                elif alias.name == "importlib.import_module":
+                    functions.add(alias.asname or "import_module")
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.level == 0
+            and node.module in {"importlib", "importlib.machinery"}
+        ):
+            for alias in node.names:
+                if alias.name == "import_module":
+                    functions.add(alias.asname or alias.name)
+    return modules, functions
+
+
+def _dynamic_import_module(
+    node: ast.Call,
+    *,
+    importlib_modules: set[str],
+    import_module_names: set[str],
+    package: str,
+) -> str | None:
+    func = node.func
+    is_import_module = False
+    is_builtin = False
+    if isinstance(func, ast.Name):
+        if func.id == "__import__":
+            is_builtin = True
+        elif func.id in import_module_names:
+            is_import_module = True
+    elif (
+        isinstance(func, ast.Attribute)
+        and func.attr == "import_module"
+        and isinstance(func.value, ast.Name)
+        and func.value.id in importlib_modules
+    ):
+        is_import_module = True
+    if not is_import_module and not is_builtin:
+        return None
+    raw = _call_string(node, 0, "name")
+    if raw is None or not raw:
+        return None
+    if not raw.startswith("."):
+        return raw
+    if not is_import_module:
+        return None
+    anchor = _call_string(node, 1, "package") or package
+    level = len(raw) - len(raw.lstrip("."))
+    remainder = raw[level:] or None
+    return _resolve_relative(anchor, level, remainder)
+
+
+def _layer_imports(tree: ast.AST, relative: str) -> tuple[list[tuple[str, int]], list[str]]:
+    """Return classified import targets and local resolution failures.
+
+    Absolute imports, ``from skeleton import name`` (as ``skeleton.name``),
+    relative imports that climb into another package (level >= 2), and
+    string literals passed to ``importlib.import_module`` or ``__import__``
+    are visible. A level-1 relative import stays inside the current package.
+    Non-literal dynamic targets are not guessed.
+    """
+    package = _package_name(relative)
+    importlib_modules, import_module_names = _dynamic_importer_names(tree)
     imports: list[tuple[str, int]] = []
+    failures: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             imports.extend((alias.name, node.lineno) for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            imports.append((node.module, node.lineno))
-    return imports
+            continue
+        if isinstance(node, ast.ImportFrom):
+            if node.level == 0 and node.module:
+                if node.module == "skeleton":
+                    if any(alias.name == "*" for alias in node.names):
+                        failures.append(
+                            f"{relative}:{node.lineno}: star import from skeleton hides the target layer"
+                        )
+                    imports.extend(
+                        (f"skeleton.{alias.name}", node.lineno)
+                        for alias in node.names
+                        if alias.name != "*"
+                    )
+                else:
+                    imports.append((node.module, node.lineno))
+                continue
+            if node.level < 2:
+                continue
+            if node.module:
+                resolved = _resolve_relative(package, node.level, node.module)
+                if resolved is None:
+                    failures.append(
+                        f"{relative}:{node.lineno}: relative import climbs out of the package graph"
+                    )
+                else:
+                    imports.append((resolved, node.lineno))
+                continue
+            if any(alias.name == "*" for alias in node.names):
+                failures.append(
+                    f"{relative}:{node.lineno}: star relative import hides the target layer"
+                )
+            parent = _resolve_relative(package, node.level, None)
+            if parent is None:
+                failures.append(
+                    f"{relative}:{node.lineno}: relative import climbs out of the package graph"
+                )
+                continue
+            imports.extend(
+                (f"{parent}.{alias.name}", node.lineno)
+                for alias in node.names
+                if alias.name != "*"
+            )
+            continue
+        if isinstance(node, ast.Call):
+            resolved = _dynamic_import_module(
+                node,
+                importlib_modules=importlib_modules,
+                import_module_names=import_module_names,
+                package=package,
+            )
+            if resolved:
+                imports.append((resolved, node.lineno))
+    return imports, failures
 
 
 def _has_path_hack(tree: ast.AST) -> bool:
@@ -191,8 +354,10 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             continue
         if _has_path_hack(tree):
             violations.append(f"{relative}: runtime sys.path mutation is forbidden")
+        imported, import_failures = _layer_imports(tree, relative)
+        violations.extend(import_failures)
         forbidden = set(source_layer.get("forbidden_external_roots", []))
-        for module, line in _absolute_imports(tree):
+        for module, line in imported:
             top = module.split(".", 1)[0]
             if top in forbidden:
                 violations.append(

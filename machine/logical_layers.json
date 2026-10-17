@@ -5,7 +5,9 @@
   "policy": {
     "rule": "A classified module may import the same logical layer or a strictly lower order. Sibling layers do not grant each other access.",
     "unclassified_internal_imports": "allowed_but_reported",
-    "relative_imports": "treated as intra-package; they are not cross-layer permission",
+    "relative_imports": "level 1 stays in the current package; level 2 or more is resolved and checked like an absolute import",
+    "root_imports": "from skeleton import name is checked as skeleton.name",
+    "dynamic_imports": "string literals passed to importlib.import_module or __import__ are checked; non-literal targets are not guessed",
     "known_upward_edges_rule": "known_upward_edges must equal the upward edges the scanner finds"
   },
   "layers": [

@@ -99,3 +99,67 @@ class LogicalLayerTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(MODULE.LogicalLayerError, "forbidden external root"):
             MODULE.validate(root)
+
+    def test_rejects_relative_import_into_another_package(self) -> None:
+        root = self._fixture()
+        (root / "skeleton/domain_probe/leak.py").write_text(
+            "from ..edge_probe import marker\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(MODULE.LogicalLayerError, "upward import skeleton.edge_probe"):
+            MODULE.validate(root)
+
+    def test_allows_relative_import_inside_the_same_package(self) -> None:
+        root = self._fixture()
+        (root / "skeleton/domain_probe/local.py").write_text(
+            "from .helper import marker\n",
+            encoding="utf-8",
+        )
+        result = MODULE.validate(root)
+        self.assertEqual(result["status"], "valid")
+
+    def test_allows_downward_relative_import(self) -> None:
+        root = self._fixture()
+        (root / "skeleton/edge_probe/down.py").write_text(
+            "from ..domain_probe import marker\n",
+            encoding="utf-8",
+        )
+        result = MODULE.validate(root)
+        self.assertEqual(result["status"], "valid")
+
+    def test_rejects_skeleton_root_import(self) -> None:
+        root = self._fixture()
+        (root / "skeleton/domain_probe/root_import.py").write_text(
+            "from skeleton import edge_probe\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(MODULE.LogicalLayerError, "upward import skeleton.edge_probe"):
+            MODULE.validate(root)
+
+    def test_rejects_importlib_and_builtin_string_imports(self) -> None:
+        root = self._fixture()
+        (root / "skeleton/domain_probe/dynamic.py").write_text(
+            "import importlib\n"
+            "from importlib import import_module\n"
+            "importlib.import_module('skeleton.edge_probe')\n"
+            "import_module('..edge_probe')\n"
+            "__import__('skeleton.edge_probe.extra')\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(MODULE.LogicalLayerError, "skeleton.edge_probe"):
+            MODULE.validate(root)
+
+    def test_known_edge_covers_relative_and_root_imports(self) -> None:
+        root = self._fixture()
+        (root / "skeleton/domain_probe/listed.py").write_text(
+            "from ..edge_probe import marker\nfrom skeleton import edge_probe\n",
+            encoding="utf-8",
+        )
+        manifest_path = root / "machine/logical_layers.json"
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        data["known_upward_edges"] = [
+            {"source": "skeleton/domain_probe/listed.py", "module": "skeleton.edge_probe"}
+        ]
+        manifest_path.write_text(json.dumps(data), encoding="utf-8")
+        result = MODULE.validate(root)
+        self.assertEqual(result["status"], "valid")

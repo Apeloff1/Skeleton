@@ -15,4 +15,6 @@ Domain code may not import FastAPI, Flask, Django, Requests, HTTPX, SQLAlchemy, 
 
 Unclassified Skeleton imports are reported and do not grant a higher-layer dependency. The numbered `PY-L0`–`PY-L4` ladder in `machine/python_package_layers.json` stays in force beside this view.
 
+The scanner resolves three forms that otherwise skip the layer of the target. A relative import with level 2 or more is resolved from the file's package and checked like an absolute import. `from skeleton import name` is checked as `skeleton.name`. A string literal passed to `importlib.import_module` or `__import__` is checked the same way. A level-1 relative import stays inside the current package. A non-literal dynamic target is not guessed.
+
 Known upward edges are debt, not permission to add another one. They are listed in the machine file and must match the scanner exactly.
