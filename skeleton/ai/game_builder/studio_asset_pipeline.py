@@ -21,6 +21,7 @@ from skeleton.jeeves.game_console_assets import (
 )
 from .contracts import canonical_digest
 from .playable_world import PlayableWorld
+from .studio_sprite_authoring import ArtistSpriteAtlas, palette_identity
 
 
 SCHEMA = "skeleton.game_builder.original_studio_art.v1"
@@ -308,6 +309,7 @@ def _synthesized_wav(*, theme: str, seed: int, density: int, kind: str) -> bytes
 
 def render_studio_art(
     world: PlayableWorld, *, target: str, direction: ArtDirection, authorized: bool,
+    artist_atlas: ArtistSpriteAtlas | None = None,
 ) -> StudioArtPack:
     """Compile real original 8x8 artwork, native tiles, and rendered frames."""
     if authorized is not True:
@@ -316,13 +318,20 @@ def render_studio_art(
         raise StudioArtError("typed canonical world and art direction required")
     if target not in CODECS:
         raise StudioArtError("target has no qualified studio preview/codec adapter")
-    tiles = tuple(_style_tile(name, direction) for name in TILE_NAMES)
+    palette = _palette(world.intent.theme, direction.contrast)
+    if artist_atlas is not None:
+        if not isinstance(artist_atlas, ArtistSpriteAtlas):
+            raise StudioArtError("typed approved original pixel atlas required")
+        if artist_atlas.palette_digest != palette_identity(palette):
+            raise StudioArtError("artist atlas is not bound to destination game palette")
+        tiles = artist_atlas.tiles
+    else:
+        tiles = tuple(_style_tile(name, direction) for name in TILE_NAMES)
     frames = tuple(_animate_hero(tiles[5], i) for i in range(direction.animation_frames))
     codec = CODECS[target]
     native = encode_tiles(tiles, codec)
     if decode_tiles(native, codec) != tiles:
         raise StudioArtError("native artwork did not survive actual planar codec")
-    palette = _palette(world.intent.theme, direction.contrast)
     atlas_pixels = bytearray(8 * len(tiles) * 8 * 4)
     for index, tile in enumerate(tiles):
         for y in range(8):
@@ -362,6 +371,16 @@ def render_studio_art(
         "style": direction.style,
         "contrast": direction.contrast,
         "seed": direction.seed,
+        "original_artist_atlas_used": artist_atlas is not None,
+        "original_artist_source_sha256": (
+            artist_atlas.source_sha256 if artist_atlas is not None else None
+        ),
+        "artist_quantization": (
+            artist_atlas.quantization if artist_atlas is not None else None
+        ),
+        "artist_atlas_digest": (
+            artist_atlas.digest if artist_atlas is not None else None
+        ),
         "foliage_density": direction.foliage_density,
         "shadow_strength": direction.shadow_strength,
         "parallax_layers": direction.parallax_layers,
@@ -398,6 +417,11 @@ def render_studio_art(
         "target": target,
         "codec": codec.value,
         "source_tile_digest": sha256(native).hexdigest(),
+        "artist_source_digest": (
+            artist_atlas.source_sha256 if artist_atlas is not None else None
+        ),
+        "artist_atlas_digest": artist_atlas.digest if artist_atlas is not None else None,
+
         "runtime_art_source_embedded": target in NATIVE_EMBEDDED_TARGETS,
         "native_binary_compiled": False,
         "native_emulator_verified": False,
