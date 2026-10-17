@@ -14,11 +14,28 @@ from skeleton.jeeves.game_emulator_triangle_semantics import (
 
 
 def _episode():
-    from skeleton.jeeves.game_emulator_triangle import build_training_triangle
-    from tests.test_emulator_training_triangle import _report
-
-    report = _report(count=1)
-    return build_training_triangle(report)["episode_lens_references"][0]
+    # A bounded source-shaped fixture that exercises the REAL Jeeves lens
+    # engine, rather than importing a test package from the host environment.
+    return {
+        "source_trace_sha256": "a" * 64,
+        "source_receipt_sha256": "b" * 64,
+        "grounded_lens_evidence": {
+            "controller_action": {"action_sequence_sha256": "c" * 64},
+            "reward_and_consequence": {"measured_reward_sequence_sha256": "d" * 64},
+        },
+        "companion_viewing": {
+            "native_rgb24_frames_optically_inspected": 3,
+            "frame_sequence_sha256": "e" * 64,
+            "audio_sequence_sha256": "f" * 64,
+        },
+        "ai_playing": {
+            "actual_native_steps": 3,
+            "actual_q_table_updates": 3,
+            "counterfactual_native_probes": 2,
+            "controller_only_probes": 1,
+        },
+        "repetition": {"replayed_native_steps": 6, "reverse_checkpoint_count": 2},
+    }
 
 
 def test_canonical_43_lenses_are_selected_and_governed():
