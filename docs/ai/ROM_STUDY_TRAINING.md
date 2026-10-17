@@ -234,3 +234,30 @@ understanding by a vision-language model. Game objects, music semantics and
 narrative interpretations remain unverified until a separate model witnesses
 the original media. Non-native and legacy sessions report missing optics
 rather than receiving fabricated observations.
+
+### Independent adversarial LLM review (local checkpoint)
+
+After a ROM is genuinely played and its triangle receipt has been committed,
+a **separate** admitted local native transformer can execute three independent
+red-team generations against measured training metadata:
+
+```sh
+python -m scripts.training.rom_study review-triangle \
+  --receipt /private/rom-receipts/rom-<source>-<run>.json \
+  --source-sha256 <full-64-hex-source-digest> \
+  --reviewer-checkpoint /private/models/independent-reviewer-checkpoint.json \
+  --output-dir /private/rom-receipts \
+  --max-new-tokens 160
+```
+
+The reviewer must be an **actually installed local Skeleton model checkpoint**;
+the reviewed data alone cannot create a real model. Three real native model
+generations attack source integrity, repetition/causality, and holdout
+generalization. The model and its generated token receipts, hashes, and
+source-linked output are independently persisted under a new create-only
+`triangle-review-*.json` receipt. Each generated judgment is treated as
+untrusted; valid JSON must cite an actual trace. Unsupported or malformed
+outputs are explicitly flagged for manual review. No review self-certifies
+superiority, gameplay success, memory promotion, or trained Jeeves language
+weights. This command never invokes external providers or overwrites a
+previous review and does not run automatically inside every ROM episode.

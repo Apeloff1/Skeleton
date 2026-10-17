@@ -36,6 +36,15 @@ def parser() -> argparse.ArgumentParser:
     )
     bundle.add_argument("--root", required=True, type=Path)
     bundle.add_argument("--entrypoint", required=True)
+    reviewer = commands.add_parser(
+        "review-triangle", help="run a separate local native LLM red-team against ROM evidence"
+    )
+    reviewer.add_argument("--receipt", required=True, type=Path)
+    reviewer.add_argument("--source-sha256", required=True)
+    reviewer.add_argument("--reviewer-checkpoint", required=True, type=Path)
+    reviewer.add_argument("--output-dir", required=True, type=Path)
+    reviewer.add_argument("--seed", type=int, default=0)
+    reviewer.add_argument("--max-new-tokens", type=int, default=160)
     audit = commands.add_parser("audit-fleet", help="read-only verified fleet coverage report")
     audit.add_argument("--root", required=True, type=Path)
     audit.add_argument("--snapshot", required=True, type=Path)
@@ -67,6 +76,62 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "review-triangle":
+            import hashlib
+            from skeleton.ai.training.rom_study import (
+                _hash, _private_output, _safe_path, _save_new, verified_rom_receipt,
+            )
+            from skeleton.jeeves.game_emulator_triangle import verify_training_triangle
+            from skeleton.jeeves.game_emulator_triangle_native_reviewer import (
+                run_native_adversarial_review, verify_native_adversarial_review,
+            )
+            from skeleton.ai.model_runtime.offline_chat import load_offline_engine
+            verified = verified_rom_receipt(
+                args.receipt, expected_source_sha256=args.source_sha256,
+            )
+            source_path = _safe_path(args.receipt)
+            source_raw = source_path.read_bytes()
+            if _hash(source_raw) != verified["receipt_sha256"]:
+                raise RomStudyError("ROM training receipt changed after independent verification")
+            source = json.loads(source_raw)
+            evidence, triangle = source["candidate_evidence"], source["training_triangle"]
+            verify_training_triangle(evidence, triangle)
+            output_dir = _private_output(args.output_dir)
+            # Checkpoint admission uses existing canonical native runtime,
+            # without reaching a hosted provider or editing production weights.
+            reviewer_engine = load_offline_engine(args.reviewer_checkpoint)
+            runtime = reviewer_engine.runtime
+            fingerprint = hashlib.sha256(json.dumps({
+                "receipt": verified["receipt_sha256"], "model": runtime.model_digest,
+                "seed": args.seed, "tokens": args.max_new_tokens,
+            }, sort_keys=True).encode()).hexdigest()
+            destination = output_dir / (
+                "triangle-review-" + args.source_sha256[:16] + "-" + fingerprint[:24] + ".json"
+            )
+            if destination.exists() or destination.is_symlink():
+                record = json.loads(_safe_path(destination).read_bytes())
+                verify_native_adversarial_review(evidence, triangle, record)
+                if record["independent_local_transformer_sha256"] != runtime.model_digest:
+                    raise RomStudyError("prior adversarial review model differs")
+                print(json.dumps({"state": "previous_verified_native_model_review",
+                                  "filename": destination.name,
+                                  "review_digest": record["review_digest"]}, sort_keys=True))
+                return 0
+            record = run_native_adversarial_review(
+                evidence, triangle, runtime, seed=args.seed,
+                max_new_tokens=args.max_new_tokens,
+            )
+            verify_native_adversarial_review(evidence, triangle, record)
+            _save_new(destination, record)
+            print(json.dumps({
+                "state": "native_model_review_executed_requires_manual_adjudication",
+                "filename": destination.name,
+                "review_digest": record["review_digest"],
+                "passes_executed": record["passes_executed"],
+                "structured_source_bound_passes": record["structured_source_bound_passes"],
+                "production_jeeves_weight_updates": 0,
+            }, sort_keys=True))
+            return 0
         if args.operation == "inspect-bundle":
             from skeleton.jeeves.game_emulator_operator_content import (
                 operator_directory_content,
