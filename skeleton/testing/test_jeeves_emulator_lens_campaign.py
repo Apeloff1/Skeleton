@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 import copy
+import io
+import json
+import tempfile
 import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
 
 from skeleton.jeeves.game_emulator_lens_review import (
     review_verified_training_report,
@@ -79,6 +84,22 @@ class LensCampaignContract(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(LensCampaignError):
                     assemble_source_pinned_lens_campaign(report, page_size=invalid)
+
+    def test_operator_cli_assembles_redacted_complete_review_campaign(self):
+        from scripts.game_emulator_lens_campaign import main
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "source.json"
+            source.write_text(json.dumps(_synthetic_report()))
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main([
+                    "--source-report", str(source), "--page-size", "37",
+                ]), 0)
+            result = json.loads(output.getvalue())
+            self.assertTrue(result["full_registered_catalog_covered"])
+            self.assertTrue(result["all_review_pages_reconstructed_from_source"])
+            self.assertFalse(result["independent_native_replay_verified"])
+            self.assertFalse(result["production_model_promotion_authorized"])
 
     def test_missing_reordered_or_duplicate_page_rejected(self):
         pages = _pages()
