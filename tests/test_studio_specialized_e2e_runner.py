@@ -1,7 +1,6 @@
 """Opt-in native original-game E2E suite runner: no CI triggers or fake victories."""
 from __future__ import annotations
 
-from hashlib import sha256
 import json
 from pathlib import Path
 import subprocess
