@@ -14,6 +14,7 @@ from .contracts import canonical_digest
 from .studio_build_qualification import (
     NativeBuildQualificationError,
     _BUILD_ADAPTERS, _header, _regular, _verify_source, qualify_native_build,
+    parse_game_boy_symbols,
 )
 from .studio_campaign import (
     CampaignOrder, StudioCampaignError,
@@ -109,6 +110,15 @@ def _qualification_receipt(root: Path, target: str, source_identity: str) -> dic
     if (sha256(body).hexdigest() != evidence.get("binary_sha256")
             or len(body) != evidence.get("binary_size")):
         raise StudioAssuranceError("ROM differs from the recorded toolchain output")
+    if target in ("nintendo_game_boy", "nintendo_game_boy_color"):
+        map_file = artifact.with_suffix(".sym")
+        try:
+            raw_symbols = _regular(map_file, 128_000)
+            parse_game_boy_symbols(raw_symbols)
+        except (OSError, ValueError) as exc:
+            raise StudioAssuranceError("RGBDS game engine symbol map unavailable") from exc
+        if sha256(raw_symbols).hexdigest() != evidence.get("symbol_sha256"):
+            raise StudioAssuranceError("ROM WRAM debug symbols differ from compilation")
     return record
 
 
@@ -153,6 +163,9 @@ def qualify_campaign_target(
         result = qualify_native_build(
             base / "targets" / target, target, authorized=True,
             execute=True, output=output, timeout_seconds=timeout_seconds,
+            output_symbols=(output.with_suffix(".sym") if target in (
+                "nintendo_game_boy", "nintendo_game_boy_color"
+            ) else None),
         )
         receipt = result.as_receipt()
         if not result.binary_built or not result.rom_header_verified:
