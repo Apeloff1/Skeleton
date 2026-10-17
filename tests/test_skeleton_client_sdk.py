@@ -215,7 +215,7 @@ def test_builds_client_scoped_calls_and_headers():
     builds.cancel("e1", "user abort")
     assert seen[-1][2]["reason"] == "user abort"
     assert builds.events("e1")["next_sequence"] == 2
-    evs = list(builds.stream_events("e1"))
+    evs = list(builds.stream_execution_events("e1"))
     assert [e.type for e in evs] == ["execution.state", "execution.turn"]
     assert evs[1].id == "turn:t1" and evs[1].sequence == 1
     with pytest.raises(ValueError):
@@ -257,7 +257,7 @@ def test_sse_stream_envelope_heartbeats_and_last_event_id():
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=SSE_BODY.encode())
 
     builds = BuildsClient(_gw(handler), actor_id="u", tenant_id="t")
-    evs = list(builds.stream_events("e1", last_event_id="6"))
+    evs = list(builds.stream_execution_events("e1", last_event_id="6"))
     assert seen_headers[0]["last-event-id"] == "6"
     assert len(evs) == 2
     first = evs[0]
@@ -281,7 +281,7 @@ def test_sse_control_events_surface_and_hb_comment_skipped():
         seen.append(req)
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=body.encode())
 
-    evs = list(BuildsClient(_gw(handler), actor_id="u", tenant_id="t").stream_events("e1", cursor="9"))
+    evs = list(BuildsClient(_gw(handler), actor_id="u", tenant_id="t").stream_execution_events("e1", cursor="9"))
     assert [e.type for e in evs] == ["stream.lagged", "stream.reset"]
     assert all(e.is_control for e in evs) and evs[0].payload == {"dropped": 4} and evs[0].id == "10"
     assert seen[0].url.params["cursor"] == "9" and "last-event-id" not in seen[0].headers
@@ -289,7 +289,7 @@ def test_sse_control_events_surface_and_hb_comment_skipped():
 
 def test_ndjson_is_not_a_stream_format_plain_list_still_ok():
     gw = _gw(lambda r: httpx.Response(200, json=[{"type": "x"}, {"type": "heartbeat"}]))
-    assert [e.type for e in BuildsClient(gw, actor_id="u", tenant_id="t").stream_events("e1")] == ["x"]
+    assert [e.type for e in BuildsClient(gw, actor_id="u", tenant_id="t").stream_execution_events("e1")] == ["x"]
     import skeleton.client.streaming as st
     assert not hasattr(st, "parse_ndjson_lines")
 
@@ -316,7 +316,7 @@ def test_stream_retries_retryable_status_then_raises_http_error():
         return httpx.Response(404, json={"detail": "unknown execution"})
 
     with pytest.raises(SkeletonHTTPError) as info:
-        list(BuildsClient(_gw(handler, sleeps=sleeps), actor_id="u", tenant_id="t").stream_events("e1"))
+        list(BuildsClient(_gw(handler, sleeps=sleeps), actor_id="u", tenant_id="t").stream_execution_events("e1"))
     assert info.value.status_code == 404 and sleeps == [pytest.approx(0.3)]
 
 
@@ -369,7 +369,7 @@ def test_sdk_route_tables_match_calls():
     ag.register(["x"]); ag.mesh_stats(); ag.status(); ag.list_workers(); ag.register_worker("X")
     ag.get_worker("X"); ag.heartbeat("X"); ag.unregister_worker("X"); ag.list_tasks(); ag.submit_task("X")
     ag.get_task("X"); ag.cancel_task("X"); ag.revive_task("X"); ag.events(); list(ag.stream_events())
-    b.submit({}); b.status("X"); b.handoff("X"); b.cancel("X"); b.events("X"); list(b.stream_events("X"))
+    b.submit({}); b.status("X"); b.handoff("X"); b.cancel("X"); b.events("X"); list(b.stream_execution_events("X"))
     b.wait("X")
     norm_seen = {(m, re.sub(r"/X(?=/|$)", "/{}", p)) for m, p in seen}
     assert norm_seen <= declared, norm_seen - declared
