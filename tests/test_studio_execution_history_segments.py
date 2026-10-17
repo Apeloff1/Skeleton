@@ -8,7 +8,6 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
 
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.studio_campaign import _atomic_json
