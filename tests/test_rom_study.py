@@ -132,6 +132,7 @@ def _fake_training(tmp_path, monkeypatch, *, updates: int):
         captured.append((request, source_lineage))
         original = {
             "policy_snapshot": {"snapshot_digest": "d" * 64},
+            "environment": {"environment_digest": "f" * 64},
             "actual_q_table_updates": updates,
             "actual_training_steps": 6,
             "actual_neural_parameter_updates": 0,
@@ -205,7 +206,14 @@ def test_optional_neural_candidate_actual_optimizer_seam(tmp_path, monkeypatch):
     model = {"model_digest": "e" * 64, "real_optimizer_steps": 4}
     def fake_optimizer(evidence, policy, *, config, cancel=None):
         trained.append((evidence, policy, config))
+        model.update({
+            "source_evidence_digest": evidence["report_digest"],
+            "source_policy_snapshot_digest": policy["snapshot_digest"],
+            "source_environment_digest": evidence["environment"]["environment_digest"],
+            "measured_predictive_gate": "candidate_predictive_gain_measured",
+        })
         report = {
+            "parent_emulator_evidence_digest": evidence["report_digest"],
             "candidate_status": "candidate_predictive_gain_measured",
             "world_model_digest": model["model_digest"],
             "real_neural_optimizer_steps": model["real_optimizer_steps"],
@@ -511,7 +519,14 @@ def test_fleet_audit_rejects_falsified_neural_optimizer_receipt(tmp_path, monkey
     _fake_training(tmp_path, monkeypatch, updates=3)
     model = {"model_digest": "c" * 64, "real_optimizer_steps": 4}
     def optimizer(evidence, policy, *, config, cancel=None):
+        model.update({
+            "source_evidence_digest": evidence["report_digest"],
+            "source_policy_snapshot_digest": policy["snapshot_digest"],
+            "source_environment_digest": evidence["environment"]["environment_digest"],
+            "measured_predictive_gate": "candidate_predictive_gain_measured",
+        })
         report = {
+            "parent_emulator_evidence_digest": evidence["report_digest"],
             "candidate_status": "candidate_predictive_gain_measured",
             "world_model_digest": model["model_digest"],
             "real_neural_optimizer_steps": 4,
@@ -575,3 +590,60 @@ def test_fleet_audit_hardware_core_coverage_and_alias_deduplication(
     assert full["totals"]["distinct_sources_in_page"] == 2
     assert full["source_execution_coverage_pct"] == 50.0
     assert full["production_jeeves_weights_modified"] is False
+
+
+
+def test_fleet_neural_candidate_cross_source_mismatch_fails_closed(
+    tmp_path, monkeypatch
+):
+    from skeleton.ai.training.rom_inventory_snapshot import (
+        freeze_rom_inventory, load_frozen_inventory,
+    )
+    from skeleton.ai.training.rom_fleet_audit import audit_fleet_all
+    from skeleton.jeeves import game_emulator_neural_world as neural
+    root, first, _ = _roms(tmp_path)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    snapshot_receipt = freeze_rom_inventory(root, private)
+    snap = load_frozen_inventory(
+        Path(snapshot_receipt["manifest_path"]), root=root,
+    )
+    approvals, _ = _approvals(tmp_path, first)
+    _fake_training(tmp_path, monkeypatch, updates=3)
+    model = {"model_digest": "c" * 64, "real_optimizer_steps": 4}
+    def optimizer(evidence, policy, *, config, cancel=None):
+        model.update({
+            "source_evidence_digest": evidence["report_digest"],
+            "source_policy_snapshot_digest": policy["snapshot_digest"],
+            "source_environment_digest": evidence["environment"]["environment_digest"],
+            "measured_predictive_gate": "candidate_predictive_gain_measured",
+        })
+        report = {
+            "world_model_digest": model["model_digest"],
+            "parent_emulator_evidence_digest": evidence["report_digest"],
+            "real_neural_optimizer_steps": 4,
+            "candidate_status": "candidate_predictive_gain_measured",
+            "production_model_promotion": False,
+        }
+        report["report_digest"] = _digest(report)
+        return model, report
+    monkeypatch.setattr(neural, "train_neural_world_from_evidence", optimizer)
+    monkeypatch.setattr(neural, "validate_neural_world_checkpoint", lambda model: None)
+    rom.train_page(root, approvals, private, inventory_snapshot=snap,
+                   runs=1, steps=4, neural_world=True)
+    before = audit_fleet_all(
+        root, Path(snapshot_receipt["manifest_path"]), approvals, private,
+    )
+    assert before["totals"]["verified_neural_candidate_sources"] == 1
+    receipt = next(private.glob("rom-*.json"))
+    document = json.loads(receipt.read_text())
+    # Even a structurally valid and self-consistent candidate from a different
+    # policy snapshot is not admissible under this ROM's source evidence.
+    document["neural_world"]["neural_model"]["source_policy_snapshot_digest"] = "a" * 64
+    receipt.write_text(json.dumps(document) + "\n")
+    rejected = audit_fleet_all(
+        root, Path(snapshot_receipt["manifest_path"]), approvals, private,
+    )
+    assert rejected["totals"]["verified_q_policy_sources"] == 0
+    assert rejected["totals"]["verified_neural_candidate_sources"] == 0
+    assert rejected["totals"]["invalid_or_stale_receipt_sources"] == 1

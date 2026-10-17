@@ -337,7 +337,26 @@ def verified_rom_receipt(path: Path, *, expected_source_sha256: str,
                 or report.get("real_neural_optimizer_steps") != model["real_optimizer_steps"]
                 or neural.get("actual_candidate_optimizer_steps") != model["real_optimizer_steps"]
                 or model["real_optimizer_steps"] <= 0
-                or report.get("production_model_promotion") is not False):
+                or report.get("production_model_promotion") is not False
+                or not isinstance(evidence, dict)
+                or not isinstance(evidence.get("policy_snapshot"), dict)
+                or not isinstance(evidence.get("environment"), dict)
+                or not isinstance(evidence.get("report_digest"), str)
+                or model.get("source_evidence_digest") != evidence["report_digest"]
+                or model.get("source_policy_snapshot_digest") != (
+                    evidence["policy_snapshot"].get("snapshot_digest")
+                )
+                or model.get("source_environment_digest") != (
+                    evidence["environment"].get("environment_digest")
+                )
+                or report.get("parent_emulator_evidence_digest") != (
+                    evidence["report_digest"]
+                )
+                or report.get("candidate_status") != model.get("measured_predictive_gate")
+                or neural.get("heldout_gain_measured") is not (
+                    report.get("candidate_status") == "candidate_predictive_gain_measured"
+                )
+                or neural.get("production_model_promotion_authorized") is not False):
             raise RomStudyError("ROM neural candidate report does not bind the learned checkpoint")
     from skeleton.jeeves.game_learning import _digest
     if (not isinstance(evidence, dict)

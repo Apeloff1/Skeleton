@@ -143,7 +143,11 @@ python -m scripts.training.rom_study audit-fleet \
 
 Inspect `next_cursor` and continue to audit the next page. Audit checks
 source bytes again, source/rights/snapshot identity, Q-training receipts and
-neural candidate evidence. It does not execute the games.
+neural candidate evidence. A trained neural candidate must also bind the
+same replay-report digest, policy snapshot, environment identity, held-out
+candidate decision, optimizer step count and production-promotion boundary.
+A self-consistent model from another ROM is rejected. It does not execute
+the games.
 
 For an entire immutable inventory without manually paging:
 
