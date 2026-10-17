@@ -608,3 +608,61 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 **Release status is still fail-closed.** An actual GB/GBC/NES cartridge compile and emulator victory, full browser/Godot runtime, physical controller, audio/GPU, first-install and six-month/year endurance require separately executed evidence and signoff. A generated code file or authored test must not be counted as an executed console game.
+
+
+## M201–M260: source-real native sprite animation, original PSG and Jeeves studio entrypoints
+
+This is the largest single functional production tranche in the current branch: 60 new explicitly classified milestones, 45 source-implemented and 15 dependent on actual toolchain/AV/endurance qualification. **Neither source emission nor unit fixtures qualify the corresponding emulator/hardware milestone.**
+
+### M201–M220 — actual GB/GBC/NES hero sprite animation
+
+The asset pipeline already authors 1–4 truly different original 8×8 hero frames. Previously, browser and Godot could cycle them but the native cartridge source retained a static tile. The native engines now include all authored frames:
+
+- **Game Boy / Game Boy Color RGBDS:** The first six semantic 2bpp tiles remain a 96-byte source-stable segment. Additional authored hero frames are appended under distinct `AnimationTiles` and `AnimationTilesEnd` labels. Initial VRAM upload includes the entire tile inventory. `AnimTick` and `AnimFrame` advance sprite tile index from tile 5 through the available 1–4 frame cycle, on finite original-game frame intervals. All timing state stays in the real WRAM model; controller/collision/gameplay behavior remains separately verified.
+- **NES ca65/ld65:** Additional 8×8 two-plane CHR frames follow the initial six semantic tiles. The engine advances `AnimTick` / `AnimFrame` within the real 6502 sprite update and changes OAM sprite tile indices. Original goal/loss tile behavior still overrides the ordinary hero animation.
+- **Compiled artwork evidence:** GB/GBC inspections use actual RGBLINK ROM0 animation label bounds, and require the compiled bytes equal the additional encoded original animation frame bytes. NES CHR inspection does the equivalent against the actual compiled iNES CHR bank. Incorrect first frame, frame count, altered compiled pixels, forged symbol addresses, unexpected bytes, or unsafe frame budget cause a fail-closed rejection.
+
+The native source manifests record exact animation count, cadence and source pixel digest. The native creation receipt distinguishes `native_hero_animation_source_integrated` from the still-false `native_hero_animation_runtime_executed`. This is not a claim of visually measured LCD/PPU animation until an actual ROM and emulator playback have been executed.
+
+### M221–M236 — genuine platform-local audio rather than an unplayable WAV attachment
+
+`studio_native_psg.py` creates a deterministic original eight-note theme arrangement, based on the game's theme, creative seed and bounded sound-intensity setting (0–4). It derives native 11-bit square-wave periods with hardware-specific calculations:
+
+- For **GB/GBC**, pulse frequency is related to the register value by `131072 / (2048 - period)`.
+- For **NTSC NES 2A03**, pulse frequency is `1789773 / (16 * (timer + 1))`.
+
+The RGBDS engine now uses actual `NR52/NR50/NR51` audio enable/routing, `NR11–14` for the eight-note melody, and `NR21–24` for distinct collectible/hazard/goal cues. The CGB source reuses these handheld sound hardware controls. The NES engine uses real `$4015` channel enable, `$4000–$4003` pulse-one melody registers, and `$4004–$4007` pulse-two cues. Melody/cue writes occur in the existing game loop and its actual tile interaction outcomes. Zero intensity disables the native audio writer.
+
+**Important fidelity boundary:** Console-local PSG scores are original thematic adaptations; they are not identical waveforms to the PCM16 WAV assets authored for browser and Godot. Existing album/artifact source identity checks do not imply audio waveform or physical speaker equivalence. Audio output, tone accuracy, mixing and latency still require actual playback capture. Register choices and hardware frequency formulas should be verified against <https://www.nesdev.org/wiki/APU_registers> and current Pan Docs before release.
+
+### M237–M245 — single full-studio Jeeves/native-builder behavior
+
+`native_game_cli.build_game()` now decodes actual authored hero frames via the console codec, converts authored animation FPS into bounded 60Hz console tick intervals, generates original PSG score from the same theme/direction, and passes all source pixels and sound parameters through the existing GB/GBC/NES owners. The build receipt exposes the true number of frames, cadence, score identity and the absence of independently executed animation/audio.
+
+`jeeves_app_runtime.game.console.source.stage` can generate the same original animated and musical native source through the **existing human-reviewed project workspace**. It accepts optional bounded `animation_fps` and `music_density` controls without breaking existing callers, verifies source manifest count/digests, and uses the same CAS revision/human approval for source editing. This does not give Jeeves unchecked shell, ROM assembly or checkpoint-training authority.
+
+Tests in `tests/test_studio_native_console_animation_e2e.py` and `tests/test_studio_native_psg.py` verify generated 1–4 frame assembly on all three console families, actual byte insertion in synthetic ROM/CHR fixtures, wrong-art / wrong-address rejections, typed hardware timer limits, five themes × five intensity levels, muted state, visible sound register writes and false-result prevention. Existing Jeeves CLI and native-game tests now assert the new source receipt fields.
+
+### M246–M260 — explicitly unqualified release and endurance work
+
+Actual **RGBDS/ca65 compilation, FCEUX/PyBoy animated gameplay, LCD/PPU framebuffer sequences, APU sound capture, native tone-frequency and mix analysis, frame/input timing under long replay, physical controller/speaker output, packaging, first-install, six-month/year endurance and release signoff** remain separate acceptance milestones. No synthetic ROM fixture, source code string or metadata can sign these off.
+
+### Focused operator commands
+
+```bash
+# Test the authored animation, generated hardware sound score, and reviewed source.
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_native_console_animation_e2e.py \
+  tests/test_studio_native_psg.py \
+  tests/test_jeeves_console_source_stage_e2e.py \
+  tests/test_jeeves_native_studio_art_e2e.py
+
+# For a real original cartridge and CPU/controller replay, install RGBDS /
+# ca65+ld65 plus PyBoy/FCEUX and use the existing explicit-operator E2E CLI.
+python -m skeleton.ai.game_builder.studio_execution_campaign_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --stages source,rom,emulator,browser,godot \
+  --authorize-local-operation --execute-run
+```
+
+No always-on CI workflow was added, because the repository has already been constrained to minimize CI congestion. The manually selectable existing specialized suite lists all relevant offline source-contract tests. **Test registration is not a claim that the suite was run or passed.**
