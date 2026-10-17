@@ -127,7 +127,7 @@ class BuildsClient:
         execution_id: str,
         *,
         poll_seconds: float = 1.0,
-        timeout_seconds: float | None = None,
+        timeout_seconds: float = 600.0,
         cancel: CancelToken | None = None,
         sleep: Callable[[float], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
@@ -135,8 +135,10 @@ class BuildsClient:
         """Poll status until a terminal ``execution_state``/``state``."""
         from skeleton.client.errors import SkeletonTimeoutError
 
+        if timeout_seconds is None or isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be a positive number (default 600)")
         nap = sleep or self._gw._sleep
-        deadline = None if timeout_seconds is None else clock() + timeout_seconds
+        deadline = clock() + timeout_seconds
         while True:
             if cancel is not None:
                 cancel.raise_if_cancelled()
@@ -144,7 +146,7 @@ class BuildsClient:
             state = current.get("execution_state", current.get("state"))
             if state in TERMINAL_STATES:
                 return current
-            if deadline is not None and clock() >= deadline:
+            if clock() >= deadline:
                 raise SkeletonTimeoutError(f"build {execution_id} not terminal (state={state})")
             if cancel is not None and nap is time.sleep:
                 cancel.wait(poll_seconds)
