@@ -194,3 +194,40 @@ test('storage retry after rejection is never poisoned by previous failure', asyn
   await ledger.observe(r, { phase: 'disconnected', now: START + 20 });
   assert.equal((await ledger.inspect())[0].failures, 1);
 });
+
+test('older concurrent status response cannot overwrite newer verified progress', async () => {
+  const ledger = new Ledger(store(), 'alice');
+  const first = await open(ledger);
+  const second = (await ledger.inspect())[0];
+  const accepted = await ledger.observe(second, {
+    phase: 'observing', cursor: 100, now: START + 30 });
+  assert.equal(accepted.observationRevision, 1);
+  const outdated = await ledger.observe(first, {
+    phase: 'disconnected', cursor: 10, now: START + 31 });
+  assert.equal(outdated, null);
+  const current = (await ledger.inspect())[0];
+  assert.equal(current.cursor, 100);
+  assert.equal(current.status, 'observing');
+});
+test('same-millisecond status collisions are fenced by revision not timestamp', async () => {
+  const ledger = new Ledger(store(), 'alice');
+  const token = await open(ledger);
+  const first = await ledger.observe(token, {
+    phase: 'disconnected', now: START, nextCheckAt: START + 300_000 });
+  assert.equal(first.observationRevision, 1);
+  assert.equal(await ledger.observe(token, {
+    phase: 'observing', now: START, nextCheckAt: START + 10 }), null);
+  assert.equal((await ledger.inspect())[0].status, 'disconnected');
+});
+test('fresh receipt version can later record a true terminal response', async () => {
+  const ledger = new Ledger(store(), 'alice');
+  const first = await open(ledger);
+  const accepted = await ledger.observe(first, {
+    phase: 'observing', cursor: 10, now: START + 50 });
+  const result = await ledger.observe(accepted, {
+    phase: 'terminal_observed', terminalState: 'completed',
+    cursor: 99, now: START + 60 });
+  assert.equal(result.terminalState, 'completed');
+  assert.equal(result.cursor, 99);
+  assert.equal(result.observationRevision, 2);
+});
