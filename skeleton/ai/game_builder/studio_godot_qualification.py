@@ -167,23 +167,26 @@ def qualify_godot_headless(
         # Generated source can execute code inside Godot; this requires
         # operator approval and an externally controlled trusted runtime.
         try:
-            result = subprocess.run(
-                [executable, "--headless", "--path", str(project),
-                 "--", "--verify-proof"],
-                cwd=scratch, shell=False, check=False,
-                timeout=timeout_seconds, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env={"PATH": os.defpath, "HOME": scratch,
-                     "XDG_DATA_HOME": scratch, "XDG_CONFIG_HOME": scratch,
-                     "LC_ALL": "C"},
-            )
+            log = Path(scratch) / "godot-proof.log"
+            with log.open("wb") as output:
+                result = subprocess.run(
+                    [executable, "--headless", "--path", str(project),
+                     "--", "--verify-proof"],
+                    cwd=scratch, shell=False, check=False,
+                    timeout=timeout_seconds, stdout=output,
+                    stderr=subprocess.STDOUT,
+                    env={"PATH": os.defpath, "HOME": scratch,
+                         "XDG_DATA_HOME": scratch, "XDG_CONFIG_HOME": scratch,
+                         "LC_ALL": "C"},
+                )
+            if result.returncode != 0 or log.stat().st_size > 64_000:
+                return _receipt(world, source_identity, available=True,
+                                executed=True, failure="godot_headless_replay_failed")
+            output_text = log.read_text("utf-8", errors="replace")
         except (OSError, subprocess.TimeoutExpired) as exc:
             return _receipt(world, source_identity, available=True, executed=True,
                             failure="godot_process_failed:" + type(exc).__name__)
-    if result.returncode != 0 or len(result.stdout) > 64_000:
-        return _receipt(world, source_identity, available=True, executed=True,
-                        failure="godot_headless_replay_failed")
-    match = _GOOD.search(result.stdout.decode("utf-8", errors="replace"))
+    match = _GOOD.search(output_text)
     if not match or match.group(1) != world or int(match.group(2)) != count:
         return _receipt(world, source_identity, available=True, executed=True,
                         failure="godot_world_or_replay_identity_mismatch")
