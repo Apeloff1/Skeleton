@@ -119,6 +119,55 @@ def reference_cpu_checkpoints(engine_source: str | "Path") -> dict:
     }
 
 
+def first_cpu_divergence(
+    observed: list[dict], expected: list[dict],
+) -> dict | None:
+    """Return the first observed CPU mismatch, never a speculative fix.
+
+    The diagnostic names at most nine CPU fields from one action, with no
+    source text, model prompts, user desktop frames or large emulator logs.
+    It is a structured review artifact, not evidence that a repair succeeded.
+    """
+    if (type(observed) is not list or type(expected) is not list
+            or len(observed) > _MAX or len(expected) > _MAX):
+        raise NativeCheckpointError("bounded sample histories required for CPU diagnostics")
+    for index in range(max(len(observed), len(expected))):
+        if index >= len(observed) or index >= len(expected):
+            return {
+                "category": "sample_count_mismatch",
+                "first_sample_index": index,
+                "expected_samples": len(expected),
+                "observed_samples": len(observed),
+            }
+        source = expected[index]
+        actual = observed[index]
+        if (type(source) is not dict or type(actual) is not dict
+                or set(source) != {"action", "state"}
+                or set(actual) != {"action", "state"}):
+            return {"category": "malformed_cpu_sample", "first_sample_index": index}
+        if source["action"] != actual["action"]:
+            return {
+                "category": "controller_action_boundary_mismatch",
+                "first_sample_index": index,
+                "expected_action": source["action"],
+                "observed_action": actual["action"],
+            }
+        if (type(source["state"]) is not dict or type(actual["state"]) is not dict
+                or set(source["state"]) != set(FIELDS)
+                or set(actual["state"]) != set(FIELDS)):
+            return {"category": "malformed_cpu_state", "first_sample_index": index}
+        changed = [key for key in FIELDS if actual["state"][key] != source["state"][key]]
+        if changed:
+            return {
+                "category": "cpu_state_diverged",
+                "first_sample_index": index, "action": source["action"],
+                "changed_fields": changed,
+                "expected": {key: source["state"][key] for key in changed},
+                "observed": {key: actual["state"][key] for key in changed},
+            }
+    return None
+
+
 def validate_checkpoints(
     samples: list[dict] | tuple[dict, ...], *,
     actions: int, source_world: str, source_proof: str,
@@ -210,6 +259,6 @@ def parse_nes_samples(raw: bytes, actions: int) -> list[dict]:
 
 __all__ = [
     "NativeCheckpointError", "SCHEMA", "FIELDS", "selected_checkpoints",
-    "make_checkpoint", "reference_cpu_checkpoints",
+    "make_checkpoint", "first_cpu_divergence", "reference_cpu_checkpoints",
     "validate_checkpoints", "parse_nes_samples",
 ]
