@@ -37,6 +37,7 @@ from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
 from .port_planner import HomebrewSource
+from .studio_asset_pipeline import ArtDirection, render_studio_art, export_studio_art
 from .rights_evidence import read_rights_evidence
 
 _NATIVE = {
@@ -64,6 +65,7 @@ def build_game(
     width: int, height: int, levels: int, collectibles: int,
     hazards: int, health: int, rights_evidence: str | Path,
     creative_identity: tuple[str, ...], output: str | Path, authorized: bool,
+    studio_art: ArtDirection | None = None,
 ) -> dict[str, object]:
     """Create native-source projects from a deterministic game, never HTML."""
     if type(authorized) is not bool or not authorized:
@@ -87,19 +89,28 @@ def build_game(
     proof = demonstrate_solvable(world, authorized=True)
     if proof.world_digest != world.digest or proof.final_state.status != "won":
         raise ValueError("world generator did not prove the original game playable")
+    if studio_art is not None and not isinstance(studio_art, ArtDirection):
+        raise TypeError("studio art direction must be typed")
+    # Preflight and actually render assets BEFORE the source exporter creates
+    # its destination. Invalid art cannot leave a half-created source project.
+    art_pack = (
+        render_studio_art(world, target=target, direction=studio_art, authorized=True)
+        if studio_art is not None else None
+    )
+    tile_art = art_pack.runtime_tiles if art_pack is not None else None
     kind = _NATIVE[target]
     if kind == "gb_rgbds":
-        project = compile_native_game_boy(world, source, authorized=True)
+        project = compile_native_game_boy(world, source, authorized=True, tile_art=tile_art)
         folder = export_native_game_boy(project, output, authorized=True)
         artifact_type = "native_game_boy_rgbds_6502free_rom_source"
         digest = project.content_digest
     elif kind == "cgb_rgbds":
-        project = compile_native_game_boy_color(world, source, authorized=True)
+        project = compile_native_game_boy_color(world, source, authorized=True, tile_art=tile_art)
         folder = export_native_game_boy_color(project, output, authorized=True)
         artifact_type = "native_cgb_rgb555_rgbds_rom_source"
         digest = project.content_digest
     elif kind == "nes_ca65":
-        project = compile_native_nes(world, source, authorized=True)
+        project = compile_native_nes(world, source, authorized=True, tile_art=tile_art)
         folder = export_native_nes(project, output, authorized=True)
         artifact_type = "native_nes_6502_ca65_nrom_source"
         digest = project.content_digest
@@ -158,6 +169,10 @@ def build_game(
         folder = export_native_desktop_source(project, output, authorized=True)
         artifact_type = "native_desktop_sdl2_c11_source"
         digest = project.content_digest
+    art_receipt = (
+        export_studio_art(art_pack, folder, authorized=True)
+        if art_pack is not None else None
+    )
     return {
         "schema": "skeleton.game_builder.native_creation_receipt.v1",
         "project_id": source.project_id,
@@ -176,6 +191,10 @@ def build_game(
         "emulator_verified": False,
         "physical_hardware_verified": False,
         "distribution_licensed": False,
+        "studio_assets": art_receipt,
+        "native_art_embedded": bool(
+            art_receipt and art_receipt["runtime_art_source_embedded"]
+        ),
     }
 
 
@@ -196,6 +215,16 @@ def main() -> None:
     parser.add_argument("--identity", required=True, action="append")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--authorize-original-homebrew", action="store_true")
+    parser.add_argument("--studio-assets", action="store_true",
+                        help="Generate actual sprites, encoded native tiles and PNG previews")
+    parser.add_argument("--studio-style",
+                        choices=("etched", "luminous", "organic", "arcade"),
+                        default="luminous")
+    parser.add_argument("--studio-contrast", choices=("classic", "high"),
+                        default="classic")
+    parser.add_argument("--studio-animation-frames", type=int, default=3)
+    parser.add_argument("--studio-no-outline", action="store_true")
+    parser.add_argument("--studio-no-highlight", action="store_true")
     args = parser.parse_args()
     result = build_game(
         target=args.target, basis=args.basis, project_id=args.project_id,
@@ -205,6 +234,14 @@ def main() -> None:
         rights_evidence=args.rights_evidence,
         creative_identity=tuple(args.identity), output=args.output,
         authorized=args.authorize_original_homebrew,
+        studio_art=(
+            ArtDirection(
+                style=args.studio_style, contrast=args.studio_contrast,
+                animation_frames=args.studio_animation_frames,
+                seed=args.seed, outline=not args.studio_no_outline,
+                highlight=not args.studio_no_highlight,
+            ) if args.studio_assets else None
+        ),
     )
     print(json.dumps(result, sort_keys=True))
 
