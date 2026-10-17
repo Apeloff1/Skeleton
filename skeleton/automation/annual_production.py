@@ -116,6 +116,9 @@ class AnnualProductionStore:
                 self.path.is_symlink() or self.path.is_dir()):
             raise ValueError("existing trusted absolute persistence directory required")
         with self._connect() as db:
+            # Journal mode changes require an exclusive lock; configure it
+            # once during provisioning, not on every year-long worker tick.
+            db.execute("PRAGMA journal_mode=WAL")
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS annual_productions (
                   production_id TEXT PRIMARY KEY,
@@ -173,7 +176,6 @@ class AnnualProductionStore:
         with closing(sqlite3.connect(str(self.path), timeout=5, isolation_level=None)) as db:
             db.execute("PRAGMA busy_timeout=5000")
             db.execute("PRAGMA foreign_keys=ON")
-            db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA synchronous=FULL")
             yield db
 
