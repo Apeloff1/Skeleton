@@ -9,12 +9,28 @@ import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 const API_BASE = CANONICAL_API_BASE;
 const SESSION_API_TIMEOUT_MS = 12_000;
 
-/** Session APIs must settle; a stalled tunnel cannot hold ordered updates forever. */
-async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+/**
+ * Timeout spans both headers and JSON body consumption. Returning a raw
+ * Response before parsing would clear the timer too early and allow a
+ * stalled body to keep an ordered session progress queue alive indefinitely.
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+): Promise<{ ok: boolean; status: number; json: () => Promise<any> }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SESSION_API_TIMEOUT_MS);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    if (!response.ok) {
+      return { ok: false, status: response.status, json: async () => null };
+    }
+    const declaredLength = Number(response.headers?.get?.('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > 512 * 1024) {
+      throw new Error('Synergy response exceeds JSON budget');
+    }
+    const parsed = await response.json();
+    return { ok: true, status: response.status, json: async () => parsed };
   } finally {
     clearTimeout(timeout);
   }
