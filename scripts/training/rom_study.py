@@ -30,6 +30,8 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--runs", type=int, default=12)
     run.add_argument("--steps", type=int, default=24)
     run.add_argument("--seed", type=int, default=0)
+    run.add_argument("--train-neural", action="store_true",
+                     help="also fit a separately validated shadow neural world model per eligible ROM")
     return p
 
 
@@ -48,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
             page = train_page(
                 args.root, args.approvals, args.output_dir, cursor=cursor,
                 limit=args.limit, runs=args.runs, steps=args.steps, seed=args.seed,
+                train_neural=args.train_neural,
             )
             pages += 1
             print(json.dumps({
@@ -56,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
                 "next_cursor": page["next_cursor"],
                 "inventory_exhausted": page["finished_inventory"],
                 "trained": page["q_policy_training_completed"],
+                "shadow_neural_candidates_trained": page["shadow_neural_candidates_trained"],
                 "blocked_or_unreviewed": page["blocked_or_unreviewed"],
                 "results": page["page_results"],
                 "neural_weights_updated": 0,

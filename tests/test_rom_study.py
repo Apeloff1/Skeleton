@@ -171,3 +171,30 @@ def test_multifile_descriptor_is_never_silently_trained(tmp_path):
     assert result["q_policy_training_completed"] == 0
     assert result["page_results"][0]["state"] == "explicit_multifile_bundle_required"
     assert result["production_weights_modified"] is False
+
+
+def test_neural_candidate_rejects_forged_or_missing_q_evidence(tmp_path):
+    from skeleton.ai.training.rom_study import train_neural_candidate
+    out = tmp_path / "private"
+    out.mkdir(mode=0o700)
+    fake = out / "rom-fake.json"
+    fake.write_text('{"schema_version":"skeleton.jeeves.rom_training_batch.v1"}')
+    with pytest.raises(RomStudyError, match="genuine source Q"):
+        train_neural_candidate(fake, out)
+
+
+def test_unapproved_neural_flag_cannot_update_weights(tmp_path, monkeypatch):
+    roms = tmp_path / "roms"
+    roms.mkdir()
+    _original(roms, "game.gb", b"operator-homebrew")
+    approvals = _approval_file(tmp_path / "rights.json", [])
+    receipts = tmp_path / "receipts"
+    receipts.mkdir(mode=0o700)
+    from skeleton.jeeves import game_emulator_neural_world
+    def forbidden(*args, **kwargs):
+        raise AssertionError("neural optimizer must never run for an unapproved ROM")
+    monkeypatch.setattr(game_emulator_neural_world, "train_neural_world_from_evidence", forbidden)
+    result = train_page(roms, approvals, receipts, train_neural=True)
+    assert result["q_policy_training_completed"] == 0
+    assert result["shadow_neural_candidates_trained"] == 0
+    assert result["production_weights_modified"] is False

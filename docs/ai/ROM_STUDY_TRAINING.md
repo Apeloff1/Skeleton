@@ -89,7 +89,7 @@ python -m scripts.training.rom_study train-all \
   --root /private/rom-library \
   --approvals /private/rom-training-approvals.json \
   --output-dir /private/rom-training-receipts \
-  --limit 32 --max-pages 1 --runs 12 --steps 24
+  --limit 32 --max-pages 1 --runs 12 --steps 24 --train-neural
 \`\`\`
 
 The command prints a continuation cursor and a status for **each** candidate.
@@ -103,6 +103,17 @@ still enforces the canonical lab's finite safety/resource budgets. Changing
 a training configuration creates a new candidate identity without overwriting
 earlier records.
 
+With `--train-neural`, each successful replay-audited Q receipt is also
+passed to the **existing** `game_emulator_neural_world` optimizer. It
+reconstructs the exact Q policy and evidence digests, rejects unverified
+or insufficient replay examples, fits an actual two-hidden-layer candidate
+network with episode-separated held-out evaluation, validates parameter
+shapes and real optimizer steps, then publishes an additional private
+`rom-world-*.json` candidate. Failed neural quality gates remain visible
+and cannot promote a model; previously committed Q training is retained.
+This trains a numeric predictive world model, **not Jeeves's speaking LLM**.
+The `--train-neural` option is explicit to avoid unexpected CPU work.
+
 The pipeline hashes the input **again** before training; selects only the
 operator-approved core and hardware mapping; admits small files through
 canonical archive inspection, or streams larger standalone images through
@@ -115,7 +126,9 @@ reported as a failed item and does not impersonate successful training.
 ## 4. What this teaches Jeeves and Dragon now
 
 The existing emulator lab performs real observed **tabular Q-policy updates**
-per eligible ROM and produces replay-verified numeric
+per eligible ROM. With the explicit neural option, it also trains genuine
+shadow neural parameters against a replay-verified held-out partition.
+The lab produces replay-verified numeric
 \`neural_candidate_dataset\` rows. These are **candidates**, not updates to
 the Jeeves speaking transformer. Source-specific memory addresses and victory
 conditions are not guessed: visual novelty is not proof of winning a game.

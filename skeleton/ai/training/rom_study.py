@@ -309,10 +309,107 @@ def _content_for_training(path: Path, *, sha: str, core: Any) -> Any:
     return prepare_emulator_content(bundle, reader=reader)
 
 
+
+def train_neural_candidate(
+    q_receipt_path: Path, output_dir: Path, *,
+    seed: int = 0, width: int = 12, epochs: int = 6,
+) -> dict[str, Any]:
+    """Fit actual *shadow world-model* parameters from audited ROM Q evidence.
+
+    The original ROM and Q receipt are never overwritten. The network
+    predicts numerical one-step telemetry, NOT dialogue, game mastery, or
+    production Jeeves weights. Actual source replay is verified again before
+    the optimizer starts.
+    """
+    from skeleton.jeeves.game_learning import _digest
+    from skeleton.jeeves.game_emulator_neural_world import (
+        NeuralWorldConfig, train_neural_world_from_evidence,
+        validate_neural_world_checkpoint, verify_neural_training_sources,
+    )
+    output_dir = _private_output(output_dir)
+    q_receipt_path = _safe_path(q_receipt_path)
+    if q_receipt_path.parent != output_dir:
+        raise RomStudyError("neural source receipt must come from the private training directory")
+    before = _regular_identity(q_receipt_path)
+    if before[2] > 32 * 1024 * 1024:
+        raise RomStudyError("ROM neural source receipt is oversized")
+    with q_receipt_path.open("rb") as stream:
+        raw = stream.read(32 * 1024 * 1024 + 1)
+    if len(raw) != before[2] or _regular_identity(q_receipt_path) != before:
+        raise RomStudyError("ROM Q receipt changed during neural intake")
+    try:
+        document = json.loads(raw)
+    except (UnicodeError, ValueError, RecursionError) as exc:
+        raise RomStudyError("invalid ROM Q evidence JSON") from exc
+    if (not isinstance(document, dict) or document.get("schema_version") != BATCH_SCHEMA
+            or document.get("training_kind") != "actual_replay_audited_tabular_q_policy"
+            or document.get("neural_weights_updated") != 0
+            or document.get("production_weights_modified") is not False
+            or not isinstance(document.get("candidate_evidence"), dict)):
+        raise RomStudyError("neural model requires a genuine source Q training receipt")
+    evidence_raw = document["candidate_evidence"]
+    policy = evidence_raw.get("policy_snapshot")
+    if not isinstance(policy, dict):
+        raise RomStudyError("neural model source policy is unavailable")
+    evidence = {key: value for key, value in evidence_raw.items()
+                if key != "policy_snapshot"}
+    evidence["policy_snapshot_digest"] = policy.get("snapshot_digest")
+    evidence["evidence_digest"] = _digest(evidence)
+    validated, _, _, source_digest = verify_neural_training_sources(evidence, policy)
+    if len(validated) != evidence.get("actual_training_steps"):
+        raise RomStudyError("neural candidate source and replay episode counts differ")
+    config = NeuralWorldConfig(
+        seed=seed, holdout_seed=(seed + 1) % (2**63),
+        width=width, epochs=epochs, minibatch=8,
+        max_samples=512, max_compute_units=8_000_000,
+    )
+    selection = _hash(_canonical({
+        "q_receipt_sha256": _hash(raw), "config": {
+            "seed": seed, "width": width, "epochs": epochs,
+        }
+    }))
+    source_sha = document["source_sha256"]
+    if not isinstance(source_sha, str) or not _SHA.fullmatch(source_sha):
+        raise RomStudyError("neural candidate source identity invalid")
+    name = "rom-world-" + source_sha[:16] + "-" + selection[:16] + ".json"
+    destination = output_dir / name
+    if destination.exists() or destination.is_symlink():
+        return {
+            "state": "previous_neural_candidate_receipt_exists",
+            "candidate_name": name, "neural_training_reexecuted": False,
+        }
+    model, measurements = train_neural_world_from_evidence(
+        evidence, policy, config=config,
+    )
+    validate_neural_world_checkpoint(model)
+    if (measurements["world_model_digest"] != model["model_digest"]
+            or model["real_optimizer_steps"] < 1
+            or model["actual_neural_parameter_training_executed"] is not True
+            or model["production_model_promotion_authorized"] is not False
+            or model["not_a_jeeves_transformer_update"] is not True):
+        raise RomStudyError("neural optimizer or model custody check failed")
+    digest = _save_new(destination, {
+        "schema_version": "skeleton.jeeves.rom_neural_candidate.v1",
+        "rom_sha256": source_sha, "source_q_receipt_sha256": _hash(raw),
+        "source_emulator_report_digest": source_digest,
+        "model": model, "heldout_measurements": measurements,
+        "production_jeeves_weights_updated": False,
+        "candidate_only_no_auto_promotion": True,
+    })
+    return {
+        "state": "shadow_neural_candidate_trained",
+        "candidate_name": name, "candidate_sha256": digest,
+        "real_neural_optimizer_steps": model["real_optimizer_steps"],
+        "heldout_status": measurements["candidate_status"],
+        "neural_training_reexecuted": True,
+    }
+
+
 def train_page(
     root: Path, approvals_path: Path, output_dir: Path, *,
     cursor: str | None = None, limit: int = 32,
     runs: int = 12, steps: int = 24, seed: int = 0,
+    train_neural: bool = False,
     cancel: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     """Run every eligible ROM on this page; persist per-ROM results before continuing.
@@ -328,6 +425,8 @@ def train_page(
     )
     from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
 
+    if type(train_neural) is not bool:
+        raise RomStudyError("neural candidate flag must be a boolean")
     if (type(runs) is not int or not 1 <= runs <= 32
             or type(steps) is not int or not 1 <= steps <= 128
             or type(seed) is not int or not 0 <= seed <= 2**63 - 1):
@@ -380,6 +479,17 @@ def train_page(
             if target.exists() or target.is_symlink():
                 summary["state"] = "previous_receipt_exists_not_reexecuted"
                 summary["receipt_name"] = filename
+                if train_neural:
+                    try:
+                        summary["neural_candidate"] = train_neural_candidate(
+                            target, output_dir, seed=seed,
+                        )
+                    except (ValueError, OSError, RuntimeError) as exc:
+                        summary["neural_candidate"] = {
+                            "state": "neural_candidate_blocked",
+                            "failure_type": type(exc).__name__,
+                            "failure_reason": str(exc)[:200],
+                        }
                 results.append(summary)
                 continue
             prepared = _content_for_training(
@@ -427,6 +537,17 @@ def train_page(
                 "measured_steps": evidence["actual_training_steps"],
                 "receipt_name": filename, "receipt_sha256": receipt_digest,
             })
+            if train_neural:
+                try:
+                    summary["neural_candidate"] = train_neural_candidate(
+                        target, output_dir, seed=seed,
+                    )
+                except (ValueError, OSError, RuntimeError) as exc:
+                    summary["neural_candidate"] = {
+                        "state": "neural_candidate_blocked",
+                        "failure_type": type(exc).__name__,
+                        "failure_reason": str(exc)[:200],
+                    }
         except (ValueError, OSError, RuntimeError, ImportError) as exc:
             summary["state"] = "emulator_training_blocked"
             summary["failure_type"] = type(exc).__name__
@@ -441,6 +562,9 @@ def train_page(
         "page_results": results,
         "q_policy_training_completed": sum(
             row["state"] == "q_policy_trained_with_receipt" for row in results),
+        "shadow_neural_candidates_trained": sum(
+            row.get("neural_candidate", {}).get("state") ==
+            "shadow_neural_candidate_trained" for row in results),
         "blocked_or_unreviewed": sum(
             row["state"] not in ("q_policy_trained_with_receipt",
                                  "previous_receipt_exists_not_reexecuted")
