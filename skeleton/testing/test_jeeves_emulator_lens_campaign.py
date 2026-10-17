@@ -8,7 +8,8 @@ from skeleton.jeeves.game_emulator_lens_review import (
     review_verified_training_report,
 )
 from skeleton.jeeves.game_emulator_lens_campaign import (
-    LensCampaignError, audit_lens_campaign,
+    LensCampaignError, assemble_source_pinned_lens_campaign,
+    audit_lens_campaign,
 )
 from skeleton.testing.test_jeeves_emulator_full_lens_review import _synthetic_report
 
@@ -60,6 +61,24 @@ class LensCampaignContract(unittest.TestCase):
         })
         with self.assertRaises(LensCampaignError):
             audit_lens_campaign(forged, source_report=report)
+
+    def test_full_campaign_assembles_all_lenses_for_varied_page_sizes(self):
+        report = _synthetic_report()
+        for size in (1, 17, 37, 64, 256, 512):
+            with self.subTest(page_size=size):
+                assembled = assemble_source_pinned_lens_campaign(
+                    report, page_size=size,
+                )
+                self.assertTrue(assembled["full_registered_catalog_covered"])
+                self.assertTrue(assembled["all_review_pages_reconstructed_from_source"])
+                self.assertEqual(
+                    assembled["lens_count"], _pages()[0]["catalog_lens_count"],
+                )
+                self.assertFalse(assembled["production_model_promotion_authorized"])
+        for invalid in (0, -1, 513, True, 2.5):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(LensCampaignError):
+                    assemble_source_pinned_lens_campaign(report, page_size=invalid)
 
     def test_missing_reordered_or_duplicate_page_rejected(self):
         pages = _pages()
