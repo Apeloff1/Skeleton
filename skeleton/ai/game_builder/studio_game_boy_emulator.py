@@ -21,6 +21,9 @@ from .studio_build_qualification import (
     _header, _regular, parse_game_boy_symbols,
 )
 from .studio_runtime_qualification import _inputs as _engine_inputs
+from .studio_native_replay_telemetry import (
+    selected_checkpoints, make_checkpoint, validate_checkpoints, NativeCheckpointError,
+)
 
 SCHEMA = "skeleton.game_builder.game_boy_emulator_playthrough.v1"
 PLATFORMS = frozenset(("nintendo_game_boy", "nintendo_game_boy_color"))
@@ -46,6 +49,8 @@ class GameBoyEmulationResult:
     frames_advanced: int
     source_actions: int
     framebuffer_sha256: str | None
+    checkpoint_digest: str | None
+    sampled_checkpoints: int
     last_state: dict | None
     blocker: str | None
     receipt_digest: str
@@ -62,6 +67,8 @@ class GameBoyEmulationResult:
             "frames_advanced": self.frames_advanced,
             "source_actions": self.source_actions,
             "framebuffer_sha256": self.framebuffer_sha256,
+            "checkpoint_digest": self.checkpoint_digest,
+            "sampled_checkpoints": self.sampled_checkpoints,
             "last_state": self.last_state,
             "blocker": self.blocker,
             "physical_controller_verified": False,
@@ -78,7 +85,8 @@ class GameBoyEmulationResult:
 def _receipt(target: str, rom: str, symbols: str, world: str, proof: str, *,
              available: bool, executed: bool = False, full: bool = False,
              won: bool = False, frames: int = 0, actions: int = 0,
-             framebuffer: str | None = None, state: dict | None = None,
+             framebuffer: str | None = None, checkpoint: str | None = None,
+             sampled: int = 0, state: dict | None = None,
              blocker: str | None = None) -> GameBoyEmulationResult:
     body = {
         "schema": SCHEMA, "target": target, "rom_sha256": rom,
@@ -87,6 +95,7 @@ def _receipt(target: str, rom: str, symbols: str, world: str, proof: str, *,
         "emulator_executed": executed, "full_controller_replay": full,
         "machine_code_victory": won, "frames_advanced": frames,
         "source_actions": actions, "framebuffer_sha256": framebuffer,
+        "checkpoint_digest": checkpoint, "sampled_checkpoints": sampled,
         "last_state": state, "blocker": blocker,
         "physical_controller_verified": False,
         "emulator_audio_verified": False, "physical_console_verified": False,
@@ -94,7 +103,8 @@ def _receipt(target: str, rom: str, symbols: str, world: str, proof: str, *,
     }
     return GameBoyEmulationResult(
         target, rom, symbols, world, proof, available, executed, full, won,
-        frames, actions, framebuffer, state, blocker, canonical_digest(body),
+        frames, actions, framebuffer, checkpoint, sampled, state, blocker,
+        canonical_digest(body),
     )
 
 
@@ -171,6 +181,8 @@ def qualify_game_boy_emulator(
     from pyboy import PyBoy
     advanced = 0
     state = None
+    sampled_events = []
+    sample_indices = set(selected_checkpoints(len(actions)))
     deadline = monotonic() + timeout_seconds
     with tempfile.TemporaryDirectory(prefix="skeleton-pyboy-original-") as scratch:
         private_rom = Path(scratch) / ("original.gbc" if target.endswith("_color") else "original.gb")
@@ -206,6 +218,8 @@ def qualify_game_boy_emulator(
                     emulator.tick()
                     advanced += 1
                 state = _wram(emulator, labels)
+                if index + 1 in sample_indices:
+                    sampled_events.append(make_checkpoint(index + 1, state))
                 if state["GameLost"]:
                     return _receipt(target, rom_sha, sym_sha, world, proof_sha,
                                     available=True, executed=True, frames=advanced,
@@ -229,11 +243,26 @@ def qualify_game_boy_emulator(
                 and actual["Health"] == expected["health"]
             )
             frame = _frame_hash(emulator)
+            try:
+                checkpoint = validate_checkpoints(
+                    sampled_events, actions=len(actions),
+                    source_world=world, source_proof=proof_sha,
+                    expected_final=expected,
+                )
+            except NativeCheckpointError:
+                return _receipt(
+                    target, rom_sha, sym_sha, world, proof_sha,
+                    available=True, executed=True, full=True, won=False,
+                    frames=advanced, actions=len(actions), state=actual,
+                    framebuffer=frame, blocker="native_cpu_checkpoint_state_mismatch",
+                )
             return _receipt(
                 target, rom_sha, sym_sha, world, proof_sha,
                 available=True, executed=True, full=True, won=outcome,
                 frames=advanced, actions=len(actions), state=actual,
                 framebuffer=frame,
+                checkpoint=checkpoint["checkpoint_digest"],
+                sampled=checkpoint["sampled_boundaries"],
                 blocker=None if outcome else "compiled_cartridge_diverged_from_reference_replay",
             )
         finally:
