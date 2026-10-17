@@ -141,7 +141,7 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
                     registry_cache.append(GameEmulatorRegistry.from_environment())
                 registry = registry_cache[0]
                 core = registry.resolve_core(grant["core_id"])
-                if grant["target_id"] not in core.target_ids:
+                if core is None or grant["target_id"] not in core.target_ids:
                     raise RomStudyError("core no longer supports approved target")
                 audited_sha = _verify_existing_q_receipt(
                     path, source_sha=digest, size=row["size_bytes"],
@@ -158,7 +158,7 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
                     "neural_candidate_status": proof["neural_candidate_status"],
                     "neural_candidate_optimizer_steps": proof["neural_candidate_optimizer_steps"],
                 })
-            except (ValueError, OSError, LookupError, ImportError):
+            except (ValueError, OSError, LookupError, ImportError, RuntimeError):
                 rejected += 1
         if audited:
             trained = any(value["q_updates"] > 0 for value in audited)
