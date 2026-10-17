@@ -5,7 +5,6 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from dataclasses import replace
 
 from skeleton.jeeves.game_console_assets import png_rgba, decode_png
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
@@ -18,7 +17,6 @@ from skeleton.ai.game_builder.studio_sprite_authoring import (
     StudioSpriteAuthoringError, import_artist_sprite_png,
     palette_identity, typed_artist_tiles,
 )
-from skeleton.ai.game_builder.native_game_cli import build_game
 from skeleton.ai.game_builder.studio_campaign import (
     CampaignOrder, StudioCampaignError, run_campaign,
 )
