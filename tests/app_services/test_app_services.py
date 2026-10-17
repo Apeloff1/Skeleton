@@ -39,7 +39,7 @@ def test_migrations_idempotent_and_versioned(tmp_path):
     assert db.schema_version() == MIGRATIONS[-1][0]
     db2 = Database(tmp_path / "y.db")
     assert db2.migrate(target=2) == [1, 2]
-    assert db2.migrate() == [3, 4, 5, 6]
+    assert db2.migrate() == [3, 4, 5, 6, 7]
 
 
 def test_adapters_satisfy_ports(app):

@@ -43,7 +43,8 @@ def test_create_list_get(env):
     r2 = c.post("/api/v1/projects", json={"brief": {"title": "Puzzle", "genre": "puzzle", "constraints": ["gb"]}},
                 headers={**ha, "Idempotency-Key": "k1"})
     assert r2.status_code == 201
-    r3 = c.post("/api/v1/projects", json={"brief": {"title": "Puzzle"}}, headers={**ha, "Idempotency-Key": "k1"})
+    r3 = c.post("/api/v1/projects", json={"brief": {"title": "Puzzle", "genre": "puzzle", "constraints": ["gb"]}},
+               headers={**ha, "Idempotency-Key": "k1"})
     assert r3.status_code == 200 and r3.json()["project_id"] == r2.json()["project_id"]
     err(c.post("/api/v1/projects", json={"brief": "Space shooter"}, headers=ha), 409, "PROJECT.NAME_CONFLICT")
     err(c.post("/api/v1/projects", json={"brief": ""}, headers=ha), 400, "PROJECT.INVALID")
@@ -119,3 +120,47 @@ def test_seal_and_session_both_required(env, monkeypatch):
     seal = {"x-gf-seal": mint_seal("sdk")}
     err(c.get("/api/v1/projects", headers=seal), 401, "PROJECT.UNAUTHENTICATED")  # seal, no session
     assert c.get("/api/v1/projects", headers={**seal, **ha}).status_code == 200
+
+
+def test_build_idempotency_mismatch_and_create_mismatch(env):
+    c, ha, *_ = env
+    pid = c.post("/api/v1/projects", json={"brief": "Idem"}, headers=ha).json()["project_id"]
+    a = c.post(f"/api/v1/projects/{pid}/builds", json={"target": "gb", "idempotency_key": "k"}, headers=ha)
+    same = c.post(f"/api/v1/projects/{pid}/builds", json={"target": "gb", "idempotency_key": "k"}, headers=ha)
+    assert same.status_code == 202 and same.json()["build_id"] == a.json()["build_id"] and same.json()["replayed"]
+    err(c.post(f"/api/v1/projects/{pid}/builds", json={"target": "nes", "idempotency_key": "k"}, headers=ha),
+        409, "PROJECT.IDEMPOTENCY_MISMATCH")
+    err(c.post(f"/api/v1/projects/{pid}/builds",
+               json={"target": "gb", "options": {"x": 1}, "idempotency_key": "k"}, headers=ha),
+        409, "PROJECT.IDEMPOTENCY_MISMATCH")
+    h = {**ha, "Idempotency-Key": "ck"}
+    assert c.post("/api/v1/projects", json={"brief": "One"}, headers=h).status_code == 201
+    assert c.post("/api/v1/projects", json={"brief": "One"}, headers=h).status_code == 200
+    err(c.post("/api/v1/projects", json={"brief": "Two"}, headers=h), 409, "PROJECT.IDEMPOTENCY_MISMATCH")
+
+
+def test_builds_list_pagination(env):
+    c, ha, *_ = env
+    pid = c.post("/api/v1/projects", json={"brief": "Pages"}, headers=ha).json()["project_id"]
+    ids = [c.post(f"/api/v1/projects/{pid}/builds", json={"target": str(i)}, headers=ha).json()["build_id"]
+           for i in range(3)]
+    p1 = c.get(f"/api/v1/projects/{pid}/builds?limit=2", headers=ha).json()
+    assert [b["build_id"] for b in p1["items"]] == ids[::-1][:2] and p1["next_cursor"]
+    p2 = c.get(f"/api/v1/projects/{pid}/builds?limit=2&cursor={p1['next_cursor']}", headers=ha).json()
+    assert [b["build_id"] for b in p2["items"]] == [ids[0]] and p2["next_cursor"] is None
+    assert p1["schema_version"] == "1.0.0"
+    err(c.get(f"/api/v1/projects/{pid}/builds?limit=101", headers=ha), 400, "PROJECT.INVALID")
+    err(c.get(f"/api/v1/projects/{pid}/builds?limit=abc", headers=ha), 400, "PROJECT.INVALID")
+    err(c.get(f"/api/v1/projects/{pid}/builds?cursor=zzz", headers=ha), 400, "PROJECT.INVALID")
+
+
+def test_projects_builds_run_through_job_api_handler(env):
+    c, ha, _, svc, _ = env
+    from skeleton.app_services.job_api import JobWorker
+    svc.jobs.register_handler("game.build", lambda ctx, p: (ctx.log("compiling"), {"rom": p["target"]})[1])
+    pid = c.post("/api/v1/projects", json={"brief": "Runs"}, headers=ha).json()["project_id"]
+    b = c.post(f"/api/v1/projects/{pid}/builds", json={"target": "gb"}, headers=ha).json()
+    assert JobWorker(svc.jobs).drain() == 1
+    got = c.get(f"/api/v1/projects/{pid}/builds/{b['build_id']}", headers=ha).json()
+    assert got["status"] == "succeeded" and got["result"] == {"rom": "gb"}
+    assert svc.jobs.get_result(b["job_id"]).result == {"rom": "gb"}
