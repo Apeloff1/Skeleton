@@ -5,6 +5,7 @@ import unittest
 
 from skeleton.ai.game_builder.studio_native_replay_telemetry import (
     NativeCheckpointError, FIELDS, selected_checkpoints, make_checkpoint,
+    first_cpu_divergence,
     validate_checkpoints, parse_nes_samples,
 )
 
@@ -52,6 +53,21 @@ class NativeReplayCheckpointTests(unittest.TestCase):
         self.assertFalse(report["physical_controller_verified"])
         self.assertFalse(report["checkpoint_weight_training_done"])
         self.assertEqual(len(report["checkpoint_digest"]), 64)
+
+    def test_diagnostics_identify_only_first_actual_wrong_cpu_field(self):
+        reference = [make_checkpoint(1, cpu(x=2, score=10))]
+        wrong = [make_checkpoint(1, cpu(x=3, score=20))]
+        diagnostic = first_cpu_divergence(wrong, reference)
+        self.assertEqual(diagnostic["category"], "cpu_state_diverged")
+        self.assertEqual(diagnostic["action"], 1)
+        self.assertEqual(diagnostic["changed_fields"], ["PlayerX", "Score"])
+        self.assertEqual(diagnostic["expected"], {"PlayerX": 2, "Score": 10})
+        self.assertEqual(diagnostic["observed"], {"PlayerX": 3, "Score": 20})
+        self.assertIsNone(first_cpu_divergence(reference, reference))
+        self.assertEqual(
+            first_cpu_divergence([], reference)["category"],
+            "sample_count_mismatch",
+        )
 
     def test_wrong_state_action_healing_score_regress_or_premature_win_fail(self):
         valid = [
