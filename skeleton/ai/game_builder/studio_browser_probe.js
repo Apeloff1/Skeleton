@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+"use strict";
+/* Execute the REAL generated HTML5 game script in a constrained fake DOM.
+ * This tests JavaScript gameplay and issued Canvas2D draw calls, not actual
+ * Chromium pixels or arbitrary third-party JavaScript safety.
+ * Execute only via the operator-approved Python qualification facade.
+ */
+const fs = require("node:fs");
+const vm = require("node:vm");
+const crypto = require("node:crypto");
+
+function fail(message) {
+  process.stdout.write(JSON.stringify({
+    schema: "skeleton.game_builder.js_playthrough_probe.v1",
+    executed: false, result: "failed", reason: String(message).slice(0, 160),
+  }) + "\n");
+  process.exitCode = 2;
+}
+function sha(content) {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+function main() {
+  if (process.argv.length !== 4) throw new Error("exact two source inputs required");
+  const html = fs.readFileSync(process.argv[2], "utf8");
+  const proof = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+  if (Buffer.byteLength(html) > 2000000 || html.length < 1000) {
+    throw new Error("browser game outside bounded source size");
+  }
+  if (proof.schema !== "skeleton.game_builder.solution_trace.v1") {
+    throw new Error("canonical solved Python replay required");
+  }
+  const actions = proof.actions;
+  if (!Array.isArray(actions) || actions.length < 1 || actions.length > 20000 ||
+      !actions.every(x => ["up", "down", "left", "right"].includes(x))) {
+    throw new Error("bounded typed controller replay required");
+  }
+  const matches = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  if (matches.length !== 1) throw new Error("exactly one generated inline script required");
+  const script = matches[0][1];
+  let rects = 0;
+  let shapes = 0;
+  let timers = [];
+  const ctx = {
+    fillRect() { rects++; },
+    strokeRect() { rects++; },
+    beginPath() { shapes++; },
+    moveTo() {}, lineTo() {}, closePath() {}, arc() {},
+    fill() { shapes++; },
+  };
+  const node = () => ({
+    textContent: "", disabled: false, dataset: {},
+    setAttribute() {}, addEventListener() {},
+    getContext() { return ctx; },
+  });
+  const nodes = Object.create(null);
+  const document = {
+    hidden: false, body: {appendChild() {}},
+    getElementById(id) { return nodes[id] ||= node(); },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+    createElement() { return node(); },
+  };
+  const sandbox = {
+    document,
+    window: {setInterval(fn, period) {
+      if (typeof fn !== "function" || !(period >= 40 && period <= 1000))
+        throw new Error("unsafe animation interval");
+      timers.push(fn);
+    }},
+    URL: {createObjectURL() { throw new Error("download not part of replay"); }},
+    Blob: class {constructor() {throw new Error("download not part of replay");}},
+    setTimeout() {throw new Error("unexpected browser async task");},
+  };
+  vm.createContext(sandbox, {name: "original-gameplay-probe"});
+  vm.runInContext(script, sandbox, {timeout: 2500, displayErrors: false});
+  const initial = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if (initial.status !== "playing" || initial.steps !== 0) {
+    throw new Error("game failed actual startup");
+  }
+  for (const action of actions) {
+    vm.runInContext("takeTurn(" + JSON.stringify(action) + ")", sandbox,
+                    {timeout: 200, displayErrors: false});
+  }
+  const final = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  const expected = proof.final_state;
+  if (!expected || final.status !== "won" ||
+      final.status !== expected.status ||
+      final.level !== expected.level_index ||
+      final.x !== expected.x || final.y !== expected.y ||
+      final.steps !== expected.steps ||
+      final.health !== expected.health || final.score !== expected.score) {
+    throw new Error("actual JS gameplay diverged from proven Python end state");
+  }
+  const recorded = JSON.parse(vm.runInContext("JSON.stringify(replay)", sandbox, {timeout: 100}));
+  if (JSON.stringify(recorded) !== JSON.stringify(actions)) {
+    throw new Error("JS controller actions diverged from original replay");
+  }
+  const studioArt = vm.runInContext("Boolean(STUDIO_ART)", sandbox, {timeout: 100});
+  const before = rects;
+  for (const advance of timers) advance();
+  if (studioArt && (timers.length !== 1 || rects <= before || rects < 64 * actions.length)) {
+    throw new Error("actual original sprite canvas draw/animation not exercised");
+  }
+  if (!rects) throw new Error("generated canvas engine drew no pixels");
+  process.stdout.write(JSON.stringify({
+    schema: "skeleton.game_builder.js_playthrough_probe.v1",
+    executed: true, result: "won",
+    source_sha256: sha(html),
+    proof_sha256: sha(fs.readFileSync(process.argv[3])),
+    source_world_digest: proof.world_digest,
+    action_count: actions.length,
+    state: {level: final.level, x: final.x, y: final.y,
+            health: final.health, score: final.score,
+            steps: final.steps, status: final.status},
+    canvas_draw_calls: rects,
+    canvas_shape_calls: shapes,
+    original_sprites_drawn: !!studioArt,
+    original_animation_tick_exercised: !!studioArt && timers.length === 1,
+    graphical_browser_pixel_output_verified: false,
+    native_godot_executed: false,
+    actual_js_gameplay_executed: true,
+  }) + "\n");
+}
+try { main(); } catch (error) { fail(error.message || String(error)); }
