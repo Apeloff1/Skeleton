@@ -13,7 +13,7 @@ from pathlib import Path
 from .studio_campaign_cli import parse_campaign_order_file
 from .studio_campaign_assurance import (
     inspect_production_assurance, qualify_campaign_target, qualify_campaign_browser,
-    qualify_campaign_godot, qualify_campaign_canvas,
+    qualify_campaign_godot, qualify_campaign_canvas, qualify_campaign_emulator,
 )
 from .studio_e2e_observation import observe_production_campaign
 from .studio_pixel_parity import inspect_cross_engine_pixels
@@ -31,10 +31,12 @@ def main(argv: list[str] | None = None) -> int:
     command.add_argument("--godot-target", help="execute canonical headless Godot 4 winning replay")
     command.add_argument("--pixel-parity-target", help="inspect exact original sprite bytes across all engine sources")
     command.add_argument("--canvas-target", help="capture only the generated game canvas through Chromium")
+    command.add_argument("--emulator-target", help="actually replay native GB/GBC ROM inputs in PyBoy")
     parser.add_argument("--execute-build", action="store_true")
     parser.add_argument("--consent-generated-game-canvas", action="store_true")
     parser.add_argument("--authorize-local-operation", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=45)
+    parser.add_argument("--max-emulator-frames", type=int, default=260000)
     parser.add_argument("--after", type=int, default=0)
     parser.add_argument("--limit", type=int, default=16)
     args = parser.parse_args(argv)
@@ -55,6 +57,15 @@ def main(argv: list[str] | None = None) -> int:
             output = observe_production_campaign(
                 order, args.campaign, authorized=True,
                 after=args.after, limit=args.limit,
+            )
+        elif args.emulator_target:
+            if not args.execute_build:
+                parser.error("--emulator-target requires explicit --execute-build")
+            output = qualify_campaign_emulator(
+                order, args.campaign, args.emulator_target,
+                authorized=True, execute=True,
+                timeout_seconds=args.timeout_seconds,
+                max_frames=args.max_emulator_frames,
             )
         elif args.canvas_target:
             if not args.execute_build or not args.consent_generated_game_canvas:
