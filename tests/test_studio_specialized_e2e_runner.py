@@ -150,6 +150,25 @@ class NativeSuiteOperatorEvidenceTests(unittest.TestCase):
         self.assertTrue(output["source_changed_during_execution"])
         self.assertFalse(output["source_contract_tests_passed"])
 
+    def test_changing_registered_command_during_execution_revokes_success(self):
+        def swap_suite_policy(repo_root, chosen, timeout, logs):
+            self.suite["timeout_seconds"] = 600
+            self.write_manifest()
+            return "passed", 0, 75, 0
+
+        with patch(
+            "skeleton.ai.game_builder.studio_specialized_e2e_runner._execute",
+            side_effect=swap_suite_policy,
+        ):
+            result = run_registered_native_e2e(
+                self.project, authorized=True, execute=True,
+                receipt_path=self.receipt,
+            )
+        self.assertEqual(result["process_status"], "passed")
+        self.assertTrue(result["source_changed_during_execution"])
+        self.assertFalse(result["source_contract_tests_passed"])
+        self.assertEqual(len(result["registered_execution_policy_digest"]), 64)
+
     def test_failed_test_or_timed_out_test_never_passes(self):
         for status, exit_code in (("failed", 1), ("timeout", None),
                                   ("not_started", None)):
