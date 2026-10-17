@@ -69,6 +69,7 @@ footer{padding:1.3rem;text-align:center;opacity:.8}
 _JS = r"""
 "use strict";
 const GAME = __SAFE_GAME_JSON__;
+const STUDIO_ART = GAME.studio_art || null;
 const root=document.getElementById("screen");
 const ctx=root.getContext("2d",{alpha:false});
 const message=document.getElementById("message");
@@ -181,7 +182,23 @@ function downloadReplay(){
  setTimeout(()=>URL.revokeObjectURL(url),0);
  emit("Downloaded local action trace (unverified until replayed).");
 }
+function drawStudioTile(index,x,y,size){
+ if(!STUDIO_ART)return false;
+ const pixels=STUDIO_ART.tiles[index],palette=STUDIO_ART.palette;
+ if(!pixels||pixels.length!==64)return false;
+ const unit=size/8;
+ for(let ty=0;ty<8;ty++)for(let tx=0;tx<8;tx++){
+  ctx.fillStyle=palette[pixels[ty*8+tx]];
+  ctx.fillRect(x*size+tx*unit,y*size+ty*unit,unit+.02,unit+.02);
+ }
+ return true;
+}
 function drawTile(tile,x,y,size){
+ if(STUDIO_ART){
+  const index=tile==="#"?1:tile==="C"?2:tile==="H"?3:tile==="G"?4:0;
+  const cleared=tile==="C"&&state.collected.includes(poskey(x,y));
+  if(drawStudioTile(cleared?0:index,x,y,size))return;
+ }
  const px=x*size,py=y*size;
  if(tile==="#"){
   ctx.fillStyle=colors.wall;ctx.fillRect(px,py,size,size);
@@ -223,10 +240,12 @@ function draw(){
   drawTile(lv.rows[y][x],x,y,size);
  }
  const px=state.x*size,py=state.y*size;
+ if(!drawStudioTile(5,state.x,state.y,size)){
  ctx.fillStyle="#ffffff";
  ctx.beginPath();ctx.arc(px+size/2,py+size/2,size*.37,0,Math.PI*2);ctx.fill();
  ctx.fillStyle="#112d39";
  ctx.fillRect(px+size*.55,py+size*.38,4,4);
+ }
  nodes.level.textContent=(state.level+1)+" / "+GAME.levels.length;
  nodes.health.textContent=state.health+" / "+GAME.intent.starting_health;
  nodes.score.textContent=state.score;
@@ -303,6 +322,7 @@ class PlayableHTML:
 def render_playable_world(
     world: PlayableWorld, *,
     research_packet: object = None,
+    studio_art: object = None,
     authorized: bool,
 ) -> PlayableHTML:
     if not authorized:
@@ -332,6 +352,17 @@ def render_playable_world(
         "world_digest": world.digest, "intent": world.intent.to_payload(),
         "levels": levels,
     }
+    if studio_art is not None:
+        from .studio_asset_pipeline import StudioArtPack
+        if not isinstance(studio_art, StudioArtPack) or studio_art.world_digest != world.digest:
+            raise PlayableExportError("verified, same-world original art pack required")
+        studio_art.verify()
+        descriptors = json.loads(dict(studio_art.files)["metadata/descriptors.json"])
+        game_data["studio_art"] = {
+            "pack_digest": studio_art.digest,
+            "tiles": [list(tile) for tile in studio_art.runtime_tiles],
+            "palette": ["#" + item[:6] for item in descriptors["palette"]],
+        }
     script = _JS.replace("__SAFE_GAME_JSON__", _safe_script_json(game_data))
     script_csp = _sha256_csp(script)
     css_csp = _sha256_csp(_CSS)
