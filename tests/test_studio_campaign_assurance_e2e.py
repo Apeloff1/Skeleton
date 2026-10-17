@@ -143,6 +143,7 @@ class ProductionGateTests(unittest.TestCase):
         self.assertFalse(build["already_qualified"])
         report = inspect_production_assurance(self.order, self.root)
         self.assertEqual(report["native_roms_structurally_verified"], 1)
+        self.assertEqual(report["compiled_original_psg_tables_verified"], 1)
         self.assertEqual(report["checked_gates"], 10)
         self.assertEqual(
             report["targets"][0]["gates"]["cartridge_structure_checked"]["status"],
@@ -270,6 +271,42 @@ class ProductionGateTests(unittest.TestCase):
             )
         with self.assertRaises(ValueError):
             inspect_production_assurance(replace(self.order, seed=734), self.root)
+
+    def test_compiled_original_music_mutation_cannot_publish_a_handheld_rom(self):
+        run_campaign(self.order, self.root, authorized=True, max_targets=1)
+        tiles = (self.root / "targets/nintendo_game_boy/assets/tiles/runtime.bin").read_bytes()
+        frames = (
+            self.root / "targets/nintendo_game_boy/assets/tiles/hero_animation.bin"
+        ).read_bytes()
+        invalid = bytearray(sample_rom(tiles, frames))
+        # ROM header and every original sprite remain byte-for-byte valid.
+        invalid[0x0286] ^= 1
+        fake = bytes(invalid)
+
+        def assembler(project, target, *, authorized, execute,
+                      output, output_symbols, timeout_seconds):
+            Path(output).write_bytes(fake)
+            Path(output_symbols).write_bytes(GB_SYMBOLS)
+            _, digest = _verify_source(Path(project), target)
+            return _receipt(
+                target, digest, available=True, invoked=True,
+                built=True, header=True, digest=sha256(fake).hexdigest(),
+                size=len(fake), symbol_sha256=sha256(GB_SYMBOLS).hexdigest(),
+            )
+        with patch(
+            "skeleton.ai.game_builder.studio_campaign_assurance.qualify_native_build",
+            side_effect=assembler,
+        ):
+            result = qualify_campaign_target(
+                self.order, self.root, "nintendo_game_boy",
+                authorized=True, execute=True,
+            )
+        self.assertFalse(result["native_rom_compiled"])
+        self.assertEqual(result["blocker"], "compiled_original_psg_music_mismatch")
+        qualified = self.root / "qualifications/nintendo_game_boy"
+        self.assertFalse((qualified / "qualified.rom").exists())
+        self.assertFalse((qualified / "qualified.sym").exists())
+        self.assertFalse((qualified / "qualification.json").exists())
 
     def test_handheld_original_sprite_mismatch_blocks_and_reclaims_unqualified_rom(self):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
