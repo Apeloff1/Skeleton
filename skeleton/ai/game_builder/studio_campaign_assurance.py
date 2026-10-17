@@ -24,6 +24,7 @@ from .studio_campaign_lock import campaign_lock
 from .studio_runtime_qualification import _inputs as _browser_inputs, qualify_browser_gameplay
 from .studio_godot_qualification import godot_inputs, qualify_godot_headless
 from .studio_pixel_parity import inspect_cross_engine_pixels
+from .studio_game_boy_emulator import qualify_game_boy_emulator
 from .studio_dragon_canvas_capture import capture_generated_game, _png_geometry
 
 SCHEMA = "skeleton.game_builder.production_assurance.v1"
@@ -55,6 +56,8 @@ PARITY_GATE = "cross_engine_pixel_art_parity"
 BROWSER_GATE = "browser_javascript_playthrough_executed"
 GODOT_GATE = "godot_headless_playthrough_executed"
 CANVAS_GATE = "generated_game_canvas_frames_recorded"
+EMULATOR_GATE = "emulator_playthrough_executed"
+EMU_CONTROLLER_GATE = "controller_response_verified"
 NATIVE_GATES = frozenset(GATES[8:10])
 
 
@@ -470,6 +473,114 @@ def qualify_campaign_canvas(
         }
 
 
+def _emulator_receipt(root: Path, target: str, source_identity: str) -> dict | None:
+    folder = root / "qualifications" / target
+    receipt_path = folder / "emulator_qualification.json"
+    if not receipt_path.exists():
+        return None
+    if folder.is_symlink() or receipt_path.is_symlink():
+        raise StudioAssuranceError("native emulator evidence may not be a symlink")
+    proof = _load_json(receipt_path)
+    if (proof.get("schema") != "skeleton.game_builder.campaign_emulator_evidence.v1"
+            or proof.get("target") != target
+            or proof.get("source_identity") != source_identity
+            or canonical_digest({k: v for k, v in proof.items()
+                                 if k != "evidence_digest"}) != proof.get("evidence_digest")):
+        raise StudioAssuranceError("native emulator receipt belongs to another campaign")
+    run = proof.get("run")
+    if (type(run) is not dict
+            or run.get("schema") != "skeleton.game_builder.game_boy_emulator_playthrough.v1"
+            or run.get("emulator_executed") is not True
+            or run.get("full_controller_replay") is not True
+            or run.get("machine_code_victory") is not True
+            or run.get("physical_controller_verified") is not False
+            or run.get("physical_console_verified") is not False
+            or type(run.get("frames_advanced")) is not int
+            or run["frames_advanced"] <= 0
+            or canonical_digest({k: v for k, v in run.items()
+                                 if k != "receipt_digest"}) != run.get("receipt_digest")):
+        raise StudioAssuranceError("native ROM playthrough evidence lacks real machine-code victory")
+    compiled = _qualification_receipt(root, target, source_identity)
+    if compiled is None:
+        raise StudioAssuranceError("emulator replay lacks independent compiled ROM evidence")
+    compiled_info = compiled["build"]
+    if (run.get("rom_sha256") != compiled_info.get("binary_sha256")
+            or run.get("symbols_sha256") != compiled_info.get("symbol_sha256")):
+        raise StudioAssuranceError("emulator proof is not for exact native ROM and symbols")
+    try:
+        _, gameplay, world = _browser_inputs(root / "targets" / target / "engines")
+    except (OSError, ValueError) as exc:
+        raise StudioAssuranceError("emulator proof's original Python game is no longer valid") from exc
+    if (run.get("world_digest") != world
+            or run.get("proof_sha256") != sha256(gameplay).hexdigest()):
+        raise StudioAssuranceError("emulator memory replay mismatched canonical source game")
+    return proof
+
+
+def qualify_campaign_emulator(
+    order: CampaignOrder, root: str | Path, target: str, *,
+    authorized: bool, execute: bool, timeout_seconds: int = 90,
+    max_frames: int = 260_000,
+) -> dict:
+    """Run qualified original GB/GBC compiled ROM against the real PyBoy CPU."""
+    if authorized is not True:
+        raise PermissionError("local emulator execution requires explicit operator authority")
+    if execute is not True:
+        raise StudioAssuranceError("native cartridge emulation requires opt-in execution")
+    if not isinstance(order, CampaignOrder) or target not in order.targets:
+        raise StudioAssuranceError("emulated target is not in canonical original game campaign")
+    if target not in ("nintendo_game_boy", "nintendo_game_boy_color"):
+        raise StudioAssuranceError("no full cartridge emulator replay adapter for target")
+    base = Path(root)
+    with campaign_lock(base):
+        campaign = _inspect_campaign_unlocked(order, base)
+        if target not in campaign["completed_targets"]:
+            raise StudioAssuranceError("original source must be checkpointed before emulator run")
+        compiled = _qualification_receipt(base, target, campaign["identity"])
+        if compiled is None:
+            raise StudioAssuranceError("real binary toolchain must complete before emulator run")
+        existing = _emulator_receipt(base, target, campaign["identity"])
+        if existing is not None:
+            return {
+                "target": target, "already_qualified": True,
+                "machine_code_victory": True,
+                "evidence_digest": existing["evidence_digest"],
+                "physical_controller_verified": False,
+            }
+        folder = base / "qualifications" / target
+        result = qualify_game_boy_emulator(
+            folder, engine_source=base / "targets" / target / "engines",
+            target=target, authorized=True, execute=True,
+            timeout_seconds=timeout_seconds, max_frames=max_frames,
+        )
+        run = result.as_receipt()
+        if not result.machine_code_victory:
+            return {
+                "target": target, "machine_code_victory": False,
+                "emulator_available": result.emulator_available,
+                "emulator_executed": result.emulator_executed,
+                "blocker": result.blocker,
+                "physical_controller_verified": False,
+            }
+        body = {
+            "schema": "skeleton.game_builder.campaign_emulator_evidence.v1",
+            "target": target, "source_identity": campaign["identity"],
+            "run": run, "physical_controller_verified": False,
+            "physical_hardware_verified": False,
+            "release_authorized": False,
+        }
+        record = {**body, "evidence_digest": canonical_digest(body)}
+        _atomic_json(folder / "emulator_qualification.json", record)
+        _emulator_receipt(base, target, campaign["identity"])
+        return {
+            "target": target, "machine_code_victory": True,
+            "already_qualified": False,
+            "framebuffer_sha256": result.framebuffer_sha256,
+            "evidence_digest": record["evidence_digest"],
+            "physical_controller_verified": False,
+        }
+
+
 def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Path) -> dict:
     """Recheck real on-disk campaign artifacts and exact qualified binaries.
 
@@ -492,12 +603,15 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
         binary = None
         browser = None
         godot = None
+        emulator = None
         art_parity = None
         canvas = None
         if source_receipt is not None:
             if target in _BUILD_ADAPTERS:
                 binary = _qualification_receipt(base, target, campaign["identity"])
             art_parity = inspect_cross_engine_pixels(source)
+            emulator = (_emulator_receipt(base, target, campaign["identity"])
+                        if target in ("nintendo_game_boy", "nintendo_game_boy_color") else None)
             browser = _browser_receipt(base, target, campaign["identity"])
             godot = _godot_receipt(base, target, campaign["identity"])
             canvas = _canvas_receipt(base, target, campaign["identity"])
@@ -507,6 +621,8 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
                 status, reason = "artifact_integrity_checked", None
             elif gate in NATIVE_GATES and binary is not None:
                 status, reason = "binary_structure_checked", None
+            elif gate in (EMULATOR_GATE, EMU_CONTROLLER_GATE) and emulator is not None:
+                status, reason = "machine_code_controller_replay_verified", None
             elif gate == CANVAS_GATE and canvas is not None:
                 status, reason = "generated_game_canvas_pixels_recorded", None
             elif gate == PARITY_GATE and art_parity is not None:
@@ -524,7 +640,8 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
                 )
             gates[gate] = {"status": status, "blocker": reason}
             if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed", "godot_gameplay_executed",
-                          "pixel_source_parity_checked", "generated_game_canvas_pixels_recorded"}:
+                          "pixel_source_parity_checked", "generated_game_canvas_pixels_recorded",
+                          "machine_code_controller_replay_verified"}:
                 passed += 1
         by_target.append({
             "target": target,
@@ -539,6 +656,9 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
             ),
             "native_binary_evidence_digest": (
                 binary["evidence_digest"] if binary else None
+            ),
+            "real_emulator_evidence_digest": (
+                emulator["evidence_digest"] if emulator else None
             ),
             "browser_javascript_evidence_digest": (
                 browser["evidence_digest"] if browser else None
@@ -557,6 +677,9 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
         "project_id": order.project_id,
         "total_targets": len(order.targets),
         "targets_with_exact_source": campaign["targets_with_verified_source"],
+        "native_rom_machine_code_playthroughs_verified": sum(
+            row["real_emulator_evidence_digest"] is not None for row in by_target
+        ),
         "native_roms_structurally_verified": sum(
             row["native_binary_evidence_digest"] is not None for row in by_target
         ),
@@ -591,6 +714,6 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
 __all__ = [
     "StudioAssuranceError", "GATES", "qualify_campaign_target",
     "qualify_campaign_browser", "qualify_campaign_godot",
-    "qualify_campaign_canvas",
+    "qualify_campaign_canvas", "qualify_campaign_emulator",
     "inspect_production_assurance",
 ]
