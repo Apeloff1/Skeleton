@@ -753,3 +753,39 @@ A process returning exit code 0 only qualifies the offline **source-contract tes
 ### Remaining explicit runtime milestones
 
 M295–M300 still require a real checked-out repository, installed pytest, native compilers, GB/GBC PyBoy and NES FCEUX where applicable, actual graphics/audio capture, signed full-game replay, first-install operation and sustained studio production evidence. A passing source suite is a precursor to this work and cannot be substituted for it. No automatic background task or new CI spam was introduced.
+
+
+## M281–M300: bounded multi-year E2E journal and verified crash-recovery protocol
+
+### Production defect corrected (M281–M286)
+
+The older qualification-history implementation held up to 4,096 E2E run receipts in a single JSON file, while its shared safe JSON reader rejected files larger than **256,000 bytes**. Detailed production traces could therefore make the history unreadable and halt multi-day or multi-month work considerably sooner than intended.
+
+The replacement retains the same user-facing operator history API, data ownership and source-bound chain. It keeps a small, writable journal head and seals each complete group of **64 E2E runs** into a separate bounded `qualification_history_segments/segment-NNNNN.json` file. The main journal holds only the remaining head and an index of sealed segment hashes and final entry digests. The archive index and each segment are checked against the exact original campaign identity, a continuous global entry number, every stored record's digest, and the previous segment tip.
+
+The configured upper bound is 512 sealed segments, or **32,768 archived runs**, plus the current writable head. At one run per hour this is sufficient capacity for several years; capacity is not evidence that years of runtime, a particular recurrence or unattended operation were actually tested. Sealed files and the index remain ordinary local files, not tamper-proof remote storage; independent trusted backup remains a separate requirement.
+
+### Crash-safe publication and compatibility (M287–M295)
+
+The existing cross-platform campaign process lock protects the append. A new sealed segment is written using the repository's fsynced atomic JSON publisher **before** the short head/index is replaced. An interruption before the head replacement may leave an unreferenced segment. The next authorized append will reuse that file only if its complete parsed contents equal the independently regenerated expected segment. No sealed file is silently overwritten or deleted. Missing, mutated, duplicate, out-of-order, symlinked or incompatible segments cause failure rather than fabricated progress.
+
+Earlier unsegmented journals remain readable and can rotate into the segmented structure without renumbering or losing the historical digest sequence. The verifier still checks exact source/artifact identity before recording each new E2E run. The operator history summary reports total historical runs, sealed segment count, remaining segment capacity, completed incident-free runs, and CPU divergence counts across **all** archived records.
+
+A pre-publication bound requires each sealed file to fit the original JSON reader's 256-KB file limit. Blocker classifications are retained as bounded normalized summaries; no raw shell logs, user recordings, prompts or model checkpoints are archived in this ledger.
+
+### Specific regressions and remaining unqualified acceptance (M296–M300)
+
+New `tests/test_studio_execution_history_segments.py` generates canonical multi-run fixture receipts, checks initial legacy history, rotates the 64th/65th runs, recovers an exact orphaned segment after a simulated interruption, links two complete segments to a 129th run, checks historical sums and rejects corrupted archives or bogus segment indexes. `tests/test_studio_execution_history_e2e.py` additionally exercises a genuine source-produced E2E run being recorded as the 65th history entry, including verification of the real independently inspected original game and persistence of earlier receipts.
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_execution_history_segments.py \
+  tests/test_studio_execution_history_e2e.py \
+  tests/test_studio_campaign_e2e.py
+
+python -m skeleton.ai.game_builder.studio_execution_campaign_cli \
+  --order original-campaign.json --campaign ./campaign \
+  --inspect-history --authorize-local-operation
+```
+
+**The newly authored regression tests have not been independently run or confirmed passing.** Measured year-long continuous production, crash/power-loss fault injection, backup/restore, first-install, actual emulator game playthrough, audio/video comparison and hardware release certification are all still outstanding. No new always-on CI workflow, automatic runtime restarter or autonomous model-training task is being asserted.
