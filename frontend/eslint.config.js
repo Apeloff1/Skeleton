@@ -75,6 +75,7 @@ module.exports = defineConfig([
       'services/monthCycleBuildAdapter.ts',
       'services/monthCycleStudioAdapter.ts',
       'services/monthCycleNative.ts',
+      'services/monthCycleForeground.ts',
     ],
     rules: {
       'react-hooks/exhaustive-deps': 'error',

@@ -197,3 +197,17 @@ boundaries, and remaining multi-day server/device certification. The same
 fast Merge Readiness test job now runs the month-cycle ledger (24 cases),
 recovery (16 cases), and integration (14 cases) suites, with no new
 workflow or CI queue burden.
+
+### Foreground reconciliation ownership
+
+`monthCycleForeground.ts` adds one explicitly owned, low-duty foreground
+driver. It schedules one due reconciliation at first active mount, at bounded
+cadence while the app is active (default 15 minutes), and after a
+background-to-foreground transition. It removes its timer and OS subscription
+on dispose, and signals the recovery worker to stop on background. This is
+not an OS background service and cannot promise to run after process exit.
+
+`monthCycleNative.ts` supplies the React Native AppState adapter.
+`test-month-cycle-foreground.cjs` (9 cases) exercises lifecycle bounce,
+stale observations, timer ownership, deadline policy and exception isolation
+in the same existing Merge Readiness test step.

@@ -40,14 +40,20 @@ credential as the namespace.
    with a bounded batch/concurrency budget. Game builds can use
    `buildCycleWorker(fetchStatus)`, with an authenticated, read-only status
    provider supplied by the app.
-4. Run a new foreground pass when appropriate, or surface jobs with
+4. To make this automatic **while an authenticated screen is mounted**, create
+   `createNativeMonthCycleForegroundDriver(recovery)`, call `start()`,
+   and hold its disposer for screen/account teardown. This adds one immediate
+   foreground pass and a low-duty 15-minute cadence while the app remains
+   active; inactive/background states stop polling and foreground restarts it.
+   Avoid installing one driver per nested component.
+5. Run a new foreground pass when appropriate, or surface jobs with
    `ledger.inspect()` and `ledger.due()`. The coordinator starts no
    unowned background timer. When killed, nothing runs until the OS restarts
    the application or an independent authorized backend scheduler exists.
-5. On unmount/account switch, call `recovery.stop()`, and discard in-process
+6. On unmount/account switch, call `recovery.stop()`, and discard in-process
    objects, not server jobs. To remove a client recovery reminder explicitly,
    call `ledger.dismiss(receipt)`. Neither operation cancels the backend job.
-6. A complete/failed/cancelled state is recorded only from a canonical
+7. A complete/failed/cancelled state is recorded only from a canonical
    backend status response. Studio "completed" without
    `completion.verified === true` remains observationally running, pending
    server-side proof.
@@ -77,6 +83,8 @@ cost of a disconnected device.
 - `test-month-cycle-recovery.cjs`: week/month elapsed time, bounded retries,
   due batching, concurrency, clock injection, cancellation, stuck native
   transport and malformed worker callbacks.
+- `test-month-cycle-foreground.cjs`: native foreground ownership, timer
+  suspension/resumption, duplicate event coalescing and stale callback fencing.
 - `test-month-cycle-integration.cjs`: canonical stream registration before
   replay, verified terminal states, game build and goal read-only adapters.
 
