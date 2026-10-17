@@ -42,6 +42,12 @@ function main() {
   let overlayDraws = 0;
   let audioStarts = 0;
   let timers = [];
+  let gamepadFrame = null;
+  const gamepad = {
+    connected: true,
+    axes: [0, 0],
+    buttons: Array.from({length: 16}, () => ({pressed: false})),
+  };
   const ctx = {
     fillRect() { rects++; },
     drawImage() { rects++; overlayDraws++; },
@@ -88,6 +94,8 @@ function main() {
   }
   const sandbox = {
     document, Audio: MockAudio, Image: MockImage,
+    navigator: {getGamepads() {return [gamepad];}},
+    requestAnimationFrame(fn) {gamepadFrame=fn;},
     window: {setInterval(fn, period) {
       if (typeof fn !== "function" || !(period >= 40 && period <= 1000))
         throw new Error("unsafe animation interval");
@@ -154,6 +162,32 @@ function main() {
   if (fromButton.steps !== 1 ||
       vm.runInContext("replay[0]", sandbox, {timeout: 100}) !== actions[0])
     throw new Error("actual onscreen directional button failed controller step");
+  // The browser game's REAL Gamepad API handler consumes standard buttons.
+  // Holding a D-pad button must not flood the 20k-turn replay.
+  keydown("KeyR");
+  const keyIndex = {up: 12, down: 13, left: 14, right: 15};
+  if (typeof gamepadFrame !== "function")
+    throw new Error("standard game controller scan was never registered");
+  gamepad.buttons[keyIndex[actions[0]]].pressed=true;
+  gamepadFrame();
+  const padFirst = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if (padFirst.steps !== 1)
+    throw new Error("gamepad directional input did not reach actual game transition");
+  gamepadFrame();
+  const padHeld = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if (padHeld.steps !== 1)
+    throw new Error("held gamepad button incorrectly repeated actions");
+  gamepad.buttons[keyIndex[actions[0]]].pressed=false;
+  gamepadFrame();
+  gamepad.buttons[1].pressed=true;gamepadFrame();
+  const padUndo = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if (padUndo.steps !== 0)throw new Error("gamepad B undo did not restore initial state");
+  gamepad.buttons[1].pressed=false;gamepadFrame();
+  gamepad.buttons[9].pressed=true;gamepadFrame();
+  const padRestart = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if(padRestart.status!=="playing"||padRestart.steps!==0)
+    throw new Error("gamepad Start restart did not restore playable game");
+  gamepad.buttons[9].pressed=false;gamepadFrame();
   const studioArt = vm.runInContext("Boolean(STUDIO_ART)", sandbox, {timeout: 100});
   const studioMedia = vm.runInContext("Boolean(STUDIO_MEDIA)", sandbox, {timeout: 100});
   const expectedAudio = vm.runInContext(
@@ -193,6 +227,8 @@ function main() {
     onscreen_button_input_verified: true,
     undo_replay_verified: true,
     restart_verified: true,
+    gamepad_input_verified: true,
+    gamepad_held_input_debounced: true,
     graphical_browser_pixel_output_verified: false,
     native_godot_executed: false,
     actual_js_gameplay_executed: true,
