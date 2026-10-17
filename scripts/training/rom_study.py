@@ -15,7 +15,7 @@ from skeleton.ai.training.rom_study import (
 from skeleton.ai.training.rom_inventory_snapshot import (
     freeze_rom_inventory, load_frozen_inventory, frozen_inventory_page,
 )
-from skeleton.ai.training.rom_fleet_audit import audit_fleet_page
+from skeleton.ai.training.rom_fleet_audit import audit_fleet_page, audit_fleet_all
 
 
 def parser() -> argparse.ArgumentParser:
@@ -43,6 +43,8 @@ def parser() -> argparse.ArgumentParser:
     audit.add_argument("--output-dir", required=True, type=Path)
     audit.add_argument("--cursor")
     audit.add_argument("--limit", type=int, default=64)
+    audit.add_argument("--max-pages", type=int, default=1,
+                       help="0 scans all snapshot pages without reloading the manifest")
     train = commands.add_parser("train-all", help="run approved Q-policy learning per ROM")
     train.add_argument("--root", required=True, type=Path)
     train.add_argument("--approvals", required=True, type=Path)
@@ -86,9 +88,16 @@ def main(argv: list[str] | None = None) -> int:
             }, sort_keys=True))
             return 0
         if args.operation == "audit-fleet":
-            report = audit_fleet_page(
-                args.root, args.snapshot, args.approvals, args.output_dir,
-                cursor=args.cursor, limit=args.limit,
+            report = (
+                audit_fleet_page(
+                    args.root, args.snapshot, args.approvals, args.output_dir,
+                    cursor=args.cursor, limit=args.limit,
+                ) if args.max_pages == 1 else
+                audit_fleet_all(
+                    args.root, args.snapshot, args.approvals, args.output_dir,
+                    cursor=args.cursor, limit=args.limit,
+                    max_pages=args.max_pages,
+                )
             )
             print(json.dumps(report, sort_keys=True))
             return 0

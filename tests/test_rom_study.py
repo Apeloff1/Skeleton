@@ -205,7 +205,14 @@ def test_optional_neural_candidate_actual_optimizer_seam(tmp_path, monkeypatch):
     model = {"model_digest": "e" * 64, "real_optimizer_steps": 4}
     def fake_optimizer(evidence, policy, *, config, cancel=None):
         trained.append((evidence, policy, config))
-        return model, {"candidate_status": "candidate_predictive_gain_measured"}
+        report = {
+            "candidate_status": "candidate_predictive_gain_measured",
+            "world_model_digest": model["model_digest"],
+            "real_neural_optimizer_steps": model["real_optimizer_steps"],
+            "production_model_promotion": False,
+        }
+        report["report_digest"] = _digest(report)
+        return model, report
     monkeypatch.setattr(neural, "train_neural_world_from_evidence", fake_optimizer)
     monkeypatch.setattr(neural, "validate_neural_world_checkpoint", lambda value: None)
     result = rom.train_page(root, approvals, output, steps=4, runs=1,
@@ -486,3 +493,47 @@ def test_fleet_audit_rejects_tampered_receipt(tmp_path, monkeypatch):
     assert report["page_counts"]["verified_q_policy_sources"] == 0
     assert report["page_counts"]["invalid_or_stale_receipt_sources"] == 1
     assert report["production_jeeves_weights_modified"] is False
+
+
+
+def test_fleet_audit_rejects_falsified_neural_optimizer_receipt(tmp_path, monkeypatch):
+    from skeleton.ai.training.rom_inventory_snapshot import (
+        freeze_rom_inventory, load_frozen_inventory,
+    )
+    from skeleton.ai.training.rom_fleet_audit import audit_fleet_all
+    from skeleton.jeeves import game_emulator_neural_world as neural
+    root, first, _ = _roms(tmp_path)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    receipt = freeze_rom_inventory(root, private)
+    snap = load_frozen_inventory(Path(receipt["manifest_path"]), root=root)
+    approvals, _ = _approvals(tmp_path, first)
+    _fake_training(tmp_path, monkeypatch, updates=3)
+    model = {"model_digest": "c" * 64, "real_optimizer_steps": 4}
+    def optimizer(evidence, policy, *, config, cancel=None):
+        report = {
+            "candidate_status": "candidate_predictive_gain_measured",
+            "world_model_digest": model["model_digest"],
+            "real_neural_optimizer_steps": 4,
+            "production_model_promotion": False,
+        }
+        report["report_digest"] = _digest(report)
+        return model, report
+    monkeypatch.setattr(neural, "train_neural_world_from_evidence", optimizer)
+    monkeypatch.setattr(neural, "validate_neural_world_checkpoint", lambda candidate: None)
+    rom.train_page(root, approvals, private, inventory_snapshot=snap,
+                   runs=1, steps=4, neural_world=True)
+    check = audit_fleet_all(
+        root, Path(receipt["manifest_path"]), approvals, private,
+    )
+    assert check["totals"]["verified_neural_candidate_sources"] == 1
+    record_path = next(private.glob("rom-*.json"))
+    record = json.loads(record_path.read_text())
+    record["neural_world"]["training_report"]["real_neural_optimizer_steps"] = 9999
+    record_path.write_text(json.dumps(record) + "\n")
+    invalid = audit_fleet_all(
+        root, Path(receipt["manifest_path"]), approvals, private,
+    )
+    assert invalid["totals"]["verified_neural_candidate_sources"] == 0
+    assert invalid["totals"]["verified_q_policy_sources"] == 0
+    assert invalid["totals"]["invalid_or_stale_receipt_sources"] == 1

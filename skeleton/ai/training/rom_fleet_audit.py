@@ -20,20 +20,11 @@ _MAX_CANDIDATES_PER_SOURCE = 128
 _RECEIPT_NAME = re.compile(r"rom-[0-9a-f]{16}-[0-9a-f]{16}\.json\Z")
 
 
-def audit_fleet_page(root: Path, snapshot_file: Path, approvals_file: Path,
-                     receipts_dir: Path, *, cursor: str | None = None,
-                     limit: int = 64) -> dict[str, Any]:
-    """Audit one frozen page; no emulator execution, neural training or promotion.
-
-    A source is covered only if an exact, unchanged, rights-reviewed
-    file has at least one independently checked receipt from the same
-    approval manifest AND same frozen library. A repeated file path does
-    not inflate distinct-ROM training counts.
-    """
-    snapshot = load_frozen_inventory(snapshot_file, root=root)
+def _audit_loaded(root: Path, snapshot: dict[str, Any],
+                  approved: dict[str, dict[str, Any]], approval_sha: str,
+                  receipts_dir: Path, *, cursor: str | None, limit: int) -> dict[str, Any]:
+    """Read-only page verifier using an already authenticated frozen census."""
     page = frozen_inventory_page(snapshot, root=root, cursor=cursor, limit=limit)
-    approved, approval_sha = _load_approvals(approvals_file)
-    receipts_dir = _private_output(receipts_dir)
     entries: list[dict[str, Any]] = []
     unique_in_snapshot = {}
     for item in snapshot["entries"]:
@@ -163,4 +154,77 @@ def audit_fleet_page(root: Path, snapshot_file: Path, approvals_file: Path,
         "production_jeeves_weights_modified": False,
         "emulator_or_optimizer_executed": False,
         "rows": entries,
+    }
+
+
+
+def audit_fleet_page(root: Path, snapshot_file: Path, approvals_file: Path,
+                     receipts_dir: Path, *, cursor: str | None = None,
+                     limit: int = 64) -> dict[str, Any]:
+    """Independently reload immutable source inventory and reviewed rights per page."""
+    snapshot = load_frozen_inventory(snapshot_file, root=root)
+    approved, approval_sha = _load_approvals(approvals_file)
+    receipts_dir = _private_output(receipts_dir)
+    return _audit_loaded(root, snapshot, approved, approval_sha,
+                         receipts_dir, cursor=cursor, limit=limit)
+
+
+def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
+                    receipts_dir: Path, *, cursor: str | None = None,
+                    limit: int = 64, max_pages: int = 0) -> dict[str, Any]:
+    """Sweep all verified identities without repeatedly loading the full census.
+
+    Summary counts are source-level facts, not success percentages for the
+    overall AI app, console compatibility, narrative mastery or serving weights.
+    """
+    if type(max_pages) is not int or not 0 <= max_pages <= 100_000:
+        raise RomStudyError("fleet audit page count must be 0 (all) or 1..100000")
+    snapshot = load_frozen_inventory(snapshot_file, root=root)
+    approved, approval_sha = _load_approvals(approvals_file)
+    receipts_dir = _private_output(receipts_dir)
+    totals: dict[str, int] = {}
+    pages = 0
+    examples: list[dict[str, Any]] = []
+    while True:
+        page = _audit_loaded(
+            root, snapshot, approved, approval_sha, receipts_dir,
+            cursor=cursor, limit=limit,
+        )
+        for key, count in page["page_counts"].items():
+            totals[key] = totals.get(key, 0) + count
+        for row in page["rows"]:
+            if (row["status"] not in ("verified_q_policy_updated",
+                                      "verified_executed_without_q_update")
+                    and len(examples) < 24):
+                examples.append({
+                    "relative_path": row["relative_path"],
+                    "status": row["status"],
+                })
+        pages += 1
+        cursor = page["next_cursor"]
+        if cursor is None or max_pages and pages >= max_pages:
+            break
+    verified = (totals.get("verified_q_policy_sources", 0) +
+                totals.get("verified_executed_without_q_updates", 0))
+    distinct = totals.get("distinct_sources_in_page", 0)
+    return {
+        "schema_version": SCHEMA,
+        "inventory_sha256": snapshot["inventory_sha256"],
+        "approval_manifest_sha256": approval_sha,
+        "pages_audited": pages,
+        "total_snapshot_candidate_files": len(snapshot["entries"]),
+        "totals": totals,
+        "source_execution_coverage_pct": (
+            round(100 * verified / distinct, 2) if distinct else 0.0
+        ),
+        "neural_candidate_source_coverage_pct": (
+            round(100 * totals.get("verified_neural_candidate_sources", 0) / distinct, 2)
+            if distinct else 0.0
+        ),
+        "coverage_scope": "distinct_verified_sources_in_pages_audited",
+        "incomplete_examples": examples,
+        "next_cursor": cursor,
+        "finished_inventory": cursor is None,
+        "emulator_or_optimizer_executed": False,
+        "production_jeeves_weights_modified": False,
     }

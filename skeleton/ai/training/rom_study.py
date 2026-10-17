@@ -179,10 +179,18 @@ def _load_approvals(path: Path) -> tuple[dict[str, dict[str, Any]], str]:
     before = _regular_identity(path)
     if before[2] > MAX_REVIEW_BYTES:
         raise RomStudyError("ROM training approval registry exceeds capacity")
-    with path.open("rb") as stream:
-        raw = stream.read(MAX_REVIEW_BYTES + 1)
-    if len(raw) != before[2] or _regular_identity(path) != before:
-        raise RomStudyError("ROM training approval registry changed during load")
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        if _stat_tuple(os.fstat(fd)) != before:
+            raise RomStudyError("ROM training approval registry changed before reading")
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            raw = stream.read(MAX_REVIEW_BYTES + 1)
+        if len(raw) != before[2] or _stat_tuple(os.fstat(fd)) != before:
+            raise RomStudyError("ROM training approval registry changed while reading")
+    finally:
+        os.close(fd)
+    if _regular_identity(path) != before:
+        raise RomStudyError("ROM training approval registry changed after reading")
     def pairs(items):
         result = {}
         for key, value in items:
@@ -318,6 +326,19 @@ def verified_rom_receipt(path: Path, *, expected_source_sha256: str,
             validate_neural_world_checkpoint(model)
         except ValueError as exc:
             raise RomStudyError("ROM receipt neural checkpoint validation failed") from exc
+        from skeleton.jeeves.game_learning import _digest
+        report = neural.get("training_report")
+        if (not isinstance(report, dict)
+                or not isinstance(report.get("report_digest"), str)
+                or report["report_digest"] != _digest({
+                    k: v for k, v in report.items() if k != "report_digest"
+                })
+                or report.get("world_model_digest") != model["model_digest"]
+                or report.get("real_neural_optimizer_steps") != model["real_optimizer_steps"]
+                or neural.get("actual_candidate_optimizer_steps") != model["real_optimizer_steps"]
+                or model["real_optimizer_steps"] <= 0
+                or report.get("production_model_promotion") is not False):
+            raise RomStudyError("ROM neural candidate report does not bind the learned checkpoint")
     from skeleton.jeeves.game_learning import _digest
     if (not isinstance(evidence, dict)
             or evidence.get("report_digest") != _digest({
@@ -325,7 +346,9 @@ def verified_rom_receipt(path: Path, *, expected_source_sha256: str,
             })
             or evidence.get("actual_neural_parameter_updates") != 0
             or type(evidence.get("actual_q_table_updates")) is not int
-            or evidence["actual_q_table_updates"] < 0):
+            or type(evidence.get("actual_training_steps")) is not int
+            or not 1 <= evidence["actual_training_steps"] <= 65_536
+            or not 0 <= evidence["actual_q_table_updates"] <= evidence["actual_training_steps"]):
         raise RomStudyError("ROM receipt lacks authentic replay-lab evidence structure")
     return {
         "source_sha256": row["source_sha256"],

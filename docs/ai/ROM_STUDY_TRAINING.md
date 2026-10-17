@@ -10,23 +10,23 @@ SDK documentation and ROM content have independent rights reviews.
 ## Ownership and scope
 
 The ROM pipeline reuses the canonical emulator catalogue and worker,
-\`skeleton/jeeves/game_emulator_catalog.py\` and
-\`skeleton/jeeves/game_emulator_host.py\`. It never executes unknown ROMs or
+`skeleton/jeeves/game_emulator_catalog.py` and
+`skeleton/jeeves/game_emulator_host.py`. It never executes unknown ROMs or
 native libraries in the inventory step. Training is owned by the existing
-\`skeleton/jeeves/game_emulator_training_lab.py\` and its finite replay-based,
+`skeleton/jeeves/game_emulator_training_lab.py` and its finite replay-based,
 held-out-audited Q-policy learner. It produces candidate neural data, **not**
 Jeeves transformer weight updates or verified game mastery.
 
 ## 1. Inventory what is actually on the local host
 
-\`\`\`sh
+```sh
 python -m scripts.training.rom_study inventory \
   --root /private/rom-library --limit 64
-\`\`\`
+```
 
 Results show exact relative path, SHA-256, size, extension, review state and
-a \`next_cursor\` when the scan has more pages. Re-run with
-\`--cursor "last/path/from/next_cursor"\`. File bytes are hashed in bounded
+a `next_cursor` when the scan has more pages. Re-run with
+`--cursor "last/path/from/next_cursor"`. File bytes are hashed in bounded
 streams, never exported as ROM content. Enumeration excludes symlinks and
 undeclared suffixes. CUE, GDI, M3U and CCD disc descriptors are surfaced and can now enter
 training only after approval of their **entire exact companion bundle**.
@@ -63,9 +63,9 @@ permission or preserve the actual ROM data.
 
 ## 2. Rights and local emulator approval
 
-Create an operator-private \`/private/rom-training-approvals.json\`:
+Create an operator-private `/private/rom-training-approvals.json`:
 
-\`\`\`json
+```json
 {
   "schema_version": "skeleton.jeeves.rom_training_approval.v1",
   "roms": [
@@ -84,7 +84,7 @@ Create an operator-private \`/private/rom-training-approvals.json\`:
     }
   ]
 }
-\`\`\`
+```
 
 For an original homebrew disc with approved companion files, first inspect
 its exact **per-game directory**, rather than an entire collection containing
@@ -114,8 +114,8 @@ permission to train on copyrighted text, audiovisual output or extracted
 assets. Proprietary ROMs without rights authorization remain blocked.
 
 Configure and independently approve the exact installed libretro core and
-legitimate firmware through the existing \`SKL_GAME_EMULATOR_REGISTRY\`
-contract. \`core_id\` and \`target_id\` must agree with the approved core.
+legitimate firmware through the existing `SKL_GAME_EMULATOR_REGISTRY`
+contract. `core_id` and `target_id` must agree with the approved core.
 Core installation, extension hints, license permission, runtime compatibility,
 measured policy updates and successful game completion are separate facts.
 
@@ -123,7 +123,7 @@ measured policy updates and successful game completion are separate facts.
 
 Create a private operator-owned output directory with mode 0700:
 
-\`\`\`sh
+```sh
 mkdir -p /private/rom-receipts
 chmod 700 /private/rom-receipts
 export SKL_GAME_EMULATOR_REGISTRY=/private/approved-cores.json
@@ -134,10 +134,10 @@ python -m scripts.training.rom_study train-all \
   --snapshot /private/rom-receipts/rom-library-snapshot.json \
   --max-pages 1 --limit 32 --runs 12 --steps 24 \
   --neural-world --neural-epochs 4 --neural-width 8
-\`\`\`
+```
 
-Read \`next_cursor\` from JSON output, then re-run with \`--cursor\` to
-continue. Use \`--max-pages 0\` only when you intentionally want a potentially
+Read `next_cursor` from JSON output, then re-run with `--cursor` to
+continue. Use `--max-pages 0` only when you intentionally want a potentially
 lengthy **foreground** scan of every page; this is not an automatic
 background job. Each call enforces bounded resources. Per-ROM results are
 stored create-only. A previously recorded result is hash and evidence
@@ -147,10 +147,10 @@ missing core, invalid source or failed replay receives an explicit blocked
 state, not a fabricated training receipt.
 
 Recorded outcomes distinguish:
-- \`q_policy_updated_with_receipt\`: replay-audited actual numeric Q updates
-- \`q_policy_executed_no_updates\`: an executed episode without measured Q updates
-- \`previous_verified_receipt_no_reexecution\`: verified earlier result
-- \`no_training_rights_review\` and other blocked states
+- `q_policy_updated_with_receipt`: replay-audited actual numeric Q updates
+- `q_policy_executed_no_updates`: an executed episode without measured Q updates
+- `previous_verified_receipt_no_reexecution`: verified earlier result
+- `no_training_rights_review` and other blocked states
 
 The lab retains per-run snapshot identities, reverse replay evidence,
 observed audiovisual state differences, held-out policy evaluation, and
@@ -170,7 +170,7 @@ The ROM learner can generate actual per-title tabular policy updates and
 optional separately trained candidate neural world models on a properly
 installed host. It **does not** fine-tune Jeeves's speaking model.
 Use the existing attested production trainer and
-\`docs/ai/JEEVES_PRODUCTION_GAME_TRAINING_RUNBOOK.md\` for independent
+`docs/ai/JEEVES_PRODUCTION_GAME_TRAINING_RUNBOOK.md` for independent
 checkpoint-derived candidate weight updates and promotion. ROM evidence
 cannot bypass dataset provenance, legal review, contamination screening or
 human promotion authority. Dragon may use reviewed observations in its
