@@ -83,6 +83,8 @@ def test_development_wildcard_requires_explicit_opt_in(monkeypatch, tmp_path: Pa
     assert configure_cors_environment(dotenv) == (
         "http://localhost",
         "http://127.0.0.1",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
     )
 
     dotenv.write_text(
@@ -127,7 +129,21 @@ def test_local_invalid_origin_falls_back_to_loopback_only() -> None:
     assert normalize_cors_origins("https://good.example,not-an-origin", production=False) == (
         "http://localhost",
         "http://127.0.0.1",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
     )
+
+
+def test_frontend_port_selects_the_published_studio_origin(monkeypatch) -> None:
+    monkeypatch.setenv("FRONTEND_PORT", "4173")
+    assert normalize_cors_origins(None, production=False) == (
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    )
+    monkeypatch.setenv("FRONTEND_PORT", "not-a-port")
+    assert "http://localhost:3000" in normalize_cors_origins("", production=False)
 
 
 def test_blank_process_value_does_not_fall_through_to_dotenv(
