@@ -149,3 +149,104 @@ def test_campaign_rejects_critic_that_did_not_produce_three_grounded_findings(
     assert page["model_review_executed_or_replayed"] == 0
     assert page["review_failures_needing_retry"] == 1
     assert page["rows"][0]["adversarial_review_state"].startswith("critic_output_incomplete")
+
+
+
+def _synthetic_corpus_inputs():
+    from skeleton.jeeves.game_emulator_triangle import LENSES
+    evidence = {
+        "report_digest": "a" * 64,
+        "source_lineage": {
+            "rights_acknowledged": True, "source_sha256": "b" * 64,
+            "rights_review_id": "independent-review-example",
+        },
+    }
+    triangle = {
+        "triangle_digest": "c" * 64,
+        "episode_lens_references": [{
+            "source_trace_sha256": "d" * 64,
+            "source_receipt_sha256": "e" * 64,
+            "unique_source_transitions": 17,
+            "grounded_lens_evidence": {
+                name: {"measurement": i, "verified": True}
+                for i, name in enumerate(LENSES)
+            },
+        }],
+    }
+    review = {
+        "review_digest": "f" * 64,
+        "structured_source_bound_passes": 3,
+        "passes": [{
+            "response": "UNTRUSTED_CRITIC_SENTINEL_NEVER_TRAIN_ON_ME",
+        }],
+    }
+    return evidence, triangle, review
+
+
+def test_weighted_eight_lens_candidate_corpus_never_multiplies_native_games(
+    monkeypatch,
+):
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    from skeleton.jeeves.game_emulator_triangle import LENSES
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    evidence, triangle, review = _synthetic_corpus_inputs()
+    result = corpus.compile_triangle_candidate_corpus(evidence, triangle, review)
+    assert result["unique_independent_native_episodes"] == 1
+    assert result["total_lens_candidate_views"] == len(LENSES) == 8
+    assert result["additional_independent_gameplay_episodes_from_lenses"] == 0
+    assert result["same_source_total_weight_per_episode"] == 1
+    assert all(row["same_source_view_weight"] == {"numerator": 1, "denominator": 8}
+               for row in result["candidate_rows"])
+    assert all(row["not_for_heldout_evaluation"] for row in result["candidate_rows"])
+    assert all("UNTRUSTED_CRITIC_SENTINEL" not in row["answer"]
+               for row in result["candidate_rows"])
+    assert result["production_jeeves_optimizer_steps"] == 0
+    corpus.verify_triangle_candidate_corpus(evidence, triangle, review, result)
+
+
+def test_corpus_cannot_train_on_unstructured_critic_or_unreviewed_rom(monkeypatch):
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    evidence, triangle, review = _synthetic_corpus_inputs()
+    review["structured_source_bound_passes"] = 2
+    with pytest.raises(corpus.TriangleCorpusError, match="three"):
+        corpus.compile_triangle_candidate_corpus(evidence, triangle, review)
+    review["structured_source_bound_passes"] = 3
+    evidence["source_lineage"]["rights_acknowledged"] = False
+    with pytest.raises(corpus.TriangleCorpusError, match="rights"):
+        corpus.compile_triangle_candidate_corpus(evidence, triangle, review)
+
+
+def test_corpus_rejects_corrupted_lens_or_falsified_candidate_output(monkeypatch):
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    evidence, triangle, review = _synthetic_corpus_inputs()
+    candidate = corpus.compile_triangle_candidate_corpus(evidence, triangle, review)
+    candidate["candidate_rows"][0]["answer"] = "Invented win and fake gameplay."
+    with pytest.raises(corpus.TriangleCorpusError, match="digest"):
+        corpus.verify_triangle_candidate_corpus(evidence, triangle, review, candidate)
+    triangle["episode_lens_references"][0]["grounded_lens_evidence"].pop("visual_state")
+    with pytest.raises(corpus.TriangleCorpusError, match="eight"):
+        corpus.compile_triangle_candidate_corpus(evidence, triangle, review)
+
+
+def test_operator_parser_exposes_unified_campaign_and_reviewed_corpus():
+    from scripts.training.rom_study import parser
+    root = parser()
+    parsed = root.parse_args([
+        "train-triangle", "--root", "/tmp/roms", "--approvals", "/tmp/approval.json",
+        "--output-dir", "/tmp/receipts", "--reviewer-checkpoint", "/tmp/reviewer.json",
+        "--snapshot", "/tmp/frozen.json",
+    ])
+    assert parsed.operation == "train-triangle"
+    assert parsed.max_pages == 1
+    second = root.parse_args([
+        "export-triangle-corpus", "--receipt", "/tmp/rom.json",
+        "--review-receipt", "/tmp/critic.json",
+        "--source-sha256", "0" * 64, "--reviewer-checkpoint", "/tmp/model.json",
+        "--output-dir", "/tmp/out",
+    ])
+    assert second.operation == "export-triangle-corpus"
