@@ -8,9 +8,11 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
 
+from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_campaign import (
     CampaignOrder, StudioCampaignError, inspect_campaign, run_campaign,
+    _file_tree,
 )
 from skeleton.ai.game_builder.native_game_cli import build_game as real_build_game
 
@@ -91,6 +93,37 @@ class OriginalStudioCampaignTests(unittest.TestCase):
             run_campaign(self.order, self.output, authorized=True)
         with self.assertRaises(StudioCampaignError):
             inspect_campaign(replace(self.order, seed=734), self.output)
+
+    def test_rehashed_native_music_source_still_fails_independent_media_review(self):
+        run_campaign(self.order, self.output, authorized=True, max_targets=1)
+        target = self.output / "targets/nintendo_game_boy"
+        program = target / "main.asm"
+        original = program.read_text(encoding="utf-8")
+        self.assertIn("SoundGoal:\n", original)
+        program.write_text(
+            original.replace("SoundGoal:\n", "SoundGoal:\n    ret\n", 1),
+            encoding="utf-8",
+        )
+        # Even with a forged fresh source tree and a rehashed campaign index,
+        # the actual original score must not silently diverge from console code.
+        file = target / "campaign_receipt.json"
+        recorded = json.loads(file.read_text())
+        tree, count, size = _file_tree(target)
+        recorded.update(tree_digest=tree, file_count=count, bytes=size)
+        recorded["receipt_digest"] = canonical_digest({
+            key: value for key, value in recorded.items() if key != "receipt_digest"
+        })
+        file.write_text(json.dumps(recorded, sort_keys=True), encoding="utf-8")
+        index_file = self.output / "index.json"
+        index = json.loads(index_file.read_text())
+        index["completed"]["nintendo_game_boy"] = recorded["receipt_digest"]
+        index_file.write_text(json.dumps(index, sort_keys=True), encoding="utf-8")
+        with self.assertRaisesRegex(
+            StudioCampaignError, "native sprites/audio code",
+        ):
+            inspect_campaign(self.order, self.output)
+        with self.assertRaises(StudioCampaignError):
+            run_campaign(self.order, self.output, authorized=True)
 
     def test_aborted_owned_stage_is_reclaimed_on_next_authorized_resume(self):
         run_campaign(self.order, self.output, authorized=True, max_targets=1)
