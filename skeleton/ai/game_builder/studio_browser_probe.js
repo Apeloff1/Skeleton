@@ -47,17 +47,21 @@ function main() {
     moveTo() {}, lineTo() {}, closePath() {}, arc() {},
     fill() { shapes++; },
   };
-  const node = () => ({
-    textContent: "", disabled: false, dataset: {},
-    setAttribute() {}, addEventListener() {},
+  const listeners = Object.create(null);
+  const node = (action) => ({
+    textContent: "", disabled: false, dataset: action ? {action} : {},
+    handlers: Object.create(null),
+    setAttribute() {},
+    addEventListener(type, fn) { this.handlers[type] = fn; },
     getContext() { return ctx; },
   });
+  const buttons = ["up", "left", "right", "down"].map(direction => node(direction));
   const nodes = Object.create(null);
   const document = {
     hidden: false, body: {appendChild() {}},
     getElementById(id) { return nodes[id] ||= node(); },
-    querySelectorAll() { return []; },
-    addEventListener() {},
+    querySelectorAll() { return buttons; },
+    addEventListener(type, fn) { listeners[type] = fn; },
     createElement() { return node(); },
   };
   const sandbox = {
@@ -95,6 +99,39 @@ function main() {
   if (JSON.stringify(recorded) !== JSON.stringify(actions)) {
     throw new Error("JS controller actions diverged from original replay");
   }
+  // Exercise actual DOM listeners and user controls, not just the core
+  // takeTurn() function. These are synthetic DOM events, not real hardware.
+  const keycodes = {up: "ArrowUp", left: "ArrowLeft",
+                    right: "ArrowRight", down: "ArrowDown"};
+  const keydown = code => {
+    if (typeof listeners.keydown !== "function")
+      throw new Error("keyboard event listener is missing");
+    listeners.keydown({
+      code, target: {tagName: "BODY"}, repeat: false,
+      altKey: false, ctrlKey: false, metaKey: false, preventDefault() {},
+    });
+  };
+  keydown("KeyZ");
+  const undone = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if (undone.status !== "playing" || undone.steps !== final.steps - 1)
+    throw new Error("actual game undo listener failed to reverse winning move");
+  keydown(keycodes[actions[actions.length - 1]]);
+  const restored = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if (JSON.stringify(restored) !== JSON.stringify(final))
+    throw new Error("keyboard controller failed to replay final winning move");
+  keydown("KeyR");
+  const restarted = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if (restarted.status !== "playing" || restarted.steps !== 0 ||
+      restarted.level !== 0 || restarted.score !== 0)
+    throw new Error("restart/reset hotkey did not clear game session");
+  const first = buttons.find(x => x.dataset.action === actions[0]);
+  if (!first || typeof first.handlers.click !== "function")
+    throw new Error("onscreen controller action was not bound");
+  first.handlers.click();
+  const fromButton = JSON.parse(vm.runInContext("JSON.stringify(state)", sandbox, {timeout: 100}));
+  if (fromButton.steps !== 1 ||
+      vm.runInContext("replay[0]", sandbox, {timeout: 100}) !== actions[0])
+    throw new Error("actual onscreen directional button failed controller step");
   const studioArt = vm.runInContext("Boolean(STUDIO_ART)", sandbox, {timeout: 100});
   const before = rects;
   for (const advance of timers) advance();
@@ -116,6 +153,10 @@ function main() {
     canvas_shape_calls: shapes,
     original_sprites_drawn: !!studioArt,
     original_animation_tick_exercised: !!studioArt && timers.length === 1,
+    keyboard_input_verified: true,
+    onscreen_button_input_verified: true,
+    undo_replay_verified: true,
+    restart_verified: true,
     graphical_browser_pixel_output_verified: false,
     native_godot_executed: false,
     actual_js_gameplay_executed: true,
