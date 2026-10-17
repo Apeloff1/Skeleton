@@ -525,6 +525,11 @@ def _emulator_receipt(root: Path, target: str, source_identity: str) -> dict | N
             or run.get("physical_console_verified") is not False
             or type(run.get(frame_key)) is not int
             or run[frame_key] <= 0
+            or type(run.get("sampled_checkpoints")) is not int
+            or not 1 <= run["sampled_checkpoints"] <= 128
+            or type(run.get("checkpoint_digest")) is not str
+            or len(run["checkpoint_digest"]) != 64
+            or any(ch not in "0123456789abcdef" for ch in run["checkpoint_digest"])
             or canonical_digest({k: v for k, v in run.items()
                                  if k != "receipt_digest"}) != run.get("receipt_digest")):
         raise StudioAssuranceError("native ROM playthrough evidence lacks real machine-code victory")
