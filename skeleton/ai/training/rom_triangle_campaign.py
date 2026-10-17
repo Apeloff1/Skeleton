@@ -502,7 +502,10 @@ def execute_native_43_lens_review(
         )
         digest = prior["semantic_review_digest"]
         count = replayed["native_jeeves_semantic_model_generations_replayed"]
-        state = "verified_43_native_lens_generations_replayed"
+        structured = prior["source_bound_interpretations"]
+        state = ("verified_43_native_lens_generations_replayed"
+                 if prior["all_semantic_interpretations_valid"]
+                 else "replayed_43_native_generations_incomplete_interpretations")
     else:
         fresh = run_native_semantic_lenses(
             evidence, triangle, review, semantic_runtime,
@@ -513,7 +516,10 @@ def execute_native_43_lens_review(
         _save_new(target, fresh)
         digest = fresh["semantic_review_digest"]
         count = fresh["native_model_generations_executed"]
-        state = "executed_43_native_lens_generations_requires_adjudication"
+        structured = fresh["source_bound_interpretations"]
+        state = ("executed_43_native_lens_generations_requires_adjudication"
+                 if fresh["all_semantic_interpretations_valid"]
+                 else "executed_43_native_generations_incomplete_interpretations")
     return {
         "state": state,
         "filename": name,
@@ -523,6 +529,9 @@ def execute_native_43_lens_review(
         "native_semantic_model_sha256": semantic_runtime.model_digest,
         "independent_adversarial_model_sha256": critic_runtime.model_digest,
         "native_model_lens_generations": count,
+        "source_referenced_interpretations": structured,
+        "lens_interpretations_incomplete": SEMANTIC_LENS_BUDGET - structured,
+        "all_lens_interpretations_valid": structured == SEMANTIC_LENS_BUDGET,
         "semantic_review_digest": digest,
         "reviewed_source_trace_count": 1,
         "new_independent_gameplay_episodes": 0,
