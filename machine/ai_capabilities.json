@@ -465,7 +465,7 @@
       "version": "1.0.0",
       "owner_plane": "orchestration",
       "enabled": true,
-      "implementation_state": "planned_target",
+      "implementation_state": "partial",
       "risk_class": "high",
       "input_modalities": [
         "text"
