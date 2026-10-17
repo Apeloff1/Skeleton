@@ -392,3 +392,105 @@ def inspect_native_episode_lenses(
             _save_new(path, manifest)
         result["operator_manifest_name"] = name
     return result
+
+
+def execute_native_43_lens_review(
+    rom_receipt: Path, critic_receipt: Path, *,
+    source_sha256: str, output_dir: Path,
+    critic_runtime: Any, semantic_runtime: Any,
+    run_index: int = 0, requested_keys: tuple[str, ...] = (),
+    seed: int = 0, max_new_tokens: int = 192,
+) -> dict[str, Any]:
+    """Actual, independently replayable 43-lens native LLM interpretation pass.
+
+    Before permitting interpretive model execution, the critic's prior three
+    native generations are independently reproduced from its own checkpoint.
+    Source and catalog identity stay pinned; generated hypotheses remain
+    unaudited until separate adjudication and are never supervised labels.
+    """
+    from skeleton.jeeves.game_emulator_triangle_semantic_inference import (
+        run_native_semantic_lenses, verify_native_semantic_lenses,
+        replay_native_semantic_lenses,
+    )
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        route_episode_semantic_lenses, SEMANTIC_LENS_BUDGET,
+    )
+    checked = verified_rom_receipt(
+        rom_receipt, expected_source_sha256=source_sha256,
+    )
+    document, read_sha = read_receipt_document(rom_receipt)
+    if checked["receipt_sha256"] != read_sha:
+        raise RomStudyError("43-lens native training evidence changed after source audit")
+    evidence, triangle = document.get("candidate_evidence"), document.get("training_triangle")
+    verify_training_triangle(evidence, triangle)
+    review, _ = read_receipt_document(critic_receipt)
+    verify_native_adversarial_review(evidence, triangle, review)
+    if review["structured_source_bound_passes"] != 3:
+        raise RomStudyError("cannot execute 43 lenses against an incomplete adversarial review")
+    replayed_critic = replay_native_adversarial_review(
+        evidence, triangle, review, critic_runtime,
+    )
+    if replayed_critic["native_generations_replayed"] != 3:
+        raise RomStudyError("independent adversarial reviewer checkpoint did not reproduce")
+    episodes = triangle["episode_lens_references"]
+    if type(run_index) is not int or not 0 <= run_index < len(episodes):
+        raise RomStudyError("43-lens review index outside native evidence")
+    source = episodes[run_index]
+    route = route_episode_semantic_lenses(
+        source, max_lenses=SEMANTIC_LENS_BUDGET, requested_keys=requested_keys,
+    )
+    semantic_runtime.assert_model_unchanged()
+    identity = hashlib.sha256(json.dumps({
+        "source": checked["receipt_sha256"],
+        "critic": review["review_digest"],
+        "native_trace": source["source_trace_sha256"],
+        "canonical_route": route["route_digest"],
+        "semantic_model": semantic_runtime.model_digest,
+        "seed": seed, "max_new_tokens": max_new_tokens,
+    }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    name = (
+        "semantic-43-native-" + source_sha256[:16] + "-"
+        + identity[:32] + ".json"
+    )
+    target = _private_output(output_dir) / name
+    if target.exists() or target.is_symlink():
+        prior, _ = read_receipt_document(target)
+        verify_native_semantic_lenses(evidence, triangle, review, prior)
+        if (prior["model_sha256"] != semantic_runtime.model_digest
+                or prior["requested_seed"] != seed
+                or prior["requested_max_new_tokens"] != max_new_tokens
+                or prior["canonical_route_sha256"] != route["route_digest"]):
+            raise RomStudyError("saved 43-lens native model or routing identity differs")
+        replayed = replay_native_semantic_lenses(
+            evidence, triangle, review, prior, semantic_runtime,
+        )
+        digest = prior["semantic_review_digest"]
+        count = replayed["native_jeeves_semantic_model_generations_replayed"]
+        state = "verified_43_native_lens_generations_replayed"
+    else:
+        fresh = run_native_semantic_lenses(
+            evidence, triangle, review, semantic_runtime,
+            run_index=run_index, requested_keys=requested_keys,
+            seed=seed, max_new_tokens=max_new_tokens,
+        )
+        verify_native_semantic_lenses(evidence, triangle, review, fresh)
+        _save_new(target, fresh)
+        digest = fresh["semantic_review_digest"]
+        count = fresh["native_model_generations_executed"]
+        state = "executed_43_native_lens_generations_requires_adjudication"
+    return {
+        "state": state,
+        "filename": name,
+        "source_sha256": source_sha256,
+        "native_trace_sha256": source["source_trace_sha256"],
+        "canonical_catalog_sha256": route["canonical_catalog_sha256"],
+        "native_semantic_model_sha256": semantic_runtime.model_digest,
+        "independent_adversarial_model_sha256": critic_runtime.model_digest,
+        "native_model_lens_generations": count,
+        "semantic_review_digest": digest,
+        "reviewed_source_trace_count": 1,
+        "new_independent_gameplay_episodes": 0,
+        "production_jeeves_weights_modified": False,
+        "semantic_findings_are_training_labels": False,
+        "operator_adjudication_required": True,
+    }
