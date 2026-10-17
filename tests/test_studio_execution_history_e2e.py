@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
-from skeleton.ai.game_builder.studio_campaign import CampaignOrder, run_campaign
+from skeleton.ai.game_builder.studio_campaign import CampaignOrder
 from skeleton.ai.game_builder.studio_execution_campaign import (
     ExecutionPolicy, run_studio_execution_campaign,
 )
