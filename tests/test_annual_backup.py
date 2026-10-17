@@ -1,8 +1,10 @@
 """SQLite online snapshot regressions for annual production (simulated jobs)."""
 from __future__ import annotations
 
+import io
 import json
 import sqlite3
+from contextlib import redirect_stdout
 from hashlib import sha256
 from pathlib import Path
 import tempfile
@@ -200,6 +202,33 @@ class AnnualSnapshotTests(unittest.TestCase):
         with self.assertRaises(AnnualBackupError):
             restore_annual_snapshot(self.root, "sealed", recovered_path)
         self.assertTrue(verify_annual_snapshot(self.root, "sealed")["verified"])
+
+    def test_operator_cli_creates_verifies_and_recovers_fenced_archive(self):
+        from scripts.annual_production_recovery import main
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main([
+                "snapshot", "--database", str(self.store.path),
+                "--archive-dir", str(self.root), "--label", "cli",
+            ]), 0)
+        self.assertTrue(json.loads(output.getvalue())["verified"])
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main([
+                "verify", "--archive-dir", str(self.root),
+                "--label", "cli",
+            ]), 0)
+        self.assertTrue(json.loads(output.getvalue())["verified"])
+        restored = self.root / "cli-restored.db"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main([
+                "restore", "--archive-dir", str(self.root),
+                "--label", "cli", "--destination", str(restored),
+            ]), 0)
+        summary = json.loads(output.getvalue())
+        self.assertTrue(summary["historic_leases_and_grants_fenced"])
+        self.assertTrue(restored.is_file())
 
     def test_restore_refuses_tampered_archive_and_existing_database(self):
         snapshot_annual_production(self.store, self.root, label="clean")
