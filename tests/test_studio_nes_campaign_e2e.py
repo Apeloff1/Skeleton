@@ -142,6 +142,41 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
         with self.assertRaises(StudioAssuranceError):
             inspect_production_assurance(self.order, self.campaign)
 
+    def test_wrong_compiled_chr_pixels_never_publish_a_qualified_nes(self):
+        corrupted = bytearray(ines_rom(
+            (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes()
+        ))
+        start = 16 + 16384
+        corrupted[start] ^= 0xFF
+
+        def assembler(project, target, *, authorized, execute, output,
+                      output_symbols, timeout_seconds):
+            binary = bytes(corrupted)
+            Path(output).write_bytes(binary)
+            Path(output_symbols).write_bytes(NES_LABELS)
+            _, digest = _verify_source(Path(project), target)
+            return native_receipt(
+                target, digest, available=True, invoked=True,
+                built=True, header=True, digest=sha256(binary).hexdigest(),
+                size=len(binary), symbol_sha256=sha256(NES_LABELS).hexdigest(),
+            )
+        with patch(
+            "skeleton.ai.game_builder.studio_campaign_assurance.qualify_native_build",
+            side_effect=assembler,
+        ):
+            status = qualify_campaign_target(
+                self.order, self.campaign, "nintendo_famicom",
+                authorized=True, execute=True,
+            )
+        self.assertFalse(status["native_rom_compiled"])
+        self.assertEqual(status["blocker"], "compiled_nes_chr_original_art_mismatch")
+        self.assertFalse(
+            (self.campaign / "qualifications/nintendo_famicom/qualified.rom").exists()
+        )
+        self.assertFalse(
+            (self.campaign / "qualifications/nintendo_famicom/qualified.sym").exists()
+        )
+
     def test_missing_emulator_or_cpu_win_cannot_publish_positive_gate(self):
         self.compile_fixture()
         html, proof, world = _inputs(
