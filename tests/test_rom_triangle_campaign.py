@@ -152,7 +152,7 @@ def test_campaign_rejects_critic_that_did_not_produce_three_grounded_findings(
 
 
 
-def _fake_semantic_route(episode, *, max_lenses=43):
+def _fake_semantic_route(episode, *, max_lenses=43, requested_keys=()):
     from skeleton.jeeves.game_emulator_triangle_semantics import SEMANTIC_LENS_BUDGET
     assert max_lenses == SEMANTIC_LENS_BUDGET
     return {
@@ -161,10 +161,14 @@ def _fake_semantic_route(episode, *, max_lenses=43):
         "route_digest": "8" * 64,
         "observation_fingerprints": ["7" * 64],
         "actually_routed_lenses": SEMANTIC_LENS_BUDGET,
+        "governance_fingerprint": "a" * 64,
+        "selection_mode": "operator_exact_43" if requested_keys else "canonical_dynamic_router",
         "routes": [{
             "lens_key": "authored_lens_" + str(i),
             "lens_family": "game", "activation_score": 0.7,
             "question": "Which source evidence could falsify this lens?",
+            "governance_grade": "heuristic",
+            "governance_fingerprint": "f" * 64,
         } for i in range(SEMANTIC_LENS_BUDGET)],
     }
 
@@ -276,3 +280,40 @@ def test_operator_parser_exposes_unified_campaign_and_reviewed_corpus():
         "--output-dir", "/tmp/out",
     ])
     assert second.operation == "export-triangle-corpus"
+
+
+
+def test_strict_43_key_operator_manifest(tmp_path):
+    from skeleton.ai.training.rom_triangle_campaign import load_operator_semantic_lens_set
+    source = tmp_path / "semantic-keys.json"
+    keys = ["lens_" + str(i) for i in range(43)]
+    source.write_text(json.dumps({
+        "schema_version": "skeleton.jeeves.semantic_lens_set.v1",
+        "lens_keys": keys,
+    }), encoding="utf-8")
+    assert load_operator_semantic_lens_set(source) == tuple(keys)
+    source.write_text(json.dumps({
+        "schema_version": "skeleton.jeeves.semantic_lens_set.v1",
+        "lens_keys": keys[:-1] + [keys[0]],
+    }), encoding="utf-8")
+    with pytest.raises(RomStudyError, match="43 distinct"):
+        load_operator_semantic_lens_set(source)
+
+
+def test_candidate_corpus_pins_requested_semantic_lens_keys(monkeypatch):
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", _fake_semantic_route)
+    evidence, triangle, review = _synthetic_corpus_inputs()
+    keys = tuple("authored_lens_" + str(i) for i in range(43))
+    result = corpus.compile_triangle_candidate_corpus(
+        evidence, triangle, review,
+        requested_semantic_lens_keys=keys,
+    )
+    assert result["operator_requested_semantic_lens_keys"] == list(keys)
+    assert result["semantic_routes_per_episode"][0]["selection_mode"] == "operator_exact_43"
+    assert len(result["semantic_lens_selection_digest"]) == 64
+    assert all(not item["factual_claims_allowed"]
+               for item in result["semantic_routes_per_episode"][0]["semantic_questions"])
+    corpus.verify_triangle_candidate_corpus(evidence, triangle, review, result)

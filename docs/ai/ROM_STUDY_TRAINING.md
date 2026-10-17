@@ -376,3 +376,33 @@ canonical keys routed** for the first three episodes, including catalog
 identity and selection counts. These semantic questions remain pending
 adjudication and cannot by themselves count as newly measured gameplay.
 
+### Reuse all 43 selected lenses from Jeeves' actual authored registry
+
+The 43-per-episode semantic pass uses
+`skeleton.jeeves.agent.semantic_maximal.MaximalSemanticRegistry`, not a
+second hard-coded list. The canonical registry contains more than 43 named
+operators, so **43 is the routed selection size, not the total registry
+count**. The eight pre-existing measured gameplay lenses remain distinct;
+they are the only supervised numeric evidence views. Semantic lenses
+contribute 43 source-linked questions, roles, failure modes and scientific
+governance decisions, not fabricated pixel/object/narrative labels.
+
+To pin exactly the 43 canonical lens keys intended for a study, provide an
+explicit JSON manifest:
+
+```json
+{
+  "schema_version": "skeleton.jeeves.semantic_lens_set.v1",
+  "lens_keys": ["<exact 43 distinct registered Jeeves semantic lens keys>"]
+}
+```
+
+Pass `--semantic-lens-set /private/approved-lens-set.json` to
+`export-triangle-corpus`. A missing, duplicate, unknown or unregistered
+key fails closed. Without the manifest, the existing cue-aware maximal router
+selects 43 of Jeeves' authored definitions. Every route is governed through
+`SemanticGovernanceBridge`; it cannot claim factual or causal authority.
+Changing the selection or the upstream catalog changes the custody digest
+and creates a different candidate-corpus filename. The original source
+episode still contributes exactly one independent gameplay episode,
+regardless of the 43 semantic questions.
