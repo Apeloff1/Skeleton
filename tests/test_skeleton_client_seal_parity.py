@@ -40,7 +40,7 @@ def test_client_mint_matches_server_mint(monkeypatch, env_secret, env_ring, secr
             monkeypatch.setenv(name, value)
     kwargs = {"secret": secret, "principal": principal, "now": 1_700_000_000.75}
     expected = server_mint("sdk", ttl, **kwargs)
-    assert client_seal.mint_seal("sdk", ttl, **kwargs) == expected
+    assert client_seal.mint_seal_token("sdk", ttl, **kwargs) == expected
     if expected is not None:
         assert verify_seal(expected, secret=secret, keyring=env_ring, now=1_700_000_000) == "sdk"
 
@@ -49,7 +49,7 @@ def test_client_mint_rejects_bool_ttl_like_server():
     with pytest.raises(ValueError):
         server_mint("sdk", True, secret="s")
     with pytest.raises(ValueError):
-        client_seal.mint_seal("sdk", True, secret="s")
+        client_seal.mint_seal_token("sdk", True, secret="s")
 
 
 def test_client_seal_module_does_not_import_server_api():
