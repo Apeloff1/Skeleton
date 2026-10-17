@@ -60,11 +60,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
+      - name: Resolve CI/CD change scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: bash scripts/ci_change_scope.sh
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Install focused unit-test runtime
+        if: steps.scope.outputs.python == 'true'
         run: >-
           python -m pip install --disable-pip-version-check
           "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.27,<1" "motor==3.7.1" "pymongo==4.18.3" "fastapi>=0.110,<1"
@@ -72,14 +79,17 @@ jobs:
       - name: Compile canonical Python package
         run: python -m compileall -q skeleton
       - name: Verify year-scale Jeeves Builder Dragon SQLite recovery
+        if: steps.scope.outputs.python == 'true'
         run: python -m unittest discover -s tests -p 'test_annual_*.py' -v
       - name: Run canonical unit runner
+        if: steps.scope.outputs.python == 'true'
         env:
           PYTHONPATH: "."
         run: python tests/run_unit.py
       - name: Verify legacy tests preserve tracked source
         run: git diff --exit-code
       - name: Run complete canonical domain suite
+        if: steps.scope.outputs.python == 'true'
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTHONPATH: ".:backend"
@@ -150,11 +160,17 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Resolve CI/CD owned surfaces
+        id: cidupe
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: bash scripts/ci_change_scope.sh
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Set up Node.js
+        if: steps.cidupe.outputs.frontend != 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "${{ env.NODE_VERSION }}"
@@ -167,9 +183,15 @@ jobs:
           "httpx>=0.27,<1" "pydantic-settings>=2.1,<3" "pymongo>=4,<5" "motor>=3,<4"
           "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.1"
       - name: Install frontend dependencies
+        if: steps.cidupe.outputs.frontend != 'true'
         run: yarn --cwd frontend install --ignore-scripts --non-interactive
-      # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
+      # CI/CD Backend Lint owns backend ruff. CI/CD Frontend owns yarn lint:ci
+      # and typecheck. This lane still runs the security suite, and it still
+      # runs those surfaces when Change Scope says CI/CD will skip them.
       - name: Canonical lint, type, and high-confidence security gates
+        env:
+          QUALITY_GATES_SKIP_FRONTEND: ${{ steps.cidupe.outputs.frontend }}
+          QUALITY_GATES_SKIP_BACKEND_LINT: ${{ steps.cidupe.outputs.backend }}
         run: bash scripts/quality-gates.sh
       - name: Full-history secret scan
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
