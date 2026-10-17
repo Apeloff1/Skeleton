@@ -86,3 +86,23 @@ pages fail closed. Its `full_registered_catalog_covered` flag is a
 **review-task-coverage** result, never proof of native emulator replay,
 independent Dragon watching, adversarial execution, gradient updates or
 game completion.
+
+
+### Operator all-catalog review assembly
+
+`assemble_source_pinned_lens_campaign(report, page_size=64)` deterministically
+schedules all registered semantic lenses, verifies each generated page
+against the actual source report and returns a concise read-only aggregate.
+It does not store raw frame media or claim independent observations.
+
+```bash
+python -m scripts.game_emulator_lens_campaign \
+  --source-report /private/emulator-training-report.json --page-size 64
+python -m unittest skeleton.testing.test_jeeves_emulator_lens_campaign -v
+```
+
+The source must be an existing absolute regular JSON file, bounded to
+32 MiB, without duplicate object fields or nonfinite numbers. The aggregate
+contains current catalog coverage and deliberately **open** Dragon and
+adversarial lanes. Complete task enumeration is not task execution, verified
+native hardware or training of production Jeeves model parameters.
