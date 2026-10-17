@@ -262,6 +262,29 @@
         "tests/test_studio_campaign_e2e.py",
         "tests/test_studio_campaign_assurance_e2e.py"
       ]
+    },
+    {
+      "id": "jeeves-original-artist-sprite-production",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_sprite_authoring.py",
+        "skeleton/ai/game_builder/studio_asset_pipeline.py",
+        "skeleton/ai/game_builder/native_game_cli.py",
+        "skeleton/ai/game_builder/jeeves_app_runtime.py",
+        "tests/test_studio_artist_sprite_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_artist_sprite_e2e.py"
+      ]
     }
   ]
 }
