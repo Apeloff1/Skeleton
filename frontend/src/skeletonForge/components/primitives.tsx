@@ -2,8 +2,9 @@
  * Small accessible building blocks shared by the cockpit panels.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { Tone } from '../run';
+import { scaledText, useStudioA11y } from './a11yContext';
 import { C, RADIUS, TONE_COLOR, TONE_GLYPH, TOUCH } from './theme';
 
 export function Card({ children, style, label, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; label?: string; testID?: string }) {
@@ -15,10 +16,12 @@ export function Card({ children, style, label, testID }: { children: React.React
 }
 
 export function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
+  const a11y = useStudioA11y();
+  const scaling = a11y.allowSystemFontScaling ? undefined : false;
   return (
     <View style={s.titleRow}>
-      <Text style={s.title} accessibilityRole="header">{children}</Text>
-      {hint ? <Text style={s.hint}>{hint}</Text> : null}
+      <Text style={scaledText(s.title, a11y)} allowFontScaling={scaling} accessibilityRole="header">{children}</Text>
+      {hint ? <Text style={scaledText(s.hint, a11y)} allowFontScaling={scaling}>{hint}</Text> : null}
     </View>
   );
 }
@@ -36,6 +39,7 @@ export interface ChipProps {
 
 /** Selectable pill; colour is never the only signal (✓ + aria state). */
 export function Chip({ label, selected = false, onPress, color = C.blue, disabled = false, role = 'radio', a11yLabel, testID }: ChipProps) {
+  const a11y = useStudioA11y();
   const checked = role === 'radio' || role === 'checkbox' ? selected : undefined;
   return (
     <Pressable
@@ -45,15 +49,17 @@ export function Chip({ label, selected = false, onPress, color = C.blue, disable
       accessibilityRole={role}
       accessibilityLabel={a11yLabel ?? label}
       accessibilityState={{ selected, disabled, checked }}
+      aria-checked={checked}
+      aria-selected={role === 'tab' ? selected : undefined}
       hitSlop={4}
       style={({ pressed }) => [
         s.chip,
         selected && { backgroundColor: color + '26', borderColor: color },
-        pressed && !disabled && s.pressed,
+        pressed && !disabled && !a11y.reduceMotion && s.pressed,
         disabled && s.disabled,
       ]}
     >
-      <Text style={[s.chipTxt, selected && { color: C.textStrong }]}>
+      <Text style={[scaledText(s.chipTxt, a11y), selected && { color: C.textStrong }]} allowFontScaling={a11y.allowSystemFontScaling ? undefined : false}>
         {selected ? '✓ ' : ''}
         {label}
       </Text>
@@ -73,6 +79,7 @@ export function Button({
   testID?: string;
   compact?: boolean;
 }) {
+  const a11y = useStudioA11y();
   const bg = tone === 'primary' ? C.green : tone === 'danger' ? C.red : tone === 'secondary' ? C.blue : 'transparent';
   const fg = tone === 'primary' ? '#052e16' : tone === 'ghost' ? C.text : '#fff';
   return (
@@ -89,20 +96,21 @@ export function Button({
         compact && s.btnCompact,
         { backgroundColor: bg },
         tone === 'ghost' && s.btnGhost,
-        pressed && !(disabled || busy) && s.pressed,
+        pressed && !(disabled || busy) && !a11y.reduceMotion && s.pressed,
         (disabled || busy) && s.disabled,
       ]}
     >
-      <Text style={[s.btnTxt, { color: fg }]}>{busy ? `${label}…` : label}</Text>
+      <Text style={[scaledText(s.btnTxt, a11y), { color: fg }]} allowFontScaling={a11y.allowSystemFontScaling ? undefined : false}>{busy ? `${label}…` : label}</Text>
     </Pressable>
   );
 }
 
 export function StatusPill({ tone, label, testID }: { tone: Tone; label: string; testID?: string }) {
+  const a11y = useStudioA11y();
   const color = TONE_COLOR[tone];
   return (
     <View style={[s.pill, { borderColor: color, backgroundColor: color + '1f' }]} accessibilityLabel={label} testID={testID}>
-      <Text style={[s.pillTxt, { color }]} importantForAccessibility="no">
+      <Text style={[scaledText(s.pillTxt, a11y), { color }]} allowFontScaling={a11y.allowSystemFontScaling ? undefined : false} importantForAccessibility="no">
         {TONE_GLYPH[tone]} {label}
       </Text>
     </View>
@@ -125,6 +133,7 @@ export function Meter({ ratio, color = C.blue, label, height = 6 }: { ratio: num
 }
 
 export function Banner({ tone, children, testID }: { tone: Tone; children: React.ReactNode; testID?: string }) {
+  const a11y = useStudioA11y();
   const color = TONE_COLOR[tone];
   return (
     <View
@@ -133,7 +142,48 @@ export function Banner({ tone, children, testID }: { tone: Tone; children: React
       accessibilityLiveRegion="polite"
       style={[s.banner, { borderColor: color, backgroundColor: color + '14' }]}
     >
-      <Text style={[s.bannerTxt, { color: tone === 'idle' ? C.mute : color }]}>{children}</Text>
+      <Text style={[scaledText(s.bannerTxt, a11y), { color: tone === 'idle' ? C.mute : color }]} allowFontScaling={a11y.allowSystemFontScaling ? undefined : false}>{children}</Text>
+    </View>
+  );
+}
+
+export function Field({
+  label, value, onChangeText, placeholder, secure = false, disabled = false, onSubmit, testID, keyboard = 'default', hint,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder?: string;
+  secure?: boolean;
+  disabled?: boolean;
+  onSubmit?: () => void;
+  testID?: string;
+  keyboard?: 'default' | 'email-address';
+  hint?: string;
+}) {
+  const a11y = useStudioA11y();
+  return (
+    <View style={s.field}>
+      <Text style={scaledText(s.fieldLabel, a11y)} allowFontScaling={a11y.allowSystemFontScaling ? undefined : false}>{label}</Text>
+      <TextInput
+        testID={testID}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={C.dim}
+        secureTextEntry={secure}
+        editable={!disabled}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType={keyboard}
+        returnKeyType={onSubmit ? 'go' : 'next'}
+        onSubmitEditing={onSubmit}
+        accessibilityLabel={label}
+        accessibilityHint={hint}
+        textContentType={secure ? 'password' : 'emailAddress'}
+        autoComplete={secure ? 'password' : 'email'}
+        style={[s.input, scaledText(s.inputText, a11y)]}
+      />
     </View>
   );
 }
@@ -159,4 +209,11 @@ export const s = StyleSheet.create({
   meter: { backgroundColor: C.border, borderRadius: 6, overflow: 'hidden', width: '100%' },
   banner: { borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 10 },
   bannerTxt: { fontSize: 13, fontWeight: '600' },
+  field: { marginBottom: 12 },
+  fieldLabel: { color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  input: {
+    minHeight: TOUCH, borderWidth: 1, borderColor: C.borderStrong, borderRadius: 10,
+    backgroundColor: C.cardAlt, paddingHorizontal: 12, justifyContent: 'center',
+  },
+  inputText: { color: C.textStrong, fontSize: 16 },
 });
