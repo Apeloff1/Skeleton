@@ -24,7 +24,7 @@ from .studio_build_qualification import _header, _regular, parse_nes_labels
 from .studio_runtime_qualification import _inputs
 from .studio_native_replay_telemetry import (
     selected_checkpoints, parse_nes_samples, validate_checkpoints, NativeCheckpointError,
-    reference_cpu_checkpoints,
+    reference_cpu_checkpoints, first_cpu_divergence,
 )
 
 SCHEMA = "skeleton.game_builder.nes_cpu_ppu_playthrough.v1"
@@ -53,6 +53,7 @@ class NESReplayResult:
     ppu_frame_sha256: str | None
     checkpoint_digest: str | None
     sampled_checkpoints: int
+    first_divergence: dict | None
     cpu_state: dict | None
     blocker: str | None
     receipt_digest: str
@@ -72,6 +73,7 @@ class NESReplayResult:
             "ppu_frame_sha256": self.ppu_frame_sha256,
             "checkpoint_digest": self.checkpoint_digest,
             "sampled_checkpoints": self.sampled_checkpoints,
+            "first_divergence": self.first_divergence,
             "cpu_state": self.cpu_state,
             "blocker": self.blocker,
             "physical_controller_verified": False,
@@ -89,8 +91,8 @@ def _receipt(rom: str, symbols: str, world: str, proof: str, *,
              available: bool, executed: bool = False, replay: bool = False,
              victory: bool = False, frames: int = 0, actions: int = 0,
              image: str | None = None, checkpoint: str | None = None,
-             sampled: int = 0, state: dict | None = None,
-             blocker: str | None = None) -> NESReplayResult:
+             sampled: int = 0, divergence: dict | None = None,
+             state: dict | None = None, blocker: str | None = None) -> NESReplayResult:
     body = {
         "schema": SCHEMA, "target": "nintendo_famicom",
         "rom_sha256": rom, "symbols_sha256": symbols,
@@ -99,6 +101,7 @@ def _receipt(rom: str, symbols: str, world: str, proof: str, *,
         "cpu_input_replay_executed": replay, "machine_code_victory": victory,
         "frame_count": frames, "action_count": actions, "ppu_frame_sha256": image,
         "checkpoint_digest": checkpoint, "sampled_checkpoints": sampled,
+        "first_divergence": divergence,
         "cpu_state": state, "blocker": blocker,
         "physical_controller_verified": False,
         "physical_console_verified": False,
@@ -108,7 +111,8 @@ def _receipt(rom: str, symbols: str, world: str, proof: str, *,
     }
     return NESReplayResult(
         rom, symbols, world, proof, available, executed, replay, victory,
-        frames, actions, image, checkpoint, sampled, state, blocker, canonical_digest(body),
+        frames, actions, image, checkpoint, sampled, divergence, state, blocker,
+        canonical_digest(body),
     )
 
 
@@ -328,6 +332,7 @@ def qualify_nes_cpu_ppu(
                 image=image, state=state,
                 blocker="nes_machine_code_diverged_from_reference_replay",
             )
+        samples = []
         try:
             samples = parse_nes_samples(
                 _regular(scratch / "cpu-snapshots.txt", 48_000), len(actions),
@@ -343,6 +348,9 @@ def qualify_nes_cpu_ppu(
                 romhash, symhash, world, proofhash, available=True, executed=True,
                 replay=True, victory=False, frames=frames, actions=count,
                 image=image, state=state,
+                divergence=first_cpu_divergence(
+                    samples, reference["samples"],
+                ),
                 blocker="nes_cpu_intermediate_checkpoint_mismatch",
             )
         return _receipt(
