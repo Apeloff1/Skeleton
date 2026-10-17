@@ -325,6 +325,16 @@ def build_game(
         "native_art_embedded": bool(
             art_receipt and art_receipt["runtime_art_source_embedded"]
         ),
+        "native_hero_animation_frames_in_source": (
+            len(hero_frames) if hero_frames is not None else 0
+        ),
+        "native_hero_animation_frame_delay": (
+            animation_delay if hero_frames is not None else None
+        ),
+        "native_hero_animation_source_integrated": (
+            hero_frames is not None and len(hero_frames) > 1
+        ),
+        "native_hero_animation_runtime_executed": False,
     }
 
 
