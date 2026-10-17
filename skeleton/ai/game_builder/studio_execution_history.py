@@ -57,6 +57,61 @@ def _read_history(root: Path, identity: str) -> dict:
     return raw
 
 
+def _validated_native_failure_events(run: dict, targets: tuple[str, ...]) -> list[dict]:
+    events = run.get("events")
+    if type(events) is not list or len(events) > 4096:
+        raise StudioQualificationHistoryError("bounded original game E2E event list required")
+    classifications = ("verified", "blocked", "unsupported")
+    required = ("target", "stage", "status", "blocker")
+    stage_ids = ("source", "rom", "emulator", "browser", "godot", "canvas")
+    counts = {status: 0 for status in classifications}
+    failures: list[dict] = []
+    for event in events:
+        if (type(event) is not dict or any(key not in event for key in required)
+                or event["target"] not in targets
+                or event["stage"] not in stage_ids
+                or event["status"] not in counts):
+            raise StudioQualificationHistoryError("E2E report contains an untyped target or stage")
+        counts[event["status"]] += 1
+        issue = event.get("first_cpu_divergence")
+        if issue is None:
+            continue
+        if (event["stage"] != "emulator" or event["status"] != "blocked"
+                or type(issue) is not dict or type(issue.get("category")) is not str
+                or issue["category"] not in (
+                    "sample_count_mismatch", "controller_action_boundary_mismatch",
+                    "malformed_cpu_sample", "malformed_cpu_state", "cpu_state_diverged"
+                )
+                or len(issue) > 8):
+            raise StudioQualificationHistoryError("unverified or oversized CPU divergence")
+        if issue["category"] == "cpu_state_diverged":
+            changed = issue.get("changed_fields")
+            if (type(changed) is not list or len(changed) > 11
+                    or any(key not in (
+                        "Level", "PlayerX", "PlayerY", "Health", "Score",
+                        "ScoreHigh", "TurnCount", "TurnCountHigh",
+                        "GemsRemaining", "GameWon", "GameLost",
+                    ) for key in changed)
+                    or any(type(issue.get(name)) is not dict
+                           or set(issue[name]) != set(changed)
+                           or any(type(value) is not int or not 0 <= value <= 255
+                                  for value in issue[name].values())
+                           for name in ("expected", "observed"))):
+                raise StudioQualificationHistoryError("native CPU anomaly contains unreviewed data")
+        failures.append({
+            "target": event["target"], "category": issue["category"],
+            "diagnostic_digest": canonical_digest(issue),
+            "first_action": issue.get("action", issue.get("expected_action")),
+            "changed_fields": issue.get("changed_fields", []),
+        })
+    if (len(events) != run.get("total_stage_attempts")
+            or counts["verified"] != run.get("verified_stage_attempts")
+            or counts["blocked"] != run.get("blocked_stage_attempts")
+            or counts["unsupported"] != run.get("unsupported_stage_attempts")):
+        raise StudioQualificationHistoryError("E2E stage classifications differ from run summary")
+    return failures
+
+
 def record_execution_run(
     order: CampaignOrder, campaign: str | Path, run: dict, *,
     authorized: bool,
@@ -71,6 +126,7 @@ def record_execution_run(
             or canonical_digest({k: v for k, v in run.items()
                                  if k != "run_digest"}) != run.get("run_digest")):
         raise StudioQualificationHistoryError("E2E run source receipt does not validate")
+    native_failures = _validated_native_failure_events(run, order.targets)
     root = Path(campaign)
     with campaign_lock(root):
         checked = _inspect_production_assurance_unlocked(order, root)
@@ -91,6 +147,8 @@ def record_execution_run(
             "verified_stage_attempts": run["verified_stage_attempts"],
             "blocked_stage_attempts": run["blocked_stage_attempts"],
             "unsupported_stage_attempts": run["unsupported_stage_attempts"],
+            "native_cpu_divergence_count": len(native_failures),
+            "first_native_cpu_divergence": native_failures[0] if native_failures else None,
             "native_cartridge_victories": checked["native_rom_machine_code_playthroughs_verified"],
             "native_cpu_checkpoint_samples_verified": checked["native_cpu_checkpoint_samples_verified"],
             "actual_browser_replays": checked["browser_javascript_playthroughs_verified"],
@@ -127,6 +185,12 @@ def inspect_execution_history(
             "current_assurance_report_digest": report["report_digest"],
             "history_digest": historical["history_digest"],
             "recorded_runs": len(rows),
+            "recorded_cpu_divergence_events": sum(
+                entry.get("native_cpu_divergence_count", 0) for entry in rows
+            ),
+            "latest_cpu_divergence": (
+                rows[-1].get("first_native_cpu_divergence") if rows else None
+            ),
             "latest_run_digest": rows[-1]["run_digest"] if rows else None,
             "latest_still_matches_current_source": (
                 rows[-1]["assurance_report_digest"] == report["report_digest"]
