@@ -70,6 +70,7 @@ _JS = r"""
 "use strict";
 const GAME = __SAFE_GAME_JSON__;
 const STUDIO_ART = GAME.studio_art || null;
+let spriteFrame = 0;
 const root=document.getElementById("screen");
 const ctx=root.getContext("2d",{alpha:false});
 const message=document.getElementById("message");
@@ -184,7 +185,9 @@ function downloadReplay(){
 }
 function drawStudioTile(index,x,y,size){
  if(!STUDIO_ART)return false;
- const pixels=STUDIO_ART.tiles[index],palette=STUDIO_ART.palette;
+ const pixels=(index===5&&STUDIO_ART.frames&&STUDIO_ART.frames.length)
+   ? STUDIO_ART.frames[spriteFrame] : STUDIO_ART.tiles[index];
+ const palette=STUDIO_ART.palette;
  if(!pixels||pixels.length!==64)return false;
  const unit=size/8;
  for(let ty=0;ty<8;ty++)for(let tx=0;tx<8;tx++){
@@ -281,6 +284,13 @@ nodes.undo.addEventListener("click",undo);
 document.getElementById("reset").addEventListener("click",reset);
 document.getElementById("download").addEventListener("click",downloadReplay);
 reset();
+if(STUDIO_ART && STUDIO_ART.frames && STUDIO_ART.frames.length>1){
+ window.setInterval(()=>{
+  if(document.hidden)return;
+  spriteFrame=(spriteFrame+1)%STUDIO_ART.frames.length;
+  if(state)draw();
+ },Math.round(1000/STUDIO_ART.fps));
+}
 """
 
 
@@ -354,6 +364,7 @@ def render_playable_world(
     }
     if studio_art is not None:
         from .studio_asset_pipeline import StudioArtPack
+        from skeleton.jeeves.game_console_assets import decode_tiles
         if not isinstance(studio_art, StudioArtPack) or studio_art.world_digest != world.digest:
             raise PlayableExportError("verified, same-world original art pack required")
         studio_art.verify()
@@ -361,6 +372,10 @@ def render_playable_world(
         game_data["studio_art"] = {
             "pack_digest": studio_art.digest,
             "tiles": [list(tile) for tile in studio_art.runtime_tiles],
+            "frames": [list(tile) for tile in decode_tiles(
+                dict(studio_art.files)["tiles/hero_animation.bin"], studio_art.codec,
+            )],
+            "fps": studio_art.direction.animation_fps,
             "palette": ["#" + item[:6] for item in descriptors["palette"]],
         }
     script = _JS.replace("__SAFE_GAME_JSON__", _safe_script_json(game_data))
