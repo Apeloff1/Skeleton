@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from skeleton.api.charter_gate import require_charter
 from skeleton.api.hmac_seal import require_seal
@@ -1403,69 +1405,192 @@ def _gameforge_runner(state: Any) -> Any:
     return runner
 
 
-@router.post("/gameforge/run")
-async def gameforge_run(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
-    replay = _idempotency.replay(dict(http_request.headers))
-    if replay is not None:
-        return replay  # type: ignore[return-value]
+_REMOTE_FS_KEYS = ("project_root", "out", "overwrite")
+
+
+def _reject_remote_project_writes(request: Dict[str, Any]) -> None:
+    if any(key in request for key in _REMOTE_FS_KEYS):
+        raise HTTPException(status_code=422, detail="remote GameForge cannot write server project files")
+
+
+def run_gameforge_adapter(request: Dict[str, Any], state: Any) -> Dict[str, Any]:
+    """Thin ``/gameforge/run`` adapter over ``build_playable_game``.
+
+    The response stays the ten-stage operator body. Godot boot stays inside
+    the builder, so the pipeline playtest mode is forced off there.
+    """
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
+    from skeleton.forge.game_builder import build_playable_game, project_operator_http
     from skeleton.forge.playtest import PLAYTEST_MODES
     from skeleton.forge.repair import REPAIR_MODES
 
-    runner = _gameforge_runner(state)
-    out = runner.execute(
+    _reject_remote_project_writes(request)
+    result = build_playable_game(
         _text_field(request, "vision", ""),
         era=_text_field(request, "era", "") or None,
-        # Empty -> None so a cockpit BIND ARCHETYPE pin applies; the runner
-        # falls back to the canonical "extraction" preset.
+        # None keeps a cockpit BIND ARCHETYPE pin. The pipeline then falls
+        # back to the canonical extraction preset.
         archetype=_text_field(request, "archetype", "") or None,
+        repair_mode=_text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES),
+        playtest_mode=_text_field(request, "playtest", "off", allowed=PLAYTEST_MODES),
+        runner=_gameforge_runner(state),
         target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
         answers=_mapping_field(request, "answers", None, optional=True) or None,
-        playtest=_text_field(request, "playtest", "off", allowed=PLAYTEST_MODES),
-        repair_mode=_text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES),
     )
-    # files can be large; keep names in the HTTP body
-    files = out.get("files") or {}
-    out = dict(out)
-    out["file_names"] = sorted(files)
-    if not _bool_field(request, "include_files", False):
-        out.pop("files", None)
+    return project_operator_http(result, include_files=_bool_field(request, "include_files", False))
+
+
+def _scope_id(value: str, fallback: str) -> str:
+    from skeleton.forge.game_builder import _ID
+
+    if isinstance(value, str) and _ID.fullmatch(value):
+        return value
+    return fallback
+
+
+def _game_build_ack(handle: Any) -> Dict[str, Any]:
+    from skeleton.forge.game_builder import RUN_SCHEMA
+
+    return {
+        "schema_version": RUN_SCHEMA,
+        "job_id": handle.job_id,
+        "execution_id": handle.execution_id,
+        "status": handle.status,
+        "replayed": bool(handle.replayed),
+        "status_ref": f"/api/v1/game/build/{handle.execution_id}",
+    }
+
+
+@router.post("/gameforge/run")
+async def gameforge_run(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    del attester
+    replay = _idempotency.replay(dict(http_request.headers))
+    if replay is not None:
+        return replay  # type: ignore[return-value]
+    try:
+        out = await run_in_threadpool(run_gameforge_adapter, request, state)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     _idempotency.remember(dict(http_request.headers), out)
     return out
 
 
-@router.post("/gameforge/intake")
-async def gameforge_intake(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "intake"))) -> Dict[str, Any]:
+@router.post("/game/build")
+async def game_build(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> JSONResponse:
+    """Accept a playable build and return 202.
+
+    The work runs on the ``game.build`` job handler, which calls
+    ``build_playable_game``. Poll ``status_ref``. This does not run the
+    build on the event loop.
+    """
+    del state
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
-        return replay  # type: ignore[return-value]
-    from skeleton.application.command_contracts import MATERIALISE_TARGETS
-    from skeleton.context.questionnaire import intake
+        return JSONResponse(status_code=202, content=replay)
+    _reject_remote_project_writes(request)
+    from skeleton.forge.game_build_queue import IdempotencyMismatch, enqueue_game_build, start_worker
+    from skeleton.forge.game_builder import DEFAULT_DEADLINE_S, _ID, coerce_brief
     from skeleton.forge.playtest import PLAYTEST_MODES
     from skeleton.forge.repair import REPAIR_MODES
 
-    # The remote intake is in-memory. It must not accept server-side disk
-    # destinations or overwrite controls, even when the request is attested.
-    if any(key in request for key in ("project_root", "out", "overwrite")):
-        raise HTTPException(status_code=422, detail="remote GameForge intake cannot write server project files")
+    if "brief" not in request:
+        raise HTTPException(status_code=422, detail="brief is required")
+    brief = request.get("brief")
+    if not isinstance(brief, (str, dict)):
+        raise HTTPException(status_code=422, detail="brief must be a string or a skeleton.projects.v1 object")
+    try:
+        coerce_brief(brief)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if isinstance(brief, str) and not brief.strip():
+        raise HTTPException(status_code=422, detail="brief is required")
+    playtest = _text_field(request, "playtest", "off", allowed=PLAYTEST_MODES)
+    repair_mode = _text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES)
+    max_rounds = _int_field(request, "max_rounds", 3, minimum=1, maximum=3)
+    deadline_s = DEFAULT_DEADLINE_S
+    if "deadline_s" in request:
+        raw_deadline = request.get("deadline_s")
+        if isinstance(raw_deadline, bool) or not isinstance(raw_deadline, (int, float)) or not 0 < float(raw_deadline) <= DEFAULT_DEADLINE_S:
+            raise HTTPException(status_code=422, detail="deadline_s must be within (0, 120]")
+        deadline_s = float(raw_deadline)
+    actor = _scope_id(str(attester or ""), "charter")
+    tenant = _scope_id(str(http_request.headers.get("x-skeleton-tenant") or "default"), "default")
+    for field, expected in (("actor_id", actor), ("tenant_id", tenant)):
+        if field in request and request.get(field) not in (None, "", expected):
+            raise HTTPException(status_code=422, detail=f"{field} comes from the charter session")
+    project_id = request.get("project_id")
+    if project_id is not None and (not isinstance(project_id, str) or _ID.fullmatch(project_id) is None):
+        raise HTTPException(status_code=422, detail="project_id must be a projects identifier")
+    payload: Dict[str, Any] = {
+        "brief": brief,
+        "playtest": playtest,
+        "repair_mode": repair_mode,
+        "max_rounds": max_rounds,
+        "include_files": _bool_field(request, "include_files", False),
+        "deadline_s": deadline_s,
+        "target": "godot",
+    }
+    if request.get("era"):
+        payload["era"] = _text_field(request, "era", "")
+    if "archetype" in request:
+        payload["archetype"] = _text_field(request, "archetype", "") or None
+    header_key = None
+    for key, value in http_request.headers.items():
+        if key.lower() in {"idempotency-key", "x-idempotency-key"}:
+            header_key = value
+            break
+    try:
+        handle = enqueue_game_build(
+            payload,
+            actor_id=actor,
+            tenant_id=tenant,
+            project_id=project_id if isinstance(project_id, str) else None,
+            idempotency_key=header_key,
+            correlation_id=http_request.headers.get("x-request-id"),
+            timeout_s=deadline_s,
+        )
+    except IdempotencyMismatch as exc:
+        raise HTTPException(status_code=409, detail="idempotency key was already used with a different body") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    start_worker()
+    ack = _game_build_ack(handle)
+    _idempotency.remember(dict(http_request.headers), ack)
+    return JSONResponse(status_code=202, content=ack)
+
+
+@router.get("/game/build/{execution_id}")
+async def game_build_status(execution_id: str, state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """Poll a build accepted by ``POST /api/v1/game/build``."""
+    del state, attester
+    from skeleton.forge.game_build_queue import execution_view
+
+    try:
+        return execution_view(execution_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="build not found") from exc
+
+
+@router.post("/gameforge/intake")
+async def gameforge_intake(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "intake"))) -> Dict[str, Any]:
+    del attester
+    replay = _idempotency.replay(dict(http_request.headers))
+    if replay is not None:
+        return replay  # type: ignore[return-value]
+    from skeleton.context.questionnaire import intake
+
+    _reject_remote_project_writes(request)
     answers = _mapping_field(request, "answers", {}, optional=False) or {}
     taken = intake(answers)
-    runner = _gameforge_runner(state)
-    out = runner.execute(
-        taken.vision,
-        era=taken.era,
-        answers=answers,
-        target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
-        archetype=_text_field(request, "archetype", "") or None,
-        playtest=_text_field(request, "playtest", "off", allowed=PLAYTEST_MODES),
-        repair_mode=_text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES),
-    )
-    files = out.get("files") or {}
-    out = dict(out)
+    forwarded = dict(request)
+    forwarded["vision"] = taken.vision
+    forwarded["era"] = taken.era
+    forwarded["answers"] = answers
+    try:
+        out = await run_in_threadpool(run_gameforge_adapter, forwarded, state)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     out["intake"] = taken.to_dict()
-    out["file_names"] = sorted(files)
-    if not _bool_field(request, "include_files", False):
-        out.pop("files", None)
     _idempotency.remember(dict(http_request.headers), out)
     return out
 
@@ -1494,3 +1619,10 @@ async def github_oauth_callback(code: str = "", state: str = "") -> Dict[str, An
     safe = {k: v for k, v in out.items() if k != "access_token"}
     safe["state"] = state
     return safe
+
+
+# Register the playable-game worker when the API module loads. The worker
+# thread itself stays explicit (start_worker on accept), never in lifespan.
+from skeleton.forge.game_build_queue import BUILD_KIND, handle_game_build, register_handler
+
+register_handler(BUILD_KIND, handle_game_build)

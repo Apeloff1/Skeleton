@@ -7,6 +7,7 @@ No Docker, remote provider, external model weights, browser, or mock HTTP stack.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from hashlib import sha256
 from http.client import HTTPConnection
 import json
 import os
@@ -14,6 +15,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import threading
 import unittest
+from uuid import uuid4
 from unittest.mock import patch
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
@@ -106,6 +108,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(session["revision"], 1)
         self.assertEqual(session["evidence"], [None])
         self.assertEqual(session["citation_audits"], [None])
+        self.assertEqual(session["faithfulness_audits"], [None])
         self.assertEqual(
             [m["role"] for m in session["messages"]],
             ["system", "user", "assistant"],
@@ -263,6 +266,137 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(empty["hits"], [])
 
+    def test_governed_reference_read_requires_grant_and_replays_the_receipt(self):
+        text = "The depth buffer stores a depth value for each pixel."
+        status, created, _ = self._request(
+            "POST", "/v1/knowledge/documents",
+            {"title": "GPU notes", "text": text},
+        )
+        self.assertEqual(status, 201)
+        request_id = str(uuid4())
+        status, denied, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": False, "request_id": request_id},
+        )
+        self.assertEqual(status, 403)
+        self.assertIn("explicit operator grant", denied["error"])
+        status, escaped, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "../secrets", "granted": True, "request_id": str(uuid4())},
+        )
+        self.assertEqual(status, 400)
+        status, answer, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 200, answer)
+        self.assertEqual(answer["status"], "succeeded")
+        self.assertFalse(answer["replayed"])
+        self.assertEqual(answer["hits"][0]["document_id"], created["document_id"])
+        self.assertEqual(
+            text[answer["hits"][0]["char_start"]:answer["hits"][0]["char_end"]],
+            answer["hits"][0]["passage"],
+        )
+        status, replay, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 200, replay)
+        self.assertTrue(replay["replayed"])
+        self.assertEqual(replay["receipt_id"], answer["receipt_id"])
+        status, conflict, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "pixel value", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 409)
+
+    def test_governed_reference_write_waits_rolls_back_and_bounds_the_job(self):
+        title = "GPU notes"
+        text = "The depth buffer stores a depth value for each pixel."
+        request_id = str(uuid4())
+        status, denied, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {"title": title, "text": text, "request_id": request_id, "approved": False},
+        )
+        self.assertEqual(status, 403)
+        self.assertIn("explicit operator approval", denied["error"])
+        status, waiting, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {"title": title, "text": text, "request_id": request_id, "approved": True},
+        )
+        self.assertEqual(status, 200, waiting)
+        self.assertEqual(waiting["error_code"], "approval_required")
+        self.assertFalse(waiting["written"])
+        status, docs, _ = self._request("GET", "/v1/knowledge/documents")
+        self.assertEqual(docs["documents"], [])
+        status, mismatched, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {
+                "title": title, "text": text, "request_id": request_id,
+                "approved": True, "approval_ref": "approval:" + ("0" * 64),
+            },
+        )
+        self.assertEqual(status, 200, mismatched)
+        self.assertEqual(mismatched["error_code"], "approval_binding_mismatch")
+        status, escaped, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {
+                "title": "../secrets", "text": text, "request_id": str(uuid4()),
+                "approved": True,
+            },
+        )
+        self.assertEqual(status, 400)
+        status, written, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {
+                "title": title, "text": text, "request_id": request_id,
+                "approved": True, "approval_ref": waiting["expected_approval_ref"],
+            },
+        )
+        self.assertEqual(status, 200, written)
+        self.assertTrue(written["written"])
+        self.assertTrue(written["created"])
+        status, found, _ = self._request(
+            "POST", "/v1/knowledge/search", {"query": "depth buffer"},
+        )
+        self.assertEqual(found["hits"][0]["document_id"], written["document_id"])
+        parent = str(uuid4())
+        status, job, _ = self._request(
+            "POST", "/v1/agents/reference-job",
+            {
+                "goal": "depth buffer", "request_id": parent, "granted": True,
+                "allow_writes": False, "title": "Extra", "text": text,
+            },
+        )
+        self.assertEqual(status, 200, job)
+        self.assertEqual(job["status"], "blocked")
+        self.assertEqual(job["steps"], 0)
+        status, read_job, _ = self._request(
+            "POST", "/v1/agents/reference-job",
+            {
+                "goal": "depth buffer", "request_id": str(uuid4()),
+                "granted": True, "allow_writes": False,
+            },
+        )
+        self.assertEqual(read_job["status"], "completed")
+        self.assertEqual(read_job["calls"], ["local.reference.read"])
+        self.assertEqual(read_job["read"]["hits"][0]["document_id"], written["document_id"])
+        status, unapproved, _ = self._request(
+            "POST", "/v1/tools/reference-write/rollback",
+            {"request_id": request_id, "approved": False},
+        )
+        self.assertEqual(status, 403)
+        status, rolled, _ = self._request(
+            "POST", "/v1/tools/reference-write/rollback",
+            {"request_id": request_id, "approved": True},
+        )
+        self.assertEqual(status, 200, rolled)
+        self.assertTrue(rolled["rolled_back"])
+        status, empty, _ = self._request(
+            "POST", "/v1/knowledge/search", {"query": "depth buffer"},
+        )
+        self.assertEqual(empty["hits"], [])
+
     def test_reference_ingestion_rejects_unauthorized_and_malformed_inputs(self):
         status, denied, _ = self._request(
             "POST", "/v1/knowledge/documents",
@@ -350,6 +484,14 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(conversation["evidence"][0], manifest)
         self.assertEqual(conversation["citation_audits"][0],
                          answer["citation_audit"])
+        self.assertEqual(answer["faithfulness"]["schema"],
+                         "skeleton.intelligence.claim-faithfulness.v1")
+        self.assertEqual(answer["faithfulness"]["model_text_sha256"],
+                         sha256(answer["text"].encode()).hexdigest())
+        self.assertIn(answer["faithfulness"]["disposition"],
+                      {"supported", "qualified", "abstain", "contested"})
+        self.assertEqual(conversation["faithfulness_audits"][0],
+                         answer["faithfulness"])
         self.assertEqual(conversation["messages"][1]["content"], answer["text"])
 
     def test_grounded_retry_after_reference_deletion_preserves_original_receipt(self):
@@ -372,6 +514,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(repeated["output_digest"], first["output_digest"])
         self.assertEqual(repeated["evidence"], first["evidence"])
         self.assertEqual(repeated["citation_audit"], first["citation_audit"])
+        self.assertEqual(repeated["faithfulness"], first["faithfulness"])
         self.assertEqual(repeated["revision"], first["revision"])
         status, conflict, _ = self._request(
             "POST", endpoint, {**payload, "grounded": False},
@@ -558,6 +701,10 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertIn("textContent", script)
         self.assertNotIn("localStorage", script)
         self.assertNotIn("innerHTML", script)
+        self.assertIn("reference-confirm", script)
+        self.assertIn("reference-job", script)
+        self.assertIn("/v1/tools/reference-write", script)
+        self.assertIn("/v1/agents/reference-job", script)
 
     def _raw_get(self, path: str):
         conn = HTTPConnection("127.0.0.1", self.port, timeout=15)
