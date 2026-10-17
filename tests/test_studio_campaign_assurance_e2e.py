@@ -58,10 +58,10 @@ class ProductionGateTests(unittest.TestCase):
     def test_incomplete_and_complete_source_are_not_release_ready(self):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
         report = inspect_production_assurance(self.order, self.root)
-        self.assertEqual(len(GATES), 17)
+        self.assertEqual(len(GATES), 19)
         self.assertEqual(report["total_targets"], 2)
         self.assertEqual(report["targets_with_exact_source"], 1)
-        self.assertEqual(report["checked_gates"], 7)
+        self.assertEqual(report["checked_gates"], 8)
         self.assertFalse(report["all_targets_release_ready"])
         self.assertEqual(report["release_qualification_percent"], 0)
         self.assertFalse(report["rights_approval_inferred"])
@@ -81,7 +81,7 @@ class ProductionGateTests(unittest.TestCase):
         run_campaign(self.order, self.root, authorized=True)
         report = inspect_production_assurance(self.order, self.root)
         self.assertEqual(report["targets_with_exact_source"], 2)
-        self.assertEqual(report["checked_gates"], 14)
+        self.assertEqual(report["checked_gates"], 16)
         self.assertEqual(report["native_roms_structurally_verified"], 0)
         self.assertFalse(report["all_targets_release_ready"])
 
@@ -114,7 +114,7 @@ class ProductionGateTests(unittest.TestCase):
         self.assertFalse(build["already_qualified"])
         report = inspect_production_assurance(self.order, self.root)
         self.assertEqual(report["native_roms_structurally_verified"], 1)
-        self.assertEqual(report["checked_gates"], 9)
+        self.assertEqual(report["checked_gates"], 10)
         self.assertEqual(
             report["targets"][0]["gates"]["cartridge_structure_checked"]["status"],
             "binary_structure_checked",
@@ -133,8 +133,8 @@ class ProductionGateTests(unittest.TestCase):
         )
         self.assertEqual(observation["source_completed_target_count"], 1)
         self.assertEqual(observation["rom_structurally_checked_count"], 1)
-        self.assertEqual(observation["total_observations"], 2)
-        self.assertEqual(observation["observations"][1]["kind"],
+        self.assertEqual(observation["total_observations"], 3)
+        self.assertEqual(observation["observations"][2]["kind"],
                          "studio.rom_structure_checked")
         self.assertFalse(observation["learned_new_weights"])
         self.assertFalse(observation["release_ready"])
