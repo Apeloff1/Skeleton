@@ -62,7 +62,7 @@ def valid_gb(cgb: bool = False) -> bytes:
 RGBDS_SYMBOLS = ("; original WRAM symbols\\n"
                  "00:c000 Level\\n00:c001 PlayerX\\n00:c002 PlayerY\\n"
                  "00:c006 Health\\n00:c007 Score\\n00:c008 GemsRemaining\\n"
-                 "00:c009 GameWon\\n00:c00a GameLost\\n00:c00b ScoreHigh\\n").replace(chr(92) + "n", chr(10)).encode("ascii")
+                 "00:c009 GameWon\\n00:c00a GameLost\\n00:c00b ScoreHigh\\n00:c00c TurnCount\\n00:c00d TurnCountHigh\\n").replace(chr(92) + "n", chr(10)).encode("ascii")
 
 
 NES_SYMBOLS = (
