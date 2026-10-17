@@ -5,10 +5,16 @@ invented JSON report. No compiler, emulator, soundcard or release is claimed.
 """
 from __future__ import annotations
 
+from hashlib import sha256
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
+from skeleton.ai.game_builder.contracts import canonical_digest
+from skeleton.ai.game_builder.studio_build_qualification import (
+    NativeBuildQualificationError, _verify_source,
+)
 from skeleton.ai.game_builder.native_game_cli import build_game
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_native_source_media_parity import (
@@ -122,6 +128,32 @@ class TrueOriginalConsoleMediaSourceTests(unittest.TestCase):
         )
         with self.assertRaises(NativeMediaSourceError):
             inspect_native_source_media(folder, target="nintendo_famicom")
+
+    def test_rehashed_source_attestation_cannot_qualify_disabled_apu_source(self):
+        target = "nintendo_game_boy"
+        folder, _ = self.generate(target)
+        program = folder / "main.asm"
+        original = program.read_text(encoding="utf-8")
+        self.assertIn("    call InitOriginalAudio\n", original)
+        program.write_text(
+            original.replace(
+                "    call InitOriginalAudio\n", "    ; disabled APU init\n", 1,
+            ), encoding="utf-8",
+        )
+        signed_file = folder / "source_attestation.json"
+        signed = json.loads(signed_file.read_text(encoding="utf-8"))
+        signed["input_files"]["main.asm"] = sha256(program.read_bytes()).hexdigest()
+        signed["attestation_digest"] = canonical_digest({
+            key: value for key, value in signed.items()
+            if key != "attestation_digest"
+        })
+        signed_file.write_text(
+            json.dumps(signed, sort_keys=True), encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            NativeBuildQualificationError, "native source media",
+        ):
+            _verify_source(folder, target)
 
     def test_non_console_platforms_and_wrong_target_are_not_qualified(self):
         folder, _ = self.generate("nintendo_game_boy")
