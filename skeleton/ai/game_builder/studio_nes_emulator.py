@@ -270,6 +270,15 @@ def qualify_nes_cpu_ppu(
                 return _receipt(romhash, symhash, world, proofhash,
                                 available=True, executed=True,
                                 blocker="nes_ppu_framebuffer_invalid")
+        # Complete CPU/PPU evidence requires a genuine emulator-produced
+        # framebuffer, never just the RAM victory flag or scripted input.
+        if image is None:
+            return _receipt(
+                romhash, symhash, world, proofhash,
+                available=True, executed=True, replay=True,
+                frames=frames, actions=count, state=state,
+                blocker="nes_emulated_ppu_framebuffer_unavailable",
+            )
         # NROM source increments Level after entering the final goal.
         victory = (
             state["GameWon"] == 1 and state["GameLost"] == 0
