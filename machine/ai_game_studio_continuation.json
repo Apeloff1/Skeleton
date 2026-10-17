@@ -385,11 +385,13 @@
       "dragon": "observer remains advisory; no model weights or Dragon reviewed knowledge promoted by this implementation",
       "budgets": "3-level 19x15 synchronous Jeeves source stage; 1..4 frames and bounded tile/image/asset file production",
       "audio": "PCM files are locally synthesized from original deterministic notes; no commercial samples, user voice, or third-party media, but media-playback integration and quality remain unqualified",
-      "animation": "Browser interval and Godot _process render the generated pose frames in produced source; source-level wiring only until exact-target execution is observed"
+      "animation": "Browser interval and Godot _process render the generated pose frames in produced source; source-level wiring only until exact-target execution is observed",
+      "publication": "Native project is assembled in a sibling same-filesystem temporary directory, all source/media/engine components completed, then directory-renamed to the previously nonexistent target; rollback removes only owned stage data. No partial work is presented at the requested output path after a failure before rename."
     },
     "tests": [
       "tests/test_jeeves_native_studio_art_e2e.py",
-      "tests/test_jeeves_console_source_stage_e2e.py"
+      "tests/test_jeeves_console_source_stage_e2e.py",
+      "tests/test_jeeves_native_studio_art_e2e.py::StudioProductionAssetTests::test_native_export_failure_leaves_no_partial_source_or_media_directory"
     ],
     "registered_suite": "jeeves-native-studio-art",
     "not_qualified": [
