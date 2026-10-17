@@ -34,7 +34,7 @@ function Button({ title, onPress, disabled = false }: { title: string; onPress: 
 }
 function CrawlerContent() {
   const router = useRouter(); const { width } = useWindowDimensions(); const auth = useStudioAuth();
-  const params = useLocalSearchParams<{ session?: string; pane?: string; topics?: string }>();
+  const params = useLocalSearchParams<{ session?: string; pane?: string; topics?: string; seeds?: string }>();
   const reducedMotion = useReducedMotion();
   const power = usePowerAwareness();
   const companionMotion = reducedMotion || power.shouldReduceAnimations ? 'off' as const : 'gentle' as const;
@@ -52,6 +52,16 @@ function CrawlerContent() {
     seededTopics.current = true;
     setTopics(raw);
   }, [params.topics]);
+  const seededHosts = useRef(false);
+  useEffect(() => {
+    const raw = typeof params.seeds === 'string' ? params.seeds : '';
+    if (seededHosts.current || raw.length > 4096) return;
+    const lines = raw.split(/\s+/).filter(Boolean).slice(0, 16);
+    const seed = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+\/$/;
+    if (!lines.length || lines.some(line => !seed.test(line))) return;
+    seededHosts.current = true;
+    setSeeds(lines.join('\n'));
+  }, [params.seeds]);
   const [readiness, setReadiness] = useState<CrawlerReadiness | null>(null);
   const [sessions, setSessions] = useState<CrawlSession[]>([]); const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [active, setActive] = useState<CrawlSession | null>(null); const activeRef = useRef<CrawlSession | null>(null);

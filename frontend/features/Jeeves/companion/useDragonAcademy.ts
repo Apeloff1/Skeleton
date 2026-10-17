@@ -107,6 +107,7 @@ export function useDragonAcademy(){
   feedBusy.current=true;
   try{
    const cursor=journal.current;
+   const requestedFromStart=cursor.lastSequence===0;
    const digest=cursor.provenance?'&last_event_digest='+cursor.chainHead:'';
    const r=await api.get<CrawlFeed>(
     PATH+'/crawler/feed?after_sequence='+cursor.lastSequence+'&limit=100'+digest,
@@ -122,8 +123,9 @@ export function useDragonAcademy(){
    if(sessionRef.current!==f.session_id){
     sessionRef.current=f.session_id;
     journal.current=EMPTY_COMPANION_JOURNAL;
-    // Another session started. Begin at event 1; never splice two sessions.
-    return;
+    // A cursor from the previous session must not be applied. A request that
+    // already started at sequence 0 belongs to this session and can land now.
+    if(!requestedFromStart)return;
    }
    if(!Array.isArray(f.events)||f.events.length>100)return;
    const next=acceptDragonFeed(journal.current,f);

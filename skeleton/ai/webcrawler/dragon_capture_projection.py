@@ -21,6 +21,7 @@ _CAPTURE_KINDS = {
     "duplicate": "visual_probe",
     "rejected": "policy_rejected",
     "error": "retry_wait",
+    "retry": "retry_wait",
     "interrupted_dispatch": "retry_wait",
     "pause": "retry_wait",
     "stopped": "retry_wait",

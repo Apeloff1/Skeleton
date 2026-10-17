@@ -55,6 +55,62 @@ def test_captured_checkpoint_projects_without_burn_or_page_text():
     assert page["source"] == "canonical_crawler_checkpoint"
 
 
+def test_http_retry_waits_instead_of_reading_the_page():
+    page = _page([_event(1, "retry", reason="http_503:scheduled")])
+    assert page["events"][0]["kind"] == "retry_wait"
+    assert page["events"][0]["payload"]["operational_kind"] == "retry"
+    assert page["events"][0]["payload"]["reason"] == "http_503:scheduled"
+
+
+def test_slice_capture_projects_into_the_companion_chain():
+    import time
+    from skeleton.ai.webcrawler.core import FetchResponse
+
+    class Fetcher:
+        def fetch_once(self, url, *, user_agent, max_bytes):
+            if url.endswith("/robots.txt"):
+                body = b"User-agent: *\nAllow: /\n"
+                return FetchResponse(url, 200, {"content-type": "text/plain"}, body, time.time())
+            body = b"<title>Root</title><main>Hello world</main>"
+            return FetchResponse(url, 200, {"content-type": "text/html"}, body, time.time())
+
+    started = time.time()
+    run = CrawlRun.create(
+        CrawlRequest(
+            seed_urls=("https://example.org/",),
+            allowed_hosts=("example.org",),
+            min_host_delay_seconds=0.25,
+        ),
+        scope={"tenant_id": "tenant", "owner_id": "owner"},
+        consent={
+            "consent_id": "consent-slice",
+            "capture_acknowledged": True,
+            "source_rights_acknowledged": True,
+            "expires_at": started + 3600,
+        },
+        now=started,
+        fetcher=Fetcher(),
+    )
+    # run_slice installs these before the first network checkpoint.
+    run._authorize = None
+    run._cancelled = None
+    run._on_checkpoint = None
+    assert run._step(started) is not None
+    assert run._step(started + 5) is not None
+    projected = project_companion_feed(
+        "session-slice", run.snapshot()["events"], fallback_url="https://example.org/",
+    )
+    assert [event["kind"] for event in projected["events"]] == [
+        "fetch_started", "robots_check", "fetch_started", "fetch_received",
+    ]
+    assert HIDDEN.isdisjoint(event["kind"] for event in projected["events"])
+    assert projected["events"][3]["payload"]["operational_kind"] == "captured"
+    assert "text" not in projected["events"][3]["payload"]
+    assert projected["events"][1]["previous_digest"] == projected["events"][0]["digest"]
+    assert projected["events"][3]["previous_digest"] == projected["events"][2]["digest"]
+    assert projected["history_truncated"] is False
+
+
 def test_unknown_and_burn_labels_stay_visual_probes():
     page = _page([_event(1, "burn_complete"), _event(2, "mystery")])
     assert [event["kind"] for event in page["events"]] == ["visual_probe", "visual_probe"]
