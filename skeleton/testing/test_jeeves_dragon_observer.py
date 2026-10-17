@@ -4,8 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 
-import pytest
-
 from skeleton.developer.game_cli import run_game_cli
 from skeleton.developer import jeeves_dragon_observer as dragon
 from skeleton.developer import jeeves_game_production as production
