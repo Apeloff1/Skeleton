@@ -526,10 +526,13 @@ export class ThermalGuard {
 let _instance: ThermalGuard | null = null;
 
 export function getThermalGuard(): ThermalGuard {
-  if (!_instance) {
-    _instance = new ThermalGuard();
-  }
+  if (!_instance) _instance = new ThermalGuard();
   return _instance;
+}
+
+/** Memory pressure cannot initialize a new periodic thermal guard. */
+export function purgeThermalCachesIfPresent(): void {
+  _instance?.cache.clear();
 }
 
 // ═══════════════ HELPERS ═══════════════
