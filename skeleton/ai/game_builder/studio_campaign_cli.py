@@ -22,7 +22,8 @@ def parse_campaign_order_file(path: Path) -> CampaignOrder:
         "schema", "project_id", "title", "seed", "targets",
         "source_basis", "rights_document", "creative_identity",
         "width", "height", "levels", "collectibles", "hazards",
-        "health", "theme", "art",
+        "health", "theme", "art", "artist_png",
+        "artist_sha256", "artist_quantization",
     }
     if set(raw) - allowed:
         raise ValueError("unknown campaign order parameters")
