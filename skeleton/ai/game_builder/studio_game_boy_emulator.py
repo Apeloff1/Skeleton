@@ -18,7 +18,7 @@ from time import monotonic
 
 from .contracts import canonical_digest
 from .studio_build_qualification import (
-    NativeBuildQualificationError, _header, _regular, parse_game_boy_symbols,
+    _header, _regular, parse_game_boy_symbols,
 )
 from .studio_runtime_qualification import _inputs as _engine_inputs
 
