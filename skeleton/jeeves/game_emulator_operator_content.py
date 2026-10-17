@@ -132,4 +132,3 @@ def operator_directory_content(root: Path, entrypoint: str):
             os.close(fd)
 
     return bundle, reader
-
