@@ -267,6 +267,11 @@ def main() -> None:
     parser.add_argument("--studio-animation-frames", type=int, default=3)
     parser.add_argument("--studio-no-outline", action="store_true")
     parser.add_argument("--studio-no-highlight", action="store_true")
+    parser.add_argument("--studio-foliage", type=int, choices=range(5), default=2)
+    parser.add_argument("--studio-shadow", type=int, choices=range(4), default=1)
+    parser.add_argument("--studio-parallax-layers", type=int, choices=range(4), default=1)
+    parser.add_argument("--studio-music-density", type=int, choices=range(5), default=2)
+    parser.add_argument("--studio-animation-fps", type=int, choices=range(1, 25), default=4)
     args = parser.parse_args()
     result = build_game(
         target=args.target, basis=args.basis, project_id=args.project_id,
@@ -282,6 +287,11 @@ def main() -> None:
                 animation_frames=args.studio_animation_frames,
                 seed=args.seed, outline=not args.studio_no_outline,
                 highlight=not args.studio_no_highlight,
+                foliage_density=args.studio_foliage,
+                shadow_strength=args.studio_shadow,
+                parallax_layers=args.studio_parallax_layers,
+                music_density=args.studio_music_density,
+                animation_fps=args.studio_animation_fps,
             ) if args.studio_assets else None
         ),
     )
