@@ -80,3 +80,25 @@ def test_partially_paged_fleet_cannot_be_reported_as_qualified(tmp_path):
     assert report["status"] == "fleet_page_horizon_incomplete"
     assert report["rom"]["finished_inventory"] is False
     assert report["automatic_weight_promotion_authorized"] is False
+
+def test_operator_cli_checks_redacted_sdk_and_rights_pinned_rom_inventory(tmp_path, capsys):
+    from scripts.training.joint_learning_custody import main
+    prior = build({"a" * 64: fixture()})
+    root, private, frozen, approvals = _rom_fixture(tmp_path)
+    before = private / "sdk-before.json"
+    after = private / "sdk-after.json"
+    before.write_text(json.dumps(prior))
+    after.write_text(json.dumps(prior))
+    assert main([
+        "--sdk-before", str(before),
+        "--sdk-after", str(after),
+        "--rom-root", str(root),
+        "--frozen-inventory", frozen["manifest_path"],
+        "--rom-approvals", str(approvals),
+        "--rom-receipts", str(private),
+        "--page-limit", "1",
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["rom"]["rights_review_required"] == 1
+    assert result["status"] == "cross_source_license_review_required"
+    assert result["actual_jeeves_speaking_model_weight_updates"] == 0
