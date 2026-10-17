@@ -222,6 +222,13 @@ def run_studio_execution_campaign(
         "native_roms_verified": report["native_roms_structurally_verified"],
         "compiled_cartridge_victories": report["native_rom_machine_code_playthroughs_verified"],
         "native_cpu_checkpoint_samples_verified": report["native_cpu_checkpoint_samples_verified"],
+        "native_animation_audio_source_targets_checked": (
+            report["original_console_media_sources_independently_checked"]
+        ),
+        "native_hero_animation_frames_in_source": (
+            report["original_console_animation_frames_in_source"]
+        ),
+        "real_native_audio_capture_verified": False,
         "actual_browser_replays": report["browser_javascript_playthroughs_verified"],
         "actual_godot_replays": report["godot_headless_playthroughs_verified"],
         "actual_game_canvas_captures": report["generated_game_canvas_captures_verified"],
