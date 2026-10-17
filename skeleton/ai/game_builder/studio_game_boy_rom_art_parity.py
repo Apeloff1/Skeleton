@@ -48,6 +48,28 @@ def parse_game_boy_tile_labels(raw: bytes) -> tuple[int, int]:
     return start, end
 
 
+def _animation_tile_bounds(symbols: bytes) -> tuple[int, int]:
+    try:
+        text = symbols.decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise GameBoyROMArtError("non-ASCII hero animation linker labels") from exc
+    names = {}
+    for line in text.splitlines():
+        result = re.fullmatch(
+            r"([0-9A-Fa-f]{2}):([0-9A-Fa-f]{4})\s+(AnimationTiles|AnimationTilesEnd)",
+            line.strip(),
+        )
+        if result is None:
+            continue
+        bank, offset, label = int(result[1], 16), int(result[2], 16), result[3]
+        if label in names or bank != 0 or not 0x0150 <= offset <= 0x3FFF:
+            raise GameBoyROMArtError("hero animation tile symbols outside ROM0")
+        names[label] = offset
+    if set(names) != {"AnimationTiles", "AnimationTilesEnd"}:
+        raise GameBoyROMArtError("actual hero animation tile linker section missing")
+    return names["AnimationTiles"], names["AnimationTilesEnd"]
+
+
 def inspect_compiled_game_boy_art(
     rom: bytes, symbol_map: bytes, source_project: str | Path, *,
     color: bool = False,
@@ -64,6 +86,24 @@ def inspect_compiled_game_boy_art(
     first, last = parse_game_boy_tile_labels(symbol_map)
     if last > len(rom) or rom[first:last] != original:
         raise GameBoyROMArtError("compiled handheld ROM pixels differ from original art")
+    animation = Path(source_project) / "assets/tiles/hero_animation.bin"
+    animated_frames = 0
+    animation_digest = None
+    if animation.exists() or animation.is_symlink():
+        try:
+            packed = _regular(animation, 64)
+        except (OSError, ValueError) as exc:
+            raise GameBoyROMArtError("authored hero frames inaccessible") from exc
+        if (not 16 <= len(packed) <= 64 or len(packed) % 16
+                or packed[:16] != original[80:96]):
+            raise GameBoyROMArtError("hero frame zero differs from original tile 5")
+        frame_start, frame_end = _animation_tile_bounds(symbol_map)
+        if (frame_start != last or frame_end != frame_start + len(packed) - 16
+                or frame_end > len(rom)
+                or rom[frame_start:frame_end] != packed[16:]):
+            raise GameBoyROMArtError("compiled hero animation differs from authored frames")
+        animated_frames = len(packed) // 16
+        animation_digest = sha256(packed).hexdigest()
     body = {
         "schema": SCHEMA,
         "target": "nintendo_game_boy_color" if color else "nintendo_game_boy",
@@ -73,7 +113,9 @@ def inspect_compiled_game_boy_art(
         "compiled_tile_sha256": sha256(rom[first:last]).hexdigest(),
         "tile_rom0_offset": first,
         "tile_byte_count": len(original),
-        "matched_indexed_pixels": 384,
+        "matched_indexed_pixels": 384 + max(0, animated_frames - 1) * 64,
+        "original_animation_frame_count": animated_frames,
+        "original_animation_sha256": animation_digest,
         "emulated_lcd_pixels_verified": False,
         "hardware_colors_verified": False,
         "release_authorized": False,
