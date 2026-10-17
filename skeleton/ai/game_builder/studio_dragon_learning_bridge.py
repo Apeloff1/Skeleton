@@ -104,6 +104,10 @@ def propose_dragon_operational_lessons(
     if type(limit) is not int or not 1 <= limit <= 64:
         raise DragonOperationalLessonError("lesson generation bound must be 1..64")
     report = inspect_production_assurance(order, campaign)
+    return _project_proposals(report, limit)
+
+
+def _project_proposals(report: dict, limit: int) -> dict:
     choices = _candidates(report, limit)
     body = {
         "schema": SCHEMA, "campaign_identity": report["campaign_identity"],
@@ -182,45 +186,48 @@ def inspect_dragon_reviewed_lessons(
     if authorized is not True:
         raise PermissionError("reviewed operational lessons require operator approval")
     root = Path(campaign)
-    proposed = propose_dragon_operational_lessons(order, root, authorized=True, limit=64)
-    allowed = {x["candidate_digest"] for x in proposed["candidates"]}
-    reviews = []
-    folder = root / "dragon_reviews"
-    if folder.is_symlink():
-        raise DragonOperationalLessonError("Dragon operational review root is not an ordinary folder")
-    if folder.exists():
-        for entry in sorted(folder.iterdir()):
-            if (entry.is_symlink() or not entry.is_file()
-                    or not _HEX.fullmatch(entry.stem)
-                    or entry.suffix != ".json"):
-                raise DragonOperationalLessonError("unrecognized Dragon lesson review")
-            if len(reviews) >= 64:
-                raise DragonOperationalLessonError("bounded human-reviewed lesson inventory exceeded")
-            review = _load_json(entry)
-            if (review.get("schema") != REVIEW_SCHEMA
-                    or review.get("candidate_digest") != entry.stem
-                    or review.get("candidate_digest") not in allowed
-                    or review.get("assurance_report_digest") != proposed["assurance_report_digest"]
-                    or review.get("human_reviewed") is not True
-                    or review.get("decision") not in _ALLOWED
-                    or review.get("model_weights_modified") is not False
-                    or review.get("knowledge_promoted") is not False
-                    or canonical_digest({k: v for k, v in review.items()
-                                         if k != "review_digest"}) != review.get("review_digest")):
-                raise DragonOperationalLessonError("stale or forged human-reviewed lesson")
-            reviews.append(review)
-    body = {
-        "schema": SCHEMA, "campaign_identity": proposed["campaign_identity"],
-        "assurance_report_digest": proposed["assurance_report_digest"],
-        "human_reviewed_lessons": len(reviews),
-        "reviewed_lessons": reviews,
-        "approved_operational_drafts": sum(
-            x["decision"] == "approve_for_reviewed_knowledge" for x in reviews
-        ),
-        "knowledge_promoted": False,
-        "model_training_performed": False,
-    }
-    return {**body, "summary_digest": canonical_digest(body)}
+    with campaign_lock(root):
+        proposed = _project_proposals(
+            _inspect_production_assurance_unlocked(order, root), 64,
+        )
+        allowed = {x["candidate_digest"] for x in proposed["candidates"]}
+        reviews = []
+        folder = root / "dragon_reviews"
+        if folder.is_symlink():
+            raise DragonOperationalLessonError("Dragon operational review root is not an ordinary folder")
+        if folder.exists():
+            for entry in sorted(folder.iterdir()):
+                if (entry.is_symlink() or not entry.is_file()
+                        or not _HEX.fullmatch(entry.stem)
+                        or entry.suffix != ".json"):
+                    raise DragonOperationalLessonError("unrecognized Dragon lesson review")
+                if len(reviews) >= 64:
+                    raise DragonOperationalLessonError("bounded human-reviewed lesson inventory exceeded")
+                review = _load_json(entry)
+                if (review.get("schema") != REVIEW_SCHEMA
+                        or review.get("candidate_digest") != entry.stem
+                        or review.get("candidate_digest") not in allowed
+                        or review.get("assurance_report_digest") != proposed["assurance_report_digest"]
+                        or review.get("human_reviewed") is not True
+                        or review.get("decision") not in _ALLOWED
+                        or review.get("model_weights_modified") is not False
+                        or review.get("knowledge_promoted") is not False
+                        or canonical_digest({k: v for k, v in review.items()
+                                             if k != "review_digest"}) != review.get("review_digest")):
+                    raise DragonOperationalLessonError("stale or forged human-reviewed lesson")
+                reviews.append(review)
+        body = {
+            "schema": SCHEMA, "campaign_identity": proposed["campaign_identity"],
+            "assurance_report_digest": proposed["assurance_report_digest"],
+            "human_reviewed_lessons": len(reviews),
+            "reviewed_lessons": reviews,
+            "approved_operational_drafts": sum(
+                x["decision"] == "approve_for_reviewed_knowledge" for x in reviews
+            ),
+            "knowledge_promoted": False,
+            "model_training_performed": False,
+        }
+        return {**body, "summary_digest": canonical_digest(body)}
 
 
 __all__ = [
