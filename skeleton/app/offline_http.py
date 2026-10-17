@@ -37,9 +37,14 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
+from skeleton.app.offline_background_job import LocalJobRejected, LocalReferenceJob
 from skeleton.app.offline_reference_read import (
     LocalReferenceRead, ReferenceReadConflict, ReferenceReadDenied,
     ReferenceReadRejected,
+)
+from skeleton.app.offline_reference_write import (
+    LocalReferenceWrite, ReferenceWriteConflict, ReferenceWriteDenied,
+    ReferenceWriteRejected,
 )
 from skeleton.app.offline_grounding import (
     audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
@@ -143,6 +148,8 @@ class OfflineHTTPApplication:
                 self._store, self.model_digest, self.tokenizer_digest
             )
             self.reference_reads = LocalReferenceRead(self.knowledge)
+            self.reference_writes = LocalReferenceWrite(self.knowledge)
+            self.reference_jobs = LocalReferenceJob(self.knowledge)
         except BaseException:
             self._store.close()
             raise
@@ -467,6 +474,54 @@ class OfflineHTTPApplication:
             except ReferenceReadConflict as exc:
                 raise OfflineHTTPError(409, str(exc)) from exc
             except ReferenceReadRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from exc
+        if path == "/v1/tools/reference-write" and method == "POST":
+            _fields(
+                body,
+                {"title", "text", "request_id", "approved", "approval_ref"},
+                {"title", "text", "request_id", "approved"},
+            )
+            try:
+                return 200, self.reference_writes.write(
+                    body["title"], body["text"], body["request_id"],
+                    approved=body["approved"], approval_ref=body.get("approval_ref"),
+                )
+            except ReferenceWriteDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except ReferenceWriteConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from exc
+            except ReferenceWriteRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from exc
+        if path == "/v1/tools/reference-write/rollback" and method == "POST":
+            _fields(body, {"request_id", "approved"}, {"request_id", "approved"})
+            try:
+                return 200, self.reference_writes.rollback(
+                    body["request_id"], approved=body["approved"],
+                )
+            except ReferenceWriteDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except ReferenceWriteRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from exc
+        if path == "/v1/agents/reference-job" and method == "POST":
+            _fields(
+                body,
+                {"goal", "request_id", "granted", "allow_writes", "title", "text", "approval_ref"},
+                {"goal", "request_id", "granted", "allow_writes"},
+            )
+            try:
+                return 200, self.reference_jobs.run(
+                    body["goal"], body["request_id"],
+                    granted=body["granted"], allow_writes=body["allow_writes"],
+                    title=body.get("title"), text=body.get("text"),
+                    approval_ref=body.get("approval_ref"),
+                )
+            except ReferenceReadDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except ReferenceWriteDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except (ReferenceReadConflict, ReferenceWriteConflict) as exc:
+                raise OfflineHTTPError(409, str(exc)) from exc
+            except (ReferenceReadRejected, ReferenceWriteRejected, LocalJobRejected) as exc:
                 raise OfflineHTTPError(400, str(exc)) from exc
         if path == "/v1/knowledge/search" and method == "POST":
             _fields(body, {"query", "limit"}, {"query"})

@@ -419,6 +419,8 @@
       "evidence": [
         "skeleton/intelligence/orchestrator.py",
         "skeleton/intelligence/pipeline_orchestrator.py",
+        "skeleton/intelligence/background_agent.py",
+        "skeleton/app/offline_background_job.py",
         "skeleton/agents"
       ],
       "required_interfaces": [
@@ -535,7 +537,9 @@
         "backend/services/tool_registry.py",
         "skeleton/api/admit_write.py",
         "skeleton/skills/manifest.py",
-        "skeleton/skills/registry.py"
+        "skeleton/skills/registry.py",
+        "skeleton/app/offline_reference_read.py",
+        "skeleton/app/offline_reference_write.py"
       ],
       "required_interfaces": [
         "tool manifest",
