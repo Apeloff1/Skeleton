@@ -347,5 +347,51 @@
       "Godot native engine execution, hardware controller validation and human playthrough",
       "Verified Dragon knowledge admission and supervised model training promotion"
     ]
+  },
+  "native_source_art_production_extension": {
+    "status": "implementation_candidate",
+    "ownership": {
+      "studio_engine": "skeleton/ai/game_builder/studio_asset_pipeline.py",
+      "game_world_and_proof": "skeleton/ai/game_builder/playable_world.py + skeleton/ai/game_builder/playable_simulation.py",
+      "native_console_source": "skeleton/ai/game_builder/{game_boy_native_export,game_boy_color_native_export,nes_native_export,sms_native_export,sega_8bit_native_export}.py",
+      "general_native_source": "skeleton/ai/game_builder/native_game_cli.py",
+      "target_engine_sources": "skeleton/ai/game_builder/playable_compiler.py + skeleton/ai/game_builder/dual_runtime_export.py",
+      "console_planar_codec_and_png": "skeleton/jeeves/game_console_assets.py",
+      "human_cas_approval": "skeleton/ai/game_builder/game_project_workspace.py",
+      "jeeves_action": "skeleton/ai/game_builder/jeeves_app_runtime.py"
+    },
+    "capabilities": [
+      "Original semantic floor/wall/collectible/hazard/goal/hero 8x8 pixel recipes with bounded direction, 4 styles, classic/high contrast, 1..4 real animation frames",
+      "Exact GB/NES 2bpp and SMS/GameGear native tile packing/decoding with generated artwork embedded in these five actual native console source emitters",
+      "Additional 10 older/desktop source targets receive real indexed8bpp image preview tiles as separate sidecar, not a false native artwork integration claim",
+      "Original sprite atlas, rendered per-level pixel-accurate PNG previews, animation frames, per-sprite geometry/interactivity descriptors, full SHA-256 file manifest",
+      "Existing native source compilers produce platform-specific assembly/C and ROM build instructions for the 15 native_game_cli targets; no binary is built",
+      "Existing canonical offline browser and Godot 4 source packages and interactive tile editor, with actual Python winning replay proof",
+      "Original homebrew rights documentary intake remains canonical; no independent IP clearance is inferred",
+      "Jeeves game.console.catalog is read-only; game.console.source.stage is a source-generating, exact-CAS, human-approved source proposal, no unlimited writer"
+    ],
+    "trust": {
+      "authoring": "explicit operator authority; source ownership references are non-certifying and project bound",
+      "code_generation": "native emitters use trusted templates and deterministically generated game/world/art bytes; raw model code not executed",
+      "source_writes": "user-visible original console source is staged for human approval; no direct model commit, shell or external SDK access",
+      "quality": "actual Python gameplay and pixel roundtrips are evidence; no ROM compilation, emulator/hardware certification, rights clearance or professional aesthetic grade claimed",
+      "consistency": "world digest and verified replay bind native and browser/Godot sources; exact sprite digest binds native source to descriptor and PNG preview",
+      "preview": "PNG output is software generated, not a console framebuffer/hardware capture",
+      "dragon": "observer remains advisory; no model weights or Dragon reviewed knowledge promoted by this implementation",
+      "budgets": "3-level 19x15 synchronous Jeeves source stage; 1..4 frames and bounded tile/image/asset file production"
+    },
+    "tests": [
+      "tests/test_jeeves_native_studio_art_e2e.py",
+      "tests/test_jeeves_console_source_stage_e2e.py"
+    ],
+    "registered_suite": "jeeves-native-studio-art",
+    "not_qualified": [
+      "native console ROM compilation and hardware/emulator playthrough",
+      "custom pixel sprites displayed during actual browser/Godot play sessions, not just rendered sidecar images",
+      "native console hero animation frames actually driven by controller state for every target",
+      "commercial platform native SDK and signed release builds",
+      "full large-scale authoring and cross-engine 3D asset/material/mesh rendering",
+      "long-duration integrated model-driven studio operation and training data promotion"
+    ]
   }
 }
