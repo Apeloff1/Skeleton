@@ -240,15 +240,31 @@ def triangle_campaign_page(
                                 )
                                 receipts.append([
                                     i, examined["filename"], examined["semantic_review_digest"],
+                                    examined["cue_supported_lenses"],
+                                    examined["hypothesis_only_lenses"],
+                                    examined["source_referenced_interpretations"],
                                 ])
                         except (ValueError, RuntimeError, OSError, ImportError, KeyError) as exc:
                             item["semantic_lens_review_state"] = "blocked_retry_required"
                             item["semantic_failure_type"] = type(exc).__name__
                             item["semantic_failure_reason"] = str(exc)[:240]
                         else:
-                            item["semantic_lens_review_state"] = "43_lenses_native_executed_or_replayed"
+                            item["semantic_lens_review_state"] = (
+                                "43_lenses_native_executed_or_replayed"
+                                if all(row[5] == 43 for row in receipts)
+                                else "incomplete_semantic_interpretations_retry_required"
+                            )
                             item["semantic_model_generations"] = 43 * len(receipts)
                             item["semantic_episode_count"] = len(receipts)
+                            item["native_cue_supported_lens_questions"] = sum(
+                                row[3] for row in receipts
+                            )
+                            item["hypothesis_only_lens_questions"] = sum(
+                                row[4] for row in receipts
+                            )
+                            item["structured_semantic_interpretations"] = sum(
+                                row[5] for row in receipts
+                            )
                             item["semantic_receipts_digest"] = hashlib.sha256(
                                 json.dumps(receipts, sort_keys=True).encode()
                             ).hexdigest()
@@ -277,15 +293,26 @@ def triangle_campaign_page(
                 "critic_output_incomplete_requires_new_review_configuration",
             ) or row["semantic_lens_review_state"] in (
                 "blocked_retry_required", "critic_incomplete_retry_required",
+                "incomplete_semantic_interpretations_retry_required",
             )
             for row in rows
         ),
         "semantic_model_generations_executed_or_replayed": sum(
             row["semantic_model_generations"] for row in rows
         ),
+        "canonical_semantic_questions_with_measured_native_cues": sum(
+            row.get("native_cue_supported_lens_questions", 0) for row in rows
+        ),
+        "canonical_semantic_questions_without_measured_native_cues": sum(
+            row.get("hypothesis_only_lens_questions", 0) for row in rows
+        ),
+        "structured_semantic_interpretations": sum(
+            row.get("structured_semantic_interpretations", 0) for row in rows
+        ),
         "semantic_lens_review_failures_needing_retry": sum(
             row["semantic_lens_review_state"] in (
                 "blocked_retry_required", "critic_incomplete_retry_required",
+                "incomplete_semantic_interpretations_retry_required",
             ) for row in rows
         ),
         "semantic_model_interpretations_are_training_labels": False,
@@ -604,6 +631,13 @@ def execute_native_43_lens_review(
         "source_referenced_interpretations": structured,
         "lens_interpretations_incomplete": SEMANTIC_LENS_BUDGET - structured,
         "all_lens_interpretations_valid": structured == SEMANTIC_LENS_BUDGET,
+        "cue_supported_lenses": route["actual_cue_supported_lenses"],
+        "hypothesis_only_lenses": (
+            SEMANTIC_LENS_BUDGET - route["actual_cue_supported_lenses"]
+        ),
+        "native_observation_cue_links": route[
+            "positively_supported_native_observation_links"
+        ],
         "semantic_review_digest": digest,
         "reviewed_source_trace_count": 1,
         "new_independent_gameplay_episodes": 0,
