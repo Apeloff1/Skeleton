@@ -370,7 +370,10 @@
       "Original homebrew rights documentary intake remains canonical; no independent IP clearance is inferred",
       "Jeeves game.console.catalog is read-only; game.console.source.stage is a source-generating, exact-CAS, human-approved source proposal, no unlimited writer",
       "Original indexed pixels are now also embedded in the actual browser canvas source via existing canonical playable_export; CSS/CSP hash is regenerated from exact script bytes",
-      "Original indexed pixels are loaded from content-bound godot/studio_art.json by generated Godot 4 script and painted through draw_rect pixel rasterization over canonical gameplay; native execution still unverified"
+      "Original indexed pixels are loaded from content-bound godot/studio_art.json by generated Godot 4 script and painted through draw_rect pixel rasterization over canonical gameplay; native execution still unverified",
+      "Per-sprite optional animation timing: generated hero pixel frames and exact indexed frame buffers are embedded into HTML5 and Godot code with bounded frame tick handling",
+      "Genuine deterministic mono PCM16 WAV soundtrack and pickup/hazard cues, output as decoded original media files with SHA receipts; platform audio playback driver remains separate",
+      "Actual transparent PNG parallax/environment overlay layers with seed-bound style, shadow, foliage, music-density, parallax, and animation-FPS CLI controls"
     ],
     "trust": {
       "authoring": "explicit operator authority; source ownership references are non-certifying and project bound",
@@ -380,7 +383,9 @@
       "consistency": "Same-world content-bound indexed tile/palette data is inserted into native GB/GBC/NES/SMS/GG source, browser GAME payload and Godot studio_art.json; matching pack digest is required, and core gameplay/replay ownership stays untouched",
       "preview": "PNG output is software generated, not a console framebuffer/hardware capture",
       "dragon": "observer remains advisory; no model weights or Dragon reviewed knowledge promoted by this implementation",
-      "budgets": "3-level 19x15 synchronous Jeeves source stage; 1..4 frames and bounded tile/image/asset file production"
+      "budgets": "3-level 19x15 synchronous Jeeves source stage; 1..4 frames and bounded tile/image/asset file production",
+      "audio": "PCM files are locally synthesized from original deterministic notes; no commercial samples, user voice, or third-party media, but media-playback integration and quality remain unqualified",
+      "animation": "Browser interval and Godot _process render the generated pose frames in produced source; source-level wiring only until exact-target execution is observed"
     },
     "tests": [
       "tests/test_jeeves_native_studio_art_e2e.py",
@@ -393,7 +398,9 @@
       "native console hero animation frames actually driven by controller state for every target",
       "commercial platform native SDK and signed release builds",
       "full large-scale authoring and cross-engine 3D asset/material/mesh rendering",
-      "long-duration integrated model-driven studio operation and training data promotion"
-    ]
+      "long-duration integrated model-driven studio operation and training data promotion",
+      "Native console sprite-frame playback, per-target sound driver, performance-tuned streaming assets and dynamic parallax scrolling in actual compiled ROM binaries"
+    ],
+    "budgets": "3-level 19x15 synchronous Jeeves source stage; at most 8 world levels for CLI, 1..4 sprite frames, 0..3 transparent background overlays, 0..3 shadow, 0..4 foliage/music, 1..24 FPS; bounded files/audio/images/source bytes"
   }
 }
