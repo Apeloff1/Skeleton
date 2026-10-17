@@ -31,7 +31,7 @@ SECURITY_GATES = (
 _CREDENTIAL_ENV = frozenset({"OPENAI_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"})
 _DEFAULT_GATE_TIMEOUT_S = 90
 _GATE_TIMEOUT_S = {
-    # Preserve the full fail-closed scan on large repositories.
+    # Preserve the exhaustive fail-closed scan; allow large tracked trees to finish.
     Path("backend/scripts/check_secret_hygiene.py"): 300,
 }
 _VERIFIED: set[tuple[str, str, str]] = set()
