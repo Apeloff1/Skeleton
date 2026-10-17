@@ -73,3 +73,15 @@ sustained device monitoring. A response body adapter that exposes only
 `.text()` cannot be prevented from buffering its full body internally;
 it is rejected after materialization if oversized. Streaming adapters
 enforce the limit before full buffering.
+
+## Session-transition and background-load invariants
+
+The same Merge Readiness job now also executes
+`scripts/test-session-transition-pressure.cjs`. It covers end-during-start,
+module switches that await previous final progress, concurrent latest-wins
+switches, unmount fencing, singleflight reminder installation and retry after
+scheduling failures, plus finite background timer policies.
+
+The session API has no durable offline outbox. These checks prove ordered
+in-memory behavior and explicit local degradation, not crash-safe delivery
+of unsent progress across process termination.

@@ -67,7 +67,7 @@ jobs:
         working-directory: frontend
         env:
           NODE_PATH: ${{ runner.temp }}/stability-typescript/node_modules
-        run: node --test scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs
+        run: node --test scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs
       - name: Record fast-gate policy
         run: |
           echo '## Fast Merge Readiness' >> "$GITHUB_STEP_SUMMARY"
