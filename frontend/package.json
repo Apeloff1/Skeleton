@@ -16,6 +16,8 @@
     "typecheck": "tsc --noEmit",
     "typecheck:jeeves": "tsc --noEmit --project tsconfig.jeeves.json",
     "test:jeeves": "node --test scripts/test-jeeves-workspace.cjs scripts/jeeves-workbench/*.test.cjs",
+    "test:env": "node --test scripts/validate-public-env.test.cjs",
+    "validate:env": "node scripts/validate-public-env.cjs",
     "export:web": "expo export --platform web",
     "audit:policy:test": "node ./scripts/test-enforce-yarn-audit.js",
     "audit:known-advisories": "node ./scripts/audit-known-yarn-advisories.cjs",
