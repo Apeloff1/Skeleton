@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 from .game_boy_native_export import GameBoySourceError, compile_native_game_boy
+from .studio_native_psg import NativePSGScore
 from .playable_world import PlayableWorld
 from .port_planner import HomebrewSource, PortMode, PortRequest, compile_port
 
@@ -117,6 +118,10 @@ def _palette_lines(palettes: tuple[tuple[int,...], ...]) -> str:
 
 def compile_native_game_boy_color(
     world: PlayableWorld, rights: HomebrewSource, *, authorized: bool,
+    tile_art: tuple[tuple[int, ...], ...] | None = None,
+    hero_frames: tuple[tuple[int, ...], ...] | None = None,
+    animation_delay: int = 12,
+    psg_score: NativePSGScore | None = None,
 ) -> GameBoyColorSourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("native CGB game needs explicit original-homebrew authorization")
@@ -125,7 +130,11 @@ def compile_native_game_boy_color(
     if world.intent.project_id != rights.project_id:
         raise GameBoyColorSourceError("CGB project identity and rights mismatch")
     try:
-        dmgb = compile_native_game_boy(world, rights, authorized=True)
+        dmgb = compile_native_game_boy(
+            world, rights, authorized=True, tile_art=tile_art,
+            hero_frames=hero_frames, animation_delay=animation_delay,
+            psg_score=psg_score,
+        )
     except GameBoySourceError as exc:
         raise GameBoyColorSourceError("original world exceeds base CGB gameplay engine budget") from exc
     cgb_plan = compile_port(PortRequest((rights,), "nintendo_game_boy_color", PortMode.REVERSE_CONSTRAINED))

@@ -103,8 +103,19 @@
     ],
     "completion_mode": "Optional explicit native|original on new goal intent. Absence preserves native semantics and historical request/state hashes; never rewrite frozen pending prompts, forms, keys, commands or receipts.",
     "requirements": {
-      "native": ["edit", "build", "preview", "export"],
-      "original": ["edit", "simulate", "review", "package", "export"]
+      "native": [
+        "edit",
+        "build",
+        "preview",
+        "export"
+      ],
+      "original": [
+        "edit",
+        "simulate",
+        "review",
+        "package",
+        "export"
+      ]
     },
     "admission": "Original mode accepts an owned existing successor or ordinary base project; it rejects implicit canonical console-editor, studio-session or studio-rules conversion before goal admission. Creating/adopting an original requires explicit edit authorization. Existing source/teacher/lease/finite-budget authorities remain mandatory.",
     "creation": "Registered authored-profile identities and exact completed goal-issued candidate receipts are model-visible data. Synthesis and adoption use existing successor owners and successor-adopt prepared-edit recovery; each actual decision remains model-produced and owner-validated.",
@@ -115,7 +126,12 @@
     "forms": "New structured decisions preserve every admitted owner operation and constraint, including exactly one or three synthesis sources, actual observed registered authored-profile IDs and mutually exclusive world changes/edits branches. Repeated identical nested owner schemas may share bounded acyclic decision-root definitions, keeping full inventory within the unchanged64KiB EngineChat serialization bound; compact prompt descriptions retain typed edit names while full forms enforce all constraints. No removal of unrelated tool functionality. Historical frozen schemas remain unchanged.",
     "positive_simulation_stage_forms": "New ORIGINAL_SIMULATE decisions require the canonical simulation owner's positive bounded integer steps field and exclude the mutually exclusive action/actions alternatives. The model chooses the step count; the host never substitutes actions/counts. Ordinary/reset-only operations, native stages and every historical frozen prompt/schema/key remain unchanged. This is a stage requirement, not a change to the simulation owner API or goal budgets.",
     "stage_owner_identity_subsets": "New original-stage owner-form subsets and matching prompt forms retain canonical owner definitions/annotations and bounds. Fresh current-world simulation omits foreign source/session/reset/controller overrides and requires positive model-chosen steps; the first current-world review uses the canonical seeded controller with bounded numeric review options and omits unissued source/policy/baseline/actions. Desktop packaging offers only observed ready registered target IDs and uses the owner's default timeout. Adoption and package export permit only exact verified candidate/artifact identities from current context, with no unproven receipt-token alternative. General/native/no-stage forms, owner APIs, existing frozen requests and finite goal budgets remain unchanged.",
-    "limits": {"requirements": 5, "steps": 16, "model_calls": 8, "jobs": 4},
+    "limits": {
+      "requirements": 5,
+      "steps": 16,
+      "model_calls": 8,
+      "jobs": 4
+    },
     "runtime": "Existing EngineChat, workspace jobs/simulation, successor/review/desktop owners and typed tool facade only; no new runtime, provider, store or promotion authority.",
     "validation": "Static source/schema checks and separately authorized genuine app operations only; no automated tests per user."
   },
@@ -298,5 +314,2356 @@
       "receipt_references": "Only recognized top-level _REF_FIELDS may expose finite existing _RECEIPT_REFS tokens; the existing resolver and owner type validation still reject unavailable, unknown or mismatched values before tool IO. Nested fields never gain receipt interpolation.",
       "authority": "Typed grammar constrains model-produced data; it never certifies action success. Current model/source/actor grants and real owner payload validation remain mandatory."
     }
+  },
+  "e2e_dragon_observation_extension": {
+    "status": "implementation_candidate",
+    "engine_owner": "skeleton/ai/game_builder/studio_e2e_observation.py",
+    "canonical_goal_owner": "backend/core/game_studio_agent.py",
+    "application_api": "backend/routes/game_studio_agent.py",
+    "read_route": "GET /game-studio-agent/goals/{goal_id}/dragon-observation",
+    "validation_boundary": "Authenticate the caller, scope tenant/owner/project, revalidate current authority and verify the sealed goal journal in game_studio_agent.inspect before projecting. Unverified v1 journals are refused.",
+    "sources": [
+      "Existing goal_journal v2 executed model decisions, exact step hashes, and recovery state",
+      "Existing StudioExecutionPlane.ExecutionOutcome real typed tool receipts and mirror proof"
+    ],
+    "trust_and_privacy": [
+      "Allowlisted operational metadata only; never expose prompts, model responses, credentials, game source, uploaded attachments or raw videos",
+      "Page-independent hash-chained observation receipts are derived, not accepted from clients",
+      "Only the canonical owner may state verified workflow completion; action observations and status=completed are not release, rights, native hardware or human gameplay qualification",
+      "Dragon learns nothing automatically: all learning remains observation-only until separate explicit scoped capture/analysis consent, independent review, rights and training-promotion authority"
+    ],
+    "operational_edges": [
+      "Completed, interrupted, paused, cancelled and legacy state are kept distinguishable",
+      "No new runtime services, model SDKs, alternate journals or authority planes",
+      "Bounded goal steps=16, page size=1..16 and deterministic replay",
+      "No implicit screenshot, video, frame, device or desktop recording"
+    ],
+    "e2e_suite": "jeeves-dragon-game-observation",
+    "tests": "tests/test_jeeves_game_e2e_observation.py",
+    "remaining_qualification": [
+      "Live authenticated owner/tenant integration tests against real CORE_DB",
+      "Consent-bound genuine screen/video capture through existing Dragon capture owner",
+      "Actual model checkpoint inference and resumed multi-day goals",
+      "Godot native engine execution, hardware controller validation and human playthrough",
+      "Verified Dragon knowledge admission and supervised model training promotion"
+    ]
+  },
+  "native_source_art_production_extension": {
+    "status": "implementation_candidate",
+    "ownership": {
+      "studio_engine": "skeleton/ai/game_builder/studio_asset_pipeline.py",
+      "game_world_and_proof": "skeleton/ai/game_builder/playable_world.py + skeleton/ai/game_builder/playable_simulation.py",
+      "native_console_source": "skeleton/ai/game_builder/{game_boy_native_export,game_boy_color_native_export,nes_native_export,sms_native_export,sega_8bit_native_export}.py",
+      "general_native_source": "skeleton/ai/game_builder/native_game_cli.py",
+      "target_engine_sources": "skeleton/ai/game_builder/playable_compiler.py + skeleton/ai/game_builder/dual_runtime_export.py",
+      "console_planar_codec_and_png": "skeleton/jeeves/game_console_assets.py",
+      "human_cas_approval": "skeleton/ai/game_builder/game_project_workspace.py",
+      "jeeves_action": "skeleton/ai/game_builder/jeeves_app_runtime.py"
+    },
+    "capabilities": [
+      "Original semantic floor/wall/collectible/hazard/goal/hero 8x8 pixel recipes with bounded direction, 4 styles, classic/high contrast, 1..4 real animation frames",
+      "Exact GB/NES 2bpp and SMS/GameGear native tile packing/decoding with generated artwork embedded in these five actual native console source emitters",
+      "Additional 10 older/desktop source targets receive real indexed8bpp image preview tiles as separate sidecar, not a false native artwork integration claim",
+      "Original sprite atlas, rendered per-level pixel-accurate PNG previews, animation frames, per-sprite geometry/interactivity descriptors, full SHA-256 file manifest",
+      "Existing native source compilers produce platform-specific assembly/C and ROM build instructions for the 15 native_game_cli targets; no binary is built",
+      "Existing canonical offline browser and Godot 4 source packages and interactive tile editor, with actual Python winning replay proof",
+      "Original homebrew rights documentary intake remains canonical; no independent IP clearance is inferred",
+      "Jeeves game.console.catalog is read-only; game.console.source.stage is a source-generating, exact-CAS, human-approved source proposal, no unlimited writer",
+      "Original indexed pixels are now also embedded in the actual browser canvas source via existing canonical playable_export; CSS/CSP hash is regenerated from exact script bytes",
+      "Original indexed pixels are loaded from content-bound godot/studio_art.json by generated Godot 4 script and painted through draw_rect pixel rasterization over canonical gameplay; native execution still unverified",
+      "Per-sprite optional animation timing: generated hero pixel frames and exact indexed frame buffers are embedded into HTML5 and Godot code with bounded frame tick handling",
+      "Genuine deterministic mono PCM16 WAV soundtrack and pickup/hazard cues, output as decoded original media files with SHA receipts; platform audio playback driver remains separate",
+      "Actual transparent PNG parallax/environment overlay layers with seed-bound style, shadow, foliage, music-density, parallax, and animation-FPS CLI controls"
+    ],
+    "trust": {
+      "authoring": "explicit operator authority; source ownership references are non-certifying and project bound",
+      "code_generation": "native emitters use trusted templates and deterministically generated game/world/art bytes; raw model code not executed",
+      "source_writes": "user-visible original console source is staged for human approval; no direct model commit, shell or external SDK access",
+      "quality": "actual Python gameplay and pixel roundtrips are evidence; no ROM compilation, emulator/hardware certification, rights clearance or professional aesthetic grade claimed",
+      "consistency": "Same-world content-bound indexed tile/palette data is inserted into native GB/GBC/NES/SMS/GG source, browser GAME payload and Godot studio_art.json; matching pack digest is required, and core gameplay/replay ownership stays untouched",
+      "preview": "PNG output is software generated, not a console framebuffer/hardware capture",
+      "dragon": "observer remains advisory; no model weights or Dragon reviewed knowledge promoted by this implementation",
+      "budgets": "3-level 19x15 synchronous Jeeves source stage; 1..4 frames and bounded tile/image/asset file production",
+      "audio": "PCM files are locally synthesized from original deterministic notes; no commercial samples, user voice, or third-party media, but media-playback integration and quality remain unqualified",
+      "animation": "Browser interval and Godot _process render the generated pose frames in produced source; source-level wiring only until exact-target execution is observed",
+      "publication": "Native project is assembled in a sibling same-filesystem temporary directory, all source/media/engine components completed, then directory-renamed to the previously nonexistent target; rollback removes only owned stage data. No partial work is presented at the requested output path after a failure before rename."
+    },
+    "tests": [
+      "tests/test_jeeves_native_studio_art_e2e.py",
+      "tests/test_jeeves_console_source_stage_e2e.py",
+      "tests/test_jeeves_native_studio_art_e2e.py::StudioProductionAssetTests::test_native_export_failure_leaves_no_partial_source_or_media_directory"
+    ],
+    "registered_suite": "jeeves-native-studio-art",
+    "not_qualified": [
+      "native console ROM compilation and hardware/emulator playthrough",
+      "runtime execution of newly inserted browser and Godot studio sprite rendering is not yet independently verified; source insertion does not prove playback",
+      "native console hero animation frames actually driven by controller state for every target",
+      "commercial platform native SDK and signed release builds",
+      "full large-scale authoring and cross-engine 3D asset/material/mesh rendering",
+      "long-duration integrated model-driven studio operation and training data promotion",
+      "Native console sprite-frame playback, per-target sound driver, performance-tuned streaming assets and dynamic parallax scrolling in actual compiled ROM binaries"
+    ],
+    "budgets": "3-level 19x15 synchronous Jeeves source stage; at most 8 world levels for CLI, 1..4 sprite frames, 0..3 transparent background overlays, 0..3 shadow, 0..4 foliage/music, 1..24 FPS; bounded files/audio/images/source bytes"
+  },
+  "jeeves_multitarget_production_milestone_extension": {
+    "status": "implementation_candidate_pending_runtime_validation",
+    "canonical_production_owners": [
+      "skeleton/ai/game_builder/studio_campaign.py",
+      "skeleton/ai/game_builder/studio_campaign_lock.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py",
+      "skeleton/ai/game_builder/studio_sprite_authoring.py"
+    ],
+    "milestone_domains": [
+      {
+        "id": "PRODUCTION-001",
+        "scope": "operator-authorized deterministic multi-target build sequence",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-002",
+        "scope": "exact content-bound source/art/replay/engine checkpoints",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-003",
+        "scope": "process-lifetime exclusive lock protecting whole production transaction",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-004",
+        "scope": "crash-safe ownership-based interrupted stage recovery without external recursive deletion",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-005",
+        "scope": "partial production resume from completed target receipts",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-006",
+        "scope": "source attestation checks before native compiler",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-007",
+        "scope": "opt-in native GB/GBC/NES compilation with bounded commands/output/deadline",
+        "status": "implemented_not_executed"
+      },
+      {
+        "id": "PRODUCTION-008",
+        "scope": "source-sha and structural ROM proof without fictional emulator certification",
+        "status": "implemented_not_executed"
+      },
+      {
+        "id": "PRODUCTION-009",
+        "scope": "separate structured 16-gate readiness projection per native target",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-010",
+        "scope": "authoritative Dragon projection of source and binary evidence, no data/weight promotion",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-011",
+        "scope": "exact PNG/SHA or typed-pixel artist original sprite conversion",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-012",
+        "scope": "native/browser/Godot same-art digest and human-reviewed Jeeves source staging",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-013",
+        "scope": "multi-target order locks artist input by SHA across restarts",
+        "status": "implemented"
+      },
+      {
+        "id": "PRODUCTION-014",
+        "scope": "native toolchain actual compilation against installed toolchains",
+        "status": "not_verified"
+      },
+      {
+        "id": "PRODUCTION-015",
+        "scope": "emulator gameplay/controller, frame, palette and audio parity",
+        "status": "not_implemented"
+      },
+      {
+        "id": "PRODUCTION-016",
+        "scope": "Dragon consented screen/video observation and reviewed knowledge admission",
+        "status": "not_implemented"
+      },
+      {
+        "id": "PRODUCTION-017",
+        "scope": "whole-story game scene/dialogue/cinematic/AI direction to final release",
+        "status": "not_implemented"
+      },
+      {
+        "id": "PRODUCTION-018",
+        "scope": "multi-week endurance, recurrent recovery and long-lived checkpoint testing",
+        "status": "not_verified"
+      },
+      {
+        "id": "PRODUCTION-019",
+        "scope": "complete multi-platform 2D/2.5D/3D studio render and native runtime integration",
+        "status": "not_implemented"
+      },
+      {
+        "id": "PRODUCTION-020",
+        "scope": "real GPU/native Godot/editor integration and packaged installer playthrough",
+        "status": "not_verified"
+      }
+    ],
+    "required_quality_evidence": [
+      "tests/test_studio_build_qualification.py",
+      "tests/test_studio_campaign_e2e.py",
+      "tests/test_studio_campaign_assurance_e2e.py",
+      "tests/test_studio_artist_sprite_e2e.py"
+    ],
+    "status_honesty": {
+      "tests_written_not_equal_passed": true,
+      "native_rom_toolchain_executed_in_this_session": false,
+      "native_emulator_qualified": false,
+      "original_artist_png_import_runtime_validated": false,
+      "model_weights_trained": false,
+      "release_readiness_proven": false,
+      "signed_vendor_sdk_distributed": false
+    },
+    "local_authority": "Source generation, native compilation and private artist pixels require explicit permission; no unreviewed shell, vendor binaries, background recording or implicit training."
+  },
+  "jeeves_runtime_cross_engine_milestone_extension": {
+    "status": "implementation_candidate_exact_runtime_validation_pending",
+    "tranche": "M41-M60",
+    "owner_files": [
+      "skeleton/ai/game_builder/studio_browser_probe.js",
+      "skeleton/ai/game_builder/studio_runtime_qualification.py",
+      "skeleton/ai/game_builder/studio_godot_qualification.py",
+      "skeleton/ai/game_builder/studio_pixel_parity.py",
+      "skeleton/ai/game_builder/studio_dragon_canvas_capture.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py"
+    ],
+    "milestones": [
+      {
+        "id": "M41",
+        "goal": "Execute actual generated HTML5 game JS to Python winning proof",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M42",
+        "goal": "Exercise actual Canvas2D sprite drawing routines and animation ticks",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M43",
+        "goal": "Exercise actual browser keyboard and onscreen directional inputs",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M44",
+        "goal": "Validate undo and restart UI replay semantics",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M45",
+        "goal": "Refuse stale/falsified browser game or proof source",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M46",
+        "goal": "Execute the original Godot 4 generated source and full replay headlessly",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M47",
+        "goal": "Copy Godot source into isolated temporary project to preserve immutable source",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M48",
+        "goal": "Crosscheck Godot source identity, replay, sprite hash and action count",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M49",
+        "goal": "Pixel-compare native console tile bytes with browser/Godot source and atlas PNG",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M50",
+        "goal": "Check four-index palette fidelity and individual real sprite animation frames",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M51",
+        "goal": "Make each runtime proof a separate source-revision-bound campaign qualification gate",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M52",
+        "goal": "Expose runtime qualification in operator CLI and Dragon evidence projection",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M53",
+        "goal": "Consent-gated real Chromium canvas-only image capture of generated games",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M54",
+        "goal": "Capture bounded gameplay frames from original winning controller replay",
+        "state": "implemented_not_executed"
+      },
+      {
+        "id": "M55",
+        "goal": "Retain PNG source-bound evidence, image SHA256 and opt-in local capture receipt",
+        "state": "implemented_test_pending"
+      },
+      {
+        "id": "M56",
+        "goal": "Refuse automatic promotion of Dragon visual observations into weights/almanacs",
+        "state": "implemented_boundaries"
+      },
+      {
+        "id": "M57",
+        "goal": "Qualify screenshots with independent actual browser, framebuffer inspection and display comparison",
+        "state": "partially_implemented"
+      },
+      {
+        "id": "M58",
+        "goal": "Build full native console emulator playthrough, controller and visual output parity",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M59",
+        "goal": "Link visual AI direction, scene editor, NPC/quests/audio/cinematics into true end-to-end game production",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M60",
+        "goal": "Long-term durable model-guided supervised studio and reviewed Dragon learning",
+        "state": "not_qualified"
+      }
+    ],
+    "proof_limits": [
+      "Node VM uses real generated JS with stub DOM/Canvas command recorder, not a browser screenshot",
+      "Godot replay is actual headless binary execution only if Godot 4 is installed and operator opts in",
+      "Canvas capture uses a real headless browser only when Playwright and Chromium are present and the operator explicitly authorizes original-game-only recording",
+      "Generated screenshots never record user desktop and do not constitute learned weights or review-approved Dragon knowledge",
+      "A Python winning trace does not substitute actual interactive hardware playthrough, native ROM compilation, signed packaging or completed game QA",
+      "No runtime actually launched by GitHub tool calls in this session; offline tests are authored but not measured passed"
+    ],
+    "suite": "jeeves-cross-engine-executable-gameplay",
+    "tests": [
+      "tests/test_studio_browser_runtime_e2e.py",
+      "tests/test_studio_godot_runtime_e2e.py",
+      "tests/test_studio_pixel_parity_e2e.py",
+      "tests/test_studio_dragon_canvas_capture.py"
+    ]
+  },
+  "jeeves_studio_audio_gamepad_dragon_learning_extension": {
+    "status": "source_implemented_pending_native_and_e2e_runtime_validation",
+    "tranche": "M61-M80",
+    "owners": [
+      "skeleton/ai/game_builder/playable_export.py",
+      "skeleton/ai/game_builder/dual_runtime_export.py",
+      "skeleton/ai/game_builder/studio_pixel_parity.py",
+      "skeleton/ai/game_builder/studio_runtime_qualification.py",
+      "skeleton/ai/game_builder/studio_godot_qualification.py",
+      "skeleton/ai/game_builder/studio_dragon_learning_bridge.py",
+      "skeleton/ai/game_builder/studio_dragon_lessons_cli.py"
+    ],
+    "milestones": [
+      {
+        "id": "M61",
+        "name": "Original synthesized WAV files actually embedded into offline HTML5 game media",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M62",
+        "name": "Original ambient PCM playback with user gesture and no per-turn restart",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M63",
+        "name": "Actual collectible and hazard event PCM cue playback path",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M64",
+        "name": "HTML5 music/effects volume scalers and mute UI controls",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M65",
+        "name": "Compositing original transparent environmental PNGs into gameplay canvas",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M66",
+        "name": "Actual Godot WAV audio assets emitted in runtime project and source manifest",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M67",
+        "name": "Godot ambient audio and event-sound AudioStreamPlayer sources",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M68",
+        "name": "Godot original parallax PNGs and scrolling scene overlay integration",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M69",
+        "name": "Godot headless qualifier stages exact original WAV/PNG resources",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M70",
+        "name": "Cross-engine original audio and parallax byte identity QA",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M71",
+        "name": "HTML5 Gamepad API supports D-pad and analog stick movement",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M72",
+        "name": "Gamepad B undo and Start restart with held-button edge debounce",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M73",
+        "name": "Generated Node runtime probe exercises actual gamepad/audio/overlay event paths",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M74",
+        "name": "Browser runtime receipts record distinct synthetic gamepad/audio/overlay measurements",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M75",
+        "name": "Dragon proposes hash-bound corrective lessons directly from assurance blockers",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M76",
+        "name": "Human-reviewed operational drafts and changed-source fail-closed gates",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M77",
+        "name": "Operator CLI and specialized E2E suite for original operational lesson feedback",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M78",
+        "name": "Native physical controller and emulator input/playback parity",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M79",
+        "name": "Real sound-card waveform/GPU parallax visual quality qualification",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M80",
+        "name": "Approved Dragon almanac promotion and actual checkpoint model training",
+        "state": "not_implemented"
+      }
+    ],
+    "implementation_checks": {
+      "generated_js_syntax_parsed_in_v8": true,
+      "runtime_audio_hardware_tested": false,
+      "godot_pcm_parallax_execution_verified": false,
+      "physical_controller_verified": false,
+      "actual_automated_weights_changed": false,
+      "user_display_captured_without_consent": false,
+      "tests_authored_not_passed": true
+    },
+    "suites": [
+      "jeeves-cross-engine-executable-gameplay",
+      "jeeves-dragon-reviewed-knowledge-gates"
+    ]
+  },
+  "jeeves_native_emulator_and_full_game_execution_extension": {
+    "status": "source_integrated_pending_actual_toolchain_and_emulator_qualification",
+    "tranche": "M81-M100",
+    "owners": [
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_campaign_cli.py"
+    ],
+    "milestones": [
+      {
+        "id": "M81",
+        "name": "RGBDS linker generates exact assembler game state symbol map",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M82",
+        "name": "Fail-closed WRAM state symbol parser with canonical label set and address scope",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M83",
+        "name": "Distinct exclusive ROM and symbol publication with rollback of owned output",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M84",
+        "name": "ROM-qualified native SHA and symbol SHA integrity checked before emulation",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M85",
+        "name": "Operator-authorized real GB/GBC CPU emulation through installed PyBoy",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M86",
+        "name": "Real emulator directional input sends full original Python reference actions",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M87",
+        "name": "Read native machine-level WRAM victory/loss/level/position/score/health",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M88",
+        "name": "Compare final native game progress and collectibles against Python full replay",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M89",
+        "name": "Hash real emulated 160x144 LCD frame buffers for controlled game outcome evidence",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M90",
+        "name": "Bound ROM emulator CPU/time/frame budgets to prevent runaway playthroughs",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M91",
+        "name": "Run emulator against private temporary ROM copy rather than edit original project",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M92",
+        "name": "Differentiate synthetic/tested emulator inputs from physical controller qualification",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M93",
+        "name": "Separate native CPU victory and controller gates from compiled structural ROM gates",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M94",
+        "name": "Dragon reads exact native CPU/controller replay evidence without model-weight promotion",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M95",
+        "name": "CLI for bounded actual GB/GBC emulation under explicit local authorization",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M96",
+        "name": "Full synchronized source-ROM-emulator-browser-Godot campaign driver",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M97",
+        "name": "Per-target status, unsupported stages and stable attempt classifications",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M98",
+        "name": "Resume from source and runtime campaign receipts with stop-after-blocker option",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M99",
+        "name": "Full NES/other-console CPU/PPU native emulator adapter and verification",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M100",
+        "name": "Actual first-install compiled native game, emulator full victory and controller review",
+        "state": "not_qualified"
+      }
+    ],
+    "tests": [
+      "tests/test_studio_build_qualification.py",
+      "tests/test_studio_game_boy_emulator_e2e.py",
+      "tests/test_studio_campaign_assurance_e2e.py",
+      "tests/test_studio_execution_campaign_e2e.py"
+    ],
+    "runtime_qualification_state": {
+      "source_code_committed": true,
+      "actual_rgbds_rom_compilation_in_this_session": false,
+      "actual_PyBoy_cartridge_executed_in_this_session": false,
+      "GB_GBC_machine_code_win_verified_on_real_rom": false,
+      "NES_native_CPU_emulation_implemented": false,
+      "physical_controller_qualified": false,
+      "actual_gpu_audio_output_qualified": false,
+      "actual_source_to_release_pipeline_qualified": false,
+      "model_weights_updated": false,
+      "release_signoff": false
+    },
+    "e2e_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_nes_cpu_ppu_and_endurance_history_extension": {
+    "status": "source_integrated_pending_native_toolchain_emulator_ci_and_endurance_validation",
+    "tranche": "M101-M120",
+    "owners": [
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_nes_emulator.py",
+      "skeleton/ai/game_builder/studio_nes_chr_parity.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_execution_campaign_cli.py"
+    ],
+    "milestones": [
+      {
+        "id": "M101",
+        "name": "NES original 6502 state labels exported to real ca65/ld65 output",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M102",
+        "name": "Bounded exact VICE zero-page label map parsed from ld65",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M103",
+        "name": "Native NES compiled binary plus labels exclusive publication and identity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M104",
+        "name": "Actual FCEUX Lua source generated from fixed canonical D-pad replay",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M105",
+        "name": "6502 native CPU memory winning state read from emulator",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M106",
+        "name": "Full controller trace with deterministic button press/release and frame budget",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M107",
+        "name": "Actual NES PPU framebuffer snapshot required for replay success",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M108",
+        "name": "FCEUX process under explicit operator approval with temporary ROM/script",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M109",
+        "name": "Bounded CPU/time/frame actions, output sizes and subprocess exit status",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M110",
+        "name": "Source, ROM, zero-page labels and Python reference replay bound to one identity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M111",
+        "name": "Exact native compiled CHR bank six original sprites compared to art source",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M112",
+        "name": "Reject and reclaim own unreceipted ROM if compiled pixels diverge",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M113",
+        "name": "NES uses native CPU and controller E2E gates alongside GB/GBC",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M114",
+        "name": "Dragon consumes independent CPU/PPU native replay receipts without weight promotion",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M115",
+        "name": "Full E2E campaign driver includes NES full replay rather than unsupported target",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M116",
+        "name": "Digest-linked per-run cross-stage production audit journal",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M117",
+        "name": "Resume-proof history review rejects stale or tampered E2E receipts",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M118",
+        "name": "Real installed FCEUX plus ca65/ld65 successful NES first-playthrough",
+        "state": "not_verified"
+      },
+      {
+        "id": "M119",
+        "name": "Native PPU versus real GPU, audio and hardware controller output parity",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M120",
+        "name": "Six-month/year endurance with crash recovery, audit and independent signoff",
+        "state": "not_verified"
+      }
+    ],
+    "evidence_honesty": {
+      "NES_6502_source_adapter_committed": true,
+      "NES_PPU_capture_source_adapter_committed": true,
+      "native_rom_compiler_executed_this_session": false,
+      "FCEUX_real_NROM_machine_code_played_this_session": false,
+      "first_real_native_NES_victory_observed": false,
+      "original_chr_pixel_runtime_correctness_independently_verified": false,
+      "physical_controller_tested": false,
+      "six_month_endurance_completed": false,
+      "actual_model_weights_updated": false,
+      "tests_written_not_claimed_passed": true
+    },
+    "suites": [
+      "jeeves-native-cartridge-emulator-full-e2e"
+    ]
+  },
+  "jeeves_native_score_checkpoint_e2e_extension": {
+    "status": "source_implemented_pending_external_native_runtime_and_specialized_test_results",
+    "tranche": "M121-M140",
+    "owners": [
+      "skeleton/ai/game_builder/game_boy_native_export.py",
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+      "skeleton/ai/game_builder/studio_nes_emulator.py",
+      "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py"
+    ],
+    "milestones": [
+      {
+        "id": "M121",
+        "name": "Audit native scoring against executable Python game reference",
+        "state": "source_fixed_pending_execution"
+      },
+      {
+        "id": "M122",
+        "name": "GB original collectible bonus +10 parity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M123",
+        "name": "NES original collectible bonus +10 parity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M124",
+        "name": "GB original completed-level bonus +100 parity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M125",
+        "name": "NES original completed-level bonus +100 parity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M126",
+        "name": "GB/GBC 16-bit score with carry and zero initialization",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M127",
+        "name": "NES 6502 16-bit score with carry and zero initialization",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M128",
+        "name": "Require ScoreHigh symbols from real RGBDS/ld65 linkers",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M129",
+        "name": "Correct native GB final-level counter to Python/NES convention",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M130",
+        "name": "Verify native 16-bit score in actual GB/GBC/NES emulator RAM",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M131",
+        "name": "Sample up to 128 source-bound CPU states during input replay",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M132",
+        "name": "Add intermediate GB/GBC PyBoy CPU memory snapshots",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M133",
+        "name": "Add intermediate NES FCEUX CPU memory snapshots",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M134",
+        "name": "Fail on missing, reordered or altered replay checkpoints",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M135",
+        "name": "Fail on premature victory or unexpected losing states",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M136",
+        "name": "Fail on non-monotonic score, health restoration or invalid level jumps",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M137",
+        "name": "Cross-check sampled final frame against original Python x/y/health/score/level",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M138",
+        "name": "Admit only digest-bound native CPU checkpoint evidence to campaign gates and Dragon reports",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M139",
+        "name": "Run actual multi-level 16-bit scoring games with RGBDS/cc65 plus emulators",
+        "state": "not_verified"
+      },
+      {
+        "id": "M140",
+        "name": "Complete lengthy continuous native production with recovery, physical graphics and human release signoff",
+        "state": "not_qualified"
+      }
+    ],
+    "validation": {
+      "python_scoring_source_rule": "10 per collectible, 100 per level goal",
+      "native_score_high_byte_included": true,
+      "native_controller_trace_sample_limit": 128,
+      "real_native_compilation_executed_this_session": false,
+      "real_pyboy_or_fceux_executed_this_session": false,
+      "real_native_multilevel_score_parity_qualified": false,
+      "source_contract_and_checkpoint_tests_authored": true,
+      "specialized_tests_measured_passed": false,
+      "physical_controller_qualified": false,
+      "model_weights_trained": false,
+      "release_ready": false
+    },
+    "suites": [
+      "jeeves-native-cartridge-emulator-full-e2e"
+    ]
+  },
+  "jeeves_native_action_reference_e2e_extension": {
+    "status": "source_changes_committed_exact_head_runtime_tests_pending",
+    "tranche": "M141-M160",
+    "owner_files": [
+      "skeleton/ai/game_builder/game_boy_native_export.py",
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
+      "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+      "skeleton/ai/game_builder/studio_nes_emulator.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py"
+    ],
+    "milestones": [
+      {
+        "id": "M141",
+        "name": "Regenerate exact canonical original game from the embedded signed intent",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M142",
+        "name": "Fail closed if regenerated world digest differs from game bundle",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M143",
+        "name": "Verify browser level maps and collectible geometry against regenerated Python world",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M144",
+        "name": "Replay every controller action through canonical Python advance semantics",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M145",
+        "name": "Check reference terminal coordinates, health, score, turns and status against signed trace",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M146",
+        "name": "Derive bounded native CPU checkpoints from real Python game transitions",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M147",
+        "name": "Compare actual emulator X/Y and collectible state at each sampled action",
+        "state": "source_implemented_pending_execution"
+      },
+      {
+        "id": "M148",
+        "name": "Compare actual intermediate native level, health and 16-bit score against reference",
+        "state": "source_implemented_pending_execution"
+      },
+      {
+        "id": "M149",
+        "name": "Increment real native 16-bit turn counter for accepted directional attempts",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M150",
+        "name": "Count blocked-wall controller attempts without fabricating player movement",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M151",
+        "name": "Require RGBDS/ld65 labels for low/high turn bytes",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M152",
+        "name": "Read full actual GB/GBC/NES turn count from CPU memory and enforce each action boundary",
+        "state": "source_implemented_pending_execution"
+      },
+      {
+        "id": "M153",
+        "name": "Reject premature GameWon, missing move, duplicate move or impossible native state",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M154",
+        "name": "Identify first sampled CPU divergence using bounded field-level diagnostic report",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M155",
+        "name": "Bind runtime CPU divergence to operator-visible E2E blocked events",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M156",
+        "name": "Persist first mismatch into digest-linked, source-validated longform run history",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M157",
+        "name": "Reject forged duplicates, inconsistent run counts and malformed CPU diagnostic evidence",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M158",
+        "name": "Regression-test regenerated multilevel original game and source/CPC anti-tamper paths",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M159",
+        "name": "Verify actual emitted ROM action count and complete reference parity in installed PyBoy/FCEUX",
+        "state": "not_verified"
+      },
+      {
+        "id": "M160",
+        "name": "Qualify release after multi-console full playthrough, hardware inspection and multi-month endurance",
+        "state": "not_qualified"
+      }
+    ],
+    "evidence_limits": [
+      "Regenerated Python source is independently executed; native CPU memory is only actually observed when PyBoy/FCEUX is installed and approved",
+      "16-bit turn counters include directional attempts that hit a wall; no native replay can qualify without consuming the full trace",
+      "First-divergence reports show only bounded original game CPU fields and are a repair diagnostic, not verified knowledge promotion",
+      "No native compilation or actual GB/GBC/NES emulator victory was executed in this connector-only development pass",
+      "No physical gamepad, speaker, GPU, installer-first-launch or multi-month endurance is verified"
+    ],
+    "focused_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_cpu_reference_dragon_triage_extension": {
+    "status": "committed_source_not_real_native_execution_qualified",
+    "tranche": "M161-M180",
+    "code_owners": [
+      "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
+      "skeleton/ai/game_builder/studio_native_correction_triage.py",
+      "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+      "skeleton/ai/game_builder/studio_nes_emulator.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_dragon_lessons_cli.py"
+    ],
+    "milestones": [
+      {
+        "id": "M161",
+        "name": "Bind sampled native CPU state to exact regenerated authored Python world",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M162",
+        "name": "Rebuild full original level layout from game intent and verify browser geometry",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M163",
+        "name": "Replay original source action trace independently rather than trust submitted final state",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M164",
+        "name": "Require every sampled x/y, level, score, health and collectibles match canonical transition",
+        "state": "source_integrated_pending_actual_emulator"
+      },
+      {
+        "id": "M165",
+        "name": "Export 16-bit attempted D-pad controller-turn counter in GB/GBC source engine",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M166",
+        "name": "Export 16-bit attempted D-pad controller-turn counter in NES 6502 source engine",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M167",
+        "name": "Include invalid/wall directional attempts in native action-count proof",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M168",
+        "name": "Verify actual input count after final GB/GBC/NES victory rather than relying on coordinates",
+        "state": "source_integrated_pending_actual_emulator"
+      },
+      {
+        "id": "M169",
+        "name": "Require both high/low action-counter symbols in actual compiler linkers",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M170",
+        "name": "Add exact action-boundary field-level diff for first native CPU mismatch",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M171",
+        "name": "Transport mismatch into real E2E stage blockers",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M172",
+        "name": "Reject duplicated stage entries and conflicting history status counts",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M173",
+        "name": "Append first native CPU diagnostic digest into current source-bound history",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M174",
+        "name": "Expose Dragon read-only correction proposals specific to movement, collision and scoring",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M175",
+        "name": "Expose Dragon corrective proposals for native controller cadence and high-byte rollover",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M176",
+        "name": "Block stale correction triage when game source or assurance receipt changed",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M177",
+        "name": "Add operator CLI switch to triage native gameplay, with explicit authorization",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M178",
+        "name": "Add reference-playthrough, synthetic CPU divergence, and fraud-path regression suite",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M179",
+        "name": "Execute and certify real compiled native cartridge with full per-action CPU parity",
+        "state": "not_verified"
+      },
+      {
+        "id": "M180",
+        "name": "Qualify fully integrated long-duration Jeeves/Builder/Dragon production and all platform releases",
+        "state": "not_qualified"
+      }
+    ],
+    "runtime_evidence": {
+      "reviewed_underyling_source_commit_required": true,
+      "first_native_actual_cpu_sample_this_session": false,
+      "first_real_6502_or_GB_ROM_victory_this_session": false,
+      "installed_emulator_execution_verified": false,
+      "independent_python_replay_source_added": true,
+      "synthetic_fixture_regressions_written": true,
+      "debugger_source_tampering_rejected": true,
+      "Dragon_trained_model_weights": false,
+      "physical_console_tested": false,
+      "six_month_endurance_verified": false
+    },
+    "specialist_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_original_compiled_art_and_independent_e2e_extension": {
+    "status": "committed_source_pending_exact_head_specialized_E2E_and_real_native_execution",
+    "tranche": "M181-M200",
+    "owners": [
+      "skeleton/ai/game_builder/studio_game_boy_rom_art_parity.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_production_blocker_taxonomy.py",
+      "skeleton/ai/game_builder/studio_native_correction_triage.py",
+      "machine/e2e_suites.json"
+    ],
+    "milestones": [
+      {
+        "id": "M181",
+        "name": "Require exact native source artifact receipt rather than campaign identity for verified source stage",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M182",
+        "name": "Reconcile every verified production source/ROM/emulator/browser/Godot/canvas stage against independently audited artifact SHA",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M183",
+        "name": "Reject rehashed false-positive successes and incompatible runtime evidence",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M184",
+        "name": "Validate historical stage evidence again while holding campaign OS lock",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M185",
+        "name": "Reject forged source, browser or native binary claims despite internally consistent run digest",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M186",
+        "name": "Read actual RGBLINK bank-0 Tiles and TilesEnd symbols for original GB/GBC source",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M187",
+        "name": "Validate sprite bank, offset, tile count and linker state manifest boundaries",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M188",
+        "name": "Compare 96 original 2bpp tile bytes in actual compiled GB/GBC ROM to source asset producer",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M189",
+        "name": "Require original compiled sprite parity before publishing a handheld cartridge qualification",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M190",
+        "name": "Recheck same compiled GB/GBC ROM bytes in independent assurance inspections",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M191",
+        "name": "Rollback only owned ROM and symbols after a compiled sprite mismatch",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M192",
+        "name": "Add tamper/incorrect linker/address original source regression tests",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M193",
+        "name": "Update mock compiled cartridges to contain actual game art instead of fabricated zero sprite bytes",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M194",
+        "name": "Classify missing compiler, ROM art, emulator, browser, Godot and native CPU blockers independently",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M195",
+        "name": "Do not persist raw command logs, secrets or arbitrary runtime error text into Dragon repair memory",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M196",
+        "name": "Preserve bounded blocker classes in digest-linked production history",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M197",
+        "name": "Expose current-source Dragon corrective review proposals specific to cause and target",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M198",
+        "name": "Fail closed on stale source, forged stages and invalid blocker categories with tests",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M199",
+        "name": "Run full specialized 13-test source, native ROM and emulator E2E suite on exact branch head",
+        "state": "not_verified"
+      },
+      {
+        "id": "M200",
+        "name": "Sign off first-install, real native emulator/hardware runtime, full renderer/audio and longform endurance",
+        "state": "not_qualified"
+      }
+    ],
+    "assurance_truth": {
+      "changed_source_stage_attestation_from_campaign_identity_to_target_digest": true,
+      "all_claimed_verified_stages_have_independent_runtime_artifact_digest": true,
+      "GB_GBC_compiled_rom_original_tiles_must_match_source": true,
+      "NES_compiled_chr_original_tiles_must_match_source": true,
+      "Dragon_root_cause_classifier_persists_no_untrusted_raw_compiler_output": true,
+      "actual_RGBDS_cc65_native_ROM_playthrough_this_session": false,
+      "native_hardware_controller_audio_gpu_verified": false,
+      "exact_head_specialized_suite_confirmed_pass": false,
+      "model_weights_updated": false,
+      "game_release_signed_off": false
+    },
+    "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_console_animated_psg_production_extension": {
+    "status": "original_native_animation_and_PSG_source_integrated_pending_real_audio_video_toolchain_and_emulator_evidence",
+    "tranche": "M201-M260",
+    "source_owners": [
+      "skeleton/ai/game_builder/studio_asset_pipeline.py",
+      "skeleton/ai/game_builder/studio_native_psg.py",
+      "skeleton/ai/game_builder/game_boy_native_export.py",
+      "skeleton/ai/game_builder/game_boy_color_native_export.py",
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/native_game_cli.py",
+      "skeleton/ai/game_builder/jeeves_app_runtime.py",
+      "skeleton/ai/game_builder/studio_game_boy_rom_art_parity.py",
+      "skeleton/ai/game_builder/studio_nes_chr_parity.py"
+    ],
+    "milestones": [
+      {
+        "id": "M201",
+        "name": "Original authored 8x8 hero animation tied to source game world and tile five",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M202",
+        "name": "Generate one through four deterministic visible original hero frames",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M203",
+        "name": "Embed additional GB RGBDS planar animation tiles beyond first six semantic tiles",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M204",
+        "name": "Preserve exact 96-byte base sprite section for independent compiled art parity",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M205",
+        "name": "Copy actual appended hero tile bytes into Game Boy VRAM at boot",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M206",
+        "name": "Advance Game Boy hero sprite tile on bounded 60Hz frame counters",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M207",
+        "name": "Reset and bound GB animation index to actual authored frame inventory",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M208",
+        "name": "Forward identical 2bpp hero frames into Game Boy Color source",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M209",
+        "name": "Keep CGB native sound/animation compatible with DMG sprite semantics",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M210",
+        "name": "Embed additional NES original two-plane CHR hero frames after base six tiles",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M211",
+        "name": "Advance actual NES PPU sprite tile number per frame through 6502 engine",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M212",
+        "name": "Preserve goal and lost-state NES sprite overrides over animation",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M213",
+        "name": "Require exact first authored animation frame equal to original tile five",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M214",
+        "name": "Reject malformed extra frames, unsupported palette indices and unsafe frame timing",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M215",
+        "name": "Reject source whose hero animation frame count exceeds four",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M216",
+        "name": "Attest compiled GB/GBC animation at linker-provided ROM0 bounds",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M217",
+        "name": "Reject forged duplicate, out-of-bank and wrong-length animation linker symbols",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M218",
+        "name": "Attest compiled NES appended CHR frames against source bytes",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M219",
+        "name": "Reject changed compiled hero frames despite valid native cartridge headers",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M220",
+        "name": "Retain source-versus-compiled animation byte count in original art evidence",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M221",
+        "name": "Compose original deterministic eight-note theme-bound PSG arrangements",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M222",
+        "name": "Provide independent melodic roots for five original studio themes",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M223",
+        "name": "Provide zero to four native sound intensity settings",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M224",
+        "name": "Generate original collectible, hazard and goal cue pitches",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M225",
+        "name": "Calculate bounded 11-bit GB handheld square-wave frequencies",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M226",
+        "name": "Calculate bounded NES 2A03 pulse timer periods",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M227",
+        "name": "Validate all PSG register byte splits against intended full timer",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M228",
+        "name": "Emit real Game Boy NR52, NR50, NR51 and pulse-register initialization",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M229",
+        "name": "Drive Game Boy square-wave melody from code-owned note tables",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M230",
+        "name": "Emit Game Boy game-event cues on a separate sound channel",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M231",
+        "name": "Preserve correct sound-channel routing for Game Boy Color",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M232",
+        "name": "Emit NES APU enable and pulse-channel setup in actual 6502 source",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M233",
+        "name": "Drive NES pulse-one original melody with bounded frame cadence",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M234",
+        "name": "Drive NES pulse-two event cues on pickup, hazard and goal",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M235",
+        "name": "Support source-disabled sound with explicit constant guard",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M236",
+        "name": "Reject game-theme mismatch between intended source and generated PSG arrangement",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M237",
+        "name": "Identify original native score by content digest without claiming PCM identity",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M238",
+        "name": "Connect native-game CLI to actual hero animation bytes from console codec",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M239",
+        "name": "Translate authored animation FPS into bounded native 60Hz tick interval",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M240",
+        "name": "Connect native-game CLI to theme/density original PSG and cue source",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M241",
+        "name": "Expose exact animation/music source receipts separately from emulator qualification",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M242",
+        "name": "Stage equivalent source from Jeeves under existing project-scoped human CAS review",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M243",
+        "name": "Accept bounded optional Jeeves animation FPS and music-intensity controls",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M244",
+        "name": "Reject inconsistent Jeeves art, animation count and music source manifest",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M245",
+        "name": "Add multi-console original frame/PSG regression suites without auto-running CI gates",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M246",
+        "name": "Execute real RGBDS build and PyBoy playback proving at least two visible frames",
+        "state": "unqualified"
+      },
+      {
+        "id": "M247",
+        "name": "Execute real RGBDS CGB build in actual color emulator with animation proof",
+        "state": "unqualified"
+      },
+      {
+        "id": "M248",
+        "name": "Execute real ca65/ld65 build and FCEUX PPU sprite-frame movement",
+        "state": "unqualified"
+      },
+      {
+        "id": "M249",
+        "name": "Capture actual GB/CGB hardware audio samples or emulator sound trace",
+        "state": "unqualified"
+      },
+      {
+        "id": "M250",
+        "name": "Capture actual NES 2A03 pulse music and three distinct effects",
+        "state": "unqualified"
+      },
+      {
+        "id": "M251",
+        "name": "Compare source PSG timer programming with actual observed audio frequencies",
+        "state": "unqualified"
+      },
+      {
+        "id": "M252",
+        "name": "Validate actual sprite-frame cadence against LCD/PPU frame boundaries",
+        "state": "unqualified"
+      },
+      {
+        "id": "M253",
+        "name": "Measure controller input and animation concurrency under prolonged replay",
+        "state": "unqualified"
+      },
+      {
+        "id": "M254",
+        "name": "Verify simultaneous game audio and graphical rendering without timing stalls",
+        "state": "unqualified"
+      },
+      {
+        "id": "M255",
+        "name": "Qualify original console sound envelopes and volume on hardware",
+        "state": "unqualified"
+      },
+      {
+        "id": "M256",
+        "name": "Exercise restart/resume/crash during real console animation/audio runs",
+        "state": "unqualified"
+      },
+      {
+        "id": "M257",
+        "name": "Verify browser/Godot-to-console visual identity beyond static source tiles",
+        "state": "unqualified"
+      },
+      {
+        "id": "M258",
+        "name": "Review rights/author-origin provenance and public platform distribution",
+        "state": "unqualified"
+      },
+      {
+        "id": "M259",
+        "name": "Complete verified installer-first-launch with all Jeeves/Dragon editor controls",
+        "state": "unqualified"
+      },
+      {
+        "id": "M260",
+        "name": "Complete six-month/year studio endurance, platform regression and release signoff",
+        "state": "unqualified"
+      }
+    ],
+    "capability_truth": {
+      "animation_frames_max": 4,
+      "native_psg_themes": 5,
+      "sound_density_min": 0,
+      "sound_density_max": 4,
+      "gameboy_nes_original_PSG_score_source": true,
+      "generated_hero_animation_compiled_source": true,
+      "browser_or_godot_PCM_identical_to_console_PSG": false,
+      "first_party_hardware_audio_measured": false,
+      "GB_CGB_NES_actual_animated_playthrough_executed_in_this_session": false,
+      "original_model_weights_updated": false,
+      "operator_review_required_for_Jeeves_source_commit": true,
+      "new_automatic_CI_workflows": 0,
+      "signed_off_complete": false
+    },
+    "test_owners": [
+      "tests/test_studio_native_console_animation_e2e.py",
+      "tests/test_studio_native_psg.py",
+      "tests/test_jeeves_native_studio_art_e2e.py",
+      "tests/test_jeeves_console_source_stage_e2e.py"
+    ],
+    "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_native_media_integrity_e2e_extension": {
+    "status": "independent_source_media_contract_committed_pending_specialized_tests_and_real_native_AV",
+    "tranche": "M261-M280",
+    "milestones": [
+      {
+        "id": "M261",
+        "name": "Independently cross-check source-derived animation/PSG against canonical authored game",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M262",
+        "name": "Revalidate game-world digest and cross-engine browser/Godot original media receipt",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M263",
+        "name": "Require exact first native animation frame equal to approved original tile five",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M264",
+        "name": "Reconstruct and compare every GB/GBC/NES additional assembly frame byte from authored planar art",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M265",
+        "name": "Require native source frame-count and 60Hz delay equal authored frame descriptors",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M266",
+        "name": "Recalculate exact original PSG low/high note tables rather than trust descriptor claims",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M267",
+        "name": "Verify actual native console audio enable and melody cadence",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M268",
+        "name": "Compare complete event cue routines to reject inserted early returns and disabled effects",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M269",
+        "name": "Enforce independent native media contract for direct authorized cartridge compiler preflight",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M270",
+        "name": "Enforce identical check in campaign publish, resume and inspect paths",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M271",
+        "name": "Project signed source media digest, frame counts and original score into canonical assurance",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M272",
+        "name": "Keep hardware/PSG execution unqualified despite passing source-art contract",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M273",
+        "name": "Test forged rehashed campaign source containing actual modified sound cue",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M274",
+        "name": "Add original GB/GBC/NES source-media tests for real generated worlds and adversarial alterations",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M275",
+        "name": "Execute all specialized native source-media/animation/audio tests on exact PR head",
+        "state": "not_verified"
+      },
+      {
+        "id": "M276",
+        "name": "Build real RGBDS Game Boy and Game Boy Color ROMs with current native asset source",
+        "state": "not_verified"
+      },
+      {
+        "id": "M277",
+        "name": "Build and emulate real ca65 NES CHR animation and pulse audio ROM",
+        "state": "not_verified"
+      },
+      {
+        "id": "M278",
+        "name": "Capture actual LCD/PPU animation and both consoles' audible PSG waveforms",
+        "state": "not_verified"
+      },
+      {
+        "id": "M279",
+        "name": "Complete original game first-install, release legality and renderer regression qualification",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M280",
+        "name": "Sign long-lived integrated Jeeves/Builder/Dragon studio operation after measured endurance",
+        "state": "not_qualified"
+      }
+    ],
+    "owners": [
+      "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_campaign.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "tests/test_studio_native_source_media_parity.py",
+      "tests/test_studio_campaign_e2e.py"
+    ],
+    "qualification_limits": {
+      "console_targets": [
+        "nintendo_game_boy",
+        "nintendo_game_boy_color",
+        "nintendo_famicom"
+      ],
+      "independent_actual_binary_execution_this_session": false,
+      "pass_of_new_specialized_test_files_measured": false,
+      "source_media_checks_enforced_before_compiler": true,
+      "source_media_checks_enforced_at_resume": true,
+      "source_media_receipt_in_assurance": true,
+      "native_animation_and_PSG_only_source_qualified": true,
+      "model_weights_updated": false,
+      "release_signed": false
+    },
+    "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_independent_native_media_controlflow_extension": {
+    "tranche": "M281-M300",
+    "status": "code_committed_source_only_exact_head_specialist_tests_and_emulators_not_executed",
+    "source_owners": [
+      "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_campaign.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py"
+    ],
+    "regression_owners": [
+      "tests/test_studio_native_source_media_parity.py",
+      "tests/test_studio_campaign_e2e.py",
+      "tests/test_studio_execution_campaign_e2e.py",
+      "tests/test_studio_execution_history_e2e.py"
+    ],
+    "milestones": [
+      {
+        "id": "M281",
+        "name": "Compare all six original indexed background/hero tiles against exact GB/GBC/NES emitted planar assembly",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M282",
+        "name": "Regenerate original hero animation from source assets and verify assembly frame inventory",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M283",
+        "name": "Reconstruct original eight-note PSG score and verify native music register data tables",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M284",
+        "name": "Verify authentic game-loop animation/music update calls and audio boot initialization",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M285",
+        "name": "Reject original-game SFX trigger deletion, duplication and inserted premature returns",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M286",
+        "name": "Enforce independent source-art and source-audio checks on campaign publish and resume",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M287",
+        "name": "Enforce same independent source-media contract on direct native ROM compiler preflight",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M288",
+        "name": "Add deterministic native media digest, verified source-frame counts to canonical assurance",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M289",
+        "name": "Surface source-media receipts to the Jeeves E2E operator summary and durable journal",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M290",
+        "name": "Surface independently checked media source counts to Dragon read-only production observation",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M291",
+        "name": "Add source/world/animation/music/SFX adversarial mutation tests and rehashed receipt tests",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M292",
+        "name": "Add real source and durable-history regression coverage of authenticated media receipt propagation",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M293",
+        "name": "Run the full focused 17-test native console source-media suite on exact branch head",
+        "state": "not_verified"
+      },
+      {
+        "id": "M294",
+        "name": "Run real GB/CGB RGBDS compilation and dual emulation with visible authored animation",
+        "state": "not_verified"
+      },
+      {
+        "id": "M295",
+        "name": "Run real NES cc65 compilation and FCEUX input/PPU animation validation",
+        "state": "not_verified"
+      },
+      {
+        "id": "M296",
+        "name": "Capture and independently classify real hardware/emulator PSG melody and three cues",
+        "state": "not_verified"
+      },
+      {
+        "id": "M297",
+        "name": "Measure synchronized controller/video/audio behavior during extended replay",
+        "state": "not_verified"
+      },
+      {
+        "id": "M298",
+        "name": "Verify all native platform builds, rights, first-install and offline distribution",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M299",
+        "name": "Measure multi-week production recovery across crash/reboot and damaged build scenarios",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M300",
+        "name": "Qualify six-month/year Jeeves–Builder–Dragon production and formal release signoff",
+        "state": "not_qualified"
+      }
+    ],
+    "verification": {
+      "implemented_source_paths": 12,
+      "test_files_registered_in_native_special_suite": 17,
+      "source_static_contract_checked_during_resumable_campaign": true,
+      "source_static_contract_checked_during_native_build": true,
+      "source_status_separated_from_runtime_and_audio_pass": true,
+      "tests_executed_and_confirmed_passing_here": false,
+      "native_ROM_emulators_executed_here": false,
+      "physical_controller_video_audio_verified_here": false,
+      "full_game_production_duration_certified": false,
+      "model_weights_changed_here": false,
+      "studio_release_qualified": false
+    }
+  },
+  "jeeves_native_suite_execution_integrity_extension": {
+    "status": "committed_operator_runner_and_source_patch_unexecuted_specialized_suite",
+    "tranche": "M281-M300",
+    "milestones": [
+      {
+        "id": "M281",
+        "name": "Fix exact assembly label parsing so Tiles and AnimationTiles cannot collide",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M282",
+        "name": "Preserve separate verification of base six sprites and appended animation frames",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M283",
+        "name": "Reject duplicated, renamed or changed assembly regions with dedicated regression",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M284",
+        "name": "Create explicit local-only operator-owned native source-test execution entrypoint",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M285",
+        "name": "Allow exactly the canonical registered offline specialized suite, never shell commands",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M286",
+        "name": "Require operator execution consent separate from merely inspecting source",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M287",
+        "name": "Require all registered input and test files exist, with bounded sizes and no symlinks",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M288",
+        "name": "Constrain source-test runtime, interpreter arguments and local plugin loading",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M289",
+        "name": "Bind source-contract results to a digest of the exact checked code inventory",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M290",
+        "name": "Bind specialized test receipts to their original registered command and timeout policy",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M291",
+        "name": "Reject passing verdict if source or execution policy changed during testing",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M292",
+        "name": "Exclusively publish source-contract receipt outside repository; forbid overwrite",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M293",
+        "name": "Keep native emulator, real audio/video and release claims false in source-test receipt",
+        "state": "source_implemented"
+      },
+      {
+        "id": "M294",
+        "name": "Test authorization refusal, command injection, linked file, timeout, drift and false success",
+        "state": "source_implemented_tests_unverified"
+      },
+      {
+        "id": "M295",
+        "name": "Execute all 18 registered native focused tests on actual branch checkout",
+        "state": "pending_operator_execution"
+      },
+      {
+        "id": "M296",
+        "name": "Repair concrete failing specialized tests against runtime reports until passing",
+        "state": "pending_real_test_results"
+      },
+      {
+        "id": "M297",
+        "name": "Build and run real RGBDS GB/GBC compiled cartridges",
+        "state": "not_verified"
+      },
+      {
+        "id": "M298",
+        "name": "Build and run real NES ca65/ld65/FCEUX cartridge and original game soundtrack",
+        "state": "not_verified"
+      },
+      {
+        "id": "M299",
+        "name": "Qualify first install, audio, video, controller devices and complete playable game",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M300",
+        "name": "Demonstrate and sign off extended Jeeves/Builder/Dragon production endurance",
+        "state": "not_qualified"
+      }
+    ],
+    "code_owners": [
+      "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+      "skeleton/ai/game_builder/studio_specialized_e2e_runner.py",
+      "tests/test_studio_native_source_media_parity.py",
+      "tests/test_studio_specialized_e2e_runner.py",
+      "machine/e2e_suites.json"
+    ],
+    "evidence": {
+      "exact_assembly_labels_checked_without_substring_alias": true,
+      "registered_specialized_test_files": 18,
+      "runner_requires_explicit_operator_consent": true,
+      "tests_never_executed_automatically_by_commits": true,
+      "test_run_binds_source_and_registry_policy": true,
+      "test_result_saved_to_new_external_receipt_only": true,
+      "specialized_test_suite_actually_executed_in_this_session": false,
+      "existing_mainline_CI_success_not_a_full_gameplay_claim": true,
+      "first_real_native_ROM_victory_this_session": false,
+      "native_speaker_or_PPU_playback_this_session": false,
+      "installer_and_model_training_completed": false,
+      "studio_release_signed_off": false
+    }
+  },
+  "jeeves_longform_qualification_history_v2": {
+    "status": "segmented_source_implemented_pending_independent_test_execution_real_endurance_and_backup_review",
+    "tranche": "M281-M300",
+    "milestones": [
+      {
+        "id": "M281",
+        "name": "Identify actual 256-KB JSON receipt limit as long-production E2E history blocker",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M282",
+        "name": "Preserve legacy unsegmented journal parsing and campaign identity",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M283",
+        "name": "Seal each 64-run head into a dedicated immutable-sized run-history file",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M284",
+        "name": "Link every historical entry digest through the archival segment boundary",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M285",
+        "name": "Commit a canonical index with source identity, segment digest and terminal run digest",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M286",
+        "name": "Revalidate historical segment file hashes, receipts, sequence and chain on every read",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M287",
+        "name": "Prevent symlink archives, missing archive files and reordered segments",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M288",
+        "name": "Prevent in-place overwrite of conflicting preexisting sealed source evidence",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M289",
+        "name": "Recover safe interrupted rotation by recognizing matching orphan archive files",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M290",
+        "name": "Keep active journal bounded so frequent production runs never cause uncontrolled JSON growth",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M291",
+        "name": "Bound every sealed segment to original 256-KB reader contract before publication",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M292",
+        "name": "Preserve correct historic CPU divergence totals and incident-free run counts across rollovers",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M293",
+        "name": "Offer 512 sealed segments, or 32,768 canonical E2E run identities, per original campaign",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M294",
+        "name": "Integrate exact archival history into existing Jeeves operator inspect/read and append APIs",
+        "state": "implemented_source"
+      },
+      {
+        "id": "M295",
+        "name": "Add deterministic crash, migration, archive tamper and true studio 65th-run tests",
+        "state": "implemented_source_tests_unverified"
+      },
+      {
+        "id": "M296",
+        "name": "Execute large synthetic 32,768-run replay through the same archive reading budget",
+        "state": "not_verified"
+      },
+      {
+        "id": "M297",
+        "name": "Demonstrate actual year-long unattended original game studio production with checkpoint recovery",
+        "state": "not_verified"
+      },
+      {
+        "id": "M298",
+        "name": "Prove durable recovery across power failure, Windows installer reboot and filesystem corruption",
+        "state": "not_verified"
+      },
+      {
+        "id": "M299",
+        "name": "Independently attest archive backup/restore off-machine and retention governance",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M300",
+        "name": "Sign qualified multi-month production, real console playback and original model learning",
+        "state": "not_qualified"
+      }
+    ],
+    "owners": [
+      "skeleton/ai/game_builder/studio_history_segments.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "tests/test_studio_execution_history_segments.py",
+      "tests/test_studio_execution_history_e2e.py"
+    ],
+    "assumptions": {
+      "segment_entries": 64,
+      "max_segments": 512,
+      "maximum_archived_runs": 32768,
+      "regular_reader_max_bytes": 256000,
+      "legacy_history_accepted": true,
+      "crash_interruption_safe_on_seal_then_index_publishing": true,
+      "autonomous_background_schedule_added": false,
+      "full_year_endurance_run_performed": false,
+      "real_native_cartridge_e2e_verified": false,
+      "model_weights_updated": false,
+      "artifact_release_signed": false
+    },
+    "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_compiled_psg_audio_parity_extension": {
+    "status": "source_and_compiled_byte_validation_integrated_not_hardware_audio_qualified",
+    "tranche": "M281-M322",
+    "milestones": [
+      {
+        "id": "M281",
+        "name": "Define a bounded independent source-authored compiled PSG ROM attestation",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M282",
+        "name": "Require actual signed game world and art-theme consistency before audio inspection",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M283",
+        "name": "Regenerate the exact original theme/seed/density eight-note PSG score",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M284",
+        "name": "Reject guessed audio addresses; use actual compiled RGBLINK/ld65 label maps",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M285",
+        "name": "Require exact GB/CGB bank-zero eight-byte low-frequency note table",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M286",
+        "name": "Require exact GB/CGB bank-zero eight-byte high-frequency note table",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M287",
+        "name": "Require exact NES two-bank NROM-256 PRG original sound layout",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M288",
+        "name": "Prevent NES music table overlap with fixed interrupt-vector region",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M289",
+        "name": "Require exact linked low/high note-table adjacency and length",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M290",
+        "name": "Reject duplicate, missing or out-of-bank sound-table labels",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M291",
+        "name": "Compare real GB/CGB ROM note bytes against original source score",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M292",
+        "name": "Compare real NES PRG note bytes against original source score",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M293",
+        "name": "Export three actual 6502 sound cue label addresses via ld65",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M294",
+        "name": "Read actual GB/CGB SM83 sound cue linker addresses",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M295",
+        "name": "Verify compiled GB/CGB pickup, hazard and goal machine routines",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M296",
+        "name": "Verify compiled NES pickup, hazard and goal pulse-APU machine routines",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M297",
+        "name": "Reject bypassed sound-enable guards and disabled/mutated opcode sequences",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M298",
+        "name": "Require three compiled original cue handlers in fixed source layout",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M299",
+        "name": "Return bounded SHA receipts for compiled note tables and cue instructions",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M300",
+        "name": "Keep compiled-score qualification separate from real audio playback",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M301",
+        "name": "Reject and reclaim an unqualified GB/CGB cartridge with modified PSG music",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M302",
+        "name": "Reject and reclaim an unqualified NES cartridge with modified PSG music",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M303",
+        "name": "Reattest compiled audio bytes when opening a previously signed ROM receipt",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M304",
+        "name": "Bind compiled sound evidence digest into game campaign qualification record",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M305",
+        "name": "Aggregate actual compiled PSG proof into Jeeves and Dragon reports",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M306",
+        "name": "Add source-safe compiled audio mismatch category to Dragon triage",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M307",
+        "name": "Register specialized original-audio ROM fault-injection regression suite",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M308",
+        "name": "Update positive GB/CGB and NES compiled ROM fixtures to contain actual original music/effect code",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M309",
+        "name": "Execute compiled GB ROM in installed PyBoy and capture actual mixed output",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M310",
+        "name": "Execute compiled GBC ROM in installed color emulator and capture both pulse channels",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M311",
+        "name": "Execute native ca65/ld65 NROM-256 in FCEUX and measure 2A03 pulse output",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M312",
+        "name": "Independently quantify native PSG melody pitch error against source expected frequency",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M313",
+        "name": "Independently quantify native PSG sound cue pitch and envelope drift",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M314",
+        "name": "Validate game-event audio at real pickup/hazard/goal action boundaries",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M315",
+        "name": "Measure simultaneous audio/animation/gameplay timing under frame load",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M316",
+        "name": "Run real original multi-level cartridge through sound-enabled full controller trace",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M317",
+        "name": "Validate gamepad, speaker and audio hardware output on physical supported devices",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M318",
+        "name": "Complete real first-install studio creation-to-cartridge compilation on Windows",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M319",
+        "name": "Complete full RGBDS/ca65+PyBoy/FCEUX specialized regression suite and record passing receipts",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M320",
+        "name": "Perform independent authored game distribution and platform license signoff",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M321",
+        "name": "Run reboot/recovery and multi-month production endurance with current audio code",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M322",
+        "name": "Qualify full user-facing Jeeves/Builder/Dragon release with genuine end-to-end proof",
+        "state": "runtime_or_release_unqualified"
+      }
+    ],
+    "owners": [
+      "skeleton/ai/game_builder/studio_compiled_psg_parity.py",
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_production_blocker_taxonomy.py"
+    ],
+    "tests": [
+      "tests/test_studio_compiled_psg_parity.py",
+      "tests/test_studio_campaign_assurance_e2e.py",
+      "tests/test_studio_nes_campaign_e2e.py",
+      "tests/test_studio_production_blocker_taxonomy.py"
+    ],
+    "evidence_truth": {
+      "compiled_rom_music_and_cue_bytes_verified_by_source_code_path": true,
+      "registered_test_suites_are_not_claimed_passed": true,
+      "NES_PRG_banks_required": 2,
+      "notes_per_original_score": 8,
+      "gameplay_effect_handlers_per_console": 3,
+      "model_weights_trained": false,
+      "real_6502_or_SM83_machine_code_audio_executed_this_session": false,
+      "physical_speakers_or_emulator_waveforms_verified": false,
+      "real_hardware_audio_certified": false,
+      "original_model_or_emulator_release_certified": false
+    },
+    "focused_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
