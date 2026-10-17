@@ -106,7 +106,8 @@ class NativeBuildQualificationTests(unittest.TestCase):
                     self.assertTrue(hasattr(stdout, "write"))
                     self.assertEqual(stderr, subprocess.STDOUT)
                     self.assertFalse(check)
-                    self.assertIn(timeout, range(1, 121))
+                    self.assertGreater(timeout, 0)
+                    self.assertLessEqual(timeout, 120)
                     self.assertTrue(str(args[0]).startswith("/opt/"))
                     calls.append(args)
                     if args[0].endswith("ld65") or args[0].endswith("rgbfix"):
