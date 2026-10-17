@@ -15,6 +15,7 @@ from skeleton.ai.game_builder.studio_campaign import (
     _file_tree,
 )
 from skeleton.ai.game_builder.native_game_cli import build_game as real_build_game
+from skeleton.ai.game_builder.studio_campaign_assurance import inspect_production_assurance
 
 
 class OriginalStudioCampaignTests(unittest.TestCase):
@@ -61,6 +62,18 @@ class OriginalStudioCampaignTests(unittest.TestCase):
             self.assertTrue((root / "engines/godot/scripts/main.gd").is_file())
             self.assertIn(target, next_run["completed_targets"])
         self.assertEqual(inspect_campaign(self.order, self.output), next_run)
+        assurance = inspect_production_assurance(self.order, self.output)
+        self.assertEqual(
+            assurance["original_console_media_sources_independently_checked"], 2,
+        )
+        self.assertEqual(assurance["original_console_animation_frames_in_source"], 4)
+        self.assertEqual(assurance["native_roms_structurally_verified"], 0)
+        for item in assurance["targets"]:
+            self.assertEqual(
+                len(item["native_animation_audio_source_parity_digest"]), 64,
+            )
+            self.assertEqual(item["native_hero_frames_in_assembly"], 2)
+            self.assertFalse(item["native_audio_emulator_verified"])
 
     def test_rollback_failure_retry_and_unmodified_completed_target(self):
         calls = []
