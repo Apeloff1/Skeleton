@@ -48,13 +48,13 @@ def ines_rom(tiles: bytes, animation: bytes):
     assert len(tiles) == 96
     assert len(animation) == 48 and animation[:16] == tiles[80:96]
     char = tiles + animation[16:]
-    prg = bytearray(16384)
+    prg = bytearray(32768)
     song = console_psg_registers(
         compose_native_psg("forest", 733, 0), "nintendo_famicom",
     )
     prg[0x100:0x110] = bytes((*song["notes_low"], *song["notes_high"]))
     return (
-        b"NES\x1a" + bytes([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        b"NES\x1a" + bytes([2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         + bytes(prg) + char + bytes(8192 - len(char))
     )
 
@@ -166,7 +166,7 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
             (self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin").read_bytes(),
             (self.campaign / "targets/nintendo_famicom/assets/tiles/hero_animation.bin").read_bytes(),
         ))
-        start = 16 + 16384
+        start = 16 + 32768
         corrupted[start] ^= 0xFF
 
         def assembler(project, target, *, authorized, execute, output,
