@@ -38,6 +38,8 @@ from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
 from .port_planner import HomebrewSource
 from .studio_asset_pipeline import ArtDirection, render_studio_art, export_studio_art
+from .playable_compiler import compile_original_game
+from .dual_runtime_export import render_dual_runtime_package, export_dual_runtime_package
 from .rights_evidence import read_rights_evidence
 
 _NATIVE = {
@@ -98,6 +100,16 @@ def build_game(
         if studio_art is not None else None
     )
     tile_art = art_pack.runtime_tiles if art_pack is not None else None
+    engine_package = None
+    if art_pack is not None:
+        # Existing canonical browser/Godot source owners, not a substitute
+        # handcrafted JavaScript or a fabricated console emulator.
+        playable = compile_original_game(intent, authorized=True)
+        if playable.world.digest != world.digest or playable.proof.digest != proof.digest:
+            raise ValueError("native and engine game worlds or playthrough proofs diverged")
+        engine_package = render_dual_runtime_package(playable, authorized=True)
+        if engine_package.manifest["world_digest"] != world.digest:
+            raise ValueError("engine source manifests do not match native source")
     kind = _NATIVE[target]
     if kind == "gb_rgbds":
         project = compile_native_game_boy(world, source, authorized=True, tile_art=tile_art)
@@ -169,6 +181,23 @@ def build_game(
         folder = export_native_desktop_source(project, output, authorized=True)
         artifact_type = "native_desktop_sdl2_c11_source"
         digest = project.content_digest
+    engine_receipt = None
+    if engine_package is not None:
+        engine_path = export_dual_runtime_package(
+            engine_package, folder / "engines", authorized=True,
+        )
+        engine_receipt = {
+            "path": str(engine_path),
+            "manifest_digest": engine_package.manifest["manifest_digest"],
+            "world_digest": world.digest,
+            "browser_source_rendered": "index.html" in engine_package.files,
+            "godot4_source_rendered": "godot/scripts/main.gd" in engine_package.files,
+            "interactive_tile_editor_source": "tile-editor.html" in engine_package.files,
+            "actual_winning_python_replay": True,
+            "godot_binary_executed": False,
+            "hardware_qualified": False,
+            "runtime_uses_custom_asset_tiles": False,
+        }
     art_receipt = (
         export_studio_art(art_pack, folder, authorized=True)
         if art_pack is not None else None
@@ -192,6 +221,7 @@ def build_game(
         "physical_hardware_verified": False,
         "distribution_licensed": False,
         "studio_assets": art_receipt,
+        "engine_sources": engine_receipt,
         "native_art_embedded": bool(
             art_receipt and art_receipt["runtime_art_source_embedded"]
         ),
