@@ -572,6 +572,88 @@ class DualRuntimePackage:
                 raise DualRuntimeExportError("package file integrity mismatch")
 
 
+def _godot_with_studio_art(script: str) -> str:
+    """Enable real generated 8x8 tile rendering atop existing Godot game logic."""
+    insertions = (
+        (
+            "var ready_to_play: bool = false",
+            "var ready_to_play: bool = false\nvar studio_tiles: Array = []\nvar studio_palette: Array = []",
+        ),
+        (
+            "    ready_to_play = true\n    _reset()",
+            "    ready_to_play = true\n    _load_studio_art()\n    _reset()",
+        ),
+        (
+            "    var player_rect := Rect2(start + Vector2(hero) * tile_size, Vector2.ONE * tile_size)",
+            """    if not studio_tiles.is_empty():
+        for tile_y in range(height):
+            for tile_x in range(width):
+                var ch: String = str(rows[tile_y]).substr(tile_x, 1)
+                var tile_index: int = 0
+                match ch:
+                    "#": tile_index = 1
+                    "C": tile_index = 2
+                    "H": tile_index = 3
+                    "G": tile_index = 4
+                if ch == "C" and collected.has(str(tile_x) + "," + str(tile_y)):
+                    tile_index = 0
+                var art_rect := Rect2(
+                    start + Vector2(tile_x, tile_y) * tile_size,
+                    Vector2.ONE * tile_size
+                )
+                _draw_studio_tile(tile_index, art_rect)
+    var player_rect := Rect2(start + Vector2(hero) * tile_size, Vector2.ONE * tile_size)""",
+        ),
+        (
+            '    draw_circle(player_rect.get_center(), tile_size * 0.32, Color("#f2f8fe"))',
+            '    draw_circle(player_rect.get_center(), tile_size * 0.32, Color("#f2f8fe"))\n    if not studio_tiles.is_empty():\n        _draw_studio_tile(5, player_rect)',
+        ),
+        (
+            "func _text(at: Vector2, message: String, font_size: int, ink: Color) -> void:",
+            """func _load_studio_art() -> void:
+    var source: String = FileAccess.get_file_as_string("res://studio_art.json")
+    if source.is_empty() or source.length() > 16000:
+        push_error("Original sprite asset document unavailable or oversized")
+        ready_to_play = false
+        return
+    var decoded: Variant = JSON.parse_string(source)
+    if typeof(decoded) != TYPE_DICTIONARY or str(decoded.get("schema", "")) != "skeleton.game_builder.original_studio_art.v1":
+        push_error("Original sprite format is not trusted")
+        ready_to_play = false
+        return
+    studio_tiles = decoded["tiles"]
+    studio_palette = decoded["palette"]
+    if studio_tiles.size() != 6 or studio_palette.size() != 4:
+        push_error("Original sprite tile/palette count differs")
+        studio_tiles.clear()
+        ready_to_play = false
+        return
+
+func _draw_studio_tile(tile_index: int, rect: Rect2) -> void:
+    if studio_tiles.is_empty() or tile_index < 0 or tile_index >= studio_tiles.size():
+        return
+    var pixels: Array = studio_tiles[tile_index]
+    if pixels.size() != 64:
+        return
+    var unit: Vector2 = rect.size / 8.0
+    for y in range(8):
+        for x in range(8):
+            var shade: int = int(pixels[y * 8 + x])
+            if shade < 0 or shade >= studio_palette.size():
+                return
+            draw_rect(Rect2(rect.position + Vector2(x, y) * unit, unit + Vector2.ONE * 0.01),
+                Color(str(studio_palette[shade])), true)
+
+func _text(at: Vector2, message: String, font_size: int, ink: Color) -> void:""",
+        ),
+    )
+    for before, after in insertions:
+        if script.count(before) != 1:
+            raise DualRuntimeExportError("Godot sprite renderer source insertion contract changed")
+        script = script.replace(before, after)
+    return script
+
+
 def _json_bytes(value: object) -> bytes:
     return (json.dumps(value, ensure_ascii=True, allow_nan=False,
                        sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
@@ -579,6 +661,7 @@ def _json_bytes(value: object) -> bytes:
 
 def render_dual_runtime_package(
     project: CompiledPlayableProject, *, authorized: bool,
+    studio_art: object = None,
 ) -> DualRuntimePackage:
     """Render original browser and Godot 4 sources from one proved world."""
     if not authorized:
@@ -614,6 +697,24 @@ def render_dual_runtime_package(
         "replay_digest": project.proof.digest,
         "final_state": project.proof.final_state.to_payload(),
     }
+    gd_script = _GODOT_SCRIPT
+    rendered_art: dict | None = None
+    if studio_art is not None:
+        from .studio_asset_pipeline import StudioArtPack
+        if not isinstance(studio_art, StudioArtPack) or studio_art.world_digest != world.digest:
+            raise DualRuntimeExportError("same-world original sprite pack required")
+        studio_art.verify()
+        if studio_art.digest not in project.playable.html:
+            raise DualRuntimeExportError("browser game does not contain matching original studio art")
+        descriptors = json.loads(dict(studio_art.files)["metadata/descriptors.json"])
+        rendered_art = {
+            "schema": "skeleton.game_builder.original_studio_art.v1",
+            "pack_digest": studio_art.digest,
+            "world_digest": world.digest,
+            "tiles": [list(tile) for tile in studio_art.runtime_tiles],
+            "palette": ["#" + item[:6] for item in descriptors["palette"]],
+        }
+        gd_script = _godot_with_studio_art(_GODOT_SCRIPT)
     editor = render_tile_editor(world, authorized=True)
     files = {
         "index.html": project.playable.html.encode("utf-8"),
@@ -621,12 +722,14 @@ def render_dual_runtime_package(
         "godot/project.godot": _PROJECT.encode("utf-8"),
         "godot/export_presets.cfg": _EXPORT_PRESETS.encode("utf-8"),
         "godot/scenes/main.tscn": _SCENE.encode("utf-8"),
-        "godot/scripts/main.gd": _GODOT_SCRIPT.encode("utf-8"),
+        "godot/scripts/main.gd": gd_script.encode("utf-8"),
         "godot/world.json": _json_bytes(native_world),
         "godot/proof.json": _json_bytes(proof),
         "README.md": README.encode("utf-8"),
         "proof/verified_solution.json": _json_bytes(proof),
     }
+    if rendered_art is not None:
+        files["godot/studio_art.json"] = _json_bytes(rendered_art)
     if sum(map(len, files.values())) > 2_000_000:
         raise DualRuntimeExportError("source package exceeds 2 MB budget")
     manifest_body: dict[str, object] = {
@@ -649,6 +752,11 @@ def render_dual_runtime_package(
         ),
         "files": {path: sha256(data).hexdigest() for path, data in sorted(files.items())},
     }
+    if rendered_art is not None:
+        manifest_body["studio_art_pack_digest"] = studio_art.digest
+        manifest_body["playable_sprite_pixels_embedded"] = True
+        manifest_body["godot_native_sprite_pixels_embedded"] = True
+        manifest_body["godot_binary_executed"] = False
     manifest = {**manifest_body, "manifest_digest": canonical_digest(manifest_body)}
     files["release.json"] = _json_bytes(manifest)
     return DualRuntimePackage(files, manifest)
