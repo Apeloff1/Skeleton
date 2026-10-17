@@ -17,6 +17,10 @@ from __future__ import annotations
 
 import argparse
 import json
+from hashlib import sha256
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 from .desktop_native_export import compile_native_desktop, export_native_desktop_source
@@ -37,6 +41,10 @@ from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
 from .port_planner import HomebrewSource
+from .studio_asset_pipeline import ArtDirection, render_studio_art, export_studio_art, _palette
+from .studio_sprite_authoring import ArtistSpriteAtlas, import_artist_sprite_png
+from .playable_compiler import compile_original_game
+from .dual_runtime_export import render_dual_runtime_package, export_dual_runtime_package
 from .rights_evidence import read_rights_evidence
 
 _NATIVE = {
@@ -64,6 +72,9 @@ def build_game(
     width: int, height: int, levels: int, collectibles: int,
     hazards: int, health: int, rights_evidence: str | Path,
     creative_identity: tuple[str, ...], output: str | Path, authorized: bool,
+    studio_art: ArtDirection | None = None,
+    theme: str = "forest",
+    artist_atlas: ArtistSpriteAtlas | None = None,
 ) -> dict[str, object]:
     """Create native-source projects from a deterministic game, never HTML."""
     if type(authorized) is not bool or not authorized:
@@ -82,82 +93,227 @@ def build_game(
         seed=seed, width=width, height=height, levels=levels,
         collectibles_per_level=collectibles, hazards_per_level=hazards,
         starting_health=health,
+        theme=theme,
     )
     world = generate_playable_world(intent, authorized=True)
     proof = demonstrate_solvable(world, authorized=True)
     if proof.world_digest != world.digest or proof.final_state.status != "won":
         raise ValueError("world generator did not prove the original game playable")
-    kind = _NATIVE[target]
-    if kind == "gb_rgbds":
-        project = compile_native_game_boy(world, source, authorized=True)
-        folder = export_native_game_boy(project, output, authorized=True)
-        artifact_type = "native_game_boy_rgbds_6502free_rom_source"
-        digest = project.content_digest
-    elif kind == "cgb_rgbds":
-        project = compile_native_game_boy_color(world, source, authorized=True)
-        folder = export_native_game_boy_color(project, output, authorized=True)
-        artifact_type = "native_cgb_rgb555_rgbds_rom_source"
-        digest = project.content_digest
-    elif kind == "nes_ca65":
-        project = compile_native_nes(world, source, authorized=True)
-        folder = export_native_nes(project, output, authorized=True)
-        artifact_type = "native_nes_6502_ca65_nrom_source"
-        digest = project.content_digest
-    elif kind == "c64_cc65":
-        project = compile_native_c64(world, source, authorized=True)
-        folder = export_native_c64(project, output, authorized=True)
-        artifact_type = "native_c64_6510_vic_ii_sid_cc65_prg_source"
-        digest = project.content_digest
-    elif kind == "dos_nasm_8086":
-        project = compile_native_dos(world, source, authorized=True)
-        folder = export_native_dos(project, output, authorized=True)
-        artifact_type = "native_dos_8086_pc_textmode_com_source"
-        digest = project.content_digest
-    elif kind == "atari8_cc65":
-        project = compile_native_atari8(world, source, authorized=True)
-        folder = export_native_atari8(project, output, authorized=True)
-        artifact_type = "native_atari8_6502_antic_gtia_pokey_xex_source"
-        digest = project.content_digest
-    elif kind == "apple2_cc65":
-        project = compile_native_apple2(world, source, authorized=True)
-        folder = export_native_apple2(project, output, authorized=True)
-        artifact_type = "native_apple2_cc65_applesingle_source"
-        digest = project.content_digest
-    elif kind == "spectrum_z80asm":
-        project = compile_native_spectrum(world, source, authorized=True)
-        folder = export_native_spectrum(project, output, authorized=True)
-        artifact_type = "native_spectrum_48k_z80_tap_source"
-        digest = project.content_digest
-    elif kind in ("sms_sdcc_z80", "gg_sdcc_z80"):
-        project = compile_native_sega_8bit(world, source, target, authorized=True)
-        folder = export_native_sega_8bit(project, output, authorized=True)
-        artifact_type = "native_sega_8bit_sdcc_vdp_original_game_source"
-        digest = project.content_digest
-    elif kind == "msx1_z80asm":
-        project = compile_native_msx1(world, source, authorized=True)
-        folder = export_native_msx1(project, output, authorized=True)
-        artifact_type = "native_msx1_z80_16kb_bios_rom_source"
-        digest = project.content_digest
-    elif kind == "coleco_z80asm":
-        project = compile_native_coleco(world, source, authorized=True)
-        folder = export_native_coleco(project, output, authorized=True)
-        artifact_type = "native_colecovision_32kb_z80_tms9918_source"
-        digest = project.content_digest
-    elif kind == "vectrex_lwasm":
-        project = compile_native_vectrex(world, source, authorized=True)
-        folder = export_native_vectrex(project, output, authorized=True)
-        artifact_type = "native_vectrex_mc6809_vector_cartridge_source"
-        digest = project.content_digest
-    elif kind == "sms_z80asm":
-        project = compile_native_sms(world, source, authorized=True)
-        folder = export_native_sms(project, output, authorized=True)
-        artifact_type = "native_sms_z80_mode4_32kb_cartridge_source"
-        digest = project.content_digest
-    else:
-        project = compile_native_desktop(world, source, target, authorized=True)
-        folder = export_native_desktop_source(project, output, authorized=True)
-        artifact_type = "native_desktop_sdl2_c11_source"
-        digest = project.content_digest
+    if studio_art is not None and not isinstance(studio_art, ArtDirection):
+        raise TypeError("studio art direction must be typed")
+    if artist_atlas is not None and studio_art is None:
+        raise ValueError("artist sprite source requires real studio asset generation")
+    # Preflight and actually render assets BEFORE the source exporter creates
+    # its destination. Invalid art cannot leave a half-created source project.
+    art_pack = (
+        render_studio_art(world, target=target, direction=studio_art,
+                          authorized=True, artist_atlas=artist_atlas)
+        if studio_art is not None else None
+    )
+    tile_art = art_pack.runtime_tiles if art_pack is not None else None
+    hero_frames = None
+    animation_delay = 12
+    if art_pack is not None and target in (
+        "nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
+    ):
+        from skeleton.jeeves.game_console_assets import decode_tiles
+        hero_frames = decode_tiles(
+            dict(art_pack.files)["tiles/hero_animation.bin"],
+            art_pack.codec,
+        )
+        if (not 1 <= len(hero_frames) <= 4
+                or hero_frames[0] != art_pack.runtime_tiles[5]):
+            raise ValueError("native hero frames differ from original authored sprite")
+        animation_delay = max(2, min(60, round(60 / art_pack.direction.animation_fps)))
+    psg_score = None
+    if (art_pack is not None
+            and target in ("nintendo_game_boy", "nintendo_game_boy_color",
+                           "nintendo_famicom")):
+        from .studio_native_psg import compose_native_psg
+        psg_score = compose_native_psg(
+            world.intent.theme, art_pack.direction.seed,
+            art_pack.direction.music_density,
+        )
+    engine_package = None
+    if art_pack is not None:
+        # Existing canonical browser/Godot source owners, not a substitute
+        # handcrafted JavaScript or a fabricated console emulator.
+        playable = compile_original_game(intent, authorized=True)
+        if playable.world.digest != world.digest or playable.proof.digest != proof.digest:
+            raise ValueError("native and engine game worlds or playthrough proofs diverged")
+        # Preserve canonical winning gameplay while rerendering the same world
+        # with the precise original pixels used by console ROM source emitters.
+        from dataclasses import replace
+        from .playable_export import render_playable_world
+        playable = replace(playable, playable=render_playable_world(
+            world, studio_art=art_pack, authorized=True,
+        ))
+        engine_package = render_dual_runtime_package(
+            playable, authorized=True, studio_art=art_pack,
+        )
+        if engine_package.manifest["world_digest"] != world.digest:
+            raise ValueError("engine source manifests do not match native source")
+    destination = Path(output)
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError("native source output must not already exist")
+    if not destination.parent.is_dir() or destination.parent.is_symlink():
+        raise ValueError("native source destination parent must be a real directory")
+    staging_parent = Path(tempfile.mkdtemp(
+        prefix=".jeeves-native-studio-", dir=str(destination.parent),
+    ))
+    try:
+        output = staging_parent / "payload"
+        kind = _NATIVE[target]
+        if kind == "gb_rgbds":
+            project = compile_native_game_boy(
+                world, source, authorized=True, tile_art=tile_art,
+                hero_frames=hero_frames, animation_delay=animation_delay,
+                psg_score=psg_score,
+            )
+            folder = export_native_game_boy(project, output, authorized=True)
+            artifact_type = "native_game_boy_rgbds_6502free_rom_source"
+            digest = project.content_digest
+        elif kind == "cgb_rgbds":
+            project = compile_native_game_boy_color(
+                world, source, authorized=True, tile_art=tile_art,
+                hero_frames=hero_frames, animation_delay=animation_delay,
+                psg_score=psg_score,
+            )
+            folder = export_native_game_boy_color(project, output, authorized=True)
+            artifact_type = "native_cgb_rgb555_rgbds_rom_source"
+            digest = project.content_digest
+        elif kind == "nes_ca65":
+            project = compile_native_nes(
+                world, source, authorized=True, tile_art=tile_art,
+                hero_frames=hero_frames, animation_delay=animation_delay,
+                psg_score=psg_score,
+            )
+            folder = export_native_nes(project, output, authorized=True)
+            artifact_type = "native_nes_6502_ca65_nrom_source"
+            digest = project.content_digest
+        elif kind == "c64_cc65":
+            project = compile_native_c64(world, source, authorized=True)
+            folder = export_native_c64(project, output, authorized=True)
+            artifact_type = "native_c64_6510_vic_ii_sid_cc65_prg_source"
+            digest = project.content_digest
+        elif kind == "dos_nasm_8086":
+            project = compile_native_dos(world, source, authorized=True)
+            folder = export_native_dos(project, output, authorized=True)
+            artifact_type = "native_dos_8086_pc_textmode_com_source"
+            digest = project.content_digest
+        elif kind == "atari8_cc65":
+            project = compile_native_atari8(world, source, authorized=True)
+            folder = export_native_atari8(project, output, authorized=True)
+            artifact_type = "native_atari8_6502_antic_gtia_pokey_xex_source"
+            digest = project.content_digest
+        elif kind == "apple2_cc65":
+            project = compile_native_apple2(world, source, authorized=True)
+            folder = export_native_apple2(project, output, authorized=True)
+            artifact_type = "native_apple2_cc65_applesingle_source"
+            digest = project.content_digest
+        elif kind == "spectrum_z80asm":
+            project = compile_native_spectrum(world, source, authorized=True)
+            folder = export_native_spectrum(project, output, authorized=True)
+            artifact_type = "native_spectrum_48k_z80_tap_source"
+            digest = project.content_digest
+        elif kind in ("sms_sdcc_z80", "gg_sdcc_z80"):
+            project = compile_native_sega_8bit(world, source, target, authorized=True, tile_art=tile_art)
+            folder = export_native_sega_8bit(project, output, authorized=True)
+            artifact_type = "native_sega_8bit_sdcc_vdp_original_game_source"
+            digest = project.content_digest
+        elif kind == "msx1_z80asm":
+            project = compile_native_msx1(world, source, authorized=True)
+            folder = export_native_msx1(project, output, authorized=True)
+            artifact_type = "native_msx1_z80_16kb_bios_rom_source"
+            digest = project.content_digest
+        elif kind == "coleco_z80asm":
+            project = compile_native_coleco(world, source, authorized=True)
+            folder = export_native_coleco(project, output, authorized=True)
+            artifact_type = "native_colecovision_32kb_z80_tms9918_source"
+            digest = project.content_digest
+        elif kind == "vectrex_lwasm":
+            project = compile_native_vectrex(world, source, authorized=True)
+            folder = export_native_vectrex(project, output, authorized=True)
+            artifact_type = "native_vectrex_mc6809_vector_cartridge_source"
+            digest = project.content_digest
+        elif kind == "sms_z80asm":
+            project = compile_native_sms(world, source, authorized=True, tile_art=tile_art)
+            folder = export_native_sms(project, output, authorized=True)
+            artifact_type = "native_sms_z80_mode4_32kb_cartridge_source"
+            digest = project.content_digest
+        else:
+            project = compile_native_desktop(world, source, target, authorized=True)
+            folder = export_native_desktop_source(project, output, authorized=True)
+            artifact_type = "native_desktop_sdl2_c11_source"
+            digest = project.content_digest
+        engine_receipt = None
+        if engine_package is not None:
+            engine_path = export_dual_runtime_package(
+                engine_package, folder / "engines", authorized=True,
+            )
+            engine_receipt = {
+                "path": str(engine_path),
+                "manifest_digest": engine_package.manifest["manifest_digest"],
+                "world_digest": world.digest,
+                "browser_source_rendered": "index.html" in engine_package.files,
+                "godot4_source_rendered": "godot/scripts/main.gd" in engine_package.files,
+                "interactive_tile_editor_source": "tile-editor.html" in engine_package.files,
+                "actual_winning_python_replay": True,
+                "godot_binary_executed": False,
+                "hardware_qualified": False,
+                "runtime_uses_custom_asset_tiles": True,
+                "actual_browser_sprite_rasterizer_embedded": True,
+                "godot_source_sprite_rasterizer_embedded": True,
+                "godot_sprite_renderer_executed": False,
+            }
+        art_receipt = (
+            export_studio_art(art_pack, folder, authorized=True)
+            if art_pack is not None else None
+        )
+        # Source attestation binds exact bytes, world identity, source manifest
+        # and art to the local build qualifier. This is NOT a license or code
+        # safety certification; it is a reproducibility/integrity receipt.
+        source_inputs = {}
+        for original_name in ("main.asm", "main.s", "nes.cfg", "game.asm",
+                              "game.c", "Makefile", "manifest.json"):
+            item = folder / original_name
+            if item.is_file() and not item.is_symlink():
+                source_inputs[original_name] = sha256(item.read_bytes()).hexdigest()
+        attestation_body = {
+            "schema": "skeleton.game_builder.source_attestation.v1",
+            "target": target, "project_id": source.project_id,
+            "world_digest": world.digest, "reference_replay_digest": proof.digest,
+            "input_files": dict(sorted(source_inputs.items())),
+            "source_content_digest": digest,
+            "studio_art_pack_digest": art_pack.digest if art_pack is not None else None,
+            "rights_independently_verified": False,
+            "binary_compiled": False,
+        }
+        from .contracts import canonical_digest
+        attestation = {**attestation_body,
+                       "attestation_digest": canonical_digest(attestation_body)}
+        with (folder / "source_attestation.json").open("xb") as attestation_file:
+            attestation_file.write(
+                (json.dumps(attestation, sort_keys=True, indent=2) + "\n").encode("utf-8")
+            )
+        # Publish one complete game with source, engine and media receipts.
+        # A partial source or failed render never becomes the destination.
+        if destination.exists() or destination.is_symlink():
+            raise FileExistsError("native source destination changed before publication")
+        os.rename(folder, destination)
+        if os.name == "posix":
+            descriptor = os.open(destination.parent, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        if engine_receipt is not None:
+            engine_receipt["path"] = str(destination / "engines")
+        if art_receipt is not None:
+            art_receipt["assets_directory"] = str(destination / "assets")
+        folder = destination
+    finally:
+        shutil.rmtree(staging_parent, ignore_errors=True)
     return {
         "schema": "skeleton.game_builder.native_creation_receipt.v1",
         "project_id": source.project_id,
@@ -176,6 +332,27 @@ def build_game(
         "emulator_verified": False,
         "physical_hardware_verified": False,
         "distribution_licensed": False,
+        "studio_assets": art_receipt,
+        "engine_sources": engine_receipt,
+        "native_art_embedded": bool(
+            art_receipt and art_receipt["runtime_art_source_embedded"]
+        ),
+        "native_hero_animation_frames_in_source": (
+            len(hero_frames) if hero_frames is not None else 0
+        ),
+        "native_hero_animation_frame_delay": (
+            animation_delay if hero_frames is not None else None
+        ),
+        "native_hero_animation_source_integrated": (
+            hero_frames is not None and len(hero_frames) > 1
+        ),
+        "native_hero_animation_runtime_executed": False,
+        "native_psg_score_digest": psg_score.digest if psg_score else None,
+        "native_psg_music_and_cues_source_integrated": bool(
+            psg_score and psg_score.density > 0
+        ),
+        "native_psg_audio_emulator_verified": False,
+        "native_psg_pcm_wav_equivalence_claimed": False,
     }
 
 
@@ -186,6 +363,9 @@ def main() -> None:
     parser.add_argument("--project-id", required=True)
     parser.add_argument("--title", required=True)
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--theme",
+                        choices=("forest", "space", "desert", "ocean", "arcade"),
+                        default="forest")
     parser.add_argument("--width", type=int, default=17)
     parser.add_argument("--height", type=int, default=15)
     parser.add_argument("--levels", type=int, default=3)
@@ -196,7 +376,56 @@ def main() -> None:
     parser.add_argument("--identity", required=True, action="append")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--authorize-original-homebrew", action="store_true")
+    parser.add_argument("--studio-artist-png", type=Path,
+                        help="Existing original 48x8 PNG atlas to convert into real native tile pixels")
+    parser.add_argument("--studio-artist-png-sha256",
+                        help="Exact original PNG SHA-256; required with --studio-artist-png")
+    parser.add_argument("--studio-artist-quantization",
+                        choices=("exact", "nearest", "ordered4"), default="nearest")
+    parser.add_argument("--studio-assets", action="store_true",
+                        help="Generate actual sprites, encoded native tiles and PNG previews")
+    parser.add_argument("--studio-style",
+                        choices=("etched", "luminous", "organic", "arcade"),
+                        default="luminous")
+    parser.add_argument("--studio-contrast", choices=("classic", "high"),
+                        default="classic")
+    parser.add_argument("--studio-animation-frames", type=int, default=3)
+    parser.add_argument("--studio-no-outline", action="store_true")
+    parser.add_argument("--studio-no-highlight", action="store_true")
+    parser.add_argument("--studio-foliage", type=int, choices=range(5), default=2)
+    parser.add_argument("--studio-shadow", type=int, choices=range(4), default=1)
+    parser.add_argument("--studio-parallax-layers", type=int, choices=range(4), default=1)
+    parser.add_argument("--studio-music-density", type=int, choices=range(5), default=2)
+    parser.add_argument("--studio-animation-fps", type=int, choices=range(1, 25), default=4)
     args = parser.parse_args()
+    studio_art = (
+        ArtDirection(
+            style=args.studio_style, contrast=args.studio_contrast,
+            animation_frames=args.studio_animation_frames, seed=args.seed,
+            outline=not args.studio_no_outline,
+            highlight=not args.studio_no_highlight,
+            foliage_density=args.studio_foliage,
+            shadow_strength=args.studio_shadow,
+            parallax_layers=args.studio_parallax_layers,
+            music_density=args.studio_music_density,
+            animation_fps=args.studio_animation_fps,
+        ) if args.studio_assets else None
+    )
+    artist_atlas = None
+    if args.studio_artist_png is not None:
+        if studio_art is None or not args.studio_artist_png_sha256:
+            parser.error("--studio-artist-png requires --studio-assets and an exact PNG SHA-256")
+        source = args.studio_artist_png
+        if source.is_symlink() or not source.is_file() or source.stat().st_size > 1024 * 1024:
+            parser.error("artist image must be an existing bounded regular PNG")
+        artist_atlas = import_artist_sprite_png(
+            source.read_bytes(), expected_sha256=args.studio_artist_png_sha256,
+            palette=_palette(args.theme, studio_art.contrast),
+            quantization=args.studio_artist_quantization,
+            authorized=args.authorize_original_homebrew,
+        )
+    elif args.studio_artist_png_sha256:
+        parser.error("an artist PNG hash without an input PNG is not an art source")
     result = build_game(
         target=args.target, basis=args.basis, project_id=args.project_id,
         title=args.title, seed=args.seed, width=args.width, height=args.height,
@@ -205,6 +434,9 @@ def main() -> None:
         rights_evidence=args.rights_evidence,
         creative_identity=tuple(args.identity), output=args.output,
         authorized=args.authorize_original_homebrew,
+        theme=args.theme,
+        studio_art=studio_art,
+        artist_atlas=artist_atlas,
     )
     print(json.dumps(result, sort_keys=True))
 

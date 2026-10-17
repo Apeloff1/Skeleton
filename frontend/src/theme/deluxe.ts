@@ -1,7 +1,9 @@
 /** Deluxe role adapters — values originate in frontend/theme/tokens.ts.
  * Kept as named aliases so older Galaxy Studio components remain import-safe.
  */
-import design, { spacing, radii, typography, elevation, palette } from '../../theme/tokens';
+import design from '../../theme/tokens';
+
+const { spacing, radii, typography, elevation, palette } = design;
 
 export const C = {
   get bg() { return design.colors.bg; },

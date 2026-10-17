@@ -187,6 +187,236 @@
         "-vv",
         "backend/tests/test_iteration_79_galaxy_studio_full_e2e.py"
       ]
+    },
+    {
+      "id": "jeeves-dragon-game-observation",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 540,
+      "required_files": [
+        "tests/test_jeeves_game_e2e_observation.py",
+        "skeleton/ai/game_builder/studio_e2e_observation.py",
+        "skeleton/ai/game_builder/studio_execution_plane.py",
+        "backend/routes/game_studio_agent.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_jeeves_game_e2e_observation.py"
+      ]
+    },
+    {
+      "id": "jeeves-native-studio-art",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "tests/test_jeeves_native_studio_art_e2e.py",
+        "tests/test_jeeves_console_source_stage_e2e.py",
+        "skeleton/ai/game_builder/studio_asset_pipeline.py",
+        "skeleton/ai/game_builder/native_game_cli.py",
+        "skeleton/ai/game_builder/game_project_workspace.py",
+        "skeleton/ai/game_builder/jeeves_app_runtime.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_jeeves_native_studio_art_e2e.py",
+        "tests/test_jeeves_console_source_stage_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-production-campaign-assurance",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_campaign.py",
+        "skeleton/ai/game_builder/studio_campaign_lock.py",
+        "skeleton/ai/game_builder/studio_build_qualification.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance_cli.py",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-original-artist-sprite-production",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_sprite_authoring.py",
+        "skeleton/ai/game_builder/studio_asset_pipeline.py",
+        "skeleton/ai/game_builder/native_game_cli.py",
+        "skeleton/ai/game_builder/jeeves_app_runtime.py",
+        "tests/test_studio_artist_sprite_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_artist_sprite_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-cross-engine-executable-gameplay",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 1200,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_browser_probe.js",
+        "skeleton/ai/game_builder/studio_runtime_qualification.py",
+        "skeleton/ai/game_builder/studio_godot_qualification.py",
+        "skeleton/ai/game_builder/studio_pixel_parity.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "tests/test_studio_browser_runtime_e2e.py",
+        "tests/test_studio_godot_runtime_e2e.py",
+        "tests/test_studio_pixel_parity_e2e.py",
+        "skeleton/ai/game_builder/studio_dragon_canvas_capture.py",
+        "tests/test_studio_dragon_canvas_capture.py",
+        "tests/test_studio_playable_media_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_browser_runtime_e2e.py",
+        "tests/test_studio_godot_runtime_e2e.py",
+        "tests/test_studio_pixel_parity_e2e.py",
+        "tests/test_studio_dragon_canvas_capture.py",
+        "tests/test_studio_playable_media_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-dragon-reviewed-knowledge-gates",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_dragon_learning_bridge.py",
+        "skeleton/ai/game_builder/studio_dragon_lessons_cli.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "skeleton/ai/game_builder/studio_campaign_lock.py",
+        "tests/test_studio_dragon_learning_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_dragon_learning_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-native-cartridge-emulator-full-e2e",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 1200,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_build_qualification.py",
+        "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "skeleton/ai/game_builder/studio_execution_campaign.py",
+        "skeleton/ai/game_builder/studio_execution_campaign_cli.py",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_game_boy_emulator_e2e.py",
+        "tests/test_studio_execution_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py",
+        "skeleton/ai/game_builder/studio_nes_emulator.py",
+        "tests/test_studio_nes_emulator_e2e.py",
+        "tests/test_studio_nes_campaign_e2e.py",
+        "skeleton/ai/game_builder/studio_nes_chr_parity.py",
+        "skeleton/ai/game_builder/studio_execution_history.py",
+        "tests/test_studio_execution_history_e2e.py",
+        "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
+        "tests/test_studio_native_replay_telemetry.py",
+        "tests/test_studio_native_score_parity.py",
+        "tests/test_studio_native_python_reference_e2e.py",
+        "skeleton/ai/game_builder/studio_native_correction_triage.py",
+        "tests/test_studio_native_correction_triage.py",
+        "skeleton/ai/game_builder/studio_game_boy_rom_art_parity.py",
+        "tests/test_studio_game_boy_rom_art_parity.py",
+        "skeleton/ai/game_builder/studio_production_blocker_taxonomy.py",
+        "tests/test_studio_production_blocker_taxonomy.py",
+        "tests/test_studio_native_console_animation_e2e.py",
+        "skeleton/ai/game_builder/game_boy_native_export.py",
+        "skeleton/ai/game_builder/nes_native_export.py",
+        "skeleton/ai/game_builder/studio_native_psg.py",
+        "tests/test_studio_native_psg.py",
+        "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+        "tests/test_studio_native_source_media_parity.py",
+        "tests/test_studio_campaign_e2e.py",
+        "skeleton/ai/game_builder/studio_specialized_e2e_runner.py",
+        "tests/test_studio_specialized_e2e_runner.py",
+        "skeleton/ai/game_builder/studio_history_segments.py",
+        "tests/test_studio_execution_history_segments.py",
+        "skeleton/ai/game_builder/studio_compiled_psg_parity.py",
+        "tests/test_studio_compiled_psg_parity.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_game_boy_emulator_e2e.py",
+        "tests/test_studio_execution_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py",
+        "tests/test_studio_nes_emulator_e2e.py",
+        "tests/test_studio_nes_campaign_e2e.py",
+        "tests/test_studio_execution_history_e2e.py",
+        "tests/test_studio_native_replay_telemetry.py",
+        "tests/test_studio_native_score_parity.py",
+        "tests/test_studio_native_python_reference_e2e.py",
+        "tests/test_studio_native_correction_triage.py",
+        "tests/test_studio_game_boy_rom_art_parity.py",
+        "tests/test_studio_production_blocker_taxonomy.py",
+        "tests/test_studio_native_console_animation_e2e.py",
+        "tests/test_studio_native_psg.py",
+        "tests/test_studio_native_source_media_parity.py",
+        "tests/test_studio_campaign_e2e.py",
+        "tests/test_studio_specialized_e2e_runner.py",
+        "tests/test_studio_execution_history_segments.py",
+        "tests/test_studio_compiled_psg_parity.py"
+      ]
     }
   ]
 }

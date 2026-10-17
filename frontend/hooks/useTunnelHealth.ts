@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import {
   subscribeTunnelHealth,
-  startHeartbeat,
+  retainHeartbeat,
   getTunnelHealth,
   type TunnelStatus,
 } from '../utils/resilientNet';
@@ -24,17 +24,23 @@ export interface TunnelHealth {
 
 export function useTunnelHealth(): TunnelHealth {
   const [state, setState] = useState(() => getTunnelHealth());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    // Ensure heartbeat is running (idempotent)
-    startHeartbeat();
+    const releaseHeartbeat = retainHeartbeat();
     const unsub = subscribeTunnelHealth((s) => setState({ ...s }));
-    return () => { unsub(); };
+    // Age progresses even when no health transition produces a new event.
+    const ticker = setInterval(() => setNow(Date.now()), 30_000);
+    return () => {
+      clearInterval(ticker);
+      unsub();
+      releaseHeartbeat();
+    };
   }, []);
 
   return {
     ...state,
-    ageMs: state.lastOkTs ? Date.now() - state.lastOkTs : Infinity,
+    ageMs: state.lastOkTs ? Math.max(0, now - state.lastOkTs) : Infinity,
   };
 }
 

@@ -23,6 +23,7 @@ SEGMENT=re.compile(r"^[A-Za-z0-9_.-]{1,96}$")
 ALLOWED=frozenset({
     ".json",".md",".txt",".py",".gd",".tscn",".cfg",".toml",
     ".yml",".yaml",".html",".js",".css",".ini",".csv",
+    ".asm",".s",".c",".h",  # bounded reviewed console/engine source; never executed
 })
 SOURCE_MAX=256000
 PROJECT_MAX_FILES=12512
@@ -350,7 +351,7 @@ class GameWorkspace:
             project=project,path=_relative(relative),reason=reason,
             expected_sha256=expected_sha256,
             new_sha256=_digest(text.encode()),new_content=text,
-            executable_source=file.suffix in {".py",".js",".gd"},
+            executable_source=file.suffix in {".py",".js",".gd",".asm",".s",".c",".h"},
             requires_explicit_human_commit=True,
             changes_other_files=False,
         )

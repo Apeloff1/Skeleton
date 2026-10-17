@@ -672,9 +672,19 @@ class Sega8BitSourceProject:
             raise Sega8BitNativeError("unreviewed cartridge cannot claim release or execution")
 
 
-def _tiles() -> str:
+def _tiles(tile_art: tuple[tuple[int, ...], ...] | None = None) -> str:
+    if tile_art is not None:
+        if (type(tile_art) is not tuple or len(tile_art) != 6
+                or any(type(tile) is not tuple or len(tile) != 64
+                       or any(type(px) is not int or not 0 <= px <= 3 for px in tile)
+                       for tile in tile_art)):
+            raise Sega8BitNativeError("SMS/GG custom art needs six 8x8 indexed original tiles")
+        originals = tuple(tuple("".join(str(px) for px in tile[y * 8:(y + 1) * 8])
+                                for y in range(8)) for tile in tile_art)
+    else:
+        originals = _PIXELS
     """Original 2-bit graphics -> genuine four-plane SMS VDP tile bytes."""
-    chars: list[tuple[str, ...]] = list(_PIXELS)
+    chars: list[tuple[str, ...]] = list(originals)
     # Independently drawn original 3x5 numeral glyphs, not font ROM content.
     numerals = (
         ("111","101","101","101","111"),
@@ -729,6 +739,7 @@ def _tiles() -> str:
 def compile_native_sega_8bit(
     world: PlayableWorld, source: HomebrewSource, target: str, *, authorized: bool,
     reduced_motion: bool = False, audio_enabled: bool = True,
+    tile_art: tuple[tuple[int, ...], ...] | None = None,
 ) -> Sega8BitSourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("Sega original homebrew generation requires explicit authorization")
@@ -837,7 +848,7 @@ def compile_native_sega_8bit(
         "__LEFT__":str(left),"__TOP__":str(top),"__HUD__":str(hud),
         "__DEFAULT_REDUCED_MOTION__":str(int(reduced_motion)),
         "__DEFAULT_AUDIO_ENABLED__":str(int(audio_enabled)),
-        "__TILES__":_tiles(),"__MAPS__":"\n\n".join(maps),
+        "__TILES__":_tiles(tile_art),"__MAPS__":"\n\n".join(maps),
         "__DEMO_ROUTES__":"\n\n".join(demo_arrays),
         "__DEMO_POINTERS__":", ".join(f"demo_{x.index}" for x in world.levels),
         "__DEMO_LENGTHS__":", ".join(str(len(x.safe_solution)) for x in world.levels),
@@ -914,6 +925,12 @@ def compile_native_sega_8bit(
         "release_approved":False,
         "toolchain_license_review_required":True,
     }
+    if tile_art is not None:
+        from .contracts import canonical_digest
+        manifest["generated_runtime_art_tile_digest"] = canonical_digest(
+            [list(tile) for tile in tile_art]
+        )
+        manifest["custom_original_tile_pixels_in_native_source"] = True
     manifest_json=json.dumps(manifest,indent=2,sort_keys=True)+"\n"
     digest=sha256((code+"\0"+makefile+"\0"+manifest_json).encode("utf-8")).hexdigest()
     return Sega8BitSourceProject(code,makefile,manifest_json,digest,target)

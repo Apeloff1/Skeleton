@@ -70,3 +70,39 @@ python scripts/check_enterprise_ai_implementation_notes.py --json
 ~~~
 
 **L00–L13:** This is an extension under existing Jeeves game-learning ownership. It uses established admission and source rights, a versioned contract, bounded read-only operation, source lineage and fail-closed integrity checks, no new authoritative durable state, privacy-safe metadata output, deterministic recovery by replaying a pinned source, output-page limits and create-only file permissions, adversarial regression tests and explicit operator controls. A rollback removes the review command without changing existing native training artifacts or promoted models. Enterprise/game-studio release remains unqualified until the separate validators, real native games, Dragon capture and independent checkpoint training pass.
+
+### All-page catalog completion audit
+
+To confirm that **every registered lens** received a source-pinned review
+task, collect successive results from
+`review_verified_training_report(report, offset=offset, limit=512)`,
+following `next_offset` until it is null. Call
+`audit_lens_campaign(pages)` from
+`skeleton.jeeves.game_emulator_lens_campaign`. The auditor checks page
+digests, fixed source-report identity, the current complete catalog, exact
+lens ordering, page boundaries, review identifiers and still-open Dragon and
+adversarial lanes. Missing, duplicated, altered or prematurely promoted
+pages fail closed. Its `full_registered_catalog_covered` flag is a
+**review-task-coverage** result, never proof of native emulator replay,
+independent Dragon watching, adversarial execution, gradient updates or
+game completion.
+
+
+### Operator all-catalog review assembly
+
+`assemble_source_pinned_lens_campaign(report, page_size=64)` deterministically
+schedules all registered semantic lenses, verifies each generated page
+against the actual source report and returns a concise read-only aggregate.
+It does not store raw frame media or claim independent observations.
+
+```bash
+python -m scripts.game_emulator_lens_campaign \
+  --source-report /private/emulator-training-report.json --page-size 64
+python -m unittest skeleton.testing.test_jeeves_emulator_lens_campaign -v
+```
+
+The source must be an existing absolute regular JSON file, bounded to
+32 MiB, without duplicate object fields or nonfinite numbers. The aggregate
+contains current catalog coverage and deliberately **open** Dragon and
+adversarial lanes. Complete task enumeration is not task execution, verified
+native hardware or training of production Jeeves model parameters.
