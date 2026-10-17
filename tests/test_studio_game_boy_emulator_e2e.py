@@ -66,6 +66,7 @@ class RealCartridgeReplayAdapterTests(unittest.TestCase):
             "samples": [make_checkpoint(1, {
                 "Level": 1, "PlayerX": 2, "PlayerY": 1,
                 "Health": 4, "Score": 0, "ScoreHigh": 0,
+                "TurnCount": 1, "TurnCountHigh": 0,
                 "GemsRemaining": 0, "GameWon": 1, "GameLost": 0,
             })],
         }
@@ -133,6 +134,7 @@ class RealCartridgeReplayAdapterTests(unittest.TestCase):
                     self.memory[addr["PlayerX"]] = 2
                     self.memory[addr["GemsRemaining"]] = 0
                     self.memory[addr["Level"]] = 1
+                    self.memory[addr["TurnCount"]] = 1
                     self.memory[addr["GameWon"]] = 1
                     self.changed = True
             def button_press(self, name):
