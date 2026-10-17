@@ -142,7 +142,7 @@ def godot_inputs(root: Path) -> tuple[dict[str, bytes], str, int, str]:
         for name, payload in files.items():
             if name.startswith("audio/") and not payload.startswith(b"RIFF"):
                 raise StudioGodotQualificationError("Godot original WAV asset is invalid")
-            if name.startswith("parallax/") and not payload.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+            if name.startswith("parallax/") and not payload.startswith(b"\x89PNG\r\n\x1a\n"):
                 raise StudioGodotQualificationError("Godot original parallax PNG invalid")
         try:
             art = json.loads(files["studio_art.json"])
