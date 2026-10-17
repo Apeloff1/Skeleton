@@ -336,7 +336,7 @@ def _verify_existing_q_receipt(
     except (ValueError, UnicodeError, RecursionError) as exc:
         raise RomStudyError("saved ROM receipt is invalid JSON") from exc
     if (type(doc) is not dict
-            or raw != _canonical(doc) + b"\\n"
+            or raw != _canonical(doc) + b"\n"
             or doc.get("schema_version") != BATCH_SCHEMA
             or doc.get("training_kind") != "actual_replay_audited_tabular_q_policy"
             or doc.get("source_sha256") != source_sha
