@@ -233,3 +233,56 @@ def triangle_campaign_page(
         "automatic_training_promotion": False,
         "independent_model_review_requires_human_adjudication": True,
     }
+
+
+def export_reviewed_candidate_corpus(
+    rom_receipt: Path, reviewer_receipt: Path, *,
+    source_sha256: str, output_dir: Path, runtime: Any,
+) -> dict[str, Any]:
+    """Replay the critic's real local checkpoint BEFORE exporting lens examples.
+
+    Exports candidate-only, correlated view labels. It never invokes a
+    production Jeeves optimizer and refuses unstructured reviewer passes.
+    """
+    from skeleton.jeeves.game_emulator_triangle_corpus import (
+        compile_triangle_candidate_corpus, verify_triangle_candidate_corpus,
+    )
+    original = verified_rom_receipt(
+        rom_receipt, expected_source_sha256=source_sha256,
+    )
+    document, digest = read_receipt_document(rom_receipt)
+    if digest != original["receipt_sha256"]:
+        raise RomStudyError("ROM evidence changed between source audits")
+    evidence, triangle = document.get("candidate_evidence"), document.get("training_triangle")
+    verify_training_triangle(evidence, triangle)
+    review, _ = read_receipt_document(reviewer_receipt)
+    verify_native_adversarial_review(evidence, triangle, review)
+    replay = replay_native_adversarial_review(evidence, triangle, review, runtime)
+    if replay["native_generations_replayed"] != 3:
+        raise RomStudyError("all independent model passes must replay before corpus export")
+    candidate = compile_triangle_candidate_corpus(evidence, triangle, review)
+    out = _private_output(output_dir)
+    name = (
+        "triangle-corpus-" + source_sha256[:16] + "-"
+        + review["review_digest"][:24] + ".json"
+    )
+    target = out / name
+    if target.exists() or target.is_symlink():
+        saved, _ = read_receipt_document(target)
+        verify_triangle_candidate_corpus(evidence, triangle, review, saved)
+        state = "prior_verified_candidate_corpus"
+    else:
+        _save_new(target, candidate)
+        state = "new_reviewed_candidate_corpus_create_only"
+    return {
+        "state": state,
+        "filename": name,
+        "candidate_corpus_digest": candidate["candidate_corpus_digest"],
+        "unique_native_episodes": candidate["unique_independent_native_episodes"],
+        "correlated_lens_views": candidate["total_lens_candidate_views"],
+        "same_source_total_weight_per_episode": 1.0,
+        "native_reviewer_generations_replayed": 3,
+        "source_rom_training_rights_acknowledged": True,
+        "candidate_still_requires_jeeves_corpus_admission": True,
+        "production_jeeves_optimizer_steps": 0,
+    }

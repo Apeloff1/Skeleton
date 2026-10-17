@@ -311,3 +311,30 @@ retained but the campaign exits at the same page with a non-success status.
 Use a different `--review-seed` or an independently selected reviewer
 checkpoint to obtain a *new* create-only review; do not relabel the old
 generation as evidence of completed adversarial scrutiny.
+
+### Candidate data for Jeeves — correlated lens amplification
+
+After the independent native critic has produced **three source-linked
+review passes** and its checkpoint is still available, export eight verified
+lens perspectives per genuinely executed native episode:
+
+```sh
+python -m scripts.training.rom_study export-triangle-corpus \
+  --receipt /private/rom-receipts/rom-<source>-<run>.json \
+  --review-receipt /private/rom-receipts/triangle-review-<source>-<config>.json \
+  --source-sha256 <full-source-sha256> \
+  --reviewer-checkpoint /private/models/reviewer.json \
+  --output-dir /private/rom-receipts
+```
+
+This command **re-executes all three critic model generations** from the
+checkpoint to verify their recorded tokens and text, then builds a private
+create-only `triangle-corpus-*.json` candidate artifact. Each native
+episode yields eight separately labeled visual/audio/controller/reward/
+temporal/causal/policy/adversarial views, each with **1/8 of that source
+episode's normalized weight**. Each is linked to the original native
+trace, receipt and one rights review. There are **zero** new independent
+games, zero synthetic rewards, zero leaked heldout steps, and **zero
+production Jeeves SGD updates**. Raw critic prose is not accepted as a
+ground-truth label; this candidate must still pass the existing Jeeves
+human-reviewed corpus admission and actual checkpoint training gates.

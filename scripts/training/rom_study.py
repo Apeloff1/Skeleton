@@ -97,12 +97,34 @@ def parser() -> argparse.ArgumentParser:
     triangle.add_argument("--neural-width", type=int, default=8)
     triangle.add_argument("--review-seed", type=int, default=0)
     triangle.add_argument("--review-tokens", type=int, default=160)
+    corpus = commands.add_parser(
+        "export-triangle-corpus",
+        help="replay the independent critic and export weighted Jeeves candidate training views",
+    )
+    corpus.add_argument("--receipt", required=True, type=Path)
+    corpus.add_argument("--review-receipt", required=True, type=Path)
+    corpus.add_argument("--source-sha256", required=True)
+    corpus.add_argument("--reviewer-checkpoint", required=True, type=Path)
+    corpus.add_argument("--output-dir", required=True, type=Path)
     return root
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "export-triangle-corpus":
+            from skeleton.ai.model_runtime.offline_chat import load_offline_engine
+            from skeleton.ai.training.rom_triangle_campaign import (
+                export_reviewed_candidate_corpus,
+            )
+            runtime = load_offline_engine(args.reviewer_checkpoint).runtime
+            result = export_reviewed_candidate_corpus(
+                args.receipt, args.review_receipt,
+                source_sha256=args.source_sha256,
+                output_dir=args.output_dir, runtime=runtime,
+            )
+            print(json.dumps(result, sort_keys=True))
+            return 0
         if args.operation == "triangle-status":
             from skeleton.ai.training.rom_triangle_campaign import (
                 read_receipt_document,
