@@ -577,11 +577,11 @@ def _godot_with_studio_art(script: str) -> str:
     insertions = (
         (
             "var ready_to_play: bool = false",
-            "var ready_to_play: bool = false\nvar studio_tiles: Array = []\nvar studio_palette: Array = []\nvar studio_frames: Array = []\nvar sprite_frame_index: int = 0\nvar sprite_fps: int = 4\nvar sprite_time: float = 0.0",
+            "var ready_to_play: bool = false\nvar studio_tiles: Array = []\nvar studio_palette: Array = []\nvar studio_frames: Array = []\nvar sprite_frame_index: int = 0\nvar sprite_fps: int = 4\nvar sprite_time: float = 0.0\nvar studio_ambience: AudioStreamPlayer\nvar studio_collectible: AudioStreamPlayer\nvar studio_hazard: AudioStreamPlayer\nvar studio_parallax: Array[Texture2D] = []",
         ),
         (
             "    ready_to_play = true\n    _reset()",
-            "    ready_to_play = true\n    _load_studio_art()\n    _reset()",
+            "    ready_to_play = true\n    _load_studio_art()\n    _setup_studio_media()\n    _reset()",
         ),
         (
             "    var player_rect := Rect2(start + Vector2(hero) * tile_size, Vector2.ONE * tile_size)",
@@ -602,6 +602,14 @@ def _godot_with_studio_art(script: str) -> str:
                     Vector2.ONE * tile_size
                 )
                 _draw_studio_tile(tile_index, art_rect)
+    for index in range(studio_parallax.size()):
+        var texture: Texture2D = studio_parallax[index]
+        var shift: float = fmod(float(steps * (index + 1) * 2), float(width) * tile_size)
+        var landscape := Rect2(start + Vector2(-shift, 0), Vector2(width, height) * tile_size)
+        draw_texture_rect(texture, landscape, false)
+        if shift > 0.0:
+            landscape.position.x += float(width) * tile_size
+            draw_texture_rect(texture, landscape, false)
     var player_rect := Rect2(start + Vector2(hero) * tile_size, Vector2.ONE * tile_size)""",
         ),
         (
@@ -642,6 +650,35 @@ func _load_studio_art() -> void:
         ready_to_play = false
         return
 
+func _setup_studio_media() -> void:
+    # Only the original generated assets are loaded from this offline project.
+    # No remote resources, third-party clips or autonomous audio capture.
+    for kind in ["ambient", "collectible", "hazard"]:
+        var path: String = "res://audio/" + kind + ".wav"
+        if not ResourceLoader.exists(path):
+            continue
+        var stream: Resource = load(path)
+        if not stream is AudioStream:
+            continue
+        var player := AudioStreamPlayer.new()
+        player.stream = stream as AudioStream
+        player.volume_db = -13.0 if kind == "ambient" else -8.0
+        add_child(player)
+        match kind:
+            "ambient":
+                studio_ambience = player
+                studio_ambience.finished.connect(func(): studio_ambience.play())
+                studio_ambience.play()
+            "collectible": studio_collectible = player
+            "hazard": studio_hazard = player
+    for index in range(3):
+        var layer: String = "res://parallax/layer_%02d.png" % index
+        if not ResourceLoader.exists(layer):
+            continue
+        var graphic: Resource = load(layer)
+        if graphic is Texture2D:
+            studio_parallax.append(graphic as Texture2D)
+
 func _draw_studio_tile(tile_index: int, rect: Rect2) -> void:
     if studio_tiles.is_empty() or tile_index < 0 or tile_index >= studio_tiles.size():
         return
@@ -665,6 +702,13 @@ func _text(at: Vector2, message: String, font_size: int, ink: Color) -> void:"""
     for before, after in insertions:
         if script.count(before) != 1:
             raise DualRuntimeExportError("Godot sprite renderer source insertion contract changed")
+        script = script.replace(before, after)
+    for before, after in (
+        ('notice = "Crystal collected."', 'notice = "Crystal collected."\n            if studio_collectible != null:\n                studio_collectible.play()'),
+        ('notice = "Hazard: one health lost."', 'notice = "Hazard: one health lost."\n        if studio_hazard != null:\n            studio_hazard.play()'),
+    ):
+        if script.count(before) != 1:
+            raise DualRuntimeExportError("Godot original audio event source contract changed")
         script = script.replace(before, after)
     return script
 
@@ -750,6 +794,11 @@ def render_dual_runtime_package(
     }
     if rendered_art is not None:
         files["godot/studio_art.json"] = _json_bytes(rendered_art)
+        for name, original_bytes in studio_art.files:
+            if name in ("audio/ambient.wav", "audio/collectible.wav", "audio/hazard.wav"):
+                files["godot/" + name] = original_bytes
+            elif name.startswith("parallax/") and name.endswith(".png"):
+                files["godot/" + name] = original_bytes
     if sum(map(len, files.values())) > 2_000_000:
         raise DualRuntimeExportError("source package exceeds 2 MB budget")
     manifest_body: dict[str, object] = {
@@ -777,6 +826,14 @@ def render_dual_runtime_package(
         manifest_body["playable_sprite_pixels_embedded"] = True
         manifest_body["godot_native_sprite_pixels_embedded"] = True
         manifest_body["godot_binary_executed"] = False
+        manifest_body["godot_original_pcm_source_integrated"] = bool(
+            files.get("godot/audio/ambient.wav")
+        )
+        manifest_body["godot_original_parallax_png_source_integrated"] = any(
+            name.startswith("godot/parallax/") for name in files
+        )
+        manifest_body["godot_audio_playback_verified"] = False
+        manifest_body["godot_graphical_parallax_playback_verified"] = False
     manifest = {**manifest_body, "manifest_digest": canonical_digest(manifest_body)}
     files["release.json"] = _json_bytes(manifest)
     return DualRuntimePackage(files, manifest)
