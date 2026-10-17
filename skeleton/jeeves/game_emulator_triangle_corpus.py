@@ -32,6 +32,7 @@ def compile_triangle_candidate_corpus(
     evidence: dict[str, Any], triangle: dict[str, Any],
     reviewed: dict[str, Any], *,
     requested_semantic_lens_keys: Sequence[str] = (),
+    semantic_inference_review: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Construct data *candidates* for the existing Jeeves corpus governance.
 
@@ -55,6 +56,15 @@ def compile_triangle_candidate_corpus(
     episodes = triangle["episode_lens_references"]
     if not 1 <= len(episodes) <= 1024 or len(episodes) * len(LENSES) > MAX_VIEWS:
         raise TriangleCorpusError("candidate training lens count exceeds bounds")
+    if semantic_inference_review is not None:
+        from .game_emulator_triangle_semantic_inference import (
+            verify_native_semantic_lenses,
+        )
+        verify_native_semantic_lenses(
+            evidence, triangle, reviewed, semantic_inference_review,
+        )
+        if tuple(semantic_inference_review["requested_lens_keys"]) != tuple(requested_semantic_lens_keys):
+            raise TriangleCorpusError("verified 43-lens model run selected another lens set")
     rows: list[dict[str, Any]] = []
     semantic_routes: list[dict[str, Any]] = []
     total_semantic_routes = 0
@@ -135,8 +145,32 @@ def compile_triangle_candidate_corpus(
             }
             row["row_digest"] = _digest(row)
             rows.append(row)
+    if semantic_inference_review is not None:
+        expected = [
+            route for route in semantic_routes
+            if route["native_trace_sha256"] == semantic_inference_review["source_native_trace_sha256"]
+        ]
+        if (len(expected) != 1
+                or expected[0]["semantic_route_digest"] != semantic_inference_review["canonical_route_sha256"]):
+            raise TriangleCorpusError("executed semantic reviewer used a different episode/lens route")
+        semantic_inference_reference = {
+            "native_trace_sha256": semantic_inference_review["source_native_trace_sha256"],
+            "semantic_review_sha256": semantic_inference_review["semantic_review_digest"],
+            "model_sha256": semantic_inference_review["model_sha256"],
+            "source_bound_hypotheses": semantic_inference_review["source_bound_interpretations"],
+            "exact_43_checkpoint_generations_verified": True,
+            "hypotheses_are_ground_truth_labels": False,
+            "human_adjudication_still_required": True,
+        }
+    else:
+        semantic_inference_reference = None
     result = {
-        "schema_version": SCHEMA,
+        "schema_version": (
+            "skeleton.jeeves.game_triangle_candidate_corpus.v3"
+            if semantic_inference_reference is not None else SCHEMA
+        ),
+        "native_semantic_inference_reference": semantic_inference_reference,
+        "semantic_model_hypotheses_added_to_supervised_labels": 0,
         "source_emulator_report_sha256": evidence["report_digest"],
         "source_training_triangle_sha256": triangle["triangle_digest"],
         "native_adversarial_review_sha256": reviewed["review_digest"],
@@ -172,7 +206,8 @@ def compile_triangle_candidate_corpus(
 
 def verify_triangle_candidate_corpus(
     evidence: dict[str, Any], triangle: dict[str, Any],
-    reviewed: dict[str, Any], candidate: Any,
+    reviewed: dict[str, Any], candidate: Any, *,
+    semantic_inference_review: dict[str, Any] | None = None,
 ) -> None:
     if not isinstance(candidate, dict) or candidate.get("candidate_corpus_digest") != _digest({
         k: v for k, v in candidate.items() if k != "candidate_corpus_digest"
@@ -181,5 +216,6 @@ def verify_triangle_candidate_corpus(
     if candidate != compile_triangle_candidate_corpus(
         evidence, triangle, reviewed,
         requested_semantic_lens_keys=candidate.get("operator_requested_semantic_lens_keys", ()),
+        semantic_inference_review=semantic_inference_review,
     ):
         raise TriangleCorpusError("candidate training corpus no longer matches measured source")
