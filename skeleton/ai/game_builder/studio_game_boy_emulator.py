@@ -224,7 +224,7 @@ def qualify_game_boy_emulator(
                 and actual["GemsRemaining"] == 0
                 and actual["PlayerX"] == expected["x"]
                 and actual["PlayerY"] == expected["y"]
-                and actual["Level"] == expected["level_index"]
+                and actual["Level"] == expected["level_index"] + 1
                 and actual["Score"] == expected["score"]
                 and actual["Health"] == expected["health"]
             )
