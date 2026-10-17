@@ -1054,5 +1054,136 @@
     "suites": [
       "jeeves-native-cartridge-emulator-full-e2e"
     ]
+  },
+  "jeeves_native_score_checkpoint_e2e_extension": {
+    "status": "source_implemented_pending_external_native_runtime_and_specialized_test_results",
+    "tranche": "M121-M140",
+    "owners": [
+      "skeleton/ai/game_builder/game_boy_native_export.py",
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+      "skeleton/ai/game_builder/studio_nes_emulator.py",
+      "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py"
+    ],
+    "milestones": [
+      {
+        "id": "M121",
+        "name": "Audit native scoring against executable Python game reference",
+        "state": "source_fixed_pending_execution"
+      },
+      {
+        "id": "M122",
+        "name": "GB original collectible bonus +10 parity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M123",
+        "name": "NES original collectible bonus +10 parity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M124",
+        "name": "GB original completed-level bonus +100 parity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M125",
+        "name": "NES original completed-level bonus +100 parity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M126",
+        "name": "GB/GBC 16-bit score with carry and zero initialization",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M127",
+        "name": "NES 6502 16-bit score with carry and zero initialization",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M128",
+        "name": "Require ScoreHigh symbols from real RGBDS/ld65 linkers",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M129",
+        "name": "Correct native GB final-level counter to Python/NES convention",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M130",
+        "name": "Verify native 16-bit score in actual GB/GBC/NES emulator RAM",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M131",
+        "name": "Sample up to 128 source-bound CPU states during input replay",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M132",
+        "name": "Add intermediate GB/GBC PyBoy CPU memory snapshots",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M133",
+        "name": "Add intermediate NES FCEUX CPU memory snapshots",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M134",
+        "name": "Fail on missing, reordered or altered replay checkpoints",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M135",
+        "name": "Fail on premature victory or unexpected losing states",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M136",
+        "name": "Fail on non-monotonic score, health restoration or invalid level jumps",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M137",
+        "name": "Cross-check sampled final frame against original Python x/y/health/score/level",
+        "state": "source_integrated_pending_execution"
+      },
+      {
+        "id": "M138",
+        "name": "Admit only digest-bound native CPU checkpoint evidence to campaign gates and Dragon reports",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M139",
+        "name": "Run actual multi-level 16-bit scoring games with RGBDS/cc65 plus emulators",
+        "state": "not_verified"
+      },
+      {
+        "id": "M140",
+        "name": "Complete lengthy continuous native production with recovery, physical graphics and human release signoff",
+        "state": "not_qualified"
+      }
+    ],
+    "validation": {
+      "python_scoring_source_rule": "10 per collectible, 100 per level goal",
+      "native_score_high_byte_included": true,
+      "native_controller_trace_sample_limit": 128,
+      "real_native_compilation_executed_this_session": false,
+      "real_pyboy_or_fceux_executed_this_session": false,
+      "real_native_multilevel_score_parity_qualified": false,
+      "source_contract_and_checkpoint_tests_authored": true,
+      "specialized_tests_measured_passed": false,
+      "physical_controller_qualified": false,
+      "model_weights_trained": false,
+      "release_ready": false
+    },
+    "suites": [
+      "jeeves-native-cartridge-emulator-full-e2e"
+    ]
   }
 }
