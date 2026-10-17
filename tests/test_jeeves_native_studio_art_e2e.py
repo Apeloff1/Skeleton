@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 from hashlib import sha256
+from io import BytesIO
+import wave
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -157,6 +159,51 @@ class StudioProductionAssetTests(unittest.TestCase):
                     getattr(built, name) is False
                     for name in compile_flags if hasattr(built, name)
                 ))
+
+    def test_real_pcm_audio_parallax_foliage_and_shadow_controls(self):
+        direction = ArtDirection(
+            style="organic", music_density=4, parallax_layers=3,
+            shadow_strength=3, foliage_density=4, animation_fps=12, seed=1501,
+        )
+        pack = render_studio_art(self.world, target="nintendo_game_boy",
+                                 direction=direction, authorized=True)
+        pack.verify()
+        files = dict(pack.files)
+        self.assertEqual(pack.manifest["environment_overlay_layers_rendered"], 3)
+        self.assertEqual(pack.manifest["original_pcm_cues_generated"], 3)
+        self.assertFalse(pack.manifest["native_audio_driver_integrated"])
+        self.assertFalse(pack.manifest["native_parallax_driver_integrated"])
+        desc = json.loads(files["metadata/descriptors.json"])
+        self.assertEqual(desc["animation"]["fps"], 12)
+        self.assertEqual(desc["shadow_strength"], 3)
+        self.assertEqual(desc["foliage_density"], 4)
+        for layer in range(3):
+            width, height, pixels = decode_png(files[f"parallax/layer_{layer:02d}.png"])
+            self.assertEqual((width, height), (11 * 8, 11 * 8))
+            self.assertTrue(any(pixels[offset + 3] > 0 for offset in range(0, len(pixels), 4)))
+        for kind, seconds in (("ambient", 4), ("collectible", 1), ("hazard", 1)):
+            payload = files[f"audio/{kind}.wav"]
+            with wave.open(BytesIO(payload), "rb") as wav:
+                self.assertEqual(wav.getnchannels(), 1)
+                self.assertEqual(wav.getsampwidth(), 2)
+                self.assertEqual(wav.getframerate(), 8000)
+                self.assertEqual(wav.getnframes(), 8000 * seconds)
+        second = render_studio_art(self.world, target="nintendo_game_boy",
+                                   direction=direction, authorized=True)
+        self.assertEqual(pack, second)
+        without = render_studio_art(
+            self.world, target="nintendo_game_boy",
+            direction=replace(direction, foliage_density=0, shadow_strength=0,
+                              music_density=0, parallax_layers=0), authorized=True)
+        self.assertNotEqual(without.runtime_tiles, pack.runtime_tiles)
+        self.assertFalse(any(name.startswith("audio/") for name, _ in without.files))
+        self.assertFalse(any(name.startswith("parallax/") for name, _ in without.files))
+        for kwargs in (
+            {"foliage_density": True}, {"shadow_strength": 4},
+            {"music_density": 5}, {"parallax_layers": -1}, {"animation_fps": 0},
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(StudioArtError):
+                ArtDirection(**kwargs)
 
     def test_native_cartridge_rejects_corrupt_art_and_unauthorized_creation(self):
         with self.assertRaises(PermissionError):
