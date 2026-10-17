@@ -2,7 +2,9 @@
  * Foundation iconography — read-only view over tokens.ts `iconography`
  * (UI_ART_ICONOGRAPHY.md / UI_ART_KIT §4), plus the naming helper (§4).
  */
-import { iconography, radii } from '../tokens';
+import tokens, { iconography } from '../tokens';
+
+const { radii } = tokens;
 
 /** Master artboard, live area, keylines, viewBox (§1). */
 export const ICON_GRID = iconography.grid;
