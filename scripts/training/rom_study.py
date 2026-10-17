@@ -21,6 +21,18 @@ from skeleton.ai.training.rom_fleet_audit import audit_fleet_page, audit_fleet_a
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="operation", required=True)
+    progress = commands.add_parser(
+        "triangle-lens-progress",
+        help="inspect source-pinned completed/pending steps of a 200-lens model session",
+    )
+    progress.add_argument("--receipt", type=Path, required=True)
+    progress.add_argument("--review-receipt", type=Path, required=True)
+    progress.add_argument("--source-sha256", required=True)
+    progress.add_argument("--output-dir", type=Path, required=True)
+    progress.add_argument("--semantic-checkpoint", type=Path, required=True)
+    progress.add_argument("--run-index", type=int, default=0)
+    progress.add_argument("--seed", type=int, default=0)
+    progress.add_argument("--max-new-tokens", type=int, default=192)
     coverage = commands.add_parser(
         "triangle-lens-audit",
         help="audit source support for all 200 authored Jeeves lenses (43 legacy optional)",
@@ -195,6 +207,21 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "triangle-lens-progress":
+            from skeleton.ai.training.rom_triangle_lens_progress import (
+                native_lens_progress,
+            )
+            from skeleton.ai.model_runtime.offline_chat import load_offline_engine
+            runtime = load_offline_engine(args.semantic_checkpoint).runtime
+            result = native_lens_progress(
+                args.receipt, args.review_receipt,
+                source_sha256=args.source_sha256,
+                output_dir=args.output_dir, semantic_runtime=runtime,
+                run_index=args.run_index,
+                seed=args.seed, max_new_tokens=args.max_new_tokens,
+            )
+            print(json.dumps(result, sort_keys=True))
+            return 0
         if args.operation == "triangle-lens-audit":
             from skeleton.ai.training.rom_triangle_campaign import (
                 read_receipt_document, load_operator_semantic_lens_set,
