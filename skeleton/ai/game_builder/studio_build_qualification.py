@@ -16,6 +16,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+from time import monotonic
 
 from .contracts import canonical_digest
 
@@ -248,32 +249,54 @@ def qualify_native_build(
     names = dict(zip(programs, binaries))
     versions = tuple(sha256(str(Path(item).resolve()).encode()).hexdigest() for item in binaries)
     invoked = False
+    deadline = monotonic() + timeout_seconds
     with tempfile.TemporaryDirectory(prefix="skeleton-native-qualify-") as temp:
         work = Path(temp)
         for name, payload in sources.items():
             with (work / name).open("xb") as stream:
                 stream.write(payload)
-        for template in adapter[2]:
+        for step, template in enumerate(adapter[2]):
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                return _receipt(target, source_digest, available=True, invoked=invoked,
+                                blocker="whole_toolchain_timeout", versions=versions)
             args = [str(names[template[0]]), *template[1:]]
             invoked = True
+            # Never capture an unlimited stderr/stdout buffer in memory.
+            # Write to a bounded staging artifact and discard it; compiler
+            # diagnostics are never sent into Dragon evidence receipts.
+            log_path = work / ("tool-step-" + str(step) + ".log")
             try:
-                result = subprocess.run(
-                    args, cwd=work, shell=False, timeout=timeout_seconds,
-                    capture_output=True, check=False,
-                    env={"PATH": os.defpath, "HOME": str(work), "LC_ALL": "C"},
-                )
+                with log_path.open("wb") as stream:
+                    result = subprocess.run(
+                        args, cwd=work, shell=False, timeout=remaining,
+                        stdout=stream, stderr=subprocess.STDOUT, check=False,
+                        env={"PATH": os.defpath, "HOME": str(work), "LC_ALL": "C"},
+                    )
             except (OSError, subprocess.TimeoutExpired) as exc:
                 return _receipt(target, source_digest, available=True, invoked=True,
                                 blocker="toolchain_execution_failed:" + type(exc).__name__,
                                 versions=versions)
+            if log_path.stat().st_size > MAX_STDIO_BYTES:
+                return _receipt(target, source_digest, available=True, invoked=True,
+                                blocker="toolchain_output_exceeds_budget", versions=versions)
             if result.returncode:
-                # Never return full subprocess output (may contain secrets).
                 return _receipt(target, source_digest, available=True, invoked=True,
                                 blocker="toolchain_exit_code:" + str(result.returncode),
                                 versions=versions)
-            if len(result.stdout) + len(result.stderr) > MAX_STDIO_BYTES:
-                return _receipt(target, source_digest, available=True, invoked=True,
-                                blocker="toolchain_output_exceeds_budget", versions=versions)
+            # An assembler is a native program, not a sandbox. Keep the
+            # generated file count/size bounded before each following step.
+            count, total = 0, 0
+            for item in work.rglob("*"):
+                if item.is_symlink():
+                    return _receipt(target, source_digest, available=True, invoked=True,
+                                    blocker="toolchain_created_symlink", versions=versions)
+                if item.is_file():
+                    count += 1
+                    total += item.stat().st_size
+                if count > 128 or total > 64 * 1024 * 1024:
+                    return _receipt(target, source_digest, available=True, invoked=True,
+                                    blocker="toolchain_workspace_exceeds_budget", versions=versions)
         try:
             rom = _regular(work / adapter[3], MAX_ROM_BYTES)
             _header(adapter[4], rom)
