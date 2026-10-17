@@ -338,7 +338,7 @@ export async function resilientFetch<T = any>(
   const deadline = start + 90_000; // entire operation, not just each attempt
   const freshAge = Number.isFinite(cfg.cacheTtlMs) ? Math.max(0, Math.min(cfg.cacheTtlMs, 90_000)) : 0;
   const staleAge = Number.isFinite(cfg.staleMaxMs) ? Math.max(0, Math.min(cfg.staleMaxMs, 24 * 60 * 60 * 1000)) : 0;
-  const eligible = (entry: CacheEntry | null | undefined, maxAge: number) =>
+  const eligible = (entry: CacheEntry | null | undefined, maxAge: number): entry is CacheEntry =>
     !!entry && entry.ts <= Date.now() && Date.now() - entry.ts < maxAge &&
     _entryChars(entry) <= maxResponseChars;
   if (options.signal?.aborted) throw new Error('Request cancelled');
