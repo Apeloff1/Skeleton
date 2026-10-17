@@ -11,6 +11,10 @@ import s, { colors } from './CrawlerWorkspace.styles';
 import CrawlerAutomationPanel from './CrawlerAutomationPanel';
 import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourceLibrary';
 import DragonKnowledgePanel from './DragonKnowledgePanel';
+import DragonCompanion from './companion/DragonCompanion';
+import { companionFromCapture, INITIAL_DRAGON_STATE } from './companion/dragonCompanionState';
+import { useReducedMotion } from './companion/useDragonMotion';
+import { usePowerAwareness } from '../../hooks/usePowerAwareness';
 
 function bytes(value: number): string { return value < 1024 ? `${value} B` : value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1048576).toFixed(1)} MB`; }
 function label(value: string): string { return value.replaceAll('_', ' '); }
@@ -30,7 +34,10 @@ function Button({ title, onPress, disabled = false }: { title: string; onPress: 
 }
 function CrawlerContent() {
   const router = useRouter(); const { width } = useWindowDimensions(); const auth = useStudioAuth();
-  const params = useLocalSearchParams<{ session?: string; pane?: string }>();
+  const params = useLocalSearchParams<{ session?: string; pane?: string; topics?: string; seeds?: string }>();
+  const reducedMotion = useReducedMotion();
+  const power = usePowerAwareness();
+  const companionMotion = reducedMotion || power.shouldReduceAnimations ? 'off' as const : 'gentle' as const;
   const requestedSession = typeof params.session === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(params.session) ? params.session : null;
   const [pane, setPane] = useState<'capture' | 'review'>(params.pane === 'review' ? 'review' : 'capture');
   const [reviewDraft, setReviewDraft] = useState<CrawlPassageSelection | null>(null);
@@ -38,6 +45,23 @@ function CrawlerContent() {
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const choosePane = (value: 'capture' | 'review') => { setPane(value); router.setParams({ pane: value }); scroll.current?.scrollTo({ y: 0, animated: false }); };
   useEffect(() => { if (params.pane === 'capture' || params.pane === 'review') setPane(params.pane); }, [params.pane]);
+  const seededTopics = useRef(false);
+  useEffect(() => {
+    const raw = typeof params.topics === 'string' ? params.topics : '';
+    if (seededTopics.current || !/^[a-z0-9]+(?:-[a-z0-9]+)*(?:[ ,][a-z0-9]+(?:-[a-z0-9]+)*){0,15}$/.test(raw) || raw.length > 160) return;
+    seededTopics.current = true;
+    setTopics(raw);
+  }, [params.topics]);
+  const seededHosts = useRef(false);
+  useEffect(() => {
+    const raw = typeof params.seeds === 'string' ? params.seeds : '';
+    if (seededHosts.current || raw.length > 4096) return;
+    const lines = raw.split(/\s+/).filter(Boolean).slice(0, 16);
+    const seed = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+\/$/;
+    if (!lines.length || lines.some(line => !seed.test(line))) return;
+    seededHosts.current = true;
+    setSeeds(lines.join('\n'));
+  }, [params.seeds]);
   const [readiness, setReadiness] = useState<CrawlerReadiness | null>(null);
   const [sessions, setSessions] = useState<CrawlSession[]>([]); const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [active, setActive] = useState<CrawlSession | null>(null); const activeRef = useRef<CrawlSession | null>(null);
@@ -119,7 +143,7 @@ function CrawlerContent() {
   const create = () => {
     const numeric = [Number(requests), Number(documents), Number(megabytes), Number(depth)];
     if (!numeric.every(Number.isInteger) || numeric[0] < 1 || numeric[0] > 128 || numeric[1] < 1 || numeric[1] > 64 || numeric[2] < 1 || numeric[2] > 32 || numeric[3] < 0 || numeric[3] > 3) { setError('Use requests 1–128, documents 1–64, MB 1–32 and depth 0–3.'); return; }
-    const body: CrawlCreate = { idempotency_key: crawlRequestKey('create'), seeds: seeds.split(/\r?\n/).map(item => item.trim()).filter(Boolean), title: title.trim() || undefined, topics: topics.split(',').map(item => item.trim()).filter(Boolean), max_requests: numeric[0], max_documents: numeric[1], max_bytes: numeric[2] * 1048576, max_depth: numeric[3], consent: true, rights_acknowledged: true };
+    const body: CrawlCreate = { idempotency_key: crawlRequestKey('create'), seeds: seeds.split(/\r?\n/).map(item => item.trim()).filter(Boolean), title: title.trim() || undefined, topics: topics.split(/[\s,]+/).map(item => item.trim()).filter(item => item.length > 0 && item.length <= 80).slice(0, 16), max_requests: numeric[0], max_documents: numeric[1], max_bytes: numeric[2] * 1048576, max_depth: numeric[3], consent: true, rights_acknowledged: true };
     void mutate('Creating crawl', async signal => { const value = await createCrawl(body, signal); if (!signal.aborted) { activeRef.current = value; setActive(value); setCreating(false); setSeeds(''); setConsent(false); setRights(false); restoredSession.current = value.session_id; router.setParams({ session: value.session_id, pane: 'capture' }); } return value; });
   };
   const control = (action: 'pause' | 'resume' | 'cancel') => {
@@ -173,7 +197,7 @@ function CrawlerContent() {
       {(creating || !active) && <View style={s.card}><Text style={s.heading}>New bounded crawl</Text><Text style={s.small}>Only explicitly selected seed hosts are admitted. Consent expires within 24 hours. Create the source scope first, then authorize a finite automatic run or one manual slice.</Text>
         <Text style={s.label}>Name (optional)</Text><TextInput accessibilityLabel="Crawl name" value={title} onChangeText={setTitle} maxLength={160} style={field} placeholder="Engine documentation" placeholderTextColor={colors.muted} />
         <Text style={s.label}>Seed URLs · one per line</Text><TextInput accessibilityLabel="Seed URLs" value={seeds} onChangeText={setSeeds} maxLength={32768} multiline style={[field, { minHeight: 110 }]} placeholder={'https://example.org/docs/\nhttps://example.org/guide/'} placeholderTextColor={colors.muted} autoCapitalize="none" />
-        <Text style={s.label}>Topics (optional, comma separated)</Text><TextInput accessibilityLabel="Crawl topics" value={topics} onChangeText={setTopics} maxLength={1280} style={field} placeholder="movement, tools, scripting" placeholderTextColor={colors.muted} />
+        <Text style={s.label}>Topics (optional, commas or spaces)</Text><TextInput accessibilityLabel="Crawl topics" value={topics} onChangeText={setTopics} maxLength={1280} style={field} placeholder="movement, tools, scripting" placeholderTextColor={colors.muted} />
         <View style={s.row}>{[['Requests', requests, setRequests], ['Documents', documents, setDocuments], ['MB', megabytes, setMegabytes], ['Link depth', depth, setDepth]].map(([name, value, setter]) => <View key={name as string} style={{ minWidth: 90, flex: 1, gap: 6 }}><Text style={s.small}>{name as string}</Text><TextInput accessibilityLabel={`Maximum ${name as string}`} keyboardType="number-pad" value={value as string} onChangeText={setter as (v: string) => void} maxLength={3} style={field} /></View>)}</View>
         <View style={s.row}><Switch value={consent} onValueChange={setConsent} accessibilityLabel="Authorize this bounded capture" /><Text style={[s.message, s.grow]}>I authorize the app to request and store this bounded set of public sources.</Text></View><View style={s.row}><Switch value={rights} onValueChange={setRights} accessibilityLabel="Acknowledge source rights" /><Text style={[s.message, s.grow]}>I have permission to capture these sources and understand their use remains governed by source rights.</Text></View>
         <Button title={busy === 'Creating crawl' ? 'Creating…' : 'Create crawl'} disabled={!canWrite || readiness?.available !== true || !consent || !rights || !seeds.trim() || !!busy || running} onPress={create} />
@@ -190,6 +214,7 @@ function CrawlerContent() {
         run={(name, operation, stop) => { void mutate(name, operation, false, stop); }} control={control} refresh={refreshActive}
         manual={() => { const id = active.session_id; const body = { idempotency_key: crawlRequestKey('run'), expected_version: active.version, max_steps: 4 }; void mutate('Run', signal => runCrawl(id, body, signal), true); }} />
       <View style={s.card}><Text style={s.heading}>Actual URL queue</Text>{active.queue.length ? active.queue.map((item, index) => <View key={`${item.url}-${index}`} style={s.check}><Text selectable style={s.message}>{item.url}</Text><Text style={s.small}>Depth {item.depth} · {item.attempts} attempts · {item.ready_at * 1000 <= Date.now() ? 'eligible now' : `next eligible ${new Date(item.ready_at * 1000).toLocaleTimeString()}`}</Text></View>) : <Text style={s.small}>No pending URL is listed in the current snapshot.</Text>}{active.frontier_count > active.queue.length && <Text style={s.small}>Showing the first {active.queue.length} of {active.frontier_count} queued URLs.</Text>}</View>
+      <View style={s.card}><Text style={s.heading}>Dragon on this crawl</Text><Text style={s.small}>The dragon watches recorded capture events. Capturing a page does not burn it into memory or train a model.</Text><DragonCompanion state={events.length ? companionFromCapture(events[events.length - 1].kind) : INITIAL_DRAGON_STATE} motion={companionMotion} reducedMotion={companionMotion === 'off'} /></View>
       <View style={s.card}><Text style={s.heading}>Recent crawl events</Text>{!!eventsError && <Text style={s.error}>Event refresh unavailable. {eventsError}</Text>}{truncatedEvents && <Text style={s.small}>The runtime retains a bounded event tail. Older events are unavailable; no history has been reconstructed.</Text>}{events.length ? [...events].reverse().map(event => <View key={event.sequence} style={s.check}><Text style={s.label}>{label(event.kind)}</Text><Text style={s.small}>{new Date(event.at * 1000).toLocaleTimeString()}{event.reason ? ` · ${label(event.reason)}` : ''}</Text>{event.url && <Text selectable style={s.small}>{event.url}</Text>}</View>) : <Text style={s.small}>{eventsObserved ? 'No event is recorded in the current bounded history.' : eventsError ? 'Recorded history is currently unavailable.' : 'Loading recorded history…'}</Text>}</View>
       <CrawlerSourceLibrary key={active.session_id + ':' + token.current} session={active} sources={sources} more={!!sourceCursor} busy={!!busy || running}
         refresh={refreshActive}
