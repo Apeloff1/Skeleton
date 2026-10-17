@@ -1,7 +1,18 @@
-"""Progress-event stream parsing (SSE, NDJSON, JSON list/envelope).
+"""Progress-event stream parsing: SSE first, plus JSON snapshot fallback.
 
-Transport-level reconnect/resume lives in ``skeleton.client.realtime`` (owned
-separately); this module only turns one HTTP response into parsed events.
+PROVISIONAL: the transport is pending Walt's realtime work and will delegate to
+``skeleton.client.realtime``. Aligned with ADR-realtime-transport
+(docs/architecture/ADR-realtime-transport.md, PR #4101):
+
+- SSE is the only canonical stream format, and NDJSON is not supported. Frames
+  are ``id: <envelope.id>``, ``event: <type>``, ``data: <envelope JSON>``.
+- The ``: hb`` heartbeat comment is skipped. ``stream.reset`` and
+  ``stream.lagged`` control events are yielded so callers can react.
+- Resume uses ``Last-Event-ID`` (``last_event_id=``) or ``?cursor=``.
+- Reconnect, dead-stream detection and jittered backoff are deliberately NOT
+  implemented here; they belong to ``skeleton.client.realtime``.
+- Today's ``/events`` endpoints return a JSON snapshot (``{"events": [...]}``),
+  which is still handled.
 
 Event shape tolerates the realtime envelope v1::
 
@@ -27,6 +38,7 @@ from skeleton.client.errors import (
 )
 
 HEARTBEAT_TYPES = frozenset({"heartbeat"})
+CONTROL_TYPES = frozenset({"stream.reset", "stream.lagged"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +62,11 @@ class StreamEvent:
     @property
     def is_envelope_v1(self) -> bool:
         return self.v is not None and self.channel is not None
+
+    @property
+    def is_control(self) -> bool:
+        """``stream.reset`` / ``stream.lagged`` (ADR section 4)."""
+        return self.type in CONTROL_TYPES
 
     @property
     def is_heartbeat(self) -> bool:
@@ -133,20 +150,6 @@ def parse_sse_lines(
             yield ev
 
 
-def parse_ndjson_lines(
-    lines: Iterable[str], cancel: CancelToken | None = None
-) -> Iterator[StreamEvent]:
-    for line in lines:
-        if cancel is not None:
-            cancel.raise_if_cancelled()
-        line = line.strip()
-        if not line:
-            continue
-        ev = StreamEvent.from_obj(_decode(line))
-        if not ev.is_heartbeat:
-            yield ev
-
-
 def parse_json_events(
     body: Any, cancel: CancelToken | None = None
 ) -> Iterator[StreamEvent]:
@@ -167,8 +170,6 @@ def iter_response_events(
     ctype = response.headers.get("content-type", "").split(";")[0].strip().lower()
     if ctype == "text/event-stream":
         yield from parse_sse_lines(response.iter_lines(), cancel)
-    elif ctype in {"application/x-ndjson", "application/ndjson", "application/jsonl"}:
-        yield from parse_ndjson_lines(response.iter_lines(), cancel)
     else:
         response.read()
         yield from parse_json_events(response.json(), cancel)
@@ -180,31 +181,54 @@ def stream_events(
     *,
     params: Mapping[str, Any] | None = None,
     last_event_id: str | None = None,
+    cursor: str | None = None,
     cancel: CancelToken | None = None,
+    idempotent: bool = False,
 ) -> Iterator[StreamEvent]:
-    """GET ``path`` with httpx streaming and yield parsed events.
+    """PROVISIONAL: GET ``path`` with httpx streaming and yield parsed events.
 
-    Retries retryable statuses (with backoff) before the body is consumed;
-    never retries mid-stream.
+    Retries retryable statuses (with backoff) only when ``idempotent=True``
+    and only before the body is consumed, never mid-stream. A 503 ``seal_unavailable`` is never retried.
+    Does not reconnect.
     """
-    headers = {"accept": "text/event-stream, application/x-ndjson, application/json"}
-    if last_event_id:
-        headers["last-event-id"] = last_event_id
+    from skeleton.client.errors import SkeletonSealConfigError
+    from skeleton.client.gateway import _invalid_seal, _seal_unavailable
+
+    query = dict(params or {})
+    if cursor:
+        query["cursor"] = cursor
     policy = gateway._retry
-    for attempt in range(policy.max_attempts):
+    max_attempts = policy.max_attempts if idempotent else 1
+    resealed = False
+    attempt = 0
+    while attempt < max_attempts:
         if cancel is not None:
             cancel.raise_if_cancelled()
+        headers = {"accept": "text/event-stream, application/json"}
+        if last_event_id:
+            headers["last-event-id"] = last_event_id
+        headers.update(gateway._call_headers())
         try:
             with gateway._client.stream(
-                "GET", path, params=params, headers=headers
+                "GET", path, params=query, headers=headers
             ) as response:
+                gateway._note_response(response, headers["x-request-id"])
                 if response.status_code >= 400:
                     response.read()
+                    if _seal_unavailable(response):
+                        raise SkeletonSealConfigError(
+                            "server has no seal secret configured (503 seal_unavailable)"
+                        )
+                    if gateway._seal is not None and not resealed and _invalid_seal(response):
+                        resealed = True
+                        gateway._seal.invalidate()
+                        continue
                     if (
                         response.status_code in policy.retry_status_codes
-                        and attempt + 1 < policy.max_attempts
+                        and attempt + 1 < max_attempts
                     ):
                         gateway._backoff(attempt, response, cancel)
+                        attempt += 1
                         continue
                     from skeleton.client.gateway import _safe_body
 

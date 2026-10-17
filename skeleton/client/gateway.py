@@ -8,8 +8,15 @@ from typing import Any, Callable, Mapping
 import httpx
 
 from skeleton.client.cancel import CancelToken
+from skeleton.client.seal import (
+    REQUEST_ID_HEADER,
+    RequestSealer,
+    new_request_id,
+    valid_request_id,
+)
 
 from skeleton.client.errors import (
+    SkeletonSealConfigError,
     SkeletonHTTPError,
     SkeletonTimeoutError,
     SkeletonTransportError,
@@ -29,7 +36,15 @@ class GatewayClient:
         retry: RetryPolicy | None = None,
         client: httpx.Client | None = None,
         sleep: Callable[[float], None] | None = None,
+        seal: RequestSealer | None = None,
+        seal_attester: str | None = None,
+        seal_principal: str | None = None,
+        seal_secret: str | None = None,
     ) -> None:
+        """``seal=`` or ``seal_attester=`` enables ``x-gf-seal`` on every request.
+
+        The secret comes from ``seal_secret=`` or ``GF_SEAL_SECRET``.
+        """
         if not base_url:
             raise ValueError("base_url is required")
         self._base = base_url.rstrip("/")
@@ -37,6 +52,12 @@ class GatewayClient:
         self._headers = dict(headers or {})
         self._retry = retry or RetryPolicy()
         self._sleep = sleep or time.sleep
+        if seal is None and seal_attester:
+            seal = RequestSealer(
+                seal_attester, principal=seal_principal, seal_secret=seal_secret
+            )
+        self._seal = seal
+        self.last_request_id: str | None = None
         self._owns_client = client is None
         self._client = client or httpx.Client(
             base_url=self._base,
@@ -55,6 +76,19 @@ class GatewayClient:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
+    def _call_headers(self, request_id: str | None = None) -> dict[str, str]:
+        """Per-request headers: exactly one ``x-request-id`` plus the seal."""
+        rid = request_id or new_request_id()
+        if not valid_request_id(rid):
+            raise ValueError("request_id must match ^[A-Za-z0-9._:-]{1,128}$")
+        headers = {REQUEST_ID_HEADER: rid}
+        if self._seal is not None:
+            headers.update(self._seal.headers())
+        return headers
+
+    def _note_response(self, response: httpx.Response, sent_id: str) -> None:
+        self.last_request_id = response.headers.get(REQUEST_ID_HEADER) or sent_id
+
     def _request(
         self,
         method: str,
@@ -64,23 +98,48 @@ class GatewayClient:
         params: Mapping[str, Any] | None = None,
         idempotent: bool = False,
         cancel: CancelToken | None = None,
+        request_id: str | None = None,
     ) -> httpx.Response:
+        """Send one logical request.
+
+        Retries only when ``idempotent=True`` (opt-in). Seal handling:
+        503 ``seal_unavailable`` raises :class:`SkeletonSealConfigError` and is
+        never retried; 401 ``invalid_seal`` re-mints once and retries once.
+        """
         last_exc: Exception | None = None
         attempts = self._retry.max_attempts if idempotent else 1
-        for attempt in range(attempts):
+        resealed = False
+        attempt = 0
+        while attempt < attempts:
             if cancel is not None:
                 cancel.raise_if_cancelled()
+            headers = self._call_headers(request_id)
             try:
                 response = self._client.request(
                     method,
                     path,
                     json=json,
                     params=params,
+                    headers=headers,
                 )
             except httpx.TimeoutException as exc:
                 raise SkeletonTimeoutError(str(exc)) from exc
             except httpx.TransportError as exc:
                 raise SkeletonTransportError(str(exc)) from exc
+            self._note_response(response, headers[REQUEST_ID_HEADER])
+
+            if _seal_unavailable(response):
+                raise SkeletonSealConfigError(
+                    "server has no seal secret configured (503 seal_unavailable)"
+                )
+            if (
+                self._seal is not None
+                and not resealed
+                and _invalid_seal(response)
+            ):
+                resealed = True
+                self._seal.invalidate()
+                continue  # one re-mint + one retry, not counted as an attempt
 
             if (
                 idempotent
@@ -94,6 +153,7 @@ class GatewayClient:
                     body=_safe_body(response),
                 )
                 self._backoff(attempt, response, cancel)
+                attempt += 1
                 continue
             return response
 
@@ -168,10 +228,11 @@ class GatewayClient:
         *,
         json: Any = None,
         params: Mapping[str, Any] | None = None,
-        idempotent: bool = True,
+        idempotent: bool = False,
     ) -> tuple[int, Any]:
         """Return ``(status_code, body)`` without raising on HTTP errors.
 
+        Not retried unless ``idempotent=True`` is passed explicitly.
         Used by smoke probes and other callers that need the status even when
         the upstream returns 4xx/5xx.
         """
@@ -190,6 +251,22 @@ class GatewayClient:
 
     def retrieval_feedback(self, body: Mapping[str, Any]) -> dict[str, Any]:
         return self._json("POST", "/api/v1/retrieval/feedback", json=dict(body))
+
+
+def _error_code(response: httpx.Response) -> str | None:
+    try:
+        body = response.json()
+    except Exception:
+        return None
+    return body.get("error") if isinstance(body, dict) else None
+
+
+def _seal_unavailable(response: httpx.Response) -> bool:
+    return response.status_code == 503 and _error_code(response) == "seal_unavailable"
+
+
+def _invalid_seal(response: httpx.Response) -> bool:
+    return response.status_code == 401 and _error_code(response) == "invalid_seal"
 
 
 def _retry_after_seconds(value: str | None) -> float | None:

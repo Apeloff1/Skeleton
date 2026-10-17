@@ -171,10 +171,17 @@ class AgentsClient:
         *,
         limit: int = 100,
         last_event_id: str | None = None,
+        cursor: str | None = None,
         cancel: CancelToken | None = None,
     ) -> Iterator[StreamEvent]:
-        """Iterate swarm events (JSON snapshot today; SSE/NDJSON if served)."""
+        """PROVISIONAL: the transport is pending Walt's realtime decision and
+        will delegate to ``skeleton/client/realtime``.
+
+        Today this returns the events of the JSON snapshot. It does not
+        reconnect.
+        """
         return stream_events(
             self._gw, "/api/v1/swarm/events",
-            params={"limit": limit}, last_event_id=last_event_id, cancel=cancel,
+            params={"limit": limit}, last_event_id=last_event_id, cursor=cursor,
+            cancel=cancel, idempotent=True,
         )

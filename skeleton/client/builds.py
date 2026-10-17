@@ -107,11 +107,19 @@ class BuildsClient:
         cancel: CancelToken | None = None,
         *,
         last_event_id: str | None = None,
+        cursor: str | None = None,
     ) -> Iterator[StreamEvent]:
-        """Yield parsed progress events (SSE / NDJSON / JSON snapshot)."""
+        """PROVISIONAL: the transport is pending Walt's realtime decision and
+        will delegate to ``skeleton/client/realtime``.
+
+        Yields SSE v1 envelopes, or the events of today's JSON snapshot.
+        Resume uses ``last_event_id`` (sent as the Last-Event-ID header) or
+        ``cursor`` (sent as ``?cursor=``). It does not reconnect.
+        """
         return stream_events(
             self._gw, f"/api/v1/engine/executions/{_seg(execution_id)}/events",
-            params=self._scope(), last_event_id=last_event_id, cancel=cancel,
+            params=self._scope(), last_event_id=last_event_id, cursor=cursor,
+            cancel=cancel, idempotent=True,
         )
 
     def wait(
