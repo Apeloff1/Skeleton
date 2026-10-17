@@ -167,3 +167,33 @@ thousands of keys, late reads, rollovers and memory pressure.
 `scripts/test-connectivity-probe.cjs` tests stuck endpoint deadlines and
 background/foreground cancellation. Both run inside the existing
 Merge Readiness check and stability test command, not as new workflows.
+
+## Week/month work-cycle recovery receipts (sixth stability pass)
+
+`services/monthCycleLedger.ts` contains a 128-slot, alternating-write,
+checksummed and per-key serialized client observation registry, bounded to
+128 records / 128 KiB per namespace. This persists backend operation IDs
+and verified replay cursors across app restarts, without treating observation
+as server execution or a completion credential. Work remains registered for
+more than a year unless explicitly dismissed; terminal receipts can be
+trimmed after 180 days. Every job has a durable observation revision that
+rejects older network responses, including callbacks arriving within the
+same millisecond.
+
+`services/monthCycleRecovery.ts` reconciles due jobs only when invoked by
+the active app. It uses at most 32 receipts per pass, 1-4 network workers,
+per-attempt deadlines and capped retry backoff. It never creates a
+background service, renews an authorization, restarts a job or performs a
+mutating backend request.
+
+`services/monthCycleStudioAdapter.ts` and
+`services/monthCycleBuildAdapter.ts` integrate the existing governed,
+read-only status APIs, and `OperationBrowserSession.resumeDurable()` enrolls
+a canonical operation before replay. `monthCycleNative.ts` uses the
+existing AsyncStorage adapter.
+
+See `MONTH_CYCLE_RECOVERY.md` for a grounded runbook, backend authority
+boundaries, and remaining multi-day server/device certification. The same
+fast Merge Readiness test job now runs the month-cycle ledger (24 cases),
+recovery (16 cases), and integration (14 cases) suites, with no new
+workflow or CI queue burden.

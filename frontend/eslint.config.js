@@ -70,6 +70,11 @@ module.exports = defineConfig([
       'utils/safeTimers.ts',
       'utils/useNetworkStatus.ts',
       'src/product/buildJobLifecycle.ts',
+      'services/monthCycleLedger.ts',
+      'services/monthCycleRecovery.ts',
+      'services/monthCycleBuildAdapter.ts',
+      'services/monthCycleStudioAdapter.ts',
+      'services/monthCycleNative.ts',
     ],
     rules: {
       'react-hooks/exhaustive-deps': 'error',
