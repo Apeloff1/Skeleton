@@ -147,8 +147,8 @@ def parser() -> argparse.ArgumentParser:
         help="optional strict JSON manifest pinning exactly 43 keys from existing Jeeves catalog",
     )
     corpus.add_argument(
-        "--semantic-review-receipt", type=Path,
-        help="optional actual 43-lens inference receipt to verify and reference in corpus v3",
+        "--semantic-review-receipt", type=Path, action="append",
+        help="repeat once per native episode to export a complete, replay-verified v4 lens corpus",
     )
     corpus.add_argument("--semantic-lens-count", type=int, choices=(43, 200), default=43)
     corpus.add_argument(
@@ -260,8 +260,8 @@ def main(argv: list[str] | None = None) -> int:
                 if args.semantic_lens_set is not None else ()
             )
             runtime = load_offline_engine(args.reviewer_checkpoint).runtime
-            if (args.semantic_review_receipt is None) != (args.semantic_checkpoint is None):
-                raise RomStudyError("semantic review receipt and checkpoint must be supplied together")
+            if bool(args.semantic_review_receipt) != (args.semantic_checkpoint is not None):
+                raise RomStudyError("semantic review receipts and checkpoint must be supplied together")
             semantic_runtime = (
                 load_offline_engine(args.semantic_checkpoint).runtime
                 if args.semantic_checkpoint is not None else None
@@ -271,7 +271,7 @@ def main(argv: list[str] | None = None) -> int:
                 source_sha256=args.source_sha256,
                 output_dir=args.output_dir, runtime=runtime,
                 requested_semantic_lens_keys=keys,
-                semantic_review_receipt=args.semantic_review_receipt,
+                semantic_review_receipts=tuple(args.semantic_review_receipt or ()),
                 semantic_runtime=semantic_runtime,
                 semantic_lens_budget=args.semantic_lens_count,
             )
