@@ -16,7 +16,9 @@
  *
  * This is the app's single TypeScript HTTP transport. The envelope-style
  * `safeFetch`/`safeGetJson` API (formerly utils/safeFetch.ts) lives at the
- * bottom of this module alongside the `api` client.
+ * bottom of this module alongside the `api` client. Long-lived SSE reads
+ * (`openEventStream`, formerly utils/apiStream.ts) live here too, but they
+ * do not enter the request/retry/circuit-breaker path.
  */
 import { trail } from './breadcrumbs';
 import { API_BASE } from './apiBase';
@@ -565,6 +567,70 @@ export async function safeGetJson<T = any>(
   opts: Omit<FetchOpts, 'method' | 'body'> = {},
 ): Promise<FetchEnvelope<T>> {
   return safeFetch<T>(path, { ...opts, method: 'GET' });
+}
+
+// ── Streaming transport (SSE, ADR-realtime-transport v1) ─────────────────
+// Same API_BASE and the same module as every other app HTTP call. The read
+// stays off the retry/circuit-breaker path: a stream is one long response,
+// and src/foundation/realtime owns parsing, resume and backoff.
+export interface EventStreamOpts {
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+  onOpen?: (status: number) => void;
+  onChunk: (text: string) => void;
+}
+export type EventStreamEnd =
+  | { kind: 'eof' } | { kind: 'aborted' } | { kind: 'http'; status: number } | { kind: 'error'; error: string };
+
+type StreamFetch = (url: string, init: { headers: Record<string, string>; signal?: AbortSignal }) => Promise<{
+  ok: boolean; status: number;
+  headers?: { get?: (name: string) => string | null };
+  body?: { getReader?: () => { read: () => Promise<{ done: boolean; value?: Uint8Array }>; cancel?: () => Promise<void> } } | null;
+  text: () => Promise<string>;
+}>;
+
+function resolveStreamFetch(): StreamFetch {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const expoFetch = require('expo/fetch')?.fetch;
+    if (typeof expoFetch === 'function') return expoFetch as StreamFetch;
+  } catch { /* web and tests use global fetch */ }
+  return fetch as unknown as StreamFetch;
+}
+
+export async function openEventStream(path: string, opts: EventStreamOpts): Promise<EventStreamEnd> {
+  const url = /^https?:\/\//i.test(path) ? path : `${BACKEND}${path}`;
+  try {
+    const res = await resolveStreamFetch()(url, {
+      headers: { Accept: 'text/event-stream', 'Cache-Control': 'no-cache', ...opts.headers },
+      signal: opts.signal,
+    });
+    if (!res.ok) return { kind: 'http', status: res.status };
+    const contentType = res.headers?.get?.('content-type') ?? '';
+    if (contentType && !contentType.toLowerCase().includes('text/event-stream')) {
+      return { kind: 'error', error: 'not_event_stream' };
+    }
+    opts.onOpen?.(res.status);
+    const reader = res.body?.getReader?.();
+    if (!reader) {
+      // No streaming body on this platform: deliver what arrived; caller reconnects.
+      opts.onChunk(await res.text());
+      return { kind: 'eof' };
+    }
+    const decoder = new TextDecoder();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) opts.onChunk(decoder.decode(value, { stream: true }));
+    }
+    const tail = decoder.decode();
+    if (tail) opts.onChunk(tail);
+    return { kind: 'eof' };
+  } catch {
+    if (opts.signal?.aborted) return { kind: 'aborted' };
+    // Never surface raw exception text: it may echo signed URLs or headers.
+    return { kind: 'error', error: 'network_error' };
+  }
 }
 
 export default api;
