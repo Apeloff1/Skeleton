@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Sequence, Callable
 from typing import Any
 
 from .game_learning import _digest
@@ -150,8 +150,15 @@ def run_native_semantic_lenses(
     run_index: int = 0, requested_keys: Sequence[str] = (),
     seed: int = 0, max_new_tokens: int = 192,
     lens_budget: int = SEMANTIC_LENS_BUDGET,
+    completed_entries: Sequence[dict[str, Any]] = (),
+    on_entry: Callable[[int, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
-    """Perform 43 or 200 real local model calls against one verified episode."""
+    """Perform or replay 43/200 native model calls; checkpoint each committed lens.
+
+    Resumed entries never bypass the real model: native receipt replay checks
+    prompt, config, token output and model checkpoint before admitting a prefix.
+    The callback writes one lens after actual inference, never before it.
+    """
     from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 
     _require(isinstance(runtime, NativeLLMRuntime),
@@ -164,9 +171,49 @@ def run_native_semantic_lenses(
     runtime.assert_model_unchanged()
     model = runtime.model_digest
     _require(_sha(model), "native semantic review model identity not admitted")
-    entries = []
+    _require(type(completed_entries) in (tuple, list)
+             and len(completed_entries) <= lens_budget
+             and (on_entry is None or callable(on_entry)),
+             "native semantic resume requires bounded previous lens receipts")
+    from skeleton.ai.model_runtime.runtime_contracts import ReplayReceipt
+    entries: list[dict[str, Any]] = []
     for index, lens in enumerate(route["routes"]):
         prompt = _prompt(source, route, lens)
+        if index < len(completed_entries):
+            prior = completed_entries[index]
+            _require(type(prior) is dict and prior.get("lens_key") == lens["lens_key"]
+                     and prior.get("canonical_lens_governance_fingerprint") ==
+                     lens["governance_fingerprint"]
+                     and prior.get("prompt_sha256") ==
+                     hashlib.sha256(prompt.encode()).hexdigest()
+                     and type(prior.get("response")) is str
+                     and len(prior["response"].encode()) <= 4096
+                     and prior.get("response_sha256") ==
+                     hashlib.sha256(prior["response"].encode()).hexdigest()
+                     and prior.get("interpretation") == _interpret(
+                         prior["response"], lens_key=lens["lens_key"],
+                         trace=source["source_trace_sha256"],
+                     ), "resumed lens evidence has changed against source measurements")
+            try:
+                native_receipt = ReplayReceipt(**prior["native_inference_receipt"])
+            except (ValueError, TypeError, KeyError) as exc:
+                raise NativeSemanticInferenceError(
+                    "resumed native lens generation receipt malformed"
+                ) from exc
+            _require(native_receipt.model_digest == model
+                     and native_receipt.seed == seed + index,
+                     "resumed lens checkpoint identity or seed differs")
+            replayed = runtime.replay(
+                native_receipt, prompt, _config(seed + index, max_new_tokens),
+            )
+            runtime.assert_model_unchanged()
+            _require(replayed.text == prior["response"]
+                     and replayed.replay_receipt.to_dict() ==
+                     prior["native_inference_receipt"]
+                     and replayed.to_record() == prior["native_inference_record"],
+                     "resumed lens has no reproducing native model execution")
+            entries.append(prior)
+            continue
         result = runtime.generate(
             prompt, _config(seed + index, max_new_tokens),
         )
@@ -182,7 +229,7 @@ def run_native_semantic_lenses(
         text = result.text
         _require(type(text) is str and len(text.encode()) <= 4096,
                  "native lens model response exceeds evidence budget")
-        entries.append({
+        entry = {
             "lens_key": lens["lens_key"],
             "canonical_lens_governance_fingerprint": lens["governance_fingerprint"],
             "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
@@ -193,7 +240,10 @@ def run_native_semantic_lenses(
             ),
             "native_inference_receipt": native,
             "native_inference_record": record,
-        })
+        }
+        if on_entry is not None:
+            on_entry(index, entry)
+        entries.append(entry)
     receipt = {
         "schema_version": SCHEMA,
         "source_emulator_report_sha256": evidence["report_digest"],
