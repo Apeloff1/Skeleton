@@ -177,8 +177,8 @@ class AnnualSnapshotTests(unittest.TestCase):
         restored = AnnualProductionStore(recovered_path)
         self.assertEqual(restored.verify_chain("original-game"), 1)
         self.assertEqual(restored.verify_authority_chain("original-game"), 0)
-        self.assertEqual(restored.state("original-game").authority_expires_at, 0)
-        self.assertIsNone(restored.state("original-game").lease_expires_at)
+        self.assertEqual(restored.read("original-game").authority_expires_at, 0)
+        self.assertIsNone(restored.read("original-game").lease_expires_at)
         with self.assertRaises(PermissionError):
             restored.claim(
                 "original-game", worker="worker-2",
