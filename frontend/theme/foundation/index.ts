@@ -155,4 +155,3 @@ export function getTheme(mode: ThemeMode, skinId?: string | null, options: GetTh
   cache.set(key, resolved);
   return resolved;
 }
-
