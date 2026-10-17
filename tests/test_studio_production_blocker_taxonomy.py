@@ -21,6 +21,7 @@ class StudioProductionBlockerClassificationTests(unittest.TestCase):
             blocked("nintendo_game_boy", "rom", "toolchain_missing:rgbasm"),
             blocked("nintendo_game_boy", "rom", "compiled_handheld_original_art_mismatch"),
             blocked("nintendo_famicom", "rom", "compiled_nes_chr_original_art_mismatch"),
+            blocked("nintendo_game_boy", "rom", "compiled_original_psg_music_mismatch"),
             blocked("nintendo_famicom", "emulator", "fceux_not_installed"),
             blocked("nintendo_game_boy", "emulator", "pyboy_not_installed"),
             blocked("nintendo_famicom", "browser", "javascript_playthrough_not_qualified"),
@@ -32,7 +33,8 @@ class StudioProductionBlockerClassificationTests(unittest.TestCase):
         self.assertEqual(
             [row["category"] for row in result["findings"]],
             ["compiler_unavailable", "compiled_sprite_mismatch",
-             "compiled_sprite_mismatch", "nes_emulator_unavailable",
+             "compiled_sprite_mismatch", "compiled_audio_mismatch",
+             "nes_emulator_unavailable",
              "gameboy_emulator_unavailable", "browser_evidence_missing",
              "godot_evidence_missing", "controller_or_gameplay_divergence"],
         )
