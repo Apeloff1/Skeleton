@@ -120,3 +120,15 @@ def test_idempotency_mismatch_409(gated_client):  # noqa: F811
         pc.start_build(proj.project_id, target="b", idempotency_key="mm-build")
     assert ei.value.status_code == 409
     assert ei.value.code == projects_mod.PROJECT_ERROR_IDEMPOTENCY_MISMATCH
+
+
+def test_same_key_different_options_409(gated_client):  # noqa: F811
+    pc = _pc(gated_client, seal=RequestSealer("test-sdk"))
+    proj = pc.create("Options brief")
+    first = pc.start_build(proj.project_id, target="t", options={"a": 1}, idempotency_key="opt-k")
+    same = pc.start_build(proj.project_id, target="t", options={"a": 1}, idempotency_key="opt-k")
+    assert same.build_id == first.build_id and same.replayed is True
+    with pytest.raises(SkeletonHTTPError) as ei:
+        pc.start_build(proj.project_id, target="t", options={"a": 2}, idempotency_key="opt-k")
+    assert ei.value.status_code == 409
+    assert ei.value.code == projects_mod.PROJECT_ERROR_IDEMPOTENCY_MISMATCH

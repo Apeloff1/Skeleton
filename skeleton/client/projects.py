@@ -69,7 +69,6 @@ SDK_ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", PROJECTS_BASE_PATH + "/{project_id}/builds/{build_id}"),
 )
 
-_MAX_BRIEF_TEXT = 20000
 _MAX_TITLE = 200
 _MAX_SUMMARY = 8000
 _MAX_GENRE = 80
@@ -407,7 +406,10 @@ class ProjectsClient:
         if isinstance(brief, ProjectBrief):
             body["brief"] = brief.as_dict()
         else:
-            _check_len("brief", brief, lo=1, hi=_MAX_BRIEF_TEXT)
+            # skeleton.projects.v1 BriefInput: non-empty string, no upper bound (the
+            # server derives title<=200 / summary<=8000 from it).
+            if not isinstance(brief, str):
+                raise TypeError("brief must be a str or ProjectBrief")
             if not brief.strip():
                 raise ValueError("brief must be non-empty")
             body["brief"] = brief

@@ -116,9 +116,11 @@ def test_create_rejects_name_and_settings_and_bad_briefs():
         pc.create("b", name="n")
     with pytest.raises(ValueError):
         pc.create("b", settings={})
-    for bad in ("", "   ", "x" * 20001):
+    for bad in ("", "   "):
         with pytest.raises(ValueError):
             pc.create(bad)
+    with pytest.raises(TypeError):
+        pc.create(123)
     for bad in (
         {"title": ""}, {"title": "t" * 201}, {"title": "t", "summary": "s" * 8001},
         {"title": "t", "genre": "g" * 81}, {"title": "t", "constraints": ["c"] * 33},
@@ -409,3 +411,23 @@ def test_idempotency_mismatch_409_not_retried(call):
     assert ei.value.code == projects_mod.PROJECT_ERROR_IDEMPOTENCY_MISMATCH
     assert projects_mod.PROJECT_ERROR_STATUS[ei.value.code] == 409
     assert len(hits) == 1
+
+
+def test_long_text_brief_has_no_client_cap_and_cursor_is_opaque():
+    bodies, params = [], []
+
+    def handler(req):
+        if req.method == "POST":
+            bodies.append(json.loads(req.content))
+            return httpx.Response(201, json=PROJECT)
+        params.append(dict(req.url.params))
+        return httpx.Response(200, json={"schema_version": "1.0.0", "items": [], "next_cursor": "r:42"})
+
+    pc = _client(handler)
+    pc.create("x" * 30000)  # schema BriefInput has no maxLength
+    assert len(bodies[0]["brief"]) == 30000
+    page = pc.list()
+    assert page.next_cursor == "r:42"
+    pc.list(cursor=page.next_cursor)
+    pc.list_builds("p1", cursor="opaque/any:thing")
+    assert params[1] == {"cursor": "r:42"} and params[2] == {"cursor": "opaque/any:thing"}
