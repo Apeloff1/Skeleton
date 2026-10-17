@@ -72,6 +72,7 @@ class AnnualWorkRunner:
             raise ProductionConflict("runner not authorized for this subsystem")
         # Ensure the saved head and full ancestry have not been tampered with.
         self.store.verify_chain(production_id)
+        self.store.verify_authority_chain(production_id)
         claim = self.store.claim(production_id, worker=owner,
                                  authority_digest=authority_digest, now=started,
                                  lease_seconds=lease_seconds)
