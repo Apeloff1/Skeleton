@@ -70,7 +70,45 @@ _JS = r"""
 "use strict";
 const GAME = __SAFE_GAME_JSON__;
 const STUDIO_ART = GAME.studio_art || null;
+const STUDIO_MEDIA = GAME.studio_media || null;
 let spriteFrame = 0;
+let musicMuted = false;
+let musicVolume = 0.35;
+let effectsVolume = 0.55;
+let ambience = null;
+const sounds = Object.create(null);
+const overlays = [];
+function startStudioMedia(){
+ if(!STUDIO_MEDIA || typeof Audio === "undefined")return;
+ if(!ambience){
+  ambience = new Audio("data:audio/wav;base64,"+STUDIO_MEDIA.audio.ambient);
+  ambience.loop = true;
+ }
+ ambience.volume = musicMuted ? 0 : musicVolume;
+ const running = ambience.play();
+ if(running && typeof running.catch === "function")running.catch(()=>{});
+}
+function playStudioCue(kind){
+ if(!STUDIO_MEDIA || musicMuted || typeof Audio === "undefined")return;
+ const blob = STUDIO_MEDIA.audio[kind];
+ if(!blob)return;
+ if(!sounds[kind])sounds[kind]=new Audio("data:audio/wav;base64,"+blob);
+ const sound=sounds[kind];
+ sound.volume=effectsVolume;
+ sound.currentTime=0;
+ const running=sound.play();
+ if(running && typeof running.catch === "function")running.catch(()=>{});
+}
+function initStudioOverlays(){
+ if(!STUDIO_MEDIA || typeof Image === "undefined")return;
+ for(const data of STUDIO_MEDIA.parallax){
+  const picture=new Image();
+  picture.onload=()=>{if(state)draw();};
+  picture.src="data:image/png;base64,"+data;
+  overlays.push(picture);
+ }
+}
+
 const root=document.getElementById("screen");
 const ctx=root.getContext("2d",{alpha:false});
 const message=document.getElementById("message");
@@ -116,6 +154,7 @@ function reset(){
 }
 function takeTurn(direction){
  if(!Object.hasOwn(delta,direction)||state.status!=="playing")return;
+ startStudioMedia();
  if(replay.length>=20000){
   emit("The 20,000-turn replay budget is full. Undo or restart to continue.");
   return;
@@ -135,9 +174,11 @@ function takeTurn(direction){
  if(tile==="C"&&!state.collected.includes(poskey(nx,ny))){
   state.collected.push(poskey(nx,ny));state.score+=10;
   emit("Crystal collected! "+state.collected.length+" of "+lv.collectibles.length);
+  playStudioCue("collectible");
  }else if(tile==="H"&&entered){
   state.health--;
   emit("Hazard encountered: 1 health lost.");
+  playStudioCue("hazard");
  }else if(blocked){
   emit("A wall blocks that move.");
  }else{emit("Continue exploring.");}
@@ -242,6 +283,15 @@ function draw(){
  for(let y=0;y<lv.height;y++)for(let x=0;x<lv.width;x++){
   drawTile(lv.rows[y][x],x,y,size);
  }
+ // Transparency in author-generated PNGs composites foliage, shadows and
+ // atmospheric details over native-style tiles; the hero remains legible.
+ for(let index=0;index<overlays.length;index++){
+  const picture=overlays[index];
+  if(!picture.complete||!picture.naturalWidth)continue;
+  const drift=(state.steps*(index+1)*2)%root.width;
+  ctx.drawImage(picture,-drift,0,root.width,root.height);
+  if(drift)ctx.drawImage(picture,root.width-drift,0,root.width,root.height);
+ }
  const px=state.x*size,py=state.y*size;
  if(!drawStudioTile(5,state.x,state.y,size)){
  ctx.fillStyle="#ffffff";
@@ -283,7 +333,23 @@ for(const button of document.querySelectorAll("[data-action]")){
 nodes.undo.addEventListener("click",undo);
 document.getElementById("reset").addEventListener("click",reset);
 document.getElementById("download").addEventListener("click",downloadReplay);
+const mute=document.getElementById("music-mute");
+if(mute)mute.addEventListener("click",()=>{
+ musicMuted=!musicMuted;
+ mute.textContent=musicMuted?"Unmute audio":"Mute audio";
+ if(ambience)ambience.volume=musicMuted?0:musicVolume;
+});
+const musicScale=document.getElementById("music-volume");
+if(musicScale)musicScale.addEventListener("input",()=>{
+ musicVolume=Number(musicScale.value)/100;
+ if(ambience)ambience.volume=musicMuted?0:musicVolume;
+});
+const effectsScale=document.getElementById("effects-volume");
+if(effectsScale)effectsScale.addEventListener("input",()=>{
+ effectsVolume=Number(effectsScale.value)/100;
+});
 reset();
+initStudioOverlays();
 if(STUDIO_ART && STUDIO_ART.frames && STUDIO_ART.frames.length>1){
  window.setInterval(()=>{
   if(document.hidden)return;
@@ -369,6 +435,32 @@ def render_playable_world(
             raise PlayableExportError("verified, same-world original art pack required")
         studio_art.verify()
         descriptors = json.loads(dict(studio_art.files)["metadata/descriptors.json"])
+        from base64 import b64encode
+        media_files = dict(studio_art.files)
+        audio = {
+            kind: b64encode(media_files[f"audio/{kind}.wav"]).decode("ascii")
+            for kind in ("ambient", "collectible", "hazard")
+            if f"audio/{kind}.wav" in media_files
+        }
+        layers = sorted(name for name in media_files
+                        if name.startswith("parallax/") and name.endswith(".png"))
+        if audio:
+            # Only publish the full verified set. The JS player must never
+            # infer an absent cue from a filename or remote network call.
+            if set(audio) != {"ambient", "collectible", "hazard"}:
+                raise PlayableExportError("original PCM cue inventory is incomplete")
+            game_data["studio_media"] = {
+                "audio": audio,
+                "parallax": [
+                    b64encode(media_files[name]).decode("ascii") for name in layers
+                ],
+            }
+        elif layers:
+            game_data["studio_media"] = {
+                "audio": {}, "parallax": [
+                    b64encode(media_files[name]).decode("ascii") for name in layers
+                ],
+            }
         game_data["studio_art"] = {
             "pack_digest": studio_art.digest,
             "tiles": [list(tile) for tile in studio_art.runtime_tiles],
@@ -385,7 +477,7 @@ def render_playable_world(
         "default-src 'none'; "
         + "script-src '" + script_csp + "'; "
         + "style-src '" + css_csp + "'; "
-        + "img-src 'none'; font-src 'none'; connect-src 'none'; "
+        + "img-src data:; media-src data:; font-src 'none'; connect-src 'none'; "
         + "object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
     )
     title = escape(world.intent.title, quote=True)
@@ -447,7 +539,11 @@ def render_playable_world(
         '<section class="surface"><div class="toolbar">'
         '<button id="undo" type="button" aria-label="Undo last move">Undo (Z)</button>'
         '<button id="reset" type="button">Restart game (R)</button>'
-        '<button id="download" type="button">Export my run</button></div>'
+        '<button id="download" type="button">Export my run</button>'
+        + ('<button id="music-mute" type="button">Mute audio</button>'
+           '<label>Music <input id="music-volume" type="range" min="0" max="100" value="35"></label>'
+           '<label>Effects <input id="effects-volume" type="range" min="0" max="100" value="55"></label>'
+           if studio_art is not None else '') + '</div>'
         '<div class="details">'
         '<details><summary>Accessible text map and legend</summary>'
         '<p>Each character is one tile: # wall, . floor, S entry, '
