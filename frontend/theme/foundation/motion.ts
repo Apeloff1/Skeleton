@@ -4,7 +4,9 @@
  * state in = fast, out = base, press = micro at 0.97, shimmer = slow,
  * ambient fade = slow × 10, <= 3 flashes/s, one pulsing element per tier.
  */
-import { hud, motion } from '../tokens';
+import tokens, { hud } from '../tokens';
+
+const { motion } = tokens;
 
 export const duration = motion.duration;
 export const easing = motion.easing;
