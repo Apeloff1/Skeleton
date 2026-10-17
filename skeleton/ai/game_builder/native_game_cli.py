@@ -125,6 +125,15 @@ def build_game(
                 or hero_frames[0] != art_pack.runtime_tiles[5]):
             raise ValueError("native hero frames differ from original authored sprite")
         animation_delay = max(2, min(60, round(60 / art_pack.direction.animation_fps)))
+    psg_score = None
+    if (art_pack is not None
+            and target in ("nintendo_game_boy", "nintendo_game_boy_color",
+                           "nintendo_famicom")):
+        from .studio_native_psg import compose_native_psg
+        psg_score = compose_native_psg(
+            world.intent.theme, art_pack.direction.seed,
+            art_pack.direction.music_density,
+        )
     engine_package = None
     if art_pack is not None:
         # Existing canonical browser/Godot source owners, not a substitute
@@ -159,6 +168,7 @@ def build_game(
             project = compile_native_game_boy(
                 world, source, authorized=True, tile_art=tile_art,
                 hero_frames=hero_frames, animation_delay=animation_delay,
+                psg_score=psg_score,
             )
             folder = export_native_game_boy(project, output, authorized=True)
             artifact_type = "native_game_boy_rgbds_6502free_rom_source"
@@ -167,6 +177,7 @@ def build_game(
             project = compile_native_game_boy_color(
                 world, source, authorized=True, tile_art=tile_art,
                 hero_frames=hero_frames, animation_delay=animation_delay,
+                psg_score=psg_score,
             )
             folder = export_native_game_boy_color(project, output, authorized=True)
             artifact_type = "native_cgb_rgb555_rgbds_rom_source"
@@ -175,6 +186,7 @@ def build_game(
             project = compile_native_nes(
                 world, source, authorized=True, tile_art=tile_art,
                 hero_frames=hero_frames, animation_delay=animation_delay,
+                psg_score=psg_score,
             )
             folder = export_native_nes(project, output, authorized=True)
             artifact_type = "native_nes_6502_ca65_nrom_source"
@@ -335,6 +347,12 @@ def build_game(
             hero_frames is not None and len(hero_frames) > 1
         ),
         "native_hero_animation_runtime_executed": False,
+        "native_psg_score_digest": psg_score.digest if psg_score else None,
+        "native_psg_music_and_cues_source_integrated": bool(
+            psg_score and psg_score.density > 0
+        ),
+        "native_psg_audio_emulator_verified": False,
+        "native_psg_pcm_wav_equivalence_claimed": False,
     }
 
 
