@@ -368,14 +368,16 @@
       "Existing native source compilers produce platform-specific assembly/C and ROM build instructions for the 15 native_game_cli targets; no binary is built",
       "Existing canonical offline browser and Godot 4 source packages and interactive tile editor, with actual Python winning replay proof",
       "Original homebrew rights documentary intake remains canonical; no independent IP clearance is inferred",
-      "Jeeves game.console.catalog is read-only; game.console.source.stage is a source-generating, exact-CAS, human-approved source proposal, no unlimited writer"
+      "Jeeves game.console.catalog is read-only; game.console.source.stage is a source-generating, exact-CAS, human-approved source proposal, no unlimited writer",
+      "Original indexed pixels are now also embedded in the actual browser canvas source via existing canonical playable_export; CSS/CSP hash is regenerated from exact script bytes",
+      "Original indexed pixels are loaded from content-bound godot/studio_art.json by generated Godot 4 script and painted through draw_rect pixel rasterization over canonical gameplay; native execution still unverified"
     ],
     "trust": {
       "authoring": "explicit operator authority; source ownership references are non-certifying and project bound",
       "code_generation": "native emitters use trusted templates and deterministically generated game/world/art bytes; raw model code not executed",
       "source_writes": "user-visible original console source is staged for human approval; no direct model commit, shell or external SDK access",
       "quality": "actual Python gameplay and pixel roundtrips are evidence; no ROM compilation, emulator/hardware certification, rights clearance or professional aesthetic grade claimed",
-      "consistency": "world digest and verified replay bind native and browser/Godot sources; exact sprite digest binds native source to descriptor and PNG preview",
+      "consistency": "Same-world content-bound indexed tile/palette data is inserted into native GB/GBC/NES/SMS/GG source, browser GAME payload and Godot studio_art.json; matching pack digest is required, and core gameplay/replay ownership stays untouched",
       "preview": "PNG output is software generated, not a console framebuffer/hardware capture",
       "dragon": "observer remains advisory; no model weights or Dragon reviewed knowledge promoted by this implementation",
       "budgets": "3-level 19x15 synchronous Jeeves source stage; 1..4 frames and bounded tile/image/asset file production"
@@ -387,7 +389,7 @@
     "registered_suite": "jeeves-native-studio-art",
     "not_qualified": [
       "native console ROM compilation and hardware/emulator playthrough",
-      "custom pixel sprites displayed during actual browser/Godot play sessions, not just rendered sidecar images",
+      "runtime execution of newly inserted browser and Godot studio sprite rendering is not yet independently verified; source insertion does not prove playback",
       "native console hero animation frames actually driven by controller state for every target",
       "commercial platform native SDK and signed release builds",
       "full large-scale authoring and cross-engine 3D asset/material/mesh rendering",
