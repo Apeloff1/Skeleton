@@ -121,12 +121,47 @@ def parser() -> argparse.ArgumentParser:
         "--semantic-lens-set", type=Path,
         help="optional strict JSON manifest pinning exactly 43 keys from existing Jeeves catalog",
     )
+    native_semantics = commands.add_parser(
+        "execute-43-lenses",
+        help="run and replay all 43 canonical Jeeves semantic lens hypotheses on native emulator evidence",
+    )
+    native_semantics.add_argument("--receipt", required=True, type=Path)
+    native_semantics.add_argument("--review-receipt", required=True, type=Path)
+    native_semantics.add_argument("--source-sha256", required=True)
+    native_semantics.add_argument("--critic-checkpoint", required=True, type=Path)
+    native_semantics.add_argument("--semantic-checkpoint", required=True, type=Path)
+    native_semantics.add_argument("--output-dir", required=True, type=Path)
+    native_semantics.add_argument("--semantic-lens-set", type=Path)
+    native_semantics.add_argument("--run-index", type=int, default=0)
+    native_semantics.add_argument("--seed", type=int, default=0)
+    native_semantics.add_argument("--max-new-tokens", type=int, default=192)
     return root
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "execute-43-lenses":
+            from skeleton.ai.training.rom_triangle_campaign import (
+                execute_native_43_lens_review, load_operator_semantic_lens_set,
+            )
+            from skeleton.ai.model_runtime.offline_chat import load_offline_engine
+            requested = (
+                load_operator_semantic_lens_set(args.semantic_lens_set)
+                if args.semantic_lens_set is not None else ()
+            )
+            critic = load_offline_engine(args.critic_checkpoint).runtime
+            semantic = load_offline_engine(args.semantic_checkpoint).runtime
+            result = execute_native_43_lens_review(
+                args.receipt, args.review_receipt,
+                source_sha256=args.source_sha256,
+                output_dir=args.output_dir, critic_runtime=critic,
+                semantic_runtime=semantic, run_index=args.run_index,
+                requested_keys=requested, seed=args.seed,
+                max_new_tokens=args.max_new_tokens,
+            )
+            print(json.dumps(result, sort_keys=True))
+            return 0
         if args.operation == "triangle-lenses":
             from skeleton.ai.training.rom_triangle_campaign import (
                 inspect_native_episode_lenses,
