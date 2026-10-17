@@ -39,9 +39,12 @@ function main() {
   const script = matches[0][1];
   let rects = 0;
   let shapes = 0;
+  let overlayDraws = 0;
+  let audioStarts = 0;
   let timers = [];
   const ctx = {
     fillRect() { rects++; },
+    drawImage() { rects++; overlayDraws++; },
     strokeRect() { rects++; },
     beginPath() { shapes++; },
     moveTo() {}, lineTo() {}, closePath() {}, arc() {},
@@ -64,8 +67,27 @@ function main() {
     addEventListener(type, fn) { listeners[type] = fn; },
     createElement() { return node(); },
   };
+  class MockAudio {
+    constructor(src) {
+      if (!src.startsWith("data:audio/wav;base64,"))
+        throw new Error("audio attempted non-original or remote media");
+      this.paused = true; this.volume = 1; this.currentTime = 0;
+    }
+    play() { audioStarts++; this.paused=false; return Promise.resolve(); }
+  }
+  class MockImage {
+    constructor() {
+      this.complete=false; this.naturalWidth=0; this.onload=null;
+    }
+    set src(src) {
+      if (!src.startsWith("data:image/png;base64,"))
+        throw new Error("parallax attempted non-original or remote images");
+      this.complete=true;this.naturalWidth=88;
+      if(this.onload)this.onload();
+    }
+  }
   const sandbox = {
-    document,
+    document, Audio: MockAudio, Image: MockImage,
     window: {setInterval(fn, period) {
       if (typeof fn !== "function" || !(period >= 40 && period <= 1000))
         throw new Error("unsafe animation interval");
@@ -133,6 +155,15 @@ function main() {
       vm.runInContext("replay[0]", sandbox, {timeout: 100}) !== actions[0])
     throw new Error("actual onscreen directional button failed controller step");
   const studioArt = vm.runInContext("Boolean(STUDIO_ART)", sandbox, {timeout: 100});
+  const studioMedia = vm.runInContext("Boolean(STUDIO_MEDIA)", sandbox, {timeout: 100});
+  const expectedAudio = vm.runInContext(
+    "Boolean(STUDIO_MEDIA && STUDIO_MEDIA.audio.ambient)", sandbox, {timeout: 100});
+  const expectedLayers = vm.runInContext(
+    "(STUDIO_MEDIA && STUDIO_MEDIA.parallax.length)||0", sandbox, {timeout: 100});
+  if (expectedAudio && audioStarts < 1)
+    throw new Error("original soundtrack did not start on actual gameplay input");
+  if (expectedLayers && overlayDraws < expectedLayers)
+    throw new Error("original environmental graphics were not composited onto game canvas");
   const before = rects;
   for (const advance of timers) advance();
   if (studioArt && (timers.length !== 1 || rects <= before || rects < 64 * actions.length)) {
@@ -152,6 +183,11 @@ function main() {
     canvas_draw_calls: rects,
     canvas_shape_calls: shapes,
     original_sprites_drawn: !!studioArt,
+    original_soundtrack_playback_method_called: expectedAudio && audioStarts>0,
+    original_overlay_draw_calls: overlayDraws,
+    original_environment_layers: expectedLayers,
+    original_media_present: studioMedia,
+    audio_hardware_verified: false,
     original_animation_tick_exercised: !!studioArt && timers.length === 1,
     keyboard_input_verified: true,
     onscreen_button_input_verified: true,
