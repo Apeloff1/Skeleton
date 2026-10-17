@@ -400,8 +400,9 @@ def main(argv: list[str] | None = None) -> int:
             from skeleton.ai.training.rom_triangle_campaign import (
                 triangle_campaign_page, load_operator_semantic_lens_set,
             )
-            if (args.semantic_lens_set is not None or args.semantic_all_runs) and args.semantic_checkpoint is None:
-                raise RomStudyError("43-lens manifest and full-run mode require semantic checkpoint")
+            if (args.semantic_lens_set is not None or args.semantic_all_runs
+                    or args.semantic_lens_count == 200) and args.semantic_checkpoint is None:
+                raise RomStudyError("200-lens mode requires a real installed semantic checkpoint")
             keys = (
                 load_operator_semantic_lens_set(args.semantic_lens_set)
                 if args.semantic_lens_set is not None else ()
@@ -424,7 +425,7 @@ def main(argv: list[str] | None = None) -> int:
                     review_tokens=args.review_tokens,
                     semantic_runtime=semantic_runtime,
                     semantic_lens_keys=keys,
-                    semantic_all_runs=args.semantic_all_runs,
+                    semantic_all_runs=args.semantic_all_runs or args.semantic_lens_count == 200,
                     semantic_seed=args.semantic_seed,
                     semantic_tokens=args.semantic_tokens,
                     semantic_lens_budget=args.semantic_lens_count,
@@ -432,6 +433,8 @@ def main(argv: list[str] | None = None) -> int:
                 pages += 1
                 print(json.dumps({
                     **result, "page_number": pages,
+                    "semantic_lens_budget_requested": args.semantic_lens_count,
+                    "all_native_episodes_required": args.semantic_lens_count == 200,
                     "model_digest": runtime.model_digest,
                     "next_cursor_is_safe_to_advance": (
                         result["review_failures_needing_retry"] == 0
