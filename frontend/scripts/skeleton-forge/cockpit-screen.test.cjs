@@ -7,6 +7,8 @@ const composeFixture = require('./fixtures/compose.json');
 const m = load('src/skeletonForge/cockpitScreen.ts');
 
 test('deep-link tab parsing accepts aliases and rejects junk', () => {
+  assert.equal(m.parseTabParam('plan'), 'plan');
+  assert.equal(m.parseTabParam('build-plan'), 'plan');
   assert.equal(m.parseTabParam('run'), 'run');
   assert.equal(m.parseTabParam(' Questionnaire '), 'build');
   assert.equal(m.parseTabParam(['graph', 'eras']), 'compose');
@@ -87,8 +89,18 @@ test('badges reflect every panel signal', () => {
 });
 
 test('tab accessibility label carries position and status', () => {
-  assert.equal(m.tabA11yLabel('run', { text: '…', tone: 'warn', a11y: 'forging' }), 'Forge run, tab 3 of 5, forging');
-  assert.equal(m.tabA11yLabel('build', { text: null, tone: 'idle', a11y: '' }), 'Questionnaire, tab 1 of 5');
+  assert.equal(m.tabA11yLabel('run', { text: '…', tone: 'warn', a11y: 'forging' }), 'Forge run, tab 4 of 6, forging');
+  assert.equal(m.tabA11yLabel('plan', { text: '✓', tone: 'ok', a11y: 'plan ready' }), 'Build plan, tab 3 of 6, plan ready');
+  assert.equal(m.tabA11yLabel('build', { text: null, tone: 'idle', a11y: '' }), 'Questionnaire, tab 1 of 6');
+});
+
+test('plan badge follows the plan lifecycle', () => {
+  const s = m.initialScreenState();
+  assert.equal(m.tabBadges(s, { runPhase: 'idle', planState: 'ready' }).plan.a11y, 'plan ready');
+  assert.equal(m.tabBadges(s, { runPhase: 'running', planState: 'planning' }).plan.text, '…');
+  assert.equal(m.tabBadges(s, { runPhase: 'error', planState: 'failed' }).plan.tone, 'bad');
+  assert.equal(m.tabBadges(s, { runPhase: 'done', planState: 'degraded' }).plan.a11y, 'plan needs review');
+  assert.equal(m.tabBadges(s, { runPhase: 'idle' }).plan.text, null);
 });
 
 test('history recall is shell-like and de-duplicated', () => {

@@ -3,8 +3,10 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { tabIndexProp, webKeyProps, type KeyEventLike } from '../a11y';
 import type { Tone } from '../run';
-import { C, RADIUS, TONE_COLOR, TONE_GLYPH, TOUCH } from './theme';
+import { C, RADIUS, TONE_COLOR, TONE_GLYPH, TOUCH, pressFeedback } from './theme';
 
 export function Card({ children, style, label, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; label?: string; testID?: string }) {
   return (
@@ -31,12 +33,17 @@ export interface ChipProps {
   disabled?: boolean;
   role?: 'radio' | 'button' | 'tab' | 'checkbox';
   a11yLabel?: string;
+  /** Roving tab stop. Omitted on native, where tab order is the platform's. */
+  tabIndex?: 0 | -1;
+  onKeyDown?: (e: KeyEventLike) => void;
+  focusRef?: (node: { focus?: () => void } | null) => void;
   testID?: string;
 }
 
 /** Selectable pill; colour is never the only signal (✓ + aria state). */
-export function Chip({ label, selected = false, onPress, color = C.blue, disabled = false, role = 'radio', a11yLabel, testID }: ChipProps) {
+export function Chip({ label, selected = false, onPress, color = C.blue, disabled = false, role = 'radio', a11yLabel, tabIndex, onKeyDown, focusRef, testID }: ChipProps) {
   const checked = role === 'radio' || role === 'checkbox' ? selected : undefined;
+  const reduce = useReduceMotion();
   return (
     <Pressable
       testID={testID}
@@ -46,10 +53,13 @@ export function Chip({ label, selected = false, onPress, color = C.blue, disable
       accessibilityLabel={a11yLabel ?? label}
       accessibilityState={{ selected, disabled, checked }}
       hitSlop={4}
+      ref={focusRef as React.Ref<React.ComponentRef<typeof Pressable>>}
+      {...webKeyProps(onKeyDown)}
+      {...tabIndexProp(tabIndex)}
       style={({ pressed }) => [
         s.chip,
         selected && { backgroundColor: color + '26', borderColor: color },
-        pressed && !disabled && s.pressed,
+        pressFeedback(pressed && !disabled, reduce),
         disabled && s.disabled,
       ]}
     >
@@ -75,6 +85,7 @@ export function Button({
 }) {
   const bg = tone === 'primary' ? C.green : tone === 'danger' ? C.red : tone === 'secondary' ? C.blue : 'transparent';
   const fg = tone === 'primary' ? '#052e16' : tone === 'ghost' ? C.text : '#fff';
+  const reduce = useReduceMotion();
   return (
     <Pressable
       testID={testID}
@@ -89,7 +100,7 @@ export function Button({
         compact && s.btnCompact,
         { backgroundColor: bg },
         tone === 'ghost' && s.btnGhost,
-        pressed && !(disabled || busy) && s.pressed,
+        pressFeedback(pressed && !(disabled || busy), reduce),
         (disabled || busy) && s.disabled,
       ]}
     >

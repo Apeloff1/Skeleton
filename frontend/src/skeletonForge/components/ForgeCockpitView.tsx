@@ -5,6 +5,8 @@
  */
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { gridMove, keyAction, readKey, rovingTabIndex, tabIndexProp, webKeyProps, type KeyEventLike } from '../a11y';
 import {
   COCKPIT_TAB_HINTS, COCKPIT_TAB_LABELS, COCKPIT_TABS, tabA11yLabel, type CockpitTab, type TabBadge,
 } from '../cockpitScreen';
@@ -12,8 +14,20 @@ import CockpitConsole, { type CockpitConsoleProps } from './CockpitConsole';
 import ComposePanel, { type ComposePanelProps } from './ComposePanel';
 import EraViewer, { type EraViewerProps } from './EraViewer';
 import ForgeRunPanel, { type ForgeRunPanelProps } from './ForgeRunPanel';
+import PlanViewer, { type PlanViewerProps } from './PlanViewer';
 import QuestionnaireFlow, { type QuestionnaireFlowProps } from './QuestionnaireFlow';
-import { C, TONE_COLOR, TOUCH } from './theme';
+import { C, TONE_COLOR, TOUCH, pressFeedback } from './theme';
+
+/** Arrow keys move between cockpit tabs and wrap. Enter/Space stay on the tab's own press. */
+export function cockpitTabMove(current: CockpitTab, event: KeyEventLike): CockpitTab | null {
+  const { key, ctrl } = readKey(event);
+  if (keyAction(key)) return null;
+  const i = COCKPIT_TABS.indexOf(current);
+  if (i < 0) return null;
+  const next = gridMove(i, key, { cols: 1, count: COCKPIT_TABS.length, ctrl, wrap: true });
+  if (next === null || next === i) return null;
+  return COCKPIT_TABS[next];
+}
 
 export interface ForgeCockpitViewProps {
   tab: CockpitTab;
@@ -21,30 +35,53 @@ export interface ForgeCockpitViewProps {
   badges: Record<CockpitTab, TabBadge>;
   questionnaire: QuestionnaireFlowProps;
   compose: ComposePanelProps;
+  plan: PlanViewerProps;
   run: ForgeRunPanelProps;
   eras: EraViewerProps;
   console: CockpitConsoleProps;
   /** Optional offline/backend banner shown above every tab. */
   notice?: string | null;
+  /** Overrides the OS reduce-motion preference when set. */
+  reduceMotion?: boolean;
   testID?: string;
 }
 
-export function CockpitTabBar({ tab, onTab, badges }: Pick<ForgeCockpitViewProps, 'tab' | 'onTab' | 'badges'>) {
+export function CockpitTabBar({ tab, onTab, badges, reduceMotion }: Pick<ForgeCockpitViewProps, 'tab' | 'onTab' | 'badges' | 'reduceMotion'>) {
+  const systemReduce = useReduceMotion();
+  const reduce = reduceMotion ?? systemReduce;
+  const refs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const viaKey = React.useRef(false);
+  const index = COCKPIT_TABS.indexOf(tab);
+  React.useEffect(() => {
+    if (!viaKey.current) return;
+    viaKey.current = false;
+    refs.current[index]?.focus?.();
+  }, [index]);
+  const onKey = (event: KeyEventLike) => {
+    const next = cockpitTabMove(tab, event);
+    if (!next) return;
+    event.preventDefault?.();
+    viaKey.current = true;
+    onTab(next);
+  };
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabs} accessibilityRole="tablist">
-      {COCKPIT_TABS.map((t) => {
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabs} accessibilityRole="tablist" accessibilityLabel="Forge steps">
+      {COCKPIT_TABS.map((t, i) => {
         const active = t === tab;
         const badge = badges[t];
         return (
           <Pressable
             key={t}
+            ref={(n) => { refs.current[i] = n; }}
             testID={`cockpit-tab-${t}`}
             onPress={() => onTab(t)}
             accessibilityRole="tab"
             accessibilityLabel={tabA11yLabel(t, badge)}
             accessibilityState={{ selected: active }}
             aria-selected={active}
-            style={({ pressed }) => [st.tab, active && st.tabActive, pressed && { opacity: 0.75 }]}
+            {...tabIndexProp(rovingTabIndex(i, index))}
+            {...webKeyProps(onKey)}
+            style={({ pressed }) => [st.tab, active && st.tabActive, pressFeedback(pressed, reduce)]}
           >
             <Text style={[st.tabTxt, active && st.tabTxtActive]}>{COCKPIT_TAB_LABELS[t]}</Text>
             {badge.text ? (
@@ -60,14 +97,14 @@ export function CockpitTabBar({ tab, onTab, badges }: Pick<ForgeCockpitViewProps
 }
 
 export default function ForgeCockpitView(props: ForgeCockpitViewProps) {
-  const { tab, notice, testID } = props;
+  const { tab, notice, testID, reduceMotion } = props;
   return (
     <View style={st.root} testID={testID}>
       <View style={st.header}>
         <Text style={st.title} accessibilityRole="header">Skeleton Forge</Text>
         <Text style={st.subtitle}>{COCKPIT_TAB_HINTS[tab]}</Text>
       </View>
-      <CockpitTabBar tab={tab} onTab={props.onTab} badges={props.badges} />
+      <CockpitTabBar tab={tab} onTab={props.onTab} badges={props.badges} reduceMotion={reduceMotion} />
       {notice ? (
         <View style={st.notice} accessibilityRole="alert" testID="cockpit-notice">
           <Text style={st.noticeTxt}>{notice}</Text>
@@ -76,7 +113,8 @@ export default function ForgeCockpitView(props: ForgeCockpitViewProps) {
       <ScrollView contentContainerStyle={st.body} keyboardShouldPersistTaps="handled" testID={`cockpit-panel-${tab}`}>
         {tab === 'build' ? <QuestionnaireFlow {...props.questionnaire} /> : null}
         {tab === 'compose' ? <ComposePanel {...props.compose} /> : null}
-        {tab === 'run' ? <ForgeRunPanel {...props.run} /> : null}
+        {tab === 'plan' ? <PlanViewer {...props.plan} reduceMotion={props.plan.reduceMotion ?? reduceMotion} /> : null}
+        {tab === 'run' ? <ForgeRunPanel {...props.run} reduceMotion={props.run.reduceMotion ?? reduceMotion} /> : null}
         {tab === 'eras' ? <EraViewer {...props.eras} /> : null}
         {tab === 'console' ? <CockpitConsole {...props.console} /> : null}
       </ScrollView>

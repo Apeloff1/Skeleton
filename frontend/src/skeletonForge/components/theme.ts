@@ -1,4 +1,5 @@
 /** Forge cockpit compatibility colors from the canonical design-token module. */
+import type { ViewStyle } from 'react-native';
 import type { Tone } from '../run';
 import design, { breathing, radii } from '../../../theme/tokens';
 
@@ -33,3 +34,13 @@ export const TONE_GLYPH: Record<Tone, string> = {
 /** Shared touch and radius rules for cockpit controls. */
 export const TOUCH = breathing.minTouch;
 export const RADIUS = radii.md;
+
+/**
+ * Pressed-control feedback. Reduced motion keeps a colour-independent
+ * opacity change and drops the scale transform.
+ */
+export function pressFeedback(pressed: boolean, reduceMotion = false): ViewStyle | null {
+  if (!pressed) return null;
+  if (reduceMotion) return { opacity: 0.85 };
+  return { opacity: 0.75, transform: [{ scale: 0.98 }] };
+}
