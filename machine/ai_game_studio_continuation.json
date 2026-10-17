@@ -663,5 +663,133 @@
       "tests/test_studio_pixel_parity_e2e.py",
       "tests/test_studio_dragon_canvas_capture.py"
     ]
+  },
+  "jeeves_studio_audio_gamepad_dragon_learning_extension": {
+    "status": "source_implemented_pending_native_and_e2e_runtime_validation",
+    "tranche": "M61-M80",
+    "owners": [
+      "skeleton/ai/game_builder/playable_export.py",
+      "skeleton/ai/game_builder/dual_runtime_export.py",
+      "skeleton/ai/game_builder/studio_pixel_parity.py",
+      "skeleton/ai/game_builder/studio_runtime_qualification.py",
+      "skeleton/ai/game_builder/studio_godot_qualification.py",
+      "skeleton/ai/game_builder/studio_dragon_learning_bridge.py",
+      "skeleton/ai/game_builder/studio_dragon_lessons_cli.py"
+    ],
+    "milestones": [
+      {
+        "id": "M61",
+        "name": "Original synthesized WAV files actually embedded into offline HTML5 game media",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M62",
+        "name": "Original ambient PCM playback with user gesture and no per-turn restart",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M63",
+        "name": "Actual collectible and hazard event PCM cue playback path",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M64",
+        "name": "HTML5 music/effects volume scalers and mute UI controls",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M65",
+        "name": "Compositing original transparent environmental PNGs into gameplay canvas",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M66",
+        "name": "Actual Godot WAV audio assets emitted in runtime project and source manifest",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M67",
+        "name": "Godot ambient audio and event-sound AudioStreamPlayer sources",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M68",
+        "name": "Godot original parallax PNGs and scrolling scene overlay integration",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M69",
+        "name": "Godot headless qualifier stages exact original WAV/PNG resources",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M70",
+        "name": "Cross-engine original audio and parallax byte identity QA",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M71",
+        "name": "HTML5 Gamepad API supports D-pad and analog stick movement",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M72",
+        "name": "Gamepad B undo and Start restart with held-button edge debounce",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M73",
+        "name": "Generated Node runtime probe exercises actual gamepad/audio/overlay event paths",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M74",
+        "name": "Browser runtime receipts record distinct synthetic gamepad/audio/overlay measurements",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M75",
+        "name": "Dragon proposes hash-bound corrective lessons directly from assurance blockers",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M76",
+        "name": "Human-reviewed operational drafts and changed-source fail-closed gates",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M77",
+        "name": "Operator CLI and specialized E2E suite for original operational lesson feedback",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M78",
+        "name": "Native physical controller and emulator input/playback parity",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M79",
+        "name": "Real sound-card waveform/GPU parallax visual quality qualification",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M80",
+        "name": "Approved Dragon almanac promotion and actual checkpoint model training",
+        "state": "not_implemented"
+      }
+    ],
+    "implementation_checks": {
+      "generated_js_syntax_parsed_in_v8": true,
+      "runtime_audio_hardware_tested": false,
+      "godot_pcm_parallax_execution_verified": false,
+      "physical_controller_verified": false,
+      "actual_automated_weights_changed": false,
+      "user_display_captured_without_consent": false,
+      "tests_authored_not_passed": true
+    },
+    "suites": [
+      "jeeves-cross-engine-executable-gameplay",
+      "jeeves-dragon-reviewed-knowledge-gates"
+    ]
   }
 }
