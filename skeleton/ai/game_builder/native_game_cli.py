@@ -41,7 +41,8 @@ from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
 from .port_planner import HomebrewSource
-from .studio_asset_pipeline import ArtDirection, render_studio_art, export_studio_art
+from .studio_asset_pipeline import ArtDirection, render_studio_art, export_studio_art, _palette
+from .studio_sprite_authoring import ArtistSpriteAtlas, import_artist_sprite_png
 from .playable_compiler import compile_original_game
 from .dual_runtime_export import render_dual_runtime_package, export_dual_runtime_package
 from .rights_evidence import read_rights_evidence
@@ -73,6 +74,7 @@ def build_game(
     creative_identity: tuple[str, ...], output: str | Path, authorized: bool,
     studio_art: ArtDirection | None = None,
     theme: str = "forest",
+    artist_atlas: ArtistSpriteAtlas | None = None,
 ) -> dict[str, object]:
     """Create native-source projects from a deterministic game, never HTML."""
     if type(authorized) is not bool or not authorized:
@@ -99,10 +101,13 @@ def build_game(
         raise ValueError("world generator did not prove the original game playable")
     if studio_art is not None and not isinstance(studio_art, ArtDirection):
         raise TypeError("studio art direction must be typed")
+    if artist_atlas is not None and studio_art is None:
+        raise ValueError("artist sprite source requires real studio asset generation")
     # Preflight and actually render assets BEFORE the source exporter creates
     # its destination. Invalid art cannot leave a half-created source project.
     art_pack = (
-        render_studio_art(world, target=target, direction=studio_art, authorized=True)
+        render_studio_art(world, target=target, direction=studio_art,
+                          authorized=True, artist_atlas=artist_atlas)
         if studio_art is not None else None
     )
     tile_art = art_pack.runtime_tiles if art_pack is not None else None
@@ -320,6 +325,12 @@ def main() -> None:
     parser.add_argument("--identity", required=True, action="append")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--authorize-original-homebrew", action="store_true")
+    parser.add_argument("--studio-artist-png", type=Path,
+                        help="Existing original 48x8 PNG atlas to convert into real native tile pixels")
+    parser.add_argument("--studio-artist-png-sha256",
+                        help="Exact original PNG SHA-256; required with --studio-artist-png")
+    parser.add_argument("--studio-artist-quantization",
+                        choices=("exact", "nearest", "ordered4"), default="nearest")
     parser.add_argument("--studio-assets", action="store_true",
                         help="Generate actual sprites, encoded native tiles and PNG previews")
     parser.add_argument("--studio-style",
@@ -336,6 +347,34 @@ def main() -> None:
     parser.add_argument("--studio-music-density", type=int, choices=range(5), default=2)
     parser.add_argument("--studio-animation-fps", type=int, choices=range(1, 25), default=4)
     args = parser.parse_args()
+    studio_art = (
+        ArtDirection(
+            style=args.studio_style, contrast=args.studio_contrast,
+            animation_frames=args.studio_animation_frames, seed=args.seed,
+            outline=not args.studio_no_outline,
+            highlight=not args.studio_no_highlight,
+            foliage_density=args.studio_foliage,
+            shadow_strength=args.studio_shadow,
+            parallax_layers=args.studio_parallax_layers,
+            music_density=args.studio_music_density,
+            animation_fps=args.studio_animation_fps,
+        ) if args.studio_assets else None
+    )
+    artist_atlas = None
+    if args.studio_artist_png is not None:
+        if studio_art is None or not args.studio_artist_png_sha256:
+            parser.error("--studio-artist-png requires --studio-assets and an exact PNG SHA-256")
+        source = args.studio_artist_png
+        if source.is_symlink() or not source.is_file() or source.stat().st_size > 1024 * 1024:
+            parser.error("artist image must be an existing bounded regular PNG")
+        artist_atlas = import_artist_sprite_png(
+            source.read_bytes(), expected_sha256=args.studio_artist_png_sha256,
+            palette=_palette(args.theme, studio_art.contrast),
+            quantization=args.studio_artist_quantization,
+            authorized=args.authorize_original_homebrew,
+        )
+    elif args.studio_artist_png_sha256:
+        parser.error("an artist PNG hash without an input PNG is not an art source")
     result = build_game(
         target=args.target, basis=args.basis, project_id=args.project_id,
         title=args.title, seed=args.seed, width=args.width, height=args.height,
@@ -345,19 +384,8 @@ def main() -> None:
         creative_identity=tuple(args.identity), output=args.output,
         authorized=args.authorize_original_homebrew,
         theme=args.theme,
-        studio_art=(
-            ArtDirection(
-                style=args.studio_style, contrast=args.studio_contrast,
-                animation_frames=args.studio_animation_frames,
-                seed=args.seed, outline=not args.studio_no_outline,
-                highlight=not args.studio_no_highlight,
-                foliage_density=args.studio_foliage,
-                shadow_strength=args.studio_shadow,
-                parallax_layers=args.studio_parallax_layers,
-                music_density=args.studio_music_density,
-                animation_fps=args.studio_animation_fps,
-            ) if args.studio_assets else None
-        ),
+        studio_art=studio_art,
+        artist_atlas=artist_atlas,
     )
     print(json.dumps(result, sort_keys=True))
 
