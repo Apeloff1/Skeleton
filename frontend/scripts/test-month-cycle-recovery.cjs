@@ -234,3 +234,19 @@ test('one failed backend result does not block a neighboring due operation', asy
   assert.equal(report.disconnected, 1);
   assert.equal(report.terminalObserved, 1);
 });
+
+test('malformed worker output is a disconnect, not a batch crash or false success', async () => {
+  const ledger = await start(3);
+  const result = await controller(ledger, async () => ({ phase: 'unknown' })).reconcileDue();
+  assert.equal(result.disconnected, 3);
+  assert.equal(result.terminalObserved, 0);
+});
+test('invalid cursor from a worker does not poison a month-old ledger receipt', async () => {
+  const ledger = await start();
+  await controller(ledger, async () =>
+    ({ phase: 'completed', cursor: Number.POSITIVE_INFINITY })).reconcileDue();
+  const row = (await ledger.inspect())[0];
+  assert.equal(row.status, 'disconnected');
+  assert.equal(row.terminalState, null);
+  assert.equal(row.cursor, 0);
+});

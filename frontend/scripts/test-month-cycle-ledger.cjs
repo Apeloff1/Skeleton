@@ -231,3 +231,23 @@ test('fresh receipt version can later record a true terminal response', async ()
   assert.equal(result.cursor, 99);
   assert.equal(result.observationRevision, 2);
 });
+
+test('native acknowledgement is not trusted when read-back returns corrupt data', async () => {
+  const st = store(), ledger = new Ledger(st, 'alice');
+  const receipt = await open(ledger);
+  const original = st.setItem;
+  st.setItem = async (key, data) => {
+    if (key.endsWith(':b')) return original(key, '{"corrupt":true}');
+    return original(key, data);
+  };
+  await assert.rejects(ledger.observe(receipt, {
+    phase: 'observing', cursor: 50, now: START + 500,
+  }), /verification/);
+  assert.equal((await ledger.inspect())[0].cursor, 0);
+});
+test('newly created slots must be readable before a job is advertised as registered', async () => {
+  const st = store(), ledger = new Ledger(st, 'alice');
+  st.setItem = async () => {}; // acknowledges but physically does not write
+  await assert.rejects(open(ledger), /verification/);
+  assert.deepEqual(await ledger.inspect(), []);
+});
