@@ -27,6 +27,9 @@ from .studio_pixel_parity import inspect_cross_engine_pixels
 from .studio_game_boy_emulator import qualify_game_boy_emulator
 from .studio_nes_emulator import qualify_nes_cpu_ppu
 from .studio_nes_chr_parity import NESCHRIntegrityError, inspect_compiled_nes_chr
+from .studio_game_boy_rom_art_parity import (
+    GameBoyROMArtError, inspect_compiled_game_boy_art,
+)
 from .studio_dragon_canvas_capture import capture_generated_game, _png_geometry
 
 SCHEMA = "skeleton.game_builder.production_assurance.v1"
@@ -130,6 +133,16 @@ def _qualification_receipt(root: Path, target: str, source_identity: str) -> dic
             raise StudioAssuranceError("RGBDS game engine symbol map unavailable") from exc
         if sha256(raw_symbols).hexdigest() != evidence.get("symbol_sha256"):
             raise StudioAssuranceError("ROM WRAM debug symbols differ from compilation")
+        if target in ("nintendo_game_boy", "nintendo_game_boy_color"):
+            try:
+                inspect_compiled_game_boy_art(
+                    body, raw_symbols, source,
+                    color=target == "nintendo_game_boy_color",
+                )
+            except GameBoyROMArtError as exc:
+                raise StudioAssuranceError(
+                    "actual handheld cartridge sprite bytes differ from source"
+                ) from exc
     return record
 
 
@@ -187,6 +200,24 @@ def qualify_campaign_target(
                 "source_identity": identity,
                 "model_training_performed": False,
             }
+        if target in ("nintendo_game_boy", "nintendo_game_boy_color"):
+            try:
+                inspect_compiled_game_boy_art(
+                    _regular(output, 8 * 1024 * 1024),
+                    _regular(output.with_suffix(".sym"), 128_000),
+                    base / "targets" / target,
+                    color=target == "nintendo_game_boy_color",
+                )
+            except (GameBoyROMArtError, OSError, ValueError):
+                if sha256(_regular(output, 8 * 1024 * 1024)).hexdigest() != result.binary_sha256:
+                    raise StudioAssuranceError("unexpected ROM mutation during tile rejection")
+                output.unlink()
+                output.with_suffix(".sym").unlink()
+                return {
+                    "target": target, "native_rom_compiled": False,
+                    "blocker": "compiled_handheld_original_art_mismatch",
+                    "source_identity": identity, "model_training_performed": False,
+                }
         if target == "nintendo_famicom":
             try:
                 inspect_compiled_nes_chr(_regular(output, 8 * 1024 * 1024),
