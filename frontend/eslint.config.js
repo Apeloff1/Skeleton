@@ -55,7 +55,13 @@ module.exports = defineConfig([
       'hooks/usePowerAwareness.ts',
       'hooks/useThermalGuard.ts',
       'hooks/useStability.ts',
+      'hooks/useStorage.ts',
+      'hooks/useMobileOptimization.ts',
+      'hooks/usePushNotifications.ts',
+      'hooks/useTunnelHealth.ts',
       'utils/thermalGuard.ts',
+      'utils/resilientNet.ts',
+      'services/synergy.ts',
     ],
     rules: {
       'react-hooks/exhaustive-deps': 'error',
