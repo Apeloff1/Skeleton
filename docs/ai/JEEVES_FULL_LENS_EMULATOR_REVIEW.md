@@ -70,3 +70,19 @@ python scripts/check_enterprise_ai_implementation_notes.py --json
 ~~~
 
 **L00–L13:** This is an extension under existing Jeeves game-learning ownership. It uses established admission and source rights, a versioned contract, bounded read-only operation, source lineage and fail-closed integrity checks, no new authoritative durable state, privacy-safe metadata output, deterministic recovery by replaying a pinned source, output-page limits and create-only file permissions, adversarial regression tests and explicit operator controls. A rollback removes the review command without changing existing native training artifacts or promoted models. Enterprise/game-studio release remains unqualified until the separate validators, real native games, Dragon capture and independent checkpoint training pass.
+
+### All-page catalog completion audit
+
+To confirm that **every registered lens** received a source-pinned review
+task, collect successive results from
+`review_verified_training_report(report, offset=offset, limit=512)`,
+following `next_offset` until it is null. Call
+`audit_lens_campaign(pages)` from
+`skeleton.jeeves.game_emulator_lens_campaign`. The auditor checks page
+digests, fixed source-report identity, the current complete catalog, exact
+lens ordering, page boundaries, review identifiers and still-open Dragon and
+adversarial lanes. Missing, duplicated, altered or prematurely promoted
+pages fail closed. Its `full_registered_catalog_covered` flag is a
+**review-task-coverage** result, never proof of native emulator replay,
+independent Dragon watching, adversarial execution, gradient updates or
+game completion.
