@@ -161,6 +161,13 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
             or len(set(requested_keys)) != len(requested_keys)
             or (requested_keys and max_lenses != len(requested_keys))):
         raise TriangleSemanticError("custom semantic lens allocation needs 43 or 200 unique canonical keys")
+    if max_lenses == EXTENDED_SEMANTIC_LENS_BUDGET:
+        from .game_emulator_triangle_complete_lenses import (
+            route_complete_lens_catalog,
+        )
+        return route_complete_lens_catalog(
+            episode, requested_keys=tuple(requested_keys),
+        )
     router, catalog_digest, catalog_count = _canonical_router()
     observations = _source_observations(episode)
     if requested_keys:
