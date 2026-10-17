@@ -1,33 +1,29 @@
-"""Decompose a game brief into a swarm dependency graph.
+"""Plan production notes for a compiled design spec.
 
-The canonical plan is deterministic. An injected model may propose a graph,
-and that proposal is used only when it matches the required gates. Anything
-else falls back to the canonical plan so CI stays deterministic and a bad
-model cannot drop QA or invent a cycle.
+The canonical graph is deterministic. An injected model may propose the same
+graph, and that proposal is used only when every gate matches. Anything else
+falls back to the canonical plan. The plan annotates ``skeleton.game_design_spec.v1``.
+It does not schedule a second game build.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Protocol
+from typing import Any, Protocol
 
 from skeleton.automation.swarm.dag import SwarmDag
 from skeleton.automation.swarm.studio.roles import StudioRole
 
 
 class PlanError(ValueError):
-    """The brief cannot be planned."""
+    """The spec cannot be planned."""
 
 
 class ModelClient(Protocol):
     def complete(self, *, role: str, prompt: str) -> Mapping[str, Any] | None:
         """Return a task graph, or None to keep the deterministic plan."""
-
-
-GENRES = frozenset({"rpg", "arcade", "puzzle", "narrative", "platformer", "adventure"})
-GENRE_ALIASES = {"platform": "platformer", "action": "arcade", "story": "narrative"}
-CONSTRAINTS = frozenset({"omit-win-item", "small-cast", "no-combat"})
 
 
 @dataclass(frozen=True)
@@ -48,7 +44,7 @@ class PlannedTask:
         }
 
     @classmethod
-    def from_dict(cls, raw: Mapping[str, Any]) -> "PlannedTask":
+    def from_dict(cls, raw: Mapping[str, Any]) -> PlannedTask:
         return cls(
             id=str(raw["id"]),
             role=StudioRole(str(raw["role"])),
@@ -58,73 +54,78 @@ class PlannedTask:
         )
 
 
-def normalize_brief(raw: Mapping[str, Any] | None) -> dict[str, Any]:
-    if not isinstance(raw, Mapping):
-        raise PlanError("brief must be an object")
-    genre = str(raw.get("genre") or "adventure").strip().lower()
-    genre = GENRE_ALIASES.get(genre, genre)
-    if genre not in GENRES:
-        genre = "adventure"
-    title = _clean_line(raw.get("title")) or "Untitled Game"
-    pitch = raw.get("pitch") if isinstance(raw.get("pitch"), str) else ""
-    constraints: list[str] = []
-    for item in raw.get("constraints") or ():
-        if isinstance(item, str) and item in CONSTRAINTS and item not in constraints:
-            constraints.append(item)
-    must: list[str] = []
-    for item in raw.get("must_include") or ():
-        cleaned = _clean_line(item)
-        if cleaned and cleaned.lower() not in {entry.lower() for entry in must}:
-            must.append(cleaned[:40])
-    return {
-        "title": title[:80],
-        "genre": genre,
-        "pitch": pitch,
-        "constraints": constraints,
-        "must_include": must[:12],
-    }
-
-
-def canonical_plan(brief: Mapping[str, Any]) -> tuple[PlannedTask, ...]:
-    title = str(brief.get("title") or "game")
+def canonical_plan(spec: Mapping[str, Any]) -> tuple[PlannedTask, ...]:
+    title = str(spec.get("title") or "game")
     return (
         PlannedTask("director", StudioRole.DIRECTOR, "studio.director", (), f"Direct {title}"),
-        PlannedTask("design", StudioRole.DESIGNER, "studio.design", ("director",), "Define the core loop"),
-        PlannedTask("systems", StudioRole.SYSTEMS, "studio.systems", ("design",), "Specify mechanics"),
-        PlannedTask("level", StudioRole.LEVEL, "studio.level", ("design",), "Lay out spaces"),
-        PlannedTask("narrative", StudioRole.NARRATIVE, "studio.narrative", ("design",), "Write beats"),
-        PlannedTask("art", StudioRole.ART, "studio.art", ("design",), "List assets"),
+        PlannedTask("design", StudioRole.DESIGNER, "studio.design", ("director",), "Record the core loop"),
+        PlannedTask("systems", StudioRole.SYSTEMS, "studio.systems", ("design",), "Name the mechanics"),
+        PlannedTask("level", StudioRole.LEVEL, "studio.level", ("design",), "Note the layout"),
+        PlannedTask("narrative", StudioRole.NARRATIVE, "studio.narrative", ("design",), "Note the beats"),
+        PlannedTask("art", StudioRole.ART, "studio.art", ("design",), "List asset requests"),
         PlannedTask("audio", StudioRole.AUDIO, "studio.audio", ("design",), "List cues"),
-        PlannedTask(
-            "integrate",
-            StudioRole.SYSTEMS,
-            "studio.integrate",
-            ("systems", "level", "narrative", "art", "audio"),
-            "Assemble the playable",
-        ),
-        PlannedTask("qa", StudioRole.QA, "studio.qa", ("integrate",), "Playtest the loop"),
     )
 
 
 def plan_brief(
-    brief: Mapping[str, Any],
+    spec: Mapping[str, Any],
     *,
     model: ModelClient | None = None,
 ) -> tuple[PlannedTask, ...]:
-    """Return the dependency graph for one brief."""
-    normalized = normalize_brief(brief)
-    fallback = canonical_plan(normalized)
+    """Return the planning graph for one compiled spec."""
+    if not isinstance(spec, Mapping) or spec.get("schema_version") != "skeleton.game_design_spec.v1":
+        raise PlanError("planner requires skeleton.game_design_spec.v1")
+    fallback = canonical_plan(spec)
     if model is None:
         return fallback
     try:
         proposed = model.complete(
             role="planner",
-            prompt=json.dumps(normalized, sort_keys=True, separators=(",", ":")),
+            prompt=json.dumps(
+                {"spec_id": spec.get("spec_id"), "genre": spec.get("genre"), "title": spec.get("title")},
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 — a bad model proposal falls back to the canonical plan
         return fallback
     accepted = _accept_proposal(proposed, fallback)
     return accepted if accepted is not None else fallback
+
+
+def apply_plan(spec: Mapping[str, Any], artefacts: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """Copy planner notes onto the spec without changing the committed game."""
+    enriched = dict(spec)
+    director = artefacts.get("director") if isinstance(artefacts.get("director"), Mapping) else {}
+    design = artefacts.get("design") if isinstance(artefacts.get("design"), Mapping) else {}
+    title = director.get("title")
+    if isinstance(title, str) and title.strip():
+        enriched["title"] = " ".join(title.split())[:48]
+    fantasy = design.get("fantasy")
+    if isinstance(fantasy, str) and fantasy.strip():
+        enriched["fantasy"] = " ".join(fantasy.split())[:180]
+    loop = design.get("core_loop")
+    if isinstance(loop, str) and loop.strip():
+        enriched["core_loop"] = " ".join(loop.split())[:180]
+    notes: dict[str, str] = {}
+    pillar = director.get("pillar")
+    if isinstance(pillar, str) and pillar.strip():
+        notes["pillar"] = " ".join(pillar.split())[:240]
+    systems = artefacts.get("systems") if isinstance(artefacts.get("systems"), Mapping) else {}
+    mechanics = systems.get("mechanics")
+    if isinstance(mechanics, list) and mechanics:
+        notes["mechanics"] = ", ".join(str(item) for item in mechanics[:8])[:240]
+    level = artefacts.get("level") if isinstance(artefacts.get("level"), Mapping) else {}
+    layout = level.get("layout")
+    if isinstance(layout, str) and layout.strip():
+        notes["layout"] = " ".join(layout.split())[:240]
+    narrative = artefacts.get("narrative") if isinstance(artefacts.get("narrative"), Mapping) else {}
+    beats = narrative.get("beats")
+    if isinstance(beats, list) and beats:
+        notes["beats"] = ", ".join(str(item) for item in beats[:6])[:240]
+    if notes:
+        enriched["production"] = notes
+    return enriched
 
 
 def _accept_proposal(
@@ -152,31 +153,8 @@ def _accept_proposal(
             if tuple(task.deps) != canonical.deps:
                 return None
             dag.submit(task.id, task.capability, {"goal": task.goal}, list(task.deps))
-    except Exception:
+    except Exception:  # noqa: BLE001 — a bad model proposal falls back to the canonical plan
         return None
     if dag.ready_wave()[0].id != "director":
         return None
     return tasks
-
-
-def _clean_line(value: object) -> str:
-    if not isinstance(value, str):
-        return ""
-    text = " ".join(value.split())
-    lowered = text.lower()
-    blocked = (
-        "ignore previous",
-        "jailbreak",
-        "<|system|>",
-        "http://",
-        "https://",
-        "../",
-        "subprocess",
-        "api_key",
-        "password",
-        "secret",
-        "token",
-    )
-    if any(marker in lowered for marker in blocked):
-        return ""
-    return text

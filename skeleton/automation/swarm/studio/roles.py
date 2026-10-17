@@ -8,9 +8,9 @@ keys it must leave behind.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Mapping
 
 from skeleton.automation.swarm.roles import RoleRegistry
 from skeleton.automation.swarm.types import AgentRole
@@ -101,10 +101,10 @@ STUDIO_ROLES: dict[StudioRole, HandoffContract] = {
     StudioRole.QA: HandoffContract(
         StudioRole.QA,
         "studio.qa",
-        "Run the build headless and file loop defects back to the planner.",
+        "Score the Godot checker, core-loop marker, and headless boot, then file defects.",
         "GUARDIAN",
-        ("schema",),
-        ("summary", "booted", "loop_works"),
+        ("schema_version",),
+        ("summary", "passed"),
     ),
 }
 
@@ -112,8 +112,7 @@ STUDIO_ROLES: dict[StudioRole, HandoffContract] = {
 TASK_OUTPUTS: dict[str, tuple[str, ...]] = {
     contract.capability: contract.produces for contract in STUDIO_ROLES.values()
 }
-TASK_OUTPUTS["studio.integrate"] = ("schema", "title", "rooms")
-TASK_OUTPUTS["studio.repair"] = ("summary", "playable")
+TASK_OUTPUTS["studio.repair"] = ("summary", "actions")
 
 
 def production_role_registry() -> RoleRegistry:
@@ -132,7 +131,6 @@ def production_role_registry() -> RoleRegistry:
             "studio.systems",
             "studio.art",
             "studio.audio",
-            "studio.integrate",
             "studio.repair",
         ),
     )
@@ -147,9 +145,7 @@ def _present(value: object) -> bool:
         return len(value) > 0
     if isinstance(value, bool):
         return True
-    if isinstance(value, (int, float)):
-        return True
-    return False
+    return isinstance(value, (int, float))
 
 
 def validate_artefact(role: StudioRole, artefact: Mapping[str, object]) -> None:

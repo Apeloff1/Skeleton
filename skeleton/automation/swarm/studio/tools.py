@@ -3,6 +3,11 @@
 File, process, test, and asset calls are untrusted payloads. The kernel
 sandbox remains the grant authority. This module never widens a sealed
 policy, never uses a shell, and refuses the injection corpus on preflight.
+
+An allowlisted ``python`` or ``python3`` argv runs workspace code with the
+host interpreter (``sys.executable``), not a separately installed binary.
+The process grant still requires that basename on the allowlist, and the
+spawn uses ``shell=False`` with a scrubbed environment.
 """
 
 from __future__ import annotations
@@ -11,8 +16,9 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any
 
 from skeleton.kernel.sandbox import Sandbox
 from skeleton.security.generated_code_sandbox import (

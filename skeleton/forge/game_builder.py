@@ -5,12 +5,20 @@ static GDScript checker, forge repair pass, and headless Godot playtest.
 The design spec and content bundle are committed by this module; Godot is
 the engine target. Repair reads checker and engine errors and retries a
 bounded number of times.
+
+``planner`` and ``qa`` are optional hooks. The default is a no-op. A planner
+may enrich ``skeleton.game_design_spec.v1`` without changing the committed
+genre, engine, brief, or scope. QA reviews the checker, core loop, and
+Godot playtest. When QA sets ``repair_requested``, this function runs one
+more ``prove_and_repair`` pass. Hooks do not materialise a second project.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
-from typing import Any, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, Protocol
 
 from skeleton.forge.game_content import CONTENT_SCHEMA, generate_content
 from skeleton.forge.game_design_spec import SCHEMA_VERSION, compile_brief
@@ -31,6 +39,109 @@ STUBBED = (
     "provider model proposals; the deterministic compiler is the commit authority",
     "vehicle dynamics past one kinematic integration proof",
 )
+
+_LOCKED_SPEC_FIELDS = ("schema_version", "version", "genre", "engine", "brief", "scope")
+
+
+class PlannerHook(Protocol):
+    """Enrich a design spec. The compiler remains the commit authority."""
+
+    def __call__(self, spec: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Return the spec to commit, or a rejected proposal the compiler ignores."""
+
+
+class QaHook(Protocol):
+    """Review a proved build. May set ``repair_requested`` for one more proof pass."""
+
+    def __call__(self, build: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Return issues against checker, core-loop, and playtest evidence."""
+
+
+def _seal_spec(body: Mapping[str, Any]) -> dict[str, Any]:
+    sealed = {key: value for key, value in body.items() if key != "spec_id"}
+    encoded = json.dumps(sealed, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    sealed["spec_id"] = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    return sealed
+
+
+def _apply_planner(spec: Mapping[str, Any], planner: PlannerHook | None) -> dict[str, Any]:
+    """Keep the compiled spec when a hook is missing or proposes a different game."""
+    committed = dict(spec)
+    if planner is None:
+        return committed
+    try:
+        proposed = planner(dict(committed))
+    except Exception:  # noqa: BLE001 — a planner hook must not take down the build
+        return committed
+    if not isinstance(proposed, Mapping):
+        return committed
+    if any(proposed.get(key) != committed.get(key) for key in _LOCKED_SPEC_FIELDS):
+        return committed
+    enriched = dict(committed)
+    for key, limit in (("title", 48), ("fantasy", 180), ("core_loop", 180)):
+        value = proposed.get(key)
+        if isinstance(value, str) and value.strip():
+            enriched[key] = " ".join(value.split())[:limit].strip()
+    production = proposed.get("production")
+    if production is None:
+        enriched.pop("production", None)
+    elif isinstance(production, Mapping):
+        notes: dict[str, str] = {}
+        for raw_key, raw_value in list(production.items())[:12]:
+            if not isinstance(raw_key, str) or not isinstance(raw_value, str):
+                continue
+            key = raw_key.strip()[:32]
+            value = " ".join(raw_value.split())[:240].strip()
+            if key and value:
+                notes[key] = value
+        if notes:
+            enriched["production"] = notes
+        else:
+            enriched.pop("production", None)
+    else:
+        return committed
+    return _seal_spec(enriched)
+
+
+def _qa_view(proved: Mapping[str, Any], spec: Mapping[str, Any], content: Any) -> dict[str, Any]:
+    files = proved.get("files") if isinstance(proved.get("files"), Mapping) else {}
+    return {
+        "ok": bool(proved.get("ok")),
+        "spec": dict(spec),
+        "content": content,
+        "marker": proved.get("marker"),
+        "proof": proved.get("proof"),
+        "check": proved.get("check"),
+        "core_loop": proved.get("core_loop"),
+        "playtest": proved.get("playtest"),
+        "repair": proved.get("repair"),
+        "files": dict(files),
+        "file_names": sorted(str(name) for name in files),
+    }
+
+
+def _call_qa(qa: QaHook | None, view: Mapping[str, Any]) -> tuple[dict[str, Any] | None, bool]:
+    if qa is None:
+        return None, False
+    try:
+        review = qa(dict(view))
+    except Exception:  # noqa: BLE001 — a QA hook must not take down the build
+        return {
+            "passed": False,
+            "issues": [{"severity": "blocker", "source": "qa", "detail": "qa hook failed"}],
+        }, False
+    if not isinstance(review, Mapping):
+        return None, False
+    requested = review.get("repair_requested") is True
+    stored = {key: value for key, value in review.items() if key != "repair_requested"}
+    return stored, requested
+
+
+def _attach_qa(body: dict[str, Any], qa: QaHook | None, report: Mapping[str, Any] | None) -> dict[str, Any]:
+    if qa is not None:
+        body["qa"] = dict(report) if isinstance(report, Mapping) else None
+    return body
+
 
 _SCRIPT_FAULTS = (
     "unbalanced",
@@ -206,12 +317,15 @@ def build_playable_game(
     out: str | None = None,
     overwrite: bool = False,
     binary: str | None = None,
+    planner: PlannerHook | None = None,
+    qa: QaHook | None = None,
 ) -> dict[str, Any]:
     """Compile a brief, generate content, materialise Godot, and prove the loop.
 
     This is the single playable-game executor. The CLI, ``POST /api/v1/game/build``,
     ``skeleton dev game build``, and the unmounted ``gameforge_routes`` run
     handler all call it. The ten-stage operator pipeline stays inside.
+    ``planner`` and ``qa`` default to no-ops so existing callers stay unchanged.
     """
     import tempfile
     from pathlib import Path
@@ -232,20 +346,40 @@ def build_playable_game(
         repair_mode=repair_mode,
     )
     if not pipeline.get("succeeded"):
-        return {
-            "schema_version": RUN_SCHEMA,
+        error = "; ".join(_failed_stages(pipeline)) or "gameforge pipeline failed"
+        spec = _apply_planner(compile_brief(brief, era=str(pipeline.get("era") or "")), planner)
+        failure = {
             "ok": False,
-            "error": "; ".join(_failed_stages(pipeline)) or "gameforge pipeline failed",
-            "spec": compile_brief(brief, era=str(pipeline.get("era") or "")),
+            "spec": spec,
             "content": None,
-            "pipeline": {
-                "succeeded": False,
-                "era": pipeline.get("era"),
-                "sim": pipeline.get("sim"),
-            },
-            "stubbed": list(STUBBED),
+            "marker": "",
+            "proof": "",
+            "check": {"ok": False, "problems": [error]},
+            "core_loop": {"passed": False, "marker": ""},
+            "playtest": None,
+            "repair": {"rounds": 0, "actions": []},
+            "files": {},
         }
-    spec = compile_brief(brief, era=str(pipeline.get("era") or ""))
+        qa_report, _requested = _call_qa(qa, _qa_view(failure, spec, None))
+        return _attach_qa(
+            {
+                "schema_version": RUN_SCHEMA,
+                "ok": False,
+                "error": error,
+                "spec": spec,
+                "content": None,
+                "pipeline": {
+                    "succeeded": False,
+                    "era": pipeline.get("era"),
+                    "sim": pipeline.get("sim"),
+                },
+                "stubbed": list(STUBBED),
+            },
+            qa,
+            qa_report,
+        )
+    spec = _apply_planner(compile_brief(brief, era=str(pipeline.get("era") or "")), planner)
+    qa_report: dict[str, Any] | None = None
     with tempfile.TemporaryDirectory(prefix="game-builder-quality-") as quality_root:
         from skeleton.forge.eras import compile_era
 
@@ -262,6 +396,19 @@ def build_playable_game(
             binary=binary,
             root=Path(quality_root),
         )
+        qa_report, repair_requested = _call_qa(qa, _qa_view(proved, spec, content))
+        if repair_requested:
+            proved = prove_and_repair(
+                proved["files"],
+                spec,
+                content,
+                playtest_mode=mode,
+                max_rounds=max_rounds,
+                pack=pack,
+                binary=binary,
+                root=Path(quality_root),
+            )
+            qa_report, _again = _call_qa(qa, _qa_view(proved, spec, content))
     project = None
     if out and proved["ok"]:
         from skeleton.forge.projector import write_project
@@ -273,7 +420,7 @@ def build_playable_game(
             meta={"spec_id": spec["spec_id"], "genre": spec["genre"], "schema": SCHEMA_VERSION},
         )
     proved_files = proved.pop("files")
-    return {
+    body = {
         "schema_version": RUN_SCHEMA,
         "ok": bool(proved["ok"]),
         "spec": spec,
@@ -297,6 +444,7 @@ def build_playable_game(
         "files": proved_files,
         "stubbed": list(STUBBED),
     }
+    return _attach_qa(body, qa, qa_report)
 
 
 def public_payload(result: Mapping[str, Any], *, include_files: bool = False) -> dict[str, Any]:
@@ -310,7 +458,7 @@ def public_payload(result: Mapping[str, Any], *, include_files: bool = False) ->
 
 def cli(argv: Sequence[str]) -> int:
     """``python -m skeleton game`` implementation."""
-    out: Optional[str] = None
+    out: str | None = None
     overwrite = False
     as_json = False
     playtest_mode = "auto"

@@ -12,14 +12,13 @@ from uuid import uuid4
 
 from skeleton.memory.core import Chunk, InMemoryTFIDFStore, MAGStore
 
-
 MAX_TOP_K = 32
 KINDS = frozenset({"decision", "constraint", "failure", "artefact"})
 
 
 def bound_top_k(value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError("top_k must be an integer")
+        raise TypeError("top_k must be an integer")
     if not 1 <= value <= MAX_TOP_K:
         raise ValueError(f"top_k must be between 1 and {MAX_TOP_K}")
     return value
