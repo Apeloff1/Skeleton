@@ -923,5 +923,136 @@
       "release_signoff": false
     },
     "e2e_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_nes_cpu_ppu_and_endurance_history_extension": {
+    "status": "source_integrated_pending_native_toolchain_emulator_ci_and_endurance_validation",
+    "tranche": "M101-M120",
+    "owners": [
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_nes_emulator.py",
+      "skeleton/ai/game_builder/studio_nes_chr_parity.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_execution_campaign_cli.py"
+    ],
+    "milestones": [
+      {
+        "id": "M101",
+        "name": "NES original 6502 state labels exported to real ca65/ld65 output",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M102",
+        "name": "Bounded exact VICE zero-page label map parsed from ld65",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M103",
+        "name": "Native NES compiled binary plus labels exclusive publication and identity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M104",
+        "name": "Actual FCEUX Lua source generated from fixed canonical D-pad replay",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M105",
+        "name": "6502 native CPU memory winning state read from emulator",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M106",
+        "name": "Full controller trace with deterministic button press/release and frame budget",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M107",
+        "name": "Actual NES PPU framebuffer snapshot required for replay success",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M108",
+        "name": "FCEUX process under explicit operator approval with temporary ROM/script",
+        "state": "source_integrated_not_executed"
+      },
+      {
+        "id": "M109",
+        "name": "Bounded CPU/time/frame actions, output sizes and subprocess exit status",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M110",
+        "name": "Source, ROM, zero-page labels and Python reference replay bound to one identity",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M111",
+        "name": "Exact native compiled CHR bank six original sprites compared to art source",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M112",
+        "name": "Reject and reclaim own unreceipted ROM if compiled pixels diverge",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M113",
+        "name": "NES uses native CPU and controller E2E gates alongside GB/GBC",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M114",
+        "name": "Dragon consumes independent CPU/PPU native replay receipts without weight promotion",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M115",
+        "name": "Full E2E campaign driver includes NES full replay rather than unsupported target",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M116",
+        "name": "Digest-linked per-run cross-stage production audit journal",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M117",
+        "name": "Resume-proof history review rejects stale or tampered E2E receipts",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M118",
+        "name": "Real installed FCEUX plus ca65/ld65 successful NES first-playthrough",
+        "state": "not_verified"
+      },
+      {
+        "id": "M119",
+        "name": "Native PPU versus real GPU, audio and hardware controller output parity",
+        "state": "not_implemented"
+      },
+      {
+        "id": "M120",
+        "name": "Six-month/year endurance with crash recovery, audit and independent signoff",
+        "state": "not_verified"
+      }
+    ],
+    "evidence_honesty": {
+      "NES_6502_source_adapter_committed": true,
+      "NES_PPU_capture_source_adapter_committed": true,
+      "native_rom_compiler_executed_this_session": false,
+      "FCEUX_real_NROM_machine_code_played_this_session": false,
+      "first_real_native_NES_victory_observed": false,
+      "original_chr_pixel_runtime_correctness_independently_verified": false,
+      "physical_controller_tested": false,
+      "six_month_endurance_completed": false,
+      "actual_model_weights_updated": false,
+      "tests_written_not_claimed_passed": true
+    },
+    "suites": [
+      "jeeves-native-cartridge-emulator-full-e2e"
+    ]
   }
 }
