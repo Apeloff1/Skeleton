@@ -838,3 +838,25 @@ and private (0700 on POSIX). Crashed or incomplete snapshots cannot be
 accepted without the sealed manifest. This does not constitute tested
 off-machine disaster recovery, cartridge completion, device parity,
 asset/audio export, a year-long run, or full release qualification.
+
+
+### Offline game-studio history restoration
+
+Create-only snapshot verification is also exposed through a CLI:
+
+```bash
+python -m scripts.studio_history_recovery snapshot --source /private/campaign --archive-dir /private/backups --name qualifying-001 --identity CAMPAIGN_SHA
+python -m scripts.studio_history_recovery verify --archive-dir /private/backups --name qualifying-001 --identity CAMPAIGN_SHA
+python -m scripts.studio_history_recovery restore --archive-dir /private/backups --name qualifying-001 --identity CAMPAIGN_SHA --destination /private/restored-campaign
+```
+
+`restore_studio_history` reconstructs the sealed head and every archived
+segment in a private staging directory, validates the restored journal chain
+and historical entry counts, and publishes the new campaign directory once
+everything agrees. Existing targets and symlink aliases are rejected. The
+original archive is independently rechecked before publication. The restore
+does NOT resume a run, authorize a Dragon observation, execute a native
+emulator, certify a playable game, renew a producer lease or promote model
+weights. The canonical campaign runtime must rebind a separately authorized
+worker before continuing. Synthetic verification:
+`python -m pytest -q --noconftest tests/test_studio_history_backup.py`.
