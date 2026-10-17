@@ -482,3 +482,34 @@ and `all_lens_interpretations_valid` distinguish usable structured
 hypotheses from missing/invalid responses. Neither success nor failure
 creates independent gameplay data, verifies semantic scene content, or
 updates Jeeves' production language-model weights.
+
+### Feed reviewed 43-lens execution into candidate-corpus custody
+
+After `execute-43-lenses` has produced a real `semantic-43-native-*.json`
+receipt, extend the existing candidate export with BOTH the review receipt
+and its exact local checkpoint:
+
+```sh
+python -m scripts.training.rom_study export-triangle-corpus \
+  --receipt /private/rom-receipts/rom-<source>-<run>.json \
+  --review-receipt /private/rom-receipts/triangle-review-<source>-<config>.json \
+  --source-sha256 <full-64-digit-source-sha256> \
+  --reviewer-checkpoint /private/models/independent-critic.json \
+  --semantic-review-receipt /private/rom-receipts/semantic-43-native-<source>-<session>.json \
+  --semantic-checkpoint /private/models/jeeves-semantic.json \
+  --output-dir /private/rom-receipts
+```
+
+This additional guarded `triangle-corpus-v3-*.json` export binds the 43
+native semantic model inferences to the exact source trace, the original
+canonical lens catalog, the source critic and the model checkpoint.
+The export **actually replays all 43 saved generations** before recording
+their digest as a separately inspectable provenance reference. Existing
+`v2` eight-measurement / 43-question exports continue to work unchanged.
+
+Model-generated hypotheses stay in their independent review receipt; the
+candidate corpus references its digest but **does not copy unverified
+hypotheses or falsifiers into target training labels**. Eight native
+measurement views retain per-episode normalized weight 1/8 each.
+No new independent gameplay examples, synthetic awards, fictional video
+semantics or production Jeeves weight updates are introduced.

@@ -317,3 +317,56 @@ def test_candidate_corpus_pins_requested_semantic_lens_keys(monkeypatch):
     assert all(not item["factual_claims_allowed"]
                for item in result["semantic_routes_per_episode"][0]["semantic_questions"])
     corpus.verify_triangle_candidate_corpus(evidence, triangle, review, result)
+
+
+def test_corpus_v3_tracks_real_43_lens_receipt_as_provenance_only(monkeypatch):
+    from skeleton.jeeves import game_emulator_triangle_corpus as corpus
+    from skeleton.jeeves import game_emulator_triangle_semantic_inference as infer
+    monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
+    monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", _fake_semantic_route)
+    monkeypatch.setattr(infer, "verify_native_semantic_lenses", lambda *a: None)
+    evidence, triangle, critic = _synthetic_corpus_inputs()
+    semantic = {
+        "source_native_trace_sha256": "d" * 64,
+        "canonical_route_sha256": _fake_semantic_route(
+            triangle["episode_lens_references"][0],
+        )["route_digest"],
+        "semantic_review_digest": "1" * 64,
+        "model_sha256": "2" * 64,
+        "source_bound_interpretations": 43,
+        "requested_lens_keys": [],
+        "entries": [{
+            "response": "UNTRUSTED_SEMANTIC_HYPOTHESIS_NOT_A_TARGET_LABEL",
+        }],
+    }
+    result = corpus.compile_triangle_candidate_corpus(
+        evidence, triangle, critic, semantic_inference_review=semantic,
+    )
+    assert result["schema_version"].endswith("candidate_corpus.v3")
+    assert result["native_semantic_inference_reference"]["source_bound_hypotheses"] == 43
+    assert result["semantic_model_hypotheses_added_to_supervised_labels"] == 0
+    assert result["additional_independent_gameplay_episodes_from_lenses"] == 0
+    assert all("UNTRUSTED_SEMANTIC_HYPOTHESIS" not in row["answer"]
+               for row in result["candidate_rows"])
+    corpus.verify_triangle_candidate_corpus(
+        evidence, triangle, critic, result, semantic_inference_review=semantic,
+    )
+    with pytest.raises(corpus.TriangleCorpusError):
+        corpus.verify_triangle_candidate_corpus(evidence, triangle, critic, result)
+
+
+def test_cli_corpus_review_receipt_requires_checkpoint_pair():
+    from scripts.training.rom_study import parser
+    args = parser().parse_args([
+        "export-triangle-corpus",
+        "--receipt", "/tmp/gameplay.json",
+        "--review-receipt", "/tmp/critic.json",
+        "--source-sha256", "a" * 64,
+        "--reviewer-checkpoint", "/tmp/critic-model.json",
+        "--semantic-review-receipt", "/tmp/semantic.json",
+        "--semantic-checkpoint", "/tmp/semantic-model.json",
+        "--output-dir", "/tmp/private",
+    ])
+    assert args.semantic_review_receipt.name == "semantic.json"
+    assert args.semantic_checkpoint.name == "semantic-model.json"
