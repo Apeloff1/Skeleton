@@ -119,11 +119,16 @@ export const useStorage = () => {
     }
   }, [enqueueWrite]);
 
-  const updateBibleProgress = useCallback(async (updates: Partial<BibleProgress>) => {
+  const updateBibleProgress = useCallback(async (
+    updates: Partial<BibleProgress> | ((current: BibleProgress) => Partial<BibleProgress>),
+  ) => {
     await hydrationRef.current;
     if (!mountedRef.current) return;
     mutationEpochRef.current++;
-    const next = { ...progressRef.current, ...updates };
+    // Evaluate relative edits AFTER hydration and against the latest snapshot.
+    // Computing completedChapters/bookmarks at call time loses concurrent edits.
+    const patch = typeof updates === 'function' ? updates(progressRef.current) : updates;
+    const next = { ...progressRef.current, ...patch };
     progressRef.current = next;
     if (mountedRef.current) setBibleProgressState(next);
     try {
@@ -134,24 +139,26 @@ export const useStorage = () => {
   }, [enqueueWrite]);
 
   const markChapterComplete = useCallback(async (chapterId: string) => {
-    await updateBibleProgress({
-      completedChapters: { ...progressRef.current.completedChapters, [chapterId]: true },
-    });
+    await updateBibleProgress(current => ({
+      completedChapters: { ...current.completedChapters, [chapterId]: true },
+    }));
   }, [updateBibleProgress]);
 
   const toggleBookmark = useCallback(async (chapterId: string) => {
-    const bookmarks = progressRef.current.bookmarks;
-    await updateBibleProgress({
-      bookmarks: bookmarks.includes(chapterId)
-        ? bookmarks.filter(id => id !== chapterId)
-        : [...bookmarks, chapterId],
+    await updateBibleProgress(current => {
+      const bookmarks = current.bookmarks;
+      return {
+        bookmarks: bookmarks.includes(chapterId)
+          ? bookmarks.filter(id => id !== chapterId)
+          : [...bookmarks, chapterId],
+      };
     });
   }, [updateBibleProgress]);
 
   const markExerciseComplete = useCallback(async (exerciseId: string, passed: boolean) => {
-    await updateBibleProgress({
-      exerciseResults: { ...progressRef.current.exerciseResults, [exerciseId]: passed },
-    });
+    await updateBibleProgress(current => ({
+      exerciseResults: { ...current.exerciseResults, [exerciseId]: passed },
+    }));
   }, [updateBibleProgress]);
 
   return {
