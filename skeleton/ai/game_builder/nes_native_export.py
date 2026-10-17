@@ -24,7 +24,7 @@ _ASM = r"""; Original world-specific NES NROM-256 homebrew, ca65/ld65.
 .res 8, 0
 
 .segment "ZEROPAGE"
-.exportzp Level, PlayerX, PlayerY, Health, Score, ScoreHigh, GemsRemaining, GameWon, GameLost
+.exportzp Level, PlayerX, PlayerY, Health, Score, ScoreHigh, TurnCount, TurnCountHigh, GemsRemaining, GameWon, GameLost
 Level: .res 1
 PlayerX: .res 1
 PlayerY: .res 1
@@ -44,6 +44,8 @@ MapPtr: .res 2
 WorkPtr: .res 2
 CalcPtr: .res 2
 ScoreHigh: .res 1
+TurnCount: .res 1
+TurnCountHigh: .res 1
 
 ; $0200-$02FF is hardware sprite DMA page.
 ; $0300-$06BF is a deterministic 960-byte shadow name table.
@@ -84,6 +86,8 @@ Reset:
     sta GameLost
     sta Score
     sta ScoreHigh
+    sta TurnCount
+    sta TurnCountHigh
     sta Cooldown
     lda #START_HEALTH
     sta Health
@@ -319,6 +323,10 @@ MoveRight:
 TryMove:
     lda #7
     sta Cooldown
+    inc TurnCount
+    bne @turnRecorded
+    inc TurnCountHigh
+@turnRecorded:
     lda NextX
     cmp #MAZE_WIDTH
     bcc @xInside
