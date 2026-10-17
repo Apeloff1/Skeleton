@@ -108,7 +108,7 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
             world, sha256(proof).hexdigest(), available=True, executed=True,
             replay=True, victory=True, frames=1500,
             actions=len(trace["actions"]),
-            image="a" * 64, state=ram,
+            image="a" * 64, checkpoint="d" * 64, sampled=1, state=ram,
         )
         with patch(
             "skeleton.ai.game_builder.studio_campaign_assurance.qualify_nes_cpu_ppu",
