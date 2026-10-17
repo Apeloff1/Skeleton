@@ -721,3 +721,35 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 Passing lint or source-schema CI is not independent proof of compiled ROM operation. No release or model-training gate is marked complete by this tranche.
+
+
+## M281–M300: valid assembly label boundaries and operator-executed native E2E evidence
+
+### Fixed source rejection bug
+
+The original compiled-media inspection compared native assembler label names using substring matching. For example, a valid `Tiles:` section followed by `AnimationTiles:` caused `source.count("Tiles:")` to see two occurrences, even though the source declared each distinct symbol once. The inspector now splits into real assembly lines and requires a unique **whole-line** start and end label in correct order. It still checks the exact generated 2bpp sprite bytes and rejects duplicate, renamed, reordered or altered sections.
+
+`tests/test_studio_native_source_media_parity.py` includes a direct regression for valid `Tiles:` + `AnimationTiles:` coexistence as well as forged labels and changed contents. The fix is in the authoritative campaign/source-qualification path rather than a bypass of graphics assurance.
+
+### A real operator-facing, bounded test-run command
+
+New `studio_specialized_e2e_runner.py` executes **only** `jeeves-native-cartridge-emulator-full-e2e` from the checked repository's `machine/e2e_suites.json` when specifically authorized. It never generates another always-on GitHub Actions workflow. It has no shell expansion or arbitrary model-supplied command, verifies that registered tests and required source files are regular files within the approved repository trees, and uses the selected Python interpreter with bounded runtime. The operator can run it from a checkout with pytest installed:
+
+```bash
+python -m skeleton.ai.game_builder.studio_specialized_e2e_runner \
+  --repo-root . \
+  --receipt ../jeeves-native-e2e-receipt.json \
+  --timeout-seconds 1200 \
+  --authorize-local-operation \
+  --execute-tests
+```
+
+The `--receipt` destination must be a **new** JSON file outside the checked source repository. It will not overwrite an existing receipt. For each actual execution, it records process exit status, runtime budget, source/test file inventory size, a digest of all required source bytes, the exact approved test suite policy digest, whether either changed during execution, and a canonical receipt digest. It never persists raw stdout/stderr into Dragon's knowledge store, nor automatically edits a game or promotes model weights.
+
+A process returning exit code 0 only qualifies the offline **source-contract test suite** if its checked source and policy remained stable. It does not qualify a real ROM, controller replay, generated screenshots, audible hardware PSG, model training, first installation, platform rights or long-duration endurance. Timeouts, no execution authority, missing/symlinked paths, registry command manipulation, absent test files, changed input during execution and receipt overwrites fail closed.
+
+`tests/test_studio_specialized_e2e_runner.py` tests those boundary cases using explicitly mocked subprocess outcomes. The specialized suite registry now includes **18 focused test files**, including the regression for the label collision and tests of its own opt-in execution control. These tests have been *authored and registered*, not run or reported green through this conversation.
+
+### Remaining explicit runtime milestones
+
+M295–M300 still require a real checked-out repository, installed pytest, native compilers, GB/GBC PyBoy and NES FCEUX where applicable, actual graphics/audio capture, signed full-game replay, first-install operation and sustained studio production evidence. A passing source suite is a precursor to this work and cannot be substituted for it. No automatic background task or new CI spam was introduced.
