@@ -37,6 +37,10 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
+from skeleton.app.offline_reference_read import (
+    LocalReferenceRead, ReferenceReadConflict, ReferenceReadDenied,
+    ReferenceReadRejected,
+)
 from skeleton.app.offline_grounding import (
     audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
     prepare_evidence,
@@ -138,6 +142,7 @@ class OfflineHTTPApplication:
             self.knowledge = OfflineKnowledgeLibrary(
                 self._store, self.model_digest, self.tokenizer_digest
             )
+            self.reference_reads = LocalReferenceRead(self.knowledge)
         except BaseException:
             self._store.close()
             raise
@@ -451,6 +456,18 @@ class OfflineHTTPApplication:
                 _fields(body, {"title", "text"}, {"title", "text"})
                 item = self.knowledge.add_text(body["title"], body["text"])
                 return (200 if item["reused"] else 201), item
+        if path == "/v1/tools/reference-read" and method == "POST":
+            _fields(body, {"query", "granted", "request_id"}, {"query", "granted", "request_id"})
+            try:
+                return 200, self.reference_reads.read(
+                    body["query"], body["request_id"], granted=body["granted"],
+                )
+            except ReferenceReadDenied as exc:
+                raise OfflineHTTPError(403, str(exc)) from exc
+            except ReferenceReadConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from exc
+            except ReferenceReadRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from exc
         if path == "/v1/knowledge/search" and method == "POST":
             _fields(body, {"query", "limit"}, {"query"})
             return 200, {"hits": self.knowledge.search(

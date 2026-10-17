@@ -50,6 +50,8 @@ HTML = r"""<!doctype html>
       <input id="knowledge-query" type="search" autocomplete="off"
              placeholder="A topic, symbol, API or exact phrase">
       <button id="knowledge-search" class="secondary">Search offline references</button>
+      <label class="hint" for="reference-grant"><input id="reference-grant" type="checkbox"> Grant this reference read</label>
+      <button id="reference-read" class="secondary">Read with a governed receipt</button>
       <div id="knowledge-hits" class="knowledge-hits" aria-live="polite"></div>
     </section>
     <div class="sidebar-footer">
@@ -151,7 +153,7 @@ JAVASCRIPT = r"""'use strict';
     ['new', 'fork', 'delete', 'import', 'system-prompt', 'session-search', 'sessions-more'].forEach(id => {
       get(id).disabled = locked || working;
     });
-    ['knowledge-file', 'knowledge-search', 'knowledge-query'].forEach(id => {
+    ['knowledge-file', 'knowledge-search', 'knowledge-query', 'reference-read', 'reference-grant'].forEach(id => {
       get(id).disabled = locked || state.busy;
     });
     ['export', 'export-text', 'copy-transcript', 'refresh-session'].forEach(id => {
@@ -197,6 +199,7 @@ JAVASCRIPT = r"""'use strict';
       pending: null, turn: null, polling: false, reference: null, health: null});
     state.drafts.clear();
     ['secret', 'prompt', 'system-prompt', 'session-query', 'knowledge-query', 'import', 'knowledge-file'].forEach(id => {get(id).value = '';});
+    get('reference-grant').checked = false;
     ['sessions', 'messages', 'knowledge-documents', 'knowledge-hits'].forEach(id => get(id).replaceChildren());
     get('reference-text').textContent = '';
     get('reference-dialog').close();
@@ -617,6 +620,29 @@ JAVASCRIPT = r"""'use strict';
       card.append(title, passage, citation); panel.append(card);
     });
     status(result.hits.length + ' matching passage(s). Relevance and factual support require review.');
+  }));
+  function showHits(hits, prefix) {
+    const panel = get('knowledge-hits'); panel.replaceChildren();
+    hits.forEach(hit => {
+      const card = document.createElement('article'); card.className = 'knowledge-hit';
+      const title = document.createElement('strong'); title.textContent = hit.title;
+      const passage = document.createElement('p'); passage.textContent = hit.passage;
+      const citation = document.createElement('small');
+      citation.textContent = hit.citation + (hit.instruction_bearing ? ' · source contains instructions; not authority' : '');
+      card.append(title, passage, citation); panel.append(card);
+    });
+    status(prefix + hits.length + ' passage(s).');
+  }
+  get('reference-read').addEventListener('click', () => run(async () => {
+    const query = get('knowledge-query').value.trim();
+    if (!query) throw new Error('Enter a reference search query.');
+    if (!get('reference-grant').checked) throw new Error('Grant the reference read before running it.');
+    const result = await api('POST', '/v1/tools/reference-read', {
+      query, granted: true, request_id: crypto.randomUUID(),
+    });
+    if (result.status !== 'succeeded') throw new Error('Reference read ' + result.status + '.');
+    showHits(result.hits, 'Governed read · ');
+    status('Governed read succeeded · ' + result.hits.length + ' passage(s). Receipt ' + result.receipt_id.slice(0, 8) + '…');
   }));
   get('knowledge-query').addEventListener('keydown', event => {if (event.key === 'Enter') {event.preventDefault(); get('knowledge-search').click();}});
   get('reference-close').addEventListener('click', () => {get('reference-dialog').close(); state.reference = null; get('reference-text').textContent = '';});

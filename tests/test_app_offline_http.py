@@ -15,6 +15,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import threading
 import unittest
+from uuid import uuid4
 from unittest.mock import patch
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
@@ -264,6 +265,50 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         self.assertEqual(empty["hits"], [])
+
+    def test_governed_reference_read_requires_grant_and_replays_the_receipt(self):
+        text = "The depth buffer stores a depth value for each pixel."
+        status, created, _ = self._request(
+            "POST", "/v1/knowledge/documents",
+            {"title": "GPU notes", "text": text},
+        )
+        self.assertEqual(status, 201)
+        request_id = str(uuid4())
+        status, denied, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": False, "request_id": request_id},
+        )
+        self.assertEqual(status, 403)
+        self.assertIn("explicit operator grant", denied["error"])
+        status, escaped, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "../secrets", "granted": True, "request_id": str(uuid4())},
+        )
+        self.assertEqual(status, 400)
+        status, answer, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 200, answer)
+        self.assertEqual(answer["status"], "succeeded")
+        self.assertFalse(answer["replayed"])
+        self.assertEqual(answer["hits"][0]["document_id"], created["document_id"])
+        self.assertEqual(
+            text[answer["hits"][0]["char_start"]:answer["hits"][0]["char_end"]],
+            answer["hits"][0]["passage"],
+        )
+        status, replay, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 200, replay)
+        self.assertTrue(replay["replayed"])
+        self.assertEqual(replay["receipt_id"], answer["receipt_id"])
+        status, conflict, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "pixel value", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 409)
 
     def test_reference_ingestion_rejects_unauthorized_and_malformed_inputs(self):
         status, denied, _ = self._request(
