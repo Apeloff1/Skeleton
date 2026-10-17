@@ -90,6 +90,7 @@ class TrueOriginalConsoleMediaSourceTests(unittest.TestCase):
             ("DEF ANIM_COUNT EQU 3", "DEF ANIM_COUNT EQU 2"),
             ("DEF MUSIC_FRAME_DELAY EQU 17", "DEF MUSIC_FRAME_DELAY EQU 18"),
             ("AnimationTiles:\n", "AnimationTiles:\n    db $00, $00\n"),
+            ("Tiles:\n", "Tiles:\n    db $00, $00\n"),
             ("OriginalMusicLow:\n", "OriginalMusicLow:\n    db $00\n"),
             ("SoundPickup:\n", "SoundPickup:\n    ret\n"),
             ("    call TickOriginalMusic\n",
@@ -120,6 +121,7 @@ class TrueOriginalConsoleMediaSourceTests(unittest.TestCase):
         original = program.read_text(encoding="utf-8")
         self.assertIn("OriginalMusicHigh:\n", original)
         self.assertIn("    jsr TickOriginalMusic\n", original)
+        self.assertIn("Tiles:\n", original)
         program.write_text(
             original.replace(
                 "OriginalMusicHigh:\n",
@@ -127,6 +129,18 @@ class TrueOriginalConsoleMediaSourceTests(unittest.TestCase):
             ), encoding="utf-8",
         )
         with self.assertRaises(NativeMediaSourceError):
+            inspect_native_source_media(folder, target="nintendo_famicom")
+
+    def test_forged_nes_background_tile_bytes_fail_before_native_qualification(self):
+        folder, _ = self.generate("nintendo_famicom")
+        program = folder / "main.s"
+        original = program.read_text(encoding="utf-8")
+        self.assertIn("Tiles:\n", original)
+        program.write_text(
+            original.replace("Tiles:\n", "Tiles:\n.byte $00\n", 1),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(NativeMediaSourceError, "source region"):
             inspect_native_source_media(folder, target="nintendo_famicom")
 
     def test_rehashed_source_attestation_cannot_qualify_disabled_apu_source(self):
