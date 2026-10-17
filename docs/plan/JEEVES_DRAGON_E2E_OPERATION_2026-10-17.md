@@ -59,3 +59,62 @@ python scripts/check_enterprise_ai_implementation_notes.py --json
 ```
 
 Verification result for this session: the changes were committed to a feature branch through the GitHub connector; local runtime tests and live backend tests were **not executed**. This file is a working acceptance plan, not a qualification certificate.
+
+
+## Second tranche: actual console source, original sprite assets and engine rendering
+
+Implementation on this feature branch extends the operational proof chain beyond an observer-only milestone. No platform release certification is inferred.
+
+| ID | Producer/action | Real output | Evidence level |
+| --- | --- | --- | --- |
+| PROD-001 | GameBuildIntent and existing playable world solver | Deterministic multi-level original game and winning reference actions | Python simulation; not a ROM emulator |
+| PROD-002 | Native source emitter registry | Existing RGBDS, ca65, Z80, cc65, DOS and SDL2 source templates for 16 registered original-console/desktop targets | Actual original target source; external toolchains not run |
+| PROD-003 | Studio pixel art engine | Original 8x8 floor, wall, collectible, hazard, goal and player bitmaps | Actual numeric RGBA/indexed pixel data, not prompt descriptions |
+| PROD-004 | Console encoder | DMG/NES 2bpp, Sega Master System/Game Gear 4bpp, 8bpp portable editor tiles | Actual native byte arrays and roundtrip decoding |
+| PROD-005 | Embedded native art | Generated original tiles replace compiled source art for GB, GBC, NES, SMS, GG | Native ROM source bytes changed, sources not assembled to binary |
+| PROD-006 | Sprite animation | Original hero poses and blink/movement PNGs, animation frame descriptor | Frame pixels exist; individual native console frame driver integration remains incomplete |
+| PROD-007 | Scene software renderer | Per-level pixel-composed PNG from actual world tile geometry | PNG bytes generated and independently decoded; not device framebuffer |
+| PROD-008 | Sprite atlas and descriptions | PNG atlas, SHA-indexed 6 sprite records, roles, collision/interaction flags, style and palette | Content-addressed project sidecar |
+| PROD-009 | Browser rendering | HTML5 canvas executes per-pixel studio sprite drawing instead of only geometric fallback when the pack is supplied | Source wired; browser execution not yet measured |
+| PROD-010 | Godot rendering | GDScript loads content-bound `res://studio_art.json` and paints sprite pixels using the canonical scene graph source | Source wired; Godot binary execution not yet measured |
+| PROD-011 | Multi-target engine source | Offline browser index.html, Godot project, interactive tile editor and verified replay source | Existing canonical engine exporter reused |
+| PROD-012 | Existing native_game_cli integration | `--studio-assets` and style/contrast/animation flags, native and engine project source emission | Operator-invoked writing into a NEW source directory |
+| PROD-013 | Jeeves native source studio action | `game.console.catalog`, `game.console.source.stage` | Actual generated ASM/C staged through existing GameWorkspace CAS, human commit still required |
+| PROD-014 | Retain legacy behavior | Default native exporter output unchanged unless studio-art option supplied | Backwards-compatible optional tile_art parameter |
+| PROD-015 | Full asset and native E2E tests | `tests/test_jeeves_native_studio_art_e2e.py`, `tests/test_jeeves_console_source_stage_e2e.py` | Tests authored/registered, not yet run on exact head |
+
+Run example, using the existing verified regular-file authorship-document intake (a referenced document is not independent ownership clearance):
+
+```bash
+python -m skeleton.ai.game_builder.native_game_cli \
+  --target nintendo_game_boy --basis bandai_wonderswan \
+  --project-id originalconsole --title "Original Console Adventure" \
+  --seed 733 --width 11 --height 11 --levels 1 \
+  --collectibles 1 --hazards 1 --health 4 \
+  --rights-evidence /path/to/owned-authorship-document.txt \
+  --identity "original-characters" \
+  --identity "independent-mechanics" \
+  --studio-assets --studio-style luminous \
+  --studio-contrast high --studio-animation-frames 3 \
+  --authorize-original-homebrew \
+  --output /path/to/new-project-directory
+```
+
+The generated directory contains the target source entrypoint and build recipe, `assets/tiles/runtime.bin`, `assets/sprites/*.png`, `assets/previews/*.png`, `assets/metadata/{descriptors,manifest}.json`, and `engines/index.html`, `engines/tile-editor.html`, `engines/godot/**`, `engines/proof/**`, plus separate exact manifest receipts.
+
+For C64, DOS, Atari, Apple II, MSX, Spectrum, ColecoVision, Vectrex and desktop targets the original native-source generators work independently and the asset/engine outputs exist, but custom ROM tile integration is not claimed. This is an explicit backlog item.
+
+### Further advanced-studio gaps, not represented as implemented
+
+Console-specific toolchain execution and cartridge compilation; physical/emulator render and controller verification; sprite atlases, color attributes, palettes and animation VRAM transfer for the remaining consoles; actual Godot/browser preview playback and screenshot comparisons; arbitrarily large sprites, backgrounds, parallax, cinematics and 3D model/material/lighting; fully edited NPC/quest/scene/audio game systems across every era; content-based legal rights validation; multi-week resilient Jeeves decision loops; consented Dragon app video recording and measured model-learning improvement. Each needs exact current-source runtime evidence, not a passing source existence check.
+
+### E2E suites
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_jeeves_native_studio_art_e2e.py \
+  tests/test_jeeves_console_source_stage_e2e.py \
+  tests/test_jeeves_game_e2e_observation.py
+```
+
+Do not count tests as passing until they have actually run against the committed PR head.
