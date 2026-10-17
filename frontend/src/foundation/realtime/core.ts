@@ -19,6 +19,8 @@ export interface Envelope<P = Record<string, unknown>> {
   correlation_id?: string;
 }
 
+/** Server writes `: hb` every 15s (`skeleton/realtime/sse.py`). Three misses and the stream is dead. */
+export const HEARTBEAT_INTERVAL_MS = 15_000;
 export const LIVENESS_TIMEOUT_MS = 45_000;
 export const BACKOFF_BASE_MS = 500;
 export const BACKOFF_MAX_MS = 30_000;
@@ -84,7 +86,18 @@ export class SseParser {
 // ── Envelope ────────────────────────────────────────────────────────────
 export type ParseResult = { ok: true; envelope: Envelope } | { ok: false; reason: string };
 
-/** Validate envelope v1; unknown fields are dropped, optional fields kept only when strings. */
+function envelopeId(raw: unknown): string | null {
+  if (typeof raw === 'string' && /^[0-9]{1,19}$/.test(raw) && !/^0+$/.test(raw)) return raw;
+  if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 && raw <= Number.MAX_SAFE_INTEGER) return String(raw);
+  return null;
+}
+
+/**
+ * Validate envelope v1. Unknown fields are dropped. `id` is the decimal string
+ * from the envelope; when the SSE `id:` line is present it must match
+ * (`sse_message_to_frame` raises on a mismatch). Optional ids are kept only
+ * when they are strings.
+ */
 export function parseEnvelope(data: string | unknown, frameId?: string): ParseResult {
   let raw: unknown = data;
   if (typeof data === 'string') {
@@ -93,8 +106,9 @@ export function parseEnvelope(data: string | unknown, frameId?: string): ParseRe
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, reason: 'not_object' };
   const r = raw as Record<string, unknown>;
   if (typeof r.v !== 'number' || r.v !== SUPPORTED_VERSION) return { ok: false, reason: 'unsupported_version' };
-  const id = typeof r.id === 'string' && r.id ? r.id : typeof r.id === 'number' ? String(r.id) : frameId;
+  const id = envelopeId(r.id);
   if (!id) return { ok: false, reason: 'missing_id' };
+  if (frameId && frameId !== id) return { ok: false, reason: 'id_mismatch' };
   if (typeof r.type !== 'string' || !r.type) return { ok: false, reason: 'missing_type' };
   if (typeof r.channel !== 'string' || !r.channel) return { ok: false, reason: 'missing_channel' };
   const payload = r.payload && typeof r.payload === 'object' && !Array.isArray(r.payload) ? (r.payload as Record<string, unknown>) : {};
@@ -102,6 +116,12 @@ export function parseEnvelope(data: string | unknown, frameId?: string): ParseRe
   if (typeof r.job_id === 'string') env.job_id = r.job_id;
   if (typeof r.correlation_id === 'string') env.correlation_id = r.correlation_id;
   return { ok: true, envelope: env };
+}
+
+/** `x-gf-seal` for `/api/v1/events` and `/api/v1/presence`. Empty when the caller has no seal. */
+export function realtimeAuthHeaders(seal: string | null | undefined): Record<string, string> {
+  const token = typeof seal === 'string' ? seal.trim() : '';
+  return token ? { 'x-gf-seal': token } : {};
 }
 
 // ── URL / resume ────────────────────────────────────────────────────────
@@ -159,26 +179,40 @@ export type StreamEffect =
   | { kind: 'reset' }
   | { kind: 'lagged'; dropped: number };
 
+function controlPayload(data: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(data) as { payload?: unknown };
+    const payload = parsed?.payload;
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) return payload as Record<string, unknown>;
+  } catch { /* control frames with no JSON payload leave the cursor alone */ }
+  return {};
+}
+
 /** Apply one parsed SSE item; returns new state and effects for the client to run. */
 export function applyItem(state: StreamState, item: SseItem, now: number): { state: StreamState; effects: StreamEffect[] } {
   const s: StreamState = { ...state, lastActivityAt: now };
   if (item.kind === 'comment') return { state: s, effects: [] };
   const { frame } = item;
   if (frame.retry !== undefined) s.retryFloorMs = Math.min(BACKOFF_MAX_MS, frame.retry);
+  // Control frames are sent with no `id:` line, so they must not move Last-Event-ID.
   if (frame.event === 'stream.reset') {
-    s.cursor = null; s.resets += 1;
+    const head = controlPayload(frame.data).head_id;
+    s.cursor = typeof head === 'string' && head ? head : null;
+    s.resets += 1;
     return { state: s, effects: [{ kind: 'reset' }] };
   }
   if (frame.event === 'stream.lagged') {
-    let dropped = 0;
-    try { const d = JSON.parse(frame.data); const n = d?.payload?.dropped ?? d?.dropped; dropped = typeof n === 'number' ? n : 0; } catch {}
+    const payload = controlPayload(frame.data);
+    const dropped = typeof payload.dropped === 'number' ? payload.dropped : 0;
     s.lagged += dropped || 1;
-    if (frame.id) s.cursor = frame.id;
+    if (s.cursor == null && typeof payload.resume_from === 'string' && payload.resume_from) {
+      s.cursor = payload.resume_from;
+    }
     return { state: s, effects: [{ kind: 'lagged', dropped }] };
   }
   const parsed = parseEnvelope(frame.data, frame.id);
   if (!parsed.ok) { s.rejected += 1; return { state: s, effects: [] }; }
-  s.cursor = frame.id || parsed.envelope.id;
+  s.cursor = parsed.envelope.id;
   s.received += 1;
   return { state: s, effects: [{ kind: 'deliver', envelope: parsed.envelope }] };
 }
@@ -188,8 +222,8 @@ export interface BuildProgress { jobId: string; status: 'running' | 'completed' 
 
 export function reduceBuildProgress(prev: Record<string, BuildProgress>, env: Envelope): Record<string, BuildProgress> {
   if (env.channel !== 'build' || !env.job_id) return prev;
-  const p = env.payload as { percent?: unknown; progress?: unknown; message?: unknown; stage?: unknown };
-  const pctRaw = typeof p.percent === 'number' ? p.percent : typeof p.progress === 'number' ? (p.progress <= 1 ? p.progress * 100 : p.progress) : null;
+  const p = env.payload as { pct?: unknown; percent?: unknown; progress?: unknown; message?: unknown; stage?: unknown };
+  const pctRaw = typeof p.pct === 'number' ? p.pct : typeof p.percent === 'number' ? p.percent : typeof p.progress === 'number' ? (p.progress <= 1 ? p.progress * 100 : p.progress) : null;
   const percent = pctRaw === null ? prev[env.job_id]?.percent ?? null : Math.max(0, Math.min(100, Math.round(pctRaw)));
   const message = typeof p.message === 'string' ? p.message : typeof p.stage === 'string' ? p.stage : prev[env.job_id]?.message ?? '';
   let status: BuildProgress['status'] = 'running';

@@ -6,18 +6,20 @@
  * - `usePresence`: join/heartbeat/leave via POST /api/v1/presence.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import api from '../../utils/apiClient';
-import { openEventStream } from '../../utils/apiStream';
-import { authHeaders } from '../../auth/gameforgeAuth';
+import api, { openEventStream } from '../../utils/apiClient';
 import { appQueryCache, QueryKey } from '../queryCache';
-import type { Channel, Envelope, StreamStatus } from './core';
+import { realtimeAuthHeaders, type Channel, type Envelope, type StreamStatus } from './core';
 import { EventStreamClient } from './client';
 import { newClientId, startPresence } from './presence';
+
+export type SealSource = string | null | (() => string | null | undefined);
 
 export interface UseEventStreamOptions {
   channels: readonly Channel[];
   jobId?: string | null;
   enabled?: boolean;
+  /** Minted `x-gf-seal`. Read on every connect and presence post so a short-lived seal can rotate. */
+  seal?: SealSource;
   onEvent?: (env: Envelope) => void;
   /** Query keys (prefixes) to invalidate on stream.reset; default: whole cache. */
   invalidateOnReset?: readonly QueryKey[];
@@ -45,7 +47,10 @@ export function useEventStream(opts: UseEventStreamOptions): EventStreamView {
     const client = new EventStreamClient({
       channels: channelKey.split(',') as Channel[],
       jobId,
-      headers: () => authHeaders(),
+      headers: () => {
+        const seal = ref.current.seal;
+        return realtimeAuthHeaders(typeof seal === 'function' ? seal() : seal);
+      },
       transport: (path, t) => openEventStream(path, t),
       onState: s => setStatus(s.status),
       onEvent: env => { setLastEvent(env); try { ref.current.onEvent?.(env); } catch {} },
@@ -63,12 +68,18 @@ export function useEventStream(opts: UseEventStreamOptions): EventStreamView {
   return { status, connected: status === 'open', lastEvent, laggedNotice, dismissLagged: () => setLagged(null) };
 }
 
-export function usePresence(scope: string | null, enabled = true) {
+export function usePresence(scope: string | null, enabled = true, seal?: SealSource) {
   const clientId = useMemo(() => newClientId(), []);
+  const sealRef = useRef(seal);
+  sealRef.current = seal;
   useEffect(() => {
     if (!enabled || !scope) return;
     return startPresence(scope, clientId, {
-      post: (path, body) => api.post(path, body, { headers: authHeaders(), retries: 0, timeoutMs: 10_000 }),
+      post: (path, body) => {
+        const current = sealRef.current;
+        const value = typeof current === 'function' ? current() : current;
+        return api.post(path, body, { headers: realtimeAuthHeaders(value), retries: 0, timeoutMs: 10_000 });
+      },
       setInterval: (fn, ms) => setInterval(fn, ms),
       clearInterval: h => clearInterval(h as ReturnType<typeof setInterval>),
     });

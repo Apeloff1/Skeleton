@@ -57,6 +57,7 @@ export class EventStreamClient {
   private watchdog: unknown = null;
   private retryTimer: unknown = null;
   private stopped = true;
+  private immediate = false;
   private generation = 0;
 
   constructor(private opts: EventStreamOptions) {
@@ -126,6 +127,7 @@ export class EventStreamClient {
       },
       onChunk: text => {
         if (gen !== this.generation) return;
+        let reconnectNow = false;
         for (const item of parser.feed(text)) {
           const { state, effects } = applyItem(this.state, item, this.clock.now());
           this.set(state);
@@ -133,9 +135,18 @@ export class EventStreamClient {
             try {
               if (e.kind === 'deliver') this.opts.onEvent?.(e.envelope);
               else if (e.kind === 'reset') this.opts.onReset?.();
-              else this.opts.onLagged?.(e.dropped);
+              else {
+                reconnectNow = true;
+                this.opts.onLagged?.(e.dropped);
+              }
             } catch {}
           }
+          if (reconnectNow) break;
+        }
+        // stream.lagged: reconnect at once from the last delivered id (or resume_from).
+        if (reconnectNow && gen === this.generation && !this.stopped) {
+          this.immediate = true;
+          this.abort?.abort();
         }
       },
     }).then(end => this.onEnd(gen, end), () => this.onEnd(gen, { kind: 'error', error: 'transport_threw' }));
@@ -144,14 +155,16 @@ export class EventStreamClient {
   private onEnd(gen: number, end: StreamEnd) {
     if (gen !== this.generation || this.stopped) return;
     if (this.watchdog !== null) { this.clock.clearTimeout(this.watchdog); this.watchdog = null; }
+    const immediate = this.immediate;
+    this.immediate = false;
     if (end.kind === 'http' && (this.opts.fatalStatuses ?? [401, 403]).includes(end.status)) {
       this.stopped = true;
       this.set({ ...this.state, status: 'closed', connectedAt: null });
       return;
     }
     const now = this.clock.now();
-    const attempt = nextAttempt(this.state.attempt, this.state.connectedAt, now);
-    const delay = backoffDelay(attempt - 1, () => this.clock.random(), this.state.retryFloorMs);
+    const attempt = immediate ? this.state.attempt : nextAttempt(this.state.attempt, this.state.connectedAt, now);
+    const delay = immediate ? 0 : backoffDelay(attempt - 1, () => this.clock.random(), this.state.retryFloorMs);
     this.set({ ...this.state, status: 'reconnecting', attempt, connectedAt: null });
     this.retryTimer = this.clock.setTimeout(() => { this.retryTimer = null; this.connect(); }, delay);
   }

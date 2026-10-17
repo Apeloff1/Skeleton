@@ -3,13 +3,16 @@
  * Pure helpers + a scheduler with injected transport/clock for tests.
  */
 export type PresenceAction = 'join' | 'heartbeat' | 'leave';
-export interface PresenceBody { action: PresenceAction; scope: string; client_id: string }
+export interface PresenceBody { action: PresenceAction; scope: string; client_id: string; meta?: Record<string, unknown> }
 export const PRESENCE_PATH = '/api/v1/presence';
-export const PRESENCE_HEARTBEAT_MS = 30_000;
+/** Server expires a member after 45s of silence; the SDK heartbeats every 15s. */
+export const PRESENCE_HEARTBEAT_MS = 15_000;
 
-export function presenceBody(action: PresenceAction, scope: string, clientId: string): PresenceBody {
+export function presenceBody(action: PresenceAction, scope: string, clientId: string, meta?: Record<string, unknown>): PresenceBody {
   if (!scope || !clientId) throw new Error('presence requires scope and client_id');
-  return { action, scope, client_id: clientId };
+  const body: PresenceBody = { action, scope, client_id: clientId };
+  if (action === 'join' && meta && Object.keys(meta).length) body.meta = meta;
+  return body;
 }
 
 export function newClientId(random: () => number = Math.random): string {
@@ -25,8 +28,8 @@ export interface PresenceDeps {
 }
 
 /** Join now, heartbeat on an interval, leave on dispose. Errors never throw to the UI. */
-export function startPresence(scope: string, clientId: string, deps: PresenceDeps, intervalMs = PRESENCE_HEARTBEAT_MS): () => void {
-  const send = (a: PresenceAction) => { void Promise.resolve().then(() => deps.post(PRESENCE_PATH, presenceBody(a, scope, clientId))).catch(() => {}); };
+export function startPresence(scope: string, clientId: string, deps: PresenceDeps, intervalMs = PRESENCE_HEARTBEAT_MS, meta?: Record<string, unknown>): () => void {
+  const send = (a: PresenceAction) => { void Promise.resolve().then(() => deps.post(PRESENCE_PATH, presenceBody(a, scope, clientId, meta))).catch(() => {}); };
   send('join');
   const h = deps.setInterval(() => send('heartbeat'), intervalMs);
   let done = false;
