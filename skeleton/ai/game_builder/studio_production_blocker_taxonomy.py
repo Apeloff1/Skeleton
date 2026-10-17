@@ -21,6 +21,10 @@ _EXACT = {
     "compiled_nes_chr_original_art_mismatch": (
         "compiled_sprite_mismatch", "Inspect the iNES CHR bank and original 2bpp source bytes"
     ),
+    "compiled_original_psg_music_mismatch": (
+        "compiled_audio_mismatch",
+        "Compare actual RGBLINK/ld65 score-table addresses and 16 source-authored PSG note bytes",
+    ),
     "native_cpu_checkpoint_state_mismatch": (
         "controller_or_gameplay_divergence", "Compare first GB/GBC CPU mismatch against the Python action trace"
     ),
