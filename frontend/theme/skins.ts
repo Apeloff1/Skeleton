@@ -8,7 +8,9 @@
  * keeps its original export names and shapes and only derives the computed
  * keys (bgSubtle, onPrimary, primarySoft, borderFocus).
  */
-import { DEFAULT_SKIN_ID, palette, skinPalettes } from './tokens';
+import tokens, { DEFAULT_SKIN_ID, skinPalettes } from './tokens';
+
+const { palette } = tokens;
 
 export type SkinColors = {
   bg: string; bgElevated: string; bgSubtle: string;
