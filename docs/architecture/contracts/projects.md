@@ -1,114 +1,104 @@
 # Projects resource contract
 
-**Status: describes the #4097 Projects router at its `/api/v1/projects` mount.**
+**Status: describes PR #4097 at commit `959eec134`.**
 
 Typed schema: `skeleton/contracts/projects.py`
 JSON schema: `docs/architecture/contracts/projects.schema.json`
+Job queue: [`docs/contracts/job_queue.md`](../../contracts/job_queue.md)
 Schema id: `skeleton.projects.v1`
-Schema version: `1.1.0`
+Schema version: `1.0.0`
 
-Checked implementation: PR [#4097](https://github.com/Apeloff1/Skeleton/pull/4097), branch `is/app-foundation-persistence`, commit `7065e555f9fff380a85ae479a79d3c34966ca097`, module `skeleton/app_services/projects_api.py`.
-
-That commit still registers prefix `/api/app/projects` and returns FastAPI `{"detail": ...}` bodies. Internal Systems is moving the same router to `/api/v1/projects` inside `create_app`, behind `install_gate`. This document is that moved contract. It is not a second resource.
+Handler: `skeleton/api/projects_routes.py`, mounted by `create_app` at `/api/v1/projects` behind `install_gate`. The domain map entry is `("/api/v1/projects", "projects")`. Store: `skeleton/persistence/app_foundation/projects_v1.py`.
 
 ## Auth
 
-`Authorization: Bearer <session token>`. The handler resolves the session and derives the caller.
+Every Projects call needs both:
 
-| Session fact | Where it goes |
-|--------------|----------------|
-| user id (`SessionPrincipal.user_id`) | `Project.owner_id`. This is the actor. |
-| tenant, when the session has one | server-side scope only. The project row has no tenant column. |
+- `x-gf-seal`, checked by `install_gate` before the handler
+- `Authorization: Bearer <session>`
 
-`actor_id` and `tenant_id` are not request fields. A body that includes them is `PROJECT.INVALID`. A missing or unknown bearer token is `PROJECT.UNAUTHENTICATED` (HTTP 401). `install_gate` still runs in front of the router.
+`actor_id` is the session user id. `tenant_id` is `APP_TENANT_ID`, or `default` when that variable is unset. Neither is taken from the query string. A body may repeat them, and the value must equal the session value. A different value is `PROJECT.INVALID`.
 
-A project is visible when `owner_id` equals the session user. Another user's project is `PROJECT.NOT_FOUND` (HTTP 404). The response does not say whether the id is missing or owned by someone else.
+A missing or unknown bearer token is `PROJECT.UNAUTHENTICATED` (HTTP 401), message `valid session required`. A seal failure is the gate's own response, `401 invalid_seal` or `503 seal_unavailable`, and is not a `PROJECT.*` envelope.
+
+A project is visible only for that actor and tenant. Anything else is `PROJECT.NOT_FOUND` (HTTP 404). The body does not say which of "missing" or "out of scope" it was.
 
 ## Routes
 
-| Method | Path | Status | Body | Response |
-|--------|------|--------|------|----------|
-| POST | `/api/v1/projects` | 201 | `ProjectCreateRequest` | `Project` |
-| GET | `/api/v1/projects` | 200 | none | `{"projects": [Project]}` |
-| GET | `/api/v1/projects/{project_id}` | 200 | none | `Project` |
-| POST | `/api/v1/projects/{project_id}/builds` | 202 | `BuildCreateRequest` | `Build` |
-| GET | `/api/v1/projects/{project_id}/builds` | 200 | none | `{"builds": [Build]}` |
-| GET | `/api/v1/projects/{project_id}/builds/{build_id}` | 200 | none | `Build` |
+| Method | Path | Success | Replay | Body / query |
+|--------|------|---------|--------|----------------|
+| POST | `/api/v1/projects` | 201 `Project` | 200 `Project` | `brief`, optional `schema_version`, optional `actor_id` / `tenant_id`. Optional `Idempotency-Key` header, 1..128 characters. |
+| GET | `/api/v1/projects` | 200 list | — | `limit` 1..100, default 50. `cursor` is `r:<rowid>` or omitted. |
+| GET | `/api/v1/projects/{project_id}` | 200 `Project` | — | none |
+| POST | `/api/v1/projects/{project_id}/builds` | 202 `Build` | 202 `Build` with `replayed: true` | Start fields below, or a link body. |
+| GET | `/api/v1/projects/{project_id}/builds` | 200 list | — | `limit` and `cursor` as on the project list. Newest row first. |
+| GET | `/api/v1/projects/{project_id}/builds/{build_id}` | 200 `Build` | — | none |
 
-`x-request-id`, when sent on create-build, is stored as the job correlation id.
+Unknown JSON fields are `PROJECT.INVALID`. `schema_version`, when sent, must be `1.0.0`.
 
 ## Project
 
-`Project` is the checked `ProjectOut`:
+```text
+schema_version, project_id, actor_id, tenant_id, brief, status, build_ids, created_at, updated_at
+```
 
-`project_id`, `owner_id`, `name`, `brief`, `settings`, `created_at`, `updated_at`
+`brief` on the resource is always the object `{title, summary, genre, constraints}`. `status` is `draft`, `active`, or `archived`. `build_ids` is the link order, unique, at most 64. `created_at` and `updated_at` are RFC3339 UTC ending in `Z`.
 
-`created_at` and `updated_at` are epoch seconds. `settings` is a JSON object and defaults to `{}`.
+`POST` accepts `brief` as that object or as a plain string. A string is stored as `title` = first line, cut at 200 characters, and `summary` = the remaining lines, cut at 8000. `genre` is `""` and `constraints` is `[]`. An empty string is `PROJECT.INVALID`. The project name is `brief.title`. The same actor and the same title is `PROJECT.NAME_CONFLICT` (HTTP 409).
 
-### Create
+`Idempotency-Key` is stored as `{tenant}:{actor}:{key}`. The same key and the same brief returns 200 and the original project. The same key and a different brief is `PROJECT.IDEMPOTENCY_MISMATCH` (HTTP 409). Equality is sha256 of the canonical brief JSON.
 
-`brief` is required and is either:
+`GET /api/v1/projects` returns `{schema_version, items, next_cursor}` in row order. `next_cursor` is `r:<rowid>` when another page exists, otherwise null. `limit=0`, `limit=101`, and a non-numeric limit are `PROJECT.INVALID`. A cursor other than `r:<digits>` is `PROJECT.INVALID`.
 
-- a string of 1 to 20000 characters, the form the checked `ProjectCreate` model accepts, or
-- an object with required `title` and optional `summary`, `genre`, and `constraints`
-
-Both forms are stored and returned as sent. A structured brief is not collapsed to a string.
-
-`name` is optional. When it is missing or blank, a string brief uses the first line, cut at 80 characters, or `Untitled project`. A structured brief uses `title`. An explicit name is stripped and may be up to 200 characters.
-
-The same owner and the same name is `PROJECT.CONFLICT` (HTTP 409), the checked unique-name failure.
+The first build link moves a `draft` project to `active`.
 
 ## Build
 
-`Build` is the checked `BuildOut` plus `execution_id`:
-
-`build_id`, `project_id`, `status`, `target`, `job_id`, `result`, `error`, `created_at`, `updated_at`, `execution_id`
-
-`status` is one of `pending`, `queued`, `running`, `succeeded`, `failed`, `cancelled`. `job_id` is a string or null. `result` is an object. `error` is a string. Timestamps are epoch seconds.
-
-`execution_id` is the engine execution this build started or linked. It is the same identifier `BuildsClient` uses for `/api/v1/engine/executions/{execution_id}`. The checked `BuildOut` does not yet include this field; the move adds it so the 202 body returns the execution.
-
-### Start
-
-`POST /api/v1/projects/{project_id}/builds` without `execution_id` starts a build. That is `BuildService.submit`: create the build row, enqueue a `game.build` job, set status to `queued`, and return the Build with `job_id` and `execution_id` set. HTTP 202.
-
-Body fields, all optional:
+A start is `POST` without `execution_id`:
 
 | Field | Rule |
 |-------|------|
 | `target` | string, at most 64 characters, default `""` |
 | `options` | object, default `{}` |
-| `idempotency_key` | string, 1 to 128 characters |
+| `idempotency_key` | optional string, 1..128 characters |
 
-The router scopes the key as `{project_id}:{idempotency_key}`. A repeat with the same key resolves to the original job: the response `job_id` equals the first response's `job_id`.
+The handler calls `job_api.enqueue("game.build", {"target", "options"}, ...)`. `x-request-id` is the correlation id. The effective idempotency key is `{tenant}:{actor}:game.build:{project_id}:{key}`. The same key with the same target and options returns 202 and the original build with `replayed: true`. A different target or options is `PROJECT.IDEMPOTENCY_MISMATCH`. See [`docs/contracts/job_queue.md`](../../contracts/job_queue.md).
 
-### Link
+`Build` is:
 
-Sending `execution_id` links that execution and does not enqueue a job. The response Build carries that `execution_id`, `job_id: null`, and status `pending`. `target`, `options`, and `idempotency_key` are not a second submit on this path. An execution the session cannot attach is `PROJECT.BUILD_CONFLICT` (HTTP 409).
+```text
+schema_version, schema_id, build_id, execution_id, project_id, status,
+target, job_id, result, error, created_at, updated_at, replayed
+```
 
-### List and get
+`schema_id` is `skeleton.projects.v1`. `execution_id` equals `build_id`. `status` is `pending`, `queued`, `running`, `succeeded`, `failed`, or `cancelled`. A start returns `queued` once the job is enqueued. `job_id` is a string or null. `result` is an object. `error` is a string. Timestamps are RFC3339 UTC ending in `Z`.
 
-`GET .../builds` returns the newest builds for the project, at most 50, under `builds`. A build id that is missing or belongs to another project is `PROJECT.BUILD_NOT_FOUND` (HTTP 404).
+The new build id is appended to `build_ids`. A 65th link is `PROJECT.BUILD_CONFLICT` (HTTP 409) and the job just enqueued is cancelled. An `execution_id` already linked for another tenant is the same code.
+
+A link is `POST` with `execution_id` and without `target`, `options`, or `idempotency_key`. Combining them is `PROJECT.INVALID`. The response is `ProjectBuildLink`:
+
+```text
+schema_version, project_id, execution_id, linked_at, replayed
+```
+
+The first link is HTTP 201. The same execution again is HTTP 200 with `replayed: true` and the original `linked_at`. `execution_id` must match `[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`.
+
+`GET .../builds` returns `{schema_version, items, next_cursor}` for build rows, newest first, at most `limit` per page. An execution that was only linked, and has no build row, is on `project.build_ids` and is not in this list. A missing build id is `PROJECT.NOT_FOUND`.
 
 ## Errors
-
-Errors use the Skeleton API envelope from `skeleton/api/errors.py`. The checked router still emits `{"detail": "invalid_session"}` and the other `detail` strings. The moved router emits:
 
 ```json
 {"error": {"type": "ProjectContractError", "code": "PROJECT.NOT_FOUND", "message": "project not found", "context": {}}}
 ```
 
-| Code | HTTP | Checked `detail` | When |
-|------|------|------------------|------|
-| `PROJECT.UNAUTHENTICATED` | 401 | `invalid_session` | Missing or unknown bearer token |
-| `PROJECT.INVALID` | 422 | validation error | Body or field rejection, including a blank brief |
-| `PROJECT.NOT_FOUND` | 404 | `project_not_found` | Unknown project, or project owned by another session user |
-| `PROJECT.BUILD_NOT_FOUND` | 404 | `build_not_found` | Unknown build on this project |
-| `PROJECT.CONFLICT` | 409 | `project_name_conflict` | This owner already has that name |
-| `PROJECT.BUILD_CONFLICT` | 409 | — | `execution_id` cannot be linked |
+| Code | HTTP | When |
+|------|------|------|
+| `PROJECT.INVALID` | 400 | Body, brief, limit, cursor, version, or a session identity that does not match |
+| `PROJECT.UNAUTHENTICATED` | 401 | Missing or unknown bearer session |
+| `PROJECT.NOT_FOUND` | 404 | Project or build outside this actor and tenant |
+| `PROJECT.NAME_CONFLICT` | 409 | This actor already has that title |
+| `PROJECT.IDEMPOTENCY_MISMATCH` | 409 | Same key, different brief or different target/options |
+| `PROJECT.BUILD_CONFLICT` | 409 | Build link refused (64-link cap, or execution owned by another tenant) |
+| `PROJECT.UNAVAILABLE` | 503 | Storage failed. The message is `project storage unavailable` and the driver text is not returned. |
 
-Context must not contain secret values.
-
-## One schema
-
-`skeleton/ai/runtime/contracts/projects.py` re-exports this module. Callers do not keep a second Projects shape. A handler that mounts these routes consumes `Project`, `Build`, and `project_error_envelope` rather than inventing fields.
+`context` is `{}` on these handler errors and must not carry secrets.

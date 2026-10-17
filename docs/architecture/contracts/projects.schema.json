@@ -2,27 +2,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "skeleton.projects.v1",
   "title": "Skeleton Projects resource",
-  "description": "Projects HTTP contract for the #4097 router moved to /api/v1/projects inside create_app behind install_gate. Resources match ProjectOut and BuildOut. brief is a string or a structured object. POST /builds starts a server-side build unless execution_id links an existing one. Caller identity comes from the bearer session.",
-  "x-schema-version": "1.1.0",
+  "description": "Projects HTTP contract implemented by PR #4097 at /api/v1/projects inside create_app behind install_gate. actor_id and tenant_id come from the session. A string brief is stored as a brief object. POST /builds starts a game.build job unless execution_id links an existing execution.",
+  "x-schema-version": "1.0.0",
   "x-typed-module": "skeleton/contracts/projects.py",
   "x-implementation": {
     "pull_request": 4097,
-    "branch": "is/app-foundation-persistence",
-    "commit": "7065e555f9fff380a85ae479a79d3c34966ca097",
-    "observed_prefix": "/api/app/projects",
+    "commit": "959eec1345f767208fb4c5dda6e7bd25b07058c3",
+    "module": "skeleton/api/projects_routes.py",
     "mount": "create_app",
-    "gate": "install_gate"
+    "gate": "install_gate",
+    "job_queue": "docs/contracts/job_queue.md"
   },
   "x-auth": {
-    "scheme": "bearer-session",
-    "header": "Authorization",
-    "identity": "Session principal. actor_id is the session user and is stored as owner_id. tenant_id is session scope when present. Neither is a request field."
+    "seal": "x-gf-seal",
+    "session": "Authorization: Bearer <session>",
+    "actor_id": "session user id",
+    "tenant_id": "APP_TENANT_ID, default default"
   },
   "x-routes": [
-    {"method": "POST", "path": "/api/v1/projects", "status": 201, "body": "ProjectCreateRequest", "response": "Project"},
+    {"method": "POST", "path": "/api/v1/projects", "status": 201, "replay_status": 200, "body": "ProjectCreateRequest", "response": "Project"},
     {"method": "GET", "path": "/api/v1/projects", "status": 200, "response": "ProjectList"},
     {"method": "GET", "path": "/api/v1/projects/{project_id}", "status": 200, "response": "Project"},
-    {"method": "POST", "path": "/api/v1/projects/{project_id}/builds", "status": 202, "body": "BuildCreateRequest", "response": "Build"},
+    {"method": "POST", "path": "/api/v1/projects/{project_id}/builds", "status": 202, "body": "BuildStartRequest", "response": "Build"},
     {"method": "GET", "path": "/api/v1/projects/{project_id}/builds", "status": 200, "response": "BuildList"},
     {"method": "GET", "path": "/api/v1/projects/{project_id}/builds/{build_id}", "status": 200, "response": "Build"}
   ],
@@ -42,9 +43,10 @@
               "PROJECT.INVALID",
               "PROJECT.UNAUTHENTICATED",
               "PROJECT.NOT_FOUND",
-              "PROJECT.BUILD_NOT_FOUND",
-              "PROJECT.CONFLICT",
-              "PROJECT.BUILD_CONFLICT"
+              "PROJECT.BUILD_CONFLICT",
+              "PROJECT.NAME_CONFLICT",
+              "PROJECT.IDEMPOTENCY_MISMATCH",
+              "PROJECT.UNAVAILABLE"
             ]
           },
           "message": {"type": "string", "minLength": 1},
@@ -69,9 +71,9 @@
         }
       }
     },
-    "Brief": {
+    "BriefInput": {
       "oneOf": [
-        {"type": "string", "minLength": 1, "maxLength": 20000},
+        {"type": "string", "minLength": 1},
         {"$ref": "#/$defs/ProjectBrief"}
       ]
     },
@@ -80,69 +82,106 @@
       "additionalProperties": false,
       "required": ["brief"],
       "properties": {
-        "brief": {"$ref": "#/$defs/Brief"},
-        "name": {"type": "string", "maxLength": 200},
-        "settings": {"type": "object"}
+        "brief": {"$ref": "#/$defs/BriefInput"},
+        "schema_version": {"const": "1.0.0"},
+        "actor_id": {"type": "string", "description": "Optional. Must equal the session user or the call is PROJECT.INVALID."},
+        "tenant_id": {"type": "string", "description": "Optional. Must equal APP_TENANT_ID or the call is PROJECT.INVALID."}
       }
     },
     "Project": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["project_id", "owner_id", "name", "brief", "settings", "created_at", "updated_at"],
+      "required": ["schema_version", "project_id", "actor_id", "tenant_id", "brief", "status", "build_ids", "created_at", "updated_at"],
       "properties": {
+        "schema_version": {"const": "1.0.0"},
         "project_id": {"type": "string"},
-        "owner_id": {"type": "string", "description": "Session user id. Clients do not send this."},
-        "name": {"type": "string", "minLength": 1, "maxLength": 200},
-        "brief": {"$ref": "#/$defs/Brief"},
-        "settings": {"type": "object"},
-        "created_at": {"type": "number", "minimum": 0, "description": "Epoch seconds, matching ProjectOut."},
-        "updated_at": {"type": "number", "minimum": 0}
+        "actor_id": {"type": "string"},
+        "tenant_id": {"type": "string"},
+        "brief": {"$ref": "#/$defs/ProjectBrief"},
+        "status": {"enum": ["draft", "active", "archived"]},
+        "build_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string"}
+        },
+        "created_at": {"type": "string", "description": "RFC3339 UTC ending in Z."},
+        "updated_at": {"type": "string"}
       }
     },
     "ProjectList": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["projects"],
+      "required": ["schema_version", "items", "next_cursor"],
       "properties": {
-        "projects": {"type": "array", "items": {"$ref": "#/$defs/Project"}}
+        "schema_version": {"const": "1.0.0"},
+        "items": {"type": "array", "items": {"$ref": "#/$defs/Project"}},
+        "next_cursor": {"type": ["string", "null"], "description": "r:<rowid>, or null on the last page."}
       }
     },
-    "BuildCreateRequest": {
+    "BuildStartRequest": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "target": {"type": "string", "maxLength": 64},
         "options": {"type": "object"},
         "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 128},
-        "execution_id": {
-          "type": "string",
-          "description": "Optional. When present, link this execution and do not start a new build job."
-        }
+        "schema_version": {"const": "1.0.0"},
+        "actor_id": {"type": "string"},
+        "tenant_id": {"type": "string"}
+      }
+    },
+    "ProjectBuildLinkRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["execution_id"],
+      "properties": {
+        "execution_id": {"type": "string"},
+        "schema_version": {"const": "1.0.0"},
+        "actor_id": {"type": "string"},
+        "tenant_id": {"type": "string"}
+      }
+    },
+    "ProjectBuildLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "project_id", "execution_id", "linked_at", "replayed"],
+      "properties": {
+        "schema_version": {"const": "1.0.0"},
+        "project_id": {"type": "string"},
+        "execution_id": {"type": "string"},
+        "linked_at": {"type": "string"},
+        "replayed": {"type": "boolean"}
       }
     },
     "Build": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["build_id", "project_id", "status", "target", "job_id", "result", "error", "created_at", "updated_at", "execution_id"],
+      "required": ["schema_version", "schema_id", "build_id", "execution_id", "project_id", "status", "target", "job_id", "result", "error", "created_at", "updated_at", "replayed"],
       "properties": {
+        "schema_version": {"const": "1.0.0"},
+        "schema_id": {"const": "skeleton.projects.v1"},
         "build_id": {"type": "string"},
+        "execution_id": {"type": "string", "description": "Equal to build_id for a started build."},
         "project_id": {"type": "string"},
         "status": {"enum": ["pending", "queued", "running", "succeeded", "failed", "cancelled"]},
         "target": {"type": "string", "maxLength": 64},
         "job_id": {"type": ["string", "null"]},
         "result": {"type": "object"},
-        "error": {"type": "string", "maxLength": 4000},
-        "created_at": {"type": "number", "minimum": 0},
-        "updated_at": {"type": "number", "minimum": 0},
-        "execution_id": {"type": "string", "description": "Engine execution this build started or linked."}
+        "error": {"type": "string"},
+        "created_at": {"type": "string"},
+        "updated_at": {"type": "string"},
+        "replayed": {"type": "boolean"}
       }
     },
     "BuildList": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["builds"],
+      "required": ["schema_version", "items", "next_cursor"],
       "properties": {
-        "builds": {"type": "array", "maxItems": 50, "items": {"$ref": "#/$defs/Build"}}
+        "schema_version": {"const": "1.0.0"},
+        "items": {"type": "array", "items": {"$ref": "#/$defs/Build"}},
+        "next_cursor": {"type": ["string", "null"]}
       }
     }
   }

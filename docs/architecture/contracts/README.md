@@ -4,10 +4,11 @@ Typed contracts live in `skeleton/contracts/`. Human-readable HTTP and boundary 
 
 | Contract | Typed module | Notes |
 |----------|--------------|-------|
-| Projects resource | `skeleton/contracts/projects.py` | [projects.md](projects.md) and [projects.schema.json](projects.schema.json). `skeleton.projects.v1` at `1.1.0`, mounted at `/api/v1/projects`. |
+| Projects resource | `skeleton/contracts/projects.py` | [projects.md](projects.md) and [projects.schema.json](projects.schema.json). `skeleton.projects.v1` at `1.0.0`, mounted at `/api/v1/projects`. |
 | Subsystem boundaries | `skeleton/contracts/subsystem_boundaries.py` | Kernel, agents, memory, GameForge facade, API error envelope. Version `1.0.0`. |
 | Health probes | `skeleton/contracts/health.py` | Parses the existing liveness and readiness JSON. Does not add routes. |
 | Operation envelope | `skeleton/contracts/protocol.py` | Existing transport-neutral internal protocol. |
 | Memory record | `skeleton/contracts/memory_record.py` | Existing durable memory authority. |
+| Job queue | `skeleton/app_services/job_api.py` | [docs/contracts/job_queue.md](../../contracts/job_queue.md). Public enqueue, status, result, and cancel API used by Projects builds (`game.build`). |
 
-Projects is the contract for the #4097 router (create from a brief, list, get, start or link a build). The session supplies the owner. A started build's `execution_id` is the engine execution at `/api/v1/engine/executions/{execution_id}`.
+Projects is the contract for the #4097 router at commit `959eec134` (create from a string or structured brief, list, get, start or link a build, paginated build list). The session supplies `actor_id` and `tenant_id`. A started build's `execution_id` equals its `build_id`.

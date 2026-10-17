@@ -14,21 +14,22 @@ Publishing a second Projects shape beside the #4097 router would fork the resour
 
 `skeleton/contracts/subsystem_boundaries.py` publishes version `1.0.0` envelopes for kernel events, agent tasks, memory writes, the GameForge `run`/`intake` facade, and the API error object. GameForge pipeline internals stay behind a request digest.
 
-`skeleton/contracts/projects.py`, `docs/architecture/contracts/projects.md`, and `docs/architecture/contracts/projects.schema.json` publish Projects schema `skeleton.projects.v1`. Version `1.1.0` describes the Projects router on PR #4097 (`skeleton/app_services/projects_api.py`, commit `7065e555`) at the mount Internal Systems is moving to: `/api/v1/projects` inside `create_app`, behind `install_gate`.
+`skeleton/contracts/projects.py`, `docs/architecture/contracts/projects.md`, and `docs/architecture/contracts/projects.schema.json` publish Projects schema `skeleton.projects.v1` at version `1.0.0`. That is the router on PR #4097 (`skeleton/api/projects_routes.py`, commit `959eec134`), mounted at `/api/v1/projects` inside `create_app` behind `install_gate`.
 
-- `POST /api/v1/projects` creates a project from a brief. The brief is a string or a structured object (`title`, `summary`, `genre`, `constraints`).
-- `GET /api/v1/projects` and `GET /api/v1/projects/{project_id}` return `ProjectOut` rows. The owner is the session user (`owner_id`).
-- `POST /api/v1/projects/{project_id}/builds` starts a server-side build and returns a `Build` with `execution_id`. A body that includes `execution_id` links that execution and does not start another job.
-- `GET /api/v1/projects/{project_id}/builds` and `GET /api/v1/projects/{project_id}/builds/{build_id}` read those builds.
+- `POST /api/v1/projects` creates a project from a string or a structured brief. The stored brief is the object. `Idempotency-Key` replays with 200 or returns `PROJECT.IDEMPOTENCY_MISMATCH`.
+- `GET /api/v1/projects` is paginated (`limit`, `cursor`) and returns `{schema_version, items, next_cursor}`.
+- `GET /api/v1/projects/{project_id}` returns one project. `actor_id` is the session user. `tenant_id` is `APP_TENANT_ID` (default `default`).
+- `POST /api/v1/projects/{project_id}/builds` starts a `game.build` job and returns `Build` (`execution_id` equals `build_id`). A body that is only `execution_id` links that execution and returns `ProjectBuildLink`.
+- `GET /api/v1/projects/{project_id}/builds` is paginated, newest first. `GET .../builds/{build_id}` returns one build.
 
-`actor_id` and `tenant_id` are derived from the bearer session and are not request fields. Errors use the Skeleton envelope (`error.type`, `error.code` as `PROJECT.*`, `error.message`, `error.context`) and never carry secrets. The checked commit still serves `/api/app/projects` with `{"detail": ...}`; the contract is the moved shape, not a second resource.
+Errors use `{error:{type, code:PROJECT.*, message, context}}`, including `PROJECT.NAME_CONFLICT`, `PROJECT.IDEMPOTENCY_MISMATCH`, and `PROJECT.UNAVAILABLE`. The job queue is `docs/contracts/job_queue.md`.
 
 Health payloads keep their current JSON. `skeleton/contracts/health.py` parses them. Public configuration snapshots go through `skeleton/config/public_snapshot.py`.
 
 ## Consequences
 
-The foundation client adds `ProjectsClient` against `PROJECT_ROUTES` and the `Project` / `Build` documents. The session user is `owner_id`. A missing project and a project owned by another session user share `PROJECT.NOT_FOUND`.
+The foundation client adds `ProjectsClient` against `PROJECT_ROUTES` and the `Project` / `Build` documents. A missing project and a project outside the session actor and tenant share `PROJECT.NOT_FOUND`.
 
-## Amendment (1.1.0)
+## Amendment
 
-Version `1.0.0` specified a contract-only project with `actor_id` and `tenant_id` on every body, RFC3339 timestamps, and a link-only `POST /builds` that did not start a build. That shape was a parallel spec. `1.1.0` replaces it with the checked #4097 resources (`ProjectOut`, `BuildOut`, epoch timestamps, bearer session, server-side `BuildService.submit`) plus the mount ruling: `/api/v1/projects`, brief string or object, `execution_id` on the Build, optional link, and the `PROJECT.*` envelope.
+An intermediate draft on this branch described a different resource (`owner_id`, epoch timestamps, version `1.1.0`). Commit `959eec134` is the implementation. The contract is version `1.0.0` and matches that router: string or structured brief, session-derived actor and tenant, start-build with optional `execution_id` link, paginated build list, `PROJECT.IDEMPOTENCY_MISMATCH`, and the `PROJECT.*` envelope.
