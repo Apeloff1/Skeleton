@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import Any
+from collections.abc import Sequence
 
 from .game_learning import _digest
 
@@ -119,7 +120,8 @@ def _source_observations(episode: dict[str, Any]):
 
 
 def route_episode_semantic_lenses(episode: dict[str, Any], *,
-                                 max_lenses: int = SEMANTIC_LENS_BUDGET
+                                 max_lenses: int = SEMANTIC_LENS_BUDGET,
+                                 requested_keys: Sequence[str] = (),
                                  ) -> dict[str, Any]:
     """Select real Jeeves lens definitions from six actual native evidence views."""
     if type(max_lenses) is not int or not 1 <= max_lenses <= SEMANTIC_LENS_BUDGET:
@@ -130,12 +132,41 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
             or type(episode.get("ai_playing")) is not dict
             or type(episode.get("repetition")) is not dict):
         raise TriangleSemanticError("semantic routing requires source-audited episode")
+    if (type(requested_keys) not in (list, tuple)
+            or len(requested_keys) not in (0, SEMANTIC_LENS_BUDGET)
+            or any(type(key) is not str or not key
+                   or key != key.strip().casefold() for key in requested_keys)
+            or len(set(requested_keys)) != len(requested_keys)
+            or (requested_keys and max_lenses != SEMANTIC_LENS_BUDGET)):
+        raise TriangleSemanticError("custom semantic lens allocation needs 43 unique canonical keys")
     router, catalog_digest, catalog_count = _canonical_router()
     observations = _source_observations(episode)
-    selection = router.select_maximal(
-        observations, max_lenses=max_lenses, max_per_family=5,
-        minimum_rare_when_supported=3,
-    )
+    if requested_keys:
+        from skeleton.jeeves.agent.semantic_lenses import LensSelection
+        catalog = {spec.key: spec for spec in router.registry.all()}
+        if any(key not in catalog for key in requested_keys):
+            raise TriangleSemanticError("requested lens missing from canonical Jeeves registry")
+        selected = tuple(catalog[key] for key in requested_keys)
+        selection = LensSelection(
+            lenses=selected,
+            activation_scores={spec.key: 1.0 for spec in selected},
+            families=tuple(sorted({spec.family for spec in selected},
+                                  key=lambda family: family.value)),
+            perpendicular=True,
+        )
+    else:
+        selection = router.select_maximal(
+            observations, max_lenses=max_lenses, max_per_family=5,
+            minimum_rare_when_supported=3,
+        )
+    if max_lenses == SEMANTIC_LENS_BUDGET and len(selection.lenses) != SEMANTIC_LENS_BUDGET:
+        raise TriangleSemanticError("canonical registry did not supply the requested 43 lenses")
+    # Apply Jeeves' existing scientific-governance profile. Selection is a
+    # question-generation permission, never a factual or causal source.
+    from skeleton.jeeves.agent.semantic_governance_bridge import SemanticGovernanceBridge
+    governance = SemanticGovernanceBridge().assess(selection, observations=observations)
+    if governance.factual_assertion_authorized or governance.causal_assertion_authorized:
+        raise TriangleSemanticError("a semantic lens attempted to create evidence authority")
     if not selection.lenses or len(selection.lenses) > max_lenses:
         raise TriangleSemanticError("canonical semantic router selection outside policy")
     route: list[dict[str, Any]] = []
@@ -143,7 +174,15 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         score = selection.activation_scores.get(spec.key)
         if type(score) not in (int, float) or not 0 <= score <= 1:
             raise TriangleSemanticError("semantic lens activation lacks native router score")
+        decision = governance.decision_for(spec.key)
+        if (decision is None or decision.factual_assertion_authorized
+                or decision.causal_assertion_authorized):
+            raise TriangleSemanticError("canonical semantic lens lacks safe governance decision")
         route.append({
+            "governance_grade": decision.grade.value,
+            "governance_fingerprint": decision.fingerprint,
+            "factual_claims_allowed": False,
+            "causal_claims_allowed": False,
             "lens_key": spec.key,
             "lens_family": spec.family.value,
             "lens_role": spec.role.value,
@@ -169,6 +208,10 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         "canonical_catalog_lens_count": catalog_count,
         "requested_max_lenses": max_lenses,
         "actually_routed_lenses": len(route),
+        "operator_requested_lens_keys": list(requested_keys),
+        "selection_mode": "operator_exact_43" if requested_keys else "canonical_dynamic_router",
+        "governance_fingerprint": governance.fingerprint,
+        "semantic_lenses_remain_hypotheses_not_source_evidence": True,
         "selection_is_dynamic_not_a_claim_of_exactly_43_catalog_lenses": True,
         "source_evidence_observation_count": len(observations),
         "observation_fingerprints": [obs.fingerprint for obs in observations],
@@ -190,6 +233,7 @@ def verify_episode_semantic_lenses(episode: dict[str, Any], saved: Any) -> None:
         raise TriangleSemanticError("saved semantic lens route receipt digest differs")
     expected = route_episode_semantic_lenses(
         episode, max_lenses=saved.get("requested_max_lenses"),
+        requested_keys=saved.get("operator_requested_lens_keys"),
     )
     if saved != expected:
         raise TriangleSemanticError("semantic lens route no longer matches source or catalog")
