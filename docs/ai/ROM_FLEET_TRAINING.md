@@ -83,6 +83,30 @@ fabricated second weight update. Existing outputs are never overwritten and
 the CLI reports a nonzero status if any approved ROM fails. No game binary is
 copied into output artifacts.
 
+## Immediate training path using the original ROM generator
+
+This repository does not ship an inventory of third-party game binaries, but
+it has a first-party executable original Game Boy ROM generator. The existing
+`scripts/accept_original_rom_ai_pipeline.py` runs genuine emulated instructions,
+independent replay audits, measured Q updates and local candidate neural SGD.
+After installing the app runtime and dependencies, start with a unique **new**
+private output directory:
+
+```bash
+mkdir -p /private/rom-research
+python scripts/accept_original_rom_ai_pipeline.py \
+  --output-directory /private/rom-research/original-seed-42 \
+  --seed 42 --max-runs 12 --episode-steps 12 \
+  --neural-epochs 4 --neural-width 8
+```
+
+The result includes `original-training.gb`, independent policy/evidence,
+an actual local MLP candidate, held-out measurements and an
+`acceptance.json` receipt. This route is distinct from independently
+approved third-party ROMs and still does **not** modify production Jeeves
+transformer weights. Invoke on the **actual runtime host** and inspect
+acceptance before describing quality as improved.
+
 ## Long-run operator follow-up
 
 Runs are bounded and cancellable; monthly/yearly learning is built by
