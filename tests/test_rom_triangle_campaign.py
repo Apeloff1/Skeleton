@@ -692,3 +692,112 @@ def test_200_semantic_questions_are_corpus_metadata_not_1600_supervised_samples(
     assert candidate["semantic_questions_are_not_supervised_labels"] is True
     assert candidate["production_jeeves_optimizer_steps"] == 0
     corpus.verify_triangle_candidate_corpus(source, triangle, review, candidate)
+
+
+def _complete_200_native_episode():
+    trace = "a" * 64
+    receipt = "b" * 64
+    return {
+        "source_trace_sha256": trace,
+        "source_receipt_sha256": receipt,
+        "grounded_lens_evidence": {
+            "controller_action": {"action_sequence_sha256": "c" * 64},
+            "reward_and_consequence": {"measured_reward_sequence_sha256": "d" * 64},
+        },
+        "companion_viewing": {
+            "native_rgb24_frames_optically_inspected": 2,
+            "frame_sequence_sha256": "e" * 64,
+            "audio_sequence_sha256": "f" * 64,
+        },
+        "ai_playing": {
+            "counterfactual_native_probes": 1,
+            "controller_only_probes": 0,
+            "actual_native_steps": 2,
+            "actual_q_table_updates": 2,
+        },
+        "repetition": {
+            "replayed_native_steps": 2,
+            "reverse_checkpoint_count": 1,
+        },
+    }
+
+
+def test_complete_200_mode_integrates_all_original_jeeves_lens_ids():
+    from skeleton.jeeves.agent.lens_system import LensCatalog
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        route_episode_semantic_lenses, verify_episode_semantic_lenses,
+    )
+    catalog = LensCatalog()
+    expected = {item.lens_id for item in catalog.all()}
+    assert len(expected) == 200
+    result = route_episode_semantic_lenses(
+        _complete_200_native_episode(), max_lenses=200,
+    )
+    assert result["canonical_registry"] == (
+        "skeleton.jeeves.agent.lens_system.LensCatalog"
+    )
+    assert result["selection_mode"] == "complete_canonical_200_catalog"
+    assert result["actually_routed_lenses"] == 200
+    assert len({row["lens_key"] for row in result["routes"]}) == 200
+    assert {row["lens_key"] for row in result["routes"]} == expected
+    assert all(row["new_independent_evidence"] == 0
+               and row["factual_claims_allowed"] is False
+               and row["training_ground_truth_label_available"] is False
+               for row in result["routes"])
+    assert result["additional_native_training_examples"] == 0
+    assert sum(bool(row["cue_support_present"]) for row in result["routes"]) + sum(
+        not row["cue_support_present"] for row in result["routes"]) == 200
+    verify_episode_semantic_lenses(_complete_200_native_episode(), result)
+
+
+def test_complete_200_operator_cannot_silently_drop_or_invent_lenses():
+    from skeleton.jeeves.agent.lens_system import LensCatalog
+    from skeleton.jeeves.game_emulator_triangle_complete_lenses import (
+        CompleteLensError,
+    )
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        route_episode_semantic_lenses,
+    )
+    original = tuple(item.lens_id for item in LensCatalog().all())
+    assert len(original) == 200
+    reversed_set = route_episode_semantic_lenses(
+        _complete_200_native_episode(), max_lenses=200,
+        requested_keys=original[::-1],
+    )
+    assert [row["lens_key"] for row in reversed_set["routes"]] == list(original[::-1])
+    with pytest.raises((CompleteLensError, ValueError), match="200|catalog"):
+        route_episode_semantic_lenses(
+            _complete_200_native_episode(), max_lenses=200,
+            requested_keys=original[:-1] + ("invented_lens",),
+        )
+
+
+def test_full_200_native_prompt_remains_bounded_and_never_claims_video_knowledge():
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        route_episode_semantic_lenses,
+    )
+    from skeleton.jeeves.game_emulator_triangle_semantic_inference import _prompt
+    source = _complete_200_native_episode()
+    route = route_episode_semantic_lenses(source, max_lenses=200)
+    for lens in route["routes"]:
+        prompt = _prompt(source, route, lens)
+        assert len(prompt.encode()) <= 4096
+        assert "MEASUREMENT METADATA ONLY" in prompt
+
+
+def test_operator_commands_use_all_200_lenses_by_default():
+    from scripts.training.rom_study import parser
+    parser_ = parser()
+    inspect = parser_.parse_args([
+        "triangle-lenses", "--receipt", "/tmp/source.json",
+        "--source-sha256", "0" * 64,
+    ])
+    assert inspect.lens_count == 200
+    study = parser_.parse_args([
+        "train-triangle", "--root", "/tmp/roms",
+        "--approvals", "/tmp/rights",
+        "--output-dir", "/tmp/receipts",
+        "--reviewer-checkpoint", "/tmp/critic",
+        "--snapshot", "/tmp/snapshot",
+    ])
+    assert study.semantic_lens_count == 200

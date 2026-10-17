@@ -633,12 +633,13 @@ model hypotheses are promoted to supervised truth labels.
 ### Full 200-lens canonical Jeeves training triangle
 
 The original 43-lens mode is retained for existing replay receipts. The
-extended mode now routes **200 distinct definitions from the existing
-MaximalSemanticRegistry**, including authored base, frontier, deep, rare,
-research, plane and depth catalogs, under the same scientific governance. The
-source registry contains more than 200 definitions; this is a **200-lens
-per-episode execution budget**, not a claim that exactly 200 lenses exist in
-the entire application. A lens that lacks positive native cue support is an
+extended mode now routes **all 200 authored definitions from
+`skeleton.jeeves.agent.lens_system.LensCatalog`**, preserving each original
+lens ID, family, authority and required outputs. The larger
+`MaximalSemanticRegistry` remains available for legacy 43-lens routing, but
+the extended mode does not choose an arbitrary 200-lens subset of it.
+This is a complete 200-definition first-order catalog, not an assertion that
+the entire application contains only 200 semantic operators. A lens that lacks positive native cue support is an
 unverified question, *not* an observed game feature.
 
 Inspect and pin one episode's full selection with:
@@ -681,3 +682,23 @@ replayed 200-lens review. The original eight measured gameplay lenses remain
 the only eight numeric training-view rows per episode. All 200 semantic
 lenses are interpretive **questions**, not 200 independent games or newly
 measured target labels. Model promotions remain separately gated.
+
+#### Canonical 200-lens full-catalog wiring (current)
+
+The extended mode now enumerates **all 200 IDs** returned by the canonical
+`LensCatalog.all()` and fails closed if the catalog grows, shrinks, drops
+required outputs or repeats IDs. Every lens carries original family,
+authority, provenance-linked cue matching and a pending independent
+interpretive question. Unsupported native visual, narrative, music or game
+mechanics are explicitly *hypothesis only*. A 200-key operator manifest must
+be an exact permutation of those 200 IDs; it cannot omit difficult lenses.
+
+New CLI `triangle-lenses`, `triangle-lens-audit`, `train-triangle` and
+`export-triangle-corpus` requests **default to 200 lenses**. Use
+`--lens-count 43` or `--semantic-lens-count 43` for existing 43-lens
+receipts and older studies. The explicit `execute-43-lenses` command stays
+available; `execute-200-lenses` invokes a real local language-model generation
+for each of the 200 catalog definitions when an installed checkpoint is
+provided. The independent model outputs are hypotheses and cannot increase
+the eight measured native source perspectives or update Jeeves weights by
+themselves.

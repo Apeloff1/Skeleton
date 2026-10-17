@@ -23,25 +23,25 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest="operation", required=True)
     coverage = commands.add_parser(
         "triangle-lens-audit",
-        help="audit evidence support for all 43 canonical Jeeves lenses across native episodes",
+        help="audit source support for all 200 authored Jeeves lenses (43 legacy optional)",
     )
     coverage.add_argument("--receipt", required=True, type=Path)
     coverage.add_argument("--source-sha256", required=True)
     coverage.add_argument("--start-episode", type=int, default=0)
     coverage.add_argument("--limit", type=int, default=8)
-    coverage.add_argument("--lens-count", type=int, choices=(43, 200), default=43)
+    coverage.add_argument("--lens-count", type=int, choices=(43, 200), default=200)
     coverage.add_argument("--semantic-lens-set", type=Path)
     lenses = commands.add_parser(
         "triangle-lenses",
-        help="inspect 43 canonical governed Jeeves lenses selected for a source episode",
+        help="inspect all 200 authored Jeeves lenses or legacy 43 selection",
     )
     lenses.add_argument("--receipt", required=True, type=Path)
     lenses.add_argument("--source-sha256", required=True)
     lenses.add_argument("--run-index", type=int, default=0)
-    lenses.add_argument("--lens-count", type=int, choices=(43, 200), default=43)
+    lenses.add_argument("--lens-count", type=int, choices=(43, 200), default=200)
     lenses.add_argument(
         "--output-dir", type=Path,
-        help="optionally create a pinned 43-lens JSON manifest for future candidate exports",
+        help="optionally pin the exact 200-lens catalog or a legacy 43-lens selection",
     )
     status = commands.add_parser(
         "triangle-status", help="verify a native ROM training triangle without loading model weights"
@@ -121,19 +121,19 @@ def parser() -> argparse.ArgumentParser:
     triangle.add_argument("--review-tokens", type=int, default=160)
     triangle.add_argument(
         "--semantic-checkpoint", type=Path,
-        help="opt in to real local model inference for 43 original Jeeves lenses",
+        help="opt in to real local model inference for all 200 authored Jeeves lenses",
     )
     triangle.add_argument(
         "--semantic-lens-set", type=Path,
-        help="optional pinned exact 43 canonical semantic lens keys; needs semantic checkpoint",
+        help="optional pinned complete 200-lens or legacy 43-lens key manifest",
     )
     triangle.add_argument(
         "--semantic-all-runs", action="store_true",
-        help="execute all 43 lenses for EVERY native episode, not only episode zero",
+        help="execute all configured lenses for EVERY native episode (recommended)",
     )
     triangle.add_argument("--semantic-seed", type=int, default=0)
     triangle.add_argument("--semantic-tokens", type=int, default=192)
-    triangle.add_argument("--semantic-lens-count", type=int, choices=(43, 200), default=43)
+    triangle.add_argument("--semantic-lens-count", type=int, choices=(43, 200), default=200)
     corpus = commands.add_parser(
         "export-triangle-corpus",
         help="replay the independent critic and export weighted Jeeves candidate training views",
@@ -145,16 +145,16 @@ def parser() -> argparse.ArgumentParser:
     corpus.add_argument("--output-dir", required=True, type=Path)
     corpus.add_argument(
         "--semantic-lens-set", type=Path,
-        help="optional strict JSON manifest pinning exactly 43 keys from existing Jeeves catalog",
+        help="strict catalog manifest: exactly 200 original or 43 legacy keys",
     )
     corpus.add_argument(
         "--semantic-review-receipt", type=Path, action="append",
         help="repeat once per native episode to export a complete, replay-verified v4 lens corpus",
     )
-    corpus.add_argument("--semantic-lens-count", type=int, choices=(43, 200), default=43)
+    corpus.add_argument("--semantic-lens-count", type=int, choices=(43, 200), default=200)
     corpus.add_argument(
         "--semantic-checkpoint", type=Path,
-        help="required with --semantic-review-receipt to replay all 43 model inferences",
+        help="required with --semantic-review-receipt to replay original model inferences",
     )
     native_semantics = commands.add_parser(
         "execute-43-lenses",

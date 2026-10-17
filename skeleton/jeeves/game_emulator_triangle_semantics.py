@@ -1,8 +1,10 @@
 """Bridge measured emulator evidence into Jeeves' existing semantic lens plane.
 
 The canonical semantic registry contains substantially more operators than
-the eight deterministic training measurements. Route up to 43 of those authored
-operators for each native episode; never conflate a lens question with a new
+the eight deterministic training measurements. Legacy 43-lens runs preserve
+replay compatibility; extended runs schedule all 200 first-order lens_system
+operators from their canonical owner, rather than a random registry subset.
+Never conflate a lens question with a new
 pixel, reward, video interpretation, or independent training example.
 """
 from __future__ import annotations
@@ -145,7 +147,7 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
                                  max_lenses: int = SEMANTIC_LENS_BUDGET,
                                  requested_keys: Sequence[str] = (),
                                  ) -> dict[str, Any]:
-    """Select real Jeeves lens definitions from six actual native evidence views."""
+    """Route 43 legacy semantic or ALL 200 canonical Jeeves lens definitions."""
     if type(max_lenses) is not int or not 1 <= max_lenses <= EXTENDED_SEMANTIC_LENS_BUDGET:
         raise TriangleSemanticError("semantic route budget must be 1..200")
     if (type(episode) is not dict
