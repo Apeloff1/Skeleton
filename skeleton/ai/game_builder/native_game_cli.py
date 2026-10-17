@@ -68,6 +68,7 @@ def build_game(
     hazards: int, health: int, rights_evidence: str | Path,
     creative_identity: tuple[str, ...], output: str | Path, authorized: bool,
     studio_art: ArtDirection | None = None,
+    theme: str = "forest",
 ) -> dict[str, object]:
     """Create native-source projects from a deterministic game, never HTML."""
     if type(authorized) is not bool or not authorized:
@@ -86,6 +87,7 @@ def build_game(
         seed=seed, width=width, height=height, levels=levels,
         collectibles_per_level=collectibles, hazards_per_level=hazards,
         starting_health=health,
+        theme=theme,
     )
     world = generate_playable_world(intent, authorized=True)
     proof = demonstrate_solvable(world, authorized=True)
@@ -247,6 +249,9 @@ def main() -> None:
     parser.add_argument("--project-id", required=True)
     parser.add_argument("--title", required=True)
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--theme",
+                        choices=("forest", "space", "desert", "ocean", "arcade"),
+                        default="forest")
     parser.add_argument("--width", type=int, default=17)
     parser.add_argument("--height", type=int, default=15)
     parser.add_argument("--levels", type=int, default=3)
@@ -281,6 +286,7 @@ def main() -> None:
         rights_evidence=args.rights_evidence,
         creative_identity=tuple(args.identity), output=args.output,
         authorized=args.authorize_original_homebrew,
+        theme=args.theme,
         studio_art=(
             ArtDirection(
                 style=args.studio_style, contrast=args.studio_contrast,
