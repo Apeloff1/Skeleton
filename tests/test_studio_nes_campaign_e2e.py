@@ -103,6 +103,7 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
                 authorized=True, execute=True,
             )
         self.assertTrue(result["native_rom_compiled"])
+        self.assertEqual(len(result["compiled_original_psg_evidence_digest"]), 64)
         return rom
 
     def test_verified_cpu_and_ppu_replay_binds_rom_symbols_source_and_observation(self):
@@ -160,6 +161,44 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
         )
         with self.assertRaises(StudioAssuranceError):
             inspect_production_assurance(self.order, self.campaign)
+
+    def test_header_valid_nes_with_corrupt_psg_music_cannot_publish(self):
+        tiles = (
+            self.campaign / "targets/nintendo_famicom/assets/tiles/runtime.bin"
+        ).read_bytes()
+        animated = (
+            self.campaign / "targets/nintendo_famicom/assets/tiles/hero_animation.bin"
+        ).read_bytes()
+        fake = bytearray(ines_rom(tiles, animated))
+        fake[16 + 0x104] ^= 1
+        corrupted = bytes(fake)
+
+        def assembler(project, target, *, authorized, execute,
+                      output, output_symbols, timeout_seconds):
+            Path(output).write_bytes(corrupted)
+            Path(output_symbols).write_bytes(NES_LABELS)
+            _, digest = _verify_source(Path(project), target)
+            return native_receipt(
+                target, digest, available=True, invoked=True,
+                built=True, header=True,
+                digest=sha256(corrupted).hexdigest(),
+                size=len(corrupted),
+                symbol_sha256=sha256(NES_LABELS).hexdigest(),
+            )
+        with patch(
+            "skeleton.ai.game_builder.studio_campaign_assurance.qualify_native_build",
+            side_effect=assembler,
+        ):
+            result = qualify_campaign_target(
+                self.order, self.campaign, "nintendo_famicom",
+                authorized=True, execute=True,
+            )
+        self.assertFalse(result["native_rom_compiled"])
+        self.assertEqual(result["blocker"], "compiled_original_psg_music_mismatch")
+        qualified = self.campaign / "qualifications/nintendo_famicom"
+        self.assertFalse((qualified / "qualified.rom").exists())
+        self.assertFalse((qualified / "qualified.sym").exists())
+        self.assertFalse((qualified / "qualification.json").exists())
 
     def test_wrong_compiled_chr_pixels_never_publish_a_qualified_nes(self):
         corrupted = bytearray(ines_rom(
