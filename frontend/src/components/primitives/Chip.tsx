@@ -1,3 +1,4 @@
+/* eslint-disable import/no-named-as-default-member -- default theme is the live skin object, not the static palette map. */
 /**
  * <Chip> — pill-shaped tag / filter / category selector.
  *
@@ -8,6 +9,7 @@ import React from 'react';
 import { Pressable, Text, View, ViewStyle, StyleProp } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { hitSlopFor, MIN_TOUCH_TARGET } from '../../foundation/a11y';
 import theme from '../../theme/tokens';
 
 interface ChipProps {
@@ -49,7 +51,10 @@ export const Chip: React.FC<ChipProps> = ({
           borderColor: active ? accent : theme.colors.border,
           opacity: pressed ? 0.9 : 1,
         })}
-        hitSlop={theme.hitSlop.sm}
+        hitSlop={hitSlopFor(MIN_TOUCH_TARGET, height)}
+        accessibilityRole="button"
+        accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
+        accessibilityState={{ selected: !!active }}
       >
         {icon && (
           <Ionicons
