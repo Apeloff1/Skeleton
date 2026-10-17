@@ -106,8 +106,8 @@ class RealNESCPUReplayTests(unittest.TestCase):
             )
             (Path(cwd) / "framebuffer.gd").write_bytes(b"GDREAL" + bytes(300))
             (Path(cwd) / "cpu-snapshots.txt").write_text(
-                "1 0 2 4 4 0 0 1 0 0\\n"
-                "2 1 2 3 4 1 0 0 1 0\\n".replace("\\\\n", "\\n")
+                "1 0 2 4 4 0 0 1 0 0" + chr(10)
+                + "2 1 2 3 4 1 0 0 1 0" + chr(10)
             )
             return subprocess.CompletedProcess(args, 0, None, None)
         with patch("skeleton.ai.game_builder.studio_nes_emulator.shutil.which",
