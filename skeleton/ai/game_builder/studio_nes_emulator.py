@@ -25,8 +25,8 @@ from .studio_runtime_qualification import _inputs
 
 SCHEMA = "skeleton.game_builder.nes_cpu_ppu_playthrough.v1"
 _ACTIONS = frozenset(("up", "down", "left", "right"))
-_OUTPUT = re.compile(r"NES_REPLAY_V1 ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)\Z")
-_FIELDS = ("Level", "PlayerX", "PlayerY", "Health", "Score",
+_OUTPUT = re.compile(r"NES_REPLAY_V1 " + r" ".join([r"([0-9]+)"] * 11) + r"\Z")
+_FIELDS = ("Level", "PlayerX", "PlayerY", "Health", "Score", "ScoreHigh",
            "GemsRemaining", "GameWon", "GameLost")
 
 
@@ -146,7 +146,8 @@ if ok then
       total, #actions,
       memory.readbyte(ram.Level), memory.readbyte(ram.PlayerX),
       memory.readbyte(ram.PlayerY), memory.readbyte(ram.Health),
-      memory.readbyte(ram.Score), memory.readbyte(ram.GemsRemaining),
+      memory.readbyte(ram.Score), memory.readbyte(ram.ScoreHigh),
+      memory.readbyte(ram.GemsRemaining),
       memory.readbyte(ram.GameWon), memory.readbyte(ram.GameLost)
     }
     outcome:write("NES_REPLAY_V1 " .. table.concat(values, " "))
@@ -287,7 +288,7 @@ def qualify_nes_cpu_ppu(
             and state["PlayerY"] == expected["y"]
             and state["Level"] == expected["level_index"] + 1
             and state["Health"] == expected["health"]
-            and state["Score"] == expected["score"]
+            and state["Score"] + 256 * state["ScoreHigh"] == expected["score"]
         )
         return _receipt(
             romhash, symhash, world, proofhash,
