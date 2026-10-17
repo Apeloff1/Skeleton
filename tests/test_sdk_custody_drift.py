@@ -76,6 +76,20 @@ class SDKCustodyDriftTests(unittest.TestCase):
                 with self.assertRaises(SDKStudyError):
                     compare_custody(old, forged)
 
+    def test_only_manifest_revision_still_invalidates_unchanged_documents(self):
+        from skeleton.ai.training.sdk_custody_drift import _digest
+        old = build({"a" * 64: fixture()})
+        revised = copy.deepcopy(old)
+        revised["source_manifest_sha256"] = "e" * 64
+        revised["snapshot_digest"] = _digest({
+            k: v for k, v in revised.items() if k != "snapshot_digest"
+        })
+        delta = compare_custody(old, revised)
+        self.assertTrue(delta["source_manifest_changed"])
+        self.assertEqual(delta["unchanged_documents"], 0)
+        self.assertEqual(delta["changes"][0]["change"],
+                         "manifest_authority_changed_requires_reapproval")
+
     def test_added_removed_document_never_reuses_unreviewed_source(self):
         original = build({"a" * 64: fixture()})
         extra = fixture()
