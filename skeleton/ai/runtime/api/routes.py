@@ -1434,6 +1434,32 @@ async def gameforge_run(http_request: Request, request: Dict[str, Any], state=De
     return out
 
 
+@router.post("/game/build")
+async def game_build(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """Product route: compile a brief into a checked Godot project.
+
+    Mounted only through ``create_app``. ``skeleton dev game build`` and the
+    unmounted ``gameforge_routes`` run handler call the same executor.
+    """
+    replay = _idempotency.replay(dict(http_request.headers))
+    if replay is not None:
+        return replay  # type: ignore[return-value]
+    from skeleton.forge.game_builder import build_playable_game, public_payload
+    from skeleton.forge.playtest import PLAYTEST_MODES
+
+    brief = _text_field(request, "brief", "")
+    if not brief.strip():
+        raise HTTPException(status_code=422, detail="brief is required")
+    result = build_playable_game(
+        brief,
+        playtest_mode=_text_field(request, "playtest", "off", allowed=PLAYTEST_MODES),
+        max_rounds=_int_field(request, "max_rounds", 3, minimum=1, maximum=3),
+    )
+    response = public_payload(result, include_files=_bool_field(request, "include_files", False))
+    _idempotency.remember(dict(http_request.headers), response)
+    return response
+
+
 @router.post("/gameforge/intake")
 async def gameforge_intake(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "intake"))) -> Dict[str, Any]:
     replay = _idempotency.replay(dict(http_request.headers))

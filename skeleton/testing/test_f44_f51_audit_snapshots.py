@@ -79,6 +79,7 @@ def test_idempotency_audit_locks_replay_remember_pairs(monkeypatch) -> None:
         "skeleton.api.routes:forge_materialise",
         "skeleton.api.routes:forge_archetype",
         "skeleton.api.routes:gameforge_run",
+        "skeleton.api.routes:game_build",
         "skeleton.api.routes:gameforge_intake",
         "skeleton.api.gameforge_routes:gameforge_run",
     ]
@@ -102,6 +103,7 @@ def test_seal_audit_locks_sidecar_depends_and_command_call(monkeypatch) -> None:
         "POST /api/v1/forge/materialise",
         "POST /api/v1/forge/archetype",
         "POST /api/v1/gameforge/run",
+        "POST /api/v1/game/build",
         "POST /api/v1/gameforge/intake",
     ]
     assert payload["charter_without_explicit_seal"] == payload["charter_gated"]

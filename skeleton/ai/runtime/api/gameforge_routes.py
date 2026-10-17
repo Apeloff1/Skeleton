@@ -1,8 +1,10 @@
-"""
-Skeleton API — GameForge route handlers
+"""Unmounted GameForge compatibility handlers.
 
-/gameforge/run      — full intake → blueprint → pipelines generation
-/gameforge/intake   — questionnaire answers → structured intake only
+``create_app`` is the only HTTP entry and does not include this router.
+``POST /gameforge/run`` delegates to ``build_playable_game``, the same
+executor as ``POST /api/v1/game/build``. ``POST /gameforge/intake`` remains
+so existing intake callers and sidecar audits keep a module to import.
+Delete this module only after those imports are gone.
 """
 
 from __future__ import annotations
@@ -15,7 +17,6 @@ from skeleton.api.command_routes import router as command_router
 from skeleton.api.hmac_seal import require_seal
 from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.server import get_state
-from skeleton.application import build_runtime_command_service
 
 router = APIRouter()
 router.include_router(command_router)
@@ -49,19 +50,25 @@ async def gameforge_run(
     state=Depends(_state),
     attester: str = Depends(require_seal),
 ) -> Dict[str, Any]:
-    """Run GameForge through the shared API/CLI application command service."""
+    """Delegate to the playable builder. This router is not mounted."""
+    del state, attester
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
+    from skeleton.forge.game_builder import build_playable_game, public_payload
+    from skeleton.forge.playtest import normalise_mode
 
-    result = build_runtime_command_service(state).execute("run", request)
-    if not result.ok:
-        error = result.error
-        raise HTTPException(
-            status_code=result.http_status,
-            detail=error.to_dict() if error is not None else {"code": "internal_error", "message": "run failed"},
-        )
-
-    response = dict(result.data)
+    brief = str(request.get("brief") or request.get("vision") or "").strip()
+    if not brief:
+        raise HTTPException(status_code=422, detail="brief is required")
+    try:
+        mode = normalise_mode(str(request.get("playtest") or "off"))
+        rounds = request.get("max_rounds", 3)
+        if isinstance(rounds, bool) or not isinstance(rounds, int) or not 1 <= rounds <= 3:
+            raise ValueError("max_rounds must be an integer from 1 to 3")
+        result = build_playable_game(brief, playtest_mode=mode, max_rounds=rounds)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response = public_payload(result, include_files=bool(request.get("include_files", False)))
     _idempotency.remember(dict(http_request.headers), response)
     return response

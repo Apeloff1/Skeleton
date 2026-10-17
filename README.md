@@ -4,6 +4,45 @@ A local-first game studio with Jeeves AI chat, Dragon web capture and reviewed
 knowledge, original-world editing, human/AI play, and bounded policy training.
 The application runs as a frontend, application API, canonical AI engine and MongoDB.
 
+## Build a playable game
+
+One CLI command and one HTTP route turn a natural-language brief into a Godot
+4 project. The brief names genre, fantasy, core loop, and scope. The builder
+commits a versioned design spec (`skeleton.game_design_spec.v1`), generates
+levels, encounters, economy, combat, narrative hooks, animation clips, a VFX
+catalog, and a kinematic vehicle proof, then materialises a Godot project. A
+bounded repair loop reads checker or engine errors and retries up to three
+times. Headless Godot, when installed, must boot the project and print
+`CORE_LOOP_OK`.
+
+```bash
+python -m skeleton game "A small top-down shooter. Fantasy: ash tunnels. Core loop: clear packs and spend salvage. Scope: small prototype." --out ./build/ash --overwrite --playtest auto --json
+```
+
+The same build is `POST /api/v1/game/build` on the application created by
+`create_app` (the only HTTP entry). Body:
+`{"brief": "...", "playtest": "off"|"auto"|"require", "max_rounds": 3, "include_files": false}`.
+The route uses the forge charter. It does not write a server-side project
+directory; pass `--out` on the CLI for a directory.
+
+`skeleton dev game build` is a workspace transport over that same
+`build_playable_game` function. It forwards the workspace vision, era,
+archetype, playtest mode, and repair mode. `python -m skeleton run` and
+`POST /api/v1/gameforge/run` remain the ten-stage operator pipeline the
+builder executes (era steering, blends, cockpit). They are not a second
+playable-game product. `skeleton/api/gameforge_routes.py` is not mounted.
+Its run handler delegates to `build_playable_game`; its intake handler stays
+until nothing imports the module. `Harness.serve` calls `create_app`.
+
+`playtest=require` fails the build unless Godot 4 boots the project and the
+core loop marker is in the engine log. Set `SKELETON_GODOT_BIN` when the
+binary is not on `PATH`. Golden briefs (top-down shooter, platformer, small
+roguelike RPG) are `skeleton/testing/test_game_builder_golden.py`.
+
+Still data, not a finished commercial game: sprites, meshes, audio, full
+input-driven play, multiplayer, and a driving simulation. The compiler is
+deterministic; it does not call a model provider.
+
 ## First install
 
 Install **Git**, **Python 3.11+**, and **Docker Desktop or Docker Engine with Compose v2**.
