@@ -188,4 +188,3 @@ def test_operator_cli_snapshot_verify_and_new_campaign_restore(tmp_path, capsys)
     assert report["restored_history_revalidated"] is True
     assert report["operator_reauthorization_required"] is True
     assert (recovered / "qualification_history.json").is_file()
-
