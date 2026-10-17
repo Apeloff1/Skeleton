@@ -424,3 +424,43 @@ That file can be reused through `--semantic-lens-set` at candidate
 export. Without `--output-dir`, the command is read-only. Selection
 always remains a set of **research questions rather than measured
 video semantics or ground-truth training labels**.
+
+### Execute all 43 routed semantic lenses against real model weights
+
+The existing `triangle-lenses` command routes 43 of Jeeves' *authored*
+canonical semantic operators and produces questions without model inference.
+The new `execute-43-lenses` command performs a separate **native checkpoint
+inference for each of the 43 original governed lenses**. It first reproduces
+all three adversarial critic generations with the critic's pinned checkpoint,
+then invokes the semantic checkpoint once per routed lens.
+
+```sh
+python -m scripts.training.rom_study execute-43-lenses \
+  --receipt /private/rom-receipts/rom-<source>-<run>.json \
+  --review-receipt /private/rom-receipts/triangle-review-<source>-<config>.json \
+  --source-sha256 <full-64-digit-source-sha256> \
+  --critic-checkpoint /private/models/independent-critic.json \
+  --semantic-checkpoint /private/models/jeeves-semantic.json \
+  --output-dir /private/rom-receipts \
+  --run-index 0 --max-new-tokens 192
+```
+
+Specify `--semantic-lens-set /private/approved-lens-set.json` to run your
+operator-pinned **exact 43 canonical lens keys** instead of the
+evidence-driven 43 chosen by `MaximalSemanticRegistry`. Every question retains
+the upstream lens key, governing decision and catalog SHA. The 43 prompts
+receive only native pixel/reward/controller/replay **measurements and their
+source digests**, not game content they cannot observe. Each result must be
+valid source-referenced JSON with an explicit
+`unverified_hypothesis` status and a falsification test.
+
+The command saves a create-only `semantic-43-native-*.json` inference
+receipt only when all 43 calls produced structurally valid hypotheses.
+Re-running the same command loads the original checkpoint and **actually
+replays each of the 43 token sequences**. The semantic reviewer model may
+share architecture or weights with the critic unless the operator deliberately
+supplies a distinct checkpoint; the receipt does not claim independence it
+cannot verify. These 43 interpretive hypotheses are not new game observations,
+not causal proof, not supervised ground truth, and not production Jeeves
+training updates. The previously implemented eight native measurement lenses
+continue to be the only source-grounded numerical training projections.
