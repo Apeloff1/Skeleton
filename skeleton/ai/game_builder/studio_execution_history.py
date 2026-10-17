@@ -203,8 +203,6 @@ def record_execution_run(
         entries = history["entries"]
         archives = history.get("segments", [])
         stats = history["_archive_stats"]
-        if len(entries) >= _MAX_RUNS:
-            raise StudioQualificationHistoryError("bounded qualification history head is full")
         item = {
             "schema": ENTRY_SCHEMA,
             "sequence": stats["archive_entry_count"] + len(entries) + 1,
