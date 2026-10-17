@@ -150,6 +150,8 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
                                             "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                             "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                             "production-status", "production-cycle", "production-training",
+                                            "dragon-observe-start", "dragon-observe-sync", "dragon-observe-status",
+                                            "dragon-observe-cycle", "dragon-observe-action", "dragon-observe-lessons", "dragon-observe-revoke",
                                                    "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "direction-campaign-reopen", "p0-acceptance",
                                             "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                             "upscale-foliage", "upscale-animation", "upscale-shadow",
@@ -210,6 +212,11 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
     parser.add_argument("--page", type=int)
     parser.add_argument("--page-size", type=int)
     parser.add_argument("--repair-generated", action="store_true")
+    parser.add_argument("--consent", action="store_true")
+    parser.add_argument("--actor")
+    parser.add_argument("--phase")
+    parser.add_argument("--event")
+    parser.add_argument("--outcome")
     parser.add_argument("--pattern", choices=("wind", "breathe", "bob", "shimmer", "water"))
     parser.add_argument("--frames", type=int)
     parser.add_argument("--frame-height", type=int)
@@ -227,6 +234,43 @@ def run_jeeves_game_cli(argv: list[str], root: Path) -> dict[str, Any]:
         parser.add_argument("--" + dimension, type=int)
     args = parser.parse_args(argv)
     try:
+        if args.action.startswith("dragon-observe-"):
+            from skeleton.developer import jeeves_dragon_observer as witness
+            observer_options = {
+                "dragon-observe-start": {"consent"},
+                "dragon-observe-sync": {"page_size"},
+                "dragon-observe-status": set(),
+                "dragon-observe-cycle": {"passes", "gate", "repair_generated"},
+                "dragon-observe-action": {"actor", "phase", "event", "outcome", "evidence"},
+                "dragon-observe-lessons": {"page", "page_size"},
+                "dragon-observe-revoke": set(),
+            }
+            allowed = observer_options[args.action] | {"action"}
+            for key, value in vars(args).items():
+                if key not in allowed and value is not None and value is not False:
+                    raise ValueError("unrelated observer option --" + key.replace("_", "-"))
+            if args.action == "dragon-observe-start":
+                return witness.start(root, consent=args.consent)
+            if args.action == "dragon-observe-sync":
+                return witness.sync(root, limit=args.page_size if args.page_size is not None else 256)
+            if args.action == "dragon-observe-status":
+                return witness.status(root)
+            if args.action == "dragon-observe-cycle":
+                return witness.cycle(
+                    root, passes=args.passes if args.passes is not None else 1,
+                    gate=args.gate, repair_generated=args.repair_generated,
+                )
+            if args.action == "dragon-observe-action":
+                return witness.record_action(
+                    root, actor=args.actor, phase=args.phase, action=args.event,
+                    outcome=args.outcome, evidence_sha256=args.evidence,
+                )
+            if args.action == "dragon-observe-lessons":
+                return witness.lessons(
+                    root, page=args.page if args.page is not None else 0,
+                    page_size=args.page_size if args.page_size is not None else 64,
+                )
+            return witness.revoke(root)
         live_actions = {
             "director-session-begin": {"action", "source", "session"},
             "director-session-status": {"action", "session"},
