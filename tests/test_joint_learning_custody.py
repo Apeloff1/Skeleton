@@ -5,6 +5,7 @@ An accounting checkpoint never grants ROM/SDK rights or updates any AI model.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from skeleton.ai.training.joint_learning_custody import audit_joint_learning_custody
 from skeleton.ai.training.rom_inventory_snapshot import freeze_rom_inventory
@@ -29,7 +30,7 @@ def _assess(before, after, tmp_path, **kwargs):
     return audit_joint_learning_custody(
         before, after,
         rom_root=root,
-        frozen_inventory=__import__("pathlib").Path(frozen["manifest_path"]),
+        frozen_inventory=Path(frozen["manifest_path"]),
         rom_approvals=approvals, rom_receipts=private,
         page_limit=1, **kwargs,
     )
@@ -72,7 +73,7 @@ def test_partially_paged_fleet_cannot_be_reported_as_qualified(tmp_path):
     rights.write_text(json.dumps({"schema_version": APPROVAL_SCHEMA, "roms": []}))
     report = audit_joint_learning_custody(
         before, before, rom_root=root,
-        frozen_inventory=__import__("pathlib").Path(frozen["manifest_path"]),
+        frozen_inventory=Path(frozen["manifest_path"]),
         rom_approvals=rights, rom_receipts=private,
         page_limit=1, max_pages=1,
     )
