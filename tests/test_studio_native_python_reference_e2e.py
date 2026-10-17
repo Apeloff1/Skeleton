@@ -17,6 +17,7 @@ from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_campaign import CampaignOrder, run_campaign
 from skeleton.ai.game_builder.studio_native_replay_telemetry import (
     NativeCheckpointError, reference_cpu_checkpoints, validate_checkpoints,
+    first_cpu_divergence,
 )
 from skeleton.ai.game_builder.studio_runtime_qualification import _inputs
 
@@ -74,6 +75,10 @@ class FullGameCPUMachineReferenceTests(unittest.TestCase):
         self.assertGreaterEqual(len(rows), 3)
         index = len(rows) // 2
         rows[index]["state"]["PlayerX"] ^= 1
+        issue = first_cpu_divergence(rows, reference["samples"])
+        self.assertEqual(issue["category"], "cpu_state_diverged")
+        self.assertEqual(issue["action"], rows[index]["action"])
+        self.assertEqual(issue["changed_fields"], ["PlayerX"])
         with self.assertRaises(NativeCheckpointError):
             validate_checkpoints(
                 rows, actions=reference["action_count"],
