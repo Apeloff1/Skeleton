@@ -60,13 +60,14 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
                   approved: dict[str, dict[str, Any]], approval_sha: str,
                   receipts_dir: Path, *, cursor: str | None, limit: int,
                   source_index: Mapping[str, str],
-                  receipt_index: Mapping[str, tuple[Path, ...]]) -> dict[str, Any]:
+                  receipt_index: Mapping[str, tuple[Path, ...]],
+                  registry_cache: list[Any] | None = None) -> dict[str, Any]:
     """Read-only page verifier using a precomputed canonical source index."""
     page = frozen_inventory_page(snapshot, root=root, cursor=cursor, limit=limit)
-    # Load and freeze the active core catalog lazily only when there is a
-    # candidate to verify. Offline inventory without installed cores still
-    # reports blocked/rights-pending sources without treating them as trained.
-    registry_cache: list[Any] = []
+    # Resolve current core catalog lazily and only ONCE across an entire
+    # multi-page fleet sweep, without executing any ROM or loading a core.
+    if registry_cache is None:
+        registry_cache = []
     entries: list[dict[str, Any]] = []
     counts = {
         "candidate_files": 0, "distinct_sources_in_page": 0,
@@ -244,6 +245,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
     receipts_dir = _private_output(receipts_dir)
     source_index = _source_index(snapshot)
     receipt_index = _receipt_index(receipts_dir)
+    registry_cache: list[Any] = []
     totals: dict[str, int] = {}
     by_target_core: dict[str, dict[str, Any]] = {}
     pages = 0
@@ -252,7 +254,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
         page = _audit_loaded(
             root, snapshot, approved, approval_sha, receipts_dir,
             cursor=cursor, limit=limit, source_index=source_index,
-            receipt_index=receipt_index,
+            receipt_index=receipt_index, registry_cache=registry_cache,
         )
         for key, count in page["page_counts"].items():
             totals[key] = totals.get(key, 0) + count
