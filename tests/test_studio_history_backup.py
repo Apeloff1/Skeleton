@@ -80,4 +80,3 @@ def test_symlinked_archive_segment_directory_is_not_a_valid_backup(tmp_path):
         verify_studio_history_snapshot(
             backup, name="record", identity=IDENTITY,
         )
-
