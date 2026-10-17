@@ -454,7 +454,7 @@ build/skeleton.o: main.s
 \tmkdir -p build
 \t$(CA65) -o $@ $<
 build/skeleton-original.nes: build/skeleton.o nes.cfg
-\t$(LD65) -C nes.cfg -o $@ $<
+\t$(LD65) -C nes.cfg -Ln build/skeleton-original.sym -o $@ $<
 clean:
 \trm -rf build
 """
