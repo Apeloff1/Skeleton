@@ -15,6 +15,7 @@ from pathlib import Path
 from .playable_world import PlayableWorld
 from .playable_simulation import demonstrate_solvable
 from .port_planner import HomebrewSource, PortMode, PortRequest, compile_port
+from .studio_native_psg import NativePSGScore, console_psg_registers
 
 TILE_FLOOR, TILE_WALL, TILE_COLLECTIBLE, TILE_HAZARD, TILE_GOAL, TILE_PLAYER = range(6)
 WIDTH_LIMIT = 19
@@ -48,6 +49,16 @@ DEF rLY EQU $FF44
 DEF rBGP EQU $FF47
 DEF rOBP0 EQU $FF48
 DEF rNR52 EQU $FF26
+DEF rNR50 EQU $FF24
+DEF rNR51 EQU $FF25
+DEF rNR11 EQU $FF11
+DEF rNR12 EQU $FF12
+DEF rNR13 EQU $FF13
+DEF rNR14 EQU $FF14
+DEF rNR21 EQU $FF16
+DEF rNR22 EQU $FF17
+DEF rNR23 EQU $FF18
+DEF rNR24 EQU $FF19
 DEF SPRITE_OAM_BASE EQU $FE00
 DEF TILEMAP EQU $9800
 DEF TILE_VRAM_BASE EQU $8000
@@ -60,6 +71,8 @@ DEF TILE_GOAL EQU 4
 DEF TILE_PLAYER EQU 5
 DEF ANIM_COUNT EQU __ANIM_COUNT__
 DEF ANIM_DELAY EQU __ANIM_DELAY__
+DEF AUDIO_ENABLED EQU __AUDIO_ENABLED__
+DEF MUSIC_FRAME_DELAY EQU __MUSIC_DELAY__
 DEF LEVEL_COUNT EQU __LEVEL_COUNT__
 DEF MAZE_WIDTH EQU __WIDTH__
 DEF MAZE_HEIGHT EQU __HEIGHT__
@@ -84,6 +97,8 @@ Boot:
     ld [TurnCountHigh], a
     ld [AnimTick], a
     ld [AnimFrame], a
+    ld [MusicTick], a
+    ld [MusicIndex], a
     ld [Cooldown], a
     ld a, START_HEALTH
     ld [Health], a
@@ -111,12 +126,14 @@ Boot:
     xor a
     ld [SPRITE_OAM_BASE+3], a
     call LoadLevelWithoutWait
+    call InitOriginalAudio
     ld a, $93
     ldh [rLCDC], a
 
 MainLoop:
     call WaitFrame
     call AnimateHero
+    call TickOriginalMusic
     ld a, [GameWon]
     or a
     jr nz, .win
@@ -229,6 +246,92 @@ AnimateHero:
     ret
 .saveTick:
     ld [AnimTick], a
+    ret
+
+InitOriginalAudio:
+    ld a, AUDIO_ENABLED
+    or a
+    ret z
+    ld a, $80
+    ldh [rNR52], a
+    ld a, $77
+    ldh [rNR50], a
+    ld a, $FF
+    ldh [rNR51], a
+    ld a, $80
+    ldh [rNR11], a
+    ldh [rNR21], a
+    ld a, $B3
+    ldh [rNR12], a
+    ld a, $F2
+    ldh [rNR22], a
+    xor a
+    ld [MusicTick], a
+    ld a, 7
+    ld [MusicIndex], a
+    ret
+
+TickOriginalMusic:
+    ld a, AUDIO_ENABLED
+    or a
+    ret z
+    ld a, [MusicTick]
+    inc a
+    cp MUSIC_FRAME_DELAY
+    jr c, .saveMusicTick
+    xor a
+    ld [MusicTick], a
+    ld a, [MusicIndex]
+    inc a
+    and $07
+    ld [MusicIndex], a
+    ld e, a
+    ld d, 0
+    ld hl, OriginalMusicLow
+    add hl, de
+    ld a, [hl]
+    ldh [rNR13], a
+    ld hl, OriginalMusicHigh
+    add hl, de
+    ld a, [hl]
+    or $80
+    ldh [rNR14], a
+    ret
+.saveMusicTick:
+    ld [MusicTick], a
+    ret
+
+SoundPickup:
+    ld a, AUDIO_ENABLED
+    or a
+    ret z
+    ld a, __SFX_PICKUP_LOW__
+    ldh [rNR23], a
+    ld a, __SFX_PICKUP_HIGH__
+    or $80
+    ldh [rNR24], a
+    ret
+
+SoundHazard:
+    ld a, AUDIO_ENABLED
+    or a
+    ret z
+    ld a, __SFX_HAZARD_LOW__
+    ldh [rNR23], a
+    ld a, __SFX_HAZARD_HIGH__
+    or $80
+    ldh [rNR24], a
+    ret
+
+SoundGoal:
+    ld a, AUDIO_ENABLED
+    or a
+    ret z
+    ld a, __SFX_GOAL_LOW__
+    ldh [rNR23], a
+    ld a, __SFX_GOAL_HIGH__
+    or $80
+    ldh [rNR24], a
     ret
 
 DrawPlayer:
@@ -360,6 +463,7 @@ TryMove:
     inc a
     ld [ScoreHigh], a
 .gemScoreFinished:
+    call SoundPickup
     ret
 .notGem:
     cp TILE_HAZARD
@@ -367,6 +471,9 @@ TryMove:
     ld a, [Health]
     dec a
     ld [Health], a
+    call SoundHazard
+    ld a, [Health]
+    or a
     ret nz
     ld a, 1
     ld [GameLost], a
@@ -385,6 +492,7 @@ TryMove:
     inc a
     ld [ScoreHigh], a
 .goalScoreFinished:
+    call SoundGoal
     ld a, [Level]
     inc a
     ld [Level], a
@@ -396,6 +504,12 @@ TryMove:
 .nextLevel:
     call LoadLevel
     ret
+
+SECTION "Original Sound Tables", ROM0
+OriginalMusicLow:
+__MUSIC_LOW__
+OriginalMusicHigh:
+__MUSIC_HIGH__
 
 SECTION "Pixel Art", ROM0
 Tiles:
@@ -428,6 +542,8 @@ TurnCount: ds 1
 TurnCountHigh: ds 1
 AnimTick: ds 1
 AnimFrame: ds 1
+MusicTick: ds 1
+MusicIndex: ds 1
 GemsRemaining: ds 1
 GameWon: ds 1
 GameLost: ds 1
@@ -506,6 +622,7 @@ def compile_native_game_boy(
     tile_art: tuple[tuple[int, ...], ...] | None = None,
     hero_frames: tuple[tuple[int, ...], ...] | None = None,
     animation_delay: int = 12,
+    psg_score: NativePSGScore | None = None,
 ) -> GameBoySourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("Game Boy native homebrew export needs explicit authorization")
@@ -533,6 +650,12 @@ def compile_native_game_boy(
         if tile_art is None or hero_frames[0] != tile_art[5]:
             raise GameBoySourceError("hero animation frame zero must match original tile atlas")
     frames = hero_frames if hero_frames is not None else ()
+    if psg_score is not None and not isinstance(psg_score, NativePSGScore):
+        raise GameBoySourceError("native music requires a typed original PSG arrangement")
+    if psg_score is not None and psg_score.theme != world.intent.theme:
+        raise GameBoySourceError("console melody must use original game theme")
+    sound = (console_psg_registers(psg_score, "nintendo_game_boy")
+             if psg_score is not None else None)
     tables: list[str] = []
     for level in world.levels:
         rows = []
@@ -552,6 +675,24 @@ def compile_native_game_boy(
         "__TILE_BYTES__": _tile_bytes(tile_art),
         "__ANIM_COUNT__": str(len(frames) if frames else 1),
         "__ANIM_DELAY__": str(animation_delay),
+        "__AUDIO_ENABLED__": str(int(sound is not None and sound["enabled"])),
+        "__MUSIC_DELAY__": str(sound["frames_per_note"] if sound else 24),
+        "__MUSIC_LOW__": "    db " + ", ".join(
+            f"${value:02X}" for value in (
+                sound["notes_low"] if sound else (0,) * 8
+            )
+        ),
+        "__MUSIC_HIGH__": "    db " + ", ".join(
+            f"${value:02X}" for value in (
+                sound["notes_high"] if sound else (0,) * 8
+            )
+        ),
+        "__SFX_PICKUP_LOW__": str(sound["events_low"][0] if sound else 0),
+        "__SFX_PICKUP_HIGH__": str(sound["events_high"][0] if sound else 0),
+        "__SFX_HAZARD_LOW__": str(sound["events_low"][1] if sound else 0),
+        "__SFX_HAZARD_HIGH__": str(sound["events_high"][1] if sound else 0),
+        "__SFX_GOAL_LOW__": str(sound["events_low"][2] if sound else 0),
+        "__SFX_GOAL_HIGH__": str(sound["events_high"][2] if sound else 0),
         "__ANIMATION_TILES__": (
             _hero_frame_bytes(frames[1:]) if len(frames) > 1
             else "    ; single original hero frame"
@@ -604,6 +745,10 @@ def compile_native_game_boy(
         manifest["native_hero_animation_digest"] = canonical_digest(
             [list(frame) for frame in frames]
         )
+    manifest["original_native_psg_integrated"] = bool(sound and sound["enabled"])
+    manifest["native_psg_score_digest"] = psg_score.digest if psg_score else None
+    manifest["native_psg_hardware_audio_played"] = False
+    manifest["native_psg_not_pcm_identity"] = True
     manifest_json = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     digest = sha256((asm + "\0" + _MAKEFILE + "\0" + manifest_json).encode()).hexdigest()
     return GameBoySourceProject(asm, _MAKEFILE, manifest_json, digest)
