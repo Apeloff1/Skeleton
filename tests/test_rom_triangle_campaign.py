@@ -128,3 +128,24 @@ def test_campaign_rejects_path_smuggling_from_a_training_page(monkeypatch, tmp_p
         campaign.triangle_campaign_page(
             tmp_path, tmp_path / "approvals.json", tmp_path / "receipts", object(),
         )
+
+
+def test_campaign_rejects_critic_that_did_not_produce_three_grounded_findings(
+    monkeypatch, tmp_path,
+):
+    monkeypatch.setattr(campaign, "train_page", lambda *a, **k: _page())
+
+    def incomplete(path, *, expected_source_sha256, **kwargs):
+        return {
+            "state": "critic_output_incomplete_requires_new_review_configuration",
+            "review_receipt_name": "triangle-review-no-grounding.json",
+            "review_digest": "e" * 64,
+            "structured_source_bound_passes": 0,
+        }
+    monkeypatch.setattr(campaign, "review_one_receipt", incomplete)
+    page = campaign.triangle_campaign_page(
+        tmp_path, tmp_path / "approvals.json", tmp_path / "receipts", object(),
+    )
+    assert page["model_review_executed_or_replayed"] == 0
+    assert page["review_failures_needing_retry"] == 1
+    assert page["rows"][0]["adversarial_review_state"].startswith("critic_output_incomplete")

@@ -303,3 +303,11 @@ Run `triangle-status --receipt <ROM-receipt> --source-sha256 <full-hash>`
 to inspect source-bound Dragon/play/reviewer challenges without loading any
 language-model checkpoint. Native model judgments still need independent
 human adjudication and do not promote Jeeves production parameters.
+
+Adversarial admission is strict: all three model passes must emit a bounded,
+source-referenced structured critique. If a local checkpoint generates
+unstructured text or invalid source claims, its native inference receipt is
+retained but the campaign exits at the same page with a non-success status.
+Use a different `--review-seed` or an independently selected reviewer
+checkpoint to obtain a *new* create-only review; do not relabel the old
+generation as evidence of completed adversarial scrutiny.

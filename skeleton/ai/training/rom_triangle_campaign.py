@@ -129,6 +129,12 @@ def review_one_receipt(
         replayed = 0
         digest = result["review_digest"]
         structured = result["structured_source_bound_passes"]
+    if structured != 3:
+        # A model that emitted unparsable, ungrounded or partial prose has
+        # executed tokens, but has NOT completed independent adversarial
+        # scrutiny. Keep the create-only receipt so reseeding/model changes
+        # are explicit and no historical attempt is overwritten.
+        state = "critic_output_incomplete_requires_new_review_configuration"
     return {
         "state": state,
         "review_receipt_name": name,
@@ -216,7 +222,10 @@ def triangle_campaign_page(
             ) for row in rows
         ),
         "review_failures_needing_retry": sum(
-            row["adversarial_review_state"] == "blocked_retry_required"
+            row["adversarial_review_state"] in (
+                "blocked_retry_required",
+                "critic_output_incomplete_requires_new_review_configuration",
+            )
             for row in rows
         ),
         "rows": rows,
