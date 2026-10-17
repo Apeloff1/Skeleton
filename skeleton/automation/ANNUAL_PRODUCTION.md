@@ -160,3 +160,20 @@ restore after filesystem damage, worker/host failover, disk capacity trends,
 realistic model and GPU/thermal contention, and unattended multi-day
 integration tests. Do not represent a simulated 366-day timestamp jump as
 a real year of production execution.
+
+### Consistent SQLite online snapshots (follow-on milestone)
+
+For a single-host, persistent SQLite production store, import
+`snapshot_annual_production` and `verify_annual_snapshot` from
+`skeleton.automation.annual_backup`. Supply an existing absolute
+operator-owned private (0700 on POSIX) directory and a fresh safe label:
+`snapshot_annual_production(store, backup_dir, label="week-001")`.
+It uses the SQLite online-backup API rather than copying a live WAL database.
+The snapshot is immutable-by-contract (create only), has a sealed SHA-256
+manifest, and is checked with SQLite integrity/FK validation. Revalidate
+the offline copy using `verify_annual_snapshot(backup_dir, "week-001")`.
+Do not regard an unsealed orphan as a successful backup, and never silently
+reuse an existing label. This is **not** an off-machine transfer, full restore
+drill, signature-authenticated custody, resumed model job, or year-long soak.
+Before restoration into any host, separately audit all production checkpoint
+and authority-rotation chains under operator approval.
