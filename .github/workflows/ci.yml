@@ -29,13 +29,6 @@ env:
 permissions:
   contents: read
 
-# Direct workflow_dispatch runs are not inside Merge Readiness' group.
-# Called runs still share that caller's per-ref cancellation; this group only
-# stops a second CI/CD run for the same ref from occupying another runner.
-concurrency:
-  group: ci-cd-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   changes:
     name: "Change Scope"
