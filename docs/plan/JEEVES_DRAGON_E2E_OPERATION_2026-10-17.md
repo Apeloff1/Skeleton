@@ -690,3 +690,34 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 Open qualification dependencies remain real RGBDS/cc65 builds, actual PyBoy/FCEUX gameplay, CPU/PPU/LCD/audio measurement, first install, hardware controller/device rendering and long-duration production. Neither a source manifest nor this preflight proves that an APU waveform or frame appeared during a true compiled cartridge run.
+
+
+## M281–M300: independent active console source/media contracts
+
+### Gameplay-source reconciliation (M281–M290)
+
+A full native console source admission now independently checks that the actual GB/GBC RGBDS or NES 6502 assembly contains **all six exact authored background/hero 2bpp tiles**, plus the actual authored hero animation frames. The inspection regenerates the expected tile and frame instructions from the original planar asset pack; a source-only build cannot silently change even one pixel while retaining the game's high-level asset descriptors.
+
+The check also derives the platform-specific original PSG score from the source game theme, seed and music density and compares both generated note tables, animation cadence, audio enable and all three complete game-event cue handlers with the actual assembly. It verifies **active** audio initialization, per-frame animation and music calls, and collectible/hazard/goal cue triggers—not simply the existence of plausible instruction snippets in an unused file.
+
+`studio_native_source_media_parity.py` is enforced on source campaign publication, every read/resume of the campaign, and direct native toolchain preflight. A separate source-media digest, original frame count and native PSG score identity are included in the canonical production assurance. Jeeves' ordered E2E runner, hash-linked execution history and Dragon's read-only observation preserve source-level evidence with separate explicit false flags for *actual emulator audio capture*.
+
+### Adversarial verification coverage (M291–M292)
+
+The specialized non-automatic native E2E suite now registers 17 test files. Added adversarial cases reject rewritten 2bpp base tiles, altered animation bytes or count, modified PSG tables, forged/rehash source receipts, missing sound initialization and loop calls, and inserted early-return SFX handlers. Production-history tests check that source-only evidence remains distinct from native runtime qualification. These regressions have been authored, but **this session has not executed the full specialized suite**.
+
+### Explicit outstanding qualification (M293–M300)
+
+Compiler invocation and genuine gameplay remain operator-authorized. Full execution still requires installed GB/GBC RGBDS, NES ca65/ld65, PyBoy/FCEUX, actual 2D sprite animation captures, audio register/playback observation, physical controller and speaker/video testing, first-install, rights/distribution review and the measured weeks-to-years production endurance required by the larger studio vision.
+
+```bash
+python -m pytest -q -ra --tb=short --noconftest \
+  tests/test_studio_native_source_media_parity.py \
+  tests/test_studio_campaign_e2e.py \
+  tests/test_studio_execution_campaign_e2e.py \
+  tests/test_studio_execution_history_e2e.py \
+  tests/test_studio_native_console_animation_e2e.py \
+  tests/test_studio_native_psg.py
+```
+
+Passing lint or source-schema CI is not independent proof of compiled ROM operation. No release or model-training gate is marked complete by this tranche.
