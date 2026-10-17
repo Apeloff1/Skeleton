@@ -2,7 +2,9 @@
  * Foundation radius — tokens.ts radii (UI_ART_KIT §2.3) plus the documented
  * legacy mappings and the icon keyline corner (UI_ART_ICONOGRAPHY.md §1).
  */
-import { iconography, radii } from '../tokens';
+import tokens, { iconography } from '../tokens';
+
+const { radii } = tokens;
 
 export const radius = radii;
 export type RadiusKey = keyof typeof radii;
