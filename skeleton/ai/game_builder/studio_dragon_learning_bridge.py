@@ -8,7 +8,6 @@ repeated runtime changes invalidate earlier assumptions before reuse.
 """
 from __future__ import annotations
 
-from hashlib import sha256
 import json
 from pathlib import Path
 import re
@@ -17,7 +16,9 @@ from .contracts import canonical_digest
 from .studio_campaign import (
     CampaignOrder, _atomic_json, _load_json,
 )
-from .studio_campaign_assurance import inspect_production_assurance
+from .studio_campaign_assurance import (
+    inspect_production_assurance, _inspect_production_assurance_unlocked,
+)
 from .studio_campaign_lock import campaign_lock
 
 SCHEMA = "skeleton.game_builder.dragon_operational_lessons.v1"
@@ -140,16 +141,13 @@ def review_dragon_operational_lesson(
     if candidate is None:
         raise DragonOperationalLessonError("lesson candidate is stale or not evidence-backed")
     with campaign_lock(root):
-        from .studio_campaign_assurance import _inspect_campaign_unlocked
-        from .studio_campaign import _verify_target
-        identity = order.identity()
-        current = _inspect_campaign_unlocked(order, root)
-        if current["identity"] != projection["campaign_identity"]:
-            raise DragonOperationalLessonError("original game has changed during lesson review")
-        for target in current["completed_targets"]:
-            _verify_target(root / "targets" / target, order.project_id, target, identity)
-        # A complete source check is performed above. The next inspection
-        # after a new build/checkpoint will invalidate this frozen report.
+        current = _inspect_production_assurance_unlocked(order, root)
+        if (current["campaign_identity"] != projection["campaign_identity"]
+                or current["report_digest"] != projection["assurance_report_digest"]):
+            raise DragonOperationalLessonError("production evidence changed during human review")
+        identity = current["campaign_identity"]
+        # The currently locked exact-source and runtime report is the lesson
+        # revision. A later source/playthrough change invalidates this review.
         body = {
             "schema": REVIEW_SCHEMA,
             "campaign_identity": identity,
