@@ -15,6 +15,8 @@ import re
 from .contracts import canonical_digest
 from .studio_build_qualification import _header, _regular
 from .studio_native_psg import compose_native_psg, console_psg_registers
+from .studio_pixel_parity import _game_json
+from .studio_runtime_qualification import _inputs
 
 SCHEMA = "skeleton.game_builder.compiled_original_psg_parity.v1"
 _TARGETS = {
@@ -85,12 +87,20 @@ def inspect_compiled_psg(
         art = json.loads(
             _regular(source / "assets/metadata/descriptors.json", 128_000)
         )
+        _, _, original_world = _inputs(source / "engines")
+        game = _game_json(
+            _regular(source / "engines/index.html", 2_000_000).decode("utf-8")
+        )
+        original_theme = game["intent"]["theme"]
         score = compose_native_psg(
-            manifest["original_theme"], art["seed"], art["music_density"],
+            original_theme, art["seed"], art["music_density"],
         )
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise CompiledPSGError("original sound provenance or cartridge invalid") from exc
     if (type(manifest) is not dict or type(art) is not dict
+            or manifest.get("world_digest") != original_world
+            or art.get("world_digest") != original_world
+            or game.get("world_digest") != original_world
             or art.get("target") != target
             or manifest.get("native_psg_score_digest") != score.digest
             or manifest.get("original_native_psg_integrated")
