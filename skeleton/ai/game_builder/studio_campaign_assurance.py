@@ -22,6 +22,7 @@ from .studio_campaign import (
 from .studio_campaign_lock import campaign_lock
 from .studio_runtime_qualification import _inputs as _browser_inputs, qualify_browser_gameplay
 from .studio_godot_qualification import godot_inputs, qualify_godot_headless
+from .studio_pixel_parity import inspect_cross_engine_pixels
 
 SCHEMA = "skeleton.game_builder.production_assurance.v1"
 QUALIFICATION_SCHEMA = "skeleton.game_builder.campaign_rom_evidence.v1"
@@ -33,6 +34,7 @@ GATES = (
     "godot_engine_source",
     "native_platform_source",
     "exact_source_attestation",
+    "cross_engine_pixel_art_parity",
     "native_rom_compiled",
     "cartridge_structure_checked",
     "browser_javascript_playthrough_executed",
@@ -46,9 +48,10 @@ GATES = (
     "release_signoff",
 )
 SOURCE_GATES = frozenset(GATES[:7])
+PARITY_GATE = "cross_engine_pixel_art_parity"
 BROWSER_GATE = "browser_javascript_playthrough_executed"
 GODOT_GATE = "godot_headless_playthrough_executed"
-NATIVE_GATES = frozenset(GATES[7:9])
+NATIVE_GATES = frozenset(GATES[8:10])
 
 
 class StudioAssuranceError(ValueError):
@@ -373,9 +376,11 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
             binary = None
             browser = None
             godot = None
+            art_parity = None
             if source_receipt is not None:
                 if target in _BUILD_ADAPTERS:
                     binary = _qualification_receipt(base, target, campaign["identity"])
+                art_parity = inspect_cross_engine_pixels(source)
                 browser = _browser_receipt(base, target, campaign["identity"])
                 godot = _godot_receipt(base, target, campaign["identity"])
             gates = {}
@@ -384,6 +389,8 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                     status, reason = "artifact_integrity_checked", None
                 elif gate in NATIVE_GATES and binary is not None:
                     status, reason = "binary_structure_checked", None
+                elif gate == PARITY_GATE and art_parity is not None:
+                    status, reason = "pixel_source_parity_checked", None
                 elif gate == GODOT_GATE and godot is not None:
                     status, reason = "godot_gameplay_executed", None
                 elif gate == BROWSER_GATE and browser is not None:
@@ -396,12 +403,16 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
                         else "independent_runtime_or_approval_evidence_required"
                     )
                 gates[gate] = {"status": status, "blocker": reason}
-                if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed", "godot_gameplay_executed"}:
+                if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed", "godot_gameplay_executed",
+                              "pixel_source_parity_checked"}:
                     passed += 1
             by_target.append({
                 "target": target,
                 "source_receipt_digest": (
                     source_receipt["receipt_digest"] if source_receipt else None
+                ),
+                "cross_engine_pixel_parity_digest": (
+                    art_parity["receipt_digest"] if art_parity else None
                 ),
                 "native_binary_evidence_digest": (
                     binary["evidence_digest"] if binary else None
