@@ -762,3 +762,28 @@ Use `python scripts/training/rom_study.py train-shadow-world --receipt /private/
 Existing `train-all` cached Q receipts additionally undergo an independent full Q/rights/episode/parameter ledger check. A legacy or synthetic partial report is blocked instead of being reported as `previous_verified_receipt_no_reexecution`.
 
 A standalone training invocation MUST supply the current operator approval manifest. New reviews, revocations, revised license rights or changed manifest bytes invalidate old Q receipts for shadow optimization. The separate neural candidate remains shadow-only and never mutates Jeeves production checkpoints.
+
+
+### Fleet-level replay validation and core-registry reconciliation
+
+Read-only fleet accounting now requires the stronger Q-policy source chain
+used by training-resume: the committed policy snapshot, every independently
+audited replay receipt, source/rights approval digest, episode/update totals
+and exact source identity must all agree. In addition, the source must still
+be supported by the **current** installed, trusted core registry. Invalid,
+synthetic, missing, withdrawn or stale candidates are counted as unverified
+rather than quietly included in execution coverage. The active registry is
+resolved lazily and cached across a multi-page audit. This operation does not
+execute a ROM or generate more training updates.
+
+The tests in `tests/test_rom_fleet_integrity.py` exercise actual Q-policy
+learning on a deterministic *simulated* state machine, a valid receipt
+read back and reused without reexecution, a forged report with a recomputed
+digest, and withdrawal of the core's approval. Native libretro cores,
+commercial cartridges, independently witnessed playthroughs, and actual
+Jeeves serving weights must still be separately qualified.
+
+```bash
+python -m pytest -q --noconftest tests/test_rom_fleet_integrity.py \
+  tests/test_rom_receipt_reuse.py tests/test_rom_neural_receipt_reuse.py
+```
