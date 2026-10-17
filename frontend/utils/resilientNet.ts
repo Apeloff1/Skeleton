@@ -14,10 +14,10 @@
  *    • Persistent GET cache (AsyncStorage) + in-memory TTL cache
  *    • Stale-while-revalidate — return cached data instantly, refresh bg
  *    • Request coalescing — duplicate in-flight GETs share one response
- *    • Idempotency-Key header so POST retries are safe server-side
+ *    • No mutation replay without a verified server-side deduplication contract
  *    • Global circuit breaker with half-open probe
  *    • Heartbeat-driven tunnel health observable (see useTunnelHealth)
- *    • 4xx is NEVER retried (deterministic client error)
+ *    • Only retry transient 408/429 GETs; deterministic 4xx errors are terminal
  *
  *  All exports are plain async functions — no React dependency, so this
  *  can be used from anywhere (screens, components, background tasks).
@@ -41,31 +41,56 @@ export function resolveUrl(pathOrUrl: string, host?: string): string {
 }
 
 // ── In-memory caches ───────────────────────────────────────────────────
-type CacheEntry = { data: any; ts: number; etag?: string };
-const MEM_CACHE_MAX = 200;             // LRU-ish cap to prevent unbounded growth
+type CacheEntry = { data: any; ts: number; chars?: number; etag?: string };
+const MEM_CACHE_MAX = 200;             // LRU cap
+const MEM_CACHE_MAX_CHARS = 16 * 1024 * 1024;
+const MEM_ENTRY_MAX_CHARS = 512 * 1024;
+let memCacheChars = 0;
 const PERSIST_MAX_BYTES = 200 * 1024;  // don't persist payloads larger than 200 KB
 const memCache = new Map<string, CacheEntry>();
 
+function _entryChars(entry: CacheEntry): number {
+  if (typeof entry.chars === 'number') return entry.chars;
+  try { return JSON.stringify(entry.data).length; } catch { return MEM_ENTRY_MAX_CHARS + 1; }
+}
+
+function _memDelete(key: string) {
+  const old = memCache.get(key);
+  if (old) memCacheChars = Math.max(0, memCacheChars - _entryChars(old));
+  memCache.delete(key);
+}
+
 function _memSet(key: string, entry: CacheEntry) {
-  // Simple LRU via delete+reinsert so the newest entry is last in iteration order
-  if (memCache.has(key)) memCache.delete(key);
-  memCache.set(key, entry);
-  // Evict oldest when over cap
-  while (memCache.size > MEM_CACHE_MAX) {
-    const oldestKey = memCache.keys().next().value;
-    if (oldestKey == null) break;
-    memCache.delete(oldestKey);
+  const chars = _entryChars(entry);
+  // Restrict aggregate retained payload volume, not just the entry count.
+  if (!Number.isFinite(chars) || chars > MEM_ENTRY_MAX_CHARS) return;
+  if (memCache.has(key)) _memDelete(key);
+  memCache.set(key, { ...entry, chars });
+  memCacheChars += chars;
+  while (memCache.size > MEM_CACHE_MAX || memCacheChars > MEM_CACHE_MAX_CHARS) {
+    const oldest = memCache.keys().next().value;
+    if (oldest === undefined) break;
+    _memDelete(oldest);
   }
 }
 
 function _memGet(key: string): CacheEntry | undefined {
   const v = memCache.get(key);
-  if (v) {
-    // Touch (move to newest)
-    memCache.delete(key);
-    memCache.set(key, v);
+  if (!v) return undefined;
+  // Corrupt/future-dated or expired entries are never treated as reusable.
+  if (!Number.isFinite(v.ts) || v.ts > Date.now() ||
+      Date.now() - v.ts > 24 * 60 * 60 * 1000) {
+    _memDelete(key);
+    return undefined;
   }
+  _memDelete(key);
+  memCache.set(key, v);
+  memCacheChars += _entryChars(v);
   return v;
+}
+
+export function getResilientCacheStats() {
+  return { entries: memCache.size, chars: memCacheChars, maxChars: MEM_CACHE_MAX_CHARS };
 }
 
 // djb2-based hash for cache keys that can include bodies > 120 chars safely
@@ -83,6 +108,8 @@ const BREAKER = {
   failures: 0,
   openUntil: 0,
   halfOpenProbeInflight: false,
+  generation: 0,
+  probeGeneration: 0,
   lastOkTs: 0,
   lastFailTs: 0,
   consecutiveOk: 0,
@@ -177,7 +204,14 @@ async function persistGet(key: string): Promise<CacheEntry | null> {
   try {
     const raw = await AsyncStorage.getItem(`rnet:${key}`);
     if (!raw) return null;
-    return JSON.parse(raw) as CacheEntry;
+    if (raw.length > PERSIST_MAX_BYTES) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const entry = parsed as CacheEntry;
+    if (typeof entry.ts !== 'number' || !Number.isFinite(entry.ts) ||
+        entry.ts > Date.now() || Date.now() - entry.ts > 24 * 60 * 60 * 1000) return null;
+    if (_entryChars(entry) > MEM_ENTRY_MAX_CHARS) return null;
+    return entry;
   } catch {
     return null;
   }
@@ -190,6 +224,42 @@ async function persistSet(key: string, entry: CacheEntry): Promise<void> {
     if (raw.length > PERSIST_MAX_BYTES) return;
     await AsyncStorage.setItem(`rnet:${key}`, raw);
   } catch {}
+}
+
+/**
+ * Streaming limits are enforced BEFORE buffering into a single string when a
+ * native ReadableStream is exposed. Older RN fetch shims without .getReader()
+ * still use .text() and reject after it resolves; declared lengths are checked
+ * by the caller before that fallback.
+ */
+async function readTextBounded(res: Response, maxChars: number): Promise<string> {
+  const tooLarge = () => Object.assign(new Error('Response exceeds size budget'), { _isClient: true });
+  if (res.body && typeof res.body.getReader === 'function' && typeof TextDecoder !== 'undefined') {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let chars = 0;
+    const parts: string[] = [];
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        // Byte count is a conservative bound for UTF-8 decoded characters.
+        chars += chunk.value.byteLength;
+        if (chars > maxChars) {
+          await reader.cancel().catch(() => {});
+          throw tooLarge();
+        }
+        parts.push(decoder.decode(chunk.value, { stream: true }));
+      }
+      parts.push(decoder.decode());
+      return parts.join('');
+    } finally {
+      reader.releaseLock();
+    }
+  }
+  const text = await res.text();
+  if (text.length > maxChars) throw tooLarge();
+  return text;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────
@@ -246,19 +316,27 @@ export async function resilientFetch<T = any>(
   // A write is never replayed or redirected to a fallback host without a
   // verified server-side idempotency contract (none is declared here).
   const configuredHosts = options.hosts || BACKEND_URLS;
-  const hosts = isGet ? configuredHosts : configuredHosts.slice(0, 1);
+  // Explicit headers may vary by tenant, locale or credentials. Never share
+  // their cache/coalescing state or forward them to an alternate host.
+  const hasHeaders = Object.keys(options.headers || {}).length > 0;
+  const hosts = isGet && !hasHeaders ? configuredHosts : configuredHosts.slice(0, 1);
   const primaryUrl = resolveUrl(path, hosts[0]);
-  const key = cacheKey(method, primaryUrl, options.body);
+  const key = cacheKey(method, primaryUrl, options.body) + (options.rawText ? ':raw' : ':json');
   const cfg = { ...DEFAULTS, ...options };
   const start = Date.now();
-  const sensitive = Object.keys(options.headers || {}).some(
-    name => /^(authorization|cookie|x-api-key|proxy-authorization)$/i.test(name),
-  );
-  const dedupe = isGet && cfg.dedupe && !sensitive && !options.signal;
-  const wantsCache = isGet && cfg.cacheTtlMs > 0 && !sensitive;
+  const dedupe = isGet && cfg.dedupe && !hasHeaders && !options.signal;
+  const wantsCache = isGet && cfg.cacheTtlMs > 0 && !hasHeaders;
   const maxResponseChars = boundedResponseChars(options.maxResponseChars);
   const attemptsPerHost = 1 + boundedRetries(options.retries, method, false);
   let ownsProbe = false;
+  let probeGeneration = 0;
+  const breakerGeneration = BREAKER.generation;
+  const deadline = start + 90_000; // entire operation, not just each attempt
+  const freshAge = Number.isFinite(cfg.cacheTtlMs) ? Math.max(0, Math.min(cfg.cacheTtlMs, 90_000)) : 0;
+  const staleAge = Number.isFinite(cfg.staleMaxMs) ? Math.max(0, Math.min(cfg.staleMaxMs, 24 * 60 * 60 * 1000)) : 0;
+  const eligible = (entry: CacheEntry | null | undefined, maxAge: number) =>
+    !!entry && entry.ts <= Date.now() && Date.now() - entry.ts < maxAge &&
+    _entryChars(entry) <= maxResponseChars;
   if (options.signal?.aborted) throw new Error('Request cancelled');
 
   // ── (1) In-flight dedupe (GET only) ──
@@ -276,7 +354,7 @@ export async function resilientFetch<T = any>(
     // ── (2) Fresh mem-cache hit? return immediately (no network) ──
     if (wantsCache) {
       const mc = _memGet(key);
-      if (mc && Date.now() - mc.ts < cfg.cacheTtlMs) {
+      if (eligible(mc, freshAge)) {
         return {
           data: mc.data,
           status: 200,
@@ -294,7 +372,7 @@ export async function resilientFetch<T = any>(
     if (hosts.length === 0) {
       if (wantsCache) {
         const cached = _memGet(key) || (cfg.persist ? await persistGet(key) : null);
-        if (cached && Date.now() - cached.ts < cfg.staleMaxMs) {
+        if (eligible(cached, staleAge)) {
           return {
             data: cached.data, status: 0, fromCache: true, stale: true,
             attempts: 0, triedHosts: [], elapsedMs: Date.now() - start, ok: true,
@@ -311,11 +389,12 @@ export async function resilientFetch<T = any>(
       // Enter half-open mode — only ONE caller probes, others serve stale/fail
       BREAKER.halfOpenProbeInflight = true;
       ownsProbe = true;
+      probeGeneration = ++BREAKER.probeGeneration;
     } else if (circuitOpen) {
       // Another probe in flight — serve stale if possible
       if (wantsCache) {
         const stale = _memGet(key) || (cfg.persist ? await persistGet(key) : null);
-        if (stale && Date.now() - stale.ts < cfg.staleMaxMs) {
+        if (eligible(stale, staleAge)) {
           return {
             data: stale.data, status: 0, fromCache: true, stale: true,
             attempts: 0, triedHosts: [], elapsedMs: Date.now() - start, ok: true,
@@ -333,11 +412,15 @@ export async function resilientFetch<T = any>(
 
       for (let attempt = 1; attempt <= attemptsPerHost; attempt++) {
         if (options.signal?.aborted) throw new Error('Request cancelled');
+        if (Date.now() >= deadline) break;
         attempts++;
         const controller = new AbortController();
         const onExternalAbort = () => controller.abort();
         options.signal?.addEventListener?.('abort', onExternalAbort);
-        const perAttemptTimeout = boundedTimeoutMs(cfg.timeoutMs + (attempt - 1) * 5000);
+        const perAttemptTimeout = Math.min(
+          boundedTimeoutMs(cfg.timeoutMs + (attempt - 1) * 5000),
+          Math.max(1, deadline - Date.now()),
+        );
         const tHandle = setTimeout(() => { try { controller.abort(); } catch {} }, perAttemptTimeout);
 
         try {
@@ -358,11 +441,8 @@ export async function resilientFetch<T = any>(
           if (bodyOut != null && !headers['Content-Type']) {
             headers['Content-Type'] = 'application/json';
           }
-          if (!isGet) {
-            // Stable idempotency key so server can dedupe on retry
-            headers['X-Idempotency-Key'] = headers['X-Idempotency-Key'] ||
-              `${method}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
-          }
+          // Do not synthesize an idempotency key and imply server-side
+          // deduplication. Caller-supplied identity passes through unchanged.
 
           const t0 = Date.now();
           const res = await fetch(url, {
@@ -379,7 +459,7 @@ export async function resilientFetch<T = any>(
           // A transient 408/429 may retry for safe reads; all other 4xx
           // responses are terminal. Never replay a mutation.
           if (res.status >= 400 && res.status < 500) {
-            const txt = await res.text().catch(() => '');
+            const txt = await readTextBounded(res, 512).catch(() => '');
             const err = `${res.status}: ${txt.slice(0, 200)}`;
             throw Object.assign(new Error(err), {
               _isClient: !isGet || !retryableHttpStatus(res.status),
@@ -388,7 +468,7 @@ export async function resilientFetch<T = any>(
           }
           // 5xx — retryable
           if (!res.ok) {
-            const txt = await res.text().catch(() => '');
+            const txt = await readTextBounded(res, 512).catch(() => '');
             throw new Error(`${res.status}: ${txt.slice(0, 100)}`);
           }
 
@@ -399,10 +479,7 @@ export async function resilientFetch<T = any>(
             throw Object.assign(new Error('Response exceeds size budget'), { _isClient: true });
           }
           const rtt = Date.now() - t0;
-          const text = await res.text();
-          if (text.length > maxResponseChars) {
-            throw Object.assign(new Error('Response exceeds size budget'), { _isClient: true });
-          }
+          const text = await readTextBounded(res, maxResponseChars);
           let parsed: any = text;
           if (!options.rawText) {
             try { parsed = JSON.parse(text); } catch { /* keep as text */ }
@@ -410,20 +487,24 @@ export async function resilientFetch<T = any>(
 
           // Write cache
           if (wantsCache) {
-            const entry: CacheEntry = { data: parsed, ts: Date.now() };
+            const entry: CacheEntry = { data: parsed, ts: Date.now(), chars: text.length };
             _memSet(key, entry);
             if (cfg.persist) { persistSet(key, entry); /* fire-and-forget */ }
           }
 
           // Breaker: success
-          BREAKER.failures = 0;
-          BREAKER.openUntil = 0;
-          BREAKER.consecutiveOk++;
-          BREAKER.lastOkTs = Date.now();
-          BREAKER.halfOpenProbeInflight = false;
-          _health.lastOkTs = BREAKER.lastOkTs;
-          _health.rttMs = rtt;
-          _publishHealth();
+          if (BREAKER.generation === breakerGeneration) {
+            BREAKER.failures = 0;
+            BREAKER.openUntil = 0;
+            BREAKER.consecutiveOk++;
+            BREAKER.lastOkTs = Date.now();
+            if (ownsProbe && BREAKER.probeGeneration === probeGeneration) {
+              BREAKER.halfOpenProbeInflight = false;
+            }
+            _health.lastOkTs = BREAKER.lastOkTs;
+            _health.rttMs = rtt;
+            _publishHealth();
+          }
 
           return {
             data: parsed as T,
@@ -441,8 +522,8 @@ export async function resilientFetch<T = any>(
           if (isClient || options.signal?.aborted) {
             throw err;
           }
-          if (attempt < attemptsPerHost) {
-            await sleep(fullJitter(attempt), options.signal);
+          if (attempt < attemptsPerHost && Date.now() < deadline) {
+            await sleep(Math.min(fullJitter(attempt), Math.max(0, deadline - Date.now())), options.signal);
           }
         } finally {
           clearTimeout(tHandle);
@@ -454,18 +535,18 @@ export async function resilientFetch<T = any>(
 
     if (options.signal?.aborted) throw new Error('Request cancelled');
     // ── (5) All hosts failed → fall back to cache if available ──
-    BREAKER.failures++;
-    BREAKER.lastFailTs = Date.now();
-    BREAKER.consecutiveOk = 0;
-    if (BREAKER.failures >= 6) {
-      BREAKER.openUntil = Date.now() + 30_000; // open for 30 s
+    if (BREAKER.generation === breakerGeneration) {
+      BREAKER.failures++;
+      BREAKER.lastFailTs = Date.now();
+      BREAKER.consecutiveOk = 0;
+      if (BREAKER.failures >= 6) BREAKER.openUntil = Date.now() + 30_000;
+      _health.lastFailTs = BREAKER.lastFailTs;
+      _publishHealth();
     }
-    _health.lastFailTs = BREAKER.lastFailTs;
-    _publishHealth();
 
     if (wantsCache) {
       const cached = _memGet(key) || (cfg.persist ? await persistGet(key) : null);
-      if (cached && Date.now() - cached.ts < cfg.staleMaxMs) {
+      if (eligible(cached, staleAge)) {
         return {
           data: cached.data,
           status: lastStatus || 0,
@@ -481,7 +562,9 @@ export async function resilientFetch<T = any>(
     }
 
     // Clear half-open marker so a future call can probe again
-    BREAKER.halfOpenProbeInflight = false;
+    if (ownsProbe && BREAKER.probeGeneration === probeGeneration) {
+      BREAKER.halfOpenProbeInflight = false;
+    }
     throw new Error(
       `resilientFetch failed after ${attempts} attempts across ${triedHosts.length} host(s): ${lastError || 'unknown'}`,
     );
@@ -497,7 +580,7 @@ export async function resilientFetch<T = any>(
   // Client errors, aborts and rejected probes must not leave the circuit
   // stuck in half-open mode indefinitely.
   const releaseProbe = () => {
-    if (ownsProbe) BREAKER.halfOpenProbeInflight = false;
+    if (ownsProbe && BREAKER.probeGeneration === probeGeneration) BREAKER.halfOpenProbeInflight = false;
   };
   void job.then(releaseProbe, releaseProbe);
   return job;
@@ -621,7 +704,7 @@ export function retainHeartbeat(): () => void {
 }
 
 // ── Cache management (debug / manual) ────────────────────────────────
-export function clearMemCache() { memCache.clear(); }
+export function clearMemCache() { memCache.clear(); memCacheChars = 0; }
 export async function clearPersistCache() {
   try {
     const keys = await AsyncStorage.getAllKeys();
@@ -651,5 +734,8 @@ export function resetCircuit(): void {
   BREAKER.halfOpenProbeInflight = false;
   BREAKER.consecutiveOk = 0;
   inflight.clear();
+  clearMemCache();
+  BREAKER.generation++;
+  BREAKER.probeGeneration++;
   _publishHealth();
 }
