@@ -119,6 +119,7 @@ class RealCartridgeReplayAdapterTests(unittest.TestCase):
                 if self.pressed == "right" and not self.changed:
                     self.memory[addr["PlayerX"]] = 2
                     self.memory[addr["GemsRemaining"]] = 0
+                    self.memory[addr["Level"]] = 1
                     self.memory[addr["GameWon"]] = 1
                     self.changed = True
             def button_press(self, name):
