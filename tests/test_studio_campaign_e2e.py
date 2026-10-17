@@ -92,6 +92,33 @@ class OriginalStudioCampaignTests(unittest.TestCase):
         with self.assertRaises(StudioCampaignError):
             inspect_campaign(replace(self.order, seed=734), self.output)
 
+    def test_aborted_owned_stage_is_reclaimed_on_next_authorized_resume(self):
+        run_campaign(self.order, self.output, authorized=True, max_targets=1)
+        stale = self.output / ".staging/.target-interrupted"
+        stale.mkdir()
+        (stale / "temporary.txt").write_text("unpublished partial output")
+        result = run_campaign(self.order, self.output, authorized=True, max_targets=1)
+        self.assertEqual(result["aborted_owned_stages_recovered"], 1)
+        self.assertFalse(stale.exists())
+        self.assertEqual(result["targets_with_verified_source"], 2)
+        self.assertEqual(
+            inspect_campaign(self.order, self.output)["aborted_owned_stages_recovered"], 1
+        )
+
+    def test_aborted_stage_symlinks_never_trigger_recursive_external_deletion(self):
+        run_campaign(self.order, self.output, authorized=True, max_targets=1)
+        outside = self.root / "original-owned-data.txt"
+        outside.write_text("preserve unrelated operator source")
+        staging = self.output / ".staging"
+        suspicious = staging / ".target-interrupted"
+        try:
+            suspicious.symlink_to(outside)
+        except (OSError, NotImplementedError):
+            return
+        with self.assertRaises(StudioCampaignError):
+            run_campaign(self.order, self.output, authorized=True, max_targets=1)
+        self.assertEqual(outside.read_text(), "preserve unrelated operator source")
+
     def test_concurrent_order_cannot_adopt_or_overwrite_completed_target(self):
         run_campaign(self.order, self.output, authorized=True, max_targets=1)
         with self.assertRaises(StudioCampaignError):
