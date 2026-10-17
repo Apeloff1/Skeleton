@@ -14,8 +14,8 @@ from pathlib import Path
 from skeleton.jeeves.game_console_assets import decode_tiles
 
 from .contracts import canonical_digest
-from .game_boy_native_export import _hero_frame_bytes
-from .nes_native_export import _hero_frame_chr
+from .game_boy_native_export import _ASM as _GB_RUNTIME, _hero_frame_bytes
+from .nes_native_export import _ASM as _NES_RUNTIME, _hero_frame_chr
 from .studio_native_psg import compose_native_psg, console_psg_registers
 from .studio_pixel_parity import _game_json, inspect_cross_engine_pixels
 from .studio_runtime_qualification import _inputs
@@ -114,6 +114,40 @@ def inspect_native_source_media(project: str | Path, *, target: str) -> dict:
         if (f"DEF ANIM_COUNT EQU {len(frames)}\n" not in source
                 or f"DEF ANIM_DELAY EQU {delay}\n" not in source):
             raise NativeMediaSourceError("GB/CGB native sprite driver has wrong frame or tick count")
+
+    # Identical pixel/music tables can still be inert if a generated CPU
+    # routine is skipped. Require the actual game loop, frame animation
+    # driver, APU initialization and music tick body from the reviewed
+    # native engine owner, not just strings somewhere in the source file.
+    engine = _NES_RUNTIME if nes else _GB_RUNTIME
+    runtime_start = "InitOriginalAudio:\n" if nes else "AnimateHero:\n"
+    runtime_end = "SoundPickup:\n"
+    for whole in (engine, source):
+        if whole.count(runtime_start) != 1 or whole.count(runtime_end) != 1:
+            raise NativeMediaSourceError("console audio/animation driver is missing")
+    expected_driver = engine.split(runtime_start, 1)[1].split(runtime_end, 1)[0]
+    actual_driver = source.split(runtime_start, 1)[1].split(runtime_end, 1)[0]
+    if actual_driver != expected_driver:
+        raise NativeMediaSourceError(
+            "native animation or APU driver control flow was modified"
+        )
+    required_loop = (
+        "    jsr WaitFrame\n    jsr TickOriginalMusic\n    jsr PollPad"
+        if nes else
+        "    call WaitFrame\n    call AnimateHero\n"
+        "    call TickOriginalMusic\n    ld a, [GameWon]"
+    )
+    if source.count(required_loop) != 1:
+        raise NativeMediaSourceError(
+            "console gameplay loop no longer advances authored animation/music"
+        )
+    for cue in ("Pickup", "Hazard", "Goal"):
+        opcode = "jsr" if nes else "call"
+        line = f"    {opcode} Sound{cue}\n"
+        if source.count(line) != 1:
+            raise NativeMediaSourceError(
+                "native gameplay lost or duplicated a sound-cue trigger"
+            )
 
     theme = game["intent"]["theme"]
     density = art.get("music_density")
