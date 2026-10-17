@@ -345,7 +345,17 @@ def _collect_audited(
             )
             transitions.append(row)
             frame = _frame_digest(environment, step)
+            optical = None
+            if request.kind == "libretro":
+                # The canonical host independently verifies and measures RGB24
+                # tiles. This runs after the real action, before any reverse
+                # replay restores earlier states. No image data is persisted.
+                from .game_emulator_dragon_observer import observe_native_frame
+                optical = observe_native_frame(
+                    environment, expected_frame_sha256=frame,
+                )
             modality.append({
+                "dragon_optical": optical,
                 "sequence": index + 1,
                 "actual_frame_sha256": frame,
                 "observed_audio_rms": float(step.observation.get("audio_rms", 0.0)),

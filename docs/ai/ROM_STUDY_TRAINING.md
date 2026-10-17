@@ -221,3 +221,16 @@ stay in the original native sample corpus, and heldout data stays excluded.
 Corrupted/mismatched triangles invalidate previously saved real lab receipts,
 rather than letting a fabricated review certify training or promotion.
 This mechanism does not update the production Jeeves language model.
+
+### Real Dragon pixel-level observation
+
+For approved libretro episodes, the trainer now calls the canonical
+`inspect_frame()` after each *actual* emulator action. The host validates the
+full RGB24 frame and computes 16x16 tile digests and sampled color/luminance
+statistics. Dragon records compact per-frame optical evidence, tile diversity,
+brightness ratios and a frame sequence identity, without copying screenshots
+into model training data. This is **real pixel-level analysis**, not image
+understanding by a vision-language model. Game objects, music semantics and
+narrative interpretations remain unverified until a separate model witnesses
+the original media. Non-native and legacy sessions report missing optics
+rather than receiving fabricated observations.

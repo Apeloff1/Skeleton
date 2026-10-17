@@ -142,6 +142,8 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
         frames: list[str] = []
         audio: list[float] = []
         visual: list[float] = []
+        optics: list[str] = []
+        optical_sources = 0
         for sequence, sensor in enumerate(modalities, 1):
             _require(type(sensor) is dict and sensor.get("sequence") == sequence
                      and _sha(sensor.get("actual_frame_sha256"))
@@ -150,9 +152,19 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
                      and sensor["observed_audio_rms"] >= 0
                      and _number(sensor.get("measured_visual_change")),
                      "companion frame/audio telemetry is missing or fabricated")
+            optical = sensor.get("dragon_optical")
+            if optical is not None:
+                from .game_emulator_dragon_observer import verify_native_observation
+                verify_native_observation(
+                    optical, frame_sha256=sensor["actual_frame_sha256"],
+                )
+                optics.append(optical["observation_digest"])
+                optical_sources += 1
             frames.append(sensor["actual_frame_sha256"])
             audio.append(sensor["observed_audio_rms"])
             visual.append(sensor["measured_visual_change"])
+        _require(optical_sources in (0, steps),
+                 "a native Dragon optical capture cannot be silently partial")
         seen_frames.update(frames)
         counter = row.get("counterfactual_probes")
         controllers = row.get("multi_controller_probes")
@@ -186,8 +198,13 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
                 "audio_sequence_sha256": _digest(audio),
                 "visual_change_sequence_sha256": _digest(visual),
                 "frames_observed_as_digests": len(frames),
+                "native_rgb24_frames_optically_inspected": optical_sources,
+                "native_rgb24_optical_sequence_sha256": (
+                    _digest(optics) if optics else None
+                ),
                 "semantic_video_witness_verified": False,
-                "status": "telemetry_indexed_media_viewer_required",
+                "status": ("native_pixel_optics_measured_semantic_review_pending"
+                           if optical_sources else "telemetry_indexed_media_viewer_required"),
             },
             "ai_playing": {
                 "actual_native_steps": steps,
@@ -252,6 +269,7 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
         view["grounded_lens_evidence"] = {
             "visual_state": {
                 "source_frame_sequence_sha256": view["companion_viewing"]["frame_sequence_sha256"],
+                "measured_pixel_optics_sha256": view["companion_viewing"]["native_rgb24_optical_sequence_sha256"],
             },
             "audio_ambience": {
                 "source_audio_sequence_sha256": view["companion_viewing"]["audio_sequence_sha256"],
@@ -314,7 +332,12 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
         "schema_version": SCHEMA,
         "parent_emulator_evidence_sha256": report["report_digest"],
         "vertices": {
-            "dragon_companion_viewing": "telemetry_indexed_awaiting_semantic_media_review",
+            "dragon_companion_viewing": (
+                "native_pixel_optics_measured_semantic_review_pending"
+                if all(view["companion_viewing"]["native_rgb24_frames_optically_inspected"]
+                       == view["unique_source_transitions"] for view in views)
+                else "telemetry_indexed_awaiting_semantic_media_review"
+            ),
             "jeeves_ai_playing_and_simulation": "verified_actual_native_gameplay",
             "adversarial_reviewer": "deterministic_scrutiny_passed_independent_model_review_pending",
         },
@@ -330,6 +353,9 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
             "unique_native_episodes": len(views),
             "unique_measured_training_transitions": total_steps,
             "unique_observed_frame_hashes": len(seen_frames),
+            "actual_native_rgb24_optical_frames": sum(
+                v["companion_viewing"]["native_rgb24_frames_optically_inspected"] for v in views
+            ),
             "curriculum_lenses_exercised": sum(bool(v) for v in coverage.values()),
             "curriculum_lenses_available": len(coverage),
             "by_angle": coverage,
