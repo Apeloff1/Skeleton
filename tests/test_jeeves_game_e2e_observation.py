@@ -170,6 +170,18 @@ class JeevesDragonObservationTests(unittest.TestCase):
                          observation["observations"][-1]["observation_digest"])
         self.assertFalse(observation["model_or_hardware_certification"])
         self.assertEqual(observation["training"], "not_authorized")
+        self.assertTrue(observation["e2e_evidence"]["world_constructed"])
+        self.assertTrue(observation["e2e_evidence"]["winning_python_replay"])
+        self.assertTrue(observation["e2e_evidence"]["browser_source_compiled"])
+        self.assertTrue(observation["e2e_evidence"]["godot_source_generated"])
+        self.assertTrue(observation["e2e_evidence"]["adversarial_mirror_passed"])
+        self.assertFalse(observation["e2e_evidence"]["source_exported"])
+        from dataclasses import replace
+        broken = replace(
+            outcome, receipts=(outcome.receipts[1], *outcome.receipts[1:])
+        )
+        with self.assertRaises(StudioObservationError):
+            observe_tool_execution(broken)
         with self.assertRaises(StudioObservationError):
             observe_tool_execution({"fake_receipts": ["success"]})
 
