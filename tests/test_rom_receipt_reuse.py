@@ -23,7 +23,7 @@ from skeleton.testing.test_game_emulator_training_lab import (
 )
 
 
-def trained_q_receipt(tmp_path: Path, runs: int = 1):
+def trained_q_receipt(tmp_path: Path, runs: int = 1, approvals_digest: str = "b" * 64):
     """Make a genuine learned Q snapshot without a native libretro dependency."""
     source = sha256(b"original-homebrew-fixture").hexdigest()
     grant = {
@@ -33,7 +33,7 @@ def trained_q_receipt(tmp_path: Path, runs: int = 1):
     lineage = {
         "rights_acknowledged": True, "source_sha256": source,
         "rights_review_id": "review-1", "rights_basis": "original:owned",
-        "approvals_manifest_sha256": "b" * 64,
+        "approvals_manifest_sha256": approvals_digest,
         "core_id": "gambatte", "target_id": "game_boy",
     }
     with patch.object(
@@ -51,7 +51,7 @@ def trained_q_receipt(tmp_path: Path, runs: int = 1):
         "schema_version": BATCH_SCHEMA, "source_sha256": source,
         "source_size_bytes": 32768,
         "core_id": "gambatte", "target_id": "game_boy",
-        "approval_manifest_sha256": "b" * 64,
+        "approval_manifest_sha256": approvals_digest,
         "registry_digest": "c" * 64,
         "training_kind": "actual_replay_audited_tabular_q_policy",
         "neural_weights_updated": 0, "production_weights_modified": False,
