@@ -27,7 +27,7 @@ _ROM_TARGETS = frozenset((
     "nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
 ))
 _EMULATOR_TARGETS = frozenset((
-    "nintendo_game_boy", "nintendo_game_boy_color",
+    "nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom",
 ))
 
 
