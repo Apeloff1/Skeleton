@@ -1,5 +1,5 @@
 # Jeeves × Dragon game-production E2E operating plan
-Date: 2026-10-17  
+Date: 2026-10-17
 Owner: canonical Jeeves studio goal journal + game-builder runtime; Dragon observes as a non-executing evidence consumer.
 
 ## Product journey
