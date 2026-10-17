@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+import time
+from typing import Any, Callable, Mapping
 
 import httpx
+
+from skeleton.client.cancel import CancelToken
 
 from skeleton.client.errors import (
     SkeletonHTTPError,
@@ -25,6 +28,7 @@ class GatewayClient:
         headers: Mapping[str, str] | None = None,
         retry: RetryPolicy | None = None,
         client: httpx.Client | None = None,
+        sleep: Callable[[float], None] | None = None,
     ) -> None:
         if not base_url:
             raise ValueError("base_url is required")
@@ -32,6 +36,7 @@ class GatewayClient:
         self._timeout = timeout_seconds
         self._headers = dict(headers or {})
         self._retry = retry or RetryPolicy()
+        self._sleep = sleep or time.sleep
         self._owns_client = client is None
         self._client = client or httpx.Client(
             base_url=self._base,
@@ -58,10 +63,13 @@ class GatewayClient:
         json: Any = None,
         params: Mapping[str, Any] | None = None,
         idempotent: bool = False,
+        cancel: CancelToken | None = None,
     ) -> httpx.Response:
         last_exc: Exception | None = None
         attempts = self._retry.max_attempts if idempotent else 1
         for attempt in range(attempts):
+            if cancel is not None:
+                cancel.raise_if_cancelled()
             try:
                 response = self._client.request(
                     method,
@@ -85,11 +93,34 @@ class GatewayClient:
                     url=str(response.url),
                     body=_safe_body(response),
                 )
+                self._backoff(attempt, response, cancel)
                 continue
             return response
 
         assert last_exc is not None
         raise last_exc
+
+    def _backoff(
+        self,
+        attempt: int,
+        response: httpx.Response | None,
+        cancel: CancelToken | None,
+    ) -> None:
+        """Sleep before the next attempt; honours ``Retry-After`` (seconds)."""
+        delay = self._retry.delay_for_attempt(attempt)
+        if response is not None:
+            hinted = _retry_after_seconds(response.headers.get("retry-after"))
+            if hinted is not None:
+                delay = min(max(hinted, 0.0), self._retry.max_delay_seconds)
+        if cancel is not None:
+            cancel.raise_if_cancelled()
+        if delay > 0:
+            if cancel is not None and self._sleep is time.sleep:
+                cancel.wait(delay)  # real clock: wake early on cancel
+            else:
+                self._sleep(delay)
+        if cancel is not None:
+            cancel.raise_if_cancelled()
 
     def _json(
         self,
@@ -99,9 +130,11 @@ class GatewayClient:
         json: Any = None,
         params: Mapping[str, Any] | None = None,
         idempotent: bool = False,
+        cancel: CancelToken | None = None,
     ) -> Any:
         response = self._request(
-            method, path, json=json, params=params, idempotent=idempotent
+            method, path, json=json, params=params, idempotent=idempotent,
+            cancel=cancel,
         )
         if response.status_code >= 400:
             raise SkeletonHTTPError(
@@ -157,6 +190,22 @@ class GatewayClient:
 
     def retrieval_feedback(self, body: Mapping[str, Any]) -> dict[str, Any]:
         return self._json("POST", "/api/v1/retrieval/feedback", json=dict(body))
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return float(value.strip())
+    except ValueError:
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+
+        when = parsedate_to_datetime(value)
+        return when.timestamp() - time.time()
+    except Exception:
+        return None
 
 
 def _safe_body(response: httpx.Response) -> Any:

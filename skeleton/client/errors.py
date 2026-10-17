@@ -33,3 +33,7 @@ class SkeletonHTTPError(SkeletonClientError):
         self.message = message
         self.url = url
         self.body = body
+
+
+class SkeletonCancelledError(SkeletonClientError):
+    """Operation was cancelled through a :class:`CancelToken`."""
