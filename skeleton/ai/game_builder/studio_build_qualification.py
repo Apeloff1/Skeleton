@@ -226,7 +226,7 @@ def parse_game_boy_symbols(payload: bytes) -> dict[str, int]:
     for line in payload.decode("ascii", errors="strict").splitlines():
         if not line or line.lstrip().startswith(";"):
             continue
-        match = re.fullmatch(r"([0-9A-Fa-f]{2}):([0-9A-Fa-f]{4})\\s+([A-Za-z][A-Za-z0-9_]*)", line.strip())
+        match = re.fullmatch(r"([0-9A-Fa-f]{2}):([0-9A-Fa-f]{4})\s+([A-Za-z][A-Za-z0-9_]*)", line.strip())
         if match is None:
             continue
         bank, address, name = int(match[1], 16), int(match[2], 16), match[3]
