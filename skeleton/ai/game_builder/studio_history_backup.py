@@ -35,7 +35,7 @@ def _private(root: Path) -> Path:
 
 
 def _checked_bytes(path: Path, *, limit: int = MAX_FILE_BYTES) -> bytes:
-    if path.is_symlink() or not path.is_file():
+    if path.is_symlink() or path.parent.is_symlink() or not path.is_file():
         raise StudioHistoryBackupError("expected bounded regular history file")
     before = path.stat()
     if not stat.S_ISREG(before.st_mode) or not 1 <= before.st_size <= limit:
