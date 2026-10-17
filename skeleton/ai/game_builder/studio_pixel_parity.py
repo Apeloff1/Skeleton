@@ -7,6 +7,7 @@ by Chromium, Godot, a console emulator or physical hardware.
 from __future__ import annotations
 
 from hashlib import sha256
+from base64 import b64decode
 import json
 from pathlib import Path
 
@@ -121,6 +122,53 @@ def inspect_cross_engine_pixels(project_root: str | Path) -> dict:
                 offset = (y * 48 + i * 8 + x) * 4
                 if pixels[offset:offset + 4] != bytes(rgba_palette[tile[y * 8 + x]]):
                     raise StudioPixelParityError("rendered PNG pixel differs from console indexed tile")
+    # Authored ambience, audio cues and PNG overlays must be the exact same
+    # source bytes in playable HTML, standalone assets and Godot packages.
+    original_audio = ("ambient", "collectible", "hazard")
+    media = game.get("studio_media", {})
+    if not isinstance(media, dict):
+        raise StudioPixelParityError("browser media source is invalid")
+    sounds = media.get("audio", {})
+    layers = media.get("parallax", [])
+    if not isinstance(sounds, dict) or not isinstance(layers, list):
+        raise StudioPixelParityError("browser media payload is not typed")
+    media_checked = 0
+    for kind in original_audio:
+        name = f"audio/{kind}.wav"
+        present = name in files
+        if present != (kind in sounds) or present != ("godot/" + name in release_files):
+            raise StudioPixelParityError("original soundtrack differs across engines")
+        if present:
+            try:
+                original = _input(source / name)
+                embedded = b64decode(sounds[kind], validate=True)
+                godot_pcm = _input(engine / "godot" / name)
+            except (ValueError, TypeError, OSError) as exc:
+                raise StudioPixelParityError("original browser audio cannot be decoded") from exc
+            if (not original.startswith(b"RIFF") or original != embedded
+                    or original != godot_pcm
+                    or sha256(godot_pcm).hexdigest() != release_files["godot/" + name]):
+                raise StudioPixelParityError("PCM sound bytes differ between console art, HTML and Godot")
+            media_checked += 1
+    expected_layers = sorted(
+        name for name in files if name.startswith("parallax/") and name.endswith(".png")
+    )
+    if len(expected_layers) != len(layers) or len(layers) > 3:
+        raise StudioPixelParityError("environment overlay count differs across engines")
+    for name, encoded in zip(expected_layers, layers):
+        if "godot/" + name not in release_files:
+            raise StudioPixelParityError("Godot parallax source asset missing")
+        try:
+            expected_png = _input(source / name)
+            embedded_png = b64decode(encoded, validate=True)
+            godot_png = _input(engine / "godot" / name)
+        except (ValueError, TypeError, OSError) as exc:
+            raise StudioPixelParityError("environment PNG encoding was altered") from exc
+        if (expected_png != embedded_png or expected_png != godot_png
+                or sha256(godot_png).hexdigest() != release_files["godot/" + name]):
+            raise StudioPixelParityError("original parallax pixels differ across runtime engines")
+        media_checked += 1
+
     level_count = len(game.get("levels", []))
     if level_count < 1 or level_count > 8:
         raise StudioPixelParityError("original game level count unsupported")
@@ -144,6 +192,7 @@ def inspect_cross_engine_pixels(project_root: str | Path) -> dict:
         "preview_digests": preview_info,
         "matching_semantic_tiles": len(tiles), "matching_animation_frames": len(animation),
         "matching_palette_entries": len(palette),
+        "matching_original_audio_and_overlay_assets": media_checked,
         "runtime_graphical_pixels_observed": False,
         "release_certified": False,
     }
