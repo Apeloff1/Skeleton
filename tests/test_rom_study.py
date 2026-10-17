@@ -241,3 +241,61 @@ def test_neural_rejection_preserves_q_evidence(tmp_path, monkeypatch):
     assert item["neural_candidate_optimizer_steps"] == 0
     assert result["neural_candidate_training_completed"] == 0
     assert result["q_policy_training_completed"] == 1
+
+
+
+def test_frozen_inventory_pins_only_hashes_and_pages_without_full_rescan(
+    tmp_path, monkeypatch
+):
+    from skeleton.ai.training import rom_inventory_snapshot as frozen
+    root, first, second = _roms(tmp_path)
+    destination = tmp_path / "frozen"
+    destination.mkdir(mode=0o700)
+    receipt = frozen.freeze_rom_inventory(root, destination)
+    assert receipt["file_count"] == 2
+    snap = frozen.load_frozen_inventory(Path(receipt["manifest_path"]), root=root)
+    assert all("data" not in row and "bytes" not in row for row in snap["entries"])
+    first_page = frozen.frozen_inventory_page(snap, root=root, limit=1)
+    assert first_page["rows"][0]["relative_path"] == "a.gb"
+    second_page = frozen.frozen_inventory_page(
+        snap, root=root, cursor=first_page["next_cursor"], limit=1
+    )
+    assert second_page["rows"][0]["relative_path"] == "b.nes"
+    assert second_page["finished"] is True
+    assert second_page["frozen_inventory_sha256"] == snap["inventory_sha256"]
+    with pytest.raises(rom.RomStudyError, match="already exists"):
+        frozen.freeze_rom_inventory(root, destination)
+    first.write_bytes(b"changed ROM source bytes")
+    altered = frozen.frozen_inventory_page(snap, root=root, limit=1)
+    assert altered["rows"][0]["state"] == "identity_unavailable"
+    assert altered["rows"][0]["emulator_execution_checked"] is False
+
+
+def test_tampered_snapshot_manifest_rejected(tmp_path):
+    from skeleton.ai.training import rom_inventory_snapshot as frozen
+    root, first, second = _roms(tmp_path)
+    destination = tmp_path / "frozen"
+    destination.mkdir(mode=0o700)
+    receipt = frozen.freeze_rom_inventory(root, destination)
+    manifest = Path(receipt["manifest_path"])
+    raw = json.loads(manifest.read_text())
+    raw["entries"][0]["file_sha256"] = "e" * 64
+    manifest.write_text(json.dumps(raw) + "\n")
+    with pytest.raises(rom.RomStudyError, match="checksum"):
+        frozen.load_frozen_inventory(manifest, root=root)
+
+
+def test_training_from_frozen_snapshot_rejects_replaced_rom(tmp_path):
+    from skeleton.ai.training import rom_inventory_snapshot as frozen
+    root, first, _ = _roms(tmp_path)
+    destination = tmp_path / "frozen"
+    destination.mkdir(mode=0o700)
+    receipt = frozen.freeze_rom_inventory(root, destination)
+    snap = frozen.load_frozen_inventory(Path(receipt["manifest_path"]), root=root)
+    approvals, _ = _approvals(tmp_path, first)
+    first.write_bytes(b"modified content which lacks the pinned SHA")
+    result = rom.train_page(root, approvals, destination, runs=1,
+                            inventory_snapshot=snap)
+    row = next(x for x in result["page_results"] if x["relative_path"] == "a.gb")
+    assert row["state"] == "source_identity_unavailable"
+    assert result["q_policy_training_completed"] == 0

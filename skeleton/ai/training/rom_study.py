@@ -388,6 +388,7 @@ def train_page(
     cursor: str | None = None, limit: int = 32,
     runs: int = 12, steps: int = 24, seed: int = 0,
     neural_world: bool = False, neural_epochs: int = 4, neural_width: int = 8,
+    inventory_snapshot: dict[str, Any] | None = None,
     cancel: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     """Run every eligible ROM on this page; persist per-ROM results before continuing.
@@ -410,7 +411,11 @@ def train_page(
             or type(neural_epochs) is not int or not 1 <= neural_epochs <= 16
             or type(neural_width) is not int or not 4 <= neural_width <= 32):
         raise RomStudyError("bounded ROM Q/neural training configuration required")
-    page = inventory_page(root, cursor=cursor, limit=limit)
+    if inventory_snapshot is not None:
+        from .rom_inventory_snapshot import frozen_inventory_page
+        page = frozen_inventory_page(inventory_snapshot, root=root, cursor=cursor, limit=limit)
+    else:
+        page = inventory_page(root, cursor=cursor, limit=limit)
     approvals, approvals_digest = _load_approvals(approvals_path)
     output_dir = _private_output(output_dir)
     registry = GameEmulatorRegistry.from_environment()
@@ -454,6 +459,7 @@ def train_page(
                 "runs": runs, "steps": steps, "seed": seed,
                 "neural_world": neural_world,
                 "neural_epochs": neural_epochs, "neural_width": neural_width,
+                "frozen_inventory_sha256": page.get("frozen_inventory_sha256"),
             }))
             filename = "rom-" + identity[:16] + "-" + run_identity[:16] + ".json"
             target = output_dir / filename
@@ -558,6 +564,7 @@ def train_page(
                 "training_kind": "actual_replay_audited_tabular_q_policy",
                 "neural_weights_updated": 0, "production_weights_modified": False,
                 "model_promotion_authorized": False,
+                "frozen_inventory_sha256": page.get("frozen_inventory_sha256"),
                 "neural_world": neural, "candidate_evidence": evidence,
             }
             receipt_digest = _save_new(target, receipt)

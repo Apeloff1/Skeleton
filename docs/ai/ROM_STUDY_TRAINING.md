@@ -37,6 +37,29 @@ There is a bounded maximum of 100,000 candidate files and 10,000 directories
 per selected root. Divide larger libraries into separate operator-approved
 roots. Inventory does not establish a working emulator.
 
+### Frozen inventory for large libraries
+
+Repeatedly re-enumerating a 100,000-ROM library for every page is inefficient.
+A private create-only snapshot stores exact paths, byte lengths and SHA-256
+identities without copying ROM contents:
+
+```sh
+python -m scripts.training.rom_study freeze-inventory \
+  --root /private/rom-library \
+  --output-dir /private/rom-receipts \
+  --name rom-library-snapshot.json
+
+python -m scripts.training.rom_study inventory \
+  --root /private/rom-library \
+  --snapshot /private/rom-receipts/rom-library-snapshot.json
+```
+
+Only the page being consumed is rehashed against its pinned source identity.
+Changing, replacing or deleting a ROM makes that source ineligible until a new
+snapshot and independent approval are issued. The snapshot is read once per
+CLI invocation and serves all foreground pages. It does not grant training
+permission or preserve the actual ROM data.
+
 ## 2. Rights and local emulator approval
 
 Create an operator-private \`/private/rom-training-approvals.json\`:
@@ -84,6 +107,7 @@ python -m scripts.training.rom_study train-all \
   --root /private/rom-library \
   --approvals /private/rom-training-approvals.json \
   --output-dir /private/rom-receipts \
+  --snapshot /private/rom-receipts/rom-library-snapshot.json \
   --max-pages 1 --limit 32 --runs 12 --steps 24 \
   --neural-world --neural-epochs 4 --neural-width 8
 \`\`\`

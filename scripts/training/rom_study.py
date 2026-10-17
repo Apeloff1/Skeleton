@@ -12,6 +12,9 @@ import sys
 from skeleton.ai.training.rom_study import (
     RomStudyError, inventory_page, train_page,
 )
+from skeleton.ai.training.rom_inventory_snapshot import (
+    freeze_rom_inventory, load_frozen_inventory, frozen_inventory_page,
+)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -21,11 +24,18 @@ def parser() -> argparse.ArgumentParser:
     inventory.add_argument("--root", required=True, type=Path)
     inventory.add_argument("--cursor")
     inventory.add_argument("--limit", type=int, default=64)
+    freeze = commands.add_parser("freeze-inventory", help="pin a large ROM inventory once")
+    freeze.add_argument("--root", required=True, type=Path)
+    freeze.add_argument("--output-dir", required=True, type=Path)
+    freeze.add_argument("--name", default="rom-library-snapshot.json")
+    inventory.add_argument("--snapshot", type=Path,
+                           help="use a previously frozen exact file census")
     train = commands.add_parser("train-all", help="run approved Q-policy learning per ROM")
     train.add_argument("--root", required=True, type=Path)
     train.add_argument("--approvals", required=True, type=Path)
     train.add_argument("--output-dir", required=True, type=Path)
     train.add_argument("--cursor")
+    train.add_argument("--snapshot", type=Path, help="reuse frozen ROM inventory for large libraries")
     train.add_argument("--limit", type=int, default=32)
     train.add_argument("--max-pages", type=int, default=1,
                        help="0 scans all pages in this foreground invocation")
@@ -42,9 +52,24 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "freeze-inventory":
+            result = freeze_rom_inventory(
+                args.root, args.output_dir, name=args.name,
+            )
+            print(json.dumps(result, sort_keys=True))
+            return 0
+        frozen = (
+            load_frozen_inventory(args.snapshot, root=args.root)
+            if getattr(args, "snapshot", None) is not None else None
+        )
         if args.operation == "inventory":
-            print(json.dumps(inventory_page(args.root, cursor=args.cursor, limit=args.limit),
-                             sort_keys=True))
+            listing = (
+                frozen_inventory_page(frozen, root=args.root,
+                                      cursor=args.cursor, limit=args.limit)
+                if frozen is not None
+                else inventory_page(args.root, cursor=args.cursor, limit=args.limit)
+            )
+            print(json.dumps(listing, sort_keys=True))
             return 0
         if type(args.max_pages) is not int or not 0 <= args.max_pages <= 100_000:
             raise RomStudyError("max_pages must be 0 (whole inventory) or 1..100000")
@@ -54,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.root, args.approvals, args.output_dir, cursor=cursor,
                 limit=args.limit, runs=args.runs, steps=args.steps, seed=args.seed,
                 neural_world=args.neural_world, neural_epochs=args.neural_epochs,
-                neural_width=args.neural_width,
+                neural_width=args.neural_width, inventory_snapshot=frozen,
             )
             pages += 1
             print(json.dumps({
