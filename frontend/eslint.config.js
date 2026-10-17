@@ -66,6 +66,7 @@ module.exports = defineConfig([
       'services/operationStreamSession.ts',
       'utils/memoryGuard.ts',
       'utils/usePersistentState.ts',
+      'utils/safeStorage.ts',
       'utils/safeTimers.ts',
       'utils/useNetworkStatus.ts',
       'src/product/buildJobLifecycle.ts',

@@ -153,3 +153,17 @@ The existing Merge Readiness job includes three new fault-injection suites:
 `test-persistent-preferences-endurance.cjs`,
 `test-build-observer-endurance.cjs`, and
 `test-timer-resume-endurance.cjs`. No additional workflow is introduced.
+
+## Shared native storage memory budget and reachability regression
+
+`safeStorage` retains at most 1,048,576 UTF-16 characters in its fast-read
+mirror and refuses individual values above 65,536 characters for mirroring;
+those values still remain native-stored. Eviction, replacement, removal,
+version rollover and global shedding keep accounting consistent. RootLayout
+sheds the mirror on OS memory pressure, fencing stale native read results.
+
+`scripts/test-native-mirror-memory.cjs` simulates oversized values,
+thousands of keys, late reads, rollovers and memory pressure.
+`scripts/test-connectivity-probe.cjs` tests stuck endpoint deadlines and
+background/foreground cancellation. Both run inside the existing
+Merge Readiness check and stability test command, not as new workflows.
