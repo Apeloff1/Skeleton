@@ -11,10 +11,10 @@ from typing import Optional
 
 from skeleton.app_services.assets import LocalAssetStore
 from skeleton.app_services.auth import AuthService
-from skeleton.app_services.db import Database
+from skeleton.persistence.app_foundation.db import Database
 from skeleton.app_services.events import EventBusBridge, FanOutPublisher
 from skeleton.app_services.jobs import BuildExecutor, BuildJobRunner, BuildService, SqliteJobQueue
-from skeleton.app_services.sqlite_repos import (
+from skeleton.persistence.app_foundation.repositories import (
     SqliteBuildRepository,
     SqliteProjectRepository,
     SqliteSessionRepository,
