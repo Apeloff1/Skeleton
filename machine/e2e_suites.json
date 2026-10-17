@@ -341,6 +341,36 @@
         "--noconftest",
         "tests/test_studio_dragon_learning_e2e.py"
       ]
+    },
+    {
+      "id": "jeeves-native-cartridge-emulator-full-e2e",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 1200,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_build_qualification.py",
+        "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "skeleton/ai/game_builder/studio_execution_campaign.py",
+        "skeleton/ai/game_builder/studio_execution_campaign_cli.py",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_game_boy_emulator_e2e.py",
+        "tests/test_studio_execution_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_game_boy_emulator_e2e.py",
+        "tests/test_studio_execution_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py"
+      ]
     }
   ]
 }
