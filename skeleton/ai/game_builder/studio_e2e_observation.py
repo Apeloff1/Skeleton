@@ -280,6 +280,7 @@ def observe_production_campaign(
         ),
         "rom_structurally_checked_count": report["native_roms_structurally_verified"],
         "actual_native_rom_victory_replays": report["native_rom_machine_code_playthroughs_verified"],
+        "actual_native_cpu_checkpoint_samples": report["native_cpu_checkpoint_samples_verified"],
         "actual_browser_javascript_replays": report["browser_javascript_playthroughs_verified"],
         "actual_godot_headless_replays": report["godot_headless_playthroughs_verified"],
         "generated_game_canvas_captures": report["generated_game_canvas_captures_verified"],
