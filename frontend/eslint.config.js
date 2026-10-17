@@ -62,6 +62,9 @@ module.exports = defineConfig([
       'utils/thermalGuard.ts',
       'utils/resilientNet.ts',
       'services/synergy.ts',
+      'services/offlineCache.ts',
+      'services/operationStreamSession.ts',
+      'utils/memoryGuard.ts',
     ],
     rules: {
       'react-hooks/exhaustive-deps': 'error',

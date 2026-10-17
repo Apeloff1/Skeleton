@@ -102,3 +102,24 @@ count checks, cancellation, storage failure and bounded paging. New sync
 generations are not pruned out from under older readers; explicit clearing
 removes all owned generations. Crash-surviving orphan staging will require an
 independently reader-safe reclamation policy in a later pass.
+
+## Memory pressure and durable operation monitoring
+
+`memoryGuard` now owns an idempotent native memory-warning listener and
+optional heap sampling timer, with explicit teardown and bounded synchronous
+shedding callbacks. RootLayout registers disposal of only regenerable
+network/thermal caches; active projects, model weights, and durable receipts
+are never memory-purged.
+
+`operationStreamSession` uses bounded idle polling backoff for multi-hour
+tasks; thrown transport adapters become truthful error states instead of
+unhandled promise rejections. Concurrent replay is single-flight, user-facing
+observers are isolated, and cursor-save/clear operations remain physically
+serialized to prevent a late native acknowledgement resurrecting erased
+cursor state. Clearing the cursor does **not** cancel server-side operations.
+
+`scripts/test-memory-pressure-runtime.cjs` and
+`scripts/test-operation-stream-endurance.cjs` run inside the existing
+Merge Readiness check beside the offline transactional suite. These
+simulate OS warnings, clock rollback, failures, concurrent replays,
+native save races, and low-cadence marathon operation following.
