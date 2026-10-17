@@ -84,6 +84,12 @@ def _source_observations(episode: dict[str, Any]):
         ("counterfactual", "probe", "alternative", "action", "simulation")
         if probes else ("controller", "action")
     )
+    alternate_description = (
+        f"Executed {probes} native alternate-action counterfactual probes and "
+        f"{play['controller_only_probes']} controller-only probes."
+        if probes else
+        f"Executed {play['controller_only_probes']} native controller-only input inspections."
+    )
     content = (
         ("visual", visual_description, visual_tags),
         (
@@ -114,8 +120,7 @@ def _source_observations(episode: dict[str, Any]):
         ),
         (
             "counterfactual",
-            f"Native probes executed: {probes} alternate-action probes and "
-            f"{play['controller_only_probes']} controller-only probes.",
+            alternate_description,
             probe_tags,
         ),
     )
@@ -216,15 +221,28 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         # The canonical router still allocates a 43-question budget. This
         # separate evidence check prevents a routed question being mistaken
         # for measured support of its content or prediction.
-        positive_observation = " ".join(
-            obs.content + " " + " ".join(obs.tags) for obs in observations
-        ).casefold()
-        cues = tuple(
-            cue for cue in spec.activation_cues
-            if cue and cue in positive_observation
-        )
+        cue_provenance = []
+        for observed in observations:
+            observed_words = (
+                observed.content + " " + " ".join(observed.tags)
+            ).casefold()
+            matched = sorted({
+                cue for cue in spec.activation_cues
+                if cue and cue in observed_words
+            })
+            if matched:
+                cue_provenance.append({
+                    "native_observation_id": observed.observation_id,
+                    "native_observation_fingerprint": observed.fingerprint,
+                    "matched_positive_cues": matched,
+                })
+        cues = tuple(sorted({
+            cue for row in cue_provenance for cue in row["matched_positive_cues"]
+        }))
         route.append({
             "matched_native_observation_cues": list(cues),
+            "native_observation_cue_provenance": cue_provenance,
+            "native_observation_cue_provenance_sha256": _digest(cue_provenance),
             "cue_support_present": bool(cues),
             "native_evidence_support_class": (
                 "measured_native_cue_present"
@@ -280,6 +298,9 @@ def route_episode_semantic_lenses(episode: dict[str, Any], *,
         "causal_assertions_authorized": False,
         "additional_native_training_examples": 0,
         "actual_cue_supported_lenses": sum(item["cue_support_present"] for item in route),
+        "positively_supported_native_observation_links": sum(
+            len(item["native_observation_cue_provenance"]) for item in route
+        ),
         "operator_selected_lenses_without_cue_support": sum(
             item["operator_requested_not_evidence"]
             and not item["cue_support_present"] for item in route
