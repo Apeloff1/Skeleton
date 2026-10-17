@@ -359,27 +359,40 @@ def qualify_native_build(
             except (OSError, ValueError) as exc:
                 return _receipt(target, source_digest, available=True, invoked=True,
                                 blocker="gameboy_symbol_map_invalid", versions=versions)
-        fd, candidate = tempfile.mkstemp(prefix=".skeleton-rom-", dir=destination.parent)
+        # Publish the two verified artifacts as new exclusive paths. If
+        # either exclusive link fails, reclaim only files created by this
+        # invocation; never overwrite another compiler's result.
+        published = []
         try:
-            with os.fdopen(fd, "wb") as handle:
-                handle.write(rom)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.link(candidate, destination)
-        finally:
-            if os.path.exists(candidate):
-                os.unlink(candidate)
-        if symbols_path is not None and symbol_data is not None:
-            fd, candidate = tempfile.mkstemp(prefix=".skeleton-sym-", dir=destination.parent)
+            if symbols_path is not None and symbol_data is not None:
+                fd, candidate = tempfile.mkstemp(
+                    prefix=".skeleton-sym-", dir=destination.parent,
+                )
+                try:
+                    with os.fdopen(fd, "wb") as handle:
+                        handle.write(symbol_data)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                    os.link(candidate, symbols_path)
+                    published.append(symbols_path)
+                finally:
+                    if os.path.exists(candidate):
+                        os.unlink(candidate)
+            fd, candidate = tempfile.mkstemp(prefix=".skeleton-rom-", dir=destination.parent)
             try:
                 with os.fdopen(fd, "wb") as handle:
-                    handle.write(symbol_data)
+                    handle.write(rom)
                     handle.flush()
                     os.fsync(handle.fileno())
-                os.link(candidate, symbols_path)
+                os.link(candidate, destination)
+                published.append(destination)
             finally:
                 if os.path.exists(candidate):
                     os.unlink(candidate)
+        except OSError:
+            for written in reversed(published):
+                written.unlink(missing_ok=True)
+            raise
         digest = sha256(rom).hexdigest()
         return _receipt(target, source_digest, available=True, invoked=True,
                         built=True, header=True, digest=digest, size=len(rom),
