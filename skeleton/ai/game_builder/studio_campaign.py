@@ -196,6 +196,27 @@ def _verify_target(root: Path, expected_project: str, expected_target: str,
     return record
 
 
+def _reclaim_aborted_stages(root: Path) -> int:
+    """Clear only orphaned owned temporary output while exclusive OS lock held.
+
+    Never delete a published target, user source, symlink or unexpected
+    directory. A crash releases the OS lock, enabling safe next-run cleanup.
+    """
+    staging = root / ".staging"
+    if not staging.is_dir() or staging.is_symlink():
+        raise StudioCampaignError("staging root is not a real controlled directory")
+    cleaned = 0
+    for entry in staging.iterdir():
+        if entry.is_symlink() or not entry.is_dir() or not entry.name.startswith(".target-"):
+            raise StudioCampaignError("unknown or linked leftover staging entry requires inspection")
+        for child in entry.rglob("*"):
+            if child.is_symlink():
+                raise StudioCampaignError("aborted staging contains unsafe symlink")
+        shutil.rmtree(entry)
+        cleaned += 1
+    return cleaned
+
+
 def _index(root: Path, identity: str, order: CampaignOrder) -> dict:
     candidate = root / "index.json"
     if candidate.is_file():
@@ -235,6 +256,7 @@ def _inspect_campaign_unlocked(order: CampaignOrder, destination: str | Path) ->
         "completed_targets": completed,
         "pending_targets": [t for t in order.targets if t not in completed],
         "failures": state["failed"],
+        "aborted_owned_stages_recovered": int(state.get("aborted_owned_stages_recovered", 0)),
         "native_roms_compiled": 0,
         "native_emulator_playthroughs_verified": 0,
         "source_completion_percent": round(100 * len(completed) / len(order.targets), 2),
@@ -270,6 +292,10 @@ def _run_campaign_unlocked(order: CampaignOrder, destination: str | Path, *,
     if (root / "targets").is_symlink() or (root / ".staging").is_symlink():
         raise StudioCampaignError("campaign staging and target roots cannot be links")
     state = _index(root, identity, order)
+    recovered = _reclaim_aborted_stages(root)
+    state["aborted_owned_stages_recovered"] = (
+        int(state.get("aborted_owned_stages_recovered", 0)) + recovered
+    )
     # Require valid source receipts before trusting an indexed completion.
     for target in order.targets:
         source = root / "targets" / target
