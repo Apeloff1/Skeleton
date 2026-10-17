@@ -1153,15 +1153,49 @@ class SQLiteEngineSubmissionStore:
             try:
                 command_payload = json.loads(row["command_json"])
                 ack_payload = json.loads(row["ack_json"])
-            except json.JSONDecodeError as exc:
+                command = EngineExecutionCommand.from_dict(command_payload)
+                ack = self._ack_from_dict(ack_payload)
+            except (
+                json.JSONDecodeError,
+                EngineServiceError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 raise EngineServiceError(
                     "stored engine submission is corrupt"
                 ) from exc
+            self._verify_stored_identity(row, command, ack)
             return _StoredSubmission(
                 principal=row["service_principal"],
-                command=EngineExecutionCommand.from_dict(command_payload),
-                ack=self._ack_from_dict(ack_payload),
+                command=command,
+                ack=ack,
             )
+
+    @staticmethod
+    def _verify_stored_identity(
+        row: sqlite3.Row,
+        command: EngineExecutionCommand,
+        ack: EngineExecutionAck,
+    ) -> None:
+        """Fail closed unless command, ack, and row keys describe one submission.
+
+        Error text is deliberately generic so no stored context leaks.
+        """
+
+        operation = command.operation
+        consistent = (
+            command.submission_digest == row["command_digest"]
+            and command.execution_request.execution_id == row["execution_id"]
+            and operation.operation_id == row["operation_id"]
+            and operation.tenant_id == row["tenant_id"]
+            and operation.idempotency_key == row["idempotency_key"]
+            and ack.execution_id == row["execution_id"]
+            and ack.operation_id == row["operation_id"]
+            and ack.trace_id == operation.trace_id
+        )
+        if not consistent:
+            raise EngineServiceError("stored engine submission is corrupt")
 
     def get_by_execution_id(
         self,
@@ -1204,7 +1238,7 @@ class SQLiteEngineSubmissionStore:
             try:
                 row = self._connection.execute(
                     """
-                    SELECT command_digest, ack_json
+                    SELECT command_digest, command_json, ack_json
                     FROM engine_submission
                     WHERE namespace = ?
                       AND service_principal = ?
@@ -2490,6 +2524,7 @@ class EngineExecutionService:
                 "engine execution belongs to a different actor or tenant"
             )
         handoff = stored.command.compiled_context
+        self._verify_handoff_durable_binding(execution_id, stored)
         return {
             "operation_id": handoff.operation_id,
             "execution_id": handoff.execution_id,
@@ -2510,6 +2545,55 @@ class EngineExecutionService:
             "idempotency_key": operation.idempotency_key,
             "trace_id": operation.trace_id,
         }
+
+    def _verify_handoff_durable_binding(
+        self,
+        execution_id: str,
+        stored: _StoredSubmission,
+    ) -> None:
+        """Fail closed when durable execution state or checkpoint drifts.
+
+        The accepted command is the only authority for the context binding.
+        A checkpoint that names a different context digest or tenant, or an
+        execution row whose identity differs from the accepted request, is
+        treated as substitution and rejected without echoing stored values.
+        """
+
+        command = stored.command
+        handoff = command.compiled_context
+        failure = "durable engine handoff binding is corrupt"
+        try:
+            execution = self.repository.get(execution_id)
+        except Exception as exc:
+            raise EngineServiceError(failure) from exc
+        request = execution.request
+        if (
+            request.identity_digest
+            != command.execution_request.identity_digest
+            or request.execution_id != handoff.execution_id
+            or request.operation_id != handoff.operation_id
+        ):
+            raise EngineServiceError(failure)
+        try:
+            checkpoint = self.repository.latest_checkpoint(execution_id)
+        except Exception as exc:
+            raise EngineServiceError(failure) from exc
+        if checkpoint is None:
+            return
+        payload = checkpoint.payload
+        if not isinstance(payload, Mapping):
+            raise EngineServiceError(failure)
+        expected = {
+            "context_digest": handoff.context_digest,
+            "context_id": handoff.context_id,
+            "handoff_digest": handoff.handoff_digest,
+            "tenant_id": handoff.tenant_id,
+            "execution_id": handoff.execution_id,
+            "operation_id": handoff.operation_id,
+        }
+        for key, value in expected.items():
+            if key in payload and payload[key] != value:
+                raise EngineServiceError(failure)
 
     def pending_tool_approvals(
         self,

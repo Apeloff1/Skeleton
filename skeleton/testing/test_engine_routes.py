@@ -150,6 +150,17 @@ def _client(service: EngineExecutionService) -> TestClient:
     return TestClient(app)
 
 
+def _inventory_headers() -> dict[str, str]:
+    """Sealed backend-service headers shared by engine route suites.
+
+    Imported by ``test_engine_handoff_recovery``; keep the name stable.
+    """
+    return {
+        "x-zaibatsu-attester": "backend-service",
+        "authorization": "Bearer " + _SERVICE_TOKEN,
+    }
+
+
 def test_engine_service_token_is_masked_in_settings_repr() -> None:
     settings = EngineSettings(service_token=_SERVICE_TOKEN)
 
