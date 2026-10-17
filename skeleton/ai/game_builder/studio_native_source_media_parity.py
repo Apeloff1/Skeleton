@@ -141,6 +141,9 @@ def inspect_native_source_media(project: str | Path, *, target: str) -> dict:
         raise NativeMediaSourceError(
             "console gameplay loop no longer advances authored animation/music"
         )
+    boot_call = "    jsr InitOriginalAudio\n" if nes else "    call InitOriginalAudio\n"
+    if source.count(boot_call) != 1:
+        raise NativeMediaSourceError("native console boot does not initialize APU")
     for cue in ("Pickup", "Hazard", "Goal"):
         opcode = "jsr" if nes else "call"
         line = f"    {opcode} Sound{cue}\n"
