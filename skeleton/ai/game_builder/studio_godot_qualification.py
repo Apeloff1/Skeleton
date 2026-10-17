@@ -98,7 +98,15 @@ def godot_inputs(root: Path) -> tuple[dict[str, bytes], str, int, str]:
                                  if k != "manifest_digest"}) != release.get("manifest_digest")):
         raise StudioGodotQualificationError("engine release manifest is not canonical")
     files: dict[str, bytes] = {}
-    paths = _INPUTS + (("studio_art.json",) if "godot/studio_art.json" in release["files"] else ())
+    optional = (
+        "studio_art.json",
+        "audio/ambient.wav", "audio/collectible.wav", "audio/hazard.wav",
+        "parallax/layer_00.png", "parallax/layer_01.png", "parallax/layer_02.png",
+    )
+    paths = _INPUTS + tuple(
+        relative for relative in optional
+        if "godot/" + relative in release["files"]
+    )
     for relative in paths:
         full = "godot/" + relative
         if full not in release["files"]:
@@ -126,6 +134,16 @@ def godot_inputs(root: Path) -> tuple[dict[str, bytes], str, int, str]:
                    for step in proof_doc["actions"])):
         raise StudioGodotQualificationError("Godot source and replay are not the same proved game")
     if "studio_art.json" in files:
+        if ("audio/ambient.wav" in files
+                and not all(name in files for name in (
+                    "audio/collectible.wav", "audio/hazard.wav"
+                ))):
+            raise StudioGodotQualificationError("incomplete original soundtrack/cue source")
+        for name, payload in files.items():
+            if name.startswith("audio/") and not payload.startswith(b"RIFF"):
+                raise StudioGodotQualificationError("Godot original WAV asset is invalid")
+            if name.startswith("parallax/") and not payload.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+                raise StudioGodotQualificationError("Godot original parallax PNG invalid")
         try:
             art = json.loads(files["studio_art.json"])
         except ValueError as exc:
