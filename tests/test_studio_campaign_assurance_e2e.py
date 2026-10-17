@@ -39,7 +39,7 @@ GB_SYMBOLS = (
     "00:c000 Level\\n00:c001 PlayerX\\n00:c002 PlayerY\\n"
     "00:c006 Health\\n00:c007 Score\\n00:c008 GemsRemaining\\n"
     "00:c009 GameWon\\n00:c00a GameLost\\n"
-).replace("\\\\n", "\\n").encode("ascii")
+).replace(chr(92) + "n", chr(10)).encode("ascii")
 
 
 class ProductionGateTests(unittest.TestCase):
