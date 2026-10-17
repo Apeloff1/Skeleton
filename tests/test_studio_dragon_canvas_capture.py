@@ -2,6 +2,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
+from skeleton.ai.game_builder.studio_campaign_assurance import (
+    inspect_production_assurance, qualify_campaign_canvas,
+)
+from skeleton.ai.game_builder.studio_e2e_observation import observe_production_campaign
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
@@ -29,6 +34,7 @@ class DragonGeneratedCanvasCaptureTests(unittest.TestCase):
             hazards=1, health=4, theme="ocean",
             art=ArtDirection(seed=733, music_density=0, parallax_layers=0),
         )
+        self.order = order
         self.campaign = self.root / "campaign"
         state = run_campaign(order, self.campaign, authorized=True)
         self.assertEqual(state["targets_with_verified_source"], 1)
@@ -90,24 +96,39 @@ class DragonGeneratedCanvasCaptureTests(unittest.TestCase):
                 browser.close()
             except Exception:
                 self.skipTest("Chromium runtime not installed; no fabricated visual proof")
-        output = capture_generated_game(
-            self.engine, self.destination, authorized=True,
-            capture_consent=True, execute=True, timeout_seconds=60,
+        output = qualify_campaign_canvas(
+            self.order, self.campaign, "nintendo_game_boy",
+            authorized=True, capture_consent=True, execute=True,
+            timeout_seconds=60,
         )
-        self.assertTrue(output["graphical_browser_pixels_observed"])
-        self.assertFalse(output["user_screen_recorded"])
+        self.assertTrue(output["generated_game_canvas_recorded"])
         self.assertFalse(output["model_training_authorized"])
-        self.assertEqual(output["world_digest"],
-                         output["world_digest"])
-        self.assertGreaterEqual(len(output["frames"]), 2)
-        self.assertLessEqual(len(output["frames"]), 3)
-        self.assertTrue((self.destination / "capture.json").is_file())
-        self.assertTrue((self.destination / "frame_00.png").is_file())
-        with self.assertRaises(DragonCanvasCaptureError):
-            capture_generated_game(
-                self.engine, self.destination, authorized=True,
-                capture_consent=True, execute=True, timeout_seconds=60,
-            )
+        frames = (self.campaign / "qualifications/nintendo_game_boy/canvas_capture")
+        saved = json.loads((frames / "capture.json").read_text())
+        self.assertTrue(saved["graphical_browser_pixels_observed"])
+        self.assertFalse(saved["user_screen_recorded"])
+        self.assertFalse(saved["model_training_authorized"])
+        replay = json.loads((self.engine / "proof/verified_solution.json").read_text())
+        self.assertEqual(saved["world_digest"], replay["world_digest"])
+        self.assertGreaterEqual(len(saved["frames"]), 2)
+        self.assertLessEqual(len(saved["frames"]), 3)
+        self.assertTrue((frames / "frame_00.png").is_file())
+        report = inspect_production_assurance(self.order, self.campaign)
+        self.assertEqual(report["generated_game_canvas_captures_verified"], 1)
+        self.assertEqual(
+            report["targets"][0]["gates"]["generated_game_canvas_frames_recorded"]["status"],
+            "generated_game_canvas_pixels_recorded",
+        )
+        observation = observe_production_campaign(
+            self.order, self.campaign, authorized=True,
+        )
+        self.assertEqual(observation["generated_game_canvas_captures"], 1)
+        self.assertFalse(observation["learned_new_weights"])
+        again = qualify_campaign_canvas(
+            self.order, self.campaign, "nintendo_game_boy",
+            authorized=True, capture_consent=True, execute=True,
+        )
+        self.assertTrue(again["already_qualified"])
 
 
 if __name__ == "__main__":
