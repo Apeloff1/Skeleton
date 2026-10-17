@@ -266,3 +266,40 @@ The reviewer executes on a local, operator-selected checkpoint. A second
 model's **distinctness from Jeeves's production speaking checkpoint** is not
 automatically established without a separately pinned production-model
 identity; the review records that limitation explicitly.
+
+### One-command supervised training triangle
+
+With an operator-approved frozen snapshot, native libretro core registry,
+rights approval manifest, and an installed local reviewer checkpoint:
+
+```sh
+python -m scripts.training.rom_study train-triangle \
+  --root /private/rom-library \
+  --approvals /private/rom-training-approvals.json \
+  --output-dir /private/rom-receipts \
+  --snapshot /private/rom-receipts/rom-library-snapshot.json \
+  --reviewer-checkpoint /private/models/reviewer.json \
+  --limit 32 --max-pages 1 --runs 12 --steps 24 \
+  --review-tokens 160
+```
+
+The campaign performs exact source identity, rights, native core admission,
+real replay-audited Q-policy training, Dragon frame-by-frame pixel and
+temporal inspection, and three checkpoint-backed adversarial model passes.
+A second run with the same frozen snapshot and configuration **reuses only
+independently verified Q training receipts**, and **actually replays the
+local critic's recorded generations** before calling a previous model review
+reproducible. Raw ROM bytes and video frames are not exported by the triangle.
+
+Each printed page includes `cursor`, `next_cursor`, separately measured
+gameplay/reviewer statuses, outstanding permission blockers, and a
+`review_failures_needing_retry` count. If a model pass fails, the CLI exits
+with code 3 **without advancing the cursor**. Retry the same page; approved
+ROM source receipts are create-only. For a deliberate continuous foreground
+library pass, set `--max-pages 0`; this is not an autonomous unattended
+background worker and may take substantial machine resources.
+
+Run `triangle-status --receipt <ROM-receipt> --source-sha256 <full-hash>`
+to inspect source-bound Dragon/play/reviewer challenges without loading any
+language-model checkpoint. Native model judgments still need independent
+human adjudication and do not promote Jeeves production parameters.
