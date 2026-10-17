@@ -261,6 +261,7 @@ TickOriginalMusic:
     lda OriginalMusicLow,x
     sta $4002
     lda OriginalMusicHigh,x
+    ora #$F8
     sta $4003
     rts
 @saveTick:
@@ -274,6 +275,7 @@ SoundPickup:
     lda #__SFX_PICKUP_LOW__
     sta $4006
     lda #__SFX_PICKUP_HIGH__
+    ora #$10
     sta $4007
 @silent:
     rts
@@ -284,6 +286,7 @@ SoundHazard:
     lda #__SFX_HAZARD_LOW__
     sta $4006
     lda #__SFX_HAZARD_HIGH__
+    ora #$10
     sta $4007
 @silent:
     rts
@@ -294,6 +297,7 @@ SoundGoal:
     lda #__SFX_GOAL_LOW__
     sta $4006
     lda #__SFX_GOAL_HIGH__
+    ora #$10
     sta $4007
 @silent:
     rts
