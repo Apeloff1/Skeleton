@@ -102,8 +102,7 @@ class OriginalStudioCampaignTests(unittest.TestCase):
         with self.assertRaises(StudioCampaignError):
             run_campaign(self.order, self.output, authorized=True, max_targets=0)
         with self.assertRaises(StudioCampaignError):
-            CampaignOrder(**{**self.order.__dict__, "targets": ("unsupported",)})
-            # dataclass slots intentionally not assumed; this is a negative test
+            replace(self.order, targets=("unsupported",))
 
 
 if __name__ == "__main__":
