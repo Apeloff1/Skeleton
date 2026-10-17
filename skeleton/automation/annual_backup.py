@@ -16,7 +16,7 @@ import stat
 import tempfile
 from typing import Any
 
-from .annual_production import AnnualProductionStore
+from .annual_production import AnnualProductionStore, SCHEMA, _hash
 
 _LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
 MAX_BACKUP_BYTES = 4 * 1024**3
@@ -56,6 +56,69 @@ def _sha_file(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
+def _audit_receipt_chains(db: sqlite3.Connection) -> None:
+    """Verify EVERY checkpoint and grant rotation in the immutable snapshot.
+
+    Database structural integrity alone cannot detect altered receipts when a
+    copied SQLite file is rewritten and its unkeyed manifest is recomputed.
+    This is tamper evidence, not operator authentication or authority renewal.
+    """
+    producers = db.execute(
+        "SELECT production_id, system, sequence, last_receipt_digest, "
+        "checkpoint_digest, authority_digest FROM annual_productions ORDER BY production_id"
+    )
+    for production_id, system, count, tip, checkpoint_tip, authority in producers:
+        previous = None
+        previous_state = None
+        ordinal = 0
+        for (sequence, epoch, state, evidence, link, digest) in db.execute(
+            "SELECT sequence, epoch, state_digest, evidence_digest, "
+            "previous_receipt_digest, receipt_digest "
+            "FROM annual_checkpoint_receipts WHERE production_id=? ORDER BY sequence",
+            (production_id,),
+        ):
+            ordinal += 1
+            expected = _hash({
+                "schema": SCHEMA, "production_id": production_id,
+                "system": system, "sequence": sequence,
+                "lease_epoch": epoch, "state_digest": state,
+                "evidence_digest": evidence, "previous_receipt_digest": link,
+            })
+            if (type(sequence) is not int or sequence != ordinal
+                    or link != previous or digest != expected):
+                raise AnnualBackupError("offline production checkpoint chain differs")
+            previous = digest
+            previous_state = state
+        if ordinal != count or tip != previous or checkpoint_tip != previous_state:
+            raise AnnualBackupError("offline production checkpoint tip differs")
+        previous_rotation = None
+        previous_grant = None
+        revision = 0
+        for (position, old, new, approval, expiry, approved, link, digest) in db.execute(
+            "SELECT revision, old_authority_digest, new_authority_digest, "
+            "approval_digest, expires_at, approved_at, previous_rotation_digest, "
+            "rotation_digest FROM annual_authority_rotations "
+            "WHERE production_id=? ORDER BY revision",
+            (production_id,),
+        ):
+            revision += 1
+            expected = _hash({
+                "schema": SCHEMA, "production_id": production_id,
+                "revision": position, "old_authority_digest": old,
+                "new_authority_digest": new, "approval_digest": approval,
+                "expires_at": expiry, "approved_at": approved,
+                "previous_rotation_digest": link,
+            })
+            if (position != revision or link != previous_rotation
+                    or (previous_grant is not None and old != previous_grant)
+                    or digest != expected):
+                raise AnnualBackupError("offline production authority chain differs")
+            previous_grant = new
+            previous_rotation = digest
+        if previous_grant is not None and authority != previous_grant:
+            raise AnnualBackupError("offline production authority head differs")
+
+
 def _check_database(path: Path) -> dict[str, Any]:
     # Read an immutable snapshot; never try a live WAL sidecar recovery here.
     from urllib.parse import quote
@@ -76,6 +139,7 @@ def _check_database(path: Path) -> dict[str, Any]:
         counts = {}
         for name in sorted(expected):
             counts[name] = db.execute("SELECT count(*) FROM " + name).fetchone()[0]
+        _audit_receipt_chains(db)
     return counts
 
 
