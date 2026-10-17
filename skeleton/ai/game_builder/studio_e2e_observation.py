@@ -241,6 +241,7 @@ def observe_production_campaign(
             ("studio.rom_structure_checked", target["native_binary_evidence_digest"]),
             ("studio.browser_javascript_replay", target["browser_javascript_evidence_digest"]),
             ("studio.godot_headless_replay", target["godot_headless_evidence_digest"]),
+            ("studio.generated_game_canvas_frames", target["generated_canvas_evidence_digest"]),
         ]
         for kind, source_digest in events:
             if source_digest is None:
@@ -279,6 +280,7 @@ def observe_production_campaign(
         "rom_structurally_checked_count": report["native_roms_structurally_verified"],
         "actual_browser_javascript_replays": report["browser_javascript_playthroughs_verified"],
         "actual_godot_headless_replays": report["godot_headless_playthroughs_verified"],
+        "generated_game_canvas_captures": report["generated_game_canvas_captures_verified"],
         "release_ready": False,
         "learned_new_weights": False,
         "dragon_knowledge_admitted": False,
