@@ -103,8 +103,19 @@
     ],
     "completion_mode": "Optional explicit native|original on new goal intent. Absence preserves native semantics and historical request/state hashes; never rewrite frozen pending prompts, forms, keys, commands or receipts.",
     "requirements": {
-      "native": ["edit", "build", "preview", "export"],
-      "original": ["edit", "simulate", "review", "package", "export"]
+      "native": [
+        "edit",
+        "build",
+        "preview",
+        "export"
+      ],
+      "original": [
+        "edit",
+        "simulate",
+        "review",
+        "package",
+        "export"
+      ]
     },
     "admission": "Original mode accepts an owned existing successor or ordinary base project; it rejects implicit canonical console-editor, studio-session or studio-rules conversion before goal admission. Creating/adopting an original requires explicit edit authorization. Existing source/teacher/lease/finite-budget authorities remain mandatory.",
     "creation": "Registered authored-profile identities and exact completed goal-issued candidate receipts are model-visible data. Synthesis and adoption use existing successor owners and successor-adopt prepared-edit recovery; each actual decision remains model-produced and owner-validated.",
@@ -115,7 +126,12 @@
     "forms": "New structured decisions preserve every admitted owner operation and constraint, including exactly one or three synthesis sources, actual observed registered authored-profile IDs and mutually exclusive world changes/edits branches. Repeated identical nested owner schemas may share bounded acyclic decision-root definitions, keeping full inventory within the unchanged64KiB EngineChat serialization bound; compact prompt descriptions retain typed edit names while full forms enforce all constraints. No removal of unrelated tool functionality. Historical frozen schemas remain unchanged.",
     "positive_simulation_stage_forms": "New ORIGINAL_SIMULATE decisions require the canonical simulation owner's positive bounded integer steps field and exclude the mutually exclusive action/actions alternatives. The model chooses the step count; the host never substitutes actions/counts. Ordinary/reset-only operations, native stages and every historical frozen prompt/schema/key remain unchanged. This is a stage requirement, not a change to the simulation owner API or goal budgets.",
     "stage_owner_identity_subsets": "New original-stage owner-form subsets and matching prompt forms retain canonical owner definitions/annotations and bounds. Fresh current-world simulation omits foreign source/session/reset/controller overrides and requires positive model-chosen steps; the first current-world review uses the canonical seeded controller with bounded numeric review options and omits unissued source/policy/baseline/actions. Desktop packaging offers only observed ready registered target IDs and uses the owner's default timeout. Adoption and package export permit only exact verified candidate/artifact identities from current context, with no unproven receipt-token alternative. General/native/no-stage forms, owner APIs, existing frozen requests and finite goal budgets remain unchanged.",
-    "limits": {"requirements": 5, "steps": 16, "model_calls": 8, "jobs": 4},
+    "limits": {
+      "requirements": 5,
+      "steps": 16,
+      "model_calls": 8,
+      "jobs": 4
+    },
     "runtime": "Existing EngineChat, workspace jobs/simulation, successor/review/desktop owners and typed tool facade only; no new runtime, provider, store or promotion authority.",
     "validation": "Static source/schema checks and separately authorized genuine app operations only; no automated tests per user."
   },
@@ -298,5 +314,38 @@
       "receipt_references": "Only recognized top-level _REF_FIELDS may expose finite existing _RECEIPT_REFS tokens; the existing resolver and owner type validation still reject unavailable, unknown or mismatched values before tool IO. Nested fields never gain receipt interpolation.",
       "authority": "Typed grammar constrains model-produced data; it never certifies action success. Current model/source/actor grants and real owner payload validation remain mandatory."
     }
+  },
+  "e2e_dragon_observation_extension": {
+    "status": "implementation_candidate",
+    "engine_owner": "skeleton/ai/game_builder/studio_e2e_observation.py",
+    "canonical_goal_owner": "backend/core/game_studio_agent.py",
+    "application_api": "backend/routes/game_studio_agent.py",
+    "read_route": "GET /game-studio-agent/goals/{goal_id}/dragon-observation",
+    "validation_boundary": "Authenticate the caller, scope tenant/owner/project, revalidate current authority and verify the sealed goal journal in game_studio_agent.inspect before projecting. Unverified v1 journals are refused.",
+    "sources": [
+      "Existing goal_journal v2 executed model decisions, exact step hashes, and recovery state",
+      "Existing StudioExecutionPlane.ExecutionOutcome real typed tool receipts and mirror proof"
+    ],
+    "trust_and_privacy": [
+      "Allowlisted operational metadata only; never expose prompts, model responses, credentials, game source, uploaded attachments or raw videos",
+      "Page-independent hash-chained observation receipts are derived, not accepted from clients",
+      "Only the canonical owner may state verified workflow completion; action observations and status=completed are not release, rights, native hardware or human gameplay qualification",
+      "Dragon learns nothing automatically: all learning remains observation-only until separate explicit scoped capture/analysis consent, independent review, rights and training-promotion authority"
+    ],
+    "operational_edges": [
+      "Completed, interrupted, paused, cancelled and legacy state are kept distinguishable",
+      "No new runtime services, model SDKs, alternate journals or authority planes",
+      "Bounded goal steps=16, page size=1..16 and deterministic replay",
+      "No implicit screenshot, video, frame, device or desktop recording"
+    ],
+    "e2e_suite": "jeeves-dragon-game-observation",
+    "tests": "tests/test_jeeves_game_e2e_observation.py",
+    "remaining_qualification": [
+      "Live authenticated owner/tenant integration tests against real CORE_DB",
+      "Consent-bound genuine screen/video capture through existing Dragon capture owner",
+      "Actual model checkpoint inference and resumed multi-day goals",
+      "Godot native engine execution, hardware controller validation and human playthrough",
+      "Verified Dragon knowledge admission and supervised model training promotion"
+    ]
   }
 }
