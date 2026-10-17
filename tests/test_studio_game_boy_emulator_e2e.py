@@ -25,7 +25,7 @@ from skeleton.ai.game_builder.studio_game_boy_emulator import (
 GB_SYMBOLS = (
     "00:c000 Level\\n00:c001 PlayerX\\n00:c002 PlayerY\\n"
     "00:c006 Health\\n00:c007 Score\\n00:c008 GemsRemaining\\n"
-    "00:c009 GameWon\\n00:c00a GameLost\\n"
+    "00:c009 GameWon\\n00:c00a GameLost\\n00:c00b ScoreHigh\\n"
 ).replace(chr(92) + "n", chr(10)).encode("ascii")
 
 
