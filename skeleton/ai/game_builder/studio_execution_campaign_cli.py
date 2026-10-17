@@ -14,6 +14,7 @@ from .studio_campaign_cli import parse_campaign_order_file
 from .studio_execution_campaign import (
     ExecutionPolicy, STAGES, run_studio_execution_campaign,
 )
+from .studio_execution_history import record_execution_run, inspect_execution_history
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,32 +27,42 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--authorize-local-operation", action="store_true")
     parser.add_argument("--execute-run", action="store_true")
+    parser.add_argument("--inspect-history", action="store_true")
     parser.add_argument("--consent-generated-game-canvas", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=90)
     parser.add_argument("--max-emulator-frames", type=int, default=260000)
     parser.add_argument("--max-source-targets", type=int)
     parser.add_argument("--stop-after-blocker", action="store_true")
     args = parser.parse_args(argv)
-    if not args.authorize_local_operation or not args.execute_run:
+    if not args.authorize_local_operation or (not args.inspect_history and not args.execute_run):
         parser.error("E2E production requires explicit local authority and execution opt-in")
     try:
         order = parse_campaign_order_file(args.order)
-        policy = ExecutionPolicy(
-            stages=tuple(args.stages.split(",")),
-            timeout_seconds=args.timeout_seconds,
-            max_emulator_frames=args.max_emulator_frames,
-            max_sources_per_run=args.max_source_targets,
-            stop_after_blocker=args.stop_after_blocker,
-            capture_consent=args.consent_generated_game_canvas,
-        )
-        result = run_studio_execution_campaign(
-            order, args.campaign, policy=policy, authorized=True, execute=True,
-        )
+        if args.inspect_history:
+            result = inspect_execution_history(order, args.campaign, authorized=True)
+        else:
+            policy = ExecutionPolicy(
+                stages=tuple(args.stages.split(",")),
+                timeout_seconds=args.timeout_seconds,
+                max_emulator_frames=args.max_emulator_frames,
+                max_sources_per_run=args.max_source_targets,
+                stop_after_blocker=args.stop_after_blocker,
+                capture_consent=args.consent_generated_game_canvas,
+            )
+            outcome = run_studio_execution_campaign(
+                order, args.campaign, policy=policy, authorized=True, execute=True,
+            )
+            review = record_execution_run(
+                order, args.campaign, outcome, authorized=True,
+            )
+            result = {**outcome, "journal_entry_digest": review["entry_digest"]}
     except (OSError, ValueError, RuntimeError, PermissionError) as exc:
         print(json.dumps({"success": False, "error": type(exc).__name__},
                          sort_keys=True))
         return 2
     print(json.dumps(result, sort_keys=True))
+    if args.inspect_history:
+        return 0
     return 0 if (
         not result["blocked_stage_attempts"]
         and not result["unsupported_stage_attempts"]
