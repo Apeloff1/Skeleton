@@ -18,7 +18,7 @@ from skeleton.ai.game_builder.studio_build_qualification import (
 from skeleton.ai.game_builder.native_game_cli import build_game
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_native_source_media_parity import (
-    NativeMediaSourceError, inspect_native_source_media,
+    NativeMediaSourceError, inspect_native_source_media, _exact_region,
 )
 
 
@@ -50,6 +50,32 @@ class TrueOriginalConsoleMediaSourceTests(unittest.TestCase):
         )
         self.assertFalse(receipt["native_binary_built"])
         return folder, receipt
+
+    def test_exact_assembly_labels_cannot_collide_with_longer_label_names(self):
+        source = (
+            "Tiles:\n"
+            "    db $11, $22\n"
+            "TilesEnd:\n"
+            "AnimationTiles:\n"
+            "    db $33, $44\n"
+            "AnimationTilesEnd:\n"
+        )
+        _exact_region(source, "Tiles:\n", "\nTilesEnd:", "    db $11, $22")
+        _exact_region(
+            source, "AnimationTiles:\n", "\nAnimationTilesEnd:",
+            "    db $33, $44",
+        )
+        for forged in (
+            source.replace("Tiles:\n", "TilesX:\n", 1),
+            source.replace("    db $11, $22", "    db $00, $22", 1),
+            source + "Tiles:\n    db $11, $22\n",
+        ):
+            with self.subTest(forged=forged):
+                with self.assertRaises(NativeMediaSourceError):
+                    _exact_region(
+                        forged, "Tiles:\n", "\nTilesEnd:",
+                        "    db $11, $22",
+                    )
 
     def test_all_three_native_consoles_match_actual_source_music_and_animation(self):
         for platform in (
