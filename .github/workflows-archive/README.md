@@ -19,3 +19,10 @@ Archive is not evidence that retired gates passed. Before making a release,
 run the relevant deeper validation and review any regressions separately.
 
 See the original Git history before this commit for the pre-slim CI design.
+
+## Restored
+
+- `ci.yml` — restored to `.github/workflows/ci.yml` by #4104 as a reusable
+  workflow called from the required **Merge Readiness** aggregate (one run per
+  head, per-ref cancel-in-progress, change-scoped job skips). The copy in this
+  folder is the inactive pre-restore snapshot.
