@@ -92,6 +92,10 @@ for (const [flow, href] of [
       // empty even when the generator is visibly mounted and interactive.
       await expect(page.getByText('🎮 AI Game Generator', { exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Close AI Game Generator' })).toBeVisible();
+    } else if (href === '/game-factory') {
+      // The factory is also a React Native Web Modal, mounted in a portal.
+      // Verify its actual controls instead of requiring children inside #root.
+      await expect(page.getByText('Game Factory', { exact: true }).first()).toBeVisible();
     } else {
       await expectRendered(page);
     }
