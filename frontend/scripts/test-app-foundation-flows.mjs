@@ -200,7 +200,8 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     assert.ok(String(boot.data?.application?.name || '').trim(), 'application name must be non-empty');
   });
   await t.test('F2-05 register, sign in, /me, reject bad and missing credentials', async () => {
-    const email = `qa-e2e-${Date.now()}@example.test`;
+    // Reserved TLDs (.test, .invalid, .localhost) fail backend EmailStr validation (#4113).
+    const email = `qa-e2e-${Date.now()}@${process.env.SKELETON_E2E_EMAIL_DOMAIN || 'example.com'}`;
     const password = `Qa-${Math.random().toString(36).slice(2)}-pass`;
     const reg = await call('POST', '/api/auth/register', { email, password });
     assert.equal(reg.ok, true, `register HTTP ${reg.status}`);
