@@ -260,6 +260,41 @@ class ProductionGateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect_production_assurance(replace(self.order, seed=734), self.root)
 
+    def test_handheld_original_sprite_mismatch_blocks_and_reclaims_unqualified_rom(self):
+        run_campaign(self.order, self.root, authorized=True, max_targets=1)
+        native = (self.root / "targets/nintendo_game_boy/assets/tiles/runtime.bin").read_bytes()
+        rom = bytearray(sample_rom(native))
+        rom[0x220] ^= 1
+        modified = bytes(rom)
+
+        def wrong_art_compiler(project, target, *, authorized, execute,
+                               output, output_symbols, timeout_seconds):
+            Path(output).write_bytes(modified)
+            Path(output_symbols).write_bytes(GB_SYMBOLS)
+            _, original_source = _verify_source(Path(project), target)
+            return _receipt(
+                target, original_source, available=True, invoked=True,
+                built=True, header=True, digest=sha256(modified).hexdigest(),
+                size=len(modified), symbol_sha256=sha256(GB_SYMBOLS).hexdigest(),
+            )
+
+        with patch(
+            "skeleton.ai.game_builder.studio_campaign_assurance.qualify_native_build",
+            side_effect=wrong_art_compiler,
+        ):
+            result = qualify_campaign_target(
+                self.order, self.root, "nintendo_game_boy",
+                authorized=True, execute=True,
+            )
+        self.assertFalse(result["native_rom_compiled"])
+        self.assertEqual(result["blocker"], "compiled_handheld_original_art_mismatch")
+        qualified = self.root / "qualifications/nintendo_game_boy"
+        self.assertFalse((qualified / "qualified.rom").exists())
+        self.assertFalse((qualified / "qualified.sym").exists())
+        self.assertFalse((qualified / "qualification.json").exists())
+        report = inspect_production_assurance(self.order, self.root)
+        self.assertEqual(report["native_roms_structurally_verified"], 0)
+
     def test_qualified_rom_tampering_never_survives_gate_inspection(self):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
         rom = sample_rom((
