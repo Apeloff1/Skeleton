@@ -151,10 +151,11 @@ class StudioProductionAssetTests(unittest.TestCase):
                     canonical_digest([list(tile) for tile in art.runtime_tiles]),
                 )
                 self.assertNotEqual(legacy.content_digest, built.content_digest)
+                compile_flags = ("binary_compiled", "rom_compiled", "cartridge_built",
+                                 "native_cartridge_compiled")
                 self.assertTrue(any(
-                    not value for name, value in vars(built).items()
-                    if name in {"binary_compiled", "rom_compiled", "cartridge_built",
-                                "native_cartridge_compiled"}
+                    getattr(built, name) is False
+                    for name in compile_flags if hasattr(built, name)
                 ))
 
     def test_native_cartridge_rejects_corrupt_art_and_unauthorized_creation(self):
