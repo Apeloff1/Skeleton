@@ -1,115 +1,181 @@
 /**
- * safeTimers — leak-free setTimeout / setInterval registry.
+ * Lifecycle-aware timer ownership for long-running native/web sessions.
  *
- *   • Every timer registered through `safeTimeout` / `safeInterval` is
- *     auto-cancelled when the component unmounts (via the returned
- *     `clear` function or the `useSafeTimers` hook).
- *   • The registry caps at 1000 live timers — drops the oldest with a
- *     log warning to surface runaway-leak bugs early.
- *   • AppState listener clears all timers when the app goes to
- *     background (battery + thermal win on Android) and re-attaches a
- *     fresh registry when it resumes.
- *
- * Usage in a component:
- *   const t = useSafeTimers();
- *   t.setTimeout(() => doThing(), 500);
- *   t.setInterval(() => poll(), 2000);
- *   // automatic cleanup on unmount
+ * Intervals are suspended while the app is inactive and automatically
+ * rearmed on foreground, rather than permanently disappearing. A busy
+ * async callback is never overlapped and its rejection is contained.
+ * Hook-owned timer disposers are removed as soon as a timeout fires.
  */
 import { useEffect, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
-interface TimerHandle {
-  id: number;
-  kind: 'timeout' | 'interval';
+type Task = () => void | Promise<unknown>;
+type Kind = 'timeout' | 'interval';
+interface Handle {
+  kind: Kind;
+  fn: Task;
+  delay: number;
+  raw: ReturnType<typeof setTimeout> | null;
+  cancelled: boolean;
+  running: boolean;
+  onDone?: () => void;
 }
+const registry = new Set<Handle>();
+const MAX_LIVE = 1000;
+let activeState: AppStateStatus = AppState.currentState || 'active';
+let subscription: { remove: () => void } | null = null;
+let installed = false;
 
-const _registry = new Set<{ raw: ReturnType<typeof setTimeout>; meta: TimerHandle }>();
-const MAX_LIVE  = 1000;
-
-function _track(raw: ReturnType<typeof setTimeout>, kind: 'timeout' | 'interval'): { raw: ReturnType<typeof setTimeout>; meta: TimerHandle } {
-  if (_registry.size >= MAX_LIVE) {
-    // Drop oldest to avoid unbounded growth — should never happen in a healthy app.
-    const oldest = _registry.values().next().value;
-    if (oldest) {
-      try { (oldest.meta.kind === 'interval' ? clearInterval : clearTimeout)(oldest.raw as any); } catch {}
-      _registry.delete(oldest);
-      // eslint-disable-next-line no-console
-      console.warn('[safeTimers] registry overflow — dropped oldest timer');
-    }
+function boundedDelay(ms: number, fallback: number): number {
+  return Number.isFinite(ms)
+    ? Math.max(1, Math.min(2_147_483_647, Math.trunc(ms)))
+    : fallback;
+}
+function dispose(handle: Handle): void {
+  if (handle.cancelled) return;
+  handle.cancelled = true;
+  if (handle.raw !== null) {
+    if (handle.kind === 'interval') clearInterval(handle.raw);
+    else clearTimeout(handle.raw);
   }
-  const handle = { raw, meta: { id: Math.random(), kind } };
-  _registry.add(handle);
-  return handle;
+  handle.raw = null;
+  registry.delete(handle);
+  const done = handle.onDone;
+  handle.onDone = undefined;
+  try { done?.(); } catch { /* cleanup cannot crash scheduler */ }
 }
-
-export function safeSetTimeout(fn: () => void, ms: number): () => void {
-  const raw = setTimeout(() => {
-    try { fn(); } finally { _registry.forEach(h => { if (h.raw === raw) _registry.delete(h); }); }
-  }, ms);
-  const h = _track(raw, 'timeout');
-  return () => { clearTimeout(h.raw as any); _registry.delete(h); };
-}
-
-export function safeSetInterval(fn: () => void, ms: number): () => void {
-  const raw = setInterval(() => {
-    try { fn(); } catch { /* swallow */ }
-  }, ms);
-  const h = _track(raw, 'interval');
-  return () => { clearInterval(h.raw as any); _registry.delete(h); };
-}
-
-/** Wipe every live timer — called automatically on AppState background. */
-export function clearAllTimers() {
-  for (const h of _registry) {
-    try { (h.meta.kind === 'interval' ? clearInterval : clearTimeout)(h.raw as any); } catch {}
+function invoke(handle: Handle): void {
+  if (handle.cancelled || handle.running) return;
+  handle.running = true;
+  let outcome: void | Promise<unknown>;
+  try { outcome = handle.fn(); }
+  catch (error) {
+    console.warn('[safeTimers] timer callback failed', error);
+    handle.running = false;
+    return;
   }
-  _registry.clear();
+  // Explicit handlers on both outcomes avoid detached rejected promises.
+  void Promise.resolve(outcome).then(
+    () => { handle.running = false; },
+    error => {
+      handle.running = false;
+      console.warn('[safeTimers] async timer callback failed', error);
+    },
+  );
 }
-
-export function liveTimerCount(): number { return _registry.size; }
-
-// ── Auto-clear on app background ────────────────────────────────────
-let _appStateInstalled = false;
-export function installAppStateGuard() {
-  if (_appStateInstalled) return;
-  _appStateInstalled = true;
+function arm(handle: Handle): void {
+  if (handle.cancelled || handle.raw !== null) return;
+  if (handle.kind === 'interval') {
+    if (activeState !== 'active') return;
+    handle.raw = setInterval(() => invoke(handle), handle.delay);
+  } else {
+    handle.raw = setTimeout(() => {
+      // Clear ownership before running user code, including throwing code.
+      if (handle.cancelled) return;
+      dispose(handle);
+      invokeAfterDisposal(handle.fn);
+    }, handle.delay);
+  }
+}
+function invokeAfterDisposal(fn: Task): void {
   try {
-    AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'background' || state === 'inactive') {
-        // Don't nuke everything — only intervals (timeouts are one-shot, safe).
-        for (const h of Array.from(_registry)) {
-          if (h.meta.kind === 'interval') {
-            try { clearInterval(h.raw as any); } catch {}
-            _registry.delete(h);
-          }
+    const result = fn();
+    void Promise.resolve(result).then(undefined, error => {
+      console.warn('[safeTimers] async timeout callback failed', error);
+    });
+  } catch (error) {
+    console.warn('[safeTimers] timeout callback failed', error);
+  }
+}
+function track(handle: Handle): () => void {
+  if (registry.size >= MAX_LIVE) {
+    const oldest = registry.values().next().value;
+    if (oldest) dispose(oldest);
+    console.warn('[safeTimers] registry saturated; evicted oldest task');
+  }
+  registry.add(handle);
+  arm(handle);
+  return () => dispose(handle);
+}
+export function safeSetTimeout(fn: Task, ms: number): () => void {
+  return track({
+    kind: 'timeout', fn, delay: boundedDelay(ms, 300),
+    raw: null, cancelled: false, running: false,
+  });
+}
+export function safeSetInterval(fn: Task, ms: number): () => void {
+  return track({
+    kind: 'interval', fn, delay: boundedDelay(ms, 1000),
+    raw: null, cancelled: false, running: false,
+  });
+}
+export function clearAllTimers(): void {
+  for (const handle of [...registry]) dispose(handle);
+}
+export function liveTimerCount(): number { return registry.size; }
+export function safeTimerStats() {
+  return {
+    registered: registry.size,
+    armed: [...registry].filter(h => h.raw !== null).length,
+    suspended: [...registry].filter(h => h.kind === 'interval' && h.raw === null).length,
+  };
+}
+export function installAppStateGuard(): void {
+  if (installed) return;
+  try {
+    subscription = AppState.addEventListener('change', state => {
+      activeState = state;
+      for (const handle of [...registry]) {
+        if (handle.kind !== 'interval' || handle.cancelled) continue;
+        if (state !== 'active') {
+          if (handle.raw !== null) clearInterval(handle.raw);
+          handle.raw = null;
+        } else {
+          arm(handle);
         }
       }
     });
-  } catch { /* swallow */ }
+    installed = true;
+  } catch {
+    subscription = null;
+  }
 }
-
-// ── Hook ────────────────────────────────────────────────────────────
+export function uninstallAppStateGuard(): void {
+  subscription?.remove();
+  subscription = null;
+  installed = false;
+  // No more reliable native state events. Do not leave a stale inactive
+  // state permanently suppressing future intervals after hot reload.
+  activeState = AppState.currentState || 'active';
+}
+/** Return a stable timer scope and cancel all owned tasks after unmount. */
 export function useSafeTimers() {
-  const cancels = useRef<Array<() => void>>([]);
-
+  const owned = useRef(new Set<() => void>());
+  const mounted = useRef(true);
   useEffect(() => {
+    mounted.current = true;
     return () => {
-      for (const c of cancels.current) { try { c(); } catch { /* swallow */ } }
-      cancels.current = [];
+      mounted.current = false;
+      for (const cancel of [...owned.current]) cancel();
+      owned.current.clear();
     };
   }, []);
-
+  function schedule(fn: Task, ms: number, kind: Kind): () => void {
+    if (!mounted.current) return () => {};
+    let release = () => {};
+    const wrapped = () => {
+      if (kind === 'timeout') owned.current.delete(release);
+      if (!mounted.current) return;
+      return fn();
+    };
+    const cancel = kind === 'interval'
+      ? safeSetInterval(wrapped, ms) : safeSetTimeout(wrapped, ms);
+    release = () => { cancel(); owned.current.delete(release); };
+    owned.current.add(release);
+    return release;
+  }
   return {
-    setTimeout: (fn: () => void, ms: number) => {
-      const c = safeSetTimeout(fn, ms);
-      cancels.current.push(c);
-      return c;
-    },
-    setInterval: (fn: () => void, ms: number) => {
-      const c = safeSetInterval(fn, ms);
-      cancels.current.push(c);
-      return c;
-    },
+    setTimeout: (fn: Task, ms: number) => schedule(fn, ms, 'timeout'),
+    setInterval: (fn: Task, ms: number) => schedule(fn, ms, 'interval'),
   };
 }
