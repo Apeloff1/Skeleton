@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type LayoutChangeEvent } from 'react-native';
+import { countAnnouncement, gridMove, keyAction, readKey, rovingTabIndex, tabIndexProp, useRovingIndex, webKeyProps, type KeyEventLike } from '../a11y';
 import { ERA_SORTS, baseEra, describeEra, eraViews, filterEras, sortEras, type EraSortKey, type EraView } from '../eras';
 import type { EraRow } from '../types';
 import { Banner, Button, Card, Chip, Meter, SectionTitle } from './primitives';
@@ -22,15 +23,40 @@ export interface EraViewerProps {
   selected?: string | null;
   onSelect?: (id: string | null) => void;
   onUseInForge?: (id: string) => void;
+  /** Jump to the build plan, when one exists for this forge. */
+  onViewPlan?: () => void;
   initialWidth?: number;
   testID?: string;
+}
+
+/**
+ * Key intent for an era card. Enter/Space are left to the button itself so
+ * activation is not double-fired. Escape dismisses the open detail.
+ */
+export function eraCardIntent(index: number, event: KeyEventLike, opts: { cols: number; count: number }): { move: number } | { dismiss: true } | null {
+  const { key, ctrl } = readKey(event);
+  const intent = keyAction(key);
+  if (intent === 'dismiss') return { dismiss: true };
+  if (intent === 'activate') return null;
+  const next = gridMove(index, key, { cols: opts.cols, count: opts.count, ctrl, wrap: opts.cols === 1 });
+  if (next === null || next === index) return null;
+  return { move: next };
+}
+
+/** Arrow keys move the sort radiogroup and wrap. Activation keys do not. */
+export function eraSortIndex(index: number, event: KeyEventLike, count: number): number | null {
+  const { key, ctrl } = readKey(event);
+  if (keyAction(key)) return null;
+  const next = gridMove(index, key, { cols: 1, count, ctrl, wrap: true });
+  if (next === null || next === index) return null;
+  return next;
 }
 
 export function columnsFor(width: number): number {
   return width >= 900 ? 3 : width >= 520 ? 2 : 1;
 }
 
-export default function EraViewer({ eras, loading, error, onReload, resultEra, pinnedEra, selected, onSelect, onUseInForge, initialWidth = 360, testID }: EraViewerProps) {
+export default function EraViewer({ eras, loading, error, onReload, resultEra, pinnedEra, selected, onSelect, onUseInForge, onViewPlan, initialWidth = 360, testID }: EraViewerProps) {
   const [query, setQuery] = React.useState('');
   const [sort, setSort] = React.useState<EraSortKey>('name');
   const [width, setWidth] = React.useState(initialWidth);
@@ -43,10 +69,36 @@ export default function EraViewer({ eras, loading, error, onReload, resultEra, p
   const result = baseEra(resultEra);
   const cols = columnsFor(width);
   const detail = selected ? all.find((v) => v.id === selected) ?? null : null;
+  const [active, setActive] = useRovingIndex(shown.length);
+  const cardRefs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const viaKey = React.useRef(false);
+  const sortIndex = Math.max(0, ERA_SORTS.findIndex((o) => o.id === sort));
+  const sortRefs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const sortViaKey = React.useRef(false);
+  React.useEffect(() => {
+    if (!viaKey.current) return;
+    viaKey.current = false;
+    cardRefs.current[active]?.focus?.();
+  }, [active]);
+  React.useEffect(() => {
+    if (!sortViaKey.current) return;
+    sortViaKey.current = false;
+    sortRefs.current[sortIndex]?.focus?.();
+  }, [sortIndex]);
+  const countText = loading && !all.length ? 'Loading eras.' : countAnnouncement(shown.length, all.length, 'era', query);
+
+  const onSortKey = (event: KeyEventLike) => {
+    const next = eraSortIndex(sortIndex, event, ERA_SORTS.length);
+    if (next === null) return;
+    event.preventDefault?.();
+    sortViaKey.current = true;
+    setSort(ERA_SORTS[next].id);
+  };
 
   return (
     <View testID={testID} onLayout={onLayout}>
       <SectionTitle hint={`${all.length} eras · GET /api/skeleton/eras`}>🕰 Era viewer</SectionTitle>
+      {onViewPlan ? <Button label="View build plan" tone="ghost" compact onPress={onViewPlan} a11yHint="Opens the Jeeves build plan for this forge" testID="era-view-plan" /> : null}
       {error ? (
         <Banner tone="bad" testID="era-error">Could not load eras: {error}</Banner>
       ) : null}
@@ -62,22 +114,41 @@ export default function EraViewer({ eras, loading, error, onReload, resultEra, p
         style={st.search}
       />
       <View style={st.sorts} accessibilityRole="radiogroup" accessibilityLabel="Sort eras by">
-        {ERA_SORTS.map((o) => (
-          <Chip key={o.id} label={o.label} selected={sort === o.id} onPress={() => setSort(o.id)} testID={`era-sort-${o.id}`} />
+        {ERA_SORTS.map((o, i) => (
+          <Chip
+            key={o.id}
+            label={o.label}
+            selected={sort === o.id}
+            onPress={() => setSort(o.id)}
+            tabIndex={rovingTabIndex(i, sortIndex)}
+            onKeyDown={onSortKey}
+            focusRef={(n) => { sortRefs.current[i] = n; }}
+            testID={`era-sort-${o.id}`}
+          />
         ))}
       </View>
       {loading && !all.length ? <ActivityIndicator color={C.accent} accessibilityLabel="Loading eras" style={{ marginVertical: 20 }} /> : null}
-      {!loading && !error && !shown.length ? <Text style={st.empty}>{all.length ? `No eras match “${query}”.` : 'No eras available.'}</Text> : null}
-      <View style={st.grid} accessibilityRole="list" accessibilityLabel={`${shown.length} eras`}>
-        {shown.map((v) => (
+      <Text accessibilityLiveRegion="polite" style={st.empty} testID="era-count">{countText}</Text>
+      <View
+        style={st.grid}
+        accessibilityRole="list"
+        accessibilityLabel={countText}
+      >
+        {shown.map((v, i) => (
           <EraCard
             key={v.id}
             v={v}
+            index={i}
             cols={cols}
+            count={shown.length}
+            active={active}
+            cardRef={(n) => { cardRefs.current[i] = n; }}
             isResult={v.id === result}
             isPinned={v.id === pinnedEra}
             selected={v.id === selected}
             onPress={onSelect ? () => onSelect(v.id === selected ? null : v.id) : undefined}
+            onMove={(next) => { viaKey.current = true; setActive(next); }}
+            onDismiss={onSelect ? () => onSelect(null) : undefined}
           />
         ))}
       </View>
@@ -85,15 +156,30 @@ export default function EraViewer({ eras, loading, error, onReload, resultEra, p
   );
 }
 
-function EraCard({ v, cols, isResult, isPinned, selected, onPress }: { v: EraView; cols: number; isResult: boolean; isPinned: boolean; selected: boolean; onPress?: () => void }) {
+function EraCard({ v, index, cols, count, active, cardRef, isResult, isPinned, selected, onPress, onMove, onDismiss }: {
+  v: EraView; index: number; cols: number; count: number; active: number;
+  cardRef?: (n: { focus?: () => void } | null) => void;
+  isResult: boolean; isPinned: boolean; selected: boolean;
+  onPress?: () => void; onMove?: (next: number) => void; onDismiss?: () => void;
+}) {
   const badges = [isResult ? 'last forge result' : '', isPinned ? 'pinned' : ''].filter(Boolean);
+  const onKey = (event: KeyEventLike) => {
+    const intent = eraCardIntent(index, event, { cols, count });
+    if (!intent) return;
+    event.preventDefault?.();
+    if ('dismiss' in intent) onDismiss?.();
+    else onMove?.(intent.move);
+  };
   return (
     <Pressable
+      ref={cardRef as React.Ref<React.ComponentRef<typeof Pressable>>}
       testID={`era-card-${v.id}`}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${describeEra(v)}${badges.length ? ` ${badges.join(', ')}.` : ''}${selected ? ' Selected.' : ''}`}
       accessibilityState={{ selected }}
+      {...tabIndexProp(rovingTabIndex(index, active))}
+      {...webKeyProps(onKey)}
       style={({ pressed }) => [
         st.card,
         { width: cols === 1 ? '100%' : cols === 2 ? '48.5%' : '32%' },
@@ -129,7 +215,12 @@ function Stat({ k, v, ratio, color }: { k: string; v: string; ratio: number; col
 
 function EraDetail({ v, isResult, isPinned, onClose, onUse }: { v: EraView; isResult: boolean; isPinned: boolean; onClose?: () => void; onUse?: (id: string) => void }) {
   return (
-    <Card testID="era-detail" label={`Era details: ${v.label}`}>
+    <View {...webKeyProps((event) => {
+      if (keyAction(readKey(event).key) !== 'dismiss') return;
+      event.preventDefault?.();
+      onClose?.();
+    })}>
+      <Card testID="era-detail" label={`Era details: ${v.label}`}>
       <View style={st.cardHead}>
         <Text style={st.detailName} accessibilityRole="header">{v.label}</Text>
         {isResult ? <Text style={[st.badge, { color: C.green, borderColor: C.green }]}>RESULT</Text> : null}
@@ -144,7 +235,8 @@ function EraDetail({ v, isResult, isPinned, onClose, onUse }: { v: EraView; isRe
         {onUse ? <Button label={isPinned ? 'Pinned for next forge' : 'Use in forge'} tone="primary" compact disabled={isPinned} onPress={() => onUse(v.id)} testID="era-use" /> : null}
         {onClose ? <Button label="Close" tone="ghost" compact onPress={onClose} testID="era-close" /> : null}
       </View>
-    </Card>
+      </Card>
+    </View>
   );
 }
 

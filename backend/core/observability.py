@@ -15,6 +15,7 @@ import asyncio
 import collections
 import json
 import logging
+import os
 import time
 from datetime import datetime
 from typing import Any, Optional
@@ -117,6 +118,19 @@ def observability_snapshot() -> dict:
 # ════════════════════════════════════════════════════════════════════════════
 #  Prom-style /api/metrics formatter
 # ════════════════════════════════════════════════════════════════════════════
+_PROCESS_STARTED_AT = time.time()
+
+
+def _label(value: str) -> str:
+    """Make a value safe for a Prometheus label (no quotes/backslashes/newlines)."""
+    return str(value).replace("\\", "").replace('"', "").replace("\n", " ")[:128]
+
+
+def _build_version() -> str:
+    """Release version: APP_VERSION (set by the release image build) or 'dev'."""
+    return os.environ.get("APP_VERSION", "").strip() or "dev"
+
+
 def prom_metrics() -> str:
     """Format LATENCY as Prom-style text exposition."""
     lines: list[str] = []
@@ -130,6 +144,15 @@ def prom_metrics() -> str:
         lines.append(f'codedock_http_latency_ms{{path="{safe}",quantile="0.95"}} {m["p95"]}')
         lines.append(f'codedock_http_latency_ms{{path="{safe}",quantile="0.99"}} {m["p99"]}')
         lines.append(f'codedock_http_latency_ms_count{{path="{safe}"}} {m["count"]}')
+    lines.append("# HELP codedock_build_info Build metadata; value is always 1.")
+    lines.append("# TYPE codedock_build_info gauge")
+    lines.append(
+        f'codedock_build_info{{version="{_label(_build_version())}",'
+        f'environment="{_label(os.environ.get("ENVIRONMENT", "development"))}"}} 1'
+    )
+    lines.append("# HELP codedock_process_uptime_seconds Seconds since the observability module loaded.")
+    lines.append("# TYPE codedock_process_uptime_seconds gauge")
+    lines.append(f"codedock_process_uptime_seconds {round(time.time() - _PROCESS_STARTED_AT, 3)}")
     lines.append("# HELP codedock_errors_total Total 5xx errors recorded.")
     lines.append("# TYPE codedock_errors_total counter")
     lines.append(f"codedock_errors_total {len(ERRORS._d)}")
