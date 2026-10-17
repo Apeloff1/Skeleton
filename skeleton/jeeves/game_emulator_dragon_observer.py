@@ -142,33 +142,73 @@ def observe_native_frame(environment: Any, *, expected_frame_sha256: str) -> dic
 
 
 def verify_native_observation(value: Any, *, frame_sha256: str) -> None:
-    """Validate source association and inner digest before Dragon indexes it."""
-    _require(type(value) is dict and value.get("schema_version") == SCHEMA
-             and value.get("source") == "actual_native_rgb24_pixel_tiles"
-             and value.get("frame_pixel_sha256") == frame_sha256
-             and value.get("new_native_steps_for_observation") == 0
-             and value.get("semantic_entities_inferred") is False
-             and value.get("independent_model_witness_executed") is False
-             and value.get("weights_updated") == 0
-             and (value.get("previous_native_frame_sha256") is None
-                  or (type(value["previous_native_frame_sha256"]) is str
-                      and len(value["previous_native_frame_sha256"]) == 64
-                      and all(ch in "0123456789abcdef"
-                              for ch in value["previous_native_frame_sha256"])))
-             and (value.get("changed_native_rgb_tile_count") is None
-                  or (type(value["changed_native_rgb_tile_count"]) is int
-                      and 0 <= value["changed_native_rgb_tile_count"] <= value["tile_count"]))
-             and (value.get("changed_native_rgb_tile_fraction") is None
-                  or (type(value["changed_native_rgb_tile_fraction"]) in (int, float)
-                      and 0 <= value["changed_native_rgb_tile_fraction"] <= 1))
-             and type(value.get("candidate_full_frame_transition")) is bool
-             and (value.get("previous_native_frame_sha256") is not None
-                  or (value.get("changed_native_rgb_tile_count") is None
-                      and value.get("changed_native_rgb_tile_fraction") is None
-                      and value.get("candidate_full_frame_transition") is False))
-             and type(value.get("tile_count")) is int and 1 <= value["tile_count"] <= 256
-             and type(value.get("unique_rgb_tile_patterns")) is int
-             and 1 <= value["unique_rgb_tile_patterns"] <= value["tile_count"]
-             and value.get("observation_digest") == _digest({
-                 k: x for k, x in value.items() if k != "observation_digest"
-             }), "Dragon optical witness identity does not match native frame")
+    """Fail-closed optics validation before indexing or corpus admission."""
+    if type(value) is not dict:
+        raise DragonOpticalError("Dragon native optical witness must be an object")
+    tile_count = value.get("tile_count")
+    unique = value.get("unique_rgb_tile_patterns")
+    rgb = value.get("sampled_rgb_mean")
+    luminance = value.get("sampled_luminance_range")
+    dark = value.get("sampled_dark_fraction")
+    bright = value.get("sampled_bright_fraction")
+    prior = value.get("previous_native_frame_sha256")
+    changed = value.get("changed_native_rgb_tile_count")
+    fraction = value.get("changed_native_rgb_tile_fraction")
+    transition = value.get("candidate_full_frame_transition")
+    required = {
+        "schema_version", "source", "frame_pixel_sha256", "tile_sequence_sha256",
+        "tile_count", "sampled_rgb_mean", "sampled_luminance_range",
+        "sampled_dark_fraction", "sampled_bright_fraction",
+        "unique_rgb_tile_patterns", "previous_native_frame_sha256",
+        "changed_native_rgb_tile_count", "changed_native_rgb_tile_fraction",
+        "candidate_full_frame_transition", "pixels_checked_by_existing_native_inspector",
+        "new_native_steps_for_observation", "semantic_entities_inferred",
+        "independent_model_witness_executed", "weights_updated", "observation_digest",
+    }
+    _require(
+        set(value) == required
+        and value.get("schema_version") == SCHEMA
+        and value.get("source") == "actual_native_rgb24_pixel_tiles"
+        and type(frame_sha256) is str
+        and value.get("frame_pixel_sha256") == frame_sha256
+        and len(frame_sha256) == 64
+        and all(ch in "0123456789abcdef" for ch in frame_sha256)
+        and type(value.get("tile_sequence_sha256")) is str
+        and len(value["tile_sequence_sha256"]) == 64
+        and all(ch in "0123456789abcdef" for ch in value["tile_sequence_sha256"])
+        and type(tile_count) is int and 1 <= tile_count <= 256
+        and type(unique) is int and 1 <= unique <= tile_count
+        and type(rgb) is list and len(rgb) == 3
+        and all(type(x) in (int, float) and 0 <= x <= 255 for x in rgb)
+        and type(luminance) is list and len(luminance) == 2
+        and all(type(x) is int and 0 <= x <= 255 for x in luminance)
+        and luminance[0] <= luminance[1]
+        and type(dark) in (int, float) and 0 <= dark <= 1
+        and type(bright) in (int, float) and 0 <= bright <= 1
+        and dark + bright <= 1.000002
+        and type(value.get("pixels_checked_by_existing_native_inspector")) is int
+        and 1 <= value["pixels_checked_by_existing_native_inspector"] <= 4096 * 4096
+        and value.get("new_native_steps_for_observation") == 0
+        and value.get("semantic_entities_inferred") is False
+        and value.get("independent_model_witness_executed") is False
+        and value.get("weights_updated") == 0
+        and type(transition) is bool
+        and (prior is None or (
+            type(prior) is str and len(prior) == 64
+            and all(ch in "0123456789abcdef" for ch in prior)
+        ))
+        and (changed is None or (type(changed) is int and 0 <= changed <= tile_count))
+        and (fraction is None or (type(fraction) in (int, float) and 0 <= fraction <= 1))
+        and value.get("observation_digest") == _digest({
+            key: item for key, item in value.items() if key != "observation_digest"
+        }),
+        "Dragon optical witness schema, source or native pixel identity differs",
+    )
+    if changed is None or fraction is None:
+        _require(changed is None and fraction is None and transition is False,
+                 "missing actual native tile delta cannot claim a scene change")
+    else:
+        _require(prior is not None
+                 and fraction == round(changed / tile_count, 6)
+                 and transition is (fraction >= 0.9 and tile_count >= 16),
+                 "Dragon native tile change and recorded temporal statistic differ")

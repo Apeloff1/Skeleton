@@ -445,3 +445,30 @@ def test_temporal_optics_refuse_wrong_prior_native_frame():
     _reseal_report(source)
     with pytest.raises(TrainingTriangleError, match="temporal cursor"):
         build_training_triangle(source)
+
+
+
+def test_native_optical_verifier_fail_closed_on_missing_tile_count():
+    from skeleton.jeeves.game_emulator_dragon_observer import (
+        verify_native_observation,
+    )
+    witness = _fake_native_rgb_observation()
+    witness["tile_count"] = None
+    with pytest.raises(ValueError, match="optical"):
+        verify_native_observation(witness, frame_sha256="a" * 64)
+
+
+def test_native_optical_verifier_rejects_rehashed_fake_temporal_fraction():
+    from skeleton.jeeves.game_emulator_dragon_observer import (
+        verify_native_observation,
+    )
+    witness = _fake_native_rgb_observation()
+    witness["previous_native_frame_sha256"] = "f" * 64
+    witness["changed_native_rgb_tile_count"] = 1
+    witness["changed_native_rgb_tile_fraction"] = 0.3
+    witness["candidate_full_frame_transition"] = True
+    witness["observation_digest"] = _digest({
+        k: v for k, v in witness.items() if k != "observation_digest"
+    })
+    with pytest.raises(ValueError, match="tile change"):
+        verify_native_observation(witness, frame_sha256="a" * 64)
