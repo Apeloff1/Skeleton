@@ -37,7 +37,71 @@ def dev_help_text() -> str:
         assets --project DIR
         package --project DIR [--dry-run] [--overwrite]
         jeeves plan|audit|next|context|handoff [--project DIR]
-        jeeves propose --kind quest --brief "Original branching quest" [--include-notes]
+        jeeves propose --kind quest --brief "Original branching quest" [--include-notes] [--dragon-digest SHA256]
+        jeeves dragon-review --source design/dragon_study.json
+        jeeves dragon-portfolio --source design/dragon_study.json
+        jeeves dragon-ingest --source design/dragon_study.json --approve SOURCE_SHA256
+        jeeves dragon-plan --source design/dragon_study.json --genre GENRE --target CONSOLE
+        jeeves dragon-adopt --source design/dragon_study.json --genre GENRE --target CONSOLE --approve HANDOFF_SHA256
+        jeeves director-draft --seed N --regions a,b,c,d --quest-types main_story,investigation [--stages N --goal TEXT --dragon-digest SHA256]
+        jeeves director-revise --source design/director_candidate_<digest>.json --revision design/director_revisions.json
+        jeeves director-examine --source design/director_candidate_<digest>.json [--routes 2..8]
+        jeeves director-promote --source design/director_candidate_<digest>.json --approve SHA256 [--routes 2..8]
+        jeeves direction-campaign --source design/director_campaign_source.json [--passes 2..8 --output SAVE_PREFIX]
+        jeeves director-board --source design/director_campaign_source.json [--routes 2..8 --dragon-digest SHA256]
+        jeeves director-session-begin --source design/director_campaign_source.json --session NAME
+        jeeves director-session-status --session NAME
+        jeeves director-session-step --session NAME --choice travel:scene_01
+        jeeves director-session-compare --session NAME --other-session OTHER
+        jeeves director-session-trace --session NAME [--tail 64]
+        jeeves director-session-fork --session NAME --other-session NEW --at TURN --approve CURRENT_HEAD_SHA256
+        jeeves dragon-policy-preview --sessions TRAIN1,TRAIN2,HOLDOUT
+        jeeves dragon-policy-train --sessions TRAIN1,TRAIN2,HOLDOUT --approve MODEL_SHA256
+        jeeves dragon-policy-predict --session NAME --digest MODEL_SHA256
+        jeeves director-serve --session NAME [--port 8765 --digest MODEL_SHA256]
+        jeeves director-godot-smoke --source design/director_campaign_source.json [--timeout 90]
+        jeeves director-loopback-e2e --source design/director_campaign_source.json [--routes 1..8]
+        jeeves director-native-http-e2e --source design/director_campaign_source.json [--timeout 90]
+        Godot export includes original source-generated PNG backdrops and ambient WAV scores
+        Real HTTP full-quest playback and actual native Godot->Python probe are separate tests
+        jeeves director-coverage --source design/director_campaign_source.json [--routes 2..8]
+        jeeves director-topology --source design/director_campaign_source.json
+        jeeves director-route --session NAME [--destination scene_02 --route-profile fastest|scenic|quiet|novel|quest --alternatives 3]
+        jeeves director-causality --session NAME [--page N --page-size 100]
+        jeeves director-story-contrast --session NAME --other-session OTHER
+        jeeves dragon-navigation-study --session NAME [--approve STUDY_SHA256]
+        jeeves director-dynamics-design --source design/director_campaign_source.json [--intensity 1..5]
+        jeeves director-dynamics-publish --source design/director_campaign_source.json --intensity N --approve DESIGN_SHA256
+        jeeves director-dynamics-audit --source design/director_dynamic_SOURCE_SHA.json
+        jeeves director-dynamics-playthrough --source design/director_dynamic_SOURCE_SHA.json --routes 4 [--include-optional]
+        jeeves director-society-design --source design/director_campaign_source.json [--intensity 1..5]
+        jeeves director-society-publish --source design/director_campaign_source.json --intensity N --approve DESIGN_SHA256
+        jeeves director-society-audit --source design/director_society_SOURCE_SHA.json
+        jeeves director-society-stress --source design/director_society_SOURCE_SHA.json [--routes 1..8 --intensity 1..5]
+        jeeves director-society-acceptance --source design/director_society_SOURCE_SHA.json
+        jeeves dragon-society-study --session NAME [--approve STUDY_SHA256]
+        jeeves dragon-society-contrast --session NAME --other-session OTHER
+        Original NPCs now have source-authored branching dialogues, clock-bound schedules and actual economy transactions
+        Godot source v7 visualizes canonically present residents, prices and earned rapport
+        jeeves director-route --session NAME --route-profile fastest|scenic|quiet|novel|quest
+        jeeves dragon-world-study --session NAME [--approve STUDY_SHA256]
+        jeeves dragon-world-contrast --session NAME --other-session OTHER
+        Living worlds simulate persistent factions, locked passages, ferries, rail, portals and ticketed routes
+        Legacy game save receipts stay byte-compatible when dynamics are absent
+        Native Godot v5 includes an interactive directed-world map with verified route highlights
+        Navigation plans never execute player decisions without explicit input
+        jeeves dragon-lab --sessions hero_a,hero_b [--approve RESEARCH_SHA256]
+        jeeves director-atlas-export --source design/director_campaign_source.json [--dry-run]
+        jeeves director-atlas-verify --source design/director_campaign_source.json
+        jeeves dragon-session-lesson --session NAME [--approve CANDIDATE_SHA256]
+        Interactive Director play journals are replayed against the canonical game world
+        Godot atlas also includes a local-bridge UI that executes canonical Director quest actions
+        The native UI requires a foreground authenticated Python loopback server
+        Original 2D/3D assets, cinematic playback and real Godot runtime verification remain separate
+        jeeves director-prepare-training --source design/director_campaign_source.json [--routes 2..8 --approve SHA256]
+        Original story and cinematic changes recompile into actual typed Director scenes
+        Dragon replay research is recorded, but does not change checkpoint weights
+        Dragon evidence flows to opt-in, create-only original-game design proposals
         jeeves queue [--project DIR]
         jeeves benchmark --console ID --genre ID --period YYYY-YYYY
         jeeves benchmark-matrix [--profile design/market_benchmarks.json]

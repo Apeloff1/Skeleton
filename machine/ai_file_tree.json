@@ -477,7 +477,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "1f9fef8aee1a5aaedae0f0c7b85672f7beaee5a1",
+      "source_git_object_sha": "228682dd7d442478990d2a4e7aad2c6f5d48cf00",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -552,7 +552,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "9685d3aec944c3373e682329c01fa6d857eefc3b",
+      "source_git_object_sha": "8458530a68722bbd145e5a9454a515af002876ee",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -696,7 +696,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "5c68d4790b32da5246aca4f727e90c8771344ea7",
+      "source_git_object_sha": "ac2bef0bc5e77e0e1e078f18d53fd8cd5c955527",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1217,7 +1217,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "e74d01b60d1d0e94dc1d5100b3743d665f3c6cd4",
+      "source_git_object_sha": "e41db4d8117306e8ccd952e730da50847f9a3bb4",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1374,7 +1374,7 @@
       "source": "skeleton/repo_intelligence",
       "destination": "skeleton/ai/build/repo_intelligence",
       "kind": "tree",
-      "source_git_object_sha": "c3b1764e0aa2d6af8dc280e5ddda873b7cd505f7",
+      "source_git_object_sha": "fb0afa7ae646bd6171595de570270ec1b0434662",
       "role": "repository intelligence for build/control workflows",
       "work_package_refs": [
         "WP-W00",
@@ -1785,7 +1785,7 @@
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "ae809fbf970d053d3ac12161509fe731a9b52abe",
+      "source_git_object_sha": "350d9aa2a27bed74711d4dd7e022d213e4870c8b",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",
@@ -3372,7 +3372,7 @@
       "source": "skeleton/architecture.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture.py",
       "kind": "file",
-      "source_git_object_sha": "fa5ce86b5a439b89b45cf505c45527758bce7f9f",
+      "source_git_object_sha": "8d381502beb2195996a1313f5a40c9f20ade017d",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",
@@ -4827,7 +4827,7 @@
       "source": "backend/gameforge/jeeves",
       "destination": "skeleton/ai/research/legacy/gameforge/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "1ca6b7410ea19a92f838d5c5f4a2cb69c4e4cbfe",
+      "source_git_object_sha": "0b4e2c99931fa6323ff18a810bb686a783de5a34",
       "role": "Legacy GameForge Jeeves implementation/status lineage retained as non-authoritative evidence.",
       "work_package_refs": [
         "WP-W11",
@@ -5763,7 +5763,15 @@
         "jeeves_boomerang_queue.py",
         "jeeves_studio_curriculum.py",
         "jeeves_studio_multifactor_corpus.py",
-        "jeeves_studio_rule_corpus.py"
+        "jeeves_studio_rule_corpus.py",
+        "joint_learning_custody.py",
+        "rom_fleet_audit.py",
+        "rom_inventory_snapshot.py",
+        "rom_study.py",
+        "rom_triangle_campaign.py",
+        "rom_triangle_lens_progress.py",
+        "sdk_custody_drift.py",
+        "sdk_study.py"
       ],
       "overlay_note": "Current main already implements these governed AI-only training modules. Declare their existing placement without copying them into the legacy tree or changing training authority."
     },
@@ -6123,7 +6131,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "63a2962e366b9f4ea565ca6200b0edc099994db9",
+      "source_git_object_sha": "ce8c9c6fe748cd6ddf0b039e44c091da225cfcb5",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",
@@ -6522,7 +6530,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_52_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_60_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7488,7 +7496,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 52
+    "native_ai_owner_count": 60
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8769,6 +8777,94 @@
       "volume_refs": [
         "VOL-006",
         "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-JOINT-LEARNING-CUSTODY",
+      "path": "skeleton/ai/training/joint_learning_custody.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Read-only joint SDK and ROM custody checkpoint. Cannot grant rights, load ROMs, train, or promote weights.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-FLEET-AUDIT",
+      "path": "skeleton/ai/training/rom_fleet_audit.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Read-only accounting of completed ROM training evidence across a frozen, operator-approved fleet.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-INVENTORY-SNAPSHOT",
+      "path": "skeleton/ai/training/rom_inventory_snapshot.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Append-only frozen ROM inventory snapshot. Selected pages are rehashed; ROM bytes stay on the machine.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-STUDY",
+      "path": "skeleton/ai/training/rom_study.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Rights-gated local ROM inventory and tabular emulator policy training. Does not download ROMs or promote speaking-model weights.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-TRIANGLE-CAMPAIGN",
+      "path": "skeleton/ai/training/rom_triangle_campaign.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Foreground ROM, native gameplay, Dragon, and independent model review campaign using the existing rights and triangle gates.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-TRIANGLE-LENS-PROGRESS",
+      "path": "skeleton/ai/training/rom_triangle_lens_progress.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Read-only custody-verified progress audit for a 200-lens Jeeves session. Progress is not a replay of model outputs.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SDK-CUSTODY-DRIFT",
+      "path": "skeleton/ai/training/sdk_custody_drift.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Versioned redacted SDK source-drift snapshots. Unkeyed digests are integrity pins, not signatures or rights grants.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SDK-STUDY",
+      "path": "skeleton/ai/training/sdk_study.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Operator-gated SDK evidence intake into the existing multidomain trainer. Does not run compilers or modify model weights.",
+      "volume_refs": [
+        "VOL-006"
       ]
     }
   ]
