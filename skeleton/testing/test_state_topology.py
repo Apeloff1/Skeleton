@@ -15,10 +15,27 @@ def test_state_topology_is_valid() -> None:
     assert errors == []
     assert summary["ok"] is True
     assert summary["architecture_tag"] == "arch-map/v3.7"
-    assert summary["topology_version"] == "1.8.0"
+    assert summary["topology_version"] == "1.9.0"
     assert summary["physical_stores"] >= 7
     assert summary["state_domains"] >= 10
     assert summary["state_flows"] >= 7
+
+
+def test_dragon_conversation_micro_projection_is_derived_from_canonical_messages() -> None:
+    topology = _topology()
+    domains = {domain["id"]: domain for domain in topology["state_domains"]}
+    projection = domains["dragon-conversation-micro-projection"]
+    assert projection["authority"] == "derived"
+    assert projection["source_of_truth"] is False
+    assert projection["rebuildable"] is True
+    assert projection["derived_from"] == [
+        "conversation-thread-state",
+        "conversation-message-state",
+    ]
+    flows = {item["id"]: item for item in topology["state_flows"]}
+    flow = flows["conversation-to-dragon-micro-projection"]
+    assert flow["from"] == "conversation-message-state"
+    assert flow["to"] == "dragon-conversation-micro-projection"
 
 
 def test_closed_gap_lineage_is_retained_on_stable_authorities() -> None:
