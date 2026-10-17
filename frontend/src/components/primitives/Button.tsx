@@ -1,3 +1,4 @@
+/* eslint-disable import/no-named-as-default-member -- default theme is the live skin object, not the static palette map. */
 /**
  * <Button> — 2026 SOTA touch target with haptics + spring animation.
  *
@@ -13,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { hitSlopFor, MIN_TOUCH_TARGET } from '../../foundation/a11y';
 import theme from '../../theme/tokens';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive' | 'gradient';
@@ -128,7 +130,8 @@ export const Button: React.FC<ButtonProps> = ({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel || label}
-      hitSlop={theme.hitSlop.sm}
+      hitSlop={hitSlopFor(MIN_TOUCH_TARGET, HEIGHTS[size])}
+      accessibilityState={{ disabled: !!isDisabled, busy: !!loading }}
       style={({ pressed }) => [
         baseStyle,
         !useGradient && { backgroundColor: bg, borderWidth: borderColor ? 1 : 0, borderColor },

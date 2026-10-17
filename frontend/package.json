@@ -27,6 +27,7 @@
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
     "test:app-foundation": "node --test scripts/app-foundation/*.test.cjs",
+    "test:app-foundation:render": "node --test scripts/app-foundation/render/*.test.cjs",
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
     "test:canonical-theme": "node --test scripts/test-canonical-theme.cjs",
