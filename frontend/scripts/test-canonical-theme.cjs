@@ -32,7 +32,7 @@ function transpile(relative, imports = {}) {
 }
 
 const tokens = transpile('theme/tokens.ts');
-const skins = transpile('theme/skins.ts');
+const skins = transpile('theme/skins.ts', { './tokens': tokens });
 const roles = transpile('constants/themes.ts', { '../theme/tokens': tokens });
 
 function luminance(hex) {
