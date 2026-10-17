@@ -12,6 +12,7 @@ import subprocess
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.studio_build_qualification import (
     NativeBuildQualificationError, _header, adapter_catalog, qualify_native_build,
+    parse_game_boy_symbols,
 )
 
 
@@ -58,6 +59,12 @@ def valid_gb(cgb: bool = False) -> bytes:
     return bytes(content)
 
 
+RGBDS_SYMBOLS = ("; original WRAM symbols\\n"
+                 "00:c000 Level\\n00:c001 PlayerX\\n00:c002 PlayerY\\n"
+                 "00:c006 Health\\n00:c007 Score\\n00:c008 GemsRemaining\\n"
+                 "00:c009 GameWon\\n00:c00a GameLost\\n").replace("\\\\n", "\\n").encode("ascii")
+
+
 class NativeBuildQualificationTests(unittest.TestCase):
     def test_catalog_and_missing_compiler_is_explicit_nonexecution(self):
         self.assertEqual(len(adapter_catalog()["executable_adapters"]), 3)
@@ -99,6 +106,7 @@ class NativeBuildQualificationTests(unittest.TestCase):
                 root = Path(temp)
                 project = make_project(root, target)
                 destination = root / "verified.rom"
+                symbols = root / "verified.sym"
                 calls = []
 
                 def fake_run(args, *, cwd, shell, timeout, stdout, stderr, check, env):
@@ -110,6 +118,8 @@ class NativeBuildQualificationTests(unittest.TestCase):
                     self.assertLessEqual(timeout, 120)
                     self.assertTrue(str(args[0]).startswith("/opt/"))
                     calls.append(args)
+                    if args[0].endswith("rgblink"):
+                        (Path(cwd) / "game.sym").write_bytes(RGBDS_SYMBOLS)
                     if args[0].endswith("ld65") or args[0].endswith("rgbfix"):
                         (Path(cwd) / romname).write_bytes(blob)
                     return subprocess.CompletedProcess(args, 0, b"ok", b"")
@@ -125,6 +135,7 @@ class NativeBuildQualificationTests(unittest.TestCase):
                     result = qualify_native_build(
                         project, target, authorized=True, execute=True,
                         output=destination,
+                        output_symbols=symbols if target != "nintendo_famicom" else None,
                     )
                 self.assertTrue(result.toolchain_available)
                 self.assertTrue(result.tools_invoked)
@@ -132,6 +143,9 @@ class NativeBuildQualificationTests(unittest.TestCase):
                 self.assertTrue(result.rom_header_verified)
                 self.assertEqual(result.binary_sha256, sha256(blob).hexdigest())
                 self.assertEqual(destination.read_bytes(), blob)
+                if target != "nintendo_famicom":
+                    self.assertEqual(symbols.read_bytes(), RGBDS_SYMBOLS)
+                    self.assertEqual(result.symbol_sha256, sha256(RGBDS_SYMBOLS).hexdigest())
                 self.assertEqual(len(calls), 2 if target == "nintendo_famicom" else 3)
                 receipt = result.as_receipt()
                 self.assertFalse(receipt["emulator_playthrough_verified"])
@@ -151,10 +165,24 @@ class NativeBuildQualificationTests(unittest.TestCase):
                 result = qualify_native_build(
                     project, "nintendo_game_boy", authorized=True,
                     execute=True, output=destination,
+                    output_symbols=root / "game.sym",
                 )
             self.assertFalse(result.binary_built)
             self.assertEqual(result.blocker, "toolchain_exit_code:2")
             self.assertFalse(destination.exists())
+
+    def test_rgbds_symbols_must_be_real_unique_wram_addresses(self):
+        labels = parse_game_boy_symbols(RGBDS_SYMBOLS)
+        self.assertEqual(labels["GameWon"], 0xC009)
+        self.assertEqual(labels["PlayerX"], 0xC001)
+        for data in (
+            RGBDS_SYMBOLS.replace(b"00:c009", b"01:c009"),
+            RGBDS_SYMBOLS.replace(b"00:c001 PlayerX", b"00:c000 PlayerX"),
+            RGBDS_SYMBOLS.replace(b"00:c009 GameWon", b"00:c009 Random"),
+            RGBDS_SYMBOLS + b"00:c123 GameWon\\n",
+        ):
+            with self.subTest(data=data), self.assertRaises(NativeBuildQualificationError):
+                parse_game_boy_symbols(data)
 
     def test_corrupt_cartridge_and_wrong_rights_target_are_rejected(self):
         for family, data in (("nes", b"BAD"), ("gb", bytes(32768)),
