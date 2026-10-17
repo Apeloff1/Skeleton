@@ -1290,6 +1290,65 @@ class DragonCrawlerApplication:
             "history_truncated": bool(events and after_sequence < events[0]["sequence"] - 1),
         }
 
+    async def companion_feed(
+        self,
+        scope: dict[str, str],
+        *,
+        after_sequence: int = 0,
+        limit: int = 100,
+        expected_digest: str | None = None,
+    ) -> dict[str, Any]:
+        """Project the account's latest crawl checkpoint into companion wire events.
+
+        Cursor mismatches fail closed. A missing or unreadable checkpoint is a
+        storage error so the academy journal can remain available.
+        """
+        from skeleton.ai.webcrawler.dragon_capture_projection import (
+            CompanionCursorError,
+            project_companion_feed,
+            validate_companion_cursor,
+        )
+        from skeleton.ai.webcrawler.operations import CrawlOperationError
+
+        validate_companion_cursor(after_sequence, limit, expected_digest)
+        row = await self.sessions.find_one(
+            {**scope, "status": {"$ne": "deleted"}},
+            sort=[("updated_at", DESCENDING), ("_id", DESCENDING)],
+        )
+        if row is None:
+            return {
+                "session_id": None,
+                "active": False,
+                "events": [],
+                "next_cursor": None,
+                "has_more": False,
+                "history_truncated": False,
+                "source": "canonical_crawler_checkpoint",
+            }
+        try:
+            _, run_type = _core()
+            snapshot = run_type.from_snapshot(_plain(row["snapshot"])).snapshot()
+            request = row.get("request")
+            seeds = request.get("seed_urls") if isinstance(request, dict) else ()
+            fallback = seeds[0] if isinstance(seeds, (list, tuple)) and seeds else None
+            projected = project_companion_feed(
+                str(row["_id"]),
+                snapshot["events"],
+                fallback_url=fallback,
+                after_sequence=after_sequence,
+                limit=limit,
+                expected_digest=expected_digest,
+            )
+        except CompanionCursorError:
+            raise
+        except CrawlerError:
+            raise
+        except (CrawlOperationError, KeyError, TypeError, ValueError) as exc:
+            raise CrawlerError(
+                "crawler_integrity", "Crawler checkpoint is not companion-replayable.", 503
+            ) from exc
+        return {"session_id": str(row["_id"]), "active": True, **projected}
+
     @staticmethod
     def _source_use(row: dict) -> None:
         if row["status"] in {"cancelled", "deleted"} or _utc(row["consent_expires_at"]) <= _now():

@@ -8,6 +8,12 @@ ok(model.includes('glasses:true,bandage:true'),'distillation must wear glasses a
 ok(!model.match(/case'[^']+'[^\n]+glasses:true/g)?.some?.(x=>!x.includes("burn_complete")),'glasses leaked outside distillation');
 ok(view.includes('shellHat'),'dragon must keep broken eggshell cap');
 ok(view.includes('blanket'),'snuggle state must have blanket');
+ok(view.includes('hornL')&&view.includes('scaleA')&&view.includes('tailSpade'),'upscaled dragon must keep horns, scales and a tail spade');
 ok(view.includes("accessibilityRole=\"summary\""),'companion must expose semantic summary');
+ok(model.includes("case'distill_complete'"),'distillation completion must be its own event');
+ok(!model.includes("case'distill_complete'")||!/case'distill_complete'[^\n]*glasses:true/.test(model),'glasses stay on during distillation, not after it is sealed');
+ok(model.includes('companionFromCapture'),'capture events must have a separate companion projection');
 ok(chat.includes('DragonCompanionPanel'),'companion must be mounted in Jeeves workspace');
+const crawler=fs.readFileSync(path.join(__dirname,'../features/Jeeves/CrawlerWorkspace.tsx'),'utf8');
+ok(crawler.includes('companionFromCapture'),'crawler workspace must show the dragon from recorded capture events');
 console.log('dragon companion contract ok');

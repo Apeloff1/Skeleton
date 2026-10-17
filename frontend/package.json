@@ -25,7 +25,7 @@
     "test:known-advisories": "node --test ./scripts/test-known-yarn-advisories.cjs",
     "test:operation-stream": "node --test scripts/test-operation-stream-reducer.mjs scripts/test-operation-stream-session.mjs",
     "test:conversation": "node --test scripts/test-conversation-projection.mjs scripts/test-chat-error-boundary.mjs",
-    "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs",
+    "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs && node scripts/test-dragon-journal-chain.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
     "test:app-foundation": "node --test scripts/app-foundation/*.test.cjs",
