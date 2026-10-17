@@ -165,6 +165,14 @@ def assemble_source_pinned_lens_campaign(
     if type(page_size) is not int or not 1 <= page_size <= 512:
         raise LensCampaignError("full lens campaign requires page size 1..512")
     validate_training_receipts(source_report)
+    minimum_page = max(
+        1, (len(_all_review_specs()) + MAX_CAMPAIGN_PAGES - 1)
+        // MAX_CAMPAIGN_PAGES,
+    )
+    if page_size < minimum_page:
+        raise LensCampaignError(
+            "page size too small for bounded complete registered lens campaign"
+        )
     pages = []
     cursor = 0
     while True:
