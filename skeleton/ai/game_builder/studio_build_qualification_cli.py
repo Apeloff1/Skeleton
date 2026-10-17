@@ -15,7 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project")
     parser.add_argument("--target")
     parser.add_argument("--output")
-    parser.add_argument("--output-symbols", help="new .sym output next to RGBDS ROM (GB/GBC only)")
+    parser.add_argument("--output-symbols", help="new .sym output beside GB/GBC/NES ROM (required for native replay)")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=45)
     parser.add_argument("--authorize-local-build", action="store_true")
