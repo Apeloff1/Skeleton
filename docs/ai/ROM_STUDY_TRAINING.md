@@ -464,3 +464,21 @@ cannot verify. These 43 interpretive hypotheses are not new game observations,
 not causal proof, not supervised ground truth, and not production Jeeves
 training updates. The previously implemented eight native measurement lenses
 continue to be the only source-grounded numerical training projections.
+
+### Forty-three actual native model lens passes
+
+The operator command `execute-43-lenses` runs each of the canonical
+43 governed lens questions through a real local Skeleton language-model
+checkpoint, after independently replaying the earlier three adversarial
+critic generations. Both checkpoints and all source receipts must be
+available. Each per-lens result retains its source trace, registered
+lens identity, governance decision, generated tokens and model identity;
+subsequent invocations replay the complete batch against the same checkpoint.
+
+The native model can return malformed or unstructured text. In that case
+all 43 **actual inference receipts** remain stored and replayable, but
+`source_referenced_interpretations`, `lens_interpretations_incomplete`
+and `all_lens_interpretations_valid` distinguish usable structured
+hypotheses from missing/invalid responses. Neither success nor failure
+creates independent gameplay data, verifies semantic scene content, or
+updates Jeeves' production language-model weights.
