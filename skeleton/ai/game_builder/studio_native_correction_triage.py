@@ -89,6 +89,31 @@ def triage_native_gameplay(
                 "must_retest_original_game": True,
                 "automatic_code_edit_allowed": False,
             })
+    # Independent compilation, pixel, toolchain and runtime failures are
+    # distinct from a CPU mismatch. Do not duplicate the CPU diagnostic or
+    # turn historical/stale failures into new source-editing instructions.
+    if current:
+        already = {item["category"] for item in items}
+        for blocker in history.get("latest_stage_blockers", []):
+            if (type(blocker) is not dict
+                    or blocker.get("category") == "controller_or_gameplay_divergence"
+                    and finding is not None):
+                continue
+            category = blocker.get("category")
+            if category in already or len(items) >= 16:
+                continue
+            if (type(category) is not str or not category
+                    or type(blocker.get("recommended_review")) is not str):
+                raise ValueError("untyped current source-bound blocker classification")
+            already.add(category)
+            items.append({
+                "category": category,
+                "target": blocker.get("target"),
+                "source_stage": blocker.get("stage"),
+                "suggested_examination": blocker["recommended_review"],
+                "must_retest_original_game": True,
+                "automatic_code_edit_allowed": False,
+            })
     body = {
         "schema": SCHEMA,
         "campaign_identity": history["campaign_identity"],
