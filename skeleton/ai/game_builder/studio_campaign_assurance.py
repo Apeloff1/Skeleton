@@ -457,7 +457,7 @@ def qualify_campaign_canvas(
         }
 
 
-def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict:
+def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Path) -> dict:
     """Recheck real on-disk campaign artifacts and exact qualified binaries.
 
     Missing E2E, learning, permission, and release evidence always fails
@@ -466,107 +466,113 @@ def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict
     if not isinstance(order, CampaignOrder):
         raise StudioAssuranceError("typed canonical campaign order required")
     base = Path(root)
-    with campaign_lock(base):
-        campaign = _inspect_campaign_unlocked(order, base)
-        by_target = []
-        passed = 0
-        for target in order.targets:
-            source = base / "targets" / target
-            source_receipt = None
-            if target in campaign["completed_targets"]:
-                source_receipt = _verify_target(
-                    source, order.project_id, target, campaign["identity"],
+    campaign = _inspect_campaign_unlocked(order, base)
+    by_target = []
+    passed = 0
+    for target in order.targets:
+        source = base / "targets" / target
+        source_receipt = None
+        if target in campaign["completed_targets"]:
+            source_receipt = _verify_target(
+                source, order.project_id, target, campaign["identity"],
+            )
+        binary = None
+        browser = None
+        godot = None
+        art_parity = None
+        canvas = None
+        if source_receipt is not None:
+            if target in _BUILD_ADAPTERS:
+                binary = _qualification_receipt(base, target, campaign["identity"])
+            art_parity = inspect_cross_engine_pixels(source)
+            browser = _browser_receipt(base, target, campaign["identity"])
+            godot = _godot_receipt(base, target, campaign["identity"])
+            canvas = _canvas_receipt(base, target, campaign["identity"])
+        gates = {}
+        for gate in GATES:
+            if gate in SOURCE_GATES and source_receipt is not None:
+                status, reason = "artifact_integrity_checked", None
+            elif gate in NATIVE_GATES and binary is not None:
+                status, reason = "binary_structure_checked", None
+            elif gate == CANVAS_GATE and canvas is not None:
+                status, reason = "generated_game_canvas_pixels_recorded", None
+            elif gate == PARITY_GATE and art_parity is not None:
+                status, reason = "pixel_source_parity_checked", None
+            elif gate == GODOT_GATE and godot is not None:
+                status, reason = "godot_gameplay_executed", None
+            elif gate == BROWSER_GATE and browser is not None:
+                status, reason = "javascript_gameplay_executed", None
+            elif gate in NATIVE_GATES and target not in _BUILD_ADAPTERS:
+                status, reason = "adapter_unavailable", "approved_native_toolchain_missing"
+            else:
+                status, reason = "not_qualified", (
+                    "source_not_generated" if source_receipt is None
+                    else "independent_runtime_or_approval_evidence_required"
                 )
-            binary = None
-            browser = None
-            godot = None
-            art_parity = None
-            canvas = None
-            if source_receipt is not None:
-                if target in _BUILD_ADAPTERS:
-                    binary = _qualification_receipt(base, target, campaign["identity"])
-                art_parity = inspect_cross_engine_pixels(source)
-                browser = _browser_receipt(base, target, campaign["identity"])
-                godot = _godot_receipt(base, target, campaign["identity"])
-                canvas = _canvas_receipt(base, target, campaign["identity"])
-            gates = {}
-            for gate in GATES:
-                if gate in SOURCE_GATES and source_receipt is not None:
-                    status, reason = "artifact_integrity_checked", None
-                elif gate in NATIVE_GATES and binary is not None:
-                    status, reason = "binary_structure_checked", None
-                elif gate == CANVAS_GATE and canvas is not None:
-                    status, reason = "generated_game_canvas_pixels_recorded", None
-                elif gate == PARITY_GATE and art_parity is not None:
-                    status, reason = "pixel_source_parity_checked", None
-                elif gate == GODOT_GATE and godot is not None:
-                    status, reason = "godot_gameplay_executed", None
-                elif gate == BROWSER_GATE and browser is not None:
-                    status, reason = "javascript_gameplay_executed", None
-                elif gate in NATIVE_GATES and target not in _BUILD_ADAPTERS:
-                    status, reason = "adapter_unavailable", "approved_native_toolchain_missing"
-                else:
-                    status, reason = "not_qualified", (
-                        "source_not_generated" if source_receipt is None
-                        else "independent_runtime_or_approval_evidence_required"
-                    )
-                gates[gate] = {"status": status, "blocker": reason}
-                if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed", "godot_gameplay_executed",
-                              "pixel_source_parity_checked", "generated_game_canvas_pixels_recorded"}:
-                    passed += 1
-            by_target.append({
-                "target": target,
-                "source_receipt_digest": (
-                    source_receipt["receipt_digest"] if source_receipt else None
-                ),
-                "cross_engine_pixel_parity_digest": (
-                    art_parity["receipt_digest"] if art_parity else None
-                ),
-                "generated_canvas_evidence_digest": (
-                    canvas["capture_digest"] if canvas else None
-                ),
-                "native_binary_evidence_digest": (
-                    binary["evidence_digest"] if binary else None
-                ),
-                "browser_javascript_evidence_digest": (
-                    browser["evidence_digest"] if browser else None
-                ),
-                "godot_headless_evidence_digest": (
-                    godot["evidence_digest"] if godot else None
-                ),
-                "gates": gates,
-                "release_ready": False,
-                "dragon_auto_training_approved": False,
-            })
-        count = len(order.targets) * len(GATES)
-        body = {
-            "schema": SCHEMA,
-            "campaign_identity": campaign["identity"],
-            "project_id": order.project_id,
-            "total_targets": len(order.targets),
-            "targets_with_exact_source": campaign["targets_with_verified_source"],
-            "native_roms_structurally_verified": sum(
-                row["native_binary_evidence_digest"] is not None for row in by_target
+            gates[gate] = {"status": status, "blocker": reason}
+            if status in {"artifact_integrity_checked", "binary_structure_checked", "javascript_gameplay_executed", "godot_gameplay_executed",
+                          "pixel_source_parity_checked", "generated_game_canvas_pixels_recorded"}:
+                passed += 1
+        by_target.append({
+            "target": target,
+            "source_receipt_digest": (
+                source_receipt["receipt_digest"] if source_receipt else None
             ),
-            "generated_game_canvas_captures_verified": sum(
-                row["generated_canvas_evidence_digest"] is not None for row in by_target
+            "cross_engine_pixel_parity_digest": (
+                art_parity["receipt_digest"] if art_parity else None
             ),
-            "godot_headless_playthroughs_verified": sum(
-                row["godot_headless_evidence_digest"] is not None for row in by_target
+            "generated_canvas_evidence_digest": (
+                canvas["capture_digest"] if canvas else None
             ),
-            "browser_javascript_playthroughs_verified": sum(
-                row["browser_javascript_evidence_digest"] is not None for row in by_target
+            "native_binary_evidence_digest": (
+                binary["evidence_digest"] if binary else None
             ),
-            "checked_gates": passed,
-            "total_gates": count,
-            "evidence_gate_coverage_percent": round(100 * passed / count, 2),
-            "release_qualification_percent": 0,
-            "all_targets_release_ready": False,
-            "rights_approval_inferred": False,
-            "dragon_training_or_weight_promotion_performed": False,
-            "targets": by_target,
-        }
-        return {**body, "report_digest": canonical_digest(body)}
+            "browser_javascript_evidence_digest": (
+                browser["evidence_digest"] if browser else None
+            ),
+            "godot_headless_evidence_digest": (
+                godot["evidence_digest"] if godot else None
+            ),
+            "gates": gates,
+            "release_ready": False,
+            "dragon_auto_training_approved": False,
+        })
+    count = len(order.targets) * len(GATES)
+    body = {
+        "schema": SCHEMA,
+        "campaign_identity": campaign["identity"],
+        "project_id": order.project_id,
+        "total_targets": len(order.targets),
+        "targets_with_exact_source": campaign["targets_with_verified_source"],
+        "native_roms_structurally_verified": sum(
+            row["native_binary_evidence_digest"] is not None for row in by_target
+        ),
+        "generated_game_canvas_captures_verified": sum(
+            row["generated_canvas_evidence_digest"] is not None for row in by_target
+        ),
+        "godot_headless_playthroughs_verified": sum(
+            row["godot_headless_evidence_digest"] is not None for row in by_target
+        ),
+        "browser_javascript_playthroughs_verified": sum(
+            row["browser_javascript_evidence_digest"] is not None for row in by_target
+        ),
+        "checked_gates": passed,
+        "total_gates": count,
+        "evidence_gate_coverage_percent": round(100 * passed / count, 2),
+        "release_qualification_percent": 0,
+        "all_targets_release_ready": False,
+        "rights_approval_inferred": False,
+        "dragon_training_or_weight_promotion_performed": False,
+        "targets": by_target,
+    }
+    return {**body, "report_digest": canonical_digest(body)}
+
+
+
+def inspect_production_assurance(order: CampaignOrder, root: str | Path) -> dict:
+    """Read canonical source and platform qualifications under one campaign lock."""
+    with campaign_lock(root):
+        return _inspect_production_assurance_unlocked(order, root)
 
 
 __all__ = [
