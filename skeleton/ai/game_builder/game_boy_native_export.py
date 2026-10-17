@@ -78,6 +78,8 @@ Boot:
     ld [GameLost], a
     ld [Score], a
     ld [ScoreHigh], a
+    ld [TurnCount], a
+    ld [TurnCountHigh], a
     ld [Cooldown], a
     ld a, START_HEALTH
     ld [Health], a
@@ -277,6 +279,14 @@ MoveDown:
 TryMove:
     ld a, 7
     ld [Cooldown], a
+    ld a, [TurnCount]
+    inc a
+    ld [TurnCount], a
+    jr nz, .turnRecorded
+    ld a, [TurnCountHigh]
+    inc a
+    ld [TurnCountHigh], a
+.turnRecorded:
     ld a, [NextX]
     cp MAZE_WIDTH
     ret nc
@@ -385,6 +395,8 @@ Cooldown: ds 1
 Health: ds 1
 Score: ds 1
 ScoreHigh: ds 1
+TurnCount: ds 1
+TurnCountHigh: ds 1
 GemsRemaining: ds 1
 GameWon: ds 1
 GameLost: ds 1
