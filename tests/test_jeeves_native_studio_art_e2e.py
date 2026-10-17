@@ -254,6 +254,23 @@ class StudioProductionAssetTests(unittest.TestCase):
                 self.assertEqual(manifest["pack_digest"], result["studio_assets"]["pack_digest"])
                 self.assertFalse(result["native_binary_built"])
                 self.assertFalse(result["emulator_verified"])
+                if target in ("nintendo_game_boy", "nintendo_famicom"):
+                    self.assertEqual(
+                        result["native_hero_animation_frames_in_source"], 3,
+                    )
+                    self.assertTrue(
+                        result["native_hero_animation_source_integrated"],
+                    )
+                    self.assertEqual(
+                        result["native_hero_animation_frame_delay"], 15,
+                    )
+                    self.assertFalse(
+                        result["native_hero_animation_runtime_executed"],
+                    )
+                else:
+                    self.assertEqual(
+                        result["native_hero_animation_frames_in_source"], 0,
+                    )
                 engines = result["engine_sources"]
                 self.assertIsNotNone(engines)
                 self.assertTrue(engines["browser_source_rendered"])
