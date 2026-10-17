@@ -34,7 +34,7 @@ NES_LABELS = (
     "al 000006 .Score\n"
     "al 000007 .GemsRemaining\n"
     "al 000008 .GameWon\n"
-    "al 000009 .GameLost\n"
+    "al 000009 .GameLost\n"\n    "al 000015 .ScoreHigh\n"
 ).encode("ascii")
 
 
@@ -100,7 +100,7 @@ class OriginalNESCampaignGatesTests(unittest.TestCase):
         ram = {
             "Level": final["level_index"] + 1,
             "PlayerX": final["x"], "PlayerY": final["y"],
-            "Health": final["health"], "Score": final["score"],
+            "Health": final["health"], "Score": final["score"] % 256,\n            "ScoreHigh": final["score"] // 256,
             "GemsRemaining": 0, "GameWon": 1, "GameLost": 0,
         }
         fake = nes_receipt(
