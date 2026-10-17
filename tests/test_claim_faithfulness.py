@@ -104,6 +104,21 @@ class ClaimFaithfulnessTests(unittest.TestCase):
         self.assertEqual(truthful["disposition"], "supported")
         self.assertNotIn("swordfish", truthful["published_text"])
 
+    def test_recognized_citation_does_not_establish_unrelated_claim(self):
+        citation = "local:notes:0:0123456789abcdef"
+        manifest = {"citations": [_passage(
+            "The depth buffer stores a depth value for each pixel.", citation,
+        )]}
+        answer = (
+            "The rendering pipeline creates rainbow unicorn particles "
+            f"[{citation}]."
+        )
+        identifiers = audit_answer_citations(answer, manifest)
+        self.assertEqual(identifiers["status"], "recognized_identifiers")
+        report = audit_answer_faithfulness(answer, manifest)
+        self.assertEqual(report["disposition"], "abstain")
+        self.assertEqual(report["claims"][0]["status"], "unsupported")
+
     def test_invented_citation_blocks_publication(self):
         citation = "local:notes:0:0123456789abcdef"
         report = assess_supplied_passages(
