@@ -50,9 +50,29 @@ class RealNESCPUReplayTests(unittest.TestCase):
         }).encode("utf-8")
 
     def execute(self, *, authorized=True, execute=True, max_frames=1500):
+        from skeleton.ai.game_builder.studio_native_replay_telemetry import make_checkpoint
+        reference = {
+            "world_digest": self.world,
+            "proof_sha256": sha256(self.proof).hexdigest(),
+            "samples": [
+                make_checkpoint(1, {
+                    "Level": 0, "PlayerX": 2, "PlayerY": 4,
+                    "Health": 4, "Score": 0, "ScoreHigh": 0,
+                    "GemsRemaining": 1, "GameWon": 0, "GameLost": 0,
+                }),
+                make_checkpoint(2, {
+                    "Level": 1, "PlayerX": 2, "PlayerY": 3,
+                    "Health": 4, "Score": 1, "ScoreHigh": 0,
+                    "GemsRemaining": 0, "GameWon": 1, "GameLost": 0,
+                }),
+            ],
+        }
         with patch(
             "skeleton.ai.game_builder.studio_nes_emulator._inputs",
             return_value=(b"original html", self.proof, self.world),
+        ), patch(
+            "skeleton.ai.game_builder.studio_nes_emulator.reference_cpu_checkpoints",
+            return_value=reference,
         ):
             return qualify_nes_cpu_ppu(
                 self.root, engine_source=self.engine,
