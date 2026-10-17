@@ -131,7 +131,7 @@ def inspect_execution_history(
                 rows[-1]["assurance_report_digest"] == report["report_digest"]
                 if rows else False
             ),
-            "verified_runs": sum(x["blocked_stage_attempts"] == 0
+            "runs_without_recorded_blockers": sum(x["blocked_stage_attempts"] == 0
                                  and x["unsupported_stage_attempts"] == 0
                                  for x in rows),
             "complete_game_release_certified": False,
