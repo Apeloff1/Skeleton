@@ -19,6 +19,7 @@ from .contracts import canonical_digest
 from .native_game_cli import _NATIVE, build_game
 from .studio_asset_pipeline import ArtDirection
 from .rights_evidence import read_rights_evidence
+from .studio_campaign_lock import campaign_lock
 
 SCHEMA = "skeleton.game_builder.studio_campaign.v1"
 RECEIPT_SCHEMA = "skeleton.game_builder.studio_campaign_target.v1"
@@ -192,7 +193,7 @@ def _index(root: Path, identity: str, order: CampaignOrder) -> dict:
             "completed": {}, "failed": {}, "revision": 0}
 
 
-def inspect_campaign(order: CampaignOrder, destination: str | Path) -> dict:
+def _inspect_campaign_unlocked(order: CampaignOrder, destination: str | Path) -> dict:
     """Read-only full integrity scan of existing checkpoints."""
     identity = order.identity()
     root = Path(destination)
@@ -223,7 +224,7 @@ def inspect_campaign(order: CampaignOrder, destination: str | Path) -> dict:
     }
 
 
-def run_campaign(order: CampaignOrder, destination: str | Path, *,
+def _run_campaign_unlocked(order: CampaignOrder, destination: str | Path, *,
                  authorized: bool, max_targets: int | None = None) -> dict:
     """Run/resume ordered source targets; never overwrite or claim compiled ROMs.
 
@@ -321,7 +322,24 @@ def run_campaign(order: CampaignOrder, destination: str | Path, *,
             shutil.rmtree(stage, ignore_errors=True)
             state["revision"] += 1
             _atomic_json(root / "index.json", state)
-    return inspect_campaign(order, root)
+    return _inspect_campaign_unlocked(order, root)
+
+
+def inspect_campaign(order: CampaignOrder, destination: str | Path) -> dict:
+    """Read only a stable source checkpoint under the shared campaign lock."""
+    with campaign_lock(destination):
+        return _inspect_campaign_unlocked(order, destination)
+
+
+def run_campaign(order: CampaignOrder, destination: str | Path, *,
+                 authorized: bool, max_targets: int | None = None) -> dict:
+    """Serialize the complete resume/build/checkpoint transaction."""
+    if authorized is not True:
+        raise PermissionError("campaign authoring requires explicit local operator authority")
+    with campaign_lock(destination):
+        return _run_campaign_unlocked(
+            order, destination, authorized=True, max_targets=max_targets,
+        )
 
 
 __all__ = [
