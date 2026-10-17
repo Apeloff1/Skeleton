@@ -8,6 +8,20 @@ or token material is ever returned over a transport by these services
 Middleware and consume ``AuthService.resolve_session`` through the
 ``SessionResolver`` port.
 """
+from skeleton.app_services import job_api
+from skeleton.app_services.job_api import (
+    JobContext,
+    JobHandle,
+    JobResult,
+    JobStatus,
+    JobWorker,
+    cancel,
+    enqueue,
+    get_result,
+    get_status,
+    register_handler,
+    start_worker,
+)
 from skeleton.app_services.events import (
     ENVELOPE_VERSION,
     EventBusBridge,
@@ -18,6 +32,8 @@ from skeleton.app_services.events import (
 )
 
 __all__ = [
+    "job_api", "JobContext", "JobHandle", "JobResult", "JobStatus", "JobWorker",
+    "cancel", "enqueue", "get_result", "get_status", "register_handler", "start_worker",
     "ENVELOPE_VERSION",
     "EventBusBridge",
     "FanOutPublisher",

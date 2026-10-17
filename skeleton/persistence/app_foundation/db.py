@@ -107,6 +107,19 @@ MIGRATIONS: tuple[tuple[int, str, str], ...] = (
         );
         CREATE INDEX idx_links_execution ON project_build_links(execution_id)
     """),
+    (7, "job_api_v1", """
+        ALTER TABLE jobs ADD COLUMN actor_id TEXT NOT NULL DEFAULT '';
+        ALTER TABLE jobs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT '';
+        ALTER TABLE jobs ADD COLUMN project_id TEXT;
+        ALTER TABLE jobs ADD COLUMN execution_id TEXT;
+        ALTER TABLE jobs ADD COLUMN timeout_s REAL NOT NULL DEFAULT 900;
+        ALTER TABLE jobs ADD COLUMN message TEXT NOT NULL DEFAULT '';
+        ALTER TABLE jobs ADD COLUMN started_at REAL;
+        ALTER TABLE jobs ADD COLUMN error_code TEXT NOT NULL DEFAULT '';
+        ALTER TABLE jobs ADD COLUMN request_hash TEXT NOT NULL DEFAULT '';
+        ALTER TABLE projects ADD COLUMN request_hash TEXT NOT NULL DEFAULT '';
+        CREATE INDEX idx_jobs_execution ON jobs(execution_id)
+    """),
 )
 
 

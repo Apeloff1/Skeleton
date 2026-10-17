@@ -7,7 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from skeleton.app_services.job_api import JobService
 
 from skeleton.app_services.assets import LocalAssetStore
 from skeleton.app_services.auth import AuthService
@@ -32,6 +35,12 @@ class AppServices:
     build_service: BuildService
     assets: LocalAssetStore
     events: FanOutPublisher
+    jobs: "JobService" = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.jobs is None:
+            from skeleton.app_services.job_api import JobService
+            self.jobs = JobService(self.db, publisher=self.events)
 
     @classmethod
     def open(cls, data_dir: str | Path, *, in_memory: bool = False,
