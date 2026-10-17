@@ -6530,7 +6530,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_60_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_178_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7496,7 +7496,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 60
+    "native_ai_owner_count": 178
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8865,6 +8865,2080 @@
       "role": "Operator-gated SDK evidence intake into the existing multidomain trainer. Does not run compilers or modify model weights.",
       "volume_refs": [
         "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-ADVENTURE-SYSTEMS-EXTENDED",
+      "path": "skeleton/ai/agents/jeeves/adventure_systems_extended.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/jeeves/adventure_systems_extended.py; explicit file-level owner for the AIFT-JEEVES overlay child (previously covered only by residual tree owner AIFT-NATIVE-AGENTS-ROOT).",
+      "volume_refs": [
+        "VOL-072",
+        "VOL-074"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-DESIGN-BIBLE-ASSETS-EXTENDED",
+      "path": "skeleton/ai/agents/jeeves/design_bible_assets_extended.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/jeeves/design_bible_assets_extended.py; explicit file-level owner for the AIFT-JEEVES overlay child (previously covered only by residual tree owner AIFT-NATIVE-AGENTS-ROOT).",
+      "volume_refs": [
+        "VOL-072",
+        "VOL-074"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-PRODUCTION-PLANNING-EXTENDED",
+      "path": "skeleton/ai/agents/jeeves/production_planning_extended.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/jeeves/production_planning_extended.py; explicit file-level owner for the AIFT-JEEVES overlay child (previously covered only by residual tree owner AIFT-NATIVE-AGENTS-ROOT).",
+      "volume_refs": [
+        "VOL-072",
+        "VOL-074"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CLEAN-ROOM-TRANSFORMATION",
+      "path": "skeleton/ai/forge/clean_room_transformation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/clean_room_transformation.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-CLEAN-ROOM-TRANSFORMATION-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/clean_room_transformation.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/clean_room_transformation.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-FORGE-10000-CYCLE-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/forge_10000_cycle.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/forge_10000_cycle.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-FORGE-1000-CYCLE-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/forge_1000_cycle.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/forge_1000_cycle.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-FORGE-100-CYCLE-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/forge_100_cycle.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/forge_100_cycle.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-PROMOTION-ARBITRATION-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/promotion_arbitration.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/promotion_arbitration.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-QUALITY-DELTA-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/quality_delta.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/quality_delta.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-RIGHTS-FINGERPRINT-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/rights_fingerprint.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/rights_fingerprint.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-RIVAL-CHALLENGER-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/rival_challenger.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/rival_challenger.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-RIVAL-PROPOSER-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/rival_proposer.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/rival_proposer.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-RIVAL-VERIFIER-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/rival_verifier.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/rival_verifier.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-SOURCE-PROVENANCE-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/source_provenance.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/source_provenance.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-CONTRACTS-STOP-POLICY-SCHEMA",
+      "path": "skeleton/ai/forge/contracts/stop_policy.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/contracts/stop_policy.schema.json; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-FLGB-FORGE-RUNTIME",
+      "path": "skeleton/ai/forge/flgb_forge_runtime.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/flgb_forge_runtime.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-FORGE-10000-CYCLE",
+      "path": "skeleton/ai/forge/forge_10000_cycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/forge_10000_cycle.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-FORGE-1000-CYCLE",
+      "path": "skeleton/ai/forge/forge_1000_cycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/forge_1000_cycle.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-FORGE-100-CYCLE",
+      "path": "skeleton/ai/forge/forge_100_cycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/forge_100_cycle.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-PROMOTION-ARBITRATION",
+      "path": "skeleton/ai/forge/promotion_arbitration.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/promotion_arbitration.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-QUALITY-DELTA",
+      "path": "skeleton/ai/forge/quality_delta.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/quality_delta.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-RIGHTS-FINGERPRINT",
+      "path": "skeleton/ai/forge/rights_fingerprint.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/rights_fingerprint.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-RIVAL-CHALLENGER",
+      "path": "skeleton/ai/forge/rival_challenger.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/rival_challenger.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-RIVAL-PROPOSER",
+      "path": "skeleton/ai/forge/rival_proposer.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/rival_proposer.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-RIVAL-VERIFIER",
+      "path": "skeleton/ai/forge/rival_verifier.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/rival_verifier.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-SOURCE-PROVENANCE",
+      "path": "skeleton/ai/forge/source_provenance.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/source_provenance.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FORGE-STOP-POLICY",
+      "path": "skeleton/ai/forge/stop_policy.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/forge/stop_policy.py; explicit file-level owner for the AIFT-FORGE overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-101"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PR-AUTOMATION-EVENT-SCHEMA-FENCE",
+      "path": "skeleton/ai/build/pr_automation/event_schema_fence.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/pr_automation/event_schema_fence.py; explicit file-level owner for the AIFT-PR-AUTOMATION overlay child (previously covered only by residual tree owner AIFT-NATIVE-BUILD-ROOT).",
+      "volume_refs": [
+        "VOL-022",
+        "VOL-059",
+        "VOL-098"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-ADMISSION",
+      "path": "skeleton/ai/runtime/provenance/admission.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/admission.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-ALGORITHM-LIFECYCLE",
+      "path": "skeleton/ai/runtime/provenance/algorithm_lifecycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/algorithm_lifecycle.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-ARCHIVE",
+      "path": "skeleton/ai/runtime/provenance/archive.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/archive.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-ATTESTATION",
+      "path": "skeleton/ai/runtime/provenance/attestation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/attestation.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-COMMITMENTS",
+      "path": "skeleton/ai/runtime/provenance/commitments.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/commitments.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-CRYPTO-BACKENDS",
+      "path": "skeleton/ai/runtime/provenance/crypto_backends.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/crypto_backends.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-CRYPTO-INVENTORY",
+      "path": "skeleton/ai/runtime/provenance/crypto_inventory.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/crypto_inventory.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-EXECUTION-RECEIPT",
+      "path": "skeleton/ai/runtime/provenance/execution_receipt.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/execution_receipt.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-HORIZON-ASSESSMENT",
+      "path": "skeleton/ai/runtime/provenance/horizon_assessment.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/horizon_assessment.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-HORIZON-SIGNALS",
+      "path": "skeleton/ai/runtime/provenance/horizon_signals.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/horizon_signals.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-KEY-LIFECYCLE",
+      "path": "skeleton/ai/runtime/provenance/key_lifecycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/key_lifecycle.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-PORTABLE-BUNDLE",
+      "path": "skeleton/ai/runtime/provenance/portable_bundle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/portable_bundle.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-QUORUM",
+      "path": "skeleton/ai/runtime/provenance/quorum.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/quorum.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-RECEIPT-MIGRATION",
+      "path": "skeleton/ai/runtime/provenance/receipt_migration.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/receipt_migration.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-RUNTIME-BRIDGE",
+      "path": "skeleton/ai/runtime/provenance/runtime_bridge.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/runtime_bridge.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-SIGNATURE-CAPABILITIES",
+      "path": "skeleton/ai/runtime/provenance/signature_capabilities.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/signature_capabilities.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-SIGNED-ENVELOPE",
+      "path": "skeleton/ai/runtime/provenance/signed_envelope.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/signed_envelope.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVENANCE-TRUST-POLICY",
+      "path": "skeleton/ai/runtime/provenance/trust_policy.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/provenance/trust_policy.py; explicit file-level owner for the AIFT-PROVENANCE overlay child (previously covered only by residual tree owner AIFT-NATIVE-RUNTIME-ROOT).",
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-INIT",
+      "path": "skeleton/ai/training/__init__.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/__init__.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ADAPTER-TRAINING",
+      "path": "skeleton/ai/training/adapter_training.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/adapter_training.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-BITEMPORAL-AUTHORITY",
+      "path": "skeleton/ai/training/bitemporal_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/bitemporal_authority.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CANDIDATE-WEIGHTS",
+      "path": "skeleton/ai/training/candidate_weights.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/candidate_weights.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CHECKPOINT-LINEAGE",
+      "path": "skeleton/ai/training/checkpoint_lineage.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/checkpoint_lineage.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTAMINATION-SCAN",
+      "path": "skeleton/ai/training/contamination_scan.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contamination_scan.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-ADAPTER-TRAINING-SCHEMA",
+      "path": "skeleton/ai/training/contracts/adapter_training.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/adapter_training.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-CANDIDATE-WEIGHTS-SCHEMA",
+      "path": "skeleton/ai/training/contracts/candidate_weights.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/candidate_weights.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-CHECKPOINT-LINEAGE-SCHEMA",
+      "path": "skeleton/ai/training/contracts/checkpoint_lineage.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/checkpoint_lineage.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-CONTAMINATION-SCAN-SCHEMA",
+      "path": "skeleton/ai/training/contracts/contamination_scan.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/contamination_scan.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-DATASET-LINEAGE-SCHEMA",
+      "path": "skeleton/ai/training/contracts/dataset_lineage.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/dataset_lineage.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-DATASET-RIGHTS-SCHEMA",
+      "path": "skeleton/ai/training/contracts/dataset_rights.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/dataset_rights.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-DEDUPLICATION-SCHEMA",
+      "path": "skeleton/ai/training/contracts/deduplication.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/deduplication.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-DISTILLATION-SCHEMA",
+      "path": "skeleton/ai/training/contracts/distillation.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/distillation.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-MIRROR-ROOM-EVALUATION-SCHEMA",
+      "path": "skeleton/ai/training/contracts/mirror_room_evaluation.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/mirror_room_evaluation.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-POST-TRAINING-SCHEMA",
+      "path": "skeleton/ai/training/contracts/post_training.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/post_training.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-PROMOTION-GATE-SCHEMA",
+      "path": "skeleton/ai/training/contracts/promotion_gate.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/promotion_gate.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CONTRACTS-TRAINING-MANIFEST-SCHEMA",
+      "path": "skeleton/ai/training/contracts/training_manifest.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/contracts/training_manifest.schema.json; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-DATASET-LINEAGE",
+      "path": "skeleton/ai/training/dataset_lineage.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/dataset_lineage.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-DATASET-RIGHTS",
+      "path": "skeleton/ai/training/dataset_rights.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/dataset_rights.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-DEDUPLICATION",
+      "path": "skeleton/ai/training/deduplication.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/deduplication.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-DISTILLATION",
+      "path": "skeleton/ai/training/distillation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/distillation.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-FLGB-TRAINING-RUNTIME",
+      "path": "skeleton/ai/training/flgb_training_runtime.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/flgb_training_runtime.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-LIFECYCLE-PROOF",
+      "path": "skeleton/ai/training/lifecycle_proof.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/lifecycle_proof.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-MIRROR-ROOM-EVALUATION",
+      "path": "skeleton/ai/training/mirror_room_evaluation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/mirror_room_evaluation.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-MODEL-RELEASE-JOURNAL",
+      "path": "skeleton/ai/training/model_release_journal.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/model_release_journal.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-PROJECT-LEARNING",
+      "path": "skeleton/ai/training/project_learning.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/project_learning.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-PROJECT-LEARNING-RUN",
+      "path": "skeleton/ai/training/project_learning_run.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/project_learning_run.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-PROMOTION-GATE",
+      "path": "skeleton/ai/training/promotion_gate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/promotion_gate.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-PROMOTION-LIFECYCLE",
+      "path": "skeleton/ai/training/promotion_lifecycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/promotion_lifecycle.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-CANDIDATE-GATE",
+      "path": "skeleton/ai/training/shadow_candidate_gate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_candidate_gate.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-IDLE-TRAINING",
+      "path": "skeleton/ai/training/shadow_idle_training.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_idle_training.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-NATIVE-TRAINER",
+      "path": "skeleton/ai/training/shadow_native_trainer.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_native_trainer.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-TRAINING-HANDOFF",
+      "path": "skeleton/ai/training/shadow_training_handoff.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_training_handoff.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-WEIGHT-INTAKE",
+      "path": "skeleton/ai/training/shadow_weight_intake.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_weight_intake.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-WEIGHT-LEDGER",
+      "path": "skeleton/ai/training/shadow_weight_ledger.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_weight_ledger.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-WEIGHT-PIPELINE",
+      "path": "skeleton/ai/training/shadow_weight_pipeline.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_weight_pipeline.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-WEIGHT-STORE",
+      "path": "skeleton/ai/training/shadow_weight_store.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_weight_store.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SHADOW-WEIGHTS",
+      "path": "skeleton/ai/training/shadow_weights.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/shadow_weights.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-ABSTENTION",
+      "path": "skeleton/ai/training/temporal_abstention.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_abstention.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-ADMISSION",
+      "path": "skeleton/ai/training/temporal_admission.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_admission.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-BENCHMARK",
+      "path": "skeleton/ai/training/temporal_benchmark.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_benchmark.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-BUDGET",
+      "path": "skeleton/ai/training/temporal_budget.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_budget.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-CAUSALITY",
+      "path": "skeleton/ai/training/temporal_causality.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_causality.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-CERTIFICATE",
+      "path": "skeleton/ai/training/temporal_certificate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_certificate.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-CERTIFICATE-REGISTRY",
+      "path": "skeleton/ai/training/temporal_certificate_registry.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_certificate_registry.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-CONSISTENCY",
+      "path": "skeleton/ai/training/temporal_consistency.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_consistency.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-COUNTERFACTUAL",
+      "path": "skeleton/ai/training/temporal_counterfactual.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_counterfactual.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-CUSTODY",
+      "path": "skeleton/ai/training/temporal_custody.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_custody.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-DRIFT",
+      "path": "skeleton/ai/training/temporal_drift.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_drift.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-EDITING",
+      "path": "skeleton/ai/training/temporal_editing.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_editing.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-ENSEMBLE",
+      "path": "skeleton/ai/training/temporal_ensemble.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_ensemble.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-FACTS",
+      "path": "skeleton/ai/training/temporal_facts.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_facts.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-FRESHNESS",
+      "path": "skeleton/ai/training/temporal_freshness.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_freshness.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-INTELLIGENCE",
+      "path": "skeleton/ai/training/temporal_intelligence.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_intelligence.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-INTERVALS",
+      "path": "skeleton/ai/training/temporal_intervals.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_intervals.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-INVARIANTS",
+      "path": "skeleton/ai/training/temporal_invariants.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_invariants.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-LEARNING-CONTROL",
+      "path": "skeleton/ai/training/temporal_learning_control.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_learning_control.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-PROMOTION",
+      "path": "skeleton/ai/training/temporal_promotion.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_promotion.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-PROVENANCE",
+      "path": "skeleton/ai/training/temporal_provenance.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_provenance.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-QUARANTINE",
+      "path": "skeleton/ai/training/temporal_quarantine.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_quarantine.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-REPLAY",
+      "path": "skeleton/ai/training/temporal_replay.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_replay.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-RESEARCH-AUTHORITY",
+      "path": "skeleton/ai/training/temporal_research_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_research_authority.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-RETRIEVAL",
+      "path": "skeleton/ai/training/temporal_retrieval.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_retrieval.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-REVOCATION",
+      "path": "skeleton/ai/training/temporal_revocation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_revocation.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-SIGNALS",
+      "path": "skeleton/ai/training/temporal_signals.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_signals.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TEMPORAL-UNCERTAINTY",
+      "path": "skeleton/ai/training/temporal_uncertainty.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/temporal_uncertainty.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-TRAINING-MANIFEST",
+      "path": "skeleton/ai/training/training_manifest.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/training_manifest.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-JEEVES-STUDIO-CURRICULUM",
+      "path": "skeleton/ai/training/jeeves_studio_curriculum.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/jeeves_studio_curriculum.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-JEEVES-STUDIO-MULTIFACTOR-CORPUS",
+      "path": "skeleton/ai/training/jeeves_studio_multifactor_corpus.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/jeeves_studio_multifactor_corpus.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-JEEVES-STUDIO-RULE-CORPUS",
+      "path": "skeleton/ai/training/jeeves_studio_rule_corpus.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native file with no legacy original at skeleton/training/jeeves_studio_rule_corpus.py; explicit file-level owner for the AIFT-TRAINING overlay child (previously covered only by residual tree owner AIFT-NATIVE-AI-ROOT-RESIDUAL).",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
       ]
     }
   ]
