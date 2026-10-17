@@ -155,14 +155,36 @@ def inspect_native_source_media(project: str | Path, *, target: str) -> dict:
         if source.count(label + ":\n") != 1 or source.count(ending + ":\n") != 1:
             raise NativeMediaSourceError("native original sound-cue handler missing")
         segment = source.split(label + ":\n", 1)[1].split(ending + ":\n", 1)[0]
+        low_byte = programmed["events_low"][index]
+        high_byte = programmed["events_high"][index]
         if nes:
-            expected = (f"lda #{programmed['events_low'][index]}\n    sta $4006",
-                        f"lda #{programmed['events_high'][index]}\n    ora #$10\n    sta $4007")
+            expected = (
+                "lda #AUDIO_ENABLED\n"
+                "    beq @silent\n"
+                f"    lda #{low_byte}\n"
+                "    sta $4006\n"
+                f"    lda #{high_byte}\n"
+                "    ora #$10\n"
+                "    sta $4007\n"
+                "@silent:\n"
+                "    rts"
+            )
         else:
-            expected = (f"ld a, {programmed['events_low'][index]}\n    ldh [rNR23], a",
-                        f"ld a, {programmed['events_high'][index]}\n    or $80\n    ldh [rNR24], a")
-        if any(fragment not in segment for fragment in expected):
-            raise NativeMediaSourceError("actual generated sound cue diverges from authored score")
+            expected = (
+                "ld a, AUDIO_ENABLED\n"
+                "    or a\n"
+                "    ret z\n"
+                f"    ld a, {low_byte}\n"
+                "    ldh [rNR23], a\n"
+                f"    ld a, {high_byte}\n"
+                "    or $80\n"
+                "    ldh [rNR24], a\n"
+                "    ret"
+            )
+        if segment.strip() != expected.strip():
+            raise NativeMediaSourceError(
+                "actual complete native cue handler differs from authored score"
+            )
 
     body = {
         "schema": SCHEMA, "target": target, "world_digest": world,
