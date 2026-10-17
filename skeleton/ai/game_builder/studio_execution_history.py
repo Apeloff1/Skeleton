@@ -92,6 +92,7 @@ def record_execution_run(
             "blocked_stage_attempts": run["blocked_stage_attempts"],
             "unsupported_stage_attempts": run["unsupported_stage_attempts"],
             "native_cartridge_victories": checked["native_rom_machine_code_playthroughs_verified"],
+            "native_cpu_checkpoint_samples_verified": checked["native_cpu_checkpoint_samples_verified"],
             "actual_browser_replays": checked["browser_javascript_playthroughs_verified"],
             "actual_godot_replays": checked["godot_headless_playthroughs_verified"],
             "full_release_qualified": False,
