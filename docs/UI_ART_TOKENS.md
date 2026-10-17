@@ -11,7 +11,7 @@ Migration tracking: [#2464](https://github.com/Apeloff1/Skeleton/issues/2464).
 
 | Source | Role now | Edit values here? |
 |--------|----------|-------------------|
-| `frontend/theme/tokens.ts` | canonical values (+ `canonicalColors`, `textUsage`, `status`, `hud`, `iconography`, `skinPalettes`, `DEFAULT_SKIN_ID`; `elevation`, `motion`, `gradients`, `hitSlop` now exported) | **yes — only here** |
+| `frontend/theme/tokens.ts` | canonical values (+ `canonicalColors`, `textUsage`, `status`, `hud`, `iconography`, `skinPalettes`, `DEFAULT_SKIN_ID` as named exports; `colors`, `colorModes`, `palette`, `spacing`, `radii`, `typography`, `elevation`, `motion`, `gradients`, `hitSlop`, `breathing` on the default `theme` object only) | **yes — only here** |
 | `frontend/theme/foundation/*` | typed read-only API (`getTheme`, `foundation`) | no |
 | `frontend/theme/skins.ts` | compatibility: derives `SKINS` / `SKIN_BY_ID` from `skinPalettes` (same exports and shapes) | no |
 | `frontend/constants/themes.ts` + `hooks/useTheme.ts` | compatibility: legacy role names over tokens | no |
@@ -19,6 +19,14 @@ Migration tracking: [#2464](https://github.com/Apeloff1/Skeleton/issues/2464).
 | `frontend/src/skeletonForge/components/theme.ts` | compatibility: `C/TONE_COLOR/TONE_GLYPH/TOUCH/RADIUS` over tokens | no |
 
 A test (`test:foundation-tokens`) fails if any of those files except tokens.ts contains a hex literal.
+
+**Import rule (lint:ci).** A binding lives either on the default `theme` object *or* as a named export,
+never both — duplicates trip `import/no-named-as-default-member` and fail `yarn lint:ci --max-warnings=0`.
+Read `theme.colors` (live, skin-mutated dark palette), `theme.colorModes.dark|light`, `theme.spacing`,
+`theme.radii`, `theme.typography`, `theme.elevation`, `theme.motion`, `theme.gradients`, `theme.hitSlop`,
+`theme.breathing`, `theme.palette` from the default import. Import `canonicalColors`, `textUsage`,
+`status`, `hud`, `iconography`, `skinPalettes`, `DEFAULT_SKIN_ID` by name. When adding a token, put it
+in exactly one of those two places (`test:foundation-tokens` enforces this).
 No file was removed: every legacy source still has importers, so each stays as a thin adapter with
 its original export names and object shapes. `skinStore` still mutates `theme.colors` exactly as before.
 
@@ -134,8 +142,9 @@ round caps/joins).
 
 #2464 consolidates the legacy theme sources onto tokens.ts. #4066 / #4070 moved `constants/themes.ts`,
 `deluxe.ts` and the Forge theme onto tokens; this package finishes it: skin palettes and Forge glyphs
-moved into tokens.ts, `skins.ts` became a derivation, and `elevation` is exported (deluxe.ts already
-imported it by name, so `glow` was `undefined` and importing deluxe.ts threw at runtime on main).
+moved into tokens.ts, `skins.ts` became a derivation, and deluxe.ts reads `elevation` from the default
+object (it previously named-imported a binding tokens.ts never exported, so `glow` was `undefined` and
+importing deluxe.ts threw at runtime on main).
 
 To change a value: edit tokens.ts → run `yarn test:canonical-theme && yarn test:foundation-tokens`.
 To add a skin: append a row to tokens.ts `skinPalettes`.
