@@ -476,9 +476,19 @@ class NativeNESSourceProject:
     hardware_verified: bool = False
 
 
-def _nes_chr() -> str:
+def _nes_chr(tile_art: tuple[tuple[int, ...], ...] | None = None) -> str:
+    if tile_art is not None:
+        if (type(tile_art) is not tuple or len(tile_art) != len(_PIXELS)
+                or any(type(tile) is not tuple or len(tile) != 64
+                       or any(type(px) is not int or not 0 <= px <= 3 for px in tile)
+                       for tile in tile_art)):
+            raise NativeNESError("NES CHR artwork must contain six exact 2bpp tiles")
+        images = tuple(tuple("".join(str(px) for px in tile[y * 8:(y + 1) * 8])
+                             for y in range(8)) for tile in tile_art)
+    else:
+        images = _PIXELS
     lines = []
-    for index, image in enumerate(_PIXELS):
+    for index, image in enumerate(images):
         lo, hi = [], []
         for row in image:
             lo.append(sum((int(ch) & 1) << (7 - i) for i, ch in enumerate(row)))
@@ -491,6 +501,7 @@ def _nes_chr() -> str:
 
 def compile_native_nes(
     world: PlayableWorld, source: HomebrewSource, *, authorized: bool,
+    tile_art: tuple[tuple[int, ...], ...] | None = None,
 ) -> NativeNESSourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("native NES homebrew source needs explicit authorization")
@@ -524,7 +535,7 @@ def compile_native_nes(
         "__START_X__": ".byte " + ", ".join(str(level.start[0]) for level in world.levels),
         "__START_Y__": ".byte " + ", ".join(str(level.start[1]) for level in world.levels),
         "__MAPS__": "\n\n".join(maps),
-        "__TILES__": _nes_chr(),
+        "__TILES__": _nes_chr(tile_art),
     }
     result = _ASM
     for marker, value in substitutions.items():
@@ -578,6 +589,12 @@ def compile_native_nes(
         "release_approved": False,
         "distribution_licensed": False,
     }
+    if tile_art is not None:
+        from .contracts import canonical_digest
+        manifest["generated_runtime_art_tile_digest"] = canonical_digest(
+            [list(tile) for tile in tile_art]
+        )
+        manifest["custom_original_tile_pixels_in_native_source"] = True
     manifest_json = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     digest = sha256((asm + "\0" + _LINKER + "\0" + _MAKEFILE + "\0" + manifest_json).encode()).hexdigest()
     return NativeNESSourceProject(asm, _LINKER, _MAKEFILE, manifest_json, digest)
