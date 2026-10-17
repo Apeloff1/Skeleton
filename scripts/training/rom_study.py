@@ -111,8 +111,10 @@ def main(argv: list[str] | None = None) -> int:
             if destination.exists() or destination.is_symlink():
                 record = json.loads(_safe_path(destination).read_bytes())
                 verify_native_adversarial_review(evidence, triangle, record)
-                if record["independent_local_transformer_sha256"] != runtime.model_digest:
-                    raise RomStudyError("prior adversarial review model differs")
+                if (record["independent_local_transformer_sha256"] != runtime.model_digest
+                        or record["requested_seed"] != args.seed
+                        or record["requested_max_new_tokens"] != args.max_new_tokens):
+                    raise RomStudyError("prior adversarial review model or run configuration differs")
                 print(json.dumps({"state": "previous_verified_native_model_review",
                                   "filename": destination.name,
                                   "review_digest": record["review_digest"]}, sort_keys=True))

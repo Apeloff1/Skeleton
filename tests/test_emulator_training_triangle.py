@@ -333,6 +333,9 @@ def test_native_adversarial_reviewer_runs_three_real_runtime_contract_calls(monk
     result = run_native_adversarial_review(report, triangle, fake, max_new_tokens=48)
     assert fake.calls == 3
     assert result["structured_source_bound_passes"] == 3
+    assert result["requested_seed"] == 0
+    assert result["requested_max_new_tokens"] == 48
+    assert result["reviewer_distinct_from_production_jeeves_verified"] is False
     assert result["production_jeeves_weight_updates"] == 0
     assert result["manual_adjudication_required"] is True
     verify_native_adversarial_review(report, triangle, result)
@@ -341,3 +344,16 @@ def test_native_adversarial_reviewer_runs_three_real_runtime_contract_calls(monk
                                         if k != "review_digest"})
     with pytest.raises(ValueError, match="finding"):
         verify_native_adversarial_review(report, triangle, result)
+
+def test_adversarial_generated_text_refuses_unhashable_trace():
+    from skeleton.jeeves.game_emulator_triangle_native_reviewer import _interpret
+    import json
+    output = json.dumps({
+        "trace_sha256": ["not a digest"],
+        "attack": "source_integrity",
+        "verdict": "supported",
+        "rationale": "This claim cannot be supported by the source evidence.",
+    })
+    assert _interpret(
+        output, attack="source_integrity", traces={"a" * 64}
+    )["status"] == "unsupported_claim_or_schema_requires_manual_review"

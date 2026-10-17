@@ -261,3 +261,8 @@ outputs are explicitly flagged for manual review. No review self-certifies
 superiority, gameplay success, memory promotion, or trained Jeeves language
 weights. This command never invokes external providers or overwrites a
 previous review and does not run automatically inside every ROM episode.
+
+The reviewer executes on a local, operator-selected checkpoint. A second
+model's **distinctness from Jeeves's production speaking checkpoint** is not
+automatically established without a separately pinned production-model
+identity; the review records that limitation explicitly.

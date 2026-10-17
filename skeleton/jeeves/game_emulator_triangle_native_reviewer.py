@@ -144,6 +144,9 @@ def run_native_adversarial_review(
         "native_model_checkpoint_digest": generation[-1]["native_inference_record"]["checkpoint_digest"],
         "passes": generation,
         "passes_executed": len(generation),
+        "requested_seed": seed,
+        "requested_max_new_tokens": max_new_tokens,
+        "reviewer_distinct_from_production_jeeves_verified": False,
         "structured_source_bound_passes": sum(
             p["interpretation"]["status"] == "schema_and_source_reference_validated"
             for p in generation
@@ -173,6 +176,11 @@ def verify_native_adversarial_review(
              and review.get("training_triangle_sha256") == triangle["triangle_digest"]
              and _sha(review.get("independent_local_transformer_sha256"))
              and review.get("passes_executed") == len(ATTACKS)
+             and type(review.get("requested_seed")) is int
+             and 0 <= review["requested_seed"] <= 2**63 - 4
+             and type(review.get("requested_max_new_tokens")) is int
+             and 16 <= review["requested_max_new_tokens"] <= 512
+             and review.get("reviewer_distinct_from_production_jeeves_verified") is False
              and review.get("separate_native_model_inference_executed") is True
              and review.get("model_judgment_is_ground_truth") is False
              and review.get("production_model_promotion") is False
@@ -185,7 +193,7 @@ def verify_native_adversarial_review(
              "red-team review pass count differs")
     traces = {row["source_trace_sha256"] for row in triangle["episode_lens_references"][:12]}
     validated = 0
-    for attack, row in zip(ATTACKS, parts, strict=True):
+    for index, (attack, row) in enumerate(zip(ATTACKS, parts, strict=True)):
         _require(type(row) is dict and row.get("attack") == attack
                  and row.get("prompt_sha256") == hashlib.sha256(
                      _prompt(triangle, attack).encode()
@@ -206,9 +214,9 @@ def verify_native_adversarial_review(
                  and record.get("output_digest") == inference.get("output_digest")
                  and record.get("request_digest") == inference.get("request_digest")
                  and _sha(record.get("checkpoint_digest"))
-                 and type(inference.get("seed")) is int
+                 and inference.get("seed") == review["requested_seed"] + index
                  and isinstance(record.get("generated_token_ids"), list)
-                 and len(record["generated_token_ids"]) > 0,
+                 and 1 <= len(record["generated_token_ids"]) <= review["requested_max_new_tokens"],
                  "native language-model inference custody differs")
         validated += row["interpretation"]["status"] == "schema_and_source_reference_validated"
     _require(review.get("structured_source_bound_passes") == validated,
