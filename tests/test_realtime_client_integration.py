@@ -20,6 +20,7 @@ from skeleton.client.realtime import (
     ReconnectBackoff,
     SSETransport,
 )
+from skeleton.realtime.hub import sealed_principal_authorizer
 from skeleton.realtime import RealtimeHub
 from skeleton.realtime.envelope import ControlEvent, RealtimeEvent
 
@@ -56,19 +57,19 @@ async def _wait_for_sub(hub, previous=None, timeout=5.0):
 
 def test_connect_publish_drop_reconnect_resume_in_process():
     async def scenario():
-        hub = RealtimeHub(id_seed=100, heartbeat_interval_s=0.05)
+        hub = RealtimeHub(authorizer=sealed_principal_authorizer, id_seed=100, heartbeat_interval_s=0.05)
         client = RealtimeClient(InProcessTransport(hub, principal="ui"), channels=("build",), backoff=_backoff(), sleep=_no_sleep)
         events = client.events()
         pending = asyncio.ensure_future(_take(events, 2))
         first_sub = await _wait_for_sub(hub)
-        hub.publish("build", "build.started", {"step": 1}, job_id="job-1")
-        hub.publish("build", "build.progress", {"step": 2}, job_id="job-1")
+        hub.publish("build", "build.started", {"step": 1}, job_id="job-1", owner="ui")
+        hub.publish("build", "build.progress", {"step": 2}, job_id="job-1", owner="ui")
         got = await pending
         assert [e.id for e in got] == ["101", "102"]
         # Server drops the connection; two events land while the client is away.
         hub.unsubscribe(first_sub, reason="test_drop")
-        hub.publish("build", "build.progress", {"step": 3}, job_id="job-1")
-        hub.publish("build", "build.completed", {"step": 4}, job_id="job-1")
+        hub.publish("build", "build.progress", {"step": 3}, job_id="job-1", owner="ui")
+        hub.publish("build", "build.completed", {"step": 4}, job_id="job-1", owner="ui")
         resumed = await _take(events, 2)
         assert [e.id for e in resumed] == ["103", "104"]
         assert client.last_event_id == "104"
@@ -84,13 +85,13 @@ def test_connect_publish_drop_reconnect_resume_in_process():
 
 def test_lagged_client_reconnects_and_recovers_every_event():
     async def scenario():
-        hub = RealtimeHub(id_seed=0, subscriber_queue=2, heartbeat_interval_s=0.05)
+        hub = RealtimeHub(authorizer=sealed_principal_authorizer, id_seed=0, subscriber_queue=2, heartbeat_interval_s=0.05)
         client = RealtimeClient(InProcessTransport(hub, principal="ui"), channels=("build",), backoff=_backoff(), sleep=_no_sleep)
         frames = client.frames()
         first = asyncio.ensure_future(_take(frames, 1))
         await _wait_for_sub(hub)
         for i in range(6):  # burst while the consumer is not reading
-            hub.publish("build", "build.log", {"i": i})
+            hub.publish("build", "build.log", {"i": i}, owner="ui")
         (lagged,) = await first
         assert isinstance(lagged, ControlEvent) and lagged.type == "stream.lagged"
         rest = await _take(frames, 6)
@@ -104,9 +105,9 @@ def test_lagged_client_reconnects_and_recovers_every_event():
 
 def test_stream_reset_invokes_callback_and_moves_cursor():
     async def scenario():
-        hub = RealtimeHub(id_seed=1000, replay_capacity=2, heartbeat_interval_s=0.05)
+        hub = RealtimeHub(authorizer=sealed_principal_authorizer, id_seed=1000, replay_capacity=2, heartbeat_interval_s=0.05)
         for _ in range(5):
-            hub.publish("agent", "agent.step", {})
+            hub.publish("agent", "agent.step", {}, owner="ui")
         resets = []
         client = RealtimeClient(
             InProcessTransport(hub, principal="ui"),
@@ -196,7 +197,7 @@ def live_server(monkeypatch):
     from skeleton.api.realtime_routes import router
 
     monkeypatch.setenv("GF_SEAL_SECRET", _SECRET)
-    hub = RealtimeHub(id_seed=500, heartbeat_interval_s=0.1)
+    hub = RealtimeHub(authorizer=sealed_principal_authorizer, id_seed=500, heartbeat_interval_s=0.1)
     app = fastapi.FastAPI()
     app.state.realtime_hub = hub
     app.include_router(router, prefix="/api/v1")
@@ -242,13 +243,13 @@ def test_http_connect_publish_drop_reconnect_resume(live_server):
             events = client.events()
             pending = asyncio.ensure_future(_take(events, 2, timeout=10))
             first = await _wait_for_sub(hub, timeout=10)
-            await asyncio.to_thread(hub.publish, "build", "build.started", {"step": 1}, job_id="job-h")
-            await asyncio.to_thread(hub.publish, "agent", "agent.step", {"step": 2}, job_id="job-h")
+            await asyncio.to_thread(hub.publish, "build", "build.started", {"step": 1}, job_id="job-h", owner="ui-tester")
+            await asyncio.to_thread(hub.publish, "agent", "agent.step", {"step": 2}, job_id="job-h", owner="ui-tester")
             got = await pending
             assert [e.type for e in got] == ["build.started", "agent.step"]
             assert [e.id for e in got] == ["501", "502"]
             hub.unsubscribe(first, reason="test_drop")
-            hub.publish("build", "build.completed", {"step": 3}, job_id="job-h")
+            hub.publish("build", "build.completed", {"step": 3}, job_id="job-h", owner="ui-tester")
             (resumed,) = await _take(events, 1, timeout=10)
             assert resumed.id == "503" and resumed.type == "build.completed"
             assert client.stats["reconnects"] == 1
