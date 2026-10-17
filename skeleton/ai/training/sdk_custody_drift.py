@@ -81,14 +81,30 @@ def _verify(snapshot: dict) -> dict[tuple[str, str], dict]:
             })):
         raise SDKStudyError("SDK custody snapshot is altered or exceeds bounds")
     indexed = {}
+    expected_fields = {
+        "sdk_id", "path", "version", "sha256", "sdk_kind",
+        "target_ids", "trainable", "rights_review_digest",
+    }
     for item in snapshot["documents"]:
-        if type(item) is not dict:
-            raise SDKStudyError("SDK source identity must be an object")
-        identity = (item.get("sdk_id"), item.get("path"))
-        if (not all(isinstance(x, str) and x for x in identity)
-                or identity in indexed):
-            raise SDKStudyError("duplicated or invalid SDK document identity")
+        if type(item) is not dict or set(item) != expected_fields:
+            raise SDKStudyError("SDK source identity fields changed")
+        identity = (item["sdk_id"], item["path"])
+        if (not all(isinstance(x, str) and 1 <= len(x) <= 1024 for x in identity)
+                or identity in indexed or type(item["trainable"]) is not bool
+                or not isinstance(item["version"], str) or not item["version"]
+                or not isinstance(item["sdk_kind"], str) or not item["sdk_kind"]
+                or type(item["target_ids"]) is not list
+                or len(item["target_ids"]) > 128
+                or any(not isinstance(t, str) or not t for t in item["target_ids"])
+                or len(set(item["target_ids"])) != len(item["target_ids"])
+                or item["target_ids"] != sorted(item["target_ids"])
+                or any(type(item[key]) is not str or len(item[key]) != 64
+                       or any(ch not in "0123456789abcdef" for ch in item[key])
+                       for key in ("sha256", "rights_review_digest"))):
+            raise SDKStudyError("duplicated, malformed or unreviewed SDK source identity")
         indexed[identity] = item
+    if list(indexed) != sorted(indexed):
+        raise SDKStudyError("SDK custody record ordering is noncanonical")
     return indexed
 
 
