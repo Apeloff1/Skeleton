@@ -26,6 +26,8 @@ export interface QuestionnaireFlowProps {
   forging?: boolean;
   /** Short compose summary shown on the review step. */
   composeSummary?: string | null;
+  /** Opens the plan viewer once a forge has produced one. */
+  onViewPlan?: () => void;
   testID?: string;
 }
 
@@ -224,7 +226,7 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
-function ReviewStep({ state, dispatch, beats, composeSummary }: QuestionnaireFlowProps) {
+function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: QuestionnaireFlowProps) {
   const req = buildRunRequest(state);
   const shadowed = shadowedBriefFacets(state);
   const arch = ARCHETYPES.find((a) => a.id === req.archetype);
@@ -247,6 +249,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary }: QuestionnaireFlo
         </Banner>
       ) : null}
       <Button label="Start over" tone="ghost" compact onPress={() => dispatch({ type: 'reset' })} testID="q-reset" />
+      {onViewPlan ? <Button label="View build plan" tone="secondary" compact onPress={onViewPlan} a11yHint="Opens the plan from the last forge" testID="q-view-plan" /> : null}
     </Card>
   );
 }

@@ -857,7 +857,7 @@ def execution_events(
 ) -> dict[str, Any]:
     principal = _verified_service_principal(request, service_token)
     try:
-        return service.events(
+        snapshot = service.events(
             execution_id,
             verified_service_principal=principal,
             actor_id=actor_id,
@@ -866,6 +866,15 @@ def execution_events(
     except Exception as exc:
         _raise_engine_error(exc)
         raise
+    # ADR-realtime-transport (#4101): with ``Accept: text/event-stream`` this
+    # route is the execution-scoped filtered view of ``/api/v1/events`` and
+    # emits the same v1 envelope. Authorization above is unchanged; JSON
+    # callers keep the existing response.
+    from skeleton.api.realtime_routes import execution_stream_or_none
+
+    stream = execution_stream_or_none(request, execution_id, principal=str(principal))
+    # A Response instance bypasses the dict response model (FastAPI contract).
+    return snapshot if stream is None else stream  # type: ignore[return-value]
 
 
 __all__ = [

@@ -19,7 +19,30 @@ export type MemTier = 'low' | 'mid' | 'high';
 
 let _tier: MemTier = 'mid';
 let _installed = false;
+let _memorySubscription: { remove: () => void } | null = null;
+let _heapPoll: ReturnType<typeof setInterval> | null = null;
 const _listeners = new Set<() => void>();
+const _shedders = new Map<string, () => void>();
+const MAX_SHEDDERS = 64;
+
+/**
+ * Resource owners register synchronous, inexpensive shedding handlers;
+ * mutation-safe snapshots isolate callbacks that throw or unregister.
+ * No new module imports are performed during an OOM warning.
+ */
+export function registerMemoryShedder(owner: string, handler: () => void): () => void {
+  if (!owner || owner.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(owner) ||
+      typeof handler !== 'function') throw new Error('Invalid memory shedder');
+  if (!_shedders.has(owner) && _shedders.size >= MAX_SHEDDERS) {
+    throw new Error('Memory shedder registry full');
+  }
+  _shedders.set(owner, handler);
+  return () => { if (_shedders.get(owner) === handler) _shedders.delete(owner); };
+}
+export function memoryGuardStats() {
+  return { installed: _installed, handlers: _shedders.size, listeners: _listeners.size,
+    stress: getStress() };
+}
 
 /** Device memory tier — drives up-front guardrail caps. */
 export function getMemTier(): MemTier { return _tier; }
@@ -57,7 +80,8 @@ const _stressListeners = new Set<() => void>();
 export function getStress(): number {
   // decay one level per 20s of calm
   const now = Date.now();
-  if (_stress > 0 && now - _stressTs > 20000) {
+  if (_stress > 0 && Number.isFinite(now) && now >= _stressTs &&
+      now - _stressTs >= 20000) {
     _stress = Math.max(0, _stress - Math.floor((now - _stressTs) / 20000));
     _stressTs = now;
   }
@@ -65,7 +89,8 @@ export function getStress(): number {
 }
 
 export function bumpStress(by = 1): void {
-  _stress = Math.min(3, _stress + by);
+  if (!Number.isFinite(by) || by <= 0) return;
+  _stress = Math.max(0, Math.min(3, _stress + Math.min(by, 3)));
   _stressTs = Date.now();
   _stressListeners.forEach(l => { try { l(); } catch {} });
 }
@@ -100,6 +125,7 @@ export function effectiveLimits(): RenderLimits {
 // Expo Go). N consecutive frames slower than 1.6× the cap raises stress.
 let _slowRun = 0;
 export function reportFrameTime(ms: number, capMs: number): void {
+  if (!Number.isFinite(ms) || !Number.isFinite(capMs) || ms <= 0 || capMs <= 0) return;
   if (ms > capMs * 1.6) {
     if (++_slowRun >= 30) { _slowRun = 0; bumpStress(1); }
   } else if (_slowRun > 0) {
@@ -117,14 +143,23 @@ let _lastPressure = 0;
 /** Fire a memory-pressure response (debounced). Safe to call manually too. */
 export function triggerMemoryPressure(reason = 'os_warning'): void {
   const now = Date.now();
-  if (now - _lastPressure < 3000) return;
+  if (_lastPressure > 0 && now >= _lastPressure && now - _lastPressure < 3000) return;
   _lastPressure = now;
-  bumpStress(1);   // redundant runtime guard escalates with each pressure event
-  traceStepSync(`MEM_PRESSURE ${reason}`);
-  // 1) force the self-cleaner (lazy import avoids a static cycle).
-  try { import('./selfCleaner').then(m => m.runSelfCleaner('mem_pressure', true)).catch(() => {}); } catch {}
-  // 2) tell heavy components to shed memory immediately.
-  _listeners.forEach(l => { try { l(); } catch {} });
+  bumpStress(1);
+  const safeReason = String(reason).replace(/[^a-zA-Z0-9_:-]/g, '').slice(0, 48);
+  traceStepSync(`MEM_PRESSURE ${safeReason}`);
+
+  // Synchronous pressure shedding before async disk/network work.
+  for (const [, handler] of [..._shedders]) {
+    try { handler(); } catch { /* one failed renderer cannot block others */ }
+  }
+  for (const listener of [..._listeners]) {
+    try { listener(); } catch { /* observer isolation */ }
+  }
+
+  // Native disk cleaner may be expensive; do not force it on every 3-second
+  // pressure burst. This path is best effort and never marks readiness.
+  try { import('./selfCleaner').then(m => m.runSelfCleaner('mem_pressure')).catch(() => {}); } catch {}
 }
 
 /** Install once, as early as possible (root layout). Idempotent. */
@@ -145,7 +180,7 @@ export function installMemoryGuard(): void {
 
   try {
     // RN exposes OS memory warnings through AppState.
-    AppState.addEventListener('memoryWarning', () => triggerMemoryPressure('os_warning'));
+    _memorySubscription = AppState.addEventListener('memoryWarning', () => triggerMemoryPressure('os_warning'));
   } catch { /* not all platforms emit this */ }
 
   // Redundant proactive poll: where a JS-heap reading is available (web /
@@ -153,7 +188,7 @@ export function installMemoryGuard(): void {
   try {
     const perf: any = (globalThis as any).performance;
     if (perf && perf.memory && typeof perf.memory.usedJSHeapSize === 'number') {
-      setInterval(() => {
+      _heapPoll = setInterval(() => {
         try {
           const m = perf.memory;
           if (m.jsHeapSizeLimit > 0 && m.usedJSHeapSize / m.jsHeapSizeLimit > 0.82) {
@@ -165,4 +200,17 @@ export function installMemoryGuard(): void {
   } catch { /* ignore */ }
 
   traceStepSync(`mem_guard_installed tier=${_tier}`);
+}
+
+/**
+ * For tests, runtime reloads and controlled shutdowns. Unlike UI-level
+ * subscriptions, this tears down the actual singleton OS listener/timer.
+ */
+export function uninstallMemoryGuard(): void {
+  if (!_installed) return;
+  _installed = false;
+  _memorySubscription?.remove();
+  _memorySubscription = null;
+  if (_heapPoll) clearInterval(_heapPoll);
+  _heapPoll = null;
 }

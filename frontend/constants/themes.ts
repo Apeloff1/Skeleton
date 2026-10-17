@@ -1,7 +1,9 @@
 /** Compatibility roles sourced from the canonical design-token module.
  * No competing palette: useTheme reads the current skin for dark mode.
  */
-import design, { colors as canonicalColors } from '../theme/tokens';
+import design from '../theme/tokens';
+
+const canonicalColors = design.colorModes;
 
 export interface ThemeColors {
   background: string;

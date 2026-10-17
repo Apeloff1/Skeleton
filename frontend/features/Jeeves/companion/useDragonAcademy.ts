@@ -4,6 +4,7 @@
  * development deployments where some other routes allow anonymous access.
  */
 import {AppState,Platform} from 'react-native';
+import {usePowerAwareness} from '../../../hooks/usePowerAwareness';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import {API_BASE} from '../../../utils/apiBase';
@@ -18,7 +19,8 @@ import {
 import type {CompanionAcademyInput,CompanionTelemetry} from './DragonCompanionPanel';
 import {type NativeAttempt,type NativeTarget,type NativeCurriculum,normalizeNativeAttempts,normalizeNativeTargets,normalizeNativeCurriculum} from './dragonNativeTargets';
 import {type DragonFamilyProjection,validateDragonFamily} from './dragonFamilyProjection';
-import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
+import {EMPTY_COMPANION_JOURNAL,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
+import {acceptDragonFeed} from './dragonReplay';
 
 type Snapshot={
  ok:boolean;progress:DragonPracticeProgress;attempts:DragonPracticeAttempt[];family?:DragonFamilyProjection;
@@ -26,7 +28,7 @@ type Snapshot={
  curriculum?:NativeCurriculum;
 };
 type HtmlArtifact={ok:boolean;html:string;sha256:string;sandbox_required:boolean;attempt_id:string};
-type CrawlFeed={ok:boolean;session_id:string|null;active:boolean;events:WireDragonEvent[];next_cursor:string|null;has_more:boolean};
+type CrawlFeed={ok:boolean;session_id:string|null;active:boolean;events:WireDragonEvent[];next_cursor:string|null;has_more:boolean;history_truncated?:boolean};
 export interface DemoView{attemptId:string;html:string;digest:string}
 const PATH='/api/dragon-academy';
 const HEX=/^[a-f0-9]{64}$/;
@@ -53,6 +55,7 @@ export function useDragonAcademy(){
  const [demo,setDemo]=useState<DemoView|null>(null);
  const [telemetry,setTelemetry]=useState<CompanionTelemetry|undefined>();
  const journal=useRef<CompanionJournal>(EMPTY_COMPANION_JOURNAL);
+ const power=usePowerAwareness();
  const sessionRef=useRef<string|null>(null);
  const feedBusy=useRef(false);
  const alive=useRef(true);
@@ -103,10 +106,15 @@ export function useDragonAcademy(){
   if(feedBusy.current||!getAuthToken()||!['active','unknown'].includes(AppState.currentState))return;
   feedBusy.current=true;
   try{
+   const cursor=journal.current;
+   const requestedFromStart=cursor.lastSequence===0;
+   const digest=cursor.provenance?'&last_event_digest='+cursor.chainHead:'';
    const r=await api.get<CrawlFeed>(
-    PATH+'/crawler/feed?after_sequence='+journal.current.lastSequence+'&limit=100',
+    PATH+'/crawler/feed?after_sequence='+cursor.lastSequence+'&limit=100'+digest,
     {headers:authHeaders(),timeoutMs:8000,retries:0});
-   if(!alive.current||!r.ok||!r.data?.ok)return;
+   if(!alive.current)return;
+   if(r.status===409){journal.current=EMPTY_COMPANION_JOURNAL;return;}
+   if(!r.ok||!r.data?.ok)return;
    const f=r.data;
    if(!f.active||!f.session_id){
     sessionRef.current=null;journal.current=EMPTY_COMPANION_JOURNAL;
@@ -115,19 +123,15 @@ export function useDragonAcademy(){
    if(sessionRef.current!==f.session_id){
     sessionRef.current=f.session_id;
     journal.current=EMPTY_COMPANION_JOURNAL;
-    // Another session started. Begin at event 1; never splice two sessions.
-    return;
+    // A cursor from the previous session must not be applied. A request that
+    // already started at sequence 0 belongs to this session and can land now.
+    if(!requestedFromStart)return;
    }
    if(!Array.isArray(f.events)||f.events.length>100)return;
-   let next=journal.current;
-   for(const event of f.events){
-    const updated=reduceDragonJournal(next,event);
-    if(updated.warnings.length>next.warnings.length)return;
-    next=updated;
-   }
+   const next=acceptDragonFeed(journal.current,f);
    journal.current=next;
    const last=f.events.at(-1);
-   if(last)setTelemetry({
+   if(last&&next.lastSequence===last.sequence)setTelemetry({
     kind:last.kind,payload:last.payload,knowledgeItems:next.indexed,
    });
   }catch{
@@ -137,12 +141,12 @@ export function useDragonAcademy(){
  useEffect(()=>{
   alive.current=true;
   void load().then(pollCrawler);
-  const interval=setInterval(()=>void pollCrawler(),12000);
+  const interval=setInterval(()=>void pollCrawler(),power.shouldReducePolling?30000:12000);
   const listener=AppState.addEventListener('change',next=>{
    if(next==='active')void load().then(pollCrawler);
   });
   return()=>{alive.current=false;clearInterval(interval);listener.remove();};
- },[load,pollCrawler]);
+ },[load,pollCrawler,power.shouldReducePolling]);
  const mutate=useCallback(async(endpoint:string,body:object={})=>{
   if(inFlight.current||!authenticated||!getAuthToken())return;
   inFlight.current=true;setBusy(true);setError('');
