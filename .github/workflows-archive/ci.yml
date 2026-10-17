@@ -42,7 +42,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
@@ -92,6 +92,22 @@ jobs:
           python -m skeleton plan "soulslike extraction with bonfire rest"
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
           python -m skeleton walk --era soulslike
+      - name: Install Godot 4.4.1
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/godot-4.4.1.zip"
+          curl -fsSL \
+            'https://downloads.godotengine.org/?version=4.4.1&flavor=stable&slug=linux.x86_64.zip' \
+            --output "$archive"
+          printf '%s  %s\n' 'd6e382fb531019f85630c1f485a561a0d20c4a2344b6c3847735cfee7da812aa' "$archive" | sha256sum --check
+          unzip -q "$archive" -d "$RUNNER_TEMP/skeleton-godot"
+          chmod +x "$RUNNER_TEMP/skeleton-godot/Godot_v4.4.1-stable_linux.x86_64"
+          echo "SKELETON_GODOT_BIN=$RUNNER_TEMP/skeleton-godot/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Golden briefs boot headless
+        env:
+          SKELETON_GAME_BUILDER_REQUIRE_GODOT: "1"
+          PYTHONPATH: "."
+        run: python -m pytest -q --noconftest skeleton/testing/test_game_builder_golden.py
   java-accelerators:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Java Batch Accelerators"

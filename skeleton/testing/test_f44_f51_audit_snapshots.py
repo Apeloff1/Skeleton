@@ -95,7 +95,7 @@ def test_seal_audit_locks_sidecar_depends_and_command_call(monkeypatch) -> None:
     payload = seal_audit_snapshot()
     assert payload["depends_seal"] == []
     assert payload["calls_seal"] == ["POST /api/v1/commands/execute/{command}", "POST /api/v1/commands/invoke"]
-    assert payload["sidecar_depends_seal"] == ["POST /api/v1/gameforge/run"]
+    assert payload["sidecar_depends_seal"] == []
     assert payload["hmac_open_and_seal_gated"] == []
     assert payload["charter_gated"] == [
         "POST /api/v1/swarm/submit",
@@ -104,6 +104,7 @@ def test_seal_audit_locks_sidecar_depends_and_command_call(monkeypatch) -> None:
         "POST /api/v1/forge/archetype",
         "POST /api/v1/gameforge/run",
         "POST /api/v1/game/build",
+        "GET /api/v1/game/build/{execution_id}",
         "POST /api/v1/gameforge/intake",
     ]
     assert payload["charter_without_explicit_seal"] == payload["charter_gated"]
