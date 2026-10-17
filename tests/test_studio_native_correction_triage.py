@@ -79,6 +79,38 @@ class DragonNativeCorrectionTests(unittest.TestCase):
         self.assertEqual(result["proposal_count"], 0)
         self.assertEqual(result["proposals"], [])
 
+    def test_qualified_source_failure_triage_distinguishes_art_from_cpu_and_staleness(self):
+        original = _history(fields=["Score"])
+        original["latest_stage_blockers"] = [
+            {
+                "target": "nintendo_game_boy", "stage": "rom",
+                "category": "compiled_sprite_mismatch",
+                "recommended_review": "Compare exact original tile bytes and RGBLINK labels",
+            },
+            {
+                "target": "nintendo_game_boy", "stage": "emulator",
+                "category": "gameboy_emulator_unavailable",
+                "recommended_review": "Provision approved PyBoy and retry exact original ROM",
+            },
+            {
+                "target": "nintendo_game_boy", "stage": "emulator",
+                "category": "controller_or_gameplay_divergence",
+                "recommended_review": "Inspect original CPU trace",
+            },
+        ]
+        result = self.project(original)
+        self.assertEqual(
+            [row["category"] for row in result["proposals"]],
+            ["collectible_goal_score_divergence", "compiled_sprite_mismatch",
+             "gameboy_emulator_unavailable"],
+        )
+        self.assertTrue(all(not row["automatic_code_edit_allowed"]
+                            for row in result["proposals"]))
+        original["latest_still_matches_current_source"] = False
+        stale = self.project(original)
+        self.assertEqual(stale["proposal_count"], 0)
+        self.assertTrue(stale["stale_history_proposals_blocked"])
+
     def test_missing_cpu_log_requires_new_real_execution(self):
         result = self.project(_history(category="sample_count_mismatch"))
         self.assertEqual(result["proposal_count"], 1)
