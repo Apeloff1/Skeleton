@@ -191,7 +191,7 @@ def record_execution_run(
                                  if k != "run_digest"}) != run.get("run_digest")):
         raise StudioQualificationHistoryError("E2E run source receipt does not validate")
     native_failures = _validated_native_failure_events(run, order.targets)
-    classified = classify_production_blockers(run["events"], limit=16)
+    classified = classify_production_blockers(run["events"], limit=8)
     root = Path(campaign)
     with campaign_lock(root):
         checked = _inspect_production_assurance_unlocked(order, root)
