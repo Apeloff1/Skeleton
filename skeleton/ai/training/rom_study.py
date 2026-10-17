@@ -301,6 +301,18 @@ def verified_rom_receipt(path: Path, *, expected_source_sha256: str,
     if expected_run_identity is not None and row.get("run_identity") != expected_run_identity:
         raise RomStudyError("ROM receipt is from a different training configuration")
     evidence = row.get("candidate_evidence")
+    neural = row.get("neural_world", {"status": "not_requested"})
+    if not isinstance(neural, dict) or neural.get("production_jeeves_weight_updates") not in (0, None):
+        raise RomStudyError("ROM receipt contains unauthorized production neural updates")
+    if neural.get("status") == "candidate_trained_requires_independent_review":
+        from skeleton.jeeves.game_emulator_neural_world import validate_neural_world_checkpoint
+        model = neural.get("neural_model")
+        if not isinstance(model, dict) or model.get("model_digest") != neural.get("candidate_model_sha256"):
+            raise RomStudyError("ROM receipt neural candidate identity changed")
+        try:
+            validate_neural_world_checkpoint(model)
+        except ValueError as exc:
+            raise RomStudyError("ROM receipt neural checkpoint validation failed") from exc
     from skeleton.jeeves.game_learning import _digest
     if (not isinstance(evidence, dict)
             or evidence.get("report_digest") != _digest({
@@ -375,6 +387,7 @@ def train_page(
     root: Path, approvals_path: Path, output_dir: Path, *,
     cursor: str | None = None, limit: int = 32,
     runs: int = 12, steps: int = 24, seed: int = 0,
+    neural_world: bool = False, neural_epochs: int = 4, neural_width: int = 8,
     cancel: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     """Run every eligible ROM on this page; persist per-ROM results before continuing.
@@ -392,8 +405,11 @@ def train_page(
 
     if (type(runs) is not int or not 1 <= runs <= 32
             or type(steps) is not int or not 1 <= steps <= 128
-            or type(seed) is not int or not 0 <= seed <= 2**63 - 1):
-        raise RomStudyError("bounded ROM training runs/steps/seed required")
+            or type(seed) is not int or not 0 <= seed <= 2**63 - 1
+            or type(neural_world) is not bool
+            or type(neural_epochs) is not int or not 1 <= neural_epochs <= 16
+            or type(neural_width) is not int or not 4 <= neural_width <= 32):
+        raise RomStudyError("bounded ROM Q/neural training configuration required")
     page = inventory_page(root, cursor=cursor, limit=limit)
     approvals, approvals_digest = _load_approvals(approvals_path)
     output_dir = _private_output(output_dir)
@@ -436,6 +452,8 @@ def train_page(
                 "approvals_manifest_sha256": approvals_digest,
                 "registry_digest": registry.registry_digest,
                 "runs": runs, "steps": steps, "seed": seed,
+                "neural_world": neural_world,
+                "neural_epochs": neural_epochs, "neural_width": neural_width,
             }))
             filename = "rom-" + identity[:16] + "-" + run_identity[:16] + ".json"
             target = output_dir / filename
@@ -478,6 +496,58 @@ def train_page(
                 )
             finally:
                 prepared.close()
+            neural = {
+                "status": "not_requested",
+                "actual_candidate_optimizer_steps": 0,
+                "production_jeeves_weight_updates": 0,
+            }
+            if neural_world:
+                # Only replay-verified, independently episode-split candidate
+                # examples can reach this existing neural optimizer.
+                from skeleton.jeeves.game_emulator_neural_world import (
+                    NeuralWorldConfig, train_neural_world_from_evidence,
+                    validate_neural_world_checkpoint,
+                )
+                from skeleton.jeeves.game_learning import _digest
+                parent = evidence["policy_snapshot"]
+                source = {k: value for k, value in evidence.items()
+                          if k != "policy_snapshot"}
+                source["policy_snapshot_digest"] = parent["snapshot_digest"]
+                source["evidence_digest"] = _digest(source)
+                try:
+                    neural_model, neural_report = train_neural_world_from_evidence(
+                        source, parent,
+                        config=NeuralWorldConfig(
+                            seed=seed, holdout_seed=(seed + 1) % (2**63),
+                            width=neural_width, epochs=neural_epochs,
+                            minibatch=8, max_samples=512,
+                            max_compute_units=8_000_000,
+                        ),
+                        cancel=cancel,
+                    )
+                    validate_neural_world_checkpoint(neural_model)
+                    neural = {
+                        "status": "candidate_trained_requires_independent_review",
+                        "actual_candidate_optimizer_steps": neural_model["real_optimizer_steps"],
+                        "candidate_model_sha256": neural_model["model_digest"],
+                        "heldout_gain_measured": (
+                            neural_report["candidate_status"] == "candidate_predictive_gain_measured"
+                        ),
+                        "neural_model": neural_model, "training_report": neural_report,
+                        "production_jeeves_weight_updates": 0,
+                        "production_model_promotion_authorized": False,
+                    }
+                except (ValueError, RuntimeError) as exc:
+                    # Q learning remains measured. Neural qualification is a
+                    # separate status, not silently marked as successful.
+                    neural = {
+                        "status": "candidate_training_blocked",
+                        "failure_type": type(exc).__name__,
+                        "failure_reason": str(exc)[:200],
+                        "actual_candidate_optimizer_steps": 0,
+                        "production_jeeves_weight_updates": 0,
+                        "production_model_promotion_authorized": False,
+                    }
             receipt = {
                 "schema_version": BATCH_SCHEMA,
                 "run_identity": run_identity,
@@ -488,7 +558,7 @@ def train_page(
                 "training_kind": "actual_replay_audited_tabular_q_policy",
                 "neural_weights_updated": 0, "production_weights_modified": False,
                 "model_promotion_authorized": False,
-                "candidate_evidence": evidence,
+                "neural_world": neural, "candidate_evidence": evidence,
             }
             receipt_digest = _save_new(target, receipt)
             summary.update({
@@ -498,6 +568,8 @@ def train_page(
                 "actual_q_table_updates": evidence["actual_q_table_updates"],
                 "measured_steps": evidence["actual_training_steps"],
                 "receipt_name": filename, "receipt_sha256": receipt_digest,
+                "neural_world_status": neural["status"],
+                "neural_candidate_optimizer_steps": neural["actual_candidate_optimizer_steps"],
             })
         except (ValueError, OSError, RuntimeError, ImportError) as exc:
             summary["state"] = "emulator_training_blocked"
@@ -519,6 +591,9 @@ def train_page(
             row["state"] not in ("q_policy_updated_with_receipt",
                                  "q_policy_executed_no_updates",
                                  "previous_verified_receipt_no_reexecution")
+            for row in results),
+        "neural_candidate_training_completed": sum(
+            row.get("neural_world_status") == "candidate_trained_requires_independent_review"
             for row in results),
         "actual_jeeves_weight_training": False,
         "production_weights_modified": False,

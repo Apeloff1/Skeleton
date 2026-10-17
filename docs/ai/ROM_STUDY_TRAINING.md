@@ -1,7 +1,9 @@
 # All available ROMs — Jeeves and Dragon training operator guide
 
 This pipeline adds **real operator-authorized gameplay Q-policy learning** over
-local ROM libraries. It does NOT imply all ROMs are legally available,
+local ROM libraries and an optional second stage of **actual candidate neural
+world-model optimizer updates** from replay-verified episodes. Neither
+stage modifies production Jeeves speaking weights. It does NOT imply all ROMs are legally available,
 supported, playable to completion, or eligible for machine-learning use.
 SDK documentation and ROM content have independent rights reviews.
 
@@ -82,7 +84,8 @@ python -m scripts.training.rom_study train-all \
   --root /private/rom-library \
   --approvals /private/rom-training-approvals.json \
   --output-dir /private/rom-receipts \
-  --max-pages 1 --limit 32 --runs 12 --steps 24
+  --max-pages 1 --limit 32 --runs 12 --steps 24 \
+  --neural-world --neural-epochs 4 --neural-width 8
 \`\`\`
 
 Read \`next_cursor\` from JSON output, then re-run with \`--cursor\` to
@@ -103,14 +106,21 @@ Recorded outcomes distinguish:
 
 The lab retains per-run snapshot identities, reverse replay evidence,
 observed audiovisual state differences, held-out policy evaluation, and
-training-only numerical candidate samples. It never guesses universal
+training-only numerical candidate samples. With `--neural-world`, the existing
+`game_emulator_neural_world` performs actual gradient steps only after
+independently verifying source receipts, split-by-episode evaluation and
+finite resource budgets. A failure is recorded as
+`candidate_training_blocked` while retaining honest Q-policy evidence.
+A successful neural run remains `candidate_trained_requires_independent_review`
+and can report a measured held-out predictive gain (not gameplay mastery). It never guesses universal
 victory registers, console compatibility or a game ending based on visual
 novelty.
 
 ## 4. Model weights and Dragon
 
-The ROM learner can generate actual per-title tabular policy updates on a
-properly installed host. It **does not** fine-tune Jeeves's speaking model.
+The ROM learner can generate actual per-title tabular policy updates and
+optional separately trained candidate neural world models on a properly
+installed host. It **does not** fine-tune Jeeves's speaking model.
 Use the existing attested production trainer and
 \`docs/ai/JEEVES_PRODUCTION_GAME_TRAINING_RUNBOOK.md\` for independent
 checkpoint-derived candidate weight updates and promotion. ROM evidence

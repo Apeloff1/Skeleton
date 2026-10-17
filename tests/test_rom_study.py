@@ -131,6 +131,7 @@ def _fake_training(tmp_path, monkeypatch, *, updates: int):
     def fake_training(request, *, source_lineage, config, policy_id, cancel=None):
         captured.append((request, source_lineage))
         original = {
+            "policy_snapshot": {"snapshot_digest": "d" * 64},
             "actual_q_table_updates": updates,
             "actual_training_steps": 6,
             "actual_neural_parameter_updates": 0,
@@ -188,3 +189,55 @@ def test_corrupted_existing_receipt_fails_closed(tmp_path, monkeypatch):
     assert item["state"] == "emulator_training_blocked"
     assert item["failure_type"] == "RomStudyError"
     assert result["q_policy_training_completed"] == 0
+
+
+
+def test_optional_neural_candidate_actual_optimizer_seam(tmp_path, monkeypatch):
+    """Native emulator is mocked, but the neural optimizer seam is exercised."""
+    root, first, _ = _roms(tmp_path)
+    approvals, _ = _approvals(tmp_path, first)
+    output = tmp_path / "receipts"
+    output.mkdir(mode=0o700)
+    _fake_training(tmp_path, monkeypatch, updates=3)
+    from skeleton.jeeves import game_emulator_neural_world as neural
+
+    trained = []
+    model = {"model_digest": "e" * 64, "real_optimizer_steps": 4}
+    def fake_optimizer(evidence, policy, *, config, cancel=None):
+        trained.append((evidence, policy, config))
+        return model, {"candidate_status": "candidate_predictive_gain_measured"}
+    monkeypatch.setattr(neural, "train_neural_world_from_evidence", fake_optimizer)
+    monkeypatch.setattr(neural, "validate_neural_world_checkpoint", lambda value: None)
+    result = rom.train_page(root, approvals, output, steps=4, runs=1,
+                            neural_world=True, neural_epochs=3, neural_width=8)
+    item = next(x for x in result["page_results"] if x["relative_path"] == "a.gb")
+    assert item["state"] == "q_policy_updated_with_receipt"
+    assert item["neural_world_status"] == "candidate_trained_requires_independent_review"
+    assert item["neural_candidate_optimizer_steps"] == 4
+    assert result["neural_candidate_training_completed"] == 1
+    assert len(trained) == 1
+    assert trained[0][0]["policy_snapshot_digest"] == "d" * 64
+    receipt = next(output.glob("rom-*.json"))
+    checked = rom.verified_rom_receipt(
+        receipt, expected_source_sha256=hashlib.sha256(first.read_bytes()).hexdigest()
+    )
+    assert checked["neural_weights_updated"] == 0
+
+
+def test_neural_rejection_preserves_q_evidence(tmp_path, monkeypatch):
+    root, first, _ = _roms(tmp_path)
+    approvals, _ = _approvals(tmp_path, first)
+    output = tmp_path / "receipts"
+    output.mkdir(mode=0o700)
+    _fake_training(tmp_path, monkeypatch, updates=2)
+    from skeleton.jeeves import game_emulator_neural_world as neural
+    def reject(*args, **kwargs):
+        raise neural.EmulatorNeuralError("insufficient independent replay episodes")
+    monkeypatch.setattr(neural, "train_neural_world_from_evidence", reject)
+    result = rom.train_page(root, approvals, output, steps=4, runs=1, neural_world=True)
+    item = next(x for x in result["page_results"] if x["relative_path"] == "a.gb")
+    assert item["state"] == "q_policy_updated_with_receipt"
+    assert item["neural_world_status"] == "candidate_training_blocked"
+    assert item["neural_candidate_optimizer_steps"] == 0
+    assert result["neural_candidate_training_completed"] == 0
+    assert result["q_policy_training_completed"] == 1

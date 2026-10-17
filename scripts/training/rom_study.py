@@ -32,6 +32,10 @@ def parser() -> argparse.ArgumentParser:
     train.add_argument("--runs", type=int, default=12)
     train.add_argument("--steps", type=int, default=24)
     train.add_argument("--seed", type=int, default=0)
+    train.add_argument("--neural-world", action="store_true",
+                       help="also train a checkpointed candidate neural world model from replay evidence")
+    train.add_argument("--neural-epochs", type=int, default=4)
+    train.add_argument("--neural-width", type=int, default=8)
     return root
 
 
@@ -49,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
             result = train_page(
                 args.root, args.approvals, args.output_dir, cursor=cursor,
                 limit=args.limit, runs=args.runs, steps=args.steps, seed=args.seed,
+                neural_world=args.neural_world, neural_epochs=args.neural_epochs,
+                neural_width=args.neural_width,
             )
             pages += 1
             print(json.dumps({
@@ -59,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
                 "q_policies_updated": result["q_policy_training_completed"],
                 "executed_without_updates": result["q_policy_runs_without_updates"],
                 "blocked_or_unreviewed": result["blocked_or_unreviewed"],
+                "neural_candidates_trained": result["neural_candidate_training_completed"],
                 "results": result["page_results"],
                 "neural_weights_updated": 0,
                 "production_weights_modified": False,
