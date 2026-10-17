@@ -14,6 +14,7 @@ from unittest.mock import patch
 import unittest
 
 from skeleton.ai.game_builder.studio_native_psg import compose_native_psg, console_psg_registers
+from skeleton.ai.game_builder.studio_compiled_psg_parity import _effect_bytes
 from skeleton.ai.game_builder.studio_asset_pipeline import ArtDirection
 from skeleton.ai.game_builder.studio_build_qualification import (
     _receipt, _verify_source,
@@ -43,6 +44,13 @@ def sample_rom(tiles: bytes, animation: bytes) -> bytes:
     data[0x0280:0x0290] = bytes((
         *registers["notes_low"], *registers["notes_high"]
     ))
+    for index in range(3):
+        start = 0x02A0 + 15 * index
+        data[start:start + 15] = _effect_bytes(
+            "nintendo_game_boy", enabled=False,
+            low=registers["events_low"][index],
+            high=registers["events_high"][index],
+        )
     checksum = 0
     for item in data[0x134:0x14D]:
         checksum = (checksum - item - 1) & 255
@@ -56,6 +64,7 @@ GB_SYMBOLS = (
     "00:c009 GameWon\\n00:c00a GameLost\\n00:c00b ScoreHigh\\n00:c00c TurnCount\\n00:c00d TurnCountHigh\\n"
     "00:0200 Tiles\\n00:0260 TilesEnd\\n00:0260 AnimationTiles\\n00:0270 AnimationTilesEnd\\n"
     "00:0280 OriginalMusicLow\\n00:0288 OriginalMusicHigh\\n"
+    "00:02a0 SoundPickup\\n00:02af SoundHazard\\n00:02be SoundGoal\\n"
 ).replace(chr(92) + "n", chr(10)).encode("ascii")
 
 
