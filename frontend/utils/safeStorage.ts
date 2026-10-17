@@ -26,15 +26,45 @@ const _mirror = new Map<string, string | null>();
 const _nativeMutations = new NativeMutationFence();
 const _keyVersions = new Map<string, number>();
 const MAX_MIRROR_ENTRIES = 2_048;
+const MAX_MIRROR_CHARS = 1024 * 1024; // ≈2 MiB UTF-16 memory budget
+const MAX_MIRROR_ITEM_CHARS = 64 * 1024;
 const MAX_VERSION_ENTRIES = 4_096;
 let _mirrorGeneration = 0;
+let _mirrorChars = 0;
+
+function forgetMirror(key: string): void {
+  if (!_mirror.has(key)) return;
+  const old = _mirror.get(key);
+  if (typeof old === 'string') _mirrorChars = Math.max(0, _mirrorChars - old.length);
+  _mirror.delete(key);
+}
 
 function remember(key: string, value: string | null): void {
-  if (!_mirror.has(key) && _mirror.size >= MAX_MIRROR_ENTRIES) {
+  forgetMirror(key);
+  const chars = typeof value === 'string' ? value.length : 0;
+  // The native store remains authoritative even when an object is too large
+  // for the ephemeral fast-read mirror.
+  if (chars > MAX_MIRROR_ITEM_CHARS) return;
+  while (_mirror.size >= MAX_MIRROR_ENTRIES ||
+         (_mirrorChars + chars > MAX_MIRROR_CHARS && _mirror.size > 0)) {
     const oldest = _mirror.keys().next().value;
-    if (oldest !== undefined) _mirror.delete(oldest);
+    if (oldest === undefined) break;
+    forgetMirror(oldest);
   }
   _mirror.set(key, value);
+  _mirrorChars += chars;
+}
+
+export function safeStorageMirrorStats() {
+  return { entries: _mirror.size, chars: _mirrorChars, maxChars: MAX_MIRROR_CHARS };
+}
+
+/** Drop only replaceable fast-read memory; never wipe native stored values. */
+export function shedSafeStorageMirror(): void {
+  _mirrorGeneration++; // fence late reads started before the pressure warning
+  _keyVersions.clear();
+  _mirror.clear();
+  _mirrorChars = 0;
 }
 
 function bumpVersion(key: string): number {
@@ -44,6 +74,7 @@ function bumpVersion(key: string): number {
     _mirrorGeneration += 1;
     _keyVersions.clear();
     _mirror.clear();
+    _mirrorChars = 0;
   }
   const next = (_keyVersions.get(key) || 0) + 1;
   _keyVersions.set(key, next);
@@ -139,7 +170,7 @@ export async function safeGetItem(key: string, fallback: string | null = null, m
 export async function safeSetItem(key: string, value: string, ms = 800): Promise<boolean> {
   const version = bumpVersion(key);
   const generation = _mirrorGeneration;
-  _mirror.delete(key); // only physical acknowledgement can populate cache
+  forgetMirror(key); // only physical acknowledgement can populate cache
   try {
     const saved = await timeout(
       _nativeMutations.run([key], () => AsyncStorage.setItem(key, value)),
@@ -147,7 +178,7 @@ export async function safeSetItem(key: string, value: string, ms = 800): Promise
     );
     if (!saved) {
       // A timed-out write is unverified: invalidate the optimistic mirror.
-      if (isCurrent(key, version, generation)) _mirror.delete(key);
+      if (isCurrent(key, version, generation)) forgetMirror(key);
       return false;
     }
     if (isCurrent(key, version, generation)) remember(key, value);
@@ -161,14 +192,14 @@ export async function safeSetItem(key: string, value: string, ms = 800): Promise
     }
     return true;
   } catch {
-    if (isCurrent(key, version, generation)) _mirror.delete(key);
+    if (isCurrent(key, version, generation)) forgetMirror(key);
     return false;
   }
 }
 
 export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
   bumpVersion(key);
-  _mirror.delete(key);
+  forgetMirror(key);
   try {
     const removed = await timeout(_nativeMutations.run([key], () => AsyncStorage.removeItem(key)), ms, false);
     if (!removed) return false;
@@ -182,7 +213,7 @@ export async function safeRemoveItem(key: string, ms = 800): Promise<boolean> {
 }
 
 export async function safeMultiRemove(keys: string[], ms = 1500): Promise<boolean> {
-  for (const k of keys) { bumpVersion(k); _mirror.delete(k); }
+  for (const k of keys) { bumpVersion(k); forgetMirror(k); }
   try {
     const removed = await timeout(_nativeMutations.run(keys, () => AsyncStorage.multiRemove(keys)), ms, false);
     if (!removed) return false;
@@ -215,9 +246,7 @@ export function resumeSafeStorageAfterWipe(): void {
 }
 
 export function clearMirror() {
-  _mirrorGeneration += 1; // fence every in-flight native read result
-  _keyVersions.clear();
-  _mirror.clear();
+  shedSafeStorageMirror();
   _metaCache = null;
 }
 
@@ -289,7 +318,7 @@ export async function pruneExpired(opts: {
     ).catch(() => false);
     // A failed prune must not declare authoritative state deleted. Preserve
     // metadata for the next attempt; prevent a stale mirror in either case.
-    for (const k of prunedKeys) { bumpVersion(k); _mirror.delete(k); }
+    for (const k of prunedKeys) { bumpVersion(k); forgetMirror(k); }
     if (removed) {
       for (const k of prunedKeys) delete meta[k];
       _metaDirty = true;
