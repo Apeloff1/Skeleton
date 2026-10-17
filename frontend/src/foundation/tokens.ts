@@ -3,7 +3,11 @@
  * theme/tokens.ts. Never introduce raw hex values here; alias the palette.
  */
 import type { TextStyle } from 'react-native';
-import theme, { palette, spacing, radii, typography, breathing } from '../../theme/tokens';
+import theme from '../../theme/tokens';
+
+// Canonical tokens expose theme-bound roles on the default object.
+// Do not import these as named exports: the theme API intentionally removed them.
+const { palette, spacing, radii, typography, breathing } = theme;
 
 export const color = {
   bg: palette.ink[950],
