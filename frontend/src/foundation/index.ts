@@ -15,3 +15,4 @@ export { AuthGate } from './AuthGate';
 export { RouteErrorFallback } from './RouteErrorFallback';
 // Existing design-system primitives, re-exported so screens import one module.
 export { Screen, Button, FeatureCard as Card, EmptyState, ErrorState, Surface } from '../components/primitives';
+export * from './realtime';
