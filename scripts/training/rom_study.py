@@ -109,6 +109,16 @@ def parser() -> argparse.ArgumentParser:
                        help="also train a checkpointed candidate neural world model from replay evidence")
     train.add_argument("--neural-epochs", type=int, default=4)
     train.add_argument("--neural-width", type=int, default=8)
+    shadow = commands.add_parser(
+        "train-shadow-world",
+        help="source-verified standalone numerical shadow world-model training from saved Q receipt",
+    )
+    shadow.add_argument("--receipt", required=True, type=Path)
+    shadow.add_argument("--approvals", required=True, type=Path)
+    shadow.add_argument("--output-dir", required=True, type=Path)
+    shadow.add_argument("--seed", type=int, default=0)
+    shadow.add_argument("--width", type=int, default=12)
+    shadow.add_argument("--epochs", type=int, default=6)
     triangle = commands.add_parser(
         "train-triangle",
         help="one-command approved native gameplay, Dragon inspection, and local adversarial review",
@@ -207,6 +217,15 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.operation == "train-shadow-world":
+            from skeleton.ai.training.rom_study import train_neural_candidate
+            result = train_neural_candidate(
+                args.receipt, args.output_dir, approvals_path=args.approvals,
+                seed=args.seed,
+                width=args.width, epochs=args.epochs,
+            )
+            print(json.dumps(result, sort_keys=True))
+            return 0
         if args.operation == "triangle-lens-progress":
             from skeleton.ai.training.rom_triangle_lens_progress import (
                 native_lens_progress,

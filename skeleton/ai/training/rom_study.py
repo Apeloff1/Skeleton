@@ -446,6 +446,296 @@ def _content_for_training(path: Path, *, sha: str, core: Any) -> Any:
     return prepare_emulator_content(bundle, reader=reader)
 
 
+def _verify_existing_q_receipt(
+    path: Path, *, source_sha: str, size: int, grant: dict[str, Any],
+    approvals_digest: str, registry_digest: str,
+) -> str:
+    """Fail closed when an existing receipt is not the exact audited source.
+
+    Existence alone is not a successful training outcome. The candidate's
+    underlying policy and source episodes are revalidated before reuse, even
+    when neural training was not requested. No ROM or core is reexecuted here.
+    """
+    from skeleton.jeeves.game_learning import _digest, GamePolicyLearner
+    from skeleton.jeeves.game_emulator_neural_world import _check_receipt
+
+    identity = _regular_identity(path)
+    if identity[2] > 32 * 1024 * 1024:
+        raise RomStudyError("saved ROM training receipt exceeds verification budget")
+    with path.open("rb") as stream:
+        raw = stream.read(32 * 1024 * 1024 + 1)
+    if len(raw) != identity[2] or _regular_identity(path) != identity:
+        raise RomStudyError("saved training receipt changed while revalidating")
+    try:
+        doc = json.loads(raw)
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise RomStudyError("saved ROM receipt is invalid JSON") from exc
+    if (type(doc) is not dict
+            or raw != _canonical(doc) + b"\n"
+            or doc.get("schema_version") != BATCH_SCHEMA
+            or doc.get("training_kind") != "actual_replay_audited_tabular_q_policy"
+            or doc.get("source_sha256") != source_sha
+            or doc.get("source_size_bytes") != size
+            or doc.get("core_id") != grant["core_id"]
+            or doc.get("target_id") != grant["target_id"]
+            or doc.get("approval_manifest_sha256") != approvals_digest
+            or doc.get("registry_digest") != registry_digest
+            or doc.get("neural_weights_updated") != 0
+            or doc.get("production_weights_modified") is not False
+            or doc.get("model_promotion_authorized") is not False):
+        raise RomStudyError("existing receipt disagrees with approved training identity")
+    report = doc.get("candidate_evidence")
+    if type(report) is not dict or type(report.get("policy_snapshot")) is not dict:
+        raise RomStudyError("existing policy evidence or learned Q snapshot is missing")
+    lineage = report.get("source_lineage")
+    if (type(lineage) is not dict
+            or lineage.get("rights_acknowledged") is not True
+            or lineage.get("source_sha256") != source_sha
+            or lineage.get("rights_review_id") != grant["rights"]["review_id"]
+            or lineage.get("rights_basis") != grant["rights"]["rights_basis"]
+            or lineage.get("approvals_manifest_sha256") != approvals_digest
+            or lineage.get("core_id") != grant["core_id"]
+            or lineage.get("target_id") != grant["target_id"]):
+        raise RomStudyError("saved receipt has different source or rights lineage")
+    policy = report["policy_snapshot"]
+    if (report.get("report_digest") != _digest({
+            key: value for key, value in report.items() if key != "report_digest"
+    }) or report.get("status") not in (
+            "observed_q_and_visual_learning_plateau",
+            "budget_exhausted_before_saturation"
+    ) or report.get("actual_neural_parameter_updates") != 0
+            or policy.get("source_lineage") != lineage
+            or report.get("environment") != policy.get("environment")):
+        raise RomStudyError("saved training report, policy or runtime lineage differs")
+    # Validate the full Q table and episodes using the canonical policy owner.
+    # Unlike neural candidate admission, a genuine one-episode Q-only run
+    # remains reusable; it must not be rejected for lacking neural samples.
+    GamePolicyLearner.from_snapshot(
+        policy, expected_source_lineage=lineage,
+    )
+    receipts = report.get("audited_run_receipts")
+    episodes = policy.get("episodes")
+    if (type(receipts) is not list or not 1 <= len(receipts) <= 32
+            or type(episodes) is not list or len(episodes) != len(receipts)
+            or type(report.get("run_count")) is not int
+            or report["run_count"] != len(receipts)):
+        raise RomStudyError("saved Q training episode count is inconsistent")
+    traces = set()
+    total_steps, total_updates = 0, 0
+    for receipt, episode in zip(receipts, episodes, strict=True):
+        _check_receipt(receipt)
+        trace = receipt.get("trace_digest")
+        if (type(trace) is not str or not _SHA.fullmatch(trace)
+                or trace in traces or type(episode) is not dict
+                or episode.get("trace_digest") != trace
+                or episode.get("steps") != receipt["actual_steps"]
+                or episode.get("seed") != receipt.get("seed")):
+            raise RomStudyError("saved Q episode identity differs from replay receipts")
+        traces.add(trace)
+        total_steps += receipt["actual_steps"]
+        total_updates += receipt["actual_tabular_q_updates"]
+    dataset = report.get("neural_candidate_dataset")
+    if (type(dataset) is not dict
+            or dataset.get("training_executed") is not False
+            or dataset.get("weights_updated") != 0
+            or dataset.get("production_promotion_authorized") is not False
+            or dataset.get("train_only_no_heldout_examples") is not True
+            or type(dataset.get("candidate_samples")) is not list
+            or dataset.get("training_sample_count") != len(dataset["candidate_samples"])
+            or dataset.get("dataset_digest") != _digest(dataset["candidate_samples"])
+            or len(dataset["candidate_samples"]) != total_steps
+            or report.get("actual_training_steps") != total_steps
+            or report.get("actual_q_table_updates") != total_updates
+            or policy.get("committed_updates") != total_updates
+            or total_updates < 1):
+        raise RomStudyError("saved Q training episode/update accounting is inconsistent")
+    return _hash(raw)
+
+
+def _verify_existing_neural_candidate(
+    path: Path, *, source_sha: str, q_digest: str,
+    source_report_digest: str, policy_digest: str,
+) -> dict[str, Any]:
+    """Reaudit an existing shadow model before reporting candidate reuse.
+
+    Neither file presence nor a recomputed unkeyed SHA authenticates the
+    native runner. This checks the saved model's own structural contract,
+    exact Q ancestry, optimizer receipts and heldout identity.
+    """
+    from skeleton.jeeves.game_learning import _digest
+    from skeleton.jeeves.game_emulator_neural_world import (
+        validate_neural_world_checkpoint,
+    )
+
+    before = _regular_identity(path)
+    if before[2] > 32 * 1024 * 1024:
+        raise RomStudyError("saved neural candidate exceeds verification budget")
+    with path.open("rb") as source:
+        raw = source.read(32 * 1024 * 1024 + 1)
+    if len(raw) != before[2] or _regular_identity(path) != before:
+        raise RomStudyError("saved neural candidate changed during inspection")
+    try:
+        doc = json.loads(raw)
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise RomStudyError("saved neural candidate is invalid JSON") from exc
+    if (type(doc) is not dict or raw != _canonical(doc) + b"\n"
+            or set(doc) != {
+                "schema_version", "rom_sha256", "source_q_receipt_sha256",
+                "source_emulator_report_digest", "model",
+                "heldout_measurements", "production_jeeves_weights_updated",
+                "candidate_only_no_auto_promotion",
+            }
+            or doc["schema_version"] != "skeleton.jeeves.rom_neural_candidate.v1"
+            or doc["rom_sha256"] != source_sha
+            or doc["source_q_receipt_sha256"] != q_digest
+            or doc["source_emulator_report_digest"] != source_report_digest
+            or doc["production_jeeves_weights_updated"] is not False
+            or doc["candidate_only_no_auto_promotion"] is not True):
+        raise RomStudyError("neural candidate source or promotion authority differs")
+    model = doc["model"]
+    measurement = doc["heldout_measurements"]
+    if type(model) is not dict or type(measurement) is not dict:
+        raise RomStudyError("saved neural parameters or holdout report absent")
+    model_digest = validate_neural_world_checkpoint(model)
+    if (model.get("source_evidence_digest") != source_report_digest
+            or model.get("source_policy_snapshot_digest") != policy_digest
+            or model.get("real_optimizer_steps") != measurement.get("real_neural_optimizer_steps")
+            or measurement.get("parent_emulator_evidence_digest") != source_report_digest
+            or measurement.get("world_model_digest") != model_digest
+            or measurement.get("candidate_status") != model.get("measured_predictive_gate")
+            or measurement.get("production_model_promotion") is not False
+            or measurement.get("report_digest") != _digest({
+                key: value for key, value in measurement.items()
+                if key != "report_digest"
+            })):
+        raise RomStudyError("shadow model lacks original optimizer/heldout ancestry")
+    return {
+        "state": "previous_neural_candidate_verified_not_retrained",
+        "candidate_name": path.name,
+        "candidate_sha256": _hash(raw),
+        "model_digest": model_digest,
+        "heldout_status": measurement["candidate_status"],
+        "neural_training_reexecuted": False,
+        "production_weights_modified": False,
+    }
+
+
+def train_neural_candidate(
+    q_receipt_path: Path, output_dir: Path, *,
+    approvals_path: Path, seed: int = 0, width: int = 12,
+    epochs: int = 6,
+) -> dict[str, Any]:
+    """Fit actual *shadow world-model* parameters from audited ROM Q evidence.
+
+    The original ROM and Q receipt are never overwritten. The network
+    predicts numerical one-step telemetry, NOT dialogue, game mastery, or
+    production Jeeves weights. Actual source replay is verified again before
+    the optimizer starts.
+    """
+    from skeleton.jeeves.game_learning import _digest
+    from skeleton.jeeves.game_emulator_neural_world import (
+        NeuralWorldConfig, train_neural_world_from_evidence,
+        validate_neural_world_checkpoint, verify_neural_training_sources,
+    )
+    output_dir = _private_output(output_dir)
+    q_receipt_path = _safe_path(q_receipt_path)
+    if q_receipt_path.parent != output_dir:
+        raise RomStudyError("neural source receipt must come from the private training directory")
+    before = _regular_identity(q_receipt_path)
+    if before[2] > 32 * 1024 * 1024:
+        raise RomStudyError("ROM neural source receipt is oversized")
+    with q_receipt_path.open("rb") as stream:
+        raw = stream.read(32 * 1024 * 1024 + 1)
+    if len(raw) != before[2] or _regular_identity(q_receipt_path) != before:
+        raise RomStudyError("ROM Q receipt changed during neural intake")
+    try:
+        document = json.loads(raw)
+    except (UnicodeError, ValueError, RecursionError) as exc:
+        raise RomStudyError("invalid ROM Q evidence JSON") from exc
+    if (not isinstance(document, dict) or document.get("schema_version") != BATCH_SCHEMA
+            or document.get("training_kind") != "actual_replay_audited_tabular_q_policy"
+            or document.get("neural_weights_updated") != 0
+            or document.get("production_weights_modified") is not False
+            or not isinstance(document.get("candidate_evidence"), dict)):
+        raise RomStudyError("neural model requires a genuine source Q training receipt")
+    # Historical rights in a Q receipt are NOT sufficient authorization
+    # for a later, separate neural optimization. Re-read the CURRENT explicit
+    # operator review and pin its exact manifest hash and native core/target.
+    source_sha = document.get("source_sha256")
+    grants, approvals_digest = _load_approvals(approvals_path)
+    grant = grants.get(source_sha)
+    if (grant is None or document.get("approval_manifest_sha256") != approvals_digest
+            or document.get("source_size_bytes") != grant["content_size_bytes"]
+            or document.get("core_id") != grant["core_id"]
+            or document.get("target_id") != grant["target_id"]
+            or not isinstance(document.get("registry_digest"), str)):
+        raise RomStudyError("current source rights review does not admit shadow training")
+    independently_verified = _verify_existing_q_receipt(
+        q_receipt_path, source_sha=source_sha, size=grant["content_size_bytes"],
+        grant=grant, approvals_digest=approvals_digest,
+        registry_digest=document["registry_digest"],
+    )
+    if independently_verified != _hash(raw):
+        raise RomStudyError("ROM Q receipt changed before neural optimization")
+    evidence_raw = document["candidate_evidence"]
+    policy = evidence_raw.get("policy_snapshot")
+    if not isinstance(policy, dict):
+        raise RomStudyError("neural model source policy is unavailable")
+    evidence = {key: value for key, value in evidence_raw.items()
+                if key != "policy_snapshot"}
+    evidence["policy_snapshot_digest"] = policy.get("snapshot_digest")
+    evidence["evidence_digest"] = _digest(evidence)
+    validated, _, _, source_digest = verify_neural_training_sources(evidence, policy)
+    if len(validated) != evidence.get("actual_training_steps"):
+        raise RomStudyError("neural candidate source and replay episode counts differ")
+    config = NeuralWorldConfig(
+        seed=seed, holdout_seed=(seed + 1) % (2**63),
+        width=width, epochs=epochs, minibatch=8,
+        max_samples=512, max_compute_units=8_000_000,
+    )
+    selection = _hash(_canonical({
+        "q_receipt_sha256": _hash(raw), "config": {
+            "seed": seed, "width": width, "epochs": epochs,
+        }
+    }))
+    source_sha = document["source_sha256"]
+    if not isinstance(source_sha, str) or not _SHA.fullmatch(source_sha):
+        raise RomStudyError("neural candidate source identity invalid")
+    name = "rom-world-" + source_sha[:16] + "-" + selection[:16] + ".json"
+    destination = output_dir / name
+    if destination.exists() or destination.is_symlink():
+        return _verify_existing_neural_candidate(
+            destination, source_sha=source_sha, q_digest=_hash(raw),
+            source_report_digest=source_digest,
+            policy_digest=policy["snapshot_digest"],
+        )
+    model, measurements = train_neural_world_from_evidence(
+        evidence, policy, config=config,
+    )
+    validate_neural_world_checkpoint(model)
+    if (measurements["world_model_digest"] != model["model_digest"]
+            or model["real_optimizer_steps"] < 1
+            or model["actual_neural_parameter_training_executed"] is not True
+            or model["production_model_promotion_authorized"] is not False
+            or model["not_a_jeeves_transformer_update"] is not True):
+        raise RomStudyError("neural optimizer or model custody check failed")
+    digest = _save_new(destination, {
+        "schema_version": "skeleton.jeeves.rom_neural_candidate.v1",
+        "rom_sha256": source_sha, "source_q_receipt_sha256": _hash(raw),
+        "source_emulator_report_digest": source_digest,
+        "model": model, "heldout_measurements": measurements,
+        "production_jeeves_weights_updated": False,
+        "candidate_only_no_auto_promotion": True,
+    })
+    return {
+        "state": "shadow_neural_candidate_trained",
+        "candidate_name": name, "candidate_sha256": digest,
+        "real_neural_optimizer_steps": model["real_optimizer_steps"],
+        "heldout_status": measurements["candidate_status"],
+        "neural_training_reexecuted": True,
+    }
+
+
 def train_page(
     root: Path, approvals_path: Path, output_dir: Path, *,
     cursor: str | None = None, limit: int = 32,
@@ -549,6 +839,16 @@ def train_page(
                     target, expected_source_sha256=identity,
                     expected_run_identity=run_identity,
                 )
+                # Never mark a fabricated or partial training report as a
+                # reused Q-policy. This second audit checks every replay
+                # receipt, learned Q-table and source-bound rights ledger.
+                independently_verified_sha = _verify_existing_q_receipt(
+                    target, source_sha=identity, size=row["size_bytes"],
+                    grant=grant, approvals_digest=approvals_digest,
+                    registry_digest=registry.registry_digest,
+                )
+                if independently_verified_sha != verified["receipt_sha256"]:
+                    raise RomStudyError("ROM Q receipt identity changed between audits")
                 summary["state"] = "previous_verified_receipt_no_reexecution"
                 summary["receipt_name"] = filename
                 summary["receipt_sha256"] = verified["receipt_sha256"]

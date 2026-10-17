@@ -13,7 +13,8 @@ from typing import Any, Mapping
 
 from .rom_inventory_snapshot import frozen_inventory_page, load_frozen_inventory
 from .rom_study import (
-    RomStudyError, _load_approvals, _private_output, verified_rom_receipt,
+    RomStudyError, _load_approvals, _private_output, _verify_existing_q_receipt,
+    verified_rom_receipt,
 )
 
 SCHEMA = "skeleton.jeeves.rom_fleet_audit.v1"
@@ -59,9 +60,14 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
                   approved: dict[str, dict[str, Any]], approval_sha: str,
                   receipts_dir: Path, *, cursor: str | None, limit: int,
                   source_index: Mapping[str, str],
-                  receipt_index: Mapping[str, tuple[Path, ...]]) -> dict[str, Any]:
+                  receipt_index: Mapping[str, tuple[Path, ...]],
+                  registry_cache: list[Any] | None = None) -> dict[str, Any]:
     """Read-only page verifier using a precomputed canonical source index."""
     page = frozen_inventory_page(snapshot, root=root, cursor=cursor, limit=limit)
+    # Resolve current core catalog lazily and only ONCE across an entire
+    # multi-page fleet sweep, without executing any ROM or loading a core.
+    if registry_cache is None:
+        registry_cache = []
     entries: list[dict[str, Any]] = []
     counts = {
         "candidate_files": 0, "distinct_sources_in_page": 0,
@@ -126,6 +132,25 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
                         or proof["content_bundle_sha256"] != grant.get("bundle_sha256")):
                     rejected += 1
                     continue
+                # A self-consistent JSON checksum or synthetic lab stub is
+                # insufficient to count any game as trained. Independently
+                # validate its entire Q snapshot, every replay receipt, actual
+                # episode/update totals and the rights-grant lineage. Compare
+                # the stored core-registry digest to the active trusted catalog.
+                if not registry_cache:
+                    from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry
+                    registry_cache.append(GameEmulatorRegistry.from_environment())
+                registry = registry_cache[0]
+                core = registry.resolve_core(grant["core_id"])
+                if core is None or grant["target_id"] not in core.target_ids:
+                    raise RomStudyError("core no longer supports approved target")
+                audited_sha = _verify_existing_q_receipt(
+                    path, source_sha=digest, size=row["size_bytes"],
+                    grant=grant, approvals_digest=approval_sha,
+                    registry_digest=registry.registry_digest,
+                )
+                if audited_sha != proof["receipt_sha256"]:
+                    raise RomStudyError("receipt changed between independent audits")
                 audited.append({
                     "receipt_sha256": proof["receipt_sha256"],
                     "receipt_name": path.name,
@@ -134,7 +159,7 @@ def _audit_loaded(root: Path, snapshot: dict[str, Any],
                     "neural_candidate_status": proof["neural_candidate_status"],
                     "neural_candidate_optimizer_steps": proof["neural_candidate_optimizer_steps"],
                 })
-            except (ValueError, OSError):
+            except (ValueError, OSError, LookupError, ImportError, RuntimeError):
                 rejected += 1
         if audited:
             trained = any(value["q_updates"] > 0 for value in audited)
@@ -220,6 +245,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
     receipts_dir = _private_output(receipts_dir)
     source_index = _source_index(snapshot)
     receipt_index = _receipt_index(receipts_dir)
+    registry_cache: list[Any] = []
     totals: dict[str, int] = {}
     by_target_core: dict[str, dict[str, Any]] = {}
     pages = 0
@@ -228,7 +254,7 @@ def audit_fleet_all(root: Path, snapshot_file: Path, approvals_file: Path,
         page = _audit_loaded(
             root, snapshot, approved, approval_sha, receipts_dir,
             cursor=cursor, limit=limit, source_index=source_index,
-            receipt_index=receipt_index,
+            receipt_index=receipt_index, registry_cache=registry_cache,
         )
         for key, count in page["page_counts"].items():
             totals[key] = totals.get(key, 0) + count
