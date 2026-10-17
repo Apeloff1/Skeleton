@@ -577,7 +577,7 @@ def _godot_with_studio_art(script: str) -> str:
     insertions = (
         (
             "var ready_to_play: bool = false",
-            "var ready_to_play: bool = false\\nvar studio_tiles: Array = []\\nvar studio_palette: Array = []\\nvar studio_frames: Array = []\\nvar sprite_frame_index: int = 0\\nvar sprite_fps: int = 4\\nvar sprite_time: float = 0.0",
+            "var ready_to_play: bool = false\nvar studio_tiles: Array = []\nvar studio_palette: Array = []\nvar studio_frames: Array = []\nvar sprite_frame_index: int = 0\nvar sprite_fps: int = 4\nvar sprite_time: float = 0.0",
         ),
         (
             "    ready_to_play = true\n    _reset()",
