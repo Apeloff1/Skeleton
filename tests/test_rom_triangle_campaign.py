@@ -152,6 +152,23 @@ def test_campaign_rejects_critic_that_did_not_produce_three_grounded_findings(
 
 
 
+def _fake_semantic_route(episode, *, max_lenses=43):
+    from skeleton.jeeves.game_emulator_triangle_semantics import SEMANTIC_LENS_BUDGET
+    assert max_lenses == SEMANTIC_LENS_BUDGET
+    return {
+        "source_native_trace_sha256": episode["source_trace_sha256"],
+        "canonical_catalog_sha256": "9" * 64,
+        "route_digest": "8" * 64,
+        "observation_fingerprints": ["7" * 64],
+        "actually_routed_lenses": SEMANTIC_LENS_BUDGET,
+        "routes": [{
+            "lens_key": "authored_lens_" + str(i),
+            "lens_family": "game", "activation_score": 0.7,
+            "question": "Which source evidence could falsify this lens?",
+        } for i in range(SEMANTIC_LENS_BUDGET)],
+    }
+
+
 def _synthetic_corpus_inputs():
     from skeleton.jeeves.game_emulator_triangle import LENSES
     evidence = {
@@ -190,10 +207,17 @@ def test_weighted_eight_lens_candidate_corpus_never_multiplies_native_games(
     from skeleton.jeeves.game_emulator_triangle import LENSES
     monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
     monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", _fake_semantic_route)
     evidence, triangle, review = _synthetic_corpus_inputs()
     result = corpus.compile_triangle_candidate_corpus(evidence, triangle, review)
     assert result["unique_independent_native_episodes"] == 1
     assert result["total_lens_candidate_views"] == len(LENSES) == 8
+    assert result["canonical_semantic_lens_selection_budget"] == 43
+    assert result["routed_semantic_lens_questions"] == 43
+    assert len(result["semantic_routes_per_episode"][0]["semantic_questions"]) == 43
+    assert all(question["factual_label_available"] is False
+               for question in result["semantic_routes_per_episode"][0]["semantic_questions"])
+    assert result["semantic_questions_are_not_supervised_labels"] is True
     assert result["additional_independent_gameplay_episodes_from_lenses"] == 0
     assert result["same_source_total_weight_per_episode"] == 1
     assert all(row["same_source_view_weight"] == {"numerator": 1, "denominator": 8}
@@ -209,6 +233,7 @@ def test_corpus_cannot_train_on_unstructured_critic_or_unreviewed_rom(monkeypatc
     from skeleton.jeeves import game_emulator_triangle_corpus as corpus
     monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
     monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", _fake_semantic_route)
     evidence, triangle, review = _synthetic_corpus_inputs()
     review["structured_source_bound_passes"] = 2
     with pytest.raises(corpus.TriangleCorpusError, match="three"):
@@ -223,6 +248,7 @@ def test_corpus_rejects_corrupted_lens_or_falsified_candidate_output(monkeypatch
     from skeleton.jeeves import game_emulator_triangle_corpus as corpus
     monkeypatch.setattr(corpus, "verify_training_triangle", lambda *a: None)
     monkeypatch.setattr(corpus, "verify_native_adversarial_review", lambda *a: None)
+    monkeypatch.setattr(corpus, "route_episode_semantic_lenses", _fake_semantic_route)
     evidence, triangle, review = _synthetic_corpus_inputs()
     candidate = corpus.compile_triangle_candidate_corpus(evidence, triangle, review)
     candidate["candidate_rows"][0]["answer"] = "Invented win and fake gameplay."

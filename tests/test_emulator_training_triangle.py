@@ -472,3 +472,55 @@ def test_native_optical_verifier_rejects_rehashed_fake_temporal_fraction():
     })
     with pytest.raises(ValueError, match="tile change"):
         verify_native_observation(witness, frame_sha256="a" * 64)
+
+
+def test_real_canonical_jeeves_router_selects_forty_three_source_bound_lenses():
+    from skeleton.jeeves.agent.semantic_maximal import MaximalSemanticRegistry
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+        verify_episode_semantic_lenses,
+    )
+    report = _report(count=1)
+    episode = build_training_triangle(report)["episode_lens_references"][0]
+    route = route_episode_semantic_lenses(episode)
+    verify_episode_semantic_lenses(episode, route)
+    assert route["requested_max_lenses"] == 43 == SEMANTIC_LENS_BUDGET
+    assert 1 <= route["actually_routed_lenses"] <= 43
+    assert route["canonical_catalog_lens_count"] >= 43
+    assert route["factual_assertions_authorized"] is False
+    assert route["additional_native_training_examples"] == 0
+    canonical = {definition.key for definition in MaximalSemanticRegistry().all()}
+    selected = {row["lens_key"] for row in route["routes"]}
+    assert len(selected) == route["actually_routed_lenses"]
+    assert selected <= canonical
+    assert all(row["training_ground_truth_label_available"] is False
+               for row in route["routes"])
+    assert all(row["state"] == "routed_interpretive_question_unanswered"
+               for row in route["routes"])
+
+
+def test_real_canonical_semantic_lens_audit_rejects_rehashed_forgery():
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        TriangleSemanticError, route_episode_semantic_lenses,
+        verify_episode_semantic_lenses,
+    )
+    source = build_training_triangle(_report(count=1))["episode_lens_references"][0]
+    route = route_episode_semantic_lenses(source)
+    forged = deepcopy(route)
+    forged["routes"][0]["training_ground_truth_label_available"] = True
+    forged["route_digest"] = _digest({k: v for k, v in forged.items()
+                                        if k != "route_digest"})
+    with pytest.raises(TriangleSemanticError, match="no longer matches"):
+        verify_episode_semantic_lenses(source, forged)
+
+
+def test_real_canonical_semantic_router_does_not_claim_new_training_weights():
+    from skeleton.jeeves.game_emulator_triangle_semantics import (
+        TriangleSemanticError, route_episode_semantic_lenses,
+    )
+    episode = build_training_triangle(_report(count=1))["episode_lens_references"][0]
+    one = route_episode_semantic_lenses(episode, max_lenses=1)
+    assert one["actually_routed_lenses"] == 1
+    assert one["routes"][0]["new_independent_evidence"] == 0
+    with pytest.raises(TriangleSemanticError, match="1..43"):
+        route_episode_semantic_lenses(episode, max_lenses=44)
