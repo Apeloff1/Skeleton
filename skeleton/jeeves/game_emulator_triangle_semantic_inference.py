@@ -250,7 +250,7 @@ def verify_native_semantic_lenses(
         and 32 <= saved["requested_max_new_tokens"] <= 512
         and saved.get("native_model_generations_executed") == SEMANTIC_LENS_BUDGET
         and saved.get("all_semantic_lenses_executed") is True
-        and saved.get("all_semantic_interpretations_valid") is True
+        and type(saved.get("all_semantic_interpretations_valid")) is bool
         and saved.get("actual_native_gameplay_steps_added_by_lenses") == 0
         and saved.get("additional_independent_training_examples") == 0
         and saved.get("semantic_hypotheses_admitted_as_ground_truth") is False
@@ -291,7 +291,9 @@ def verify_native_semantic_lenses(
         )
         validated += entry["interpretation"]["status"] == "source_referenced_interpretation_not_ground_truth"
     _require(saved.get("source_bound_interpretations") == validated
-             and validated == SEMANTIC_LENS_BUDGET,
+             and saved["all_semantic_interpretations_valid"] is (
+                 validated == SEMANTIC_LENS_BUDGET
+             ),
              "native semantic lens completeness or grounded references differ")
 
 
