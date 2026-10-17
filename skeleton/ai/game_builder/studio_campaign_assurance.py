@@ -25,6 +25,7 @@ from .studio_runtime_qualification import _inputs as _browser_inputs, qualify_br
 from .studio_godot_qualification import godot_inputs, qualify_godot_headless
 from .studio_pixel_parity import inspect_cross_engine_pixels
 from .studio_game_boy_emulator import qualify_game_boy_emulator
+from .studio_nes_emulator import qualify_nes_cpu_ppu
 from .studio_dragon_canvas_capture import capture_generated_game, _png_geometry
 
 SCHEMA = "skeleton.game_builder.production_assurance.v1"
@@ -487,15 +488,20 @@ def _emulator_receipt(root: Path, target: str, source_identity: str) -> dict | N
                                  if k != "evidence_digest"}) != proof.get("evidence_digest")):
         raise StudioAssuranceError("native emulator receipt belongs to another campaign")
     run = proof.get("run")
+    nes = target == "nintendo_famicom"
+    schema = ("skeleton.game_builder.nes_cpu_ppu_playthrough.v1" if nes
+              else "skeleton.game_builder.game_boy_emulator_playthrough.v1")
+    replay_key = "cpu_input_replay_executed" if nes else "full_controller_replay"
+    frame_key = "frame_count" if nes else "frames_advanced"
     if (type(run) is not dict
-            or run.get("schema") != "skeleton.game_builder.game_boy_emulator_playthrough.v1"
+            or run.get("schema") != schema
             or run.get("emulator_executed") is not True
-            or run.get("full_controller_replay") is not True
+            or run.get(replay_key) is not True
             or run.get("machine_code_victory") is not True
             or run.get("physical_controller_verified") is not False
             or run.get("physical_console_verified") is not False
-            or type(run.get("frames_advanced")) is not int
-            or run["frames_advanced"] <= 0
+            or type(run.get(frame_key)) is not int
+            or run[frame_key] <= 0
             or canonical_digest({k: v for k, v in run.items()
                                  if k != "receipt_digest"}) != run.get("receipt_digest")):
         raise StudioAssuranceError("native ROM playthrough evidence lacks real machine-code victory")
@@ -521,14 +527,14 @@ def qualify_campaign_emulator(
     authorized: bool, execute: bool, timeout_seconds: int = 90,
     max_frames: int = 260_000,
 ) -> dict:
-    """Run qualified original GB/GBC compiled ROM against the real PyBoy CPU."""
+    """Execute validated GB/GBC PyBoy or NES FCEUX machine-code controller replay."""
     if authorized is not True:
         raise PermissionError("local emulator execution requires explicit operator authority")
     if execute is not True:
         raise StudioAssuranceError("native cartridge emulation requires opt-in execution")
     if not isinstance(order, CampaignOrder) or target not in order.targets:
         raise StudioAssuranceError("emulated target is not in canonical original game campaign")
-    if target not in ("nintendo_game_boy", "nintendo_game_boy_color"):
+    if target not in ("nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom"):
         raise StudioAssuranceError("no full cartridge emulator replay adapter for target")
     base = Path(root)
     with campaign_lock(base):
@@ -547,11 +553,19 @@ def qualify_campaign_emulator(
                 "physical_controller_verified": False,
             }
         folder = base / "qualifications" / target
-        result = qualify_game_boy_emulator(
-            folder, engine_source=base / "targets" / target / "engines",
-            target=target, authorized=True, execute=True,
-            timeout_seconds=timeout_seconds, max_frames=max_frames,
-        )
+        engine = base / "targets" / target / "engines"
+        if target == "nintendo_famicom":
+            result = qualify_nes_cpu_ppu(
+                folder, engine_source=engine,
+                authorized=True, execute=True,
+                timeout_seconds=timeout_seconds, max_frames=max_frames,
+            )
+        else:
+            result = qualify_game_boy_emulator(
+                folder, engine_source=engine, target=target,
+                authorized=True, execute=True,
+                timeout_seconds=timeout_seconds, max_frames=max_frames,
+            )
         run = result.as_receipt()
         if not result.machine_code_victory:
             return {
@@ -574,7 +588,10 @@ def qualify_campaign_emulator(
         return {
             "target": target, "machine_code_victory": True,
             "already_qualified": False,
-            "framebuffer_sha256": result.framebuffer_sha256,
+            "framebuffer_sha256": (
+                result.ppu_frame_sha256 if target == "nintendo_famicom"
+                else result.framebuffer_sha256
+            ),
             "evidence_digest": record["evidence_digest"],
             "physical_controller_verified": False,
         }
@@ -610,7 +627,8 @@ def _inspect_production_assurance_unlocked(order: CampaignOrder, root: str | Pat
                 binary = _qualification_receipt(base, target, campaign["identity"])
             art_parity = inspect_cross_engine_pixels(source)
             emulator = (_emulator_receipt(base, target, campaign["identity"])
-                        if target in ("nintendo_game_boy", "nintendo_game_boy_color") else None)
+                        if target in ("nintendo_game_boy", "nintendo_game_boy_color",
+                                      "nintendo_famicom") else None)
             browser = _browser_receipt(base, target, campaign["identity"])
             godot = _godot_receipt(base, target, campaign["identity"])
             canvas = _canvas_receipt(base, target, campaign["identity"])
