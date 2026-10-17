@@ -19,15 +19,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useModalStore, ModalType } from '../store/modalStore';
-import theme from '../theme/tokens';
-import { Screen, AppHeader, SearchBar, Chip, FeatureCard, SectionHeader } from '../components/UI';
-import { useNotesCount } from '../utils/useNotesCount';
-import * as haptics from '../utils/haptics';
-import { toast } from '../components/Toast';
-import { actionSheet } from '../components/ActionSheet';
-import { useMenuPrefs, togglePin, toggleHide } from '../utils/menuPrefs';
-import { useFeatureFlag } from '../utils/featureFlags';
+import { useModalStore, ModalType } from '../src/store/modalStore';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader, SearchBar, Chip, FeatureCard, SectionHeader } from '../src/components/UI';
+import { useNotesCount } from '../src/utils/useNotesCount';
+import * as haptics from '../src/utils/haptics';
+import { toast } from '../src/components/AppToast';
+import { actionSheet } from '../src/components/ActionSheet';
+import { useMenuPrefs, togglePin, toggleHide } from '../src/utils/menuPrefs';
+import { useFeatureFlag } from '../src/utils/featureFlags';
 
 // ─────────────────────────────────────────────────────────────────────
 // FEATURE CATALOG — single source of truth for what the APK contains.

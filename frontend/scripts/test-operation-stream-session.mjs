@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import {
   OperationBrowserSession,
-} from '../services/operationStreamSession.ts';
+} from '../src/services/operationStreamSession.ts';
 
 function snapshot(state = 'running', version = 1) {
   return {

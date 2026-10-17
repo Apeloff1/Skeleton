@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 function load() {
-  const name = path.join(__dirname, '../services/monthCycleLedger.ts');
+  const name = path.join(__dirname, '../src/services/monthCycleLedger.ts');
   const result = ts.transpileModule(fs.readFileSync(name, 'utf8'), {
     fileName: name, compilerOptions: {
       module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,

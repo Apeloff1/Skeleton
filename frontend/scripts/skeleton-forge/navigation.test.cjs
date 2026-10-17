@@ -15,7 +15,7 @@ test('route file exists and deep-links tabs', () => {
 });
 
 test('route registry declares /skeleton-forge exactly once under build', () => {
-  const reg = read('utils/routeRegistry.ts');
+  const reg = read('src/utils/routeRegistry.ts');
   const hits = reg.match(/path: '\/skeleton-forge'[^}]*/g) || [];
   assert.equal(hits.length, 1);
   assert.match(hits[0], /category: 'build'/);

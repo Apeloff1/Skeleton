@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const read = relativePath => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 const inventory = read('../app/ai-models.tsx');
-const readiness = read('../features/Jeeves/JeevesRuntimeStatus.tsx');
+const readiness = read('../src/features/Jeeves/JeevesRuntimeStatus.tsx');
 const catalog = read('../src/product/productCatalog.ts');
 const client = read('../src/product/chatSessionClient.ts');
 

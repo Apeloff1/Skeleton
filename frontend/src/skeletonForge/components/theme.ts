@@ -1,6 +1,6 @@
 /** Forge cockpit compatibility colors from the canonical design-token module. */
 import type { Tone } from '../run';
-import design, { breathing, radii } from '../../../theme/tokens';
+import design, { breathing, radii } from '../../theme/tokens';
 
 export const C = {
   get bg() { return design.colors.bg; },

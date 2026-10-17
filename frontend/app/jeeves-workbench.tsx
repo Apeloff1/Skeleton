@@ -1,1 +1,1 @@
-export { default } from '../features/Jeeves/workbench/WorkbenchScreen';
+export { default } from '../src/features/Jeeves/workbench/WorkbenchScreen';

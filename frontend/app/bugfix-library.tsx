@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/BugfixLibrary/BugfixLibraryModal'), 'BugfixLibraryRoute', 'BugfixLibraryModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/BugfixLibrary/BugfixLibraryModal'), 'BugfixLibraryRoute', 'BugfixLibraryModal');

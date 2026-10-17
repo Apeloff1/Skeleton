@@ -31,9 +31,9 @@ function transpile(relative, imports = {}) {
   return module.exports;
 }
 
-const tokens = transpile('theme/tokens.ts');
-const skins = transpile('theme/skins.ts');
-const roles = transpile('constants/themes.ts', { '../theme/tokens': tokens });
+const tokens = transpile('src/theme/tokens.ts');
+const skins = transpile('src/theme/skins.ts');
+const roles = transpile('src/constants/themes.ts', { '../theme/tokens': tokens });
 
 function luminance(hex) {
   const rgb = /^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -111,11 +111,11 @@ test('Deluxe cards and Forge status colors follow skin transitions without stale
 
 test('Deluxe and cockpit contain no independent hexadecimal color palettes', () => {
   for (const relative of ['src/theme/deluxe.ts',
-    'src/skeletonForge/components/theme.ts', 'constants/themes.ts']) {
+    'src/skeletonForge/components/theme.ts', 'src/constants/themes.ts']) {
     const file = fs.readFileSync(path.resolve(__dirname, '..', relative), 'utf8');
     assert.doesNotMatch(file, /#[0-9a-fA-F]{3,8}\b/);
   }
   const hook = fs.readFileSync(
-    path.resolve(__dirname, '..', 'hooks/useTheme.ts'), 'utf8');
+    path.resolve(__dirname, '..', 'src/hooks/useTheme.ts'), 'utf8');
   assert.match(hook, /useActiveSkin\(\)/);
 });

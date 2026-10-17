@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { safeSetItem } from '../utils/safeStorage';
+import { safeSetItem } from '../src/utils/safeStorage';
 
 const WELCOME_FLAG_KEY = '@codedock:welcome_seen:v1';
 

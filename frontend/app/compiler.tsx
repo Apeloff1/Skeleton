@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/Compiler/CompilerModal'), 'CompilerRoute', 'CompilerModal', { onApplyFix: () => {} } as any);
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/Compiler/CompilerModal'), 'CompilerRoute', 'CompilerModal', { onApplyFix: () => {} } as any);
