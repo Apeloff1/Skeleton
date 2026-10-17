@@ -125,3 +125,17 @@ Track per-SDK readiness and improvement separately, including errors,
 unsupported APIs, interface/compiler diagnostics, reproducible examples,
 resource ceilings and rollback. Proprietary SDK access remains an external
 prerequisite; the system must neither bypass terms nor fabricate SDK coverage.
+
+### SDK revision and rights-review drift
+
+Preserve a redacted, versioned custody snapshot before reusing a previous
+approved SDK corpus. Given `report, sources = validate_sources(manifest)`,
+call `custody_snapshot(report, sources)` from
+`skeleton.ai.training.sdk_custody_drift` and retain that JSON snapshot
+in a private, reviewed record. Repeat for the subsequent SDK installation,
+then call `compare_custody(previous, current)`. Any modified source hash,
+SDK version, target binding, license review, revocation, or added/removed
+document requires review before corpus reuse. No raw SDK docs are copied
+into the comparison. These SHA-256 identity pins are **not** external
+authenticity signatures, and the diff does not execute SDKs or update Jeeves
+production model weights.
