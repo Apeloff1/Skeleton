@@ -214,7 +214,8 @@ def _header(family: str, payload: bytes) -> None:
 
 
 _GB_WRAM_LABELS = ("Level", "PlayerX", "PlayerY", "Health", "Score",
-                   "ScoreHigh", "GemsRemaining", "GameWon", "GameLost")
+                   "ScoreHigh", "TurnCount", "TurnCountHigh",
+                   "GemsRemaining", "GameWon", "GameLost")
 
 
 def parse_game_boy_symbols(payload: bytes) -> dict[str, int]:
