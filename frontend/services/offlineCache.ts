@@ -17,6 +17,7 @@ const CACHE_MANIFEST_KEY = '@tutolage_manifest';
 const COMMIT_KEY = '@tutolage_offline_commit:v1';
 const CURRENT_VERSION = '2026-SOTA-v2';
 const PAGE_SIZE = 100;
+const LEGACY_CHUNK_SIZE = 200;
 const MAX_PAGE_CHARS = 1024 * 1024;
 const MAX_READ_DOCS = 20_000;
 const MAX_COLLECTIONS = 5_000;
@@ -226,17 +227,6 @@ async function removeKeys(keys: string[]): Promise<void> {
     await AsyncStorage.multiRemove(keys.slice(i, i + 100));
   }
 }
-async function removeStagedGeneration(generation: string): Promise<void> {
-  try {
-    const prefix = CACHE_PREFIX + 'g-' + generation + '/';
-    // A successful generation is authoritative after commit. Never delete it
-    // from an old cleanup callback; deleting another sync's staging is unsafe.
-    const current = await committed();
-    if (current?.generation === generation) return;
-    const keys = await AsyncStorage.getAllKeys();
-    await removeKeys(keys.filter(key => key.startsWith(prefix)));
-  } catch { /* best effort */ }
-}
 
 async function runSync(onProgress?: (overall: OverallProgress) => void, signal?: AbortSignal): Promise<SyncResult> {
   const invalid: SyncResult = { success: false, collections: 0, documents: 0 };
@@ -246,7 +236,6 @@ async function runSync(onProgress?: (overall: OverallProgress) => void, signal?:
   signal?.addEventListener('abort', onAbort, { once: true });
   if (signal?.aborted) controller.abort();
   const generation = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-  let committedSuccessfully = false;
   try {
     const manifest = validateManifest(await requestJson(`${API}/api/academy/offline/manifest`, controller.signal));
     if (!manifest || controller.signal.aborted) return invalid;
@@ -273,16 +262,15 @@ async function runSync(onProgress?: (overall: OverallProgress) => void, signal?:
     };
     // LAST authoritative write: after every page and metadata row completed.
     await AsyncStorage.setItem(COMMIT_KEY, JSON.stringify(commit));
-    committedSuccessfully = true;
     return { success: true, collections: completed, documents };
   } catch { return invalid; }
   finally {
     signal?.removeEventListener('abort', onAbort);
     if (syncController === controller) syncController = null;
-    // Do not delete a prior committed generation from a detached callback:
-    // older readers may have captured its pointer before this transaction.
-    // An incomplete staging namespace is always safe to remove by exact ID.
-    if (!committedSuccessfully) void removeStagedGeneration(generation);
+    // Do not delete a prior committed generation (old readers can hold its
+    // pointer) or auto-delete ambiguous partially committed staging after an
+    // uncertain native acknowledgement. Explicit clear reclaims all owned
+    // generations. A later orphan GC needs reader leases + durable fencing.
   }
 }
 
@@ -315,17 +303,18 @@ export async function getCachedCollectionPage(
     const expected = active.manifest.collections[collection];
     const meta = await getStoredMeta(collection, active.generation);
     if (!meta || meta.total !== expected || skip >= expected) return [];
-    const first = Math.floor(skip / PAGE_SIZE);
-    const end = Math.min(meta.chunks, Math.ceil((skip + limit) / PAGE_SIZE));
+    const chunkSize = active.generation ? PAGE_SIZE : LEGACY_CHUNK_SIZE;
+    const first = Math.floor(skip / chunkSize);
+    const end = Math.min(meta.chunks, Math.ceil((skip + limit) / chunkSize));
     const result: unknown[] = [];
     for (let chunk = first; chunk < end; chunk++) {
       const raw = await AsyncStorage.getItem(baseKey(collection, active.generation) + '_' + chunk);
       if (!raw || raw.length > MAX_PAGE_CHARS) return [];
       const docs = JSON.parse(raw);
-      if (!Array.isArray(docs) || docs.length > PAGE_SIZE) return [];
+      if (!Array.isArray(docs) || docs.length > chunkSize) return [];
       result.push(...docs);
     }
-    return result.slice(skip % PAGE_SIZE, skip % PAGE_SIZE + limit);
+    return result.slice(skip % chunkSize, skip % chunkSize + limit);
   } catch { return []; }
 }
 
