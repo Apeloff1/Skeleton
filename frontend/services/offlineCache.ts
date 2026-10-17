@@ -148,16 +148,25 @@ async function requestJson(url: string, signal?: AbortSignal): Promise<unknown> 
   signal?.addEventListener('abort', onAbort, { once: true });
   if (signal?.aborted) controller.abort();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let rejectOnAbort: (() => void) | null = null;
+  const abortPromise = new Promise<never>((_resolve, reject) => {
+    rejectOnAbort = () => reject(new Error('Offline request aborted'));
+    if (controller.signal.aborted) rejectOnAbort();
+    else controller.signal.addEventListener('abort', rejectOnAbort, { once: true });
+  });
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    // Abort must settle the caller even when an outdated fetch shim ignores
+    // AbortSignal entirely; a late response can never write staged data.
+    const response = await Promise.race([fetch(url, { signal: controller.signal }), abortPromise]);
     if (!response.ok || controller.signal.aborted) throw new Error('Offline endpoint unavailable');
     const declared = Number(response.headers?.get?.('content-length'));
     if (Number.isFinite(declared) && declared > MAX_PAGE_CHARS) throw new Error('Oversized offline page');
-    const text = await response.text();
+    const text = await Promise.race([response.text(), abortPromise]);
     if (controller.signal.aborted || text.length > MAX_PAGE_CHARS) throw new Error('Offline page invalid');
     return JSON.parse(text);
   } finally {
     clearTimeout(timer);
+    if (rejectOnAbort) controller.signal.removeEventListener('abort', rejectOnAbort);
     signal?.removeEventListener('abort', onAbort);
   }
 }
