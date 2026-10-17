@@ -117,10 +117,10 @@ class AllLensReviewContract(unittest.TestCase):
         review = review_verified_training_report(report, limit=24)
         self.assertEqual(review["review_lens_count"], 24)
         self.assertFalse(review["source_integrity"]["native_runtime_reexecuted"])
-        self.assertEqual(review["source_actual_steps_claimed_by_report"]
-                         if "source_actual_steps_claimed_by_report" in review else
-                         review["source_integrity"]["source_actual_steps_claimed_by_report"],
-                         report["actual_training_steps"])
+        self.assertEqual(
+            review["source_integrity"]["source_actual_steps_claimed_by_report"],
+            report["actual_training_steps"],
+        )
 
     def test_page_stable_digest_source_and_catalog_unchanged(self):
         report = _synthetic_report()
