@@ -122,6 +122,10 @@ def test_43_lens_coverage_rejects_invalid_page(monkeypatch):
         coverage.audit_43_lens_coverage(evidence, triangle, start_episode=2)
     with pytest.raises(coverage.TriangleCoverageError, match="page"):
         coverage.audit_43_lens_coverage(evidence, triangle, limit=17)
+    with pytest.raises(coverage.TriangleCoverageError, match="page"):
+        coverage.audit_43_lens_coverage(
+            evidence, triangle, requested_keys=[["unhashable"]] * 43,
+        )
 
 
 def test_rom_cli_exposes_cross_episode_lens_audit():

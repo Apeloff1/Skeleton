@@ -36,6 +36,8 @@ def audit_43_lens_coverage(
             or type(limit) is not int or not 1 <= limit <= MAX_EPISODES_PER_PAGE
             or type(requested_keys) not in (tuple, list)
             or len(requested_keys) not in (0, SEMANTIC_LENS_BUDGET)
+            or any(type(key) is not str or not key
+                   or key != key.strip().casefold() for key in requested_keys)
             or len(set(requested_keys)) != len(requested_keys)):
         raise TriangleCoverageError("invalid 43-lens audit episode page or lens selection")
     selected = episodes[start_episode:start_episode + limit]

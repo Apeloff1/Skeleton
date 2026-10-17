@@ -23,7 +23,7 @@ def _fixture(monkeypatch):
             "native_rgb24_frames_optically_inspected": 3,
         },
         "ai_playing": {
-            "actual_tabular_q_updates": 2,
+            "actual_q_table_updates": 2,
             "counterfactual_native_probes": 2,
         },
         "repetition": {"replayed_native_steps": 6},
@@ -41,6 +41,9 @@ def _fixture(monkeypatch):
         "prediction_to_test": "Future repeated native gameplay might show a new pattern.",
         "failure_mode": "No semantic interpretation is directly observed.",
         "governance_fingerprint": f"{i + 12:064x}",
+        "native_evidence_support_class": "hypothesis_only_without_matching_native_cue",
+        "matched_native_observation_cues": [],
+        "native_observation_cue_provenance_sha256": _digest([]),
     } for i in range(43)]
     route = {
         "actually_routed_lenses": 43,
