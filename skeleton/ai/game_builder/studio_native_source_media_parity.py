@@ -14,8 +14,12 @@ from pathlib import Path
 from skeleton.jeeves.game_console_assets import decode_tiles
 
 from .contracts import canonical_digest
-from .game_boy_native_export import _ASM as _GB_RUNTIME, _hero_frame_bytes
-from .nes_native_export import _ASM as _NES_RUNTIME, _hero_frame_chr
+from .game_boy_native_export import (
+    _ASM as _GB_RUNTIME, _hero_frame_bytes, _tile_bytes,
+)
+from .nes_native_export import (
+    _ASM as _NES_RUNTIME, _hero_frame_chr, _nes_chr,
+)
 from .studio_native_psg import compose_native_psg, console_psg_registers
 from .studio_pixel_parity import _game_json, inspect_cross_engine_pixels
 from .studio_runtime_qualification import _inputs
@@ -100,6 +104,13 @@ def inspect_native_source_media(project: str | Path, *, target: str) -> dict:
         raise NativeMediaSourceError("native source frame manifest differs from actual indexed pixels")
 
     nes = target == "nintendo_famicom"
+    # Before auditing appended hero animation, verify the *base six* tiles
+    # present in the assembler are exactly the generated 2bpp atlas. This
+    # catches rehashed source-only pixel corruption before any ROM exists.
+    authored_tiles = tuple(tuple(tile) for tile in tiles)
+    expected_base = (_nes_chr(authored_tiles) if nes
+                     else _tile_bytes(authored_tiles))
+    _exact_region(source, "Tiles:\n", "\nTilesEnd:", expected_base)
     if nes:
         expected_frames = (_hero_frame_chr(frames[1:]) if len(frames) > 1
                            else "; single original player sprite")
