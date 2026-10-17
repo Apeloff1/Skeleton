@@ -147,3 +147,30 @@ def test_options_do_not_escape_observer_commands(tmp_path):
     assert not cli(root, "dragon-observe-sync", "--page-size", "257")["ok"]
     assert not cli(root, "dragon-observe-cycle", "--passes", "9")["ok"]
     assert not cli(root, "dragon-observe-status", "--evidence", "0" * 64)["ok"]
+
+
+def test_opted_in_jeeves_cli_returns_are_observed_without_raw_payload(tmp_path):
+    root = workspace(tmp_path)
+    assert cli(root, "dragon-observe-start", "--consent")["ok"]
+    response = cli(root, "production-status")
+    assert response["ok"]
+    assert response["dragon_observer"]["actual_cli_return_observed"] is True
+    assert response["dragon_observer"]["raw_content_retained"] is False
+    report = cli(root, "dragon-observe-status")
+    assert report["instrumented_cli_observations"] == 1
+    assert report["operator_claims"] == 0
+    assert report["canonical_production_observations"] == 0
+    assert report["production"]["project_complete"] is False
+
+
+def test_bad_flags_and_corrupt_event_types_cannot_bypass_validation(tmp_path):
+    root = workspace(tmp_path)
+    assert cli(root, "dragon-observe-start", "--consent")["ok"]
+    assert not cli(root, "production-status", "--actor", "dragon")["ok"]
+    cli(root, "production-status")
+    event_path = root / ".jeeves" / "production" / "dragon_observer" / "events" / "000000000001.json"
+    corrupt = json.loads(event_path.read_text())
+    corrupt["actor"] = {"actor": "jeeves"}
+    corrupt["digest"] = production._digest({k: v for k, v in corrupt.items() if k != "digest"})
+    event_path.write_text(json.dumps(corrupt))
+    assert not cli(root, "dragon-observe-status")["ok"]
