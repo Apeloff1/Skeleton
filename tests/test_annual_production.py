@@ -141,6 +141,22 @@ class AnnualProductionTests(unittest.TestCase):
         with self.assertRaises(ProductionConflict):
             self.db.heartbeat(lease, now=T0-1)
 
+    def test_clock_rollback_cannot_sign_an_old_checkpoint_after_heartbeat(self):
+        self.enroll()
+        original=self.claim()
+        renewed=self.db.heartbeat(original,now=T0+100,lease_seconds=120)
+        with self.assertRaises(ProductionConflict):
+            self.cp(renewed,now=T0+90)
+        self.assertEqual(self.db.read("project-1").sequence,0)
+
+    def test_clock_rollback_cannot_claim_stale_lease_release(self):
+        self.enroll()
+        lease=self.claim()
+        self.db.release(lease,now=T0+20,retry_seconds=10)
+        with self.assertRaises(ProductionConflict):
+            self.claim(now=T0+10)
+        self.assertEqual(self.db.read("project-1").status,"waiting")
+
     def test_checkpoint_sequence_must_advance_exactly_one(self):
         self.enroll()
         lease = self.claim()
