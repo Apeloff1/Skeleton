@@ -58,7 +58,7 @@ class ProductionGateTests(unittest.TestCase):
     def test_incomplete_and_complete_source_are_not_release_ready(self):
         run_campaign(self.order, self.root, authorized=True, max_targets=1)
         report = inspect_production_assurance(self.order, self.root)
-        self.assertEqual(len(GATES), 16)
+        self.assertEqual(len(GATES), 17)
         self.assertEqual(report["total_targets"], 2)
         self.assertEqual(report["targets_with_exact_source"], 1)
         self.assertEqual(report["checked_gates"], 7)
