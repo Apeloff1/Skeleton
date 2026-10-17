@@ -155,7 +155,9 @@ export class MonthCycleLedger {
       const existing = payload.records.find(
         r => r.operationId === operationId && r.consumerId === consumerId,
       );
-      if (existing && existing.status !== 'dismissed' && existing.status !== 'terminal_observed') {
+      // An operation ID identifies one canonical backend operation forever.
+      // Repeated enrollment must never revive a terminal/dismissed receipt.
+      if (existing) {
         if (existing.kind !== kind) throw new Error('Work-cycle kind mismatch');
         return clone(existing);
       }
@@ -169,13 +171,7 @@ export class MonthCycleLedger {
         status: 'observing', cursor: 0, firstSeenAt: at, lastSeenAt: at,
         nextCheckAt: at, failures: 0, terminalState: null,
       };
-      if (existing) {
-        // Reopening a completed/dismissed ID replaces its retired incarnation
-        // rather than creating duplicate keys in the durable registry.
-        payload.records[payload.records.indexOf(existing)] = record;
-      } else {
-        payload.records.push(record);
-      }
+      payload.records.push(record);
       return clone(record);
     });
   }
