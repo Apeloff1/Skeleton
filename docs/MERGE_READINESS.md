@@ -47,6 +47,11 @@ and it fails unless all of these constituent gates succeed for the same head:
 - **PR Automation Tests** — compiles the automation packages and runs the
   auto-merge, runner-v2, repository-machine, and filesystem/tool transaction
   contracts.
+- **CI/CD** — calls the reusable `.github/workflows/ci.yml` (restored in
+  #4104 after ace886be archived it): Frontend, Backend Lint/Test/Import Smoke,
+  Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and a
+  build-only Docker Build. Change-scoped jobs skip (as success) when a PR does
+  not touch their inputs; `main` pushes run all of them.
 
 The machine-readable copy of this list is `.github/ci/required-checks.json`;
 `scripts/check_required_checks_policy.py` fails the `Quarantine Policy` lane if
