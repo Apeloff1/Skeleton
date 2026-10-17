@@ -7,6 +7,10 @@ Up to 128 observations per long game, every action for shorter games.
 """
 from __future__ import annotations
 
+from hashlib import sha256
+import json
+from pathlib import Path
+
 from .contracts import canonical_digest
 
 FIELDS = ("Level", "PlayerX", "PlayerY", "Health", "Score", "ScoreHigh",
@@ -43,15 +47,13 @@ def make_checkpoint(index: int, state: dict) -> dict:
     return {"action": index, "state": {key: state[key] for key in FIELDS}}
 
 
-def reference_cpu_checkpoints(engine_source: str | "Path") -> dict:
+def reference_cpu_checkpoints(engine_source: str | Path) -> dict:
     """Rebuild actual signed Python world and independently replay all actions.
 
     This never guesses world geometry from graphics or trusts a browser-saved
     final state. The original seed/intent, regenerated world digest, embedded
     level maps and each canonical Python game transition must agree.
     """
-    from pathlib import Path
-    import json
     from .studio_runtime_qualification import _inputs
     from .studio_pixel_parity import _game_json
     from .playable_world import GameBuildIntent, generate_playable_world
@@ -114,7 +116,7 @@ def reference_cpu_checkpoints(engine_source: str | "Path") -> dict:
         raise NativeCheckpointError("Python canonical replay does not match signed game proof")
     return {
         "world_digest": identity,
-        "proof_sha256": __import__("hashlib").sha256(proof).hexdigest(),
+        "proof_sha256": sha256(proof).hexdigest(),
         "action_count": len(actions),
         "samples": expected,
     }
