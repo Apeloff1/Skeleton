@@ -114,6 +114,7 @@ def parser() -> argparse.ArgumentParser:
         help="source-verified standalone numerical shadow world-model training from saved Q receipt",
     )
     shadow.add_argument("--receipt", required=True, type=Path)
+    shadow.add_argument("--approvals", required=True, type=Path)
     shadow.add_argument("--output-dir", required=True, type=Path)
     shadow.add_argument("--seed", type=int, default=0)
     shadow.add_argument("--width", type=int, default=12)
@@ -219,7 +220,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "train-shadow-world":
             from skeleton.ai.training.rom_study import train_neural_candidate
             result = train_neural_candidate(
-                args.receipt, args.output_dir, seed=args.seed,
+                args.receipt, args.output_dir, approvals_path=args.approvals,
+                seed=args.seed,
                 width=args.width, epochs=args.epochs,
             )
             print(json.dumps(result, sort_keys=True))
