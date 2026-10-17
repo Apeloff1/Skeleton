@@ -320,6 +320,35 @@ function draw(){
   }).join("")).join("\n");
  document.getElementById("text-map").textContent=printable;
 }
+// Standard Gamepad API: D-pad 12..15, left stick axes 0/1, B undo and
+// Start restart. One turn on each new press; no uncontrolled hold-repeat.
+let previousGamepadInput="";
+function gamepadCommand(pad){
+ if(!pad || !pad.connected)return "";
+ const pressed=(index)=>Boolean(pad.buttons&&pad.buttons[index]&&pad.buttons[index].pressed);
+ if(pressed(9))return "restart";
+ if(pressed(1))return "undo";
+ const ax=pad.axes&&Number.isFinite(pad.axes[0])?pad.axes[0]:0;
+ const ay=pad.axes&&Number.isFinite(pad.axes[1])?pad.axes[1]:0;
+ if(pressed(12)||ay<=-0.6)return "up";
+ if(pressed(13)||ay>=0.6)return "down";
+ if(pressed(14)||ax<=-0.6)return "left";
+ if(pressed(15)||ax>=0.6)return "right";
+ return "";
+}
+function pollGameController(){
+ const pads=typeof navigator!=="undefined"&&typeof navigator.getGamepads==="function"
+   ? navigator.getGamepads():[];
+ const pad=Array.from(pads||[]).find(p=>p&&p.connected);
+ const next=gamepadCommand(pad);
+ if(next!==previousGamepadInput&&next&&!document.hidden){
+  if(next==="undo")undo();
+  else if(next==="restart")reset();
+  else takeTurn(next);
+ }
+ previousGamepadInput=next;
+ if(typeof requestAnimationFrame==="function")requestAnimationFrame(pollGameController);
+}
 document.addEventListener("keydown",event=>{
  if(event.altKey||event.ctrlKey||event.metaKey||event.repeat)return;
  if(["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName))return;
@@ -352,6 +381,8 @@ if(effectsScale)effectsScale.addEventListener("input",()=>{
 });
 reset();
 initStudioOverlays();
+if(typeof navigator!=="undefined"&&typeof navigator.getGamepads==="function" &&
+   typeof requestAnimationFrame==="function")requestAnimationFrame(pollGameController);
 if(STUDIO_ART && STUDIO_ART.frames && STUDIO_ART.frames.length>1){
  window.setInterval(()=>{
   if(document.hidden)return;
@@ -531,6 +562,7 @@ def render_playable_world(
         '<span><b>▲</b> Hazard — avoid</span>'
         '<span><b>▣</b> Exit — opens after collection</span></div>'
         '</section><section class="surface"><h2>Move</h2>'
+        '<p>Controller: D-pad / left stick to move, B to undo, Start to restart.</p>'
         '<div class="controls">'
         '<button data-action="up" aria-label="Move up">↑</button>'
         '<button data-action="left" aria-label="Move left">←</button>'
