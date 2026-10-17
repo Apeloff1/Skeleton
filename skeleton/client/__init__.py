@@ -24,6 +24,7 @@ from skeleton.client.projects import (
     Project,
     ProjectBrief,
     ProjectBuild,
+    ProjectBuildLink,
     ProjectPage,
     ProjectsClient,
 )
@@ -33,16 +34,17 @@ from skeleton.client.services import ServicesClient
 from skeleton.client.streaming import StreamEvent
 
 __all__ = [
+    "PROJECTS_BASE_PATH",
     "AgentsClient",
     "AuthClient",
     "BuildsClient",
     "CancelToken",
     "GatewayClient",
     "MemoryClient",
-    "PROJECTS_BASE_PATH",
     "Project",
     "ProjectBrief",
     "ProjectBuild",
+    "ProjectBuildLink",
     "ProjectPage",
     "ProjectsClient",
     "RequestSealer",

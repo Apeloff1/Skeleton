@@ -1,21 +1,17 @@
-"""Projects client for the single contract ``skeleton.projects.v1``.
+"""Projects client for ``skeleton.projects.v1`` (base ``/api/v1/projects``).
 
-This follows the TD ruling: there is one contract, ``skeleton.projects.v1``
-(PR #4112, being amended), served by Internal Systems' #4097 code under
-``/api/v1/projects``. Until IS moves the routes, #4097 serves them at
-``/api/app/projects``; pass ``base_path=`` to target that.
+Aligned to Internal Systems' #4097 at 6524b7c35 (``skeleton/api/projects_routes.py``;
+its ``skeleton/contracts/projects.py`` is byte-identical to #4112's).
 
-- Auth: ``Authorization: Bearer <session token>`` plus ``x-gf-seal`` when the
-  gateway has a seal configured. ``actor_id`` and ``tenant_id`` are never sent;
-  the server derives them from the session.
-- Requests carry ``schema_version`` "1.0.0".
-- Responses are parsed loosely so both the current #4097 shapes (``ProjectOut``,
-  ``{"projects": [...]}``, ``BuildOut``) and the v1 shapes (``Project`` with
-  status and build_ids, ``{"items": [...], "next_cursor": ...}``, Build plus
-  ``execution_id``) are accepted.
-- Errors: the v1 envelope ``{"error": {"type", "code": "PROJECT.*",
-  "message"}}`` and the legacy ``{"detail": "<code>"}`` both surface as
-  :class:`SkeletonHTTPError` with ``.code`` (and ``.message``) set.
+- Auth: every route needs ``x-gf-seal`` (configure a seal on the gateway) and
+  ``Authorization: Bearer <session token>``. Seal failures come from the gate as
+  ``{"error": "invalid_seal"}`` (re-minted once) or ``{"error":
+  "seal_unavailable"}`` (never retried).
+- ``actor_id`` and ``tenant_id`` are server-derived and never sent. Unknown body
+  fields are rejected with 400, so the client sends only contract fields.
+- Errors use ``{"error": {"type": "ProjectContractError", "code": "PROJECT.*",
+  "message", "context"}}`` and surface as :class:`SkeletonHTTPError` with
+  ``.code``, ``.message`` and ``.context`` set.
 """
 
 from __future__ import annotations
@@ -23,8 +19,9 @@ from __future__ import annotations
 import os
 import time
 import uuid
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping, Sequence, Union
+from typing import Any
 from urllib.parse import quote
 
 import httpx
@@ -41,6 +38,22 @@ PROJECTS_BASE_PATH = "/api/v1/projects"
 PROJECTS_SCHEMA_VERSION = "1.0.0"
 PROJECTS_SCHEMA_ID = "skeleton.projects.v1"
 SESSION_ENV = "SKELETON_SESSION_TOKEN"
+
+PROJECT_ERROR_INVALID = "PROJECT.INVALID"  # 400
+PROJECT_ERROR_UNAUTHENTICATED = "PROJECT.UNAUTHENTICATED"  # 401
+PROJECT_ERROR_NOT_FOUND = "PROJECT.NOT_FOUND"  # 404
+PROJECT_ERROR_BUILD_CONFLICT = "PROJECT.BUILD_CONFLICT"  # 409
+PROJECT_ERROR_NAME_CONFLICT = "PROJECT.NAME_CONFLICT"  # 409
+PROJECT_ERROR_UNAVAILABLE = "PROJECT.UNAVAILABLE"  # 503
+PROJECT_ERROR_STATUS: dict[str, int] = {
+    PROJECT_ERROR_INVALID: 400,
+    PROJECT_ERROR_UNAUTHENTICATED: 401,
+    PROJECT_ERROR_NOT_FOUND: 404,
+    PROJECT_ERROR_BUILD_CONFLICT: 409,
+    PROJECT_ERROR_NAME_CONFLICT: 409,
+    PROJECT_ERROR_UNAVAILABLE: 503,
+}
+
 PROJECT_STATUSES = frozenset({"draft", "active", "archived"})
 BUILD_STATUSES = frozenset({"pending", "queued", "running", "succeeded", "failed", "cancelled"})
 TERMINAL_BUILD_STATUSES = frozenset({"succeeded", "failed", "cancelled"})
@@ -78,16 +91,9 @@ def _opt_str(value: Any) -> str | None:
     return None if value is None else str(value)
 
 
-def _ts(value: Any) -> float | str | None:
-    """Timestamps: float epoch (#4097) or RFC 3339 string (v1); kept as given."""
-    if value is None or isinstance(value, (int, float, str)) and not isinstance(value, bool):
-        return value
-    return str(value)
-
-
 @dataclass(frozen=True, slots=True)
 class ProjectBrief:
-    """Structured brief (``skeleton.projects.v1`` ``ProjectBrief``)."""
+    """``ProjectBrief``: title 1..200, summary <=8000, genre <=80, <=32 constraints."""
 
     title: str
     summary: str = ""
@@ -99,7 +105,7 @@ class ProjectBrief:
         _check_len("summary", self.summary, hi=_MAX_SUMMARY)
         _check_len("genre", self.genre, hi=_MAX_GENRE)
         if isinstance(self.constraints, (str, bytes)):
-            raise ValueError("constraints must be a sequence of strings")
+            raise TypeError("constraints must be a sequence of strings")
         items = tuple(self.constraints)
         if len(items) > _MAX_CONSTRAINTS:
             raise ValueError(f"at most {_MAX_CONSTRAINTS} constraints")
@@ -116,68 +122,62 @@ class ProjectBrief:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "ProjectBrief":
-        return cls(
-            title=str(data.get("title") or "Untitled"),
-            summary=str(data.get("summary") or ""),
-            genre=str(data.get("genre") or ""),
-            constraints=tuple(str(c) for c in (data.get("constraints") or ())),
+    def from_dict(cls, data: Mapping[str, Any]) -> ProjectBrief:
+        """Lenient: server data is trusted, so no length re-validation."""
+        obj = object.__new__(cls)
+        object.__setattr__(obj, "title", str(data.get("title") or ""))
+        object.__setattr__(obj, "summary", str(data.get("summary") or ""))
+        object.__setattr__(obj, "genre", str(data.get("genre") or ""))
+        object.__setattr__(
+            obj, "constraints", tuple(str(c) for c in (data.get("constraints") or ()))
         )
+        return obj
 
 
-BriefInput = Union[str, ProjectBrief]
+BriefInput = str | ProjectBrief
 
 
 @dataclass(frozen=True, slots=True)
 class Project:
-    """Union of #4097 ``ProjectOut`` and v1 ``Project`` (unknown keys ignored)."""
+    """``Project`` (unknown keys ignored)."""
 
     project_id: str
-    name: str = ""
-    brief: str | ProjectBrief = ""
-    settings: dict[str, Any] = field(default_factory=dict)
-    status: str | None = None
+    brief: ProjectBrief
+    status: str = "draft"
     build_ids: tuple[str, ...] = ()
-    owner_id: str | None = None
     actor_id: str | None = None
     tenant_id: str | None = None
-    created_at: float | str | None = None
-    updated_at: float | str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
     schema_version: str | None = None
 
+    @property
+    def title(self) -> str:
+        return self.brief.title
+
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "Project":
-        raw_brief = data.get("brief", "")
-        brief: str | ProjectBrief
-        if isinstance(raw_brief, Mapping):
-            try:
-                brief = ProjectBrief.from_dict(raw_brief)
-            except ValueError:
-                brief = str(raw_brief.get("title") or "")
+    def from_dict(cls, data: Mapping[str, Any]) -> Project:
+        raw = data.get("brief")
+        if isinstance(raw, Mapping):
+            brief = ProjectBrief.from_dict(raw)
         else:
-            brief = str(raw_brief or "")
-        name = data.get("name")
-        if not name and isinstance(brief, ProjectBrief):
-            name = brief.title
+            brief = ProjectBrief.from_dict({"title": str(raw or "")})
         return cls(
             project_id=str(data["project_id"]),
-            name=str(name or ""),
             brief=brief,
-            settings=dict(data.get("settings") or {}),
-            status=_opt_str(data.get("status")),
+            status=str(data.get("status") or "draft"),
             build_ids=tuple(str(b) for b in (data.get("build_ids") or ())),
-            owner_id=_opt_str(data.get("owner_id")),
             actor_id=_opt_str(data.get("actor_id")),
             tenant_id=_opt_str(data.get("tenant_id")),
-            created_at=_ts(data.get("created_at")),
-            updated_at=_ts(data.get("updated_at")),
+            created_at=_opt_str(data.get("created_at")),
+            updated_at=_opt_str(data.get("updated_at")),
             schema_version=_opt_str(data.get("schema_version")),
         )
 
 
 @dataclass(frozen=True, slots=True)
 class ProjectPage:
-    """``list()`` result: items plus ``next_cursor`` when the server pages."""
+    """``ProjectList``: items plus ``next_cursor``."""
 
     items: tuple[Project, ...]
     next_cursor: str | None = None
@@ -191,59 +191,76 @@ class ProjectPage:
 
 @dataclass(frozen=True, slots=True)
 class ProjectBuild:
-    """#4097 ``BuildOut`` plus optional v1 ``execution_id`` / link fields."""
+    """``Build`` (``execution_id`` == ``build_id``; ``replayed`` on idempotent replay)."""
 
-    build_id: str | None = None
+    build_id: str
     project_id: str = ""
-    status: str | None = None
+    status: str = "pending"
     execution_id: str | None = None
     target: str = ""
     job_id: str | None = None
     result: dict[str, Any] = field(default_factory=dict)
     error: str = ""
-    created_at: float | str | None = None
-    updated_at: float | str | None = None
-    linked_at: str | None = None
-    replayed: bool | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    replayed: bool = False
     schema_version: str | None = None
+    schema_id: str | None = None
 
     @property
     def is_terminal(self) -> bool:
         return self.status in TERMINAL_BUILD_STATUSES
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "ProjectBuild":
-        replayed = data.get("replayed")
+    def from_dict(cls, data: Mapping[str, Any]) -> ProjectBuild:
+        build_id = str(data["build_id"])
         err = data.get("error")
         return cls(
-            build_id=_opt_str(data.get("build_id")),
+            build_id=build_id,
             project_id=str(data.get("project_id") or ""),
-            status=_opt_str(data.get("status")),
-            execution_id=_opt_str(data.get("execution_id")),
+            status=str(data.get("status") or "pending"),
+            execution_id=_opt_str(data.get("execution_id")) or build_id,
             target=str(data.get("target") or ""),
             job_id=_opt_str(data.get("job_id")),
             result=dict(data.get("result") or {}),
-            error="" if err is None else (err if isinstance(err, str) else str(err)),
-            created_at=_ts(data.get("created_at")),
-            updated_at=_ts(data.get("updated_at")),
+            error="" if err is None else str(err),
+            created_at=_opt_str(data.get("created_at")),
+            updated_at=_opt_str(data.get("updated_at")),
+            replayed=data.get("replayed") is True,
+            schema_version=_opt_str(data.get("schema_version")),
+            schema_id=_opt_str(data.get("schema_id")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectBuildLink:
+    """``ProjectBuildLink``: result of linking an existing engine execution."""
+
+    project_id: str
+    execution_id: str
+    linked_at: str | None = None
+    replayed: bool = False
+    schema_version: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ProjectBuildLink:
+        return cls(
+            project_id=str(data.get("project_id") or ""),
+            execution_id=str(data["execution_id"]),
             linked_at=_opt_str(data.get("linked_at")),
-            replayed=replayed if isinstance(replayed, bool) else None,
+            replayed=data.get("replayed") is True,
             schema_version=_opt_str(data.get("schema_version")),
         )
 
 
-def _items(data: Any, *keys: str) -> list[Any]:
-    if isinstance(data, list):
-        return data
-    if isinstance(data, Mapping):
-        for key in keys:
-            if isinstance(data.get(key), list):
-                return data[key]
+def _items(data: Any) -> list[Any]:
+    if isinstance(data, Mapping) and isinstance(data.get("items"), list):
+        return data["items"]
     return []
 
 
 class ProjectsClient:
-    """Typed client for ``skeleton.projects.v1`` (session-bearer auth)."""
+    """Typed client for ``skeleton.projects.v1`` (seal + session-bearer auth)."""
 
     __slots__ = ("_gw", "_token", "base_path")
 
@@ -336,27 +353,42 @@ class ProjectsClient:
         self,
         brief: BriefInput,
         *,
-        name: str | None = None,
-        settings: Mapping[str, Any] | None = None,
+        idempotency_key: str | None = None,
+        name: Any = None,
+        settings: Any = None,
     ) -> Project:
-        """POST {base}. Never retried.
+        """POST {base}: 201 Created, or 200 when replayed via ``Idempotency-Key``.
 
-        ``brief`` is plain text (1..20000) or a structured :class:`ProjectBrief`.
+        ``brief`` is plain text (1..20000) or a :class:`ProjectBrief`. Retried
+        only when ``idempotency_key`` is given (1..128); otherwise never.
+        ``name``/``settings`` are not part of the contract and raise ValueError.
         """
+        if name is not None or settings is not None:
+            raise ValueError(
+                "name/settings are not part of skeleton.projects.v1 (server rejects "
+                "unknown fields); put the title in ProjectBrief.title"
+            )
         body: dict[str, Any] = {"schema_version": PROJECTS_SCHEMA_VERSION}
         if isinstance(brief, ProjectBrief):
             body["brief"] = brief.as_dict()
         else:
             _check_len("brief", brief, lo=1, hi=_MAX_BRIEF_TEXT)
+            if not brief.strip():
+                raise ValueError("brief must be non-empty")
             body["brief"] = brief
-        _check_len("name", name, hi=200)
-        if name is not None:
-            body["name"] = name
-        if settings is not None:
-            body["settings"] = dict(settings)
-        return Project.from_dict(self._call("POST", self.base_path, json=body))
+        headers: dict[str, str] | None = None
+        if idempotency_key is not None:
+            _check_len("idempotency_key", idempotency_key, lo=1, hi=128)
+            headers = {"Idempotency-Key": idempotency_key}
+        return Project.from_dict(
+            self._call(
+                "POST", self.base_path, json=body, extra_headers=headers,
+                idempotent=idempotency_key is not None,
+            )
+        )
 
     def list(self, *, limit: int | None = None, cursor: str | None = None) -> ProjectPage:
+        """GET {base}?limit=1..100&cursor= -> items + next_cursor."""
         params: dict[str, Any] = {}
         if limit is not None:
             if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
@@ -366,7 +398,7 @@ class ProjectsClient:
             _check_len("cursor", cursor, lo=1, hi=512)
             params["cursor"] = cursor
         data = self._call("GET", self.base_path, params=params or None, idempotent=True)
-        items = tuple(Project.from_dict(p) for p in _items(data, "items", "projects"))
+        items = tuple(Project.from_dict(p) for p in _items(data))
         nxt = data.get("next_cursor") if isinstance(data, Mapping) else None
         return ProjectPage(items=items, next_cursor=_opt_str(nxt))
 
@@ -383,17 +415,15 @@ class ProjectsClient:
         target: str | None = None,
         options: Mapping[str, Any] | None = None,
         idempotency_key: str | None = None,
-        execution_id: str | None = None,
         cancel: CancelToken | None = None,
     ) -> ProjectBuild:
-        """POST {base}/{id}/builds: start a build, or link ``execution_id``.
+        """POST {base}/{id}/builds (start): 202 Build, ``replayed`` on replay.
 
-        Safe to retry: a uuid4 ``idempotency_key`` is generated when none is
-        given and reused across retries (sent in the body and as the
-        ``Idempotency-Key`` header).
+        A uuid4 ``idempotency_key`` is generated when none is given and reused
+        across retries, so retrying is safe. To link an existing execution use
+        :meth:`link_execution` (start and link fields are never mixed).
         """
         _check_len("target", target, hi=64)
-        _check_len("execution_id", execution_id, lo=1, hi=128)
         key = idempotency_key or uuid.uuid4().hex
         _check_len("idempotency_key", key, lo=1, hi=128)
         body: dict[str, Any] = {"schema_version": PROJECTS_SCHEMA_VERSION, "idempotency_key": key}
@@ -401,28 +431,30 @@ class ProjectsClient:
             body["target"] = target
         if options is not None:
             body["options"] = dict(options)
-        if execution_id is not None:
-            body["execution_id"] = execution_id
-        data = self._call(
-            "POST", f"{self.base_path}/{_seg(project_id)}/builds",
-            json=body, extra_headers={"Idempotency-Key": key},
-            idempotent=True, cancel=cancel,
+        return ProjectBuild.from_dict(
+            self._call(
+                "POST", f"{self.base_path}/{_seg(project_id)}/builds",
+                json=body, idempotent=True, cancel=cancel,
+            )
         )
-        return ProjectBuild.from_dict(data or {})
 
-    def link_execution(
-        self, project_id: str, execution_id: str, *, idempotency_key: str | None = None
-    ) -> ProjectBuild:
-        """Link an existing engine execution (thin alias of ``start_build``)."""
-        if not execution_id:
-            raise ValueError("execution_id is required")
-        return self.start_build(
-            project_id, execution_id=execution_id, idempotency_key=idempotency_key
+    def link_execution(self, project_id: str, execution_id: str) -> ProjectBuildLink:
+        """POST {base}/{id}/builds (link): 201 ProjectBuildLink, 200 on replay.
+
+        Linking is idempotent per (project, execution), so it is safe to retry.
+        """
+        _check_len("execution_id", execution_id, lo=1, hi=128)
+        body = {"schema_version": PROJECTS_SCHEMA_VERSION, "execution_id": execution_id}
+        return ProjectBuildLink.from_dict(
+            self._call(
+                "POST", f"{self.base_path}/{_seg(project_id)}/builds",
+                json=body, idempotent=True,
+            )
         )
 
     def list_builds(self, project_id: str) -> list[ProjectBuild]:
         data = self._call("GET", f"{self.base_path}/{_seg(project_id)}/builds", idempotent=True)
-        return [ProjectBuild.from_dict(b) for b in _items(data, "builds", "items")]
+        return [ProjectBuild.from_dict(b) for b in _items(data)]
 
     def get_build(
         self, project_id: str, build_id: str, *, cancel: CancelToken | None = None

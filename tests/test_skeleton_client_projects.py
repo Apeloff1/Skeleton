@@ -1,8 +1,4 @@
-"""ProjectsClient tests: one contract, skeleton.projects.v1 (TD ruling).
-
-The v1 base path is /api/v1/projects. #4097 currently serves /api/app/projects,
-which is reachable through ``base_path=``.
-"""
+"""ProjectsClient tests for skeleton.projects.v1 (aligned to #4097 at 6524b7c35)."""
 
 from __future__ import annotations
 
@@ -19,174 +15,218 @@ from skeleton.client import (
     Project,
     ProjectBrief,
     ProjectBuild,
+    ProjectBuildLink,
     ProjectsClient,
+    RequestSealer,
     RetryPolicy,
     SkeletonCancelledError,
     SkeletonHTTPError,
+    SkeletonSealConfigError,
     SkeletonSessionConfigError,
     SkeletonTimeoutError,
 )
 from skeleton.client import projects as projects_mod
 
-LEGACY_PROJECT = {
-    "project_id": "p1", "owner_id": "u1", "name": "Game", "brief": "make a game",
-    "settings": {"a": 1}, "created_at": 1.5, "updated_at": 2.5, "extra": "ignored",
-}
-V1_PROJECT = {
-    "schema_version": "1.0.0", "project_id": "p2", "actor_id": "u1", "tenant_id": "t1",
+PROJECT = {
+    "schema_version": "1.0.0", "project_id": "p1", "actor_id": "u1", "tenant_id": "default",
     "brief": {"title": "Space game", "summary": "s", "genre": "arcade", "constraints": ["2D"]},
-    "status": "active", "build_ids": ["e1", "e2"],
-    "created_at": "2026-10-17T16:00:00Z", "updated_at": "2026-10-17T16:05:00Z",
+    "status": "active", "build_ids": ["b1", "b2"],
+    "created_at": "2026-10-17T16:00:00Z", "updated_at": "2026-10-17T16:05:00Z", "future": 1,
 }
 
 
 def _build(status="queued", **kw):
-    return {"build_id": "b1", "project_id": "p1", "status": status, "target": "", "job_id": "j1",
-            "result": {}, "error": "", "created_at": 1.0, "updated_at": 1.0, "future_field": 1, **kw}
+    return {"schema_version": "1.0.0", "schema_id": "skeleton.projects.v1", "build_id": "b1",
+            "execution_id": "b1", "project_id": "p1", "status": status, "target": "", "job_id": "j1",
+            "result": {}, "error": "", "created_at": "2026-10-17T16:00:00Z",
+            "updated_at": "2026-10-17T16:00:00Z", "replayed": False, **kw}
 
 
-def _client(handler, *, sleeps=None, token="sess-tok", base_path=None):
+def _env(code, message="m", status=400):
+    return httpx.Response(status, json={"error": {"type": "ProjectContractError", "code": code,
+                                                  "message": message, "context": {}}})
+
+
+def _client(handler, *, sleeps=None, token="sess-tok", base_path=None, seal=None):
     sleeps = sleeps if sleeps is not None else []
     gw = GatewayClient(
         "http://test",
         client=httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler)),
         retry=RetryPolicy(max_attempts=3, base_delay_seconds=0.1, max_delay_seconds=1.0),
-        sleep=sleeps.append,
+        sleep=sleeps.append, seal=seal,
     )
     kw = {} if base_path is None else {"base_path": base_path}
     return ProjectsClient(gw, session_token=token, **kw)
 
 
-def test_base_path_constant_and_override():
+def test_constants_and_base_path_override():
     assert PROJECTS_BASE_PATH == "/api/v1/projects"
+    assert projects_mod.PROJECT_ERROR_STATUS == {
+        "PROJECT.INVALID": 400, "PROJECT.UNAUTHENTICATED": 401, "PROJECT.NOT_FOUND": 404,
+        "PROJECT.BUILD_CONFLICT": 409, "PROJECT.NAME_CONFLICT": 409, "PROJECT.UNAVAILABLE": 503}
+    assert projects_mod.TERMINAL_BUILD_STATUSES == {"succeeded", "failed", "cancelled"}
     paths = []
 
     def handler(req):
         paths.append(req.url.path)
-        return httpx.Response(200, json={"projects": []})
+        return httpx.Response(200, json={"schema_version": "1.0.0", "items": [], "next_cursor": None})
 
     _client(handler).list()
-    _client(handler, base_path="/api/app/projects/").list()
-    assert paths == ["/api/v1/projects", "/api/app/projects"]
+    _client(handler, base_path="/custom/projects/").list()
+    assert paths == ["/api/v1/projects", "/custom/projects"]
     with pytest.raises(ValueError):
         _client(handler, base_path="api/x")
 
 
-def test_parsing_tolerates_legacy_and_v1_shapes():
-    legacy = Project.from_dict(LEGACY_PROJECT)
-    assert legacy.brief == "make a game" and legacy.owner_id == "u1" and legacy.status is None
-    v1 = Project.from_dict(V1_PROJECT)
-    assert isinstance(v1.brief, ProjectBrief) and v1.brief.constraints == ("2D",)
-    assert v1.status == "active" and v1.build_ids == ("e1", "e2") and v1.name == "Space game"
-    assert v1.actor_id == "u1" and v1.tenant_id == "t1" and v1.created_at.endswith("Z")
-    b = ProjectBuild.from_dict(_build("succeeded", job_id=None, execution_id="e9"))
-    assert b.is_terminal and b.job_id is None and b.execution_id == "e9"
+def test_models_parse_leniently():
+    p = Project.from_dict(PROJECT)
+    assert p.title == "Space game" and p.brief.constraints == ("2D",) and p.status == "active"
+    assert p.build_ids == ("b1", "b2") and p.tenant_id == "default" and p.created_at.endswith("Z")
+    b = ProjectBuild.from_dict(_build("succeeded", job_id=None, replayed=True))
+    assert b.is_terminal and b.execution_id == "b1" and b.replayed and b.schema_id == "skeleton.projects.v1"
+    assert ProjectBuild.from_dict({"build_id": "x"}).execution_id == "x"
 
 
-def test_create_text_and_structured_brief_bodies_have_no_actor_or_tenant():
-    bodies = []
-    headers = []
+def test_create_both_brief_forms_seal_bearer_and_no_scope_fields(monkeypatch):
+    bodies, headers = [], []
 
     def handler(req):
         bodies.append(json.loads(req.content))
         headers.append(req.headers)
-        return httpx.Response(201, json=V1_PROJECT if len(bodies) > 1 else LEGACY_PROJECT)
+        return httpx.Response(201, json=PROJECT)
 
-    pc = _client(handler)
-    assert pc.create("make a game", name="Game", settings={"a": 1}).name == "Game"
-    brief = ProjectBrief(title="Space game", summary="s", genre="arcade", constraints=["2D"])
-    assert pc.create(brief).status == "active"
-    assert bodies[0] == {"schema_version": "1.0.0", "brief": "make a game", "name": "Game", "settings": {"a": 1}}
+    pc = _client(handler, seal=RequestSealer("sdk", seal_secret="s"))
+    assert pc.create("Space game\nshoot rocks").title == "Space game"
+    pc.create(ProjectBrief(title="Space game", summary="s", genre="arcade", constraints=["2D"]))
+    assert bodies[0] == {"schema_version": "1.0.0", "brief": "Space game\nshoot rocks"}
     assert bodies[1] == {"schema_version": "1.0.0", "brief": {
         "title": "Space game", "summary": "s", "genre": "arcade", "constraints": ["2D"]}}
     for body in bodies:
-        assert "actor_id" not in body and "tenant_id" not in body
+        assert set(body) == {"schema_version", "brief"}
     for h in headers:
-        assert h["authorization"] == "Bearer sess-tok" and len(h.get_list("x-request-id")) == 1
+        assert h["authorization"] == "Bearer sess-tok" and h["x-gf-seal"].startswith("sdk.")
+        assert len(h.get_list("x-request-id")) == 1 and "idempotency-key" not in h
 
 
-def test_brief_validation():
+def test_create_rejects_name_and_settings_and_bad_briefs():
     pc = _client(lambda r: pytest.fail("no request expected"))
+    with pytest.raises(ValueError, match="not part of skeleton.projects.v1"):
+        pc.create("b", name="n")
     with pytest.raises(ValueError):
-        pc.create("")
-    with pytest.raises(ValueError):
-        pc.create("x" * 20001)
-    with pytest.raises(ValueError):
-        pc.create("ok", name="n" * 201)
+        pc.create("b", settings={})
+    for bad in ("", "   ", "x" * 20001):
+        with pytest.raises(ValueError):
+            pc.create(bad)
     for bad in (
-        dict(title=""), dict(title="t" * 201), dict(title="t", summary="s" * 8001),
-        dict(title="t", genre="g" * 81), dict(title="t", constraints=["c"] * 33),
-        dict(title="t", constraints=[""]), dict(title="t", constraints="abc"),
+        {"title": ""}, {"title": "t" * 201}, {"title": "t", "summary": "s" * 8001},
+        {"title": "t", "genre": "g" * 81}, {"title": "t", "constraints": ["c"] * 33},
+        {"title": "t", "constraints": [""]},
     ):
         with pytest.raises(ValueError):
             ProjectBrief(**bad)
+    with pytest.raises(TypeError):
+        ProjectBrief(title="t", constraints="abc")
     with pytest.raises(ValueError):
-        pc.start_build("p1", target="t" * 65)
+        pc.create("b", idempotency_key="")
     with pytest.raises(ValueError):
-        pc.start_build("p1", idempotency_key="k" * 129)
+        pc.create("b", idempotency_key="k" * 129)
 
 
-def test_list_both_shapes_and_cursor():
+def test_create_never_retried_without_key():
+    hits, sleeps = [], []
+
+    def handler(req):
+        hits.append(1)
+        return _env("PROJECT.UNAVAILABLE", status=503)
+
+    with pytest.raises(SkeletonHTTPError) as info:
+        _client(handler, sleeps=sleeps).create("brief")
+    assert len(hits) == 1 and sleeps == [] and info.value.code == "PROJECT.UNAVAILABLE"
+
+
+def test_create_with_idempotency_key_header_retries_and_accepts_200_replay():
+    keys, sleeps = [], []
+
+    def handler(req):
+        keys.append(req.headers.get("idempotency-key"))
+        return _env("PROJECT.UNAVAILABLE", status=503) if len(keys) == 1 else httpx.Response(200, json=PROJECT)
+
+    p = _client(handler, sleeps=sleeps).create("brief", idempotency_key="create-1")
+    assert p.project_id == "p1" and keys == ["create-1", "create-1"] and len(sleeps) == 1
+
+
+def test_list_items_cursor_and_limit():
     seen = []
 
     def handler(req):
         seen.append(dict(req.url.params))
-        if "cursor" in req.url.params:
-            return httpx.Response(200, json={"schema_version": "1.0.0", "items": [V1_PROJECT], "next_cursor": None})
-        if "limit" in req.url.params:
-            return httpx.Response(200, json={"schema_version": "1.0.0", "items": [V1_PROJECT], "next_cursor": "c2"})
-        return httpx.Response(200, json={"projects": [LEGACY_PROJECT]})
+        nxt = None if "cursor" in req.url.params else "c2"
+        return httpx.Response(200, json={"schema_version": "1.0.0", "items": [PROJECT], "next_cursor": nxt})
 
     pc = _client(handler)
-    legacy = pc.list()
-    assert [p.project_id for p in legacy] == ["p1"] and legacy.next_cursor is None
     page = pc.list(limit=10)
-    assert [p.project_id for p in page.items] == ["p2"] and page.next_cursor == "c2" and len(page) == 1
+    assert [p.project_id for p in page] == ["p1"] and page.next_cursor == "c2" and len(page) == 1
     assert pc.list(cursor="c2").next_cursor is None
-    assert seen[1] == {"limit": "10"} and seen[2] == {"cursor": "c2"}
-    with pytest.raises(ValueError):
-        pc.list(limit=101)
+    assert seen == [{"limit": "10"}, {"cursor": "c2"}]
+    for bad in (0, 101, True):
+        with pytest.raises(ValueError):
+            pc.list(limit=bad)
 
 
 def test_get_list_builds_get_build():
     def handler(req):
         p = req.url.path
         if p == "/api/v1/projects/p1":
-            return httpx.Response(200, json=LEGACY_PROJECT)
+            return httpx.Response(200, json=PROJECT)
         if p.endswith("/builds"):
-            return httpx.Response(200, json={"builds": [_build(), _build("running")]})
+            return httpx.Response(200, json={"schema_version": "1.0.0", "items": [_build(), _build("running")]})
         return httpx.Response(200, json=_build("running"))
 
     pc = _client(handler)
-    assert pc.get("p1").owner_id == "u1"
-    assert len(pc.list_builds("p1")) == 2
+    assert pc.get("p1").status == "active"
+    assert [b.status for b in pc.list_builds("p1")] == ["queued", "running"]
     assert pc.get_build("p1", "b1").status == "running"
 
 
-def test_start_build_returns_execution_id_and_link_execution():
+def test_start_build_body_and_replay():
     bodies = []
-    headers = []
+
+    def handler(req):
+        bodies.append(json.loads(req.content))
+        return httpx.Response(202, json=_build(replayed=len(bodies) > 1))
+
+    pc = _client(handler)
+    b = pc.start_build("p1", target="web", options={"x": 1}, idempotency_key="k1")
+    assert b.execution_id == "b1" and b.build_id == "b1" and b.status == "queued" and not b.replayed
+    assert pc.start_build("p1", idempotency_key="k1").replayed
+    assert bodies[0] == {"schema_version": "1.0.0", "idempotency_key": "k1", "target": "web", "options": {"x": 1}}
+    for body in bodies:
+        assert not set(body) & {"execution_id", "actor_id", "tenant_id"}
+    with pytest.raises(ValueError):
+        pc.start_build("p1", target="t" * 65)
+    with pytest.raises(ValueError):
+        pc.start_build("p1", idempotency_key="k" * 129)
+    with pytest.raises(TypeError):
+        pc.start_build("p1", execution_id="e1")  # linking is a separate call
+
+
+def test_link_execution_returns_distinct_type_and_never_mixes_fields():
+    bodies, statuses = [], iter([201, 200])
 
     def handler(req):
         body = json.loads(req.content)
         bodies.append(body)
-        headers.append(req.headers)
-        if "execution_id" in body:
-            return httpx.Response(200, json={"schema_version": "1.0.0", "project_id": "p1",
-                                             "execution_id": body["execution_id"],
-                                             "linked_at": "2026-10-17T16:00:00Z", "replayed": False})
-        return httpx.Response(202, json=_build(execution_id="e-new"))
+        code = next(statuses)
+        return httpx.Response(code, json={"schema_version": "1.0.0", "project_id": "p1",
+                                          "execution_id": body["execution_id"],
+                                          "linked_at": "2026-10-17T16:00:00Z", "replayed": code == 200})
 
     pc = _client(handler)
-    b = pc.start_build("p1", target="web", options={"x": 1}, idempotency_key="k1")
-    assert b.execution_id == "e-new" and b.build_id == "b1" and b.status == "queued"
-    assert bodies[0] == {"schema_version": "1.0.0", "idempotency_key": "k1", "target": "web", "options": {"x": 1}}
-    assert headers[0]["idempotency-key"] == "k1"
-    link = pc.link_execution("p1", "e-old")
-    assert link.execution_id == "e-old" and link.replayed is False and link.build_id is None
-    assert bodies[1]["execution_id"] == "e-old" and bodies[1]["schema_version"] == "1.0.0"
-    for body in bodies:
-        assert "actor_id" not in body and "tenant_id" not in body
+    link = pc.link_execution("p1", "exec-1")
+    assert isinstance(link, ProjectBuildLink) and not isinstance(link, ProjectBuild)
+    assert link.execution_id == "exec-1" and link.linked_at.endswith("Z") and not link.replayed
+    assert pc.link_execution("p1", "exec-1").replayed
+    assert bodies[0] == {"schema_version": "1.0.0", "execution_id": "exec-1"}
     with pytest.raises(ValueError):
         pc.link_execution("p1", "")
 
@@ -200,64 +240,80 @@ def test_missing_token_and_redacted_repr(monkeypatch):
     assert "env-secret" not in repr(ProjectsClient(gw))
 
 
-def test_v1_error_envelope_and_legacy_detail_fallback():
-    def handler(req):
-        if req.method == "POST":
-            return httpx.Response(409, json={"error": {"type": "ProjectContractError", "code": "PROJECT.BUILD_CONFLICT",
-                                                       "message": "build already linked", "context": {"k": 1}}})
-        if "/builds/" in req.url.path:
-            return httpx.Response(404, json={"detail": "build_not_found"})
-        if req.url.path == "/api/v1/projects":
-            return httpx.Response(401, json={"detail": "invalid_session"})
-        return httpx.Response(404, json={"error": {"type": "ProjectContractError", "code": "PROJECT.NOT_FOUND",
-                                                   "message": "project not found"}})
-
-    pc = _client(handler)
+@pytest.mark.parametrize("code,status", sorted(projects_mod.PROJECT_ERROR_STATUS.items()))
+def test_v1_error_envelope_codes(code, status):
+    pc = _client(lambda r: httpx.Response(status, json={"error": {
+        "type": "ProjectContractError", "code": code, "message": "nope", "context": {"k": 1}}}))
     with pytest.raises(SkeletonHTTPError) as info:
-        pc.start_build("p1")
-    assert info.value.code == "PROJECT.BUILD_CONFLICT" and info.value.message == "build already linked"
-    assert info.value.context == {"k": 1}
+        pc.get("p1")
+    assert info.value.status_code == status and info.value.code == code
+    assert info.value.message == "nope" and info.value.context == {"k": 1}
+
+
+def test_gate_string_error_form_parsed():
+    pc = _client(lambda r: httpx.Response(401, json={"error": "invalid_seal"}))
     with pytest.raises(SkeletonHTTPError) as info:
-        pc.get("nope")
-    assert info.value.code == "PROJECT.NOT_FOUND" and info.value.message == "project not found"
-    for call, code in [(lambda: pc.get_build("p1", "x"), "build_not_found"), (lambda: pc.list(), "invalid_session")]:
-        with pytest.raises(SkeletonHTTPError) as info:
-            call()
-        assert info.value.code == code
+        pc.get("p1")  # no seal configured, so no re-mint; string code still parsed
+    assert info.value.code == "invalid_seal"
 
 
-def test_create_not_retried():
+def test_invalid_seal_reminted_once_then_succeeds_or_raises():
+    seals = []
+
+    def ok_after_one(req):
+        seals.append(req.headers["x-gf-seal"])
+        return httpx.Response(401, json={"error": "invalid_seal"}) if len(seals) == 1 else httpx.Response(200, json=PROJECT)
+
+    now = [1000.0]
+
+    def clock():
+        now[0] += 1
+        return now[0]
+
+    pc = _client(ok_after_one, seal=RequestSealer("sdk", seal_secret="s", clock=clock))
+    assert pc.get("p1").project_id == "p1" and len(seals) == 2 and seals[0] != seals[1]
+
     hits = []
-    sleeps: list[float] = []
+
+    def always(req):
+        hits.append(1)
+        return httpx.Response(401, json={"error": "invalid_seal"})
+
+    with pytest.raises(SkeletonHTTPError) as info:
+        _client(always, seal=RequestSealer("sdk", seal_secret="s")).create("b")
+    assert len(hits) == 2 and info.value.code == "invalid_seal"
+
+
+def test_seal_unavailable_never_retried_even_for_retryable_calls():
+    hits, sleeps = [], []
 
     def handler(req):
         hits.append(1)
-        return httpx.Response(503, json={"detail": "busy"})
+        return httpx.Response(503, json={"error": "seal_unavailable"})
 
-    with pytest.raises(SkeletonHTTPError):
-        _client(handler, sleeps=sleeps).create("brief")
+    with pytest.raises(SkeletonSealConfigError):
+        _client(handler, sleeps=sleeps).start_build("p1")
     assert len(hits) == 1 and sleeps == []
 
 
 def test_start_build_retry_reuses_generated_idempotency_key():
-    keys = []
-    sleeps: list[float] = []
+    keys, sleeps = [], []
 
     def handler(req):
-        keys.append((json.loads(req.content)["idempotency_key"], req.headers["idempotency-key"]))
+        keys.append(json.loads(req.content)["idempotency_key"])
         return httpx.Response(503 if len(keys) < 3 else 202, json=_build())
 
     b = _client(handler, sleeps=sleeps).start_build("p1")
     assert b.build_id == "b1" and len(keys) == 3 and len(set(keys)) == 1
-    assert keys[0][0] == keys[0][1] and re.fullmatch(r"[0-9a-f]{32}", keys[0][0]) and len(sleeps) == 2
+    assert re.fullmatch(r"[0-9a-f]{32}", keys[0]) and len(sleeps) == 2
 
 
 def test_wait_build_terminal_cancel_timeout():
-    statuses = iter(["queued", "running", "succeeded"])
+    statuses = iter(["pending", "queued", "running", "failed"])
     naps: list[float] = []
     pc = _client(lambda r: httpx.Response(200, json=_build(next(statuses))))
-    assert pc.wait_build("p1", "b1", poll_seconds=0.2, sleep=naps.append).status == "succeeded"
-    assert naps == [0.2, 0.2]
+    assert pc.wait_build("p1", "b1", poll_seconds=0.2, sleep=naps.append).status == "failed"
+    assert naps == [0.2, 0.2, 0.2]
 
     tok = CancelToken()
     pc2 = _client(lambda r: httpx.Response(200, json=_build("running")))
@@ -286,15 +342,14 @@ def test_wait_build_default_timeout_and_validation():
 
 
 def test_projects_routes_exist_in_backend_router():
+    """Conformance against #4097's real router (skips until it is on this branch)."""
     try:
-        from skeleton.app_services.projects_api import PREFIX, build_router
+        from skeleton.api.projects_routes import build_router
     except ImportError:
-        pytest.skip("#4097 (skeleton.app_services.projects_api) is not on this branch yet")
-    if PREFIX != PROJECTS_BASE_PATH:
-        pytest.skip(f"#4097 router is still at {PREFIX}; waiting for IS to move it to {PROJECTS_BASE_PATH}")
-    router = build_router(services=lambda: None)
+        pytest.skip("#4097 (skeleton.api.projects_routes) is not on this branch yet")
+    router = build_router()
     backend = {
-        (m, re.sub(r"\{[^}]+\}", "{}", r.path))
+        (m, re.sub(r"\{[^}]+\}", "{}", "/api/v1" + r.path))  # mounted with prefix /api/v1
         for r in router.routes for m in (getattr(r, "methods", None) or ())
     }
     for method, path in projects_mod.SDK_ROUTES:

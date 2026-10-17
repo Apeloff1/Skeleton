@@ -45,9 +45,12 @@ class SkeletonHTTPError(SkeletonClientError):
                     self.message = envelope["message"]
                 ctx = envelope.get("context")
                 self.context = dict(ctx) if isinstance(ctx, dict) else {}
+            elif isinstance(envelope, str) and envelope:
+                code = envelope  # gate form: {"error": "invalid_seal" | "seal_unavailable"}
             elif isinstance(body.get("detail"), str):
                 code = body["detail"]  # legacy {"detail": "<code>"}
-        #: Machine-readable error code from ``{"detail": "<code>"}`` bodies.
+        #: Machine-readable error code: v1 ``error.code``, the gate's string
+        #: ``error`` value, or legacy ``detail``.
         self.code = code
 
 
