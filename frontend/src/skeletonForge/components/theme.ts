@@ -1,6 +1,6 @@
 /** Forge cockpit compatibility colors from the canonical design-token module. */
 import type { Tone } from '../run';
-import design, { breathing, radii } from '../../../theme/tokens';
+import design, { breathing, radii, status } from '../../../theme/tokens';
 
 export const C = {
   get bg() { return design.colors.bg; },
@@ -26,8 +26,9 @@ export const TONE_COLOR: Record<Tone, string> = {
   get idle() { return C.dim; },
 };
 
+/** Glyph values live in tokens.ts `status.glyph` (single edit point). */
 export const TONE_GLYPH: Record<Tone, string> = {
-  ok: '✓', warn: '!', bad: '✕', idle: '○',
+  ok: status.glyph.ok, warn: status.glyph.warn, bad: status.glyph.bad, idle: status.glyph.idle,
 };
 
 /** Shared touch and radius rules for cockpit controls. */
