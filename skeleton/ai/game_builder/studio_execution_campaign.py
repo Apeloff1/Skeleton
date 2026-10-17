@@ -126,7 +126,9 @@ def run_studio_execution_campaign(
                 "blocker": None if complete else source_state["failures"].get(
                     target, "source_not_yet_generated"
                 ),
-                "source_receipt_digest": source_state["identity"] if complete else None,
+                # Exact source artifact digest is resolved from independently
+                # checked assurance below, not substituted by campaign identity.
+                "source_receipt_digest": None,
             })
         if policy.stop_after_blocker and any(x["status"] == "blocked" for x in entries):
             halted = True
@@ -196,6 +198,15 @@ def run_studio_execution_campaign(
     # The assurance reader independently verifies and hashes the full actual
     # source+build+emulator+browser+Godot+canvas receipts before summarizing.
     report = inspect_production_assurance(order, root)
+    from .studio_execution_history import validate_stage_evidence
+
+    source_rows = {row["target"]: row for row in report["targets"]}
+    for entry in entries:
+        if entry["stage"] == "source" and entry["status"] == "verified":
+            entry["source_receipt_digest"] = source_rows[entry["target"]][
+                "source_receipt_digest"
+            ]
+    validate_stage_evidence(entries, report)
     body = {
         "schema": SCHEMA,
         "campaign_identity": report["campaign_identity"],
