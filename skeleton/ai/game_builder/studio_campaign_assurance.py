@@ -26,6 +26,7 @@ from .studio_godot_qualification import godot_inputs, qualify_godot_headless
 from .studio_pixel_parity import inspect_cross_engine_pixels
 from .studio_game_boy_emulator import qualify_game_boy_emulator
 from .studio_nes_emulator import qualify_nes_cpu_ppu
+from .studio_nes_chr_parity import NESCHRIntegrityError, inspect_compiled_nes_chr
 from .studio_dragon_canvas_capture import capture_generated_game, _png_geometry
 
 SCHEMA = "skeleton.game_builder.production_assurance.v1"
@@ -114,6 +115,11 @@ def _qualification_receipt(root: Path, target: str, source_identity: str) -> dic
     if (sha256(body).hexdigest() != evidence.get("binary_sha256")
             or len(body) != evidence.get("binary_size")):
         raise StudioAssuranceError("ROM differs from the recorded toolchain output")
+    if target == "nintendo_famicom":
+        try:
+            inspect_compiled_nes_chr(body, root / "targets" / target)
+        except NESCHRIntegrityError as exc:
+            raise StudioAssuranceError("actual NES cartridge original sprites differ from source") from exc
     if target in ("nintendo_game_boy", "nintendo_game_boy_color", "nintendo_famicom"):
         map_file = artifact.with_suffix(".sym")
         try:
@@ -181,6 +187,23 @@ def qualify_campaign_target(
                 "source_identity": identity,
                 "model_training_performed": False,
             }
+        if target == "nintendo_famicom":
+            try:
+                inspect_compiled_nes_chr(_regular(output, 8 * 1024 * 1024),
+                                         base / "targets" / target)
+            except (NESCHRIntegrityError, OSError, ValueError):
+                # The binary was published by this exclusive, lock-held build,
+                # but the actual compiled CHR bytes diverged. Reclaim only
+                # the just-produced output after verifying its own SHA.
+                if sha256(_regular(output, 8 * 1024 * 1024)).hexdigest() != result.binary_sha256:
+                    raise StudioAssuranceError("unexpected ROM mutation during CHR rejection")
+                output.unlink()
+                output.with_suffix(".sym").unlink()
+                return {
+                    "target": target, "native_rom_compiled": False,
+                    "blocker": "compiled_nes_chr_original_art_mismatch",
+                    "source_identity": identity, "model_training_performed": False,
+                }
         body = {
             "schema": QUALIFICATION_SCHEMA, "target": target,
             "source_identity": identity,
