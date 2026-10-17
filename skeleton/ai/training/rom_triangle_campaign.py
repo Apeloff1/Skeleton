@@ -239,6 +239,8 @@ def export_reviewed_candidate_corpus(
     rom_receipt: Path, reviewer_receipt: Path, *,
     source_sha256: str, output_dir: Path, runtime: Any,
     requested_semantic_lens_keys: tuple[str, ...] = (),
+    semantic_review_receipt: Path | None = None,
+    semantic_runtime: Any | None = None,
 ) -> dict[str, Any]:
     """Replay the critic's real local checkpoint BEFORE exporting lens examples.
 
@@ -261,20 +263,46 @@ def export_reviewed_candidate_corpus(
     replay = replay_native_adversarial_review(evidence, triangle, review, runtime)
     if replay["native_generations_replayed"] != 3:
         raise RomStudyError("all independent model passes must replay before corpus export")
+    native_semantic_review = None
+    if semantic_review_receipt is not None:
+        if semantic_runtime is None:
+            raise RomStudyError("semantic checkpoint required for model-backed 43-lens candidate corpus")
+        from skeleton.jeeves.game_emulator_triangle_semantic_inference import (
+            verify_native_semantic_lenses, replay_native_semantic_lenses,
+        )
+        native_semantic_review, _ = read_receipt_document(semantic_review_receipt)
+        verify_native_semantic_lenses(
+            evidence, triangle, review, native_semantic_review,
+        )
+        replayed_semantic = replay_native_semantic_lenses(
+            evidence, triangle, review, native_semantic_review, semantic_runtime,
+        )
+        if replayed_semantic["native_jeeves_semantic_model_generations_replayed"] != 43:
+            raise RomStudyError("43 native semantic checkpoint generations were not reproduced")
+    elif semantic_runtime is not None:
+        raise RomStudyError("semantic checkpoint must accompany a saved 43-lens review")
     candidate = compile_triangle_candidate_corpus(
         evidence, triangle, review,
         requested_semantic_lens_keys=requested_semantic_lens_keys,
+        semantic_inference_review=native_semantic_review,
     )
     out = _private_output(output_dir)
     name = (
-        "triangle-corpus-v2-" + source_sha256[:16] + "-"
+        ("triangle-corpus-v3-" if native_semantic_review is not None
+         else "triangle-corpus-v2-")
+        + source_sha256[:16] + "-"
         + review["review_digest"][:16] + "-"
-        + candidate["semantic_lens_selection_digest"][:16] + ".json"
+        + candidate["semantic_lens_selection_digest"][:16]
+        + (("-" + native_semantic_review["semantic_review_digest"][:16])
+           if native_semantic_review is not None else "") + ".json"
     )
     target = out / name
     if target.exists() or target.is_symlink():
         saved, _ = read_receipt_document(target)
-        verify_triangle_candidate_corpus(evidence, triangle, review, saved)
+        verify_triangle_candidate_corpus(
+            evidence, triangle, review, saved,
+            semantic_inference_review=native_semantic_review,
+        )
         state = "prior_verified_candidate_corpus"
     else:
         _save_new(target, candidate)
@@ -283,6 +311,14 @@ def export_reviewed_candidate_corpus(
         "state": state,
         "filename": name,
         "candidate_corpus_digest": candidate["candidate_corpus_digest"],
+        "verified_43_lens_native_inference_receipt": (
+            native_semantic_review["semantic_review_digest"]
+            if native_semantic_review is not None else None
+        ),
+        "replayed_semantic_model_generations": (
+            43 if native_semantic_review is not None else 0
+        ),
+        "semantic_generated_hypotheses_used_as_labels": False,
         "unique_native_episodes": candidate["unique_independent_native_episodes"],
         "correlated_lens_views": candidate["total_lens_candidate_views"],
         "canonical_semantic_lens_selection_budget": candidate["canonical_semantic_lens_selection_budget"],
