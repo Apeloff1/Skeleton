@@ -1,6 +1,6 @@
 # C4 views
 
-These views describe the system as it is wired today, plus the Projects contract that is specified and not mounted.
+These views describe the system as it is wired today, plus the Projects contract at `/api/v1/projects` (`skeleton.projects.v1` version `1.1.0`).
 
 | View | Question it answers |
 |------|---------------------|

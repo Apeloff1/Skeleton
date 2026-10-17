@@ -41,7 +41,7 @@ flowchart TB
 | Memory | `MemoryWriteBoundary` plus `skeleton.contracts.memory_record` | Memory routes on the main router. Mongo is behind persistence. |
 | GameForge | `GameForgeCommandBoundary` for `run` and `intake` only | Charter-gated `POST /api/v1/gameforge/run` and `/intake` on `skeleton.api.routes`. Sidecar handlers remain importable and are not mounted. |
 | API | `ApiErrorBoundary` and `skeleton.api.errors` | `create_app`. |
-| Projects | `skeleton.contracts.projects` | Not mounted. Schema links `build_ids` to engine `execution_id`. |
+| Projects | `skeleton.contracts.projects` (`skeleton.projects.v1` at `1.1.0`) | `/api/v1/projects` inside `create_app`, behind `install_gate`. Resources match the #4097 `ProjectOut` and `BuildOut`. `POST /builds` starts a build and returns `execution_id`. |
 
 Cortex HTTP, including `/api/v1/secrets`, stays unmounted. `reject_cortex_secret_routes` walks nested routers and refuses startup if a secrets path is registered.
 

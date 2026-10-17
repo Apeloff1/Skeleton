@@ -25,4 +25,4 @@ flowchart LR
     backend --> chroma
 ```
 
-The client SDK in progress covers auth, agents, builds, and stream parsing. Projects are a published contract (`docs/architecture/contracts/projects.md`) so that SDK and the app shell can align before a Projects router exists. Builds in that contract are engine executions.
+The client SDK in progress covers auth, agents, builds, and stream parsing. Projects are published in `docs/architecture/contracts/projects.md` (`skeleton.projects.v1` at `1.1.0`) as the contract for the #4097 router moving to `/api/v1/projects`. A build started there returns an `execution_id` for `/api/v1/engine/executions/{execution_id}`.

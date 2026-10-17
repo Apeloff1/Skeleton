@@ -3,7 +3,7 @@
 Current views, newer than the 2026-10-10 rollout snapshot below:
 
 - [C4 context, container, and component](c4/README.md)
-- [Projects and subsystem contracts](contracts/README.md) — Projects HTTP is specified and not mounted
+- [Projects and subsystem contracts](contracts/README.md) — Projects HTTP is `skeleton.projects.v1` at `/api/v1/projects`
 - [Logical layers](LOGICAL_LAYERS.md) — domain, infrastructure, application, interface
 
 > Generated from main @ `40e81412e995a9b153a02ff39f3ae1aec187de25` on 2026-10-10.

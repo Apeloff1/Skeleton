@@ -101,7 +101,7 @@
       "title": "Versioned subsystem contracts and the Projects resource",
       "status": "accepted",
       "path": "docs/adr/ADR-0003-subsystem-and-projects-contracts.md",
-      "decision_source": "app foundation client and frontend need a Projects contract before routes exist",
+      "decision_source": "Projects contract describes the #4097 router moving to /api/v1/projects",
       "masterplan_refs": [
         "VOL-003",
         "VOL-058"
