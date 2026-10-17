@@ -1,7 +1,7 @@
 /**
  * /skeleton-forge — Skeleton GameForge cockpit: guided questionnaire,
- * live compose graph, forge-run panel, era viewer and cockpit console.
- * Deep link a tab with ?tab=build|compose|run|eras|console.
+ * live compose graph, build plan, forge-run panel, era viewer and console.
+ * Deep link a tab with ?tab=build|compose|plan|run|eras|console.
  */
 import React from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';

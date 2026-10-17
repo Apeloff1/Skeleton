@@ -1,10 +1,10 @@
 /**
- * Power & Hardware Awareness Hook v11.4
- * Monitors battery, memory, and adjusts app behavior accordingly
+ * Device power policy for long-running sessions.
+ * All battery events flow through one immutable state update. Subscriptions
+ * are removed on unmount, including when asynchronous initialization races it.
  */
-
 import { useState, useEffect, useCallback } from 'react';
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 import * as Battery from 'expo-battery';
 
 export type PerformanceMode = 'high' | 'balanced' | 'powersaver';
@@ -29,104 +29,112 @@ const DEFAULT_STATE: PowerState = {
   appState: 'active',
 };
 
+function validBatteryLevel(level: number): boolean {
+  // Expo reports -1 when battery level is unknown; never mistake it for 0%.
+  return Number.isFinite(level) && level >= 0 && level <= 1;
+}
+
+function isBatteryCharging(state: Battery.BatteryState): boolean {
+  return state === Battery.BatteryState.CHARGING || state === Battery.BatteryState.FULL;
+}
+
 export function usePowerAwareness() {
-  const [state, setState] = useState<PowerState>(DEFAULT_STATE);
+  const [state, setState] = useState<PowerState>(() => ({
+    ...DEFAULT_STATE, appState: AppState.currentState || 'active',
+  }));
 
   const updatePerformanceMode = useCallback((level: number, charging: boolean) => {
-    let mode: PerformanceMode = 'balanced';
-    let reduceAnimations = false;
-    let reducePolling = false;
-    let isLowPower = false;
+    if (!validBatteryLevel(level)) return;
+    const isLowPower = !charging && level <= 0.30;
+    const performanceMode: PerformanceMode = charging || level > 0.50
+      ? 'high'
+      : isLowPower ? 'powersaver' : 'balanced';
+    const shouldReduceAnimations = isLowPower;
+    const shouldReducePolling = !charging && level <= 0.15;
 
-    if (charging) {
-      mode = 'high';
-    } else if (level <= 0.15) {
-      mode = 'powersaver';
-      reduceAnimations = true;
-      reducePolling = true;
-      isLowPower = true;
-    } else if (level <= 0.30) {
-      mode = 'powersaver';
-      reduceAnimations = true;
-      isLowPower = true;
-    } else if (level <= 0.50) {
-      mode = 'balanced';
-    } else {
-      mode = 'high';
-    }
-
-    setState(prev => ({
-      ...prev,
-      batteryLevel: level,
-      isCharging: charging,
-      isLowPower,
-      performanceMode: mode,
-      shouldReduceAnimations: reduceAnimations,
-      shouldReducePolling: reducePolling,
-    }));
+    setState(prev => {
+      if (prev.batteryLevel === level && prev.isCharging === charging &&
+          prev.isLowPower === isLowPower && prev.performanceMode === performanceMode &&
+          prev.shouldReduceAnimations === shouldReduceAnimations &&
+          prev.shouldReducePolling === shouldReducePolling) return prev;
+      return {
+        ...prev, batteryLevel: level, isCharging: charging, isLowPower,
+        performanceMode, shouldReduceAnimations, shouldReducePolling,
+      };
+    });
   }, []);
 
   useEffect(() => {
+    let disposed = false;
     let batterySubscription: Battery.Subscription | null = null;
     let chargingSubscription: Battery.Subscription | null = null;
+    const reading = { level: DEFAULT_STATE.batteryLevel, charging: DEFAULT_STATE.isCharging };
 
     const initBattery = async () => {
       try {
-        const level = await Battery.getBatteryLevelAsync();
-        const charging = await Battery.getBatteryStateAsync();
-        const isCharging = charging === Battery.BatteryState.CHARGING || charging === Battery.BatteryState.FULL;
-        updatePerformanceMode(level, isCharging);
+        const [level, chargeState] = await Promise.all([
+          Battery.getBatteryLevelAsync(),
+          Battery.getBatteryStateAsync(),
+        ]);
+        if (disposed) return;
+        if (validBatteryLevel(level)) reading.level = level;
+        reading.charging = isBatteryCharging(chargeState);
+        updatePerformanceMode(reading.level, reading.charging);
 
+        // A previously unmounted hook must never attach native listeners.
+        if (disposed) return;
         batterySubscription = Battery.addBatteryLevelListener(({ batteryLevel }) => {
-          setState(prev => {
-            updatePerformanceMode(batteryLevel, prev.isCharging);
-            return prev;
-          });
+          if (disposed || !validBatteryLevel(batteryLevel)) return;
+          reading.level = batteryLevel;
+          updatePerformanceMode(reading.level, reading.charging);
         });
-
         chargingSubscription = Battery.addBatteryStateListener(({ batteryState }) => {
-          const charging = batteryState === Battery.BatteryState.CHARGING || batteryState === Battery.BatteryState.FULL;
-          setState(prev => {
-            updatePerformanceMode(prev.batteryLevel, charging);
-            return prev;
-          });
+          if (disposed) return;
+          reading.charging = isBatteryCharging(batteryState);
+          updatePerformanceMode(reading.level, reading.charging);
         });
-      } catch (e) {
-        // Battery API not available - use defaults
-        console.log('Battery API not available');
+      } catch {
+        // Battery APIs are optional (web/simulators). Keep safe defaults and
+        // tear down a partially established listener, if any.
+        batterySubscription?.remove();
+        chargingSubscription?.remove();
+        batterySubscription = null;
+        chargingSubscription = null;
       }
     };
 
-    initBattery();
-
-    // App state listener
-    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
-      setState(prev => ({ ...prev, appState: nextState }));
+    void initBattery();
+    const appStateSubscription = AppState.addEventListener('change', nextState => {
+      if (!disposed) {
+        setState(prev => prev.appState === nextState ? prev : { ...prev, appState: nextState });
+      }
     });
 
     return () => {
+      disposed = true;
       batterySubscription?.remove();
       chargingSubscription?.remove();
       appStateSubscription.remove();
     };
   }, [updatePerformanceMode]);
 
-  // Helper functions
   const getAnimationDuration = useCallback((baseDuration: number) => {
-    if (state.shouldReduceAnimations) return 0;
-    if (state.performanceMode === 'powersaver') return baseDuration * 0.5;
-    return baseDuration;
-  }, [state.shouldReduceAnimations, state.performanceMode]);
+    if (!Number.isFinite(baseDuration) || baseDuration <= 0) return 0;
+    if (state.appState !== 'active' || state.shouldReduceAnimations) return 0;
+    const base = Math.min(60_000, baseDuration);
+    return state.performanceMode === 'powersaver' ? base * 0.5 : base;
+  }, [state.shouldReduceAnimations, state.performanceMode, state.appState]);
 
   const getPollingInterval = useCallback((baseInterval: number) => {
-    if (state.shouldReducePolling) return baseInterval * 3;
-    if (state.performanceMode === 'powersaver') return baseInterval * 2;
-    return baseInterval;
-  }, [state.shouldReducePolling, state.performanceMode]);
+    // Never return Infinity or a huge timer value: React Native timers can
+    // overflow and unexpectedly spin at millisecond cadence.
+    const base = Number.isFinite(baseInterval)
+      ? Math.max(250, Math.min(300_000, baseInterval)) : 12_000;
+    if (state.appState !== 'active') return Math.max(60_000, base);
+    const multiplier = state.shouldReducePolling ? 3
+      : state.performanceMode === 'powersaver' ? 2 : 1;
+    return Math.min(300_000, base * multiplier);
+  }, [state.shouldReducePolling, state.performanceMode, state.appState]);
 
-  return {
-    ...state,
-    getAnimationDuration,
-    getPollingInterval,
-  };
+  return { ...state, getAnimationDuration, getPollingInterval };
 }

@@ -69,6 +69,48 @@ footer{padding:1.3rem;text-align:center;opacity:.8}
 _JS = r"""
 "use strict";
 const GAME = __SAFE_GAME_JSON__;
+const STUDIO_ART = GAME.studio_art || null;
+const STUDIO_MEDIA = GAME.studio_media || null;
+let spriteFrame = 0;
+let musicMuted = false;
+let musicVolume = 0.35;
+let effectsVolume = 0.55;
+let ambience = null;
+const sounds = Object.create(null);
+const overlays = [];
+function startStudioMedia(){
+ if(!STUDIO_MEDIA || !STUDIO_MEDIA.audio.ambient || typeof Audio === "undefined")return;
+ if(!ambience){
+  ambience = new Audio("data:audio/wav;base64,"+STUDIO_MEDIA.audio.ambient);
+  ambience.loop = true;
+ }
+ ambience.volume = musicMuted ? 0 : musicVolume;
+ if(ambience.paused){
+  const running = ambience.play();
+  if(running && typeof running.catch === "function")running.catch(()=>{});
+ }
+}
+function playStudioCue(kind){
+ if(!STUDIO_MEDIA || musicMuted || typeof Audio === "undefined")return;
+ const blob = STUDIO_MEDIA.audio[kind];
+ if(!blob)return;
+ if(!sounds[kind])sounds[kind]=new Audio("data:audio/wav;base64,"+blob);
+ const sound=sounds[kind];
+ sound.volume=effectsVolume;
+ sound.currentTime=0;
+ const running=sound.play();
+ if(running && typeof running.catch === "function")running.catch(()=>{});
+}
+function initStudioOverlays(){
+ if(!STUDIO_MEDIA || typeof Image === "undefined")return;
+ for(const data of STUDIO_MEDIA.parallax){
+  const picture=new Image();
+  picture.onload=()=>{if(state)draw();};
+  picture.src="data:image/png;base64,"+data;
+  overlays.push(picture);
+ }
+}
+
 const root=document.getElementById("screen");
 const ctx=root.getContext("2d",{alpha:false});
 const message=document.getElementById("message");
@@ -114,6 +156,7 @@ function reset(){
 }
 function takeTurn(direction){
  if(!Object.hasOwn(delta,direction)||state.status!=="playing")return;
+ startStudioMedia();
  if(replay.length>=20000){
   emit("The 20,000-turn replay budget is full. Undo or restart to continue.");
   return;
@@ -133,9 +176,11 @@ function takeTurn(direction){
  if(tile==="C"&&!state.collected.includes(poskey(nx,ny))){
   state.collected.push(poskey(nx,ny));state.score+=10;
   emit("Crystal collected! "+state.collected.length+" of "+lv.collectibles.length);
+  playStudioCue("collectible");
  }else if(tile==="H"&&entered){
   state.health--;
   emit("Hazard encountered: 1 health lost.");
+  playStudioCue("hazard");
  }else if(blocked){
   emit("A wall blocks that move.");
  }else{emit("Continue exploring.");}
@@ -181,7 +226,25 @@ function downloadReplay(){
  setTimeout(()=>URL.revokeObjectURL(url),0);
  emit("Downloaded local action trace (unverified until replayed).");
 }
+function drawStudioTile(index,x,y,size){
+ if(!STUDIO_ART)return false;
+ const pixels=(index===5&&STUDIO_ART.frames&&STUDIO_ART.frames.length)
+   ? STUDIO_ART.frames[spriteFrame] : STUDIO_ART.tiles[index];
+ const palette=STUDIO_ART.palette;
+ if(!pixels||pixels.length!==64)return false;
+ const unit=size/8;
+ for(let ty=0;ty<8;ty++)for(let tx=0;tx<8;tx++){
+  ctx.fillStyle=palette[pixels[ty*8+tx]];
+  ctx.fillRect(x*size+tx*unit,y*size+ty*unit,unit+.02,unit+.02);
+ }
+ return true;
+}
 function drawTile(tile,x,y,size){
+ if(STUDIO_ART){
+  const index=tile==="#"?1:tile==="C"?2:tile==="H"?3:tile==="G"?4:0;
+  const cleared=tile==="C"&&state.collected.includes(poskey(x,y));
+  if(drawStudioTile(cleared?0:index,x,y,size))return;
+ }
  const px=x*size,py=y*size;
  if(tile==="#"){
   ctx.fillStyle=colors.wall;ctx.fillRect(px,py,size,size);
@@ -222,11 +285,22 @@ function draw(){
  for(let y=0;y<lv.height;y++)for(let x=0;x<lv.width;x++){
   drawTile(lv.rows[y][x],x,y,size);
  }
+ // Transparency in author-generated PNGs composites foliage, shadows and
+ // atmospheric details over native-style tiles; the hero remains legible.
+ for(let index=0;index<overlays.length;index++){
+  const picture=overlays[index];
+  if(!picture.complete||!picture.naturalWidth)continue;
+  const drift=(state.steps*(index+1)*2)%root.width;
+  ctx.drawImage(picture,-drift,0,root.width,root.height);
+  if(drift)ctx.drawImage(picture,root.width-drift,0,root.width,root.height);
+ }
  const px=state.x*size,py=state.y*size;
+ if(!drawStudioTile(5,state.x,state.y,size)){
  ctx.fillStyle="#ffffff";
  ctx.beginPath();ctx.arc(px+size/2,py+size/2,size*.37,0,Math.PI*2);ctx.fill();
  ctx.fillStyle="#112d39";
  ctx.fillRect(px+size*.55,py+size*.38,4,4);
+ }
  nodes.level.textContent=(state.level+1)+" / "+GAME.levels.length;
  nodes.health.textContent=state.health+" / "+GAME.intent.starting_health;
  nodes.score.textContent=state.score;
@@ -246,6 +320,35 @@ function draw(){
   }).join("")).join("\n");
  document.getElementById("text-map").textContent=printable;
 }
+// Standard Gamepad API: D-pad 12..15, left stick axes 0/1, B undo and
+// Start restart. One turn on each new press; no uncontrolled hold-repeat.
+let previousGamepadInput="";
+function gamepadCommand(pad){
+ if(!pad || !pad.connected)return "";
+ const pressed=(index)=>Boolean(pad.buttons&&pad.buttons[index]&&pad.buttons[index].pressed);
+ if(pressed(9))return "restart";
+ if(pressed(1))return "undo";
+ const ax=pad.axes&&Number.isFinite(pad.axes[0])?pad.axes[0]:0;
+ const ay=pad.axes&&Number.isFinite(pad.axes[1])?pad.axes[1]:0;
+ if(pressed(12)||ay<=-0.6)return "up";
+ if(pressed(13)||ay>=0.6)return "down";
+ if(pressed(14)||ax<=-0.6)return "left";
+ if(pressed(15)||ax>=0.6)return "right";
+ return "";
+}
+function pollGameController(){
+ const pads=typeof navigator!=="undefined"&&typeof navigator.getGamepads==="function"
+   ? navigator.getGamepads():[];
+ const pad=Array.from(pads||[]).find(p=>p&&p.connected);
+ const next=gamepadCommand(pad);
+ if(next!==previousGamepadInput&&next&&!document.hidden){
+  if(next==="undo")undo();
+  else if(next==="restart")reset();
+  else takeTurn(next);
+ }
+ previousGamepadInput=next;
+ if(typeof requestAnimationFrame==="function")requestAnimationFrame(pollGameController);
+}
 document.addEventListener("keydown",event=>{
  if(event.altKey||event.ctrlKey||event.metaKey||event.repeat)return;
  if(["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName))return;
@@ -261,7 +364,32 @@ for(const button of document.querySelectorAll("[data-action]")){
 nodes.undo.addEventListener("click",undo);
 document.getElementById("reset").addEventListener("click",reset);
 document.getElementById("download").addEventListener("click",downloadReplay);
+const mute=document.getElementById("music-mute");
+if(mute)mute.addEventListener("click",()=>{
+ musicMuted=!musicMuted;
+ mute.textContent=musicMuted?"Unmute audio":"Mute audio";
+ if(ambience)ambience.volume=musicMuted?0:musicVolume;
+});
+const musicScale=document.getElementById("music-volume");
+if(musicScale)musicScale.addEventListener("input",()=>{
+ musicVolume=Number(musicScale.value)/100;
+ if(ambience)ambience.volume=musicMuted?0:musicVolume;
+});
+const effectsScale=document.getElementById("effects-volume");
+if(effectsScale)effectsScale.addEventListener("input",()=>{
+ effectsVolume=Number(effectsScale.value)/100;
+});
 reset();
+initStudioOverlays();
+if(typeof navigator!=="undefined"&&typeof navigator.getGamepads==="function" &&
+   typeof requestAnimationFrame==="function")requestAnimationFrame(pollGameController);
+if(STUDIO_ART && STUDIO_ART.frames && STUDIO_ART.frames.length>1){
+ window.setInterval(()=>{
+  if(document.hidden)return;
+  spriteFrame=(spriteFrame+1)%STUDIO_ART.frames.length;
+  if(state)draw();
+ },Math.round(1000/STUDIO_ART.fps));
+}
 """
 
 
@@ -303,6 +431,7 @@ class PlayableHTML:
 def render_playable_world(
     world: PlayableWorld, *,
     research_packet: object = None,
+    studio_art: object = None,
     authorized: bool,
 ) -> PlayableHTML:
     if not authorized:
@@ -332,6 +461,48 @@ def render_playable_world(
         "world_digest": world.digest, "intent": world.intent.to_payload(),
         "levels": levels,
     }
+    if studio_art is not None:
+        from .studio_asset_pipeline import StudioArtPack
+        from skeleton.jeeves.game_console_assets import decode_tiles
+        if not isinstance(studio_art, StudioArtPack) or studio_art.world_digest != world.digest:
+            raise PlayableExportError("verified, same-world original art pack required")
+        studio_art.verify()
+        descriptors = json.loads(dict(studio_art.files)["metadata/descriptors.json"])
+        from base64 import b64encode
+        media_files = dict(studio_art.files)
+        audio = {
+            kind: b64encode(media_files[f"audio/{kind}.wav"]).decode("ascii")
+            for kind in ("ambient", "collectible", "hazard")
+            if f"audio/{kind}.wav" in media_files
+        }
+        layers = sorted(name for name in media_files
+                        if name.startswith("parallax/") and name.endswith(".png"))
+        if audio:
+            # Only publish the full verified set. The JS player must never
+            # infer an absent cue from a filename or remote network call.
+            if set(audio) != {"ambient", "collectible", "hazard"}:
+                raise PlayableExportError("original PCM cue inventory is incomplete")
+            game_data["studio_media"] = {
+                "audio": audio,
+                "parallax": [
+                    b64encode(media_files[name]).decode("ascii") for name in layers
+                ],
+            }
+        elif layers:
+            game_data["studio_media"] = {
+                "audio": {}, "parallax": [
+                    b64encode(media_files[name]).decode("ascii") for name in layers
+                ],
+            }
+        game_data["studio_art"] = {
+            "pack_digest": studio_art.digest,
+            "tiles": [list(tile) for tile in studio_art.runtime_tiles],
+            "frames": [list(tile) for tile in decode_tiles(
+                dict(studio_art.files)["tiles/hero_animation.bin"], studio_art.codec,
+            )],
+            "fps": studio_art.direction.animation_fps,
+            "palette": ["#" + item[:6] for item in descriptors["palette"]],
+        }
     script = _JS.replace("__SAFE_GAME_JSON__", _safe_script_json(game_data))
     script_csp = _sha256_csp(script)
     css_csp = _sha256_csp(_CSS)
@@ -339,7 +510,7 @@ def render_playable_world(
         "default-src 'none'; "
         + "script-src '" + script_csp + "'; "
         + "style-src '" + css_csp + "'; "
-        + "img-src 'none'; font-src 'none'; connect-src 'none'; "
+        + "img-src data:; media-src data:; font-src 'none'; connect-src 'none'; "
         + "object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
     )
     title = escape(world.intent.title, quote=True)
@@ -391,6 +562,7 @@ def render_playable_world(
         '<span><b>▲</b> Hazard — avoid</span>'
         '<span><b>▣</b> Exit — opens after collection</span></div>'
         '</section><section class="surface"><h2>Move</h2>'
+        '<p>Controller: D-pad / left stick to move, B to undo, Start to restart.</p>'
         '<div class="controls">'
         '<button data-action="up" aria-label="Move up">↑</button>'
         '<button data-action="left" aria-label="Move left">←</button>'
@@ -401,7 +573,11 @@ def render_playable_world(
         '<section class="surface"><div class="toolbar">'
         '<button id="undo" type="button" aria-label="Undo last move">Undo (Z)</button>'
         '<button id="reset" type="button">Restart game (R)</button>'
-        '<button id="download" type="button">Export my run</button></div>'
+        '<button id="download" type="button">Export my run</button>'
+        + ('<button id="music-mute" type="button">Mute audio</button>'
+           '<label>Music <input id="music-volume" type="range" min="0" max="100" value="35"></label>'
+           '<label>Effects <input id="effects-volume" type="range" min="0" max="100" value="55"></label>'
+           if studio_art is not None else '') + '</div>'
         '<div class="details">'
         '<details><summary>Accessible text map and legend</summary>'
         '<p>Each character is one tile: # wall, . floor, S entry, '

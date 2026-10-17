@@ -142,15 +142,35 @@ def academy_status(owner: str = Depends(_principal)) -> dict:
 
 
 @router.get("/crawler/feed")
-def crawler_feed(
+async def crawler_feed(
     after_sequence: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=250),
-    owner: str = Depends(_principal),
+    last_event_digest: str | None = Query(default=None, max_length=64),
+    user: dict | None = Depends(get_current_user),
 ) -> dict:
+    """Prefer the account's canonical crawl checkpoint, then the practice journal.
+
+    A digest cursor that does not match the checkpoint is a conflict. Storage
+    or checkpoint failures leave the practice-lab journal available.
+    """
+    owner = _principal(user)
+    scope = _crawler_scope(user)
+    canonical = None
+    try:
+        canonical = await crawler_application.companion_feed(
+            scope, after_sequence=after_sequence, limit=limit, expected_digest=last_event_digest,
+        )
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Crawler journal replay unavailable") from None
+    except (PyMongoError, CrawlerError):
+        canonical = None
+    if canonical and canonical.get("active"):
+        return {"ok": True, **canonical}
     with _lab() as (lab, _):
         try:
             feed = DragonSessionProjection(lab.db).read(
-                owner, authorized=True, after_sequence=after_sequence, limit=limit
+                owner, authorized=True, after_sequence=after_sequence, limit=limit,
+                expected_digest=last_event_digest,
             )
         except ValueError:
             raise HTTPException(status_code=409, detail="Crawler journal replay unavailable") from None

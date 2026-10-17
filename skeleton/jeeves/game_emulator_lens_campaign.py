@@ -12,6 +12,7 @@ from typing import Any
 from .game_learning import _digest
 from .game_emulator_lens_review import (
     SCHEMA, EmulatorLensReviewError, _all_review_specs,
+    review_verified_training_report, validate_training_receipts,
 )
 
 MAX_CAMPAIGN_PAGES = 128
@@ -21,7 +22,9 @@ class LensCampaignError(EmulatorLensReviewError):
     """A lens page is missing, altered, repeated or has an untrusted outcome."""
 
 
-def audit_lens_campaign(pages: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def audit_lens_campaign(
+    pages: Sequence[dict[str, Any]], *, source_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Audit full ordered coverage, source pinning, page digests and open lanes.
 
     Review receipts are structurally checked but cannot independently prove that
@@ -55,9 +58,19 @@ def audit_lens_campaign(pages: Sequence[dict[str, Any]]) -> dict[str, Any]:
     seen = []
     counts: Counter[str] = Counter()
     page_digests = []
+    if source_report is not None:
+        validated = validate_training_receipts(source_report)
+        if validated["report_digest"] != source:
+            raise LensCampaignError("source report differs from reviewed campaign")
     for page in pages:
         if type(page) is not dict:
             raise LensCampaignError("each page must be a canonical object")
+        if source_report is not None:
+            expected = review_verified_training_report(
+                source_report, offset=len(seen), limit=page.get("page_size", 0),
+            )
+            if page != expected:
+                raise LensCampaignError("review page differs from exact source and catalog")
         reported_digest = page.get("review_digest")
         if (type(reported_digest) is not str
                 or reported_digest != _digest({
@@ -127,6 +140,7 @@ def audit_lens_campaign(pages: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "page_digests": page_digests,
         "family_counts": dict(sorted(counts.items())),
         "full_registered_catalog_covered": True,
+        "all_review_pages_reconstructed_from_source": source_report is not None,
         "independent_native_replay_verified": False,
         "independent_dragon_observations_verified": 0,
         "independent_adversarial_reviews_verified": 0,
@@ -135,3 +149,43 @@ def audit_lens_campaign(pages: Sequence[dict[str, Any]]) -> dict[str, Any]:
     }
     outcome["audit_digest"] = _digest(outcome)
     return outcome
+
+
+
+def assemble_source_pinned_lens_campaign(
+    source_report: dict[str, Any], *, page_size: int = 64,
+) -> dict[str, Any]:
+    """Build + independently reconstruct the entire canonical lens catalog.
+
+    The bounded iterator does not persist review tasks, observe screenshots,
+    synthesize independent Dragon testimony, or update model parameters.
+    Every generated page is re-derived from the original source report before
+    its digest can contribute to the final read-only campaign projection.
+    """
+    if type(page_size) is not int or not 1 <= page_size <= 512:
+        raise LensCampaignError("full lens campaign requires page size 1..512")
+    validate_training_receipts(source_report)
+    minimum_page = max(
+        1, (len(_all_review_specs()) + MAX_CAMPAIGN_PAGES - 1)
+        // MAX_CAMPAIGN_PAGES,
+    )
+    if page_size < minimum_page:
+        raise LensCampaignError(
+            "page size too small for bounded complete registered lens campaign"
+        )
+    pages = []
+    cursor = 0
+    while True:
+        if len(pages) >= MAX_CAMPAIGN_PAGES:
+            raise LensCampaignError("canonical lens catalog exceeds bounded review pages")
+        page = review_verified_training_report(
+            source_report, offset=cursor, limit=page_size,
+        )
+        pages.append(page)
+        next_offset = page.get("next_offset")
+        if next_offset is None:
+            break
+        if type(next_offset) is not int or next_offset <= cursor:
+            raise LensCampaignError("canonical review pagination stalled or moved backward")
+        cursor = next_offset
+    return audit_lens_campaign(pages, source_report=source_report)
