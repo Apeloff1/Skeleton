@@ -52,6 +52,9 @@ class EnduranceProductionHistoryTests(unittest.TestCase):
             self.order, self.campaign, one, authorized=True,
         )
         self.assertEqual(first["sequence"], 1)
+        self.assertEqual(first["native_animation_audio_source_targets_checked"], 1)
+        self.assertEqual(first["native_hero_animation_frames_in_source"], 3)
+        self.assertFalse(first["real_native_audio_capture_verified"])
         state = inspect_execution_history(
             self.order, self.campaign, authorized=True,
         )
@@ -73,6 +76,8 @@ class EnduranceProductionHistoryTests(unittest.TestCase):
             self.order, self.campaign, two, authorized=True,
         )
         self.assertEqual(second["sequence"], 2)
+        self.assertEqual(second["native_animation_audio_source_targets_checked"], 2)
+        self.assertEqual(second["native_hero_animation_frames_in_source"], 6)
         self.assertEqual(second["previous_entry_digest"], first["entry_digest"])
         latest = inspect_execution_history(
             self.order, self.campaign, authorized=True,
