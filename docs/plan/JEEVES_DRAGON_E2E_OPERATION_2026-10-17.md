@@ -821,3 +821,20 @@ python -m pytest -q -ra --tb=short --noconftest \
 ```
 
 **Qualification remains deliberately strict:** A verified compiled audio byte sequence is *not* a sound capture. Real RGBDS/ca65 compilation, running all games in PyBoy/FCEUX, measuring note frequencies and mix/envelopes, hearing event-triggered audio under gameplay, hardware controller/speaker checks, first-install, release licensing, and production endurance have **not** been established by this source/fixture pass. The offline PSG audition-preview component was not delivered in this tranche. Do not equate authored or compiled tests with a fully playable, audible and independently verified console game.
+
+### Offline qualification history snapshots
+
+The segmented E2E journal can be copied without moving or exporting game
+ROMs, assets, prompts or model weights:
+`snapshot_studio_history(campaign_root, private_backup_root,
+name="qualification-001", identity=campaign_identity)` from
+`skeleton.ai.game_builder.studio_history_backup`. The source is locked
+against concurrent campaign writes; archived 64-run segments and the
+journal head are individually hashed and preserved as create-only receipts.
+`verify_studio_history_snapshot(private_backup_root,
+name="qualification-001", identity=campaign_identity)` rechecks the
+offline source-bound digest chain. The target folder must exist, be absolute
+and private (0700 on POSIX). Crashed or incomplete snapshots cannot be
+accepted without the sealed manifest. This does not constitute tested
+off-machine disaster recovery, cartridge completion, device parity,
+asset/audio export, a year-long run, or full release qualification.
