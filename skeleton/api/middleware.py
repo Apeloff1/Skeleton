@@ -164,6 +164,7 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/capabilities", "capabilities"),
     ("/api/v1/interface", "interface"),
     ("/api/v1/auth", "auth"),
+    ("/api/v1/projects", "projects"),
     ("/api/v1/cortex", "cognition"),
     ("/api/v1/health", "observability"),
     ("/api/v1/metrics", "observability"),
@@ -335,9 +336,11 @@ class RequestSealMiddleware:
             return
 
         # Fail-closed credential seal (#16 HMAC) on non-open routes.
-        from skeleton.api.hmac_seal import _resolve_secret, verify_seal
+        from skeleton.api.hmac_seal import _resolve_secret, load_keyring, verify_seal
 
-        if not _resolve_secret():
+        # Gate on primary secret OR rotatable keyring (keyring-only deployments
+        # must verify, not 503). verify_seal already accepts ring keys.
+        if not _resolve_secret() and not load_keyring():
             resp = _json_response(503, {"error": "seal_unavailable"})
             await resp(scope, receive, send_with_seal)
             return

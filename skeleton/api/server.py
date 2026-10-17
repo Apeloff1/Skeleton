@@ -1114,6 +1114,9 @@ def create_app() -> Any:
     app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
     app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
     app.include_router(engine_router, prefix="/api/v1")
+    # skeleton.projects.v1 (Internal Systems, #4097): seal via install_gate + session.
+    from skeleton.api.projects_routes import router as projects_router
+    app.include_router(projects_router, prefix="/api/v1")
     app.include_router(cockpit_router)
     if _omnifabric_api_enabled():
         # Lazy import keeps the kernel OmniFabric service off the import path
