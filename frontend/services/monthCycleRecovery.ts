@@ -24,6 +24,7 @@ export interface MonthCycleRecoveryOptions {
   baseRetryMs?: number;
   maxRetryMs?: number;
   onObserved?: (record: MonthCycleRecord) => void;
+  clock?: () => number;
 }
 export interface MonthCycleRecoveryReport {
   attempted: number;
@@ -87,6 +88,7 @@ export class MonthCycleRecovery {
   private readonly baseRetryMs: number;
   private readonly maxRetryMs: number;
   private readonly onObserved?: (record: MonthCycleRecord) => void;
+  private readonly clock: () => number;
   private batch: Promise<MonthCycleRecoveryReport> | null = null;
   private controller: AbortController | null = null;
 
@@ -102,9 +104,10 @@ export class MonthCycleRecovery {
     this.maxRetryMs = Math.max(this.baseRetryMs,
       finite(options.maxRetryMs, 6 * 60 * 60_000, 30_000, 7 * 24 * 60 * 60_000));
     this.onObserved = options.onObserved;
+    this.clock = options.clock ?? Date.now;
   }
   stop() { this.controller?.abort(); }
-  reconcileDue(now = Date.now()): Promise<MonthCycleRecoveryReport> {
+  reconcileDue(now = this.clock()): Promise<MonthCycleRecoveryReport> {
     if (this.batch) return this.batch;
     const controller = new AbortController();
     this.controller = controller;
@@ -135,7 +138,7 @@ export class MonthCycleRecovery {
           break;
         }
         report.attempted++;
-        const sampledAt = Math.max(now, Date.now());
+        const sampledAt = Math.max(now, this.clock());
         if (observed.phase === 'disconnected') {
           const dueAt = sampledAt + delayedRetry(record, {
             base: this.baseRetryMs, max: this.maxRetryMs, disconnected: true,
