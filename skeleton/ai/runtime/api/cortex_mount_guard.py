@@ -55,6 +55,7 @@ def _iter_paths(routes: object, prefix: str, stack: tuple[int, ...]):
     if not isinstance(routes, (list, tuple)):
         raise RuntimeError(_UNINSPECTABLE)
     if len(stack) > _MAX_DEPTH:
+        raise RuntimeError(_UNINSPECTABLE)
     for route in routes:
         marker = id(route)
         if marker in stack:  # true cycle only; the same router at two prefixes is walked twice
