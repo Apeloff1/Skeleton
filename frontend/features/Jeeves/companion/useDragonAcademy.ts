@@ -19,7 +19,8 @@ import {
 import type {CompanionAcademyInput,CompanionTelemetry} from './DragonCompanionPanel';
 import {type NativeAttempt,type NativeTarget,type NativeCurriculum,normalizeNativeAttempts,normalizeNativeTargets,normalizeNativeCurriculum} from './dragonNativeTargets';
 import {type DragonFamilyProjection,validateDragonFamily} from './dragonFamilyProjection';
-import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
+import {EMPTY_COMPANION_JOURNAL,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
+import {acceptDragonFeed} from './dragonReplay';
 
 type Snapshot={
  ok:boolean;progress:DragonPracticeProgress;attempts:DragonPracticeAttempt[];family?:DragonFamilyProjection;
@@ -27,7 +28,7 @@ type Snapshot={
  curriculum?:NativeCurriculum;
 };
 type HtmlArtifact={ok:boolean;html:string;sha256:string;sandbox_required:boolean;attempt_id:string};
-type CrawlFeed={ok:boolean;session_id:string|null;active:boolean;events:WireDragonEvent[];next_cursor:string|null;has_more:boolean};
+type CrawlFeed={ok:boolean;session_id:string|null;active:boolean;events:WireDragonEvent[];next_cursor:string|null;has_more:boolean;history_truncated?:boolean};
 export interface DemoView{attemptId:string;html:string;digest:string}
 const PATH='/api/dragon-academy';
 const HEX=/^[a-f0-9]{64}$/;
@@ -125,15 +126,10 @@ export function useDragonAcademy(){
     return;
    }
    if(!Array.isArray(f.events)||f.events.length>100)return;
-   let next=journal.current;
-   for(const event of f.events){
-    const updated=reduceDragonJournal(next,event);
-    if(updated.warnings.length>next.warnings.length)return;
-    next=updated;
-   }
+   const next=acceptDragonFeed(journal.current,f);
    journal.current=next;
    const last=f.events.at(-1);
-   if(last)setTelemetry({
+   if(last&&next.lastSequence===last.sequence)setTelemetry({
     kind:last.kind,payload:last.payload,knowledgeItems:next.indexed,
    });
   }catch{

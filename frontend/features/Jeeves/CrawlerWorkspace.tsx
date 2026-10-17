@@ -48,7 +48,7 @@ function CrawlerContent() {
   const seededTopics = useRef(false);
   useEffect(() => {
     const raw = typeof params.topics === 'string' ? params.topics : '';
-    if (seededTopics.current || !/^[a-z0-9]+(?:[ ,][a-z0-9]+){0,15}$/.test(raw) || raw.length > 160) return;
+    if (seededTopics.current || !/^[a-z0-9]+(?:-[a-z0-9]+)*(?:[ ,][a-z0-9]+(?:-[a-z0-9]+)*){0,15}$/.test(raw) || raw.length > 160) return;
     seededTopics.current = true;
     setTopics(raw);
   }, [params.topics]);
@@ -133,7 +133,7 @@ function CrawlerContent() {
   const create = () => {
     const numeric = [Number(requests), Number(documents), Number(megabytes), Number(depth)];
     if (!numeric.every(Number.isInteger) || numeric[0] < 1 || numeric[0] > 128 || numeric[1] < 1 || numeric[1] > 64 || numeric[2] < 1 || numeric[2] > 32 || numeric[3] < 0 || numeric[3] > 3) { setError('Use requests 1–128, documents 1–64, MB 1–32 and depth 0–3.'); return; }
-    const body: CrawlCreate = { idempotency_key: crawlRequestKey('create'), seeds: seeds.split(/\r?\n/).map(item => item.trim()).filter(Boolean), title: title.trim() || undefined, topics: topics.split(',').map(item => item.trim()).filter(Boolean), max_requests: numeric[0], max_documents: numeric[1], max_bytes: numeric[2] * 1048576, max_depth: numeric[3], consent: true, rights_acknowledged: true };
+    const body: CrawlCreate = { idempotency_key: crawlRequestKey('create'), seeds: seeds.split(/\r?\n/).map(item => item.trim()).filter(Boolean), title: title.trim() || undefined, topics: topics.split(/[\s,]+/).map(item => item.trim()).filter(item => item.length > 0 && item.length <= 80).slice(0, 16), max_requests: numeric[0], max_documents: numeric[1], max_bytes: numeric[2] * 1048576, max_depth: numeric[3], consent: true, rights_acknowledged: true };
     void mutate('Creating crawl', async signal => { const value = await createCrawl(body, signal); if (!signal.aborted) { activeRef.current = value; setActive(value); setCreating(false); setSeeds(''); setConsent(false); setRights(false); restoredSession.current = value.session_id; router.setParams({ session: value.session_id, pane: 'capture' }); } return value; });
   };
   const control = (action: 'pause' | 'resume' | 'cancel') => {
@@ -187,7 +187,7 @@ function CrawlerContent() {
       {(creating || !active) && <View style={s.card}><Text style={s.heading}>New bounded crawl</Text><Text style={s.small}>Only explicitly selected seed hosts are admitted. Consent expires within 24 hours. Create the source scope first, then authorize a finite automatic run or one manual slice.</Text>
         <Text style={s.label}>Name (optional)</Text><TextInput accessibilityLabel="Crawl name" value={title} onChangeText={setTitle} maxLength={160} style={field} placeholder="Engine documentation" placeholderTextColor={colors.muted} />
         <Text style={s.label}>Seed URLs · one per line</Text><TextInput accessibilityLabel="Seed URLs" value={seeds} onChangeText={setSeeds} maxLength={32768} multiline style={[field, { minHeight: 110 }]} placeholder={'https://example.org/docs/\nhttps://example.org/guide/'} placeholderTextColor={colors.muted} autoCapitalize="none" />
-        <Text style={s.label}>Topics (optional, comma separated)</Text><TextInput accessibilityLabel="Crawl topics" value={topics} onChangeText={setTopics} maxLength={1280} style={field} placeholder="movement, tools, scripting" placeholderTextColor={colors.muted} />
+        <Text style={s.label}>Topics (optional, commas or spaces)</Text><TextInput accessibilityLabel="Crawl topics" value={topics} onChangeText={setTopics} maxLength={1280} style={field} placeholder="movement, tools, scripting" placeholderTextColor={colors.muted} />
         <View style={s.row}>{[['Requests', requests, setRequests], ['Documents', documents, setDocuments], ['MB', megabytes, setMegabytes], ['Link depth', depth, setDepth]].map(([name, value, setter]) => <View key={name as string} style={{ minWidth: 90, flex: 1, gap: 6 }}><Text style={s.small}>{name as string}</Text><TextInput accessibilityLabel={`Maximum ${name as string}`} keyboardType="number-pad" value={value as string} onChangeText={setter as (v: string) => void} maxLength={3} style={field} /></View>)}</View>
         <View style={s.row}><Switch value={consent} onValueChange={setConsent} accessibilityLabel="Authorize this bounded capture" /><Text style={[s.message, s.grow]}>I authorize the app to request and store this bounded set of public sources.</Text></View><View style={s.row}><Switch value={rights} onValueChange={setRights} accessibilityLabel="Acknowledge source rights" /><Text style={[s.message, s.grow]}>I have permission to capture these sources and understand their use remains governed by source rights.</Text></View>
         <Button title={busy === 'Creating crawl' ? 'Creating…' : 'Create crawl'} disabled={!canWrite || readiness?.available !== true || !consent || !rights || !seeds.trim() || !!busy || running} onPress={create} />
