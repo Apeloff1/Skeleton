@@ -1565,5 +1565,344 @@
       "game_release_signed_off": false
     },
     "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_console_animated_psg_production_extension": {
+    "status": "original_native_animation_and_PSG_source_integrated_pending_real_audio_video_toolchain_and_emulator_evidence",
+    "tranche": "M201-M260",
+    "source_owners": [
+      "skeleton/ai/game_builder/studio_asset_pipeline.py",
+      "skeleton/ai/game_builder/studio_native_psg.py",
+      "skeleton/ai/game_builder/game_boy_native_export.py",
+      "skeleton/ai/game_builder/game_boy_color_native_export.py",
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/native_game_cli.py",
+      "skeleton/ai/game_builder/jeeves_app_runtime.py",
+      "skeleton/ai/game_builder/studio_game_boy_rom_art_parity.py",
+      "skeleton/ai/game_builder/studio_nes_chr_parity.py"
+    ],
+    "milestones": [
+      {
+        "id": "M201",
+        "name": "Original authored 8x8 hero animation tied to source game world and tile five",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M202",
+        "name": "Generate one through four deterministic visible original hero frames",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M203",
+        "name": "Embed additional GB RGBDS planar animation tiles beyond first six semantic tiles",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M204",
+        "name": "Preserve exact 96-byte base sprite section for independent compiled art parity",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M205",
+        "name": "Copy actual appended hero tile bytes into Game Boy VRAM at boot",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M206",
+        "name": "Advance Game Boy hero sprite tile on bounded 60Hz frame counters",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M207",
+        "name": "Reset and bound GB animation index to actual authored frame inventory",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M208",
+        "name": "Forward identical 2bpp hero frames into Game Boy Color source",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M209",
+        "name": "Keep CGB native sound/animation compatible with DMG sprite semantics",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M210",
+        "name": "Embed additional NES original two-plane CHR hero frames after base six tiles",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M211",
+        "name": "Advance actual NES PPU sprite tile number per frame through 6502 engine",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M212",
+        "name": "Preserve goal and lost-state NES sprite overrides over animation",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M213",
+        "name": "Require exact first authored animation frame equal to original tile five",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M214",
+        "name": "Reject malformed extra frames, unsupported palette indices and unsafe frame timing",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M215",
+        "name": "Reject source whose hero animation frame count exceeds four",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M216",
+        "name": "Attest compiled GB/GBC animation at linker-provided ROM0 bounds",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M217",
+        "name": "Reject forged duplicate, out-of-bank and wrong-length animation linker symbols",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M218",
+        "name": "Attest compiled NES appended CHR frames against source bytes",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M219",
+        "name": "Reject changed compiled hero frames despite valid native cartridge headers",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M220",
+        "name": "Retain source-versus-compiled animation byte count in original art evidence",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M221",
+        "name": "Compose original deterministic eight-note theme-bound PSG arrangements",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M222",
+        "name": "Provide independent melodic roots for five original studio themes",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M223",
+        "name": "Provide zero to four native sound intensity settings",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M224",
+        "name": "Generate original collectible, hazard and goal cue pitches",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M225",
+        "name": "Calculate bounded 11-bit GB handheld square-wave frequencies",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M226",
+        "name": "Calculate bounded NES 2A03 pulse timer periods",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M227",
+        "name": "Validate all PSG register byte splits against intended full timer",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M228",
+        "name": "Emit real Game Boy NR52, NR50, NR51 and pulse-register initialization",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M229",
+        "name": "Drive Game Boy square-wave melody from code-owned note tables",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M230",
+        "name": "Emit Game Boy game-event cues on a separate sound channel",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M231",
+        "name": "Preserve correct sound-channel routing for Game Boy Color",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M232",
+        "name": "Emit NES APU enable and pulse-channel setup in actual 6502 source",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M233",
+        "name": "Drive NES pulse-one original melody with bounded frame cadence",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M234",
+        "name": "Drive NES pulse-two event cues on pickup, hazard and goal",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M235",
+        "name": "Support source-disabled sound with explicit constant guard",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M236",
+        "name": "Reject game-theme mismatch between intended source and generated PSG arrangement",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M237",
+        "name": "Identify original native score by content digest without claiming PCM identity",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M238",
+        "name": "Connect native-game CLI to actual hero animation bytes from console codec",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M239",
+        "name": "Translate authored animation FPS into bounded native 60Hz tick interval",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M240",
+        "name": "Connect native-game CLI to theme/density original PSG and cue source",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M241",
+        "name": "Expose exact animation/music source receipts separately from emulator qualification",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M242",
+        "name": "Stage equivalent source from Jeeves under existing project-scoped human CAS review",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M243",
+        "name": "Accept bounded optional Jeeves animation FPS and music-intensity controls",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M244",
+        "name": "Reject inconsistent Jeeves art, animation count and music source manifest",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M245",
+        "name": "Add multi-console original frame/PSG regression suites without auto-running CI gates",
+        "state": "source_implemented_runtime_unverified"
+      },
+      {
+        "id": "M246",
+        "name": "Execute real RGBDS build and PyBoy playback proving at least two visible frames",
+        "state": "unqualified"
+      },
+      {
+        "id": "M247",
+        "name": "Execute real RGBDS CGB build in actual color emulator with animation proof",
+        "state": "unqualified"
+      },
+      {
+        "id": "M248",
+        "name": "Execute real ca65/ld65 build and FCEUX PPU sprite-frame movement",
+        "state": "unqualified"
+      },
+      {
+        "id": "M249",
+        "name": "Capture actual GB/CGB hardware audio samples or emulator sound trace",
+        "state": "unqualified"
+      },
+      {
+        "id": "M250",
+        "name": "Capture actual NES 2A03 pulse music and three distinct effects",
+        "state": "unqualified"
+      },
+      {
+        "id": "M251",
+        "name": "Compare source PSG timer programming with actual observed audio frequencies",
+        "state": "unqualified"
+      },
+      {
+        "id": "M252",
+        "name": "Validate actual sprite-frame cadence against LCD/PPU frame boundaries",
+        "state": "unqualified"
+      },
+      {
+        "id": "M253",
+        "name": "Measure controller input and animation concurrency under prolonged replay",
+        "state": "unqualified"
+      },
+      {
+        "id": "M254",
+        "name": "Verify simultaneous game audio and graphical rendering without timing stalls",
+        "state": "unqualified"
+      },
+      {
+        "id": "M255",
+        "name": "Qualify original console sound envelopes and volume on hardware",
+        "state": "unqualified"
+      },
+      {
+        "id": "M256",
+        "name": "Exercise restart/resume/crash during real console animation/audio runs",
+        "state": "unqualified"
+      },
+      {
+        "id": "M257",
+        "name": "Verify browser/Godot-to-console visual identity beyond static source tiles",
+        "state": "unqualified"
+      },
+      {
+        "id": "M258",
+        "name": "Review rights/author-origin provenance and public platform distribution",
+        "state": "unqualified"
+      },
+      {
+        "id": "M259",
+        "name": "Complete verified installer-first-launch with all Jeeves/Dragon editor controls",
+        "state": "unqualified"
+      },
+      {
+        "id": "M260",
+        "name": "Complete six-month/year studio endurance, platform regression and release signoff",
+        "state": "unqualified"
+      }
+    ],
+    "capability_truth": {
+      "animation_frames_max": 4,
+      "native_psg_themes": 5,
+      "sound_density_min": 0,
+      "sound_density_max": 4,
+      "gameboy_nes_original_PSG_score_source": true,
+      "generated_hero_animation_compiled_source": true,
+      "browser_or_godot_PCM_identical_to_console_PSG": false,
+      "first_party_hardware_audio_measured": false,
+      "GB_CGB_NES_actual_animated_playthrough_executed_in_this_session": false,
+      "original_model_weights_updated": false,
+      "operator_review_required_for_Jeeves_source_commit": true,
+      "new_automatic_CI_workflows": 0,
+      "signed_off_complete": false
+    },
+    "test_owners": [
+      "tests/test_studio_native_console_animation_e2e.py",
+      "tests/test_studio_native_psg.py",
+      "tests/test_jeeves_native_studio_art_e2e.py",
+      "tests/test_jeeves_console_source_stage_e2e.py"
+    ],
+    "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
