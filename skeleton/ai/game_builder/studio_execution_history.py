@@ -221,6 +221,9 @@ def record_execution_run(
             "unlisted_stage_blocker_categories": classified["omitted_after_limit"],
             "blocker_classification_digest": classified["classification_digest"],
             "native_cartridge_victories": checked["native_rom_machine_code_playthroughs_verified"],
+            "compiled_original_psg_tables_verified": (
+                checked["compiled_original_psg_tables_verified"]
+            ),
             "native_cpu_checkpoint_samples_verified": checked["native_cpu_checkpoint_samples_verified"],
             "native_animation_audio_source_targets_checked": (
                 checked["original_console_media_sources_independently_checked"]
