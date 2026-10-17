@@ -78,7 +78,9 @@ class NativeGodotRuntimeTests(unittest.TestCase):
             self.assertEqual(args[-1], "--verify-proof")
             self.assertEqual(timeout, 45)
             self.assertTrue((Path(args[args.index("--path") + 1]) / "world.json").is_file())
-            return subprocess.CompletedProcess(args, 0, success_line.encode(), b"")
+            stdout.write(success_line.encode())
+            stdout.flush()
+            return subprocess.CompletedProcess(args, 0, None, None)
         with patch("skeleton.ai.game_builder.studio_godot_qualification.shutil.which",
                    return_value="/opt/godot4"), patch(
             "skeleton.ai.game_builder.studio_godot_qualification.subprocess.run",
@@ -106,12 +108,14 @@ class NativeGodotRuntimeTests(unittest.TestCase):
 
     def test_native_headless_execution_rejects_false_success_and_source_mutation(self):
         _, world, count, _ = godot_inputs(self.engine)
+        def wrong_result(args, *, stdout, **kwargs):
+            stdout.write(("NATIVE_REPLAY_OK " + world + " actions=0").encode())
+            stdout.flush()
+            return subprocess.CompletedProcess(args, 0, None, None)
         with patch("skeleton.ai.game_builder.studio_godot_qualification.shutil.which",
                    return_value="/opt/godot4"), patch(
             "skeleton.ai.game_builder.studio_godot_qualification.subprocess.run",
-            return_value=subprocess.CompletedProcess(
-                ["godot4"], 0, ("NATIVE_REPLAY_OK " + world + " actions=0").encode(), b""
-            ),
+            side_effect=wrong_result,
         ):
             result = qualify_godot_headless(
                 self.engine, authorized=True, execute=True,
