@@ -377,6 +377,10 @@
       "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
       "target": "127.0.0.1:8000"
     },
+    "test_playable_async_e2e.py": {
+      "reason": "Opt-in disposable HTTP end-to-end for async playable generation and health during the job. Excluded from the in-process Backend Test suite.",
+      "target": "disposable-approved-target"
+    },
     "test_stage_a_hardening.py": {
       "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
       "target": "remote-preview"
