@@ -72,6 +72,9 @@ def _prompt(source: dict[str, Any], route: dict[str, Any],
         "lens_failure_mode": lens["failure_mode"],
         "measured_native_cues_for_lens": lens["matched_native_observation_cues"],
         "native_evidence_support_class": lens["native_evidence_support_class"],
+        "positive_native_cue_provenance_sha256": lens[
+            "native_observation_cue_provenance_sha256"
+        ],
         "unmeasured_game_meaning_must_not_be_inferred": True,
         "canonical_semantic_route_sha256": route["route_digest"],
         "measured_native_episode_steps": source["unique_source_transitions"],

@@ -95,6 +95,9 @@ def compile_triangle_candidate_corpus(
                 "activation_score": view["activation_score"],
                 "native_evidence_support_class": view["native_evidence_support_class"],
                 "matched_native_observation_cues": view["matched_native_observation_cues"],
+                "native_observation_cue_provenance_sha256": view[
+                    "native_observation_cue_provenance_sha256"
+                ],
                 "question": view["question"],
                 "governance_grade": view["governance_grade"],
                 "governance_fingerprint": view["governance_fingerprint"],

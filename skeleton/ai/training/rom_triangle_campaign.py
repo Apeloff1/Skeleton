@@ -472,6 +472,9 @@ def inspect_native_episode_lenses(
             "question": item["question"],
             "native_evidence_support_class": item["native_evidence_support_class"],
             "matched_native_observation_cues": item["matched_native_observation_cues"],
+            "native_observation_cue_provenance_sha256": item[
+                "native_observation_cue_provenance_sha256"
+            ],
             "factual_claims_allowed": False,
         } for item in route["routes"]],
         "independent_new_gameplay_episodes_from_semantic_lenses": 0,

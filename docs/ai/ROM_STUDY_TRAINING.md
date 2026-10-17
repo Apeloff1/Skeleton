@@ -569,3 +569,11 @@ were recognized. The 43-lens model prompt and candidate corpus carry
 this distinction, and `triangle-lenses` reports supported versus
 hypothesis-only counts. Existing semantic-routing artifacts are
 source/catalog-bound and must be regenerated after routing-policy changes.
+
+Each routed semantic lens now also records the exact native observation IDs,
+observation fingerprints, and cue strings responsible for its eligibility.
+The cue-provenance sequence has its own source digest, which travels into
+the corresponding local model prompt and candidate corpus. Rehashing and
+substituting an unrelated frame or observation does not pass route replay.
+This is source attribution for *questions*, not a claim of semantic vision
+or an independent game sample.

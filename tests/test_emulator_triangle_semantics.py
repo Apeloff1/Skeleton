@@ -138,3 +138,49 @@ def test_cue_evidence_classes_are_source_bound_and_do_not_create_training_labels
                and row["training_ground_truth_label_available"] is False
                for row in route["routes"])
     verify_episode_semantic_lenses(episode, route)
+
+
+def test_43_lens_cue_provenance_matches_exact_native_observation_fingerprints():
+    episode = _episode()
+    from skeleton.jeeves.game_emulator_triangle_semantics import _source_observations
+    from skeleton.jeeves.game_learning import _digest
+    observations = _source_observations(episode)
+    known = {item.observation_id: item.fingerprint for item in observations}
+    route = route_episode_semantic_lenses(episode)
+    assert route["actually_routed_lenses"] == 43
+    assert route["positively_supported_native_observation_links"] == sum(
+        len(row["native_observation_cue_provenance"]) for row in route["routes"]
+    )
+    for lens in route["routes"]:
+        supports = lens["native_observation_cue_provenance"]
+        assert lens["native_observation_cue_provenance_sha256"] == _digest(supports)
+        assert bool(supports) is lens["cue_support_present"]
+        assert set(lens["matched_native_observation_cues"]) == {
+            cue for row in supports for cue in row["matched_positive_cues"]
+        }
+        for support in supports:
+            assert known[support["native_observation_id"]] == support[
+                "native_observation_fingerprint"
+            ]
+            assert support["matched_positive_cues"]
+    verify_episode_semantic_lenses(episode, route)
+
+
+def test_rehashed_43_lens_source_cue_substitution_is_rejected():
+    from copy import deepcopy
+    from skeleton.jeeves.game_learning import _digest
+    original = route_episode_semantic_lenses(_episode())
+    forged = deepcopy(original)
+    supported = next(row for row in forged["routes"]
+                     if row["native_observation_cue_provenance"])
+    supported["native_observation_cue_provenance"][0][
+        "native_observation_fingerprint"
+    ] = "0" * 64
+    supported["native_observation_cue_provenance_sha256"] = _digest(
+        supported["native_observation_cue_provenance"]
+    )
+    forged["route_digest"] = _digest({
+        k: v for k, v in forged.items() if k != "route_digest"
+    })
+    with pytest.raises(TriangleSemanticError, match="no longer matches"):
+        verify_episode_semantic_lenses(_episode(), forged)
