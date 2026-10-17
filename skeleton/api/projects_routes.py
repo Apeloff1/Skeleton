@@ -33,8 +33,10 @@ from skeleton.contracts.projects import (
     ProjectListQuery,
     _ID,
 )
+from skeleton.app_services.job_api import IdempotencyMismatch
 from skeleton.persistence.app_foundation.projects_v1 import (
     BuildLinkConflict,
+    CreateIdempotencyMismatch,
     ProjectNameConflict,
     ProjectsV1Store,
     _iso,
@@ -45,12 +47,15 @@ _log = logging.getLogger(__name__)
 PROJECT_ERROR_UNAUTHENTICATED = "PROJECT.UNAUTHENTICATED"
 PROJECT_ERROR_NAME_CONFLICT = "PROJECT.NAME_CONFLICT"
 PROJECT_ERROR_UNAVAILABLE = "PROJECT.UNAVAILABLE"
+PROJECT_ERROR_IDEMPOTENCY_MISMATCH = "PROJECT.IDEMPOTENCY_MISMATCH"
+GAME_BUILD_KIND = "game.build"
 ERROR_STATUS = {
     PROJECT_ERROR_INVALID: 400,
     PROJECT_ERROR_UNAUTHENTICATED: 401,
     PROJECT_ERROR_NOT_FOUND: 404,
     PROJECT_ERROR_BUILD_CONFLICT: 409,
     PROJECT_ERROR_NAME_CONFLICT: 409,
+    PROJECT_ERROR_IDEMPOTENCY_MISMATCH: 409,
     PROJECT_ERROR_UNAVAILABLE: 503,
 }
 BuildStatus = Literal["pending", "queued", "running", "succeeded", "failed", "cancelled"]
@@ -66,6 +71,12 @@ class ProjectHTTPError(Exception):
 def error_response(code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=ERROR_STATUS[code], content={"error": {
         "type": "ProjectContractError", "code": code, "message": message, "context": {}}})
+
+
+def _limit(raw: str) -> int:
+    if not raw.isdigit() or not 1 <= int(raw) <= 100:
+        raise ProjectHTTPError(PROJECT_ERROR_INVALID, "limit must be from 1 to 100")
+    return int(raw)
 
 
 def _tenant() -> str:
@@ -178,14 +189,17 @@ def build_router(services_dep=get_app_services) -> APIRouter:
                 who.user_id, _tenant(), _brief_from(data["brief"]), idempotency_key)
         except ProjectNameConflict:
             raise ProjectHTTPError(PROJECT_ERROR_NAME_CONFLICT, "a project with this title already exists")
+        except CreateIdempotencyMismatch:
+            raise ProjectHTTPError(PROJECT_ERROR_IDEMPOTENCY_MISMATCH,
+                                   "Idempotency-Key was already used with a different body")
         return JSONResponse(status_code=200 if replayed else 201, content=project.as_dict())
 
     @router.get("")
     @guarded
     async def list_projects(request: Request, svc: AppServices = Depends(services_dep),
-                            limit: int = 50, cursor: Optional[str] = None):
+                            limit: str = "50", cursor: Optional[str] = None):
         who = await _auth(request, svc)
-        q = ProjectListQuery(actor_id=who.user_id, tenant_id=_tenant(), limit=limit, cursor=cursor)
+        q = ProjectListQuery(actor_id=who.user_id, tenant_id=_tenant(), limit=_limit(limit), cursor=cursor)
         items, nxt = ProjectsV1Store(svc.db).list(q.actor_id, q.tenant_id, q.limit, q.cursor)
         return JSONResponse({"schema_version": PROJECTS_SCHEMA_VERSION,
                              "items": [p.as_dict() for p in items], "next_cursor": nxt})
@@ -225,28 +239,34 @@ def build_router(services_dep=get_app_services) -> APIRouter:
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "options must be an object")
         if key is not None and (not isinstance(key, str) or not key or len(key) > 128):
             raise ProjectHTTPError(PROJECT_ERROR_INVALID, "idempotency_key must be 1..128 chars")
-        scoped = f"{project_id}:{key}" if key else None
-        existing = svc.queue.get_by_idempotency_key(scoped) if scoped else None
-        if existing is not None:
-            b = svc.builds.get_build(str(existing.payload.get("build_id")))
-            return JSONResponse(status_code=202, content=build_out(b, replayed=True))
-        b = svc.build_service.submit(project_id, target=target, options=options,
-                                     correlation_id=request.headers.get("x-request-id", ""),
-                                     idempotency_key=scoped)
         try:
-            store.link(who.user_id, _tenant(), project_id, b.build_id)
-        except BuildLinkConflict:
-            svc.build_service.cancel(b.build_id)
-            raise ProjectHTTPError(PROJECT_ERROR_BUILD_CONFLICT, "project build limit reached")
-        return JSONResponse(status_code=202, content=build_out(b))
+            handle = svc.jobs.enqueue(
+                GAME_BUILD_KIND, {"target": target, "options": options},
+                actor_id=who.user_id, tenant_id=_tenant(), project_id=project_id,
+                idempotency_key=f"{project_id}:{key}" if key else None,
+                correlation_id=request.headers.get("x-request-id") or None)
+        except IdempotencyMismatch:
+            raise ProjectHTTPError(PROJECT_ERROR_IDEMPOTENCY_MISMATCH,
+                                   "idempotency_key was already used with a different target/options")
+        b = svc.builds.get_build(handle.execution_id)
+        if not handle.replayed:
+            try:
+                store.link(who.user_id, _tenant(), project_id, b.build_id)
+            except BuildLinkConflict:
+                svc.jobs.cancel(handle.job_id)
+                raise ProjectHTTPError(PROJECT_ERROR_BUILD_CONFLICT, "project build limit reached")
+            b = svc.builds.get_build(handle.execution_id)
+        return JSONResponse(status_code=202, content=build_out(b, replayed=handle.replayed))
 
     @router.get("/{project_id}/builds")
     @guarded
-    async def list_builds(project_id: str, request: Request, svc: AppServices = Depends(services_dep)):
+    async def list_builds(project_id: str, request: Request, svc: AppServices = Depends(services_dep),
+                          limit: str = "50", cursor: Optional[str] = None):
         who = await _auth(request, svc)
         _project_or_404(svc, who, project_id)
-        return JSONResponse({"schema_version": PROJECTS_SCHEMA_VERSION,
-                             "items": [build_out(b) for b in svc.builds.list_builds(project_id)]})
+        ids, nxt = ProjectsV1Store(svc.db).list_build_rows(project_id, _limit(limit), cursor)
+        items = [build_out(b) for b in (svc.builds.get_build(i) for i in ids) if b is not None]
+        return JSONResponse({"schema_version": PROJECTS_SCHEMA_VERSION, "items": items, "next_cursor": nxt})
 
     @router.get("/{project_id}/builds/{build_id}")
     @guarded

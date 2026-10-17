@@ -32,6 +32,23 @@ class BuildLinkConflict(Exception):
     pass
 
 
+class CreateIdempotencyMismatch(Exception):
+    pass
+
+
+def brief_hash(brief: ProjectBrief) -> str:
+    import hashlib
+    return hashlib.sha256(json.dumps(brief.as_dict(), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _cursor(cursor: Optional[str]) -> Optional[int]:
+    if cursor is None:
+        return None
+    if not cursor.startswith("r:") or not cursor[2:].isdigit():
+        raise ProjectContractError("cursor is invalid")
+    return int(cursor[2:])
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
@@ -64,13 +81,15 @@ class ProjectsV1Store:
             if create_key:
                 r = c.execute("SELECT * FROM projects WHERE create_key=?", (create_key,)).fetchone()
                 if r is not None:
+                    if r["request_hash"] and r["request_hash"] != brief_hash(brief):
+                        raise CreateIdempotencyMismatch(idempotency_key)
                     return self._row_to_project(c, r), True
             try:
                 c.execute(
                     "INSERT INTO projects (project_id, owner_id, name, settings, created_at, updated_at,"
-                    " brief, tenant_id, status, brief_json, create_key) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    " brief, tenant_id, status, brief_json, create_key, request_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     (pid, actor_id, brief.title, "{}", now, now, brief.summary, tenant_id,
-                     ProjectStatus.DRAFT.value, json.dumps(brief.as_dict(), sort_keys=True), create_key))
+                     ProjectStatus.DRAFT.value, json.dumps(brief.as_dict(), sort_keys=True), create_key, brief_hash(brief)))
             except sqlite3.IntegrityError as exc:
                 # Only UNIQUE(owner_id, name) can fire here (create_key replay handled above).
                 raise ProjectNameConflict(brief.title) from exc
@@ -85,11 +104,7 @@ class ProjectsV1Store:
 
     def list(self, actor_id: str, tenant_id: str, limit: int = 50,
              cursor: Optional[str] = None) -> tuple[list[Project], Optional[str]]:
-        after = 0
-        if cursor is not None:
-            if not cursor.startswith("r:") or not cursor[2:].isdigit():
-                raise ProjectContractError("cursor is invalid")
-            after = int(cursor[2:])
+        after = _cursor(cursor) or 0
         with self.db.tx() as c:
             rows = c.execute(
                 "SELECT rowid AS rid, * FROM projects WHERE owner_id=? AND tenant_id=? AND rowid>?"
@@ -125,3 +140,17 @@ class ProjectsV1Store:
             c.execute("UPDATE projects SET status=?, updated_at=? WHERE project_id=?",
                       (updated.status.value, time.time(), project_id))
             return result
+
+    def list_build_rows(self, project_id: str, limit: int = 50, cursor: Optional[str] = None):
+        """Newest first; returns (rows, next_cursor). Caller has already scope-checked the project."""
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ProjectContractError("limit must be from 1 to 100")
+        before = _cursor(cursor)
+        sql = "SELECT rowid AS rid, build_id FROM builds WHERE project_id=?"
+        args: list = [project_id]
+        if before is not None:
+            sql += " AND rowid<?"
+            args.append(before)
+        rows = self.db.query(sql + " ORDER BY rowid DESC LIMIT ?", (*args, limit + 1))
+        nxt = f"r:{rows[limit - 1]['rid']}" if len(rows) > limit else None
+        return [r["build_id"] for r in rows[:limit]], nxt
