@@ -1904,5 +1904,135 @@
       "tests/test_jeeves_console_source_stage_e2e.py"
     ],
     "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_native_media_integrity_e2e_extension": {
+    "status": "independent_source_media_contract_committed_pending_specialized_tests_and_real_native_AV",
+    "tranche": "M261-M280",
+    "milestones": [
+      {
+        "id": "M261",
+        "name": "Independently cross-check source-derived animation/PSG against canonical authored game",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M262",
+        "name": "Revalidate game-world digest and cross-engine browser/Godot original media receipt",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M263",
+        "name": "Require exact first native animation frame equal to approved original tile five",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M264",
+        "name": "Reconstruct and compare every GB/GBC/NES additional assembly frame byte from authored planar art",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M265",
+        "name": "Require native source frame-count and 60Hz delay equal authored frame descriptors",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M266",
+        "name": "Recalculate exact original PSG low/high note tables rather than trust descriptor claims",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M267",
+        "name": "Verify actual native console audio enable and melody cadence",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M268",
+        "name": "Compare complete event cue routines to reject inserted early returns and disabled effects",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M269",
+        "name": "Enforce independent native media contract for direct authorized cartridge compiler preflight",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M270",
+        "name": "Enforce identical check in campaign publish, resume and inspect paths",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M271",
+        "name": "Project signed source media digest, frame counts and original score into canonical assurance",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M272",
+        "name": "Keep hardware/PSG execution unqualified despite passing source-art contract",
+        "state": "source_integrated"
+      },
+      {
+        "id": "M273",
+        "name": "Test forged rehashed campaign source containing actual modified sound cue",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M274",
+        "name": "Add original GB/GBC/NES source-media tests for real generated worlds and adversarial alterations",
+        "state": "source_integrated_tests_unverified"
+      },
+      {
+        "id": "M275",
+        "name": "Execute all specialized native source-media/animation/audio tests on exact PR head",
+        "state": "not_verified"
+      },
+      {
+        "id": "M276",
+        "name": "Build real RGBDS Game Boy and Game Boy Color ROMs with current native asset source",
+        "state": "not_verified"
+      },
+      {
+        "id": "M277",
+        "name": "Build and emulate real ca65 NES CHR animation and pulse audio ROM",
+        "state": "not_verified"
+      },
+      {
+        "id": "M278",
+        "name": "Capture actual LCD/PPU animation and both consoles' audible PSG waveforms",
+        "state": "not_verified"
+      },
+      {
+        "id": "M279",
+        "name": "Complete original game first-install, release legality and renderer regression qualification",
+        "state": "not_qualified"
+      },
+      {
+        "id": "M280",
+        "name": "Sign long-lived integrated Jeeves/Builder/Dragon studio operation after measured endurance",
+        "state": "not_qualified"
+      }
+    ],
+    "owners": [
+      "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+      "skeleton/ai/game_builder/studio_build_qualification.py",
+      "skeleton/ai/game_builder/studio_campaign.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "tests/test_studio_native_source_media_parity.py",
+      "tests/test_studio_campaign_e2e.py"
+    ],
+    "qualification_limits": {
+      "console_targets": [
+        "nintendo_game_boy",
+        "nintendo_game_boy_color",
+        "nintendo_famicom"
+      ],
+      "independent_actual_binary_execution_this_session": false,
+      "pass_of_new_specialized_test_files_measured": false,
+      "source_media_checks_enforced_before_compiler": true,
+      "source_media_checks_enforced_at_resume": true,
+      "source_media_receipt_in_assurance": true,
+      "native_animation_and_PSG_only_source_qualified": true,
+      "model_weights_updated": false,
+      "release_signed": false
+    },
+    "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
