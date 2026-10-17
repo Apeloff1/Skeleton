@@ -1,4 +1,9 @@
-"""Durable state primitives for resumable Skeleton execution."""
+"""Durable state primitives for resumable Skeleton execution.
+
+FROZEN (issue #4122): ``skeleton.state`` is frozen in place. New code must
+import only ``skeleton.persistence``; migration into the canonical package is
+tracked in issue #4122. Docstring-only notice: no behaviour change, no warning.
+"""
 
 from .migrations import (
     CheckpointMigrator,

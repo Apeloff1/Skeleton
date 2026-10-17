@@ -167,6 +167,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/feature-flags', title: 'Feature Flags', category: 'settings' },
   { path: '/forge-hub', title: 'Forge Hub', category: 'build' },
   { path: '/skeleton-forge', title: 'Skeleton Forge Cockpit', category: 'build' },
+  { path: '/skeleton-studio', title: 'Skeleton Studio', category: 'build' },
   { path: '/forge', title: 'Forge', category: 'build' },
   { path: '/forge-operator', title: 'Forge Operator', category: 'build' },
   { path: '/forge-operator/compose-run', title: 'Forge Operator · Compose & Run', category: 'build' },

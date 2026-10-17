@@ -224,7 +224,21 @@ def test_priority_header_cannot_claim_control(w):
 
 
 def test_server_py_not_modified():
+    """Pack F never touches the server lifespan.
+
+    The #3622 follow-up (TD: create_app is the only HTTP entry) adds one
+    extend-only agent-edge hook inside create_app; every other server.py
+    change, and anything touching startup/shutdown/lifespan, still fails.
+    """
     import subprocess
 
-    out = subprocess.run(["git", "diff", "--name-only", "origin/main", "--", "skeleton/api/server.py"], capture_output=True, text=True)
-    assert out.stdout.strip() == ""
+    out = subprocess.run(["git", "diff", "-U0", "origin/main", "--", "skeleton/api/server.py"], capture_output=True, text=True)
+    changed = [
+        line[1:]
+        for line in out.stdout.splitlines()
+        if line[:1] in "+-" and not line.startswith(("+++", "---"))
+    ]
+    for line in changed:
+        text = line.strip()
+        assert not any(t in text for t in ("on_event", "lifespan", "startup", "shutdown")), line
+        assert not text or "agent_edge" in text or text.startswith("#"), line

@@ -335,6 +335,20 @@ jobs:
       - run: yarn test:operation-stream
       - run: yarn test:conversation
       - run: yarn test:product-journeys
+      - name: App-foundation contract regressions (consolidated from Merge Readiness)
+        shell: bash
+        run: |
+          shopt -s nullglob
+          tests=(scripts/app-foundation/*.test.cjs)
+          if [ -d scripts/app-foundation ] && [ ${#tests[@]} -eq 0 ]; then
+            echo '::error::app-foundation test directory has no tests'
+            exit 1
+          fi
+          if [ ${#tests[@]} -gt 0 ]; then
+            node --test "${tests[@]}"
+          else
+            echo '::notice::app-foundation tests not yet present'
+          fi
       - run: yarn test:build-lifecycle
       - run: yarn test:knowledge-experience
       - run: yarn test:world-workbench
