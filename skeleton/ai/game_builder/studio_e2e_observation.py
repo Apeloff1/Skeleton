@@ -207,6 +207,77 @@ def observe_goal(goal: Mapping, *, after: int = 0, limit: int = 8) -> dict:
     }
 
 
+def observe_production_campaign(
+    order: object, destination: object, *, authorized: bool,
+    after: int = 0, limit: int = 16,
+) -> dict:
+    """Dragon's read-only view of a CURRENT verified source/ROM campaign.
+
+    This is neither an app recording nor an admission to the Dragon's almanac.
+    The source-checking owner is consulted on every call. Observations contain
+    no raw prompts, game code, model logs, audio samples or document paths.
+    """
+    from .studio_campaign import CampaignOrder
+    from .studio_campaign_assurance import inspect_production_assurance
+
+    if authorized is not True:
+        raise PermissionError("Dragon production observation requires operator authority")
+    if not isinstance(order, CampaignOrder):
+        raise StudioObservationError("typed original game production order required")
+    if type(after) is not int or not 0 <= after <= 256:
+        raise StudioObservationError("invalid production event cursor")
+    if type(limit) is not int or not 1 <= limit <= 32:
+        raise StudioObservationError("invalid production observation page size")
+    report = inspect_production_assurance(order, destination)
+    previous = _digest({
+        "schema": SCHEMA, "type": "production_campaign",
+        "campaign_identity": report["campaign_identity"],
+    })
+    records = []
+    for target in report["targets"]:
+        events = [
+            ("studio.source_integrity_checked", target["source_receipt_digest"]),
+            ("studio.rom_structure_checked", target["native_binary_evidence_digest"]),
+        ]
+        for kind, source_digest in events:
+            if source_digest is None:
+                continue
+            source_digest = _sha(source_digest, "production evidence digest")
+            record = {
+                "sequence": len(records) + 1, "kind": kind,
+                "target": target["target"],
+                "source_evidence_digest": source_digest,
+                "verification": "local_exact_source_and_artifact_integrity",
+                "video_recorded": False,
+                "human_controller_playthrough_verified": False,
+                "model_training_performed": False,
+                "knowledge_promoted": False,
+                "previous_event_digest": previous,
+            }
+            record["event_digest"] = _digest(record)
+            previous = record["event_digest"]
+            records.append(record)
+    page = records[after:after + limit]
+    return {
+        "schema_version": SCHEMA,
+        "source": "verified_local_game_production_assurance",
+        "campaign_identity": report["campaign_identity"],
+        "assurance_report_digest": report["report_digest"],
+        "observations": page,
+        "total_observations": len(records),
+        "next_cursor": after + limit if after + limit < len(records) else None,
+        "head_event_digest": previous if records else None,
+        "page_digest": _digest(page),
+        "source_completed_target_count": report["targets_with_exact_source"],
+        "rom_structurally_checked_count": report["native_roms_structurally_verified"],
+        "release_ready": False,
+        "learned_new_weights": False,
+        "dragon_knowledge_admitted": False,
+        "screen_or_video_recorded": False,
+        "next_action": "review production blockers and authorize explicit verification",
+    }
+
+
 def observe_tool_execution(outcome: object) -> dict:
     """Bridge the *actual* typed local tool outcome to a Dragon-safe summary."""
     from .studio_execution_plane import ExecutionOutcome
