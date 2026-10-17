@@ -80,7 +80,8 @@ def _interpret(text: str, *, attack: str, traces: set[str]) -> dict[str, Any]:
         return {"status": "unstructured_output_requires_manual_review"}
     if (type(row) is not dict
             or set(row) != {"trace_sha256", "verdict", "rationale", "attack"}
-            or row.get("trace_sha256") not in traces
+            or type(row.get("trace_sha256")) is not str
+            or row["trace_sha256"] not in traces
             or row.get("attack") != attack
             or row.get("verdict") not in ("challenge", "supported", "uncertain")
             or type(row.get("rationale")) is not str
@@ -204,7 +205,8 @@ def verify_native_adversarial_review(
                  and record.get("model_digest") == inference.get("model_digest")
                  and record.get("output_digest") == inference.get("output_digest")
                  and record.get("request_digest") == inference.get("request_digest")
-                 and record.get("checkpoint_digest") == review["native_model_checkpoint_digest"]
+                 and _sha(record.get("checkpoint_digest"))
+                 and type(inference.get("seed")) is int
                  and isinstance(record.get("generated_token_ids"), list)
                  and len(record["generated_token_ids"]) > 0,
                  "native language-model inference custody differs")

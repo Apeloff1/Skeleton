@@ -216,3 +216,128 @@ def test_rehashed_numeric_change_cannot_bypass_replay_projection():
     _reseal_report(report)
     with pytest.raises(TrainingTriangleError, match="numeric features"):
         build_training_triangle(report)
+
+
+def _fake_native_rgb_observation(frame_sha="a" * 64):
+    from skeleton.jeeves.game_emulator_dragon_observer import observe_native_frame
+    class Native:
+        def inspect_frame(self):
+            return {
+                "schema_version": "skeleton.game.native_frame_inspection.v1",
+                "pixel_sha256": frame_sha,
+                "full_resolution_tile_hashes": True,
+                "tile_color_statistics_are_sampled": True,
+                "native_frames_executed_for_inspection": 0,
+                "width": 1, "height": 1, "total_tiles": 1,
+                "tiles": [{
+                    "samples": 64, "sampled_rgb_mean": [64.0, 128.0, 192.0],
+                    "sampled_luminance_range": [92, 92],
+                    "sampled_dark_count": 0, "sampled_bright_count": 0,
+                    "tile_rgb_sha256": "d" * 64,
+                }],
+            }
+    return observe_native_frame(Native(), expected_frame_sha256=frame_sha)
+
+
+def test_dragon_observes_pixel_derived_color_and_tile_metrics():
+    from skeleton.jeeves.game_emulator_dragon_observer import verify_native_observation
+    optical = _fake_native_rgb_observation()
+    verify_native_observation(optical, frame_sha256="a" * 64)
+    assert optical["sampled_rgb_mean"] == [64.0, 128.0, 192.0]
+    assert optical["sampled_luminance_range"] == [92, 92]
+    assert optical["pixels_checked_by_existing_native_inspector"] == 1
+    assert optical["semantic_entities_inferred"] is False
+    assert optical["weights_updated"] == 0
+
+
+def test_triangle_indexes_real_optical_receipts_but_no_semantic_witness():
+    report = _report(count=1)
+    episode = report["audited_run_receipts"][0]
+    frame = episode["modalities"][0]["actual_frame_sha256"]
+    episode["modalities"][0]["dragon_optical"] = _fake_native_rgb_observation(frame)
+    episode["receipt_digest"] = _digest({
+        k: v for k, v in episode.items() if k != "receipt_digest"
+    })
+    _reseal_report(report)
+    triangle = build_training_triangle(report)
+    assert triangle["source_diversity"]["actual_native_rgb24_optical_frames"] == 1
+    assert triangle["vertices"]["dragon_companion_viewing"] == (
+        "native_pixel_optics_measured_semantic_review_pending"
+    )
+    assert triangle["episode_lens_references"][0]["grounded_lens_evidence"][
+        "visual_state"
+    ]["measured_pixel_optics_sha256"] is not None
+    assert triangle["training"]["semantic_video_review_done"] is False
+
+
+def test_tampered_dragon_pixel_metrics_fail_closed():
+    report = _report(count=1)
+    episode = report["audited_run_receipts"][0]
+    frame = episode["modalities"][0]["actual_frame_sha256"]
+    witness = _fake_native_rgb_observation(frame)
+    witness["sampled_rgb_mean"][0] = 0.0
+    episode["modalities"][0]["dragon_optical"] = witness
+    episode["receipt_digest"] = _digest({
+        k: v for k, v in episode.items() if k != "receipt_digest"
+    })
+    _reseal_report(report)
+    with pytest.raises(ValueError, match="optical"):
+        build_training_triangle(report)
+
+
+def test_native_adversarial_reviewer_runs_three_real_runtime_contract_calls(monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from skeleton.ai.model_runtime import native_llm_runtime
+    from skeleton.jeeves.game_emulator_triangle_native_reviewer import (
+        run_native_adversarial_review, verify_native_adversarial_review,
+    )
+    report = _report(count=1)
+    triangle = build_training_triangle(report)
+    class SimulatedRuntime:
+        # Contract mock only; an installed NativeLLMRuntime is required by production.
+        model_digest = "e" * 64
+        def __init__(self):
+            self.calls = 0
+        def assert_model_unchanged(self):
+            return None
+        def generate(self, prompt, config):
+            self.calls += 1
+            meta = json.loads(prompt.split("\n")[-1])
+            attack = meta["attack"]
+            payload = json.dumps({
+                "trace_sha256": meta["episodes"][0]["trace_sha256"],
+                "verdict": "challenge", "attack": attack,
+                "rationale": "The observed metadata does not establish generalized mastery.",
+            })
+            rr = SimpleNamespace(
+                model_digest=self.model_digest, seed=config.seed,
+                to_dict=lambda: {
+                    "model_digest": self.model_digest,
+                    "output_digest": "a" * 64, "request_digest": "b" * 64,
+                    "seed": config.seed,
+                },
+            )
+            return SimpleNamespace(
+                text=payload, generated_ids=(1,),
+                replay_receipt=rr,
+                to_record=lambda: {
+                    "model_digest": self.model_digest,
+                    "output_digest": "a" * 64, "request_digest": "b" * 64,
+                    "checkpoint_digest": "c" * 64,
+                    "generated_token_ids": [1],
+                },
+            )
+    monkeypatch.setattr(native_llm_runtime, "NativeLLMRuntime", SimulatedRuntime)
+    fake = SimulatedRuntime()
+    result = run_native_adversarial_review(report, triangle, fake, max_new_tokens=48)
+    assert fake.calls == 3
+    assert result["structured_source_bound_passes"] == 3
+    assert result["production_jeeves_weight_updates"] == 0
+    assert result["manual_adjudication_required"] is True
+    verify_native_adversarial_review(report, triangle, result)
+    result["passes"][1]["interpretation"]["verdict"] = "supported"
+    result["review_digest"] = _digest({k: v for k, v in result.items()
+                                        if k != "review_digest"})
+    with pytest.raises(ValueError, match="finding"):
+        verify_native_adversarial_review(report, triangle, result)
