@@ -9,7 +9,6 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from pathlib import Path
-import re
 
 from skeleton.jeeves.game_console_assets import decode_tiles, decode_png
 
