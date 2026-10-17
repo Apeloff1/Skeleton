@@ -117,7 +117,7 @@ class AnnualHandoffTests(unittest.TestCase):
             self.send("dragon","dragon-2")
 
     def test_unstarted_source_has_no_provenance_to_transfer(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ProductionConflict):
             self.send(receipt=D("forged"))
 
     def test_terminal_destination_cannot_accept_new_canon_handoff(self):
