@@ -38,8 +38,18 @@ from skeleton.app.local_ai import (
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
 from skeleton.app.offline_grounding import (
-    audit_answer_citations, grounded_request_digest, prepare_evidence,
+    audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
+    prepare_evidence,
 )
+
+
+def _audit_pair(text: str, evidence: dict[str, Any] | None) -> dict[str, Any]:
+    if evidence is None:
+        return {"citation_audit": None, "faithfulness": None}
+    return {
+        "citation_audit": audit_answer_citations(text, evidence),
+        "faithfulness": audit_answer_faithfulness(text, evidence),
+    }
 
 
 MAX_JSON_BYTES = 16 * 1024 * 1024
@@ -286,7 +296,7 @@ class OfflineHTTPApplication:
                     "output_tokens": receipt.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
                     "evidence": evidence,
-                    "citation_audit": audit_answer_citations(receipt.text, evidence) if evidence else None,
+                    **_audit_pair(receipt.text, evidence),
                 },
             }
         if observed is not None:
@@ -346,10 +356,7 @@ class OfflineHTTPApplication:
                     "output_tokens": replay.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
                     "evidence": previous[replay.revision - 1],
-                    "citation_audit": (
-                        audit_answer_citations(replay.text, previous[replay.revision - 1])
-                        if previous[replay.revision - 1] is not None else None
-                    ),
+                    **_audit_pair(replay.text, previous[replay.revision - 1]),
                 }
             manifest = None
             if grounded:
@@ -397,10 +404,7 @@ class OfflineHTTPApplication:
                 "output_tokens": receipt.generated_tokens,
                 "replayed": False, "model_digest": self.model_digest,
                 "evidence": committed_evidence,
-                "citation_audit": (
-                    audit_answer_citations(receipt.text, committed_evidence)
-                    if committed_evidence is not None else None
-                ),
+                **_audit_pair(receipt.text, committed_evidence),
             }
 
     def dispatch(self, method: str, path: str,
@@ -519,14 +523,16 @@ class OfflineHTTPApplication:
                 ]
                 if len(answers) != len(evidence):
                     raise RuntimeContractError("conversation evidence count drift")
+                audits = [
+                    _audit_pair(answer, item)
+                    for answer, item in zip(answers, evidence)
+                ]
                 return 200, {
                     "session_id": sid, "revision": stored.revision,
                     "messages": stored.transcript.to_list(),
                     "evidence": evidence,
-                    "citation_audits": [
-                        audit_answer_citations(answer, item) if item else None
-                        for answer, item in zip(answers, evidence)
-                    ],
+                    "citation_audits": [item["citation_audit"] for item in audits],
+                    "faithfulness_audits": [item["faithfulness"] for item in audits],
                 }
             if method == "DELETE":
                 with self._turn_lock:

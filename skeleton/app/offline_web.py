@@ -111,6 +111,9 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 .knowledge-record{display:flex;align-items:center;justify-content:space-between;gap:4px}.knowledge-record button{flex-shrink:0;font-size:10px;padding:5px}.knowledge-hit strong{display:block;color:#b4c8ff}.knowledge-hit p{white-space:pre-wrap;color:#e0e8f8;max-height:190px;overflow:auto}.knowledge-hit small{color:#a7bcdb;overflow-wrap:anywhere}
 
 .source-custody-label{display:block;margin-top:12px;color:#adc2e8;font-size:10px;font-weight:700}
+.faithfulness{display:block;margin-top:8px;font-size:11px;font-weight:700}
+.faithfulness.supported{color:#b7e3c2}.faithfulness.qualified{color:#f0d48a}
+.faithfulness.abstain,.faithfulness.contested{color:#ffc1c4}
 .source-custody-item{white-space:pre-wrap;font-size:11px;margin-top:7px;color:#d0d9ed;background:#1e2d42;border:1px solid #344a68;border-radius:7px;padding:9px;max-height:180px;overflow:auto}
 [hidden]{display:none!important}.turn-progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1c2943;border-bottom:1px solid #35466b;padding:12px 24px;font-size:12px}.turn-progress #turn-label{flex:1}.transcript-tools{display:flex;gap:8px;justify-content:center;margin:8px}.message-actions{display:flex;gap:7px;margin-top:12px;white-space:normal}.instructions{margin:12px 0;color:#b8c9e9;font-size:12px}.instructions textarea{width:100%;margin-top:9px;color:#eff2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:8px}.sidebar input[type=search]{min-width:0;flex:1;width:100%;color:#eef2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:9px}.reference-name{text-align:left;padding:4px;border:0;background:transparent;font-size:11px;overflow-wrap:anywhere}.session small:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}dialog{width:min(850px,94vw);max-height:86vh;overflow:auto;background:#131d2d;color:#ebf1ff;border:1px solid #526a95;border-radius:14px;padding:22px}dialog::backdrop{background:#000a}dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;background:#0b1321;padding:15px;border-radius:9px}dialog .hint{overflow-wrap:anywhere}:focus-visible{outline:2px solid #a1c1ff;outline-offset:3px}
 
@@ -126,7 +129,7 @@ JAVASCRIPT = r"""'use strict';
   const bytes = value => new TextEncoder().encode(value).byteLength;
   const state = {
     token: '', connected: false, busy: false, epoch: 0,
-    session: '', revision: 0, messages: [], evidence: [], audits: [],
+    session: '', revision: 0, messages: [], evidence: [], audits: [], faithfulness: [],
     sessions: [], cursor: null, query: '', drafts: new Map(),
     pending: null, turn: null, timer: null, polling: false,
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
@@ -190,7 +193,7 @@ JAVASCRIPT = r"""'use strict';
     state.network.abort();
     state.network = new AbortController();
     Object.assign(state, {token: '', connected: false, busy: false, session: '', revision: 0,
-      messages: [], evidence: [], audits: [], sessions: [], cursor: null, query: '',
+      messages: [], evidence: [], audits: [], faithfulness: [], sessions: [], cursor: null, query: '',
       pending: null, turn: null, polling: false, reference: null, health: null});
     state.drafts.clear();
     ['secret', 'prompt', 'system-prompt', 'session-query', 'knowledge-query', 'import', 'knowledge-file'].forEach(id => {get(id).value = '';});
@@ -267,9 +270,15 @@ JAVASCRIPT = r"""'use strict';
     state.messages.forEach(message => {
       lines.push('## ' + (message.role === 'user' ? 'You' : message.role === 'system' ? 'Instructions' : 'Local model'), '', message.content, '');
       if (message.role === 'assistant') {
-        const evidence = state.evidence[turn++];
+        const evidence = state.evidence[turn];
+        const faith = state.faithfulness[turn++];
+        if (faith) {
+          lines.push('### Grounded publication', '', faith.published_text, '',
+            'Faithfulness: ' + faith.disposition, 'Deterministic atom check, not semantic verification.', '');
+          if (faith.published_text !== message.content) lines.push('### Unverified model draft', '', message.content, '');
+        }
         if (evidence?.citations?.length) {
-          lines.push('### Supplied evidence (not factual verification)', '');
+          lines.push('### Supplied evidence', '');
           if (state.audits[turn - 1]) lines.push('Citation ID audit: ' + state.audits[turn - 1].status, '');
           evidence.citations.forEach(source => lines.push(source.title + ' — ' + source.citation, '', source.passage, ''));
         }
@@ -285,12 +294,14 @@ JAVASCRIPT = r"""'use strict';
       const card = document.createElement('article');
       card.className = 'message ' + (message.role === 'user' ? 'user' : 'assistant');
       const header = document.createElement('header');
-      header.textContent = message.role === 'user' ? 'YOU' : message.role === 'system' ? 'CONVERSATION INSTRUCTIONS' : 'LOCAL MODEL';
-      const content = document.createElement('div'); content.textContent = message.content;
+      const faith = message.role === 'assistant' ? state.faithfulness[completed] : null;
+      const visible = faith?.published_text || message.content;
+      header.textContent = message.role === 'user' ? 'YOU' : message.role === 'system' ? 'CONVERSATION INSTRUCTIONS' : (faith && visible !== message.content ? 'GROUNDED ANSWER' : 'LOCAL MODEL');
+      const content = document.createElement('div'); content.textContent = visible;
       card.append(header, content);
       const actions = document.createElement('div'); actions.className = 'message-actions';
       const copyButton = document.createElement('button'); copyButton.className = 'small'; copyButton.textContent = 'Copy';
-      copyButton.addEventListener('click', () => void copy(message.content)); actions.append(copyButton);
+      copyButton.addEventListener('click', () => void copy(visible)); actions.append(copyButton);
       if (message.role === 'assistant') {
         const index = completed++;
         const fork = document.createElement('button'); fork.className = 'small';
@@ -304,9 +315,22 @@ JAVASCRIPT = r"""'use strict';
         actions.append(fork);
         const supplied = state.evidence[index];
         const audit = state.audits[index];
+        const verdict = state.faithfulness[index];
+        if (verdict) {
+          const badge = document.createElement('small');
+          badge.className = 'faithfulness ' + verdict.disposition;
+          badge.textContent = 'Grounded publication: ' + verdict.disposition + ' · deterministic atom check, not semantic verification';
+          card.append(badge);
+          if (verdict.published_text !== message.content) {
+            const draft = document.createElement('details'); draft.className = 'source-custody-item';
+            const heading = document.createElement('summary'); heading.textContent = 'Unverified model draft';
+            const body = document.createElement('p'); body.textContent = message.content;
+            draft.append(heading, body); card.append(draft);
+          }
+        }
         if (supplied?.citations?.length) {
           const label = document.createElement('small'); label.className = 'source-custody-label';
-          label.textContent = 'Sources supplied to model; factual accuracy not verified' +
+          label.textContent = 'Sources supplied to the model' +
             (audit ? ' · citation IDs: ' + audit.status : '');
           card.append(label);
           supplied.citations.forEach(source => {
@@ -355,6 +379,7 @@ JAVASCRIPT = r"""'use strict';
     if (current !== id) {state.turn = null; state.pending = null; stopPolling();}
     state.session = result.session_id; state.revision = result.revision;
     state.messages = result.messages; state.evidence = result.evidence || []; state.audits = result.citation_audits || [];
+    state.faithfulness = result.faithfulness_audits || [];
     if (current !== id) get('prompt').value = state.drafts.get(id) || '';
     get('revision').textContent = result.revision + ' saved turns';
     showMessages(); await loadSessions(); updateControls();
@@ -538,7 +563,7 @@ JAVASCRIPT = r"""'use strict';
     if (!window.confirm('Permanently delete this conversation and its receipts? Export a backup first if needed.')) return;
     await api('DELETE', '/v1/sessions/' + state.session);
     state.drafts.delete(state.session); state.session = ''; state.revision = 0;
-    state.messages = []; state.evidence = []; state.audits = []; state.pending = null; state.turn = null;
+    state.messages = []; state.evidence = []; state.audits = []; state.faithfulness = []; state.pending = null; state.turn = null;
     get('prompt').value = ''; get('revision').textContent = 'No conversation selected';
     showMessages(); await loadSessions(); status('Conversation deleted.');
   }));

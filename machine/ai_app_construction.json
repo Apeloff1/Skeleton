@@ -480,7 +480,8 @@
         "skeleton/intelligence/verifier.py",
         "skeleton/intelligence/verification.py",
         "skeleton/intelligence/uncertainty.py",
-        "skeleton/intelligence/plan_verifier.py"
+        "skeleton/intelligence/plan_verifier.py",
+        "skeleton/intelligence/grounded_journey.py"
       ],
       "required_interfaces": [
         "verdict",

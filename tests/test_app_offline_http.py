@@ -7,6 +7,7 @@ No Docker, remote provider, external model weights, browser, or mock HTTP stack.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from hashlib import sha256
 from http.client import HTTPConnection
 import json
 import os
@@ -106,6 +107,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(session["revision"], 1)
         self.assertEqual(session["evidence"], [None])
         self.assertEqual(session["citation_audits"], [None])
+        self.assertEqual(session["faithfulness_audits"], [None])
         self.assertEqual(
             [m["role"] for m in session["messages"]],
             ["system", "user", "assistant"],
@@ -350,6 +352,14 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(conversation["evidence"][0], manifest)
         self.assertEqual(conversation["citation_audits"][0],
                          answer["citation_audit"])
+        self.assertEqual(answer["faithfulness"]["schema"],
+                         "skeleton.intelligence.claim-faithfulness.v1")
+        self.assertEqual(answer["faithfulness"]["model_text_sha256"],
+                         sha256(answer["text"].encode()).hexdigest())
+        self.assertIn(answer["faithfulness"]["disposition"],
+                      {"supported", "qualified", "abstain", "contested"})
+        self.assertEqual(conversation["faithfulness_audits"][0],
+                         answer["faithfulness"])
         self.assertEqual(conversation["messages"][1]["content"], answer["text"])
 
     def test_grounded_retry_after_reference_deletion_preserves_original_receipt(self):
@@ -372,6 +382,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(repeated["output_digest"], first["output_digest"])
         self.assertEqual(repeated["evidence"], first["evidence"])
         self.assertEqual(repeated["citation_audit"], first["citation_audit"])
+        self.assertEqual(repeated["faithfulness"], first["faithfulness"])
         self.assertEqual(repeated["revision"], first["revision"])
         status, conflict, _ = self._request(
             "POST", endpoint, {**payload, "grounded": False},
