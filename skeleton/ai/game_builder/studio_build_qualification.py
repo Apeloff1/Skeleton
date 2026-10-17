@@ -46,7 +46,7 @@ _BUILD_ADAPTERS = {
     "nintendo_famicom": (
         "main.s", ("nes.cfg",), (
             ("ca65", "-o", "game.o", "main.s"),
-            ("ld65", "-C", "nes.cfg", "-o", "game.nes", "game.o"),
+            ("ld65", "-C", "nes.cfg", "-Ln", "game.sym", "-o", "game.nes", "game.o"),
         ), "game.nes", "nes",
     ),
 }
@@ -240,6 +240,35 @@ def parse_game_boy_symbols(payload: bytes) -> dict[str, int]:
     return labels
 
 
+_NES_RAM_LABELS = _GB_WRAM_LABELS
+
+
+def parse_nes_labels(payload: bytes) -> dict[str, int]:
+    """Parse actual ld65 -Ln VICE export labels within CPU zero-page RAM."""
+    import re
+    if type(payload) is not bytes or not 1 <= len(payload) <= 128_000:
+        raise NativeBuildQualificationError("bounded actual ca65 linker symbol map required")
+    try:
+        decoded = payload.decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise NativeBuildQualificationError("non-ASCII ca65 linker symbols") from exc
+    found: dict[str, int] = {}
+    for line in decoded.splitlines():
+        match = re.fullmatch(r"al ([0-9A-Fa-f]{6}) \.([A-Za-z][A-Za-z0-9_]*)", line.strip())
+        if match is None:
+            continue
+        name = match.group(2)
+        if name not in _NES_RAM_LABELS:
+            continue
+        address = int(match.group(1), 16)
+        if name in found or not 0 <= address <= 0xFF:
+            raise NativeBuildQualificationError("NES original game state label outside zero-page")
+        found[name] = address
+    if set(found) != set(_NES_RAM_LABELS) or len(set(found.values())) != len(found):
+        raise NativeBuildQualificationError("NES label file lacks distinct original game state")
+    return found
+
+
 def qualify_native_build(
     project: str | Path, target: str, *, authorized: bool,
     execute: bool = False, output: str | Path | None = None,
@@ -279,9 +308,9 @@ def qualify_native_build(
             or not destination.parent.is_dir() or destination.parent.is_symlink()):
         raise NativeBuildQualificationError("native binary output must be a new contained path")
     symbols_path = None
-    if adapter[4] in ("gb", "gbc"):
+    if adapter[4] in ("gb", "gbc", "nes"):
         if output_symbols is None:
-            raise NativeBuildQualificationError("GB/GBC qualification requires explicit symbol output")
+            raise NativeBuildQualificationError("native GB/GBC/NES qualification requires explicit symbol output")
         symbols_path = Path(output_symbols)
         if (symbols_path.parent != destination.parent
                 or symbols_path == destination
@@ -355,7 +384,8 @@ def qualify_native_build(
         if symbols_path is not None:
             try:
                 symbol_data = _regular(work / "game.sym", 128_000)
-                parse_game_boy_symbols(symbol_data)
+                (parse_nes_labels(symbol_data) if target == "nintendo_famicom"
+                 else parse_game_boy_symbols(symbol_data))
             except (OSError, ValueError) as exc:
                 return _receipt(target, source_digest, available=True, invoked=True,
                                 blocker="gameboy_symbol_map_invalid", versions=versions)
