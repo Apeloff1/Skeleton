@@ -13,6 +13,7 @@ from pathlib import Path
 from .studio_campaign_cli import parse_campaign_order_file
 from .studio_campaign_assurance import (
     inspect_production_assurance, qualify_campaign_target, qualify_campaign_browser,
+    qualify_campaign_godot,
 )
 from .studio_e2e_observation import observe_production_campaign
 
@@ -26,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     command.add_argument("--dragon-observe", action="store_true")
     command.add_argument("--target", help="specific canonical console ROM target to compile")
     command.add_argument("--browser-target", help="execute native generated HTML5 JavaScript winning replay")
+    command.add_argument("--godot-target", help="execute canonical headless Godot 4 winning replay")
     parser.add_argument("--execute-build", action="store_true")
     parser.add_argument("--authorize-local-operation", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=45)
@@ -42,6 +44,14 @@ def main(argv: list[str] | None = None) -> int:
             output = observe_production_campaign(
                 order, args.campaign, authorized=True,
                 after=args.after, limit=args.limit,
+            )
+        elif args.godot_target:
+            if not args.execute_build:
+                parser.error("--godot-target requires explicit --execute-build")
+            output = qualify_campaign_godot(
+                order, args.campaign, args.godot_target,
+                authorized=True, execute=True,
+                timeout_seconds=args.timeout_seconds,
             )
         elif args.browser_target:
             if not args.execute_build:
