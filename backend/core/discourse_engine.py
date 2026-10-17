@@ -25,11 +25,12 @@ from typing import Any
 
 from core.swarm_agents import SWARM_DOMAINS, BY_ID, find_relevant, pick_balanced
 from core.compressed_vault import sample_shard, get_shard_entry
-from core.databases import get_sync_db
+from core.databases import lazy_sync_collection
 
-_db = get_sync_db()
-_discourse = _db["swarm_discourse_logs"]
-_discourse.create_index([("build_id", 1), ("phase", 1), ("created_at", -1)])
+_discourse = lazy_sync_collection(
+    "swarm_discourse_logs",
+    ([("build_id", 1), ("phase", 1), ("created_at", -1)], {}),
+)
 
 DISCOURSE_MOVES = [
     "proposes",
