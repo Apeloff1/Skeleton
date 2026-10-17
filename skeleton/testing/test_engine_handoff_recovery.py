@@ -14,10 +14,18 @@ from skeleton.api.engine_service import (
 )
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.testing.test_engine_routes import (
+    _SERVICE_TOKEN,
     _client,
-    _inventory_headers,
     _service_and_command,
 )
+
+
+def _inventory_headers() -> dict[str, str]:
+    """Authenticated inventory request with the exact test-service identity."""
+    return {
+        "x-zaibatsu-attester": "backend-service",
+        "authorization": "Bearer " + _SERVICE_TOKEN,
+    }
 
 
 @pytest.fixture
