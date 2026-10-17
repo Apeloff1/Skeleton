@@ -209,6 +209,31 @@
         "--noconftest",
         "tests/test_jeeves_game_e2e_observation.py"
       ]
+    },
+    {
+      "id": "jeeves-native-studio-art",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "tests/test_jeeves_native_studio_art_e2e.py",
+        "tests/test_jeeves_console_source_stage_e2e.py",
+        "skeleton/ai/game_builder/studio_asset_pipeline.py",
+        "skeleton/ai/game_builder/native_game_cli.py",
+        "skeleton/ai/game_builder/game_project_workspace.py",
+        "skeleton/ai/game_builder/jeeves_app_runtime.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_jeeves_native_studio_art_e2e.py",
+        "tests/test_jeeves_console_source_stage_e2e.py"
+      ]
     }
   ]
 }
