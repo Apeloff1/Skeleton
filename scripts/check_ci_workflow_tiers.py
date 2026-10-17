@@ -107,9 +107,9 @@ def audit(root: Path = ROOT) -> list[str]:
         backend = (root / WORKFLOWS / "backend-quality.yml").read_text(encoding="utf-8")
         for required in (
             "python scripts/check_ci_workflow_tiers.py",
-            "python scripts/check_workflow_permissions.py",
+            "python backend/scripts/check_workflow_permissions.py",
             "python scripts/check_repository_python_sast.py",
-            "python scripts/check_malware_iocs.py",
+            "python backend/scripts/check_malware_iocs.py",
         ):
             if required not in backend:
                 failures.append(f"Backend Quality missing scan: {required}")
