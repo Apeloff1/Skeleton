@@ -155,6 +155,11 @@ def triangle_campaign_page(
     neural_epochs: int = 4, neural_width: int = 8,
     inventory_snapshot: dict[str, Any] | None = None,
     review_seed: int = 0, review_tokens: int = 160,
+    semantic_runtime: Any | None = None,
+    semantic_lens_keys: tuple[str, ...] = (),
+    semantic_all_runs: bool = False,
+    semantic_seed: int = 0,
+    semantic_tokens: int = 192,
 ) -> dict[str, Any]:
     """One bounded foreground page, with an independent review for eligible ROMs.
 
@@ -180,6 +185,10 @@ def triangle_campaign_page(
             "source_sha256": row.get("source_sha256"),
             "gameplay_state": row["state"],
             "adversarial_review_state": "not_eligible",
+            "semantic_lens_review_state": (
+                "not_requested" if semantic_runtime is None else "not_eligible"
+            ),
+            "semantic_model_generations": 0,
         }
         if row["state"] in accepted:
             identity, filename = row.get("source_sha256"), row.get("receipt_name")
@@ -205,6 +214,47 @@ def triangle_campaign_page(
                 item["structured_source_bound_passes"] = reviewed[
                     "structured_source_bound_passes"
                 ]
+                if semantic_runtime is not None:
+                    if reviewed["structured_source_bound_passes"] != 3:
+                        item["semantic_lens_review_state"] = "critic_incomplete_retry_required"
+                    else:
+                        try:
+                            recorded, _ = read_receipt_document(output_dir / filename)
+                            episode_count = len(
+                                recorded["training_triangle"]["episode_lens_references"]
+                            )
+                            indices = (
+                                range(episode_count) if semantic_all_runs else (0,)
+                            )
+                            receipts = []
+                            for i in indices:
+                                examined = execute_native_43_lens_review(
+                                    output_dir / filename,
+                                    output_dir / reviewed["review_receipt_name"],
+                                    source_sha256=identity, output_dir=output_dir,
+                                    critic_runtime=runtime,
+                                    semantic_runtime=semantic_runtime,
+                                    run_index=i, requested_keys=semantic_lens_keys,
+                                    seed=semantic_seed + i * 43,
+                                    max_new_tokens=semantic_tokens,
+                                )
+                                receipts.append([
+                                    i, examined["filename"], examined["semantic_review_digest"],
+                                ])
+                        except (ValueError, RuntimeError, OSError, ImportError, KeyError) as exc:
+                            item["semantic_lens_review_state"] = "blocked_retry_required"
+                            item["semantic_failure_type"] = type(exc).__name__
+                            item["semantic_failure_reason"] = str(exc)[:240]
+                        else:
+                            item["semantic_lens_review_state"] = "43_lenses_native_executed_or_replayed"
+                            item["semantic_model_generations"] = 43 * len(receipts)
+                            item["semantic_episode_count"] = len(receipts)
+                            item["semantic_receipts_digest"] = hashlib.sha256(
+                                json.dumps(receipts, sort_keys=True).encode()
+                            ).hexdigest()
+                            item["semantic_review_receipt_preview"] = [
+                                row[1] for row in receipts[:3]
+                            ]
         rows.append(item)
     return {
         "schema_version": "skeleton.jeeves.rom_training_triangle_campaign.v1",
@@ -225,9 +275,20 @@ def triangle_campaign_page(
             row["adversarial_review_state"] in (
                 "blocked_retry_required",
                 "critic_output_incomplete_requires_new_review_configuration",
+            ) or row["semantic_lens_review_state"] in (
+                "blocked_retry_required", "critic_incomplete_retry_required",
             )
             for row in rows
         ),
+        "semantic_model_generations_executed_or_replayed": sum(
+            row["semantic_model_generations"] for row in rows
+        ),
+        "semantic_lens_review_failures_needing_retry": sum(
+            row["semantic_lens_review_state"] in (
+                "blocked_retry_required", "critic_incomplete_retry_required",
+            ) for row in rows
+        ),
+        "semantic_model_interpretations_are_training_labels": False,
         "rows": rows,
         "production_jeeves_weight_updates": 0,
         "automatic_training_promotion": False,
