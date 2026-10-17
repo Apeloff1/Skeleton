@@ -177,3 +177,28 @@ reuse an existing label. This is **not** an off-machine transfer, full restore
 drill, signature-authenticated custody, resumed model job, or year-long soak.
 Before restoration into any host, separately audit all production checkpoint
 and authority-rotation chains under operator approval.
+
+
+### Fenced restoration of a verified annual production archive
+
+Run the operator commands from the repository root:
+
+```bash
+python -m scripts.annual_production_recovery snapshot --database /private/work/production.db --archive-dir /private/backups --label day-001
+python -m scripts.annual_production_recovery verify --archive-dir /private/backups --label day-001
+python -m scripts.annual_production_recovery restore --archive-dir /private/backups --label day-001 --destination /private/recovery/production.db
+```
+
+The restored SQLite file is an independent create-only copy; active sessions,
+old lease tokens, worker epochs and the old grant expiry are explicitly fenced.
+The original checkpoint and grant-rotation chains remain inspectable. No
+worker is launched or silently reauthorized. Operators must use
+`AnnualProductionStore.renew_authority` with an independently verified,
+new approval before a nonterminal job can claim work. Never overwrite or
+unlink an existing production database to make a recovery appear successful.
+The restoration rejects WAL/SHM/journal sidecars and verifies database
+integrity before publication. A SHA-256 manifest is tamper detection, not
+a trusted operator signature; off-host disaster-recovery validation remains
+a separate deployment gate.
+
+Regressions: `python -m unittest discover -s tests -p 'test_annual_*.py' -v`.
