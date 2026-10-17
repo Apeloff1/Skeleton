@@ -702,3 +702,11 @@ for each of the 200 catalog definitions when an installed checkpoint is
 provided. The independent model outputs are hypotheses and cannot increase
 the eight measured native source perspectives or update Jeeves weights by
 themselves.
+
+The one-command campaign now defaults to all native episodes whenever a
+semantic checkpoint is supplied: **200 operator lenses × each independently
+verified gameplay episode**. The previously optional
+`--semantic-all-runs` flag remains accepted. To conserve resources in an
+explicit legacy/diagnostic run, select `--semantic-first-run-only`.
+The command remains a foreground workload, creates no independent samples
+from repeated questions, and requires actual local checkpoint inference.

@@ -128,8 +128,13 @@ def parser() -> argparse.ArgumentParser:
         help="optional pinned complete 200-lens or legacy 43-lens key manifest",
     )
     triangle.add_argument(
-        "--semantic-all-runs", action="store_true",
-        help="execute all configured lenses for EVERY native episode (recommended)",
+        "--semantic-all-runs", action="store_true", default=True,
+        help="execute all configured lenses for EVERY native episode (default)",
+    )
+    triangle.add_argument(
+        "--semantic-first-run-only", action="store_false",
+        dest="semantic_all_runs",
+        help="explicit legacy resource-saving option: only episode zero",
     )
     triangle.add_argument("--semantic-seed", type=int, default=0)
     triangle.add_argument("--semantic-tokens", type=int, default=192)
@@ -294,15 +299,17 @@ def main(argv: list[str] | None = None) -> int:
             evidence, triangle = document["candidate_evidence"], document["training_triangle"]
             verify_training_triangle(evidence, triangle)
             from skeleton.jeeves.game_emulator_triangle_semantics import (
-                SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
+                EXTENDED_SEMANTIC_LENS_BUDGET, route_episode_semantic_lenses,
             )
             previews = [
-                route_episode_semantic_lenses(episode)
+                route_episode_semantic_lenses(
+                    episode, max_lenses=EXTENDED_SEMANTIC_LENS_BUDGET,
+                )
                 for episode in triangle["episode_lens_references"][:3]
             ]
             print(json.dumps({
-                "semantic_router": "canonical_jeeves_maximal_registry",
-                "semantic_lens_selection_budget": SEMANTIC_LENS_BUDGET,
+                "semantic_router": "all_200_canonical_jeeves_lens_system",
+                "semantic_lens_selection_budget": EXTENDED_SEMANTIC_LENS_BUDGET,
                 "semantic_episode_previews": [{
                     "source_trace_sha256": item["source_native_trace_sha256"],
                     "routed": item["actually_routed_lenses"],

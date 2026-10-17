@@ -801,3 +801,23 @@ def test_operator_commands_use_all_200_lenses_by_default():
         "--snapshot", "/tmp/snapshot",
     ])
     assert study.semantic_lens_count == 200
+
+
+def test_full_200_campaign_defaults_to_every_native_episode_when_model_is_selected():
+    from scripts.training.rom_study import parser
+    base = [
+        "train-triangle", "--root", "/tmp/roms",
+        "--approvals", "/tmp/rights",
+        "--output-dir", "/tmp/receipts",
+        "--reviewer-checkpoint", "/tmp/critic",
+        "--snapshot", "/tmp/frozen.json",
+        "--semantic-checkpoint", "/tmp/semantic",
+    ]
+    default = parser().parse_args(base)
+    assert default.semantic_lens_count == 200
+    assert default.semantic_all_runs is True
+    backwards_compatible = parser().parse_args(
+        base + ["--semantic-lens-count", "43", "--semantic-first-run-only"]
+    )
+    assert backwards_compatible.semantic_lens_count == 43
+    assert backwards_compatible.semantic_all_runs is False
