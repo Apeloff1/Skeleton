@@ -30,7 +30,7 @@ function fixture(overrides = {}) {
   }
   const module = { exports: {} };
   new Function('require','module','exports',transpiled.outputText)(id => {
-    if (id === '@react-native-async-storage/async-storage') return { default: store };
+    if (id === '@react-native-async-storage/async-storage') return store;
     if (id === './NativeMutationFence') return { NativeMutationFence: Fence };
     if (id === './storageRetentionPolicy') return { isPrunableStorageKey: () => false };
     throw new Error('Unexpected import '+id);
