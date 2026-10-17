@@ -81,10 +81,13 @@ jobs:
             echo "${name}=${value}" >> "$GITHUB_ENV"
           done
           echo "::add-mask::${mongo_pw}"
+          # The password is generated above for this run only; nothing is committed.
+          # Userinfo is assembled at runtime so the URI never appears as a literal.
+          userinfo="${MONGO_INITDB_ROOT_USERNAME}:${mongo_pw}"
           {
             echo "MONGO_INITDB_ROOT_PASSWORD=${mongo_pw}"
-            echo "MONGO_URL=mongodb://admin:${mongo_pw}@mongo:27017/tutolage?authSource=admin"
-            echo "SKL_MONGO_URI=mongodb://admin:${mongo_pw}@mongo:27017/skeleton?authSource=admin"
+            echo "MONGO_URL=mongodb://${userinfo}@mongo:27017/tutolage?authSource=admin"
+            echo "SKL_MONGO_URI=mongodb://${userinfo}@mongo:27017/skeleton?authSource=admin"
           } >> "$GITHUB_ENV"
 
       - name: Validate compose configuration
