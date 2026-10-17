@@ -103,15 +103,18 @@ class Harness:
         try:
             from fastapi import FastAPI
             from uvicorn import Config as UvicornConfig, Server
+            from skeleton.api.command_routes import router as command_router
             from skeleton.api.routes import router
-            from skeleton.api.gameforge_routes import router as gameforge_router
             from skeleton.api.server import get_state
 
             get_state().wire_from_genesis(self.genesis)
 
             app = FastAPI(title="Skeleton API", version="16.0.0")
+            # GameForge HTTP lives on ``router``. The seal-gated sidecar
+            # duplicated those paths and nested command routes through an
+            # import cycle. Command routes mount beside the main router.
             app.include_router(router, prefix="/api/v1")
-            app.include_router(gameforge_router, prefix="/api/v1")
+            app.include_router(command_router, prefix="/api/v1")
 
             config = UvicornConfig(app, host=host, port=port, log_level="info")
             server = Server(config)

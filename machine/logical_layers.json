@@ -1,0 +1,121 @@
+{
+  "schema_version": "skeleton.architecture.logical_layers.v1",
+  "status": "active",
+  "purpose": "Domain, application, infrastructure, and interface boundaries for selected Skeleton packages. A classified module may import the same layer or a lower order only. Known upward edges are explicit debt: a new edge fails the build, and a removed edge must be deleted from this list.",
+  "policy": {
+    "rule": "A classified module may import the same logical layer or a strictly lower order. Sibling layers do not grant each other access.",
+    "unclassified_internal_imports": "allowed_but_reported",
+    "relative_imports": "treated as intra-package; they are not cross-layer permission",
+    "known_upward_edges_rule": "known_upward_edges must equal the upward edges the scanner finds"
+  },
+  "layers": [
+    {
+      "id": "domain",
+      "order": 0,
+      "paths": [
+        "skeleton/kernel",
+        "skeleton/contracts"
+      ],
+      "forbidden_external_roots": [
+        "fastapi",
+        "flask",
+        "django",
+        "requests",
+        "httpx",
+        "sqlalchemy",
+        "psycopg",
+        "psycopg2",
+        "pymongo",
+        "redis",
+        "aiohttp"
+      ]
+    },
+    {
+      "id": "infrastructure",
+      "order": 1,
+      "paths": [
+        "skeleton/persistence",
+        "skeleton/observability",
+        "skeleton/config"
+      ],
+      "forbidden_external_roots": []
+    },
+    {
+      "id": "application",
+      "order": 2,
+      "paths": [
+        "skeleton/intelligence",
+        "skeleton/memory",
+        "skeleton/retrieval",
+        "skeleton/agents",
+        "skeleton/automation",
+        "skeleton/forge"
+      ],
+      "forbidden_external_roots": [
+        "fastapi",
+        "flask",
+        "django",
+        "starlette"
+      ]
+    },
+    {
+      "id": "interface",
+      "order": 3,
+      "paths": [
+        "skeleton/api",
+        "skeleton/app"
+      ],
+      "forbidden_external_roots": []
+    }
+  ],
+  "known_upward_edges": [
+    {
+      "source": "skeleton/observability/budget_accounting.py",
+      "module": "skeleton.intelligence.admission"
+    },
+    {
+      "source": "skeleton/observability/budget_accounting.py",
+      "module": "skeleton.intelligence.quota"
+    },
+    {
+      "source": "skeleton/observability/budget_accounting.py",
+      "module": "skeleton.intelligence.quota_sqlite"
+    },
+    {
+      "source": "skeleton/observability/cost_governor.py",
+      "module": "skeleton.intelligence.admission"
+    },
+    {
+      "source": "skeleton/observability/cost_governor.py",
+      "module": "skeleton.intelligence.admission_runtime"
+    },
+    {
+      "source": "skeleton/observability/cost_governor.py",
+      "module": "skeleton.intelligence.quota"
+    },
+    {
+      "source": "skeleton/observability/cost_governor.py",
+      "module": "skeleton.intelligence.quota_sqlite"
+    },
+    {
+      "source": "skeleton/observability/cost_governor.py",
+      "module": "skeleton.intelligence.shared_pressure"
+    },
+    {
+      "source": "skeleton/observability/cost_governor_codec.py",
+      "module": "skeleton.intelligence.admission"
+    },
+    {
+      "source": "skeleton/observability/cost_governor_codec.py",
+      "module": "skeleton.intelligence.quota"
+    },
+    {
+      "source": "skeleton/persistence/snapshots.py",
+      "module": "skeleton.memory.core"
+    },
+    {
+      "source": "skeleton/persistence/snapshots.py",
+      "module": "skeleton.retrieval.kag"
+    }
+  ]
+}

@@ -46,6 +46,39 @@ def test_route_inventory_is_required() -> None:
         )
 
 
+def test_included_router_secrets_are_rejected() -> None:
+    from fastapi import FastAPI
+    from fastapi.routing import APIRouter
+
+    app = FastAPI()
+    router = APIRouter(prefix="/api/v1")
+    nested = APIRouter()
+
+    @nested.get("/secrets/{name}")
+    def read_secret(name: str) -> dict[str, str]:
+        return {"name": name}
+
+    router.include_router(nested)
+    app.include_router(router)
+    with pytest.raises(RuntimeError, match="cortex secrets"):
+        reject_cortex_secret_routes(app)
+
+
+def test_included_router_without_secrets_is_allowed() -> None:
+    from fastapi import FastAPI
+    from fastapi.routing import APIRouter
+
+    app = FastAPI()
+    router = APIRouter(prefix="/api/v1")
+
+    @router.get("/health")
+    def health() -> dict[str, bool]:
+        return {"alive": True}
+
+    app.include_router(router)
+    reject_cortex_secret_routes(app)
+
+
 def test_real_application_factory_rejects_unchartered_cortex_paths() -> None:
     from skeleton.api.server import create_app
 

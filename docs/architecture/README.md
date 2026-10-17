@@ -1,5 +1,11 @@
 # Skeleton Architecture Reference (rollout set)
 
+Current views, newer than the 2026-10-10 rollout snapshot below:
+
+- [C4 context, container, and component](c4/README.md)
+- [Projects and subsystem contracts](contracts/README.md) — Projects HTTP is specified and not mounted
+- [Logical layers](LOGICAL_LAYERS.md) — domain, infrastructure, application, interface
+
 > Generated from main @ `40e81412e995a9b153a02ff39f3ae1aec187de25` on 2026-10-10.
 > Owner: Technical Director. Scope: what exists on `main` at that SHA, nothing aspirational.
 > Existing deeper references stay authoritative for their slice:
