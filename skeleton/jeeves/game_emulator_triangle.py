@@ -52,7 +52,7 @@ def _source(report: Mapping[str, Any]) -> tuple[list[dict[str, Any]], dict[str, 
     _require(_sha(claimed) and claimed == _digest({
         key: value for key, value in report.items() if key != "report_digest"
     }), "parent lab report checksum differs")
-    _require(report.get("source_lineage", {}).get("rights_acknowledged") is True,
+    _require(type(report.get("source_lineage")) is dict and report["source_lineage"].get("rights_acknowledged") is True,
              "triangle source rights have not been approved")
     _require(report.get("status") in (
         "observed_q_and_visual_learning_plateau", "budget_exhausted_before_saturation"
@@ -68,7 +68,7 @@ def _source(report: Mapping[str, Any]) -> tuple[list[dict[str, Any]], dict[str, 
              and policy["snapshot_digest"] == _digest({
                  k: v for k, v in policy.items() if k != "snapshot_digest"
              }), "triangle source policy checksum differs")
-    _require(report.get("environment") == policy.get("environment"),
+    _require(type(report.get("environment")) is dict and _sha(report["environment"].get("environment_digest")) and report["environment"] == policy.get("environment"),
              "triangle source environment and committed policy differ")
     data = report.get("neural_candidate_dataset")
     _require(type(data) is dict and data.get("train_only_no_heldout_examples") is True
@@ -106,7 +106,7 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
                  }), "gameplay episode receipt digest/order differs")
         trace = row.get("trace_digest")
         _require(_sha(trace) and trace not in seen_traces
-                 and row.get("angle") in coverage,
+                 and type(row.get("angle")) is str and row["angle"] in coverage,
                  "gameplay trace or curriculum lens repeated without independent play")
         seen_traces.add(trace)
         coverage[row["angle"]] += 1
@@ -124,6 +124,7 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
         checkpoints = row.get("reverse_checkpoints")
         _require(type(checkpoints) is list and bool(checkpoints)
                  and all(type(c) is dict and c.get("end_state_matches") is True
+                         and type(c.get("replayed_steps")) is int and c["replayed_steps"] >= 1
                          and c.get("ending_snapshot_digest") == row.get("final_snapshot_digest")
                          for c in checkpoints),
                  "reverse native replay changed the game state")
@@ -213,7 +214,7 @@ def build_training_triangle(report: dict[str, Any]) -> dict[str, Any]:
                  "independently_replayed_emulator_transition",
                  "triangle dataset contains an unverified/simulated training sample")
         trace, sequence = sample.get("trace_digest"), sample.get("sequence")
-        _require(trace in proofs and type(sequence) is int
+        _require(_sha(trace) and trace in proofs and type(sequence) is int
                  and 1 <= sequence <= proofs[trace]["steps"]
                  and sample.get("seed") == proofs[trace]["seed"]
                  and sample.get("environment_digest") ==
