@@ -370,3 +370,85 @@ def test_cli_corpus_review_receipt_requires_checkpoint_pair():
     ])
     assert args.semantic_review_receipt.name == "semantic.json"
     assert args.semantic_checkpoint.name == "semantic-model.json"
+
+
+
+def test_full_triangle_campaign_executes_43_per_source_episode(monkeypatch, tmp_path):
+    monkeypatch.setattr(campaign, "train_page", lambda *a, **k: _page())
+    monkeypatch.setattr(campaign, "review_one_receipt", lambda *a, **k: {
+        "state": "new_local_adversarial_review_executed",
+        "review_receipt_name": "triangle-review-a.json",
+        "review_digest": "f" * 64,
+        "structured_source_bound_passes": 3,
+    })
+    monkeypatch.setattr(campaign, "read_receipt_document", lambda *a, **k: ({
+        "training_triangle": {
+            "episode_lens_references": [
+                {"source_trace_sha256": "a" * 64},
+                {"source_trace_sha256": "b" * 64},
+            ],
+        },
+    }, "c" * 64))
+    seen = []
+
+    def fake_semantic(*a, run_index, requested_keys, seed, **kw):
+        seen.append((run_index, tuple(requested_keys), seed))
+        return {
+            "filename": "semantic-43-" + str(run_index) + ".json",
+            "semantic_review_digest": f"{run_index + 1:064x}",
+        }
+
+    monkeypatch.setattr(campaign, "execute_native_43_lens_review", fake_semantic)
+    result = campaign.triangle_campaign_page(
+        tmp_path, tmp_path / "approvals.json", tmp_path / "receipts", object(),
+        semantic_runtime=object(), semantic_all_runs=True, semantic_seed=110,
+        semantic_lens_keys=tuple("lens_" + str(i) for i in range(43)),
+    )
+    assert seen == [(0, tuple("lens_" + str(i) for i in range(43)), 110),
+                    (1, tuple("lens_" + str(i) for i in range(43)), 153)]
+    assert result["semantic_model_generations_executed_or_replayed"] == 86
+    assert result["review_failures_needing_retry"] == 0
+    assert result["rows"][0]["semantic_episode_count"] == 2
+    assert result["rows"][0]["semantic_lens_review_state"] == "43_lenses_native_executed_or_replayed"
+    assert result["rows"][1]["semantic_model_generations"] == 0
+    assert result["production_jeeves_weight_updates"] == 0
+
+
+def test_semantic_campaign_failure_blocks_page_advancement(monkeypatch, tmp_path):
+    monkeypatch.setattr(campaign, "train_page", lambda *a, **k: _page())
+    monkeypatch.setattr(campaign, "review_one_receipt", lambda *a, **k: {
+        "state": "prior_local_adversarial_review_replayed",
+        "review_receipt_name": "triangle-review-a.json",
+        "review_digest": "f" * 64,
+        "structured_source_bound_passes": 3,
+    })
+    monkeypatch.setattr(campaign, "read_receipt_document", lambda *a, **k: ({
+        "training_triangle": {"episode_lens_references": [{}]},
+    }, "c" * 64))
+
+    def fail(*a, **k):
+        raise ValueError("native semantic model timed out")
+
+    monkeypatch.setattr(campaign, "execute_native_43_lens_review", fail)
+    page = campaign.triangle_campaign_page(
+        tmp_path, tmp_path / "approvals.json", tmp_path / "receipts", object(),
+        semantic_runtime=object(),
+    )
+    assert page["review_failures_needing_retry"] == 1
+    assert page["semantic_lens_review_failures_needing_retry"] == 1
+    assert page["rows"][0]["semantic_lens_review_state"] == "blocked_retry_required"
+    assert page["semantic_model_generations_executed_or_replayed"] == 0
+
+
+def test_campaign_cli_accepts_semantic_model_and_all_episode_mode():
+    from scripts.training.rom_study import parser
+    flags = parser().parse_args([
+        "train-triangle", "--root", "/tmp/roms", "--approvals", "/tmp/rights",
+        "--output-dir", "/tmp/receipts", "--snapshot", "/tmp/snapshot",
+        "--reviewer-checkpoint", "/tmp/critic",
+        "--semantic-checkpoint", "/tmp/semantic",
+        "--semantic-all-runs", "--semantic-seed", "112",
+    ])
+    assert flags.semantic_all_runs is True
+    assert flags.semantic_seed == 112
+    assert flags.semantic_checkpoint.name == "semantic"

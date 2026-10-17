@@ -513,3 +513,40 @@ hypotheses or falsifiers into target training labels**. Eight native
 measurement views retain per-episode normalized weight 1/8 each.
 No new independent gameplay examples, synthetic awards, fictional video
 semantics or production Jeeves weight updates are introduced.
+
+### Automatically execute the 43 lenses inside the full ROM training campaign
+
+Enable the native 43-lens checkpoint in the existing long-form campaign.
+The **critic checkpoint remains a distinct explicit selection** and its
+source-bound model outputs are replayed before each semantic session:
+
+```sh
+python -m scripts.training.rom_study train-triangle \
+  --root /private/rom-library \
+  --approvals /private/rom-training-approvals.json \
+  --snapshot /private/rom-receipts/rom-library-snapshot.json \
+  --output-dir /private/rom-receipts \
+  --reviewer-checkpoint /private/models/adversarial.json \
+  --semantic-checkpoint /private/models/semantic.json \
+  --semantic-all-runs --max-pages 0 \
+  --review-tokens 160 --semantic-tokens 192
+```
+
+The optional `--semantic-checkpoint` enables the fully wired 43-lens
+native model phase. Without `--semantic-all-runs` it analyzes the first
+verified native episode per admitted ROM; with it, it executes **43 separate
+governed lens inferences for every actual replay-audited episode**. The
+`--semantic-lens-set` flag selects an exact 43-key canonical manifest.
+`--semantic-seed` and `--semantic-tokens` are independent, versioned
+generation controls. New output reports counts and source-linked
+`semantic-43-native-*.json` receipts, never fabricated success. Existing
+gameplay and critic receipts are reused, with actual local model replay
+required for saved critic and semantic outputs.
+
+If the semantic checkpoint fails, any particular lens produces malformed
+output, or a source reference changes, the campaign does not advance its
+inventory cursor and returns an error. This is intentionally resource-heavy
+and operator-run, not a hidden background recording or automatic weight
+promotion process. Even a completed 43-lens pass creates hypotheses and
+falsification prompts, **not 43 new independent samples**, new reward labels
+or trained Jeeves production weights.
