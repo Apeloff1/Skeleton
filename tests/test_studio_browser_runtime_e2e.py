@@ -92,7 +92,7 @@ class RuntimeReplayQualificationTests(unittest.TestCase):
         self.assertTrue(qualified["javascript_gameplay_executed"])
         inspected = inspect_production_assurance(self.order, self.campaign)
         self.assertEqual(inspected["browser_javascript_playthroughs_verified"], 1)
-        self.assertEqual(inspected["checked_gates"], 8)
+        self.assertEqual(inspected["checked_gates"], 9)
         self.assertEqual(
             inspected["targets"][0]["gates"]["browser_javascript_playthrough_executed"]["status"],
             "javascript_gameplay_executed",
