@@ -65,6 +65,10 @@ module.exports = defineConfig([
       'services/offlineCache.ts',
       'services/operationStreamSession.ts',
       'utils/memoryGuard.ts',
+      'utils/usePersistentState.ts',
+      'utils/safeTimers.ts',
+      'utils/useNetworkStatus.ts',
+      'src/product/buildJobLifecycle.ts',
     ],
     rules: {
       'react-hooks/exhaustive-deps': 'error',

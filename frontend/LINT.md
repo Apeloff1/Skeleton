@@ -123,3 +123,33 @@ cursor state. Clearing the cursor does **not** cancel server-side operations.
 Merge Readiness check beside the offline transactional suite. These
 simulate OS warnings, clock rollback, failures, concurrent replays,
 native save races, and low-cadence marathon operation following.
+
+## Long-session preference, timer and build-observer hardening
+
+`utils/usePersistentState.ts` now fences late hydration against user edits,
+serializes writes by storage key across hook remounts and flushes unsaved
+debounced edits on unmount. Oversized/unserializable preference payloads are
+refused rather than poisoning previously stored preferences. This helper is
+only for bounded UI settings, not canonical game/AI checkpoints.
+
+`utils/safeTimers.ts` suspends intervals in background and rearms the same
+owned interval on foreground without duplicates. Async callbacks cannot
+overlap, rejected callbacks are contained, completed timeouts no longer
+remain in the hook registry, and an install/uninstall path owns the native
+listener. Native intervals are capped at 1000 live registrations.
+
+`utils/useNetworkStatus.ts` runs no redundant heartbeat when native NetInfo
+or web connectivity events are available. In fallback mode probes own a
+deadline, are nonoverlapping, and ignore stale responses after backgrounding
+or unmounting. This observes reachability, not authoritative game-job state.
+
+`src/product/buildJobLifecycle.ts` can observe multi-hour builds without
+an arbitrary default step count. An explicit maxChecks remains an optional
+monitoring budget. Transient status transport failures retry a bounded number
+of times and end as *disconnected*, **not** a backend build failure.
+Backend reported failure, cancellation and completion remain separate.
+
+The existing Merge Readiness job includes three new fault-injection suites:
+`test-persistent-preferences-endurance.cjs`,
+`test-build-observer-endurance.cjs`, and
+`test-timer-resume-endurance.cjs`. No additional workflow is introduced.
