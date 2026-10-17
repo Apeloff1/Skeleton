@@ -2421,5 +2421,249 @@
       "artifact_release_signed": false
     },
     "specialized_suite": "jeeves-native-cartridge-emulator-full-e2e"
+  },
+  "jeeves_compiled_psg_audio_parity_extension": {
+    "status": "source_and_compiled_byte_validation_integrated_not_hardware_audio_qualified",
+    "tranche": "M281-M322",
+    "milestones": [
+      {
+        "id": "M281",
+        "name": "Define a bounded independent source-authored compiled PSG ROM attestation",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M282",
+        "name": "Require actual signed game world and art-theme consistency before audio inspection",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M283",
+        "name": "Regenerate the exact original theme/seed/density eight-note PSG score",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M284",
+        "name": "Reject guessed audio addresses; use actual compiled RGBLINK/ld65 label maps",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M285",
+        "name": "Require exact GB/CGB bank-zero eight-byte low-frequency note table",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M286",
+        "name": "Require exact GB/CGB bank-zero eight-byte high-frequency note table",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M287",
+        "name": "Require exact NES two-bank NROM-256 PRG original sound layout",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M288",
+        "name": "Prevent NES music table overlap with fixed interrupt-vector region",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M289",
+        "name": "Require exact linked low/high note-table adjacency and length",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M290",
+        "name": "Reject duplicate, missing or out-of-bank sound-table labels",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M291",
+        "name": "Compare real GB/CGB ROM note bytes against original source score",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M292",
+        "name": "Compare real NES PRG note bytes against original source score",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M293",
+        "name": "Export three actual 6502 sound cue label addresses via ld65",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M294",
+        "name": "Read actual GB/CGB SM83 sound cue linker addresses",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M295",
+        "name": "Verify compiled GB/CGB pickup, hazard and goal machine routines",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M296",
+        "name": "Verify compiled NES pickup, hazard and goal pulse-APU machine routines",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M297",
+        "name": "Reject bypassed sound-enable guards and disabled/mutated opcode sequences",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M298",
+        "name": "Require three compiled original cue handlers in fixed source layout",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M299",
+        "name": "Return bounded SHA receipts for compiled note tables and cue instructions",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M300",
+        "name": "Keep compiled-score qualification separate from real audio playback",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M301",
+        "name": "Reject and reclaim an unqualified GB/CGB cartridge with modified PSG music",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M302",
+        "name": "Reject and reclaim an unqualified NES cartridge with modified PSG music",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M303",
+        "name": "Reattest compiled audio bytes when opening a previously signed ROM receipt",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M304",
+        "name": "Bind compiled sound evidence digest into game campaign qualification record",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M305",
+        "name": "Aggregate actual compiled PSG proof into Jeeves and Dragon reports",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M306",
+        "name": "Add source-safe compiled audio mismatch category to Dragon triage",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M307",
+        "name": "Register specialized original-audio ROM fault-injection regression suite",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M308",
+        "name": "Update positive GB/CGB and NES compiled ROM fixtures to contain actual original music/effect code",
+        "state": "source_implemented_tests_registered_not_measured"
+      },
+      {
+        "id": "M309",
+        "name": "Execute compiled GB ROM in installed PyBoy and capture actual mixed output",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M310",
+        "name": "Execute compiled GBC ROM in installed color emulator and capture both pulse channels",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M311",
+        "name": "Execute native ca65/ld65 NROM-256 in FCEUX and measure 2A03 pulse output",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M312",
+        "name": "Independently quantify native PSG melody pitch error against source expected frequency",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M313",
+        "name": "Independently quantify native PSG sound cue pitch and envelope drift",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M314",
+        "name": "Validate game-event audio at real pickup/hazard/goal action boundaries",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M315",
+        "name": "Measure simultaneous audio/animation/gameplay timing under frame load",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M316",
+        "name": "Run real original multi-level cartridge through sound-enabled full controller trace",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M317",
+        "name": "Validate gamepad, speaker and audio hardware output on physical supported devices",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M318",
+        "name": "Complete real first-install studio creation-to-cartridge compilation on Windows",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M319",
+        "name": "Complete full RGBDS/ca65+PyBoy/FCEUX specialized regression suite and record passing receipts",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M320",
+        "name": "Perform independent authored game distribution and platform license signoff",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M321",
+        "name": "Run reboot/recovery and multi-month production endurance with current audio code",
+        "state": "runtime_or_release_unqualified"
+      },
+      {
+        "id": "M322",
+        "name": "Qualify full user-facing Jeeves/Builder/Dragon release with genuine end-to-end proof",
+        "state": "runtime_or_release_unqualified"
+      }
+    ],
+    "owners": [
+      "skeleton/ai/game_builder/studio_compiled_psg_parity.py",
+      "skeleton/ai/game_builder/nes_native_export.py",
+      "skeleton/ai/game_builder/studio_campaign_assurance.py",
+      "skeleton/ai/game_builder/studio_e2e_observation.py",
+      "skeleton/ai/game_builder/studio_execution_campaign.py",
+      "skeleton/ai/game_builder/studio_execution_history.py",
+      "skeleton/ai/game_builder/studio_production_blocker_taxonomy.py"
+    ],
+    "tests": [
+      "tests/test_studio_compiled_psg_parity.py",
+      "tests/test_studio_campaign_assurance_e2e.py",
+      "tests/test_studio_nes_campaign_e2e.py",
+      "tests/test_studio_production_blocker_taxonomy.py"
+    ],
+    "evidence_truth": {
+      "compiled_rom_music_and_cue_bytes_verified_by_source_code_path": true,
+      "registered_test_suites_are_not_claimed_passed": true,
+      "NES_PRG_banks_required": 2,
+      "notes_per_original_score": 8,
+      "gameplay_effect_handlers_per_console": 3,
+      "model_weights_trained": false,
+      "real_6502_or_SM83_machine_code_audio_executed_this_session": false,
+      "physical_speakers_or_emulator_waveforms_verified": false,
+      "real_hardware_audio_certified": false,
+      "original_model_or_emulator_release_certified": false
+    },
+    "focused_suite": "jeeves-native-cartridge-emulator-full-e2e"
   }
 }
