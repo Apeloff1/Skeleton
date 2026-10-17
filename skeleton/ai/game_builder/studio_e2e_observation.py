@@ -237,6 +237,7 @@ def observe_production_campaign(
     for target in report["targets"]:
         events = [
             ("studio.source_integrity_checked", target["source_receipt_digest"]),
+            ("studio.cross_engine_pixel_parity", target["cross_engine_pixel_parity_digest"]),
             ("studio.rom_structure_checked", target["native_binary_evidence_digest"]),
             ("studio.browser_javascript_replay", target["browser_javascript_evidence_digest"]),
             ("studio.godot_headless_replay", target["godot_headless_evidence_digest"]),
@@ -271,6 +272,10 @@ def observe_production_campaign(
         "head_event_digest": previous if records else None,
         "page_digest": _digest(page),
         "source_completed_target_count": report["targets_with_exact_source"],
+        "cross_engine_pixel_parity_count": sum(
+            row["cross_engine_pixel_parity_digest"] is not None
+            for row in report["targets"]
+        ),
         "rom_structurally_checked_count": report["native_roms_structurally_verified"],
         "actual_browser_javascript_replays": report["browser_javascript_playthroughs_verified"],
         "actual_godot_headless_replays": report["godot_headless_playthroughs_verified"],
