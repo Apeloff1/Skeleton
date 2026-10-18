@@ -426,5 +426,62 @@
     "budget_met": false,
     "words_per_second": 1958.1098165168962,
     "projected_seconds": 510696586.8639631
+  },
+  {
+    "schema": "skeleton.game_map_variants.v1",
+    "bytes_trained": 6531740,
+    "cycle_start": 0,
+    "cycle_bytes": 6531740,
+    "goal": 1000000000,
+    "official_tracks": {
+      "visual": 1.5121704775878497,
+      "narrative": 1.4745006681394313,
+      "systems": 1.5055118528539717,
+      "review": 1.5097609405131627,
+      "practice": 1.499099735847114,
+      "rights": 1.6163887836008148,
+      "sound": 1.5409454269471075,
+      "stage": 1.512303309665505,
+      "craft": 1.4260927835451176,
+      "play": 1.570881690620964,
+      "maps": 4.202247154463002
+    },
+    "torch_best_tracks": {
+      "visual": 1.5121705532073975,
+      "narrative": 1.4745006561279297,
+      "systems": 1.5055118799209595,
+      "review": 1.5097609758377075,
+      "practice": 1.4990999698638916,
+      "rights": 1.6163887977600098,
+      "sound": 1.5409454107284546,
+      "stage": 1.5123032331466675,
+      "craft": 1.4260927438735962,
+      "play": 1.570881724357605,
+      "maps": 4.202247142791748
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 154,
+      "rejects": 180,
+      "accept_rate": 0.0
+    },
+    "model_digest": "3d6963d51e3f14085b4c916a84ec8c9c46f5d11158c675017fc5eefcd4eb8e2c",
+    "seconds": 148.651,
+    "loss_focus": null,
+    "selection": "map-billion",
+    "promotion": false,
+    "words_trained": 21376,
+    "language": "english",
+    "source_digest": "aec9f79614ec2b80bf0711744632cd85bdbe07b39723cd06ddecf38b915832b5",
+    "stop_reason": "plateau",
+    "budget_met": false,
+    "words_per_second": 143.79990716510483,
+    "projected_seconds": 6954107.410179641,
+    "maps_trained": 21376,
+    "maps_kept": 9856,
+    "maps_per_second": 143.79990716510483,
+    "max_seconds": 1800.0
   }
 ]
