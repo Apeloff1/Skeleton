@@ -122,6 +122,17 @@ def test_ratchet_keeps_a_mean_gain_and_blocks_a_track_collapse():
     assert ratchet.observe(before, tiny) is False
 
 
+def test_ratchet_stall_resets_when_a_step_is_kept():
+    ratchet = AdaptiveRatchet()
+    before = {"visual": 2.0, "narrative": 2.0, "systems": 2.0}
+    worse = {name: 2.1 for name in before}
+    for _ in range(3):
+        assert ratchet.observe(before, worse) is False
+    assert ratchet.stall == 3
+    assert ratchet.observe(before, {name: 1.5 for name in before}) is True
+    assert ratchet.stall == 0
+
+
 def test_ratchet_shrinks_steps_and_tightens_across_the_cycle():
     ratchet = AdaptiveRatchet()
     before = {"visual": 2.0, "narrative": 2.0, "systems": 2.0}

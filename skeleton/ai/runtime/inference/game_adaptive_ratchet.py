@@ -71,6 +71,7 @@ class AdaptiveRatchet:
         self.accepts = 0
         self.rejects = 0
         self.reject_streak = 0
+        self.stall = 0
         self.steps_since_adapt = 0
         self.recent: deque[int] = deque(maxlen=16)
 
@@ -85,12 +86,14 @@ class AdaptiveRatchet:
         if accepted:
             self.accepts += 1
             self.reject_streak = 0
+            self.stall = 0
             # The bar only rises on a kept step. A reject run is what eases it.
             self.margin = min(self.margin_cap, max(self.margin, mean_gain * 0.2))
             self.slack = max(1e-5, self.slack * 0.98)
         else:
             self.rejects += 1
             self.reject_streak += 1
+            self.stall += 1
             if self.reject_streak >= 4:
                 # Ease the bar. The step size stays with the accept-rate window
                 # so a reject run cannot pin it at the floor in one burst.
@@ -484,7 +487,8 @@ def train_budget(
             opt = _fresh_optimizer(parameters, peak_lr)
             _pin(model)
         bytes_done += batch_bytes
-        if log is not None and (bytes_done // (8 * 1024 * 1024) != (bytes_done - batch_bytes) // (8 * 1024 * 1024) or bytes_done >= goal):
+        plateau = ratchet.stall >= 64 and (ratchet.accepts > 0 or cycle_start > 0)
+        if log is not None and (bytes_done // (8 * 1024 * 1024) != (bytes_done - batch_bytes) // (8 * 1024 * 1024) or bytes_done >= goal or plateau):
             print(
                 f"bytes={bytes_done} loss={domain_loss:.4f} "
                 f"tracks={ {k: round(v, 4) for k, v in best_scores.items()} } "
@@ -493,6 +497,14 @@ def train_budget(
                 file=log,
                 flush=True,
             )
+        if plateau:
+            if log is not None:
+                print(
+                    f"plateau bytes={bytes_done} accepts={ratchet.accepts} rejects={ratchet.rejects}",
+                    file=log,
+                    flush=True,
+                )
+            break
     model.load_state_dict(best_state)
     _pin(model)
     official = NumpyRecurrentLM(
