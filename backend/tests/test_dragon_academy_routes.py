@@ -35,8 +35,13 @@ def test_registered_with_existing_auth_and_no_authority_mint_endpoints():
     assert "/api/dragon-academy/status" in paths
     assert "/api/dragon-academy/practice/run" in paths
     assert "/api/dragon-academy/practice/subscribe" in paths
-    assert not any("offer" in p or "approve" in p or "xp" in p or "review" in p
-                   for p in paths)
+    # Inspect complete path segments, not substrings: legitimate read-only
+    # /preview routes include "review" inside that word.
+    forbidden_authority_segments = {"offer", "approve", "xp", "review"}
+    assert not any(
+        forbidden_authority_segments.intersection(path.strip("/").split("/"))
+        for path in paths
+    )
     assert '/api/dragon-academy/native/generate' in paths
     assert '/api/dragon-academy/native/targets' in paths
 
