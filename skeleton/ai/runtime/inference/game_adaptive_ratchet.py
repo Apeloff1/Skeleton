@@ -49,7 +49,7 @@ class AdaptiveRatchet:
         self,
         *,
         margin_cap: float = 5e-4,
-        min_scale: float = 0.05,
+        min_scale: float = 0.25,
         slack: float = 1e-4,
         slack_cap: float = 5e-4,
         target_accept: float = 0.4,
@@ -91,7 +91,8 @@ class AdaptiveRatchet:
             self.rejects += 1
             self.reject_streak += 1
             if self.reject_streak >= 4:
-                self.scale = max(self.min_scale, self.scale * 0.97)
+                # Ease the bar. The step size stays with the accept-rate window
+                # so a reject run cannot pin it at the floor in one burst.
                 self.slack = min(self.slack_cap, self.slack * 1.15)
                 self.margin = max(self.margin_floor, self.margin * 0.5)
                 self.reject_streak = 0
@@ -103,14 +104,14 @@ class AdaptiveRatchet:
         # Once per window, not once per chunk. A per-chunk cut pinned the step
         # at the floor before a real gain could land.
         self.steps_since_adapt += 1
-        if len(self.recent) < 8 or self.steps_since_adapt < 16:
+        if len(self.recent) < 16 or self.steps_since_adapt < 16:
             return
         self.steps_since_adapt = 0
         rate = sum(self.recent) / len(self.recent)
         if rate < self.target_accept - 0.15:
-            self.scale = max(self.min_scale, self.scale * 0.95)
+            self.scale = max(self.min_scale, self.scale * 0.9)
         elif rate > self.target_accept + 0.2:
-            self.scale = min(self.ceiling, self.scale * 1.02)
+            self.scale = min(self.ceiling, self.scale * 1.05)
 
     def tighten(self, cycle_bytes: int, cycle_budget: int) -> float:
         """Cosine ceiling from 1 at the start of this cycle to the floor at the end."""
@@ -273,7 +274,7 @@ def _warmup(cycle_bytes: int, *, continuation: bool) -> float:
     # A continuation already has a fitted network, so the step starts small
     # rather than at zero and can still climb while the accept rate allows it.
     if continuation:
-        return 0.15 + 0.85 * ramp
+        return 0.7 + 0.3 * ramp
     return ramp
 
 
@@ -431,7 +432,7 @@ def train_budget(
         for name in review:
             if name in stream.weights:
                 stream.weights[name] = min(3.0, max(stream.weights[name], 1.5))
-        fresh_docs = chunk_docs if len(replay) < 32 else max(1, int(chunk_docs * 0.6))
+        fresh_docs = chunk_docs if len(replay) < 32 else max(1, int(chunk_docs * 0.85))
         batch: list[tuple[str, str]] = []
         batch_bytes = 0
         while len(batch) < fresh_docs and bytes_done + batch_bytes < goal:
@@ -560,7 +561,7 @@ def main() -> None:
         json.dumps(
             train_budget(
                 additional_bytes=BUDGET_BYTES,
-                peak_lr=ADAMW_LR,
+                peak_lr=3e-4,
                 chunk_docs=96,
                 ledger_path=Path("skeleton/ai/runtime/inference/game_corpus_cycles.json"),
                 log=sys.stdout,

@@ -130,9 +130,13 @@ def test_ratchet_shrinks_steps_and_tightens_across_the_cycle():
     locked = ratchet.margin
     for _ in range(4):
         assert ratchet.observe(before, worse) is False
-    assert ratchet.scale < scale
+    assert ratchet.scale == scale
     assert ratchet.margin < locked
     assert ratchet.margin >= ratchet.margin_floor
+    for _ in range(16):
+        assert ratchet.observe(before, worse) is False
+    assert ratchet.scale < scale
+    assert ratchet.scale >= ratchet.min_scale
     fresh = AdaptiveRatchet()
     assert fresh.tighten(0, 100) > fresh.tighten(50, 100) > fresh.tighten(100, 100)
     assert fresh.scale == fresh.min_scale
