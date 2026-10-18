@@ -91,6 +91,10 @@ def _iter_paths(routes: object, prefix: str, stack: tuple[int, ...]):
                         raise RuntimeError(_UNINSPECTABLE)
                     continue
                 yield from _iter_paths(children, full, here)
+            elif isinstance(getattr(route, "routes", None), (list, tuple)):
+                # Structural route wrappers (including test/studio adapters)
+                # can expose child routes without being Starlette Mounts.
+                yield from _iter_paths(route.routes, full, here)
             continue
         if original is not None:
             context = getattr(route, "include_context", None)
@@ -98,6 +102,18 @@ def _iter_paths(routes: object, prefix: str, stack: tuple[int, ...]):
             if not isinstance(extra, str):
                 raise RuntimeError(_UNINSPECTABLE)
             yield from _iter_paths(getattr(original, "routes", None), _join(prefix, extra), here)
+            continue
+        candidates = getattr(route, "effective_candidates", None)
+        if callable(candidates):
+            # FastAPI and local router adapters may expose a lazy route list.
+            # Inspect every candidate; refuse opaque or malformed results.
+            try:
+                nested = candidates()
+            except Exception as exc:
+                raise RuntimeError(_UNINSPECTABLE) from exc
+            if not isinstance(nested, (list, tuple)):
+                raise RuntimeError(_UNINSPECTABLE)
+            yield from _iter_paths(nested, prefix, here)
             continue
         if isinstance(getattr(route, "host", None), str):
             # Starlette Host: same path space, walk its app's table (opaque -> refuse).
@@ -126,49 +142,6 @@ def reject_cortex_secret_routes(app: object) -> None:
                 "unchartered cortex secrets HTTP route is forbidden: "
                 "keep cortex_routes unmounted"
             )
-    routes = getattr(app, "routes", None)
-    if routes is None or isinstance(routes, (str, bytes)):
-        raise RuntimeError("HTTP route inventory unavailable; refusing startup")
-    try:
-        pending = list(routes)
-    except TypeError as exc:
-        raise RuntimeError("HTTP route inventory unavailable; refusing startup") from exc
-    seen: set[int] = set()
-    while pending:
-        route = pending.pop()
-        marker = id(route)
-        if marker in seen:
-            continue
-        seen.add(marker)
-        path = getattr(route, "path", None)
-        if isinstance(path, str):
-            _reject_secret_path(path)
-        candidates = getattr(route, "effective_candidates", None)
-        if callable(candidates):
-            try:
-                nested = candidates()
-            except Exception as exc:
-                raise RuntimeError("uninspectable HTTP route; refusing startup") from exc
-            if not isinstance(nested, list):
-                raise RuntimeError("uninspectable HTTP route; refusing startup")
-            pending.extend(nested)
-        children = getattr(route, "routes", None)
-        if isinstance(children, list):
-            prefix = path if isinstance(path, str) else ""
-            for child in children:
-                child_path = getattr(child, "path", None)
-                if (
-                    prefix
-                    and isinstance(child_path, str)
-                    and not child_path.startswith(prefix.rstrip("/") + "/")
-                    and child_path != prefix
-                ):
-                    joined = prefix.rstrip("/") + "/" + child_path.lstrip("/")
-                    _reject_secret_path(joined)
-            pending.extend(children)
-        if not isinstance(path, str):
-            raise RuntimeError("uninspectable HTTP route; refusing startup")
-
 def _reject_secret_path(path: str) -> None:
     # Starlette provides decoded ASGI paths; also inspect percent-encoded
     # aliases so registration spelling cannot bypass the source guard.
