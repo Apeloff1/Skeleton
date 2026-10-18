@@ -43,7 +43,7 @@ def test_game_world_graphic_styles_react_to_original_128_parameter_changes():
         owner=editor())
     modified=route.native_world_codex_edit(
         route.NativeCodexWorldEditRequest(index="0",changes={
-            "flora_succession":255,"sky_islands":188,
+            "flora_succession":255,"verticality":188,
         }),owner=editor())["new_decimal_index"]
     after=route.native_world_codex_tiles(
         route.NativeCodexTileRequest(index=modified,target="nes"),
