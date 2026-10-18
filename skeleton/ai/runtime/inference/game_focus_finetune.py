@@ -46,6 +46,7 @@ SCHEMA = "skeleton.game_focus_finetune.v1"
 ENTERPRISE_SCHEMA = "skeleton.game_finetune_enterprise.v1"
 FOCUS_BYTES = 8 * 1024 * 1024
 HALF_BYTES = 32 * 1024 * 1024
+PREDICTION_BYTES = 8 * 1024 * 1024
 # Official NumpyRecurrentLM reload after the focus fine-tune. Half targets are these values / 2.
 OFFICIAL_FOCUS_BASELINE = {
     "visual": 1.5055037017735209,
@@ -63,7 +64,7 @@ _LEVELS = {
     "L01": "no new runtime root; NumpyRecurrentLM and TinyTransformer stay the owners",
     "L02": "half targets are half the measured baseline; holdout text is not a training target",
     "L03": "promotion stays false; a serving checkpoint is not replaced",
-    "L04": "AdamW fine-tune from the saved weights; the gradient uses shared template bytes",
+    "L04": "each round tries every legal source and keeps the prediction step that raises every track",
     "L05": "weights stay under the gitignored checkpoint directory",
     "L06": "original lessons only; no personal data and no commercial game text",
     "L07": "a rejected or non-finite step restores the weights",
@@ -252,13 +253,13 @@ def finetune_toward_half(
     source: Path | str = Path(".skeleton/game-corpus-199/checkpoint.pt"),
     checkpoint_dir: Path | str = Path(".skeleton/game-corpus-half"),
     hidden: int = 256,
-    budget_bytes: int = HALF_BYTES,
+    budget_bytes: int = PREDICTION_BYTES,
     peak_lr: float = 3e-5,
     baseline: dict[str, float] | None = None,
     rollback_digest: str,
     log: Any = None,
 ) -> dict[str, Any]:
-    """Fine-tune a widened copy until the budget, the half targets, or a reject plateau."""
+    """Fine-tune a widened copy by the prediction step with the largest legal-source gain."""
     if not isinstance(rollback_digest, str) or len(rollback_digest) < 16:
         raise ValueError("rollback_digest is required")
     if _source_digest(source) != rollback_digest:
@@ -278,10 +279,12 @@ def finetune_toward_half(
         "margin_cap": 1e-5,
         "stream_weights": half_weights(),
         "continuation": True,
-        "plateau_rejects": 256,
         "log_bytes": 1024 * 1024,
         "score_ceiling": targets,
-        "loss_focus": "skeleton",
+        "selection": "maximal",
+        "prediction": "both",
+        "source_docs": 1,
+        "plateau_rejects": 12,
         "ledger_path": Path("skeleton/ai/runtime/inference/game_corpus_cycles.json"),
         "log": log,
     }

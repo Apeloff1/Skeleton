@@ -406,6 +406,23 @@ def domains() -> tuple[str, ...]:
     return tuple(TEMPLATES)
 
 
+def legal_source_groups() -> dict[str, tuple[str, ...]]:
+    """Every original domain, once. Track groups plus the domains that sit outside them.
+
+    These are the lessons the fine-tune may read. Holdout lines are not a source.
+    """
+    tracked = {name for names in TRACKS.values() for name in names}
+    groups = {track: tuple(names) for track, names in TRACKS.items()}
+    adjacent = tuple(name for name in TEMPLATES if name not in tracked)
+    if not adjacent:
+        raise RuntimeError("adjacent legal sources are missing")
+    groups["adjacent"] = adjacent
+    covered = [name for names in groups.values() for name in names]
+    if sorted(covered) != sorted(TEMPLATES) or len(covered) != len(set(covered)):
+        raise RuntimeError("legal sources do not match the corpus domains")
+    return groups
+
+
 def focus_weights() -> dict[str, float]:
     """Legal, coding, and the review domains are sampled ahead of the rest."""
     weights = {domain: 1.0 for domain in TEMPLATES}
@@ -586,6 +603,21 @@ class CorpusStream:
         # Own holdouts are reserved by serial. The 40-character filter is for the
         # English and A-to-Z measurement lines, which use different wording.
         self.banned = banned_windows(DENYLIST)
+
+    def next_from(self, domain: str) -> tuple[str, tuple[str, ...]]:
+        """Next clean lesson from one legal source."""
+        if domain not in self.weights:
+            raise ValueError(f"unknown domain {domain}")
+        for _ in range(10000):
+            counter = self.serial[domain]
+            self.serial[domain] = counter + 1
+            serial = training_serial(counter)
+            text = render(domain, serial)
+            if len(text) < 40 or leaks(text, self.banned):
+                continue
+            self.counts[domain] += 1
+            return text, byte_kinds(domain, serial)
+        raise RuntimeError(f"corpus stream could not find a clean {domain} document")
 
     def next_document(self) -> tuple[str, str]:
         domain, text, _kinds = self.next_example()

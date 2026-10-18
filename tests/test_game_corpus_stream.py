@@ -226,6 +226,38 @@ def test_a_short_budget_trains_without_promoting():
     assert set(receipt["official_tracks"]) == {"visual", "narrative", "systems", "review", "practice"}
 
 
+def test_legal_sources_cover_every_domain_once():
+    from skeleton.ai.runtime.inference.game_corpus_stream import legal_source_groups
+
+    groups = legal_source_groups()
+    covered = [name for names in groups.values() for name in names]
+    assert sorted(covered) == sorted(TEMPLATES)
+    assert len(covered) == len(set(covered))
+    assert set(groups) == {"visual", "narrative", "systems", "review", "practice", "adjacent"}
+    assert "legal" in groups["systems"]
+    assert "audio" in groups["adjacent"]
+
+
+def test_maximal_prediction_does_not_promote():
+    root = Path(tempfile.mkdtemp())
+    receipt = train_budget(
+        budget_bytes=20000,
+        checkpoint_dir=root,
+        hidden=16,
+        chunk_docs=2,
+        selection="maximal",
+        prediction="both",
+        source_docs=1,
+        plateau_rejects=1,
+        log_bytes=10**9,
+    )
+    assert receipt["selection"] == "maximal"
+    assert receipt["prediction"] == "both"
+    assert receipt["promotion"] is False
+    assert receipt["service_checkpoint_touched"] is False
+    assert receipt["loss_focus"] is None
+
+
 def test_byte_kinds_label_the_rendered_document():
     serial = training_serial(0)
     text = render("legal", serial)

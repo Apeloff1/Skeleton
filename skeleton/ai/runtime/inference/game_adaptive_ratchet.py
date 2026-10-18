@@ -28,6 +28,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_se
 from skeleton.ai.runtime.inference.game_corpus_stream import (
     BUDGET_BYTES,
     CorpusStream,
+    legal_source_groups,
     track_holdouts,
 )
 from skeleton.ai.runtime.inference.neural import BOS, EOS, NeuralLMConfig, NumpyRecurrentLM
@@ -198,6 +199,91 @@ def _batch_loss(
     return F.cross_entropy(logits.reshape(-1, 258), targets.reshape(-1), ignore_index=-100)
 
 
+def _prediction_loss(model: ByteRNN, texts: list[str], mode: str) -> torch.Tensor:
+    """Next-byte loss. Surprise mode puts the gradient on the bytes the model predicts badly."""
+    if mode not in ("uniform", "surprise"):
+        raise ValueError("prediction mode must be uniform or surprise")
+    if not texts:
+        raise ValueError("prediction loss needs documents")
+    seqs = [_encode(text) for text in texts]
+    lengths = torch.tensor([len(seq) - 1 for seq in seqs])
+    inputs = pad_sequence([seq[:-1] for seq in seqs], batch_first=True)
+    targets = pad_sequence([seq[1:] for seq in seqs], batch_first=True, padding_value=-100)
+    packed = pack_padded_sequence(model.embed(inputs), lengths, batch_first=True, enforce_sorted=False)
+    packed_out, _hidden = model.rnn(packed)
+    unpacked, _ = pad_packed_sequence(packed_out, batch_first=True)
+    logits = model.out(unpacked)
+    flat_targets = targets.reshape(-1)
+    nll = F.cross_entropy(logits.reshape(-1, 258), flat_targets, ignore_index=-100, reduction="none")
+    mask = flat_targets != -100
+    if mode == "uniform":
+        return nll[mask].mean()
+    raw = torch.where(mask, nll.detach().clamp(min=0), torch.zeros_like(nll))
+    mean = raw.sum() / mask.sum().clamp(min=1)
+    weight = torch.where(mask, (raw / mean.clamp(min=1e-6)).clamp(max=4), torch.zeros_like(nll))
+    return (nll * weight).sum() / weight.sum().clamp(min=1e-6)
+
+
+def _maximal_round(
+    model: ByteRNN,
+    parameters: list[torch.nn.Parameter],
+    *,
+    peak_lr: float,
+    groups: Mapping[str, tuple[str, ...]],
+    stream: CorpusStream,
+    source_docs: int,
+    modes: tuple[str, ...],
+    best_scores: Mapping[str, float],
+    tracks: Mapping[str, tuple[str, ...]],
+) -> dict[str, Any]:
+    """Try every legal source and keep the step that most improves the weakest track."""
+    origin = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+    best: dict[str, Any] | None = None
+    attempted_bytes = 0
+    for mode in modes:
+        for name, domains in groups.items():
+            rows: list[tuple[str, str]] = []
+            for domain in domains:
+                for _ in range(source_docs):
+                    text, _kinds = stream.next_from(domain)
+                    rows.append((domain, text))
+                    attempted_bytes += len(text.encode("utf-8"))
+            model.load_state_dict(origin)
+            _pin(model)
+            opt = _fresh_optimizer(parameters, peak_lr)
+            loss = _prediction_loss(model, [text for _domain, text in rows], mode)
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(parameters, GRAD_CLIP)
+            opt.step()
+            _pin(model)
+            value = float(loss.detach())
+            if not math.isfinite(value):
+                continue
+            scores = _scores(model, tracks)
+            gains = {track: float(best_scores[track]) - float(scores[track]) for track in best_scores}
+            worst = min(gains.values())
+            mean = sum(gains.values()) / len(gains)
+            rank = (worst, mean)
+            if best is None or rank > best["rank"]:
+                best = {
+                    "rank": rank,
+                    "worst": worst,
+                    "mean": mean,
+                    "source": name,
+                    "mode": mode,
+                    "loss": value,
+                    "scores": scores,
+                    "rows": rows,
+                    "state": {key: value.detach().cpu().clone() for key, value in model.state_dict().items()},
+                }
+    model.load_state_dict(origin)
+    _pin(model)
+    if best is None:
+        return {"kept": False, "attempted_bytes": attempted_bytes, "worst": 0.0, "mean": 0.0, "source": "", "mode": "", "loss": 0.0, "scores": dict(best_scores), "rows": []}
+    return {"kept": False, "attempted_bytes": attempted_bytes, **best}
+
+
 @torch.no_grad()
 def _scores(model: ByteRNN, tracks: Mapping[str, tuple[str, ...]]) -> dict[str, float]:
     model.eval()
@@ -354,6 +440,7 @@ def _append_ledger(path: Path, receipt: Mapping[str, Any]) -> None:
         "model_digest": receipt["model_digest"],
         "seconds": receipt["seconds"],
         "loss_focus": receipt.get("loss_focus"),
+        "selection": receipt.get("selection"),
         "promotion": False,
     }
     if rows and rows[-1].get("model_digest") == row["model_digest"] and rows[-1].get("bytes_trained") == row["bytes_trained"]:
@@ -393,6 +480,9 @@ def train_budget(
     log_bytes: int = 8 * 1024 * 1024,
     score_ceiling: Mapping[str, float] | None = None,
     loss_focus: str | None = None,
+    selection: str = "greedy",
+    prediction: str = "uniform",
+    source_docs: int = 1,
     ledger_path: Path | str | None = None,
     log: Any = None,
 ) -> dict[str, Any]:
@@ -426,7 +516,15 @@ def train_budget(
         raise ValueError("log_bytes must be a positive int")
     if loss_focus not in (None, "skeleton"):
         raise ValueError("loss_focus must be None or 'skeleton'")
+    if selection not in ("greedy", "maximal"):
+        raise ValueError("selection must be greedy or maximal")
+    if prediction not in ("uniform", "surprise", "both"):
+        raise ValueError("prediction must be uniform, surprise, or both")
+    if isinstance(source_docs, bool) or not isinstance(source_docs, int) or source_docs < 1:
+        raise ValueError("source_docs must be a positive int")
     kept_bytes = frozenset({"skeleton"}) if loss_focus == "skeleton" else None
+    prediction_modes = ("uniform", "surprise") if prediction == "both" else (prediction,)
+    source_groups = legal_source_groups() if selection == "maximal" else {}
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     pause = root / "PAUSE"
@@ -527,6 +625,73 @@ def train_budget(
                 time.sleep(0.5)
             if log is not None:
                 print("resumed", file=log, flush=True)
+        if selection == "maximal":
+            found = _maximal_round(
+                model,
+                parameters,
+                peak_lr=peak_lr * ratchet.scale,
+                groups=source_groups,
+                stream=stream,
+                source_docs=source_docs,
+                modes=prediction_modes,
+                best_scores=best_scores,
+                tracks=tracks,
+            )
+            batch_bytes = int(found["attempted_bytes"])
+            bytes_done += batch_bytes
+            domain_loss = float(found["loss"])
+            kept = float(found["worst"]) > 0.0 and float(found["mean"]) > ratchet.margin
+            if kept:
+                model.load_state_dict(found["state"])
+                _pin(model)
+                best_scores = found["scores"]
+                best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+                ratchet.accepts += 1
+                ratchet.reject_streak = 0
+                ratchet.stall = 0
+                for domain, text in found["rows"]:
+                    replay.append((domain, text))
+                    previous = domain_ema.get(domain, domain_loss)
+                    domain_ema[domain] = 0.9 * previous + 0.1 * domain_loss
+                    mastery.record_attempt(domain, success=True, weight=0.08)
+            else:
+                ratchet.rejects += 1
+                ratchet.reject_streak += 1
+                ratchet.stall += 1
+            plateau = ratchet.stall >= plateau_rejects and (ratchet.accepts > 0 or cycle_start > 0 or continuation is True)
+            boundary = bytes_done // log_bytes != (bytes_done - batch_bytes) // log_bytes or bytes_done >= goal or plateau
+            if boundary:
+                _save_checkpoint(
+                    ckpt_path,
+                    model=model,
+                    opt=opt,
+                    ratchet=ratchet,
+                    mastery=mastery,
+                    bytes_done=bytes_done,
+                    best_state=best_state,
+                    goal=goal,
+                    cycle_start=cycle_start,
+                    replay=replay,
+                    domain_ema=domain_ema,
+                )
+                if log is not None:
+                    print(
+                        f"bytes={bytes_done} loss={domain_loss:.4f} source={found['source']}/{found['mode']} "
+                        f"gain={float(found['mean']):+.6f} worst={float(found['worst']):+.6f} "
+                        f"tracks={ {k: round(v, 4) for k, v in best_scores.items()} } "
+                        f"accepts={ratchet.accepts} rejects={ratchet.rejects}",
+                        file=log,
+                        flush=True,
+                    )
+            if plateau:
+                if log is not None:
+                    print(
+                        f"plateau bytes={bytes_done} accepts={ratchet.accepts} rejects={ratchet.rejects}",
+                        file=log,
+                        flush=True,
+                    )
+                break
+            continue
         review = set(mastery.review_queue(limit=6))
         if domain_ema:
             level = sorted(domain_ema.values())[len(domain_ema) // 2]
@@ -673,6 +838,8 @@ def train_budget(
         "promotion": False,
         "canonical_replaced": False,
         "loss_focus": loss_focus,
+        "selection": selection,
+        "prediction": prediction,
         "byte_loss_is_gameplay_quality": False,
         "perfect_builder_claimed": False,
         "service_checkpoint_touched": False,
