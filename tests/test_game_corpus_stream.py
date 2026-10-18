@@ -5,7 +5,14 @@ import math
 import tempfile
 from pathlib import Path
 
-from skeleton.ai.runtime.inference.game_adaptive_ratchet import AdaptiveRatchet, train_budget
+from skeleton.ai.runtime.inference.game_adaptive_ratchet import (
+    AdaptiveRatchet,
+    ByteRNN,
+    _scores,
+    expand_byte_rnn,
+    train_budget,
+)
+from skeleton.ai.runtime.inference.game_focus_finetune import enterprise_record, half_targets
 from skeleton.ai.runtime.inference.game_corpus_stream import (
     BUDGET_BYTES,
     DENYLIST,
@@ -194,6 +201,42 @@ def test_a_short_budget_trains_without_promoting():
     assert receipt["adamw"]["betas"] == [0.9, 0.999]
     assert receipt["adamw"]["weight_decay"] == 0.01
     assert set(receipt["official_tracks"]) == {"visual", "narrative", "systems", "review", "practice"}
+
+
+def test_score_ceiling_stops_before_the_budget():
+    root = Path(tempfile.mkdtemp())
+    receipt = train_budget(
+        budget_bytes=200_000,
+        checkpoint_dir=root,
+        hidden=16,
+        chunk_docs=4,
+        score_ceiling={name: 100.0 for name in ("visual", "narrative", "systems", "review", "practice")},
+    )
+    assert receipt["bytes_trained"] == 0
+    assert receipt["promotion"] is False
+    assert set(receipt["official_tracks"]) == {"visual", "narrative", "systems", "review", "practice"}
+
+
+def test_widening_keeps_the_current_holdouts_and_records_the_half():
+    small = ByteRNN(8)
+    wide = expand_byte_rnn(small, 16)
+    tracks = {name: rows[:2] for name, rows in track_holdouts().items()}
+    before = _scores(small, tracks)
+    after = _scores(wide, tracks)
+    for name in before:
+        assert abs(before[name] - after[name]) < 1e-4
+    baseline = {"visual": 1.5, "narrative": 1.4}
+    assert half_targets(baseline) == {"visual": 0.75, "narrative": 0.7}
+    record = enterprise_record(
+        baseline=baseline,
+        official={"visual": 1.2, "narrative": 1.1},
+        rollback_digest="a" * 64,
+    )
+    assert record["enterprise_qualified"] is False
+    assert record["standardized"] is True
+    assert record["half_met_all"] is False
+    assert record["promotion"] is False
+    assert set(record["levels"]) == {f"L{i:02d}" for i in range(14)}
 
 
 def test_transformer_finetune_stays_off_the_serving_checkpoint():

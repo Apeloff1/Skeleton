@@ -198,6 +198,41 @@ def _pin(model: ByteRNN) -> None:
         model.rnn.bias_hh_l0.zero_()
 
 
+def expand_byte_rnn(model: ByteRNN, hidden: int) -> ByteRNN:
+    """Widen a fitted byte network without changing the function it already computes.
+
+    New hidden units start at zero and stay zero until a later fine-tune uses them.
+    """
+    if isinstance(hidden, bool) or not isinstance(hidden, int) or hidden < model.hidden:
+        raise ValueError("expanded hidden size must be an int >= the current size")
+    if hidden == model.hidden:
+        return model
+    wider = ByteRNN(hidden)
+    old = model.hidden
+    with torch.no_grad():
+        wider.embed.weight.zero_()
+        wider.embed.weight[:, :old].copy_(model.embed.weight)
+        wider.rnn.weight_hh_l0.zero_()
+        wider.rnn.weight_hh_l0[:old, :old].copy_(model.rnn.weight_hh_l0)
+        wider.rnn.bias_ih_l0.zero_()
+        wider.rnn.bias_ih_l0[:old].copy_(model.rnn.bias_ih_l0)
+        wider.out.weight.zero_()
+        wider.out.weight[:, :old].copy_(model.out.weight)
+        wider.out.bias.copy_(model.out.bias)
+    _pin(wider)
+    return wider
+
+
+def network_digest(model: ByteRNN) -> str:
+    """Digest of the official reload. The model id stays on the corpus network."""
+    official = NumpyRecurrentLM(
+        model_id="game-corpus-199",
+        config=NeuralLMConfig(hidden_size=model.hidden, seed=11, dtype="float64"),
+        parameters=model.numpy_parameters(),
+    )
+    return official.model_digest
+
+
 def _save_checkpoint(
     path: Path,
     *,
@@ -275,8 +310,7 @@ def _restore_ratchet(ratchet: AdaptiveRatchet, saved: Mapping[str, Any]) -> None
 
 def _warmup(cycle_bytes: int, *, continuation: bool) -> float:
     ramp = min(1.0, max(cycle_bytes, 1) / WARMUP_BYTES)
-    # A continuation already has a fitted network, so the step starts small
-    # rather than at zero and can still climb while the accept rate allows it.
+    # A continuation already has a fitted network, so the step starts at the peak rate.
     if continuation:
         return 1.0
     return ramp
@@ -336,7 +370,12 @@ def train_budget(
     chunk_docs: int = 192,
     min_scale: float = 0.25,
     slack: float = 1e-4,
+    margin_cap: float = 5e-4,
     stream_weights: Mapping[str, float] | None = None,
+    continuation: bool | None = None,
+    plateau_rejects: int = 64,
+    log_bytes: int = 8 * 1024 * 1024,
+    score_ceiling: Mapping[str, float] | None = None,
     ledger_path: Path | str | None = None,
     log: Any = None,
 ) -> dict[str, Any]:
@@ -355,8 +394,15 @@ def train_budget(
         raise ValueError("min_scale must be in (0, 1]")
     if isinstance(slack, bool) or not isinstance(slack, (int, float)) or not 0.0 < float(slack) <= 1e-2:
         raise ValueError("slack must be in (0, 1e-2]")
+    if isinstance(margin_cap, bool) or not isinstance(margin_cap, (int, float)) or not 0.0 < float(margin_cap) <= 1e-2:
+        raise ValueError("margin_cap must be in (0, 1e-2]")
     min_scale = float(min_scale)
     slack = float(slack)
+    margin_cap = float(margin_cap)
+    if isinstance(plateau_rejects, bool) or not isinstance(plateau_rejects, int) or plateau_rejects < 1:
+        raise ValueError("plateau_rejects must be a positive int")
+    if isinstance(log_bytes, bool) or not isinstance(log_bytes, int) or log_bytes < 1:
+        raise ValueError("log_bytes must be a positive int")
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     pause = root / "PAUSE"
@@ -364,11 +410,23 @@ def train_budget(
     ckpt_path = root / "checkpoint.pt"
     torch.manual_seed(11)
     tracks = track_holdouts()
+    ceiling: dict[str, float] | None = None
+    if score_ceiling is not None:
+        if not isinstance(score_ceiling, Mapping) or isinstance(score_ceiling, str) or not score_ceiling:
+            raise ValueError("score_ceiling must be a non-empty mapping")
+        ceiling = {}
+        for name, value in score_ceiling.items():
+            numeric = float(value)
+            if not math.isfinite(numeric) or numeric <= 0:
+                raise ValueError("score_ceiling values must be positive and finite")
+            ceiling[str(name)] = numeric
+        if not set(ceiling) <= set(tracks):
+            raise ValueError("score_ceiling names are not holdout tracks")
     model = ByteRNN(hidden)
     parameters = [p for p in model.parameters() if p.requires_grad]
     peak_lr = float(peak_lr)
     opt = _fresh_optimizer(parameters, peak_lr)
-    ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=max(slack, 5e-4))
+    ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=max(slack, 5e-4), margin_cap=margin_cap)
     mastery = SamMatrix()
     stream = CorpusStream(weights=stream_weights)
     base_weights = dict(stream.weights)
@@ -397,7 +455,7 @@ def train_budget(
             cycle_start = int(saved.get("cycle_start", bytes_done))
         else:
             opt = _fresh_optimizer(parameters, peak_lr)
-            ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=max(slack, 5e-4))
+            ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=max(slack, 5e-4), margin_cap=margin_cap)
             cycle_start = bytes_done
     else:
         goal = additional_bytes if additional_bytes is not None else budget_bytes
@@ -406,13 +464,21 @@ def train_budget(
     model.train()
     if log is not None:
         print(
-            f"cycle_start={cycle_start} bytes={bytes_done} goal={goal} "
+            f"cycle_start={cycle_start} bytes={bytes_done} goal={goal} hidden={hidden} "
             f"tracks={ {k: round(v, 6) for k, v in best_scores.items()} } "
             f"replay={len(replay)} mastered={len(mastery.snapshot())}",
             file=log,
             flush=True,
         )
     while bytes_done < goal:
+        if ceiling is not None and all(best_scores[name] <= ceiling[name] for name in ceiling):
+            if log is not None:
+                print(
+                    f"ceiling bytes={bytes_done} tracks={ {k: round(v, 4) for k, v in best_scores.items()} }",
+                    file=log,
+                    flush=True,
+                )
+            break
         if pause.exists():
             _save_checkpoint(
                 ckpt_path,
@@ -459,7 +525,7 @@ def train_budget(
         opt_state = copy.deepcopy(opt.state_dict())
         cycle_bytes = max(0, bytes_done - cycle_start)
         cycle_budget = max(1, goal - cycle_start)
-        warmup = _warmup(cycle_bytes, continuation=cycle_start > 0)
+        warmup = _warmup(cycle_bytes, continuation=cycle_start > 0 if continuation is None else continuation)
         ratchet.tighten(cycle_bytes, cycle_budget)
         opt.param_groups[0]["lr"] = peak_lr * warmup * ratchet.scale
         loss = _batch_loss(model, [text for _domain, text in batch])
@@ -494,16 +560,31 @@ def train_budget(
             opt = _fresh_optimizer(parameters, peak_lr)
             _pin(model)
         bytes_done += batch_bytes
-        plateau = ratchet.stall >= 64 and (ratchet.accepts > 0 or cycle_start > 0)
-        if log is not None and (bytes_done // (8 * 1024 * 1024) != (bytes_done - batch_bytes) // (8 * 1024 * 1024) or bytes_done >= goal or plateau):
-            print(
-                f"bytes={bytes_done} loss={domain_loss:.4f} "
-                f"tracks={ {k: round(v, 4) for k, v in best_scores.items()} } "
-                f"margin={ratchet.margin:.6f} scale={ratchet.scale:.4f} "
-                f"accepts={ratchet.accepts} rejects={ratchet.rejects}",
-                file=log,
-                flush=True,
+        plateau = ratchet.stall >= plateau_rejects and (ratchet.accepts > 0 or cycle_start > 0 or continuation is True)
+        boundary = bytes_done // log_bytes != (bytes_done - batch_bytes) // log_bytes or bytes_done >= goal or plateau
+        if boundary:
+            _save_checkpoint(
+                ckpt_path,
+                model=model,
+                opt=opt,
+                ratchet=ratchet,
+                mastery=mastery,
+                bytes_done=bytes_done,
+                best_state=best_state,
+                goal=goal,
+                cycle_start=cycle_start,
+                replay=replay,
+                domain_ema=domain_ema,
             )
+            if log is not None:
+                print(
+                    f"bytes={bytes_done} loss={domain_loss:.4f} "
+                    f"tracks={ {k: round(v, 4) for k, v in best_scores.items()} } "
+                    f"margin={ratchet.margin:.6f} scale={ratchet.scale:.4f} "
+                    f"accepts={ratchet.accepts} rejects={ratchet.rejects}",
+                    file=log,
+                    flush=True,
+                )
         if plateau:
             if log is not None:
                 print(
