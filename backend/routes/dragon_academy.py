@@ -797,7 +797,7 @@ def native_living_world_checkpoint_advance(
     owner: str = Depends(_native_source_editor),
 ) -> dict:
     from skeleton.ai.webcrawler.dragon_living_world_checkpoint import continue_world
-    from skeleton.ai.webcrawler.dragon_living_world import describe, terrain_for_state_for_state
+    from skeleton.ai.webcrawler.dragon_living_world import describe, terrain_for_state
 
     try:
         world = _dragon_living_world(body)
