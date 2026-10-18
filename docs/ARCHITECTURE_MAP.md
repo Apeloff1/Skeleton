@@ -128,8 +128,8 @@ At source level, the dependency rules are:
 
 | Interface | Contract |
 | --- | --- |
-| Frontend → Backend | canonical resolver in `frontend/utils/apiBase.ts`, then `/api/*` |
-| Frontend → Engine | canonical resolver in `frontend/utils/apiBase.ts`, then `/api/v1/*` |
+| Frontend → Backend | canonical resolver in `frontend/src/utils/apiBase.ts`, then `/api/*` |
+| Frontend → Engine | canonical resolver in `frontend/src/utils/apiBase.ts`, then `/api/v1/*` |
 | Backend health | `GET /api/health` |
 | Engine liveness | `GET /api/v1/health/live` |
 | Engine → native | bounded native ABI with Python fallback |
