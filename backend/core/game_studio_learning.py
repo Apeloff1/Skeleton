@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Event
 from uuid import uuid4
+from weakref import WeakKeyDictionary
 
 from pymongo import ReturnDocument
 from pymongo.errors import PyMongoError
@@ -22,14 +23,38 @@ round_records = workspace.database["game_learning_rounds"]
 lesson_records = workspace.database["game_learning_lessons"]
 log = logging.getLogger(__name__)
 _indexes_ready = False
-_index_lock = asyncio.Lock()
+# Async locks and compute quotas belong to the current event loop, not import time.
+_index_locks: WeakKeyDictionary = WeakKeyDictionary()
+_compute_slots_by_loop: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def _get_index_lock() -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    lock = _index_locks.get(loop)
+    if lock is None:
+        lock = asyncio.Lock()
+        _index_locks[loop] = lock
+    return lock
+
+
+def _get_compute_slots(kind: str, capacity: int) -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    slots = _compute_slots_by_loop.get(loop)
+    if slots is None:
+        slots = {}
+        _compute_slots_by_loop[loop] = slots
+    slot = slots.get(kind)
+    if slot is None:
+        slot = asyncio.Semaphore(capacity)
+        slots[kind] = slot
+    return slot
 
 
 async def ensure_campaign_indexes():
     global _indexes_ready
     if _indexes_ready:
         return
-    async with _index_lock:
+    async with _get_index_lock():
         if _indexes_ready:
             return
         await campaigns.create_index(
@@ -2468,7 +2493,6 @@ async def _run_studio_compute(scope, local_slots, operation):
             raise asyncio.CancelledError
 
 
-_scenario_spectator_slots = asyncio.Semaphore(2)
 
 
 async def scenario_mirror_views(scope, identifier, *, lanes=10, steps=12, sample=0):
@@ -2500,7 +2524,7 @@ async def scenario_mirror_views(scope, identifier, *, lanes=10, steps=12, sample
     seed = (row["config"]["seed"] + row["cursor"] * 257 + sample * 7) % (2**31 - 16)
     result = await _run_studio_compute(
         scope,
-        _scenario_spectator_slots,
+        _get_compute_slots("scenario", 2),
         lambda _cancel: mirrored_simulations(
             source,
             seed=seed,
@@ -2616,7 +2640,6 @@ async def scenario_engine_test_manifest(scope, editor):
         raise GameLearningError("test_manifest_engine", "Unknown studio engine.", 404) from exc
 
 
-_engine_probe_slots = asyncio.Semaphore(1)
 
 
 async def engine_probe_page(scope, editor, *, offset=0, limit=8):
@@ -2633,7 +2656,7 @@ async def engine_probe_page(scope, editor, *, offset=0, limit=8):
     try:
         contract, actions = await _run_studio_compute(
             scope,
-            _engine_probe_slots,
+            _get_compute_slots("engine_probe", 1),
             lambda _cancel: (
                 run_engine_contract_diagnostics(editor),
                 engine_action_diagnostics(editor, offset=offset, limit=limit),
@@ -2654,7 +2677,6 @@ async def engine_probe_page(scope, editor, *, offset=0, limit=8):
     }
 
 
-_shadow_audit_slots = asyncio.Semaphore(1)
 
 
 async def scenario_shadow_audit(
@@ -2697,7 +2719,7 @@ async def scenario_shadow_audit(
     seed = (row["config"]["seed"] + row["cursor"] * 101) % (2**31 - 12000)
     result = await _run_studio_compute(
         scope,
-        _shadow_audit_slots,
+        _get_compute_slots("shadow_audit", 1),
         lambda cancel: run_shadow_saturation(
             source,
             seed=seed,
@@ -2724,7 +2746,6 @@ async def scenario_shadow_audit(
     }
 
 
-_multifactor_probe_slots = asyncio.Semaphore(1)
 
 
 async def _multifactor_original_source(scope, identifier):
@@ -2776,7 +2797,7 @@ async def multifactor_plan_preview(scope, identifier, *, axis_offset=0, count=6,
     try:
         design = await _run_studio_compute(
             scope,
-            _multifactor_probe_slots,
+            _get_compute_slots("multifactor", 1),
             lambda _cancel: plan_multifactor_scenarios(
                 source,
                 interaction_order=order,
@@ -2832,7 +2853,7 @@ async def multifactor_verified_experiments(
     try:
         result = await _run_studio_compute(
             scope,
-            _multifactor_probe_slots,
+            _get_compute_slots("multifactor", 1),
             lambda _cancel: execute_multifactor_scenarios(
                 source,
                 interaction_order=3,
