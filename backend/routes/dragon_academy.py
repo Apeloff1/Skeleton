@@ -1050,14 +1050,14 @@ def native_living_world_temporal_maze(
 
 
 class NativeCodexWorldRequest(BaseModel):
-    """Exact 1024-bit+ world identity; Python decimal, never a JS float."""
+    """Exact versioned world identity; decimal strings, never a JS float."""
 
     model_config = ConfigDict(extra="forbid")
-    index: str = Field(default="0", strict=True, min_length=1, max_length=400, pattern=r"^(0|[1-9][0-9]*)$")
+    index: str = Field(default="0", strict=True, min_length=1, max_length=600, pattern=r"^(0|[1-9][0-9]*)$")
 
 
 class NativeCodexWorldEditRequest(NativeCodexWorldRequest):
-    changes: dict[str, StrictInt] = Field(default_factory=dict, max_length=128)
+    changes: dict[str, StrictInt] = Field(default_factory=dict, max_length=192)
 
 
 class NativeCodexWorldPlayRequest(NativeCodexWorldRequest):
@@ -1123,6 +1123,84 @@ def native_world_codex_edit(
         }
     except ValueError:
         raise HTTPException(status_code=422, detail="Original Codex axis or level unsupported") from None
+
+
+@router.post("/native/production/worlds/codex/impact")
+def native_world_codex_impact(
+    body: NativeCodexWorldEditRequest,
+    owner: str = Depends(_native_source_editor),
+) -> dict:
+    """Show observed design consequences before accepting an edited world ID.
+
+    Only compares deterministic source-generated gameplay and native tile bytes;
+    it does not pretend to have rendered a commercial 3D level or ROM binary.
+    """
+    from skeleton.ai.webcrawler.dragon_world_codex import (
+        unrank, edit, DOMAIN_AXIS, EXTENSION_DOMAIN_AXIS,
+    )
+    from skeleton.ai.webcrawler.dragon_world_codex_runtime import (
+        start, codex_cell, gate_catalog,
+    )
+    from skeleton.ai.webcrawler.dragon_codex_tiles import tile_pack
+
+    try:
+        old=unrank(body.index)
+        new=edit(body.index, body.changes)
+        old_state=start(old)
+        new_state=start(new)
+        before=codex_cell(old, old_state)
+        after=codex_cell(new, new_state)
+        old_gates=gate_catalog(old, old_state)
+        new_gates=gate_catalog(new, new_state)
+        original_tiles=tile_pack(old, "nes")
+        edited_tiles=tile_pack(new, "nes")
+        domains={**DOMAIN_AXIS,**EXTENSION_DOMAIN_AXIS}
+        return {
+            "ok": True,
+            "source_index":old.decimal_index,
+            "edited_index":new.decimal_index,
+            "version":new.schema,
+            "changed_axes":sorted(
+                axis for axis,level in body.changes.items()
+                if (old.values+old.extension_values)[
+                    tuple(axis for names in domains.values() for axis in names).index(axis)
+                ]!=level
+            ),
+            "affected_domains":[name for name,axes in domains.items()
+                                if any(axis in body.changes for axis in axes)],
+            "terrain": {
+                "before":before["codex_terrain"],
+                "after":after["codex_terrain"],
+                "aerial_before":before.get("aerial_topology"),
+                "aerial_after":after.get("aerial_topology"),
+                "changed":before["codex_cell_digest"]!=after["codex_cell_digest"],
+            },
+            "traversal":{
+                "before":old_gates,"after":new_gates,
+                "additional_route_names":[
+                    row["name"] for row in new_gates
+                    if row["name"] not in {gate["name"] for gate in old_gates}
+                ],
+            },
+            "tiles":{
+                "target":"nes",
+                "before_count":len(original_tiles.named_tiles),
+                "after_count":len(edited_tiles.named_tiles),
+                "changed":[name for name,h in zip(
+                    edited_tiles.named_tiles,edited_tiles.artwork_hashes)
+                    if name not in original_tiles.named_tiles or
+                    original_tiles.artwork_hashes[
+                        original_tiles.named_tiles.index(name)
+                    ]!=h],
+                "verified_roundtrip":edited_tiles.all_tile_roundtrips_verified,
+                "hardware_binary_compiled":False,
+            },
+        }
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="World axis change or indexed gameplay design is unsupported",
+        ) from None
 
 
 @router.post("/native/production/worlds/codex/play")
