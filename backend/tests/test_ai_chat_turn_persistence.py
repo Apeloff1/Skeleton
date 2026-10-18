@@ -58,8 +58,14 @@ def _matches(doc, query):
     for key, expected in query.items():
         actual = doc.get(key)
         if isinstance(expected, dict):
-            if "$gt" in expected and not actual > expected["$gt"]:
-                return False
+            if "$gt" in expected:
+                threshold = expected["$gt"]
+                # Mongo compares only compatible BSON types for order queries.
+                # A missing field must not raise while examining another doc.
+                if actual is None or type(actual) is not type(threshold):
+                    return False
+                if not actual > threshold:
+                    return False
             if "$exists" in expected:
                 exists = key in doc
                 if exists is not bool(expected["$exists"]):
@@ -402,7 +408,16 @@ async def test_mongo_renewal_invalidates_previous_lease_token():
 
 
 @pytest.mark.asyncio
-async def test_mongo_expiry_takeover_fences_stale_event_append():
+async def test_mongo_expiry_takeover_fences_stale_event_append(monkeypatch):
+    from core import chat_turns as chat_turn_module
+
+    # The lease timestamps are deliberately fixed; validation must use the
+    # same simulated clock, not the calendar date on the CI runner.
+    monkeypatch.setattr(
+        chat_turn_module,
+        "_utcnow",
+        lambda: NOW + timedelta(seconds=12),
+    )
     authority = MongoChatTurnAuthority(FakeDatabase())
     operation_id = str(uuid4())
     turn = await authority.create_operation(
