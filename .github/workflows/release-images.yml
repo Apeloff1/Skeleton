@@ -65,7 +65,7 @@ jobs:
         shell: bash
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+        run: docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin <<< "$GHCR_TOKEN"
 
       - name: Build backend image
         shell: bash
