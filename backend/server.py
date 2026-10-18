@@ -4025,11 +4025,22 @@ async def delete_file(file_id: str):
 # Addons
 @api_router.post("/addons", response_model=LanguageAddon)
 async def create_addon(data: dict):
-    existing = await db.language_addons.find_one({"language_key": data.get("language_key")})
-    if existing:
-        raise HTTPException(status_code=400, detail="Addon exists")
+    from core.databases import get_sync_db
+    from pymongo.errors import DuplicateKeyError
+
     addon = LanguageAddon(**data)
-    await db.language_addons.insert_one(addon.dict())
+
+    def insert_unique_addon():
+        collection = get_sync_db().language_addons
+        # Serialize duplicate detection with the database's unique index rather
+        # than racing a separate find and insert from concurrent requests.
+        collection.create_index("language_key", unique=True)
+        collection.insert_one(addon.dict())
+
+    try:
+        await asyncio.to_thread(insert_unique_addon)
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=400, detail="Addon exists") from exc
     return addon
 
 @api_router.get("/addons")
@@ -4039,7 +4050,9 @@ async def get_addons():
 
 @api_router.delete("/addons/{addon_id}")
 async def delete_addon(addon_id: str):
-    await db.language_addons.delete_one({"id": addon_id})
+    from core.databases import get_sync_db
+
+    await asyncio.to_thread(get_sync_db().language_addons.delete_one, {"id": addon_id})
     return {"success": True}
 
 # Preferences
