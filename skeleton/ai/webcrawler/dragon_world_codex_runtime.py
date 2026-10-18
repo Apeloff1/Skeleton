@@ -1,4 +1,4 @@
-"""Executable 128-axis world codex and earned delayed traversal.
+"""Executable versioned 128/192-axis world codex and earned delayed traversal.
 
 Every axis has a distinct actual action, domain effect and evolving tile
 projection. Temporal gates depend on achieved progress, environmental phase,
@@ -497,7 +497,7 @@ def report(address:CodexAddress,state:CodexState, *,
         "domain_progress":{
             name:{"reputation":state.domain_reputation[n],
                   "axes":{axis:state.axis_mastery[n*8+i]
-                          for i,axis in enumerate(DOMAIN_AXIS[name])}}
+                          for i,axis in enumerate({**DOMAIN_AXIS,**EXTENSION_DOMAIN_AXIS}[name])}}
             for n,name in enumerate(domains)
         },
         "available_actions":available_actions(address,state),
