@@ -207,7 +207,7 @@ export async function getOfflineFootprint(): Promise<{ files: number; bytes: num
  */
 export async function syncAllOffline(
   onProgress: (state: SyncState) => void,
-  opts: { chaptersPerItem?: number; itemTypes?: 'book' | 'bible' | 'track' | 'subject'[] } = {},
+  opts: { chaptersPerItem?: number; itemTypes?: ('book' | 'bible' | 'track' | 'subject')[] } = {},
 ): Promise<SyncState> {
   abort = false;
   const chaptersPerItem = opts.chaptersPerItem ?? 5;
