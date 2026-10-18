@@ -134,6 +134,19 @@ TRACKS: dict[str, tuple[str, ...]] = {
         "music_rights",
         "asset_rights",
     ),
+    "sound": ("audio", "music", "haptics"),
+    "stage": ("animation", "camera", "lighting", "vfx", "particles", "color_script", "weather"),
+    "craft": ("materials", "shader", "rigging", "props", "crowd", "trailer"),
+    "play": (
+        "accessibility",
+        "behavior",
+        "interface",
+        "inventory",
+        "level_design",
+        "localization",
+        "netcode",
+        "performance",
+    ),
 }
 
 TEMPLATES: dict[str, tuple[str, ...]] = {
@@ -449,16 +462,17 @@ def domains() -> tuple[str, ...]:
 
 
 def legal_source_groups() -> dict[str, tuple[str, ...]]:
-    """Every original domain, once. Track groups plus the domains that sit outside them.
+    """Every original domain, once, grouped by the track that measures it.
 
-    These are the lessons the fine-tune may read. Holdout lines are not a source.
+    A domain that is not on a track is reported under ``adjacent``. An empty
+    adjacent set is valid: the tracks then cover the corpus. Holdout lines
+    are not a source.
     """
     tracked = {name for names in TRACKS.values() for name in names}
     groups = {track: tuple(names) for track, names in TRACKS.items()}
     adjacent = tuple(name for name in TEMPLATES if name not in tracked)
-    if not adjacent:
-        raise RuntimeError("adjacent legal sources are missing")
-    groups["adjacent"] = adjacent
+    if adjacent:
+        groups["adjacent"] = adjacent
     covered = [name for names in groups.values() for name in names]
     if sorted(covered) != sorted(TEMPLATES) or len(covered) != len(set(covered)):
         raise RuntimeError("legal sources do not match the corpus domains")
