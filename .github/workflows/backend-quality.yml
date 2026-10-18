@@ -55,7 +55,9 @@ jobs:
   ruff:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Full SAST, secret and malware checks can exceed 30 minutes on large PRs.
+    # Preserve all fail-closed scanners instead of cancelling required evidence.
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: backend
