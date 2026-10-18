@@ -2196,7 +2196,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if attempt_limit != self.max_retries + 1:
                 configure = getattr(client, "with_options", None)
                 if not callable(configure):
-                    raise ProviderPolicyError("provider client cannot enforce admitted retry limit")
+                    raise ProviderPolicyError("resource admission cannot enforce configured provider retry limit")
                 client = configure(max_retries=attempt_limit - 1)
             messages: list[dict[str, str]] = [message.as_openai_input() for message in request.history]
             messages.append({"role": "user", "content": request.prompt})
