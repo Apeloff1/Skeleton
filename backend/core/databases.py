@@ -54,7 +54,12 @@ class _ActiveLoopMotorClient(AsyncIOMotorClient):
     """
 
     def get_io_loop(self):
-        return asyncio.get_running_loop()
+        try:
+            return asyncio.get_running_loop()
+        except RuntimeError:
+            # Retain Motor's documented synchronous loop lookup for callers
+            # outside a coroutine; active async I/O never reuses that cache.
+            return super().get_io_loop()
 
 
 # Single shared async client for all three logical databases.
