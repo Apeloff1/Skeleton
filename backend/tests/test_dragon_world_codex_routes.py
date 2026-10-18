@@ -261,12 +261,8 @@ def test_extended_axes_refuse_non_canonical_and_forged_identities():
         read_index(str(EXTENDED_CODEX_WORLD_ADDRESSES))
     with pytest.raises(ValueError):
         read_index("0"+enhanced.decimal_index)
-    with pytest.raises(HTTPException) as unsupported:
-        route.native_world_codex_edit(
-            route.NativeCodexWorldEditRequest(changes={"sky_islands":True}),
-            owner=owner(),
-        )
-    assert unsupported.value.status_code==422
+    with pytest.raises(ValidationError):
+        route.NativeCodexWorldEditRequest(changes={"sky_islands":True})
 
 
 def test_codecs_refuse_nonexistent_platform_or_axis_in_real_world_content():
