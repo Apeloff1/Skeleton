@@ -22,6 +22,7 @@ from skeleton.ai.runtime.inference.game_corpus_stream import (
     TEMPLATES,
     CorpusStream,
     banned_windows,
+    byte_kinds,
     holdout_documents,
     iter_documents,
     leaks,
@@ -200,7 +201,36 @@ def test_a_short_budget_trains_without_promoting():
     assert receipt["byte_loss_is_gameplay_quality"] is False
     assert receipt["adamw"]["betas"] == [0.9, 0.999]
     assert receipt["adamw"]["weight_decay"] == 0.01
+    assert receipt["loss_focus"] is None
     assert set(receipt["official_tracks"]) == {"visual", "narrative", "systems", "review", "practice"}
+
+
+def test_byte_kinds_label_the_rendered_document():
+    serial = training_serial(0)
+    text = render("legal", serial)
+    kinds = byte_kinds("legal", serial)
+    assert len(kinds) == len(text.encode("utf-8"))
+    assert "skeleton" in kinds
+    assert "digit" in kinds
+    domain, lesson, labels = CorpusStream(weights=focus_weights()).next_example()
+    assert domain in TEMPLATES
+    assert len(labels) == len(lesson.encode("utf-8"))
+    assert set(labels) <= {"skeleton", "digit", "slot"}
+
+
+def test_skeleton_focus_trains_without_promoting():
+    root = Path(tempfile.mkdtemp())
+    receipt = train_budget(
+        budget_bytes=4096,
+        checkpoint_dir=root,
+        hidden=16,
+        chunk_docs=4,
+        loss_focus="skeleton",
+    )
+    assert receipt["loss_focus"] == "skeleton"
+    assert receipt["promotion"] is False
+    assert receipt["service_checkpoint_touched"] is False
+    assert receipt["bytes_trained"] >= 4096
 
 
 def test_score_ceiling_stops_before_the_budget():

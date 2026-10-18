@@ -172,11 +172,25 @@ def _encode(text: str) -> torch.Tensor:
     return torch.tensor([BOS, *list(text.encode("utf-8")), EOS], dtype=torch.long)
 
 
-def _batch_loss(model: ByteRNN, texts: list[str]) -> torch.Tensor:
+def _batch_loss(
+    model: ByteRNN,
+    texts: list[str],
+    kinds: list[tuple[str, ...]] | None = None,
+    keep: frozenset[str] | None = None,
+) -> torch.Tensor:
     seqs = [_encode(text) for text in texts]
     lengths = torch.tensor([len(seq) - 1 for seq in seqs])
     inputs = pad_sequence([seq[:-1] for seq in seqs], batch_first=True)
     targets = pad_sequence([seq[1:] for seq in seqs], batch_first=True, padding_value=-100)
+    if keep is not None:
+        if kinds is None or len(kinds) != len(texts):
+            raise ValueError("kept-byte loss needs one kind row per document")
+        for row, labels in enumerate(kinds):
+            for col, kind in enumerate([*labels, "eos"]):
+                if kind not in keep:
+                    targets[row, col] = -100
+        if int((targets != -100).sum()) == 0:
+            raise ValueError("kept-byte loss dropped every target")
     packed = pack_padded_sequence(model.embed(inputs), lengths, batch_first=True, enforce_sorted=False)
     packed_out, _hidden = model.rnn(packed)
     unpacked, _ = pad_packed_sequence(packed_out, batch_first=True)
@@ -339,6 +353,7 @@ def _append_ledger(path: Path, receipt: Mapping[str, Any]) -> None:
         },
         "model_digest": receipt["model_digest"],
         "seconds": receipt["seconds"],
+        "loss_focus": receipt.get("loss_focus"),
         "promotion": False,
     }
     if rows and rows[-1].get("model_digest") == row["model_digest"] and rows[-1].get("bytes_trained") == row["bytes_trained"]:
@@ -376,6 +391,7 @@ def train_budget(
     plateau_rejects: int = 64,
     log_bytes: int = 8 * 1024 * 1024,
     score_ceiling: Mapping[str, float] | None = None,
+    loss_focus: str | None = None,
     ledger_path: Path | str | None = None,
     log: Any = None,
 ) -> dict[str, Any]:
@@ -403,6 +419,9 @@ def train_budget(
         raise ValueError("plateau_rejects must be a positive int")
     if isinstance(log_bytes, bool) or not isinstance(log_bytes, int) or log_bytes < 1:
         raise ValueError("log_bytes must be a positive int")
+    if loss_focus not in (None, "skeleton"):
+        raise ValueError("loss_focus must be None or 'skeleton'")
+    kept_bytes = frozenset({"skeleton"}) if loss_focus == "skeleton" else None
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     pause = root / "PAUSE"
@@ -513,11 +532,11 @@ def train_budget(
         for name in review:
             if name in stream.weights:
                 stream.weights[name] = min(4.0, max(stream.weights[name], base_weights.get(name, 1.5)))
-        batch: list[tuple[str, str]] = []
+        batch: list[tuple[str, str, tuple[str, ...]]] = []
         batch_bytes = 0
         while len(batch) < chunk_docs and bytes_done + batch_bytes < goal:
-            domain, text = stream.next_document()
-            batch.append((domain, text))
+            domain, text, kinds = stream.next_example()
+            batch.append((domain, text, kinds))
             batch_bytes += len(text.encode("utf-8"))
         if not batch:
             break
@@ -528,7 +547,12 @@ def train_budget(
         warmup = _warmup(cycle_bytes, continuation=cycle_start > 0 if continuation is None else continuation)
         ratchet.tighten(cycle_bytes, cycle_budget)
         opt.param_groups[0]["lr"] = peak_lr * warmup * ratchet.scale
-        loss = _batch_loss(model, [text for _domain, text in batch])
+        loss = _batch_loss(
+            model,
+            [text for _domain, text, _kinds in batch],
+            kinds=[kinds for _domain, _text, kinds in batch],
+            keep=kept_bytes,
+        )
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(parameters, GRAD_CLIP)
@@ -544,15 +568,15 @@ def train_budget(
             continue
         after_scores = _scores(model, tracks)
         kept = ratchet.observe(best_scores, after_scores)
-        for domain, _text in batch:
+        for domain, _text, _kinds in batch:
             previous = domain_ema.get(domain, domain_loss)
             domain_ema[domain] = 0.9 * previous + 0.1 * domain_loss
             mastery.record_attempt(domain, success=kept, weight=0.08 if kept else 0.02)
         if kept:
             best_scores = after_scores
             best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
-            for item in batch:
-                replay.append(item)
+            for domain, text, _kinds in batch:
+                replay.append((domain, text))
         else:
             model.load_state_dict(before)
             # A rejected step's moments would replay the same overshoot.
@@ -643,6 +667,7 @@ def train_budget(
         "seconds": round(time.perf_counter() - started, 3),
         "promotion": False,
         "canonical_replaced": False,
+        "loss_focus": loss_focus,
         "byte_loss_is_gameplay_quality": False,
         "perfect_builder_claimed": False,
         "service_checkpoint_touched": False,

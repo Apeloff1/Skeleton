@@ -467,6 +467,34 @@ def validate_templates() -> dict[str, int]:
     return {"domains": len(TEMPLATES), "templates": sum(len(v) for v in TEMPLATES.values())}
 
 
+def byte_kinds(domain: str, serial: int) -> tuple[str, ...]:
+    """Label each rendered byte as skeleton, digit, or slot.
+
+    Skeleton bytes are the template wording shared by every serial. Digits are
+    the pass id. Slots are the fields that change with that id.
+    """
+    templates = TEMPLATES[domain]
+    template = templates[serial % len(templates)]
+    values: dict[str, str] = {}
+    mix = serial // len(templates)
+    for _literal, name, _spec, _conv in string.Formatter().parse(template):
+        if not name or name == "n":
+            continue
+        options = SLOTS[name]
+        values[name] = options[mix % len(options)]
+        mix //= len(options)
+    kinds: list[str] = []
+    for literal, name, _spec, _conv in string.Formatter().parse(template):
+        if literal:
+            kinds.extend(["skeleton"] * len(literal.encode("utf-8")))
+        if name:
+            piece = str(serial) if name == "n" else values[name]
+            kinds.extend([("digit" if name == "n" else "slot")] * len(piece.encode("utf-8")))
+    if len(kinds) != len(render(domain, serial).encode("utf-8")):
+        raise RuntimeError(f"byte kinds drifted for {domain}")
+    return tuple(kinds)
+
+
 def render(domain: str, serial: int) -> str:
     templates = TEMPLATES[domain]
     template = templates[serial % len(templates)]
@@ -560,6 +588,11 @@ class CorpusStream:
         self.banned = banned_windows(DENYLIST)
 
     def next_document(self) -> tuple[str, str]:
+        domain, text, _kinds = self.next_example()
+        return domain, text
+
+    def next_example(self) -> tuple[str, str, tuple[str, ...]]:
+        """Next clean lesson, with one kind label per document byte."""
         for _ in range(10000):
             domain = max(
                 self.weights,
@@ -576,7 +609,7 @@ class CorpusStream:
             if len(text) < 40 or leaks(text, self.banned):
                 continue
             self.counts[domain] += 1
-            return domain, text
+            return domain, text, byte_kinds(domain, serial)
         raise RuntimeError("corpus stream could not find a clean document")
 
 

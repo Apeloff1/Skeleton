@@ -78,5 +78,78 @@
     "seconds": 5.795,
     "promotion": false,
     "note": "Focus fine-tune. Legal and coding weighted at 3, proofreading, syntax, errors, crash, and lint at 2.5, plus tutorial, achievement, navigation, moderation, analytics, subtitles, and photo mode. AdamW peak 3e-5. All five tracks fell. The cycle stopped after 64 rejected chunks and kept this state. The separate local transformer holdout logprob moved from -5.617680 to -5.448432 over 827 steps and was kept as a candidate, not a serving model."
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "bytes_trained": 931860,
+    "cycle_start": 0,
+    "cycle_bytes": 931860,
+    "goal": 33554432,
+    "official_tracks": {
+      "visual": 1.5024955435009084,
+      "narrative": 1.473844519777313,
+      "systems": 1.507959462084698,
+      "review": 1.5533088380243099,
+      "practice": 1.52230878820073
+    },
+    "torch_best_tracks": {
+      "visual": 1.5024956464767456,
+      "narrative": 1.4738445281982422,
+      "systems": 1.5079594850540161,
+      "review": 1.5533087253570557,
+      "practice": 1.5223087072372437
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0005,
+      "accepts": 25,
+      "rejects": 257,
+      "accept_rate": 0.0
+    },
+    "model_digest": "5949fbf8ed17c42a126d6852a94c651d8861455f58374042b13735cf931825fd",
+    "seconds": 248.565,
+    "promotion": false,
+    "enterprise": {
+      "schema": "skeleton.game_finetune_enterprise.v1",
+      "standardized": true,
+      "enterprise_qualified": false,
+      "owner": "skeleton.ai.runtime.inference",
+      "runtime_root_added": false,
+      "levels": {
+        "L00": "inference package owns the byte network and the local transformer candidate",
+        "L01": "no new runtime root; NumpyRecurrentLM and TinyTransformer stay the owners",
+        "L02": "half targets are half the measured baseline; holdout text is not a training target",
+        "L03": "promotion stays false; a serving checkpoint is not replaced",
+        "L04": "AdamW fine-tune from the saved weights, widened only by zero-filled hidden units",
+        "L05": "weights stay under the gitignored checkpoint directory",
+        "L06": "original lessons only; no personal data and no commercial game text",
+        "L07": "a rejected or non-finite step restores the weights",
+        "L08": "official track losses, digest, accepts, and rejects are on the receipt",
+        "L09": "byte budget, learning rate, hidden size, and seconds are recorded",
+        "L10": "official NumpyRecurrentLM reload is the acceptance measurement",
+        "L11": "rollback digest is the pre-finetune network; use it when the half is not met",
+        "L12": "PAUSE saves and waits; a reject plateau keeps the best weights",
+        "L13": "not an enterprise-qualified volume; the half target is explicit and unmet until measured"
+      },
+      "half_targets": {
+        "visual": 0.7527518508867604,
+        "narrative": 0.7383703856276141,
+        "systems": 0.75549293202513,
+        "review": 0.7797221628378603,
+        "practice": 0.7636280441484232
+      },
+      "half_met": {
+        "visual": false,
+        "narrative": false,
+        "systems": false,
+        "review": false,
+        "practice": false
+      },
+      "half_met_all": false,
+      "rollback_digest": "0e45ff72aaea58646e918e9a0442c3df30ee6912a060a663674c463531c1da75",
+      "rollback_trigger": "keep the rollback network when any track is above its half target",
+      "promotion": false
+    }
   }
 ]

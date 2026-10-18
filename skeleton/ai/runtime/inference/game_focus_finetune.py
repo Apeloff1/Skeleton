@@ -54,7 +54,7 @@ _LEVELS = {
     "L01": "no new runtime root; NumpyRecurrentLM and TinyTransformer stay the owners",
     "L02": "half targets are half the measured baseline; holdout text is not a training target",
     "L03": "promotion stays false; a serving checkpoint is not replaced",
-    "L04": "AdamW fine-tune from the saved weights, widened only by zero-filled hidden units",
+    "L04": "AdamW fine-tune from the saved weights; the gradient uses shared template bytes",
     "L05": "weights stay under the gitignored checkpoint directory",
     "L06": "original lessons only; no personal data and no commercial game text",
     "L07": "a rejected or non-finite step restores the weights",
@@ -186,12 +186,18 @@ def seed_expanded_checkpoint(
     if path.exists():
         existing = torch.load(path, map_location="cpu", weights_only=False)
         if int(existing.get("hidden", -1)) == hidden and int(existing.get("bytes_done", 0)) > 0:
+            status_path = root / "status.json"
+            cycle_complete = False
+            if status_path.exists():
+                status = json.loads(status_path.read_text(encoding="utf-8"))
+                cycle_complete = isinstance(status, dict) and status.get("state") == "complete"
             return {
                 "hidden": hidden,
                 "bytes_done": int(existing["bytes_done"]),
                 "goal": existing.get("goal"),
                 "checkpoint": str(path),
                 "seeded": False,
+                "cycle_complete": cycle_complete,
             }
     loaded = torch.load(source, map_location="cpu", weights_only=False)
     current = int(loaded["hidden"])
@@ -265,16 +271,24 @@ def finetune_toward_half(
         "plateau_rejects": 256,
         "log_bytes": 1024 * 1024,
         "score_ceiling": targets,
+        "loss_focus": "skeleton",
         "ledger_path": Path("skeleton/ai/runtime/inference/game_corpus_cycles.json"),
         "log": log,
     }
     saved_goal = seeded.get("goal")
-    if seeded.get("seeded", True):
-        train_kwargs["budget_bytes"] = budget_bytes
-    elif isinstance(saved_goal, int) and not isinstance(saved_goal, bool) and seeded["bytes_done"] < saved_goal:
-        train_kwargs["budget_bytes"] = saved_goal
+    unfinished = (
+        isinstance(saved_goal, int)
+        and not isinstance(saved_goal, bool)
+        and int(seeded["bytes_done"]) < saved_goal
+        and not seeded.get("cycle_complete")
+    )
+    if seeded.get("seeded", True) or not unfinished:
+        if seeded.get("seeded", True):
+            train_kwargs["budget_bytes"] = budget_bytes
+        else:
+            train_kwargs["additional_bytes"] = budget_bytes
     else:
-        train_kwargs["additional_bytes"] = budget_bytes
+        train_kwargs["budget_bytes"] = saved_goal
     receipt = train_budget(**train_kwargs)
     receipt["enterprise"] = enterprise_record(
         baseline=baseline,
