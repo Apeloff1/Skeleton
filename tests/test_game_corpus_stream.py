@@ -107,7 +107,10 @@ def test_track_holdouts_are_outside_the_training_serials():
         "stage",
         "craft",
         "play",
+        "maps",
     } <= set(tracks)
+    assert "sea_map" in TRACKS["maps"]
+    assert "adventure_map" in TRACKS["maps"]
     assert "copyright" in TRACKS["rights"]
     assert "legal" in TRACKS["systems"]
     assert "assets" in TRACKS["visual"]

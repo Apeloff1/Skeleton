@@ -147,6 +147,7 @@ TRACKS: dict[str, tuple[str, ...]] = {
         "netcode",
         "performance",
     ),
+    "maps": ("sea_map", "mountain_map", "cave_map", "elevation_map", "adventure_map"),
 }
 
 TEMPLATES: dict[str, tuple[str, ...]] = {
@@ -453,6 +454,26 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
     "asset_rights": (
         "Pass {n}. The {asset} enters the {place} build only with a {grant} that covers the shipped revision. A preview file is not that grant.",
         "Pass {n}. The {role} traces the {item_color} {item} back to its author and its {grant}. A recolor does not create a new owner.",
+    ),
+    "sea_map": (
+        "Pass {n}. The seamap for the {place} marks deep water, the shore, and the {item} rock. A chart that never meets the shore is not a harbor.",
+        "Pass {n}. The {role} stores the seamap variant beside the {place} chart. A coast change rewrites the seam and the elevation together.",
+    ),
+    "mountain_map": (
+        "Pass {n}. The mountain map for the {place} has a peak, a valley, and a pass. The peak stays higher than the valley on every variant.",
+        "Pass {n}. The {role} marks the cliff at the {place} and the stair that crosses it. A picture of the ridge does not replace that height.",
+    ),
+    "cave_map": (
+        "Pass {n}. The cave map for the {place} starts at one entrance. Every floor cell connects back to that entrance, and a wall is not a step.",
+        "Pass {n}. Depth in the {place} cave is the step count from the mouth. A pool is one step deeper than the floor beside it.",
+    ),
+    "elevation_map": (
+        "Pass {n}. The elevation map for the {place} stores a height on every cell. A walk reads that height, and the drawing does not invent a second one.",
+        "Pass {n}. A ramp, a hill, a valley, a plateau, and a terrace are variants of the same {place} grid. Each cell still has one height.",
+    ),
+    "adventure_map": (
+        "Pass {n}. The adventure map for the {place} links original screens across seams. A height change above one step is a stair, and the return uses the opposite seam.",
+        "Pass {n}. The {role} names each screen on the {place} overworld. A coast, a ridge, and a cave mouth can share the map without copying another game.",
     ),
 }
 

@@ -133,6 +133,11 @@ FOCUS: dict[str, str] = {
     "likeness": "The rule is that a performer face on the {asset} needs written consent for the {place}, and silence is not a {grant}.",
     "music_rights": "The rule is that the {note} cue separates the composition from the recorded take, and only the take named by the {grant} may ship.",
     "asset_rights": "The rule is that the {asset} enters the {place} only with a {grant} for the shipped revision, and a preview file is not that grant.",
+    "sea_map": "The rule is that the seamap of the {place} marks deep water, the shore, and the rock, and a chart with no shore is not a harbor.",
+    "mountain_map": "The rule is that the mountain map of the {place} has a peak, a valley, and a pass, and the peak is higher than the valley.",
+    "cave_map": "The rule is that the cave map of the {place} starts at one entrance and every floor step connects back to that entrance.",
+    "elevation_map": "The rule is that the elevation map of the {place} stores a height on every cell, and a walk uses that height rather than the picture.",
+    "adventure_map": "The rule is that the adventure map of the {place} links screens across seams, and a large height change is a stair rather than a silent step.",
 }
 
 
