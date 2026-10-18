@@ -135,7 +135,9 @@ class Subscription:
         if event.channel not in self.channels:
             return False
         if event.channel == CHANNEL_PRESENCE:
-            return True
+            # Presence is scoped to its verified producer, not public scope metadata.
+            access = self.hub._access.get(event.seq)
+            return access is not None and access.owner == self.principal and access.tenant is None
         if self.job_id is not None and event.job_id != self.job_id:
             return False
         if self.job_grant is not None and event.job_id == self.job_grant:
@@ -443,7 +445,7 @@ class RealtimeHub:
                         )
                     )
             if CHANNEL_PRESENCE in wanted:
-                sub._queue.append(self._snapshot_event_locked())
+                sub._queue.append(self._snapshot_event_locked(principal=principal))
                 sub._events_queued += 1
             self._subs[sub.id] = sub
             active = len(self._subs)
@@ -464,10 +466,12 @@ class RealtimeHub:
         self.slo.set_active_connections(active)
 
     # -- presence ----------------------------------------------------------
-    def _snapshot_event_locked(self, scope: Optional[str] = None) -> RealtimeEvent:
+    def _snapshot_event_locked(self, scope: Optional[str] = None, *, principal: Optional[str] = None) -> RealtimeEvent:
         """Per-subscriber presence.snapshot. Not stored; carries the head id."""
         members = sorted(
-            (m.to_dict() for m in self._presence.values() if scope is None or m.scope == scope),
+            (m.to_dict() for m in self._presence.values()
+             if (scope is None or m.scope == scope)
+             and (principal is None or m.principal == principal)),
             key=lambda m: (m["scope"], m["client_id"]),
         )
         return RealtimeEvent(
@@ -501,7 +505,7 @@ class RealtimeHub:
             self._leave(client_id, principal, scope, reason="left")
         else:
             self._touch(client_id, principal, scope, meta, announce=True)
-        return self.presence_snapshot(scope)
+        return self.presence_snapshot(scope, principal=principal)
 
     def _touch(self, client_id: str, principal: str, scope: str, meta: Optional[Mapping[str, Any]], *, announce: bool) -> PresenceMember:
         clean_meta, hits = self.guard.scrub(meta or {})
@@ -520,7 +524,7 @@ class RealtimeHub:
             member = PresenceMember(client_id, principal, scope, ts_from_ms(now), now, clean_meta)
             self._presence[key] = member
         if announce:
-            self.publish(CHANNEL_PRESENCE, "presence.joined", member.to_dict())
+            self.publish(CHANNEL_PRESENCE, "presence.joined", member.to_dict(), owner=principal)
         return member
 
     def _leave(self, client_id: str, principal: str, scope: str, *, reason: str) -> bool:
@@ -531,7 +535,7 @@ class RealtimeHub:
             del self._presence[(scope, client_id)]
         payload = member.to_dict()
         payload["reason"] = reason
-        self.publish(CHANNEL_PRESENCE, "presence.left", payload)
+        self.publish(CHANNEL_PRESENCE, "presence.left", payload, owner=principal)
         return True
 
     def sweep_presence(self, now_ms: Optional[float] = None) -> List[PresenceMember]:
@@ -546,13 +550,15 @@ class RealtimeHub:
             payload = m.to_dict()
             payload["reason"] = "heartbeat_timeout"
             self.slo.record_presence_timeout()
-            self.publish(CHANNEL_PRESENCE, "presence.left", payload)
+            self.publish(CHANNEL_PRESENCE, "presence.left", payload, owner=m.principal)
         return expired
 
-    def presence_snapshot(self, scope: str = DEFAULT_SCOPE) -> Dict[str, Any]:
+    def presence_snapshot(self, scope: str = DEFAULT_SCOPE, *, principal: Optional[str] = None) -> Dict[str, Any]:
         validate_identifier(scope, "scope")
         with self._lock:
-            members = sorted((m.to_dict() for m in self._presence.values() if m.scope == scope), key=lambda m: m["client_id"])
+            members = sorted((m.to_dict() for m in self._presence.values()
+                              if m.scope == scope and (principal is None or m.principal == principal)),
+                             key=lambda m: m["client_id"])
             head = str(self._seq)
         return {"scope": scope, "members": members, "count": len(members), "head_id": head}
 
