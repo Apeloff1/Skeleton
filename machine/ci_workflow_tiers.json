@@ -2,7 +2,6 @@
   "schema": "skeleton.ci.workflow_tiers.v1",
   "purpose": "fast iteration without falsely clearing specialized acceptance",
   "specialized_manual_only": [
-    "ci.yml",
     "app-assembly.yml",
     "arm64.yml",
     "ai-product-completion.yml",
@@ -27,5 +26,8 @@
     "security_gates_remain_enabled": true,
     "full_p0_signoff_requires_separate_exact_head_evidence": true,
     "fast_merge_gate_not_full_qualification": true
-  }
+  },
+  "required_reusable_workflows": [
+    "ci.yml"
+  ]
 }
