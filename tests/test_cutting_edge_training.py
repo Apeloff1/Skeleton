@@ -20,6 +20,7 @@ from skeleton.cortex.transformer import TinyTransformer
 
 
 def _mouth(**kwargs) -> TinyTransformer:
+    seed = kwargs.pop("seed", 11)
     model = TinyTransformer(
         vocab=("alpha", "beta", "gamma", "delta"),
         dim=8,
@@ -27,7 +28,7 @@ def _mouth(**kwargs) -> TinyTransformer:
         n_heads=2,
         n_layers=1,
         d_ff=16,
-        seed=11,
+        seed=seed,
         **kwargs,
     )
     model.tie()
@@ -153,3 +154,199 @@ def test_numpy_policy_min_p_is_deterministic():
     second = model.infer(request, threading.Event())
     assert first.text == second.text
     assert np.isfinite(model.loss(("zz",)))
+
+
+def test_specialized_calibrate_and_cached_perplexity():
+    model = _mouth(norm="rms", ffn_kind="swiglu")
+    corpus = ["alpha beta gamma delta", "beta gamma alpha delta", "alpha beta gamma"]
+    report = model.specialized_calibrate(corpus, epochs=2, lr=0.03, weight_decay=0.005)
+    assert report["calibrated"] == 1
+    assert report["final_ppl"] <= report["initial_ppl"]
+    ppl_plain = model.perplexity("alpha beta gamma", cached=False)
+    ppl_cached = model.perplexity("alpha beta gamma", cached=True)
+    assert abs(ppl_plain - ppl_cached) < 1e-6
+    gen = model.generate("alpha", n=4, seed=7, min_p=0.5)
+    assert isinstance(gen, (list, tuple)) and len(gen) > 0
+
+
+def test_cooperative_speculative_and_cooperative_gossip():
+    from skeleton.cortex.gossip import adaptive_gossip, cooperative_decode, cooperative_logits
+    from skeleton.cortex.speculative import cooperative_speculative
+
+    v1 = _mouth(seed=11)
+    v2 = _mouth(seed=17)
+    draft = _mouth(norm="rms", ffn_kind="swiglu", seed=23)
+    corpus = ["alpha beta gamma delta", "alpha beta gamma"]
+    v1.fit(corpus, lr=0.04, schedule="cosine")
+    v2.fit(corpus, lr=0.02, schedule="cosine")
+
+    prefix = v1._ids("alpha beta")
+    published, spec_res = cooperative_speculative([v1, v2], draft, prefix, 4, proposals=2, weights=[0.7, 0.3])
+    assert len(published) == 4
+    assert spec_res.proposed >= spec_res.accepted_count
+
+    ens_logits = cooperative_logits([v1, v2], prefix, weights=[0.6, 0.4])
+    assert len(ens_logits) == v1.V
+    decoded = cooperative_decode([v1, v2], "alpha", n=4, seed=3, min_p=0.2)
+    assert isinstance(decoded, str) and len(decoded) > 0
+
+    gossip_res = adaptive_gossip(v2, v1, corpus, max_alpha=0.4)
+    assert gossip_res["dst_ppl_after"] <= gossip_res["dst_ppl_before"] + 1e-6
+
+
+def test_fleet_consensus_and_moe_cooperation():
+    from skeleton.cortex.hive import fleet_consensus
+    from skeleton.cortex.neocortex import JeevesCortex
+
+    p1 = JeevesCortex()
+    p2 = JeevesCortex()
+    p1.transformer.fit(["steady alpha beta gamma trace", "soulslike ttk poise"], lr=0.04, schedule="cosine")
+    p1.sleep.record("steady alpha beta gamma trace", [0.2] * p1.transformer.dim, slack=0.3)
+    summary = fleet_consensus([p1, p2], texts=["steady alpha beta gamma trace"])
+    assert summary["peers"] == 2
+    assert summary["leader_index"] in (0, 1)
+    assert summary["pulls"] >= 0
+
+    coop = p1.moe.cooperate([0.2] * p1.transformer.dim)
+    assert "gates" in coop and "entropy" in coop
+    spoken = p1.cooperative_speak("steady", n=4, seed=2, min_p=0.1)
+    assert isinstance(spoken["text"], str) and abs(sum(spoken["weights"]) - 1.0) < 1e-3
+
+    sleep_res = p1.sleep.consolidate(p1, n=2, lr=0.04, prioritized=True)
+    assert sleep_res.get("prioritized") is True
+
+
+def test_accumulator_cosine_and_weight_decay():
+    from skeleton.cortex.accum import accumulate_fit
+
+    model = _mouth()
+    before = model.perplexity("alpha beta gamma")
+    res = accumulate_fit(
+        model,
+        ["alpha beta gamma delta", "alpha beta gamma"],
+        k=2,
+        lr=0.05,
+        schedule="cosine",
+        weight_decay=0.005,
+    )
+    assert res["schedule"] == "cosine"
+    assert res["flushes"] >= 1
+    assert model.perplexity("alpha beta gamma") <= before
+
+
+def test_neural_trainer_adamw_and_native_transformer_policy(tmp_path):
+    import hashlib
+    import threading
+    from datetime import UTC, datetime
+    from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+    from skeleton.ai.runtime.inference.native_transformer import NativeTransformerModel
+    from skeleton.ai.runtime.training import (
+        DataQualityReport,
+        DataQualityRule,
+        DatasetManifest,
+        DatasetRegistry,
+        DatasetSplit,
+        IngestEnvelope,
+        TrainingRepository,
+        TrainingRunManifest,
+        corpus_digest,
+    )
+    from skeleton.ai.runtime.training.neural_trainer import NeuralLocalTrainer
+
+    now = datetime(2026, 10, 4, 16, tzinfo=UTC)
+    corpus = ("alpha beta", "beta alpha", "alpha beta gamma")
+    datasets = DatasetRegistry(tmp_path / "datasets.sqlite3")
+    ingest = IngestEnvelope.from_bytes(
+        source_id="fixture://adamw-neural",
+        payload="\n".join(corpus).encode(),
+        parser_version="plain@1",
+        classification="internal",
+        rights=("training",),
+        trusted=True,
+        acquired_at=now,
+    )
+    datasets.register_ingest(ingest)
+    dataset = DatasetManifest(
+        dataset_id="adamw-fixture",
+        version="1",
+        splits=(DatasetSplit("train", corpus_digest(corpus), len(corpus)),),
+        source_ingest_digests=(ingest.content_digest,),
+        classification="internal",
+        permitted_uses=("training",),
+        retention_class="model-development",
+        parser_versions=("plain@1",),
+    )
+    datasets.register_dataset(dataset)
+    datasets.record_quality(
+        DataQualityReport.evaluate(
+            dataset.digest,
+            (DataQualityRule("validity", "valid_fraction", ">=", 1.0),),
+            {"valid_fraction": 1.0},
+        )
+    )
+    initial = NeuralLocalTrainer.initialize_model("run-adamw-1", hidden_size=8, seed=7)
+    manifest = TrainingRunManifest(
+        run_id="run-adamw-1",
+        dataset_digest=dataset.digest,
+        base_model_digest=initial.model_digest,
+        code_digest=hashlib.sha256(b"adamw-code").hexdigest(),
+        environment_digest=hashlib.sha256(b"float64-runtime").hexdigest(),
+        seed=7,
+        hyperparameters={},
+        world_size=1,
+        parallelism="single",
+        resource_budget={"max_steps": 10000, "max_updates": 100, "max_documents": 100},
+    )
+    runs = TrainingRepository(tmp_path / "runs.sqlite3")
+    trainer = NeuralLocalTrainer(datasets, runs)
+    trained_model, artifact = trainer.train(
+        manifest,
+        corpus,
+        hidden_size=8,
+        epochs=2,
+        learning_rate=0.05,
+        optimizer="adamw",
+        weight_decay=0.01,
+        now=now,
+    )
+    assert artifact.final_loss < artifact.initial_loss
+    restored_model, restored_artifact = trainer.load_artifact("run-adamw-1")
+    assert restored_model.model_digest == trained_model.model_digest
+    assert restored_artifact.training_receipt_digest == artifact.training_receipt_digest
+
+    native_runtime = NativeLLMRuntime(_mouth(seed=3))
+    native = NativeTransformerModel(native_runtime, model_id="tiny-native")
+    req = LocalInferenceRequest(prompt="alpha", max_output_tokens=3, seed=5, temperature=0.8, min_p=0.2)
+    out = native.infer(req, threading.Event())
+    assert out.output_tokens >= 1
+
+
+def test_traffic_splitter_qos_routing_and_recovery():
+    from skeleton.distributed.mesh.traffic_splitter import TrafficSplitter
+
+    splitter = TrafficSplitter(rng=random.Random(42))
+    splitter.add_backend("fast", weight=100, max_concurrency=2, quality_score=1.0)
+    splitter.add_backend("slow", weight=100, max_concurrency=2, quality_score=0.6)
+
+    for _ in range(25):
+        splitter.record("fast", latency_ms=15.0, error=False)
+        splitter.record("slow", latency_ms=250.0, error=False)
+
+    fast_eff = splitter._backends["fast"].effective_weight(latency_budget_ms=50.0)
+    slow_eff = splitter._backends["slow"].effective_weight(latency_budget_ms=50.0)
+    assert fast_eff > slow_eff * 2.0
+
+    actions = splitter.auto_rebalance(max_error_rate=0.1, max_latency_ms=100.0)
+    assert any(a["backend"] == "slow" and a["reason"] == "high_latency" for a in actions)
+
+    for _ in range(25):
+        splitter.record("slow", latency_ms=20.0, error=False)
+    rec_actions = splitter.auto_rebalance(max_error_rate=0.1, max_latency_ms=100.0, recover=True)
+    assert any(a["backend"] == "slow" and a["reason"] == "recovered" for a in rec_actions)
+
+    b1 = splitter.acquire_route("sess-1")
+    b2 = splitter.acquire_route("sess-2")
+    assert b1 is not None and b2 is not None
+    splitter.release_route(b1, latency_ms=12.0, error=False)
+    splitter.release_route(b2, latency_ms=14.0, error=False)
+

@@ -302,3 +302,143 @@ def review_documents(concept_loss: Mapping[str, float], *, rounds: int = 2) -> t
         for concept in ordered:
             lines.extend(grouped[concept])
     return tuple(lines)
+
+
+def _eval_loss(model: object, documents: Sequence[str]) -> float:
+    if hasattr(model, "loss") and callable(model.loss):
+        return float(model.loss(tuple(documents)))
+    if hasattr(model, "perplexity") and callable(model.perplexity):
+        return float(model.perplexity(tuple(documents)))
+    raise TypeError("self-learn model must expose loss(documents) or perplexity(documents)")
+
+
+def concept_losses(model: object) -> dict[str, float]:
+    """Measure per-concept loss across the holdout-free practice bank."""
+    grouped = practice_by_concept()
+    return {concept: _eval_loss(model, lines) for concept, lines in grouped.items()}
+
+
+def focused_review_documents(
+    concept_loss: Mapping[str, float],
+    *,
+    top_concepts: int = 4,
+    rounds: int = 2,
+    include_tail: bool = True,
+) -> tuple[str, ...]:
+    """Emphasize the weakest concepts with higher repetition while retaining tail coverage."""
+    if isinstance(top_concepts, bool) or not isinstance(top_concepts, int) or top_concepts < 1:
+        raise ValueError("top_concepts must be a positive int")
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or rounds < 1:
+        raise ValueError("rounds must be a positive int")
+    grouped = practice_by_concept()
+    unknown = [name for name in concept_loss if name not in grouped]
+    if unknown:
+        raise ValueError(f"unknown concepts: {unknown}")
+    ordered = review_order(concept_loss)
+    focus = ordered[: min(top_concepts, len(ordered))]
+    tail = ordered[min(top_concepts, len(ordered)) :]
+    lines: list[str] = []
+    for _ in range(rounds):
+        for concept in focus:
+            lines.extend(grouped[concept])
+    if include_tail:
+        for concept in tail:
+            lines.extend(grouped[concept])
+    return tuple(lines)
+
+
+def self_learn_pass(
+    model: object,
+    *,
+    rounds: int = 1,
+    top_concepts: int = 4,
+    learning_rate: float = 0.01,
+    optimizer: str = "adamw",
+    weight_decay: float = 0.01,
+    gradient_clip: float = 1.0,
+    eval_documents: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Execute a closed-loop self-learning review cycle with best-weight retention.
+
+    Evaluates per-concept loss, schedules focused practice on the weakest concepts,
+    trains the learner, and retains the pre-pass weights if evaluation loss does not
+    improve. Held-out lines may be supplied as `eval_documents` for measurement only
+    and are never included in training documents.
+    """
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or not 1 <= rounds <= 16:
+        raise ValueError("rounds must be an int in [1, 16]")
+    if isinstance(top_concepts, bool) or not isinstance(top_concepts, int) or top_concepts < 1:
+        raise ValueError("top_concepts must be a positive int")
+    before_concepts = concept_losses(model)
+    ordered = review_order(before_concepts)
+    weakest = ordered[: min(top_concepts, len(ordered))]
+    schedule = focused_review_documents(
+        before_concepts,
+        top_concepts=top_concepts,
+        rounds=rounds,
+        include_tail=True,
+    )
+    eval_set = tuple(eval_documents) if eval_documents is not None else practice_documents()[:32]
+    if not eval_set:
+        raise ValueError("eval_documents must not be empty")
+    initial_eval = _eval_loss(model, eval_set)
+
+    # Save state for fail-closed best-weight retention.
+    saved_dict = model.to_dict() if hasattr(model, "to_dict") else None
+    saved_snap = model.snapshot() if saved_dict is None and hasattr(model, "snapshot") else None
+
+    if hasattr(model, "train") and hasattr(model, "to_dict"):
+        model.train(
+            schedule,
+            epochs=1,
+            learning_rate=learning_rate,
+            gradient_clip=gradient_clip,
+            optimizer=optimizer,
+            weight_decay=weight_decay,
+        )
+    elif hasattr(model, "specialized_calibrate"):
+        model.specialized_calibrate(
+            schedule,
+            epochs=1,
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            holdout=eval_set,
+        )
+    elif hasattr(model, "fit"):
+        model.fit(schedule, lr=learning_rate, schedule="cosine")
+    else:
+        raise TypeError("unsupported learner model for self_learn_pass")
+
+    candidate_eval = _eval_loss(model, eval_set)
+    kept_best = True
+    if candidate_eval >= initial_eval:
+        kept_best = False
+        if saved_dict is not None:
+            restored = type(model).from_dict(saved_dict)
+            model.embedding = restored.embedding
+            model.recurrent = restored.recurrent
+            model.hidden_bias = restored.hidden_bias
+            model.output = restored.output
+            model.output_bias = restored.output_bias
+        elif saved_snap is not None:
+            restored = type(model).from_snapshot(saved_snap)
+            model.E, model.P, model.Wout, model.bout = restored.E, restored.P, restored.Wout, restored.bout
+            model.layers, model.n_layers = restored.layers, restored.n_layers
+            model.fitted, model.steps = restored.fitted, restored.steps
+            if getattr(model, "tied", False) and hasattr(model, "tie"):
+                model.tie()
+    final_eval = _eval_loss(model, eval_set)
+    after_concepts = concept_losses(model)
+    return {
+        "schema_version": PRACTICE_VERSION,
+        "weakest_concepts": weakest,
+        "scheduled_documents": len(schedule),
+        "initial_eval_loss": initial_eval,
+        "candidate_eval_loss": candidate_eval,
+        "final_eval_loss": final_eval,
+        "improved": final_eval < initial_eval,
+        "kept_candidate": kept_best,
+        "concept_loss_before": before_concepts,
+        "concept_loss_after": after_concepts,
+        "promoted": False,
+    }

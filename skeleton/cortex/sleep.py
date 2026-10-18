@@ -35,6 +35,9 @@ class SleepTrace:
     slack: float = 0.0
     conf: float = 0.0
 
+    def priority(self) -> float:
+        return max(0.05, float(self.conf) + 0.5 * max(0.0, float(self.slack)))
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "stim": self.stim[:160],
@@ -140,13 +143,26 @@ class SleepCycle:
         self.buffer.append(tr)
         return tr
 
-    def consolidate(self, neo, *, n: int = K_REPLAY, lr: float = 0.06) -> Dict[str, Any]:
+    def consolidate(
+        self,
+        neo,
+        *,
+        n: int = K_REPLAY,
+        lr: float = 0.06,
+        prioritized: bool = False,
+    ) -> Dict[str, Any]:
         """Replay. Heads step. Adapters distill. Callosum Hebbs. EMA updates."""
         buf = list(self.buffer)
         if not buf:
             return {"replays": 0, "cycles": self.cycles}
         k = min(max(1, int(n)), len(buf))
-        sample = buf if len(buf) <= k else self._rng.sample(buf, k)
+        if len(buf) <= k:
+            sample = buf
+        elif prioritized:
+            ranked = sorted(buf, key=lambda t: t.priority(), reverse=True)
+            sample = ranked[:k]
+        else:
+            sample = self._rng.sample(buf, k)
         heads_steps = 0
         distills = 0
         hebbs = 0
@@ -175,7 +191,7 @@ class SleepCycle:
                     if ex is not None:
                         ex.distill(h, mixed, lr=lr * 0.5)
                         distills += 1
-                        moe.credit(slot, lr=0.01)
+                        moe.credit(slot, lr=0.01, hidden=h)
             if callosum is not None and "left" in tr.fired and "right" in tr.fired:
                 callosum.hebb(h, lr=0.02)
                 hebbs += 1
@@ -196,6 +212,7 @@ class SleepCycle:
             "hebbs": hebbs,
             "cycles": self.cycles,
             "buffer": len(self.buffer),
+            "prioritized": bool(prioritized),
         }
 
     def prune(self, *, min_conf: float = 0.35) -> int:

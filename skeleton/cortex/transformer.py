@@ -956,28 +956,111 @@ class TinyTransformer:
         self.fitted += len(corpus)
         return n
 
-    def logprob(self, text: str) -> float:
+    def logprob(self, text: str, *, cached: bool = False) -> float:
         ids = self._ids(text)
         if len(ids) < 2:
             return math.log(1.0 / max(1, self.V))
         lp = 0.0
         n = 0
+        cache = KVCache(self.n_layers, self.ctx) if (cached and not self.use_mod) else None
         for i in range(1, len(ids)):
             window = ids[max(0, i - self.ctx):i]
-            p = softmax(self._logits(window))
+            logits = self._logits_window(window, cache) if cache is not None else self._logits(window)
+            p = softmax(logits)
             lp += math.log(max(p[ids[i]], 1e-12))
             n += 1
         return lp / max(1, n)
 
-    def perplexity(self, texts: Iterable[str] | str) -> float:
+    def perplexity(self, texts: Iterable[str] | str, *, cached: bool = False) -> float:
         if isinstance(texts, str):
             seq = [texts]
         else:
             seq = [t for t in texts if t]
         if not seq:
             return float(self.V)
-        mean = sum(self.logprob(t) for t in seq) / len(seq)
+        mean = sum(self.logprob(t, cached=cached) for t in seq) / len(seq)
         return math.exp(-mean)
+
+    def _apply_weight_decay(self, factor: float) -> None:
+        if factor == 1.0:
+            return
+        for row in self.E:
+            for d in range(len(row)):
+                row[d] *= factor
+        if not self.tied:
+            for row in self.Wout:
+                for d in range(len(row)):
+                    row[d] *= factor
+        for layer in self.layers:
+            for mat in (layer.Wq, layer.Wk, layer.Wv, layer.Wo, layer.W1, layer.Wu, layer.W2):
+                for row in mat:
+                    for d in range(len(row)):
+                        row[d] *= factor
+
+    def specialized_calibrate(
+        self,
+        texts: Iterable[str],
+        *,
+        epochs: int = 2,
+        lr: float = 0.03,
+        weight_decay: float = 0.005,
+        holdout: Iterable[str] | None = None,
+    ) -> Dict[str, Any]:
+        """Coherence-gated specialization pass with decoupled weight decay and best-snapshot retention."""
+        if isinstance(epochs, bool) or not isinstance(epochs, int) or not 1 <= epochs <= 64:
+            raise ValueError("epochs must be an integer in [1, 64]")
+        if isinstance(lr, bool) or not isinstance(lr, (int, float)) or not math.isfinite(float(lr)) or not 0 < float(lr) <= 1.0:
+            raise ValueError("lr must be finite and in (0, 1]")
+        if isinstance(weight_decay, bool) or not isinstance(weight_decay, (int, float)) or not math.isfinite(float(weight_decay)) or not 0.0 <= float(weight_decay) <= 0.5:
+            raise ValueError("weight_decay must be finite and in [0, 0.5]")
+        corpus = [t for t in texts if isinstance(t, str) and t.strip()]
+        eval_corpus = [t for t in (holdout if holdout is not None else corpus) if isinstance(t, str) and t.strip()]
+        if not corpus or not eval_corpus:
+            return {"calibrated": 0, "reason": "empty-corpus"}
+        initial_ppl = self.perplexity(eval_corpus)
+        best_ppl = initial_ppl
+        best_snap = self.snapshot()
+        windows: List[Tuple[List[int], int]] = []
+        for raw in corpus:
+            ids = self._ids(raw)
+            if len(ids) < 2:
+                continue
+            for i in range(1, len(ids)):
+                windows.append((ids[max(0, i - self.ctx):i], ids[i]))
+        if not windows:
+            return {"calibrated": 0, "reason": "no-token-windows", "initial_ppl": initial_ppl, "final_ppl": initial_ppl}
+        total_steps = max(1, epochs * len(windows))
+        step_idx = 0
+        kept_epoch = 0
+        for ep in range(1, epochs + 1):
+            for window, target in windows:
+                eta = cosine_lr(step_idx, total_steps, base=float(lr), floor=float(lr) * 0.1)
+                if weight_decay > 0.0 and self._accel is None:
+                    self._apply_weight_decay(1.0 - eta * float(weight_decay))
+                self._sgd(window, target, eta)
+                step_idx += 1
+            self.fitted += len(corpus)
+            cand_ppl = self.perplexity(eval_corpus)
+            if math.isfinite(cand_ppl) and cand_ppl < best_ppl:
+                best_ppl = cand_ppl
+                best_snap = self.snapshot()
+                kept_epoch = ep
+        if best_ppl <= initial_ppl:
+            restored = type(self).from_snapshot(best_snap)
+            self.E, self.P, self.Wout, self.bout = restored.E, restored.P, restored.Wout, restored.bout
+            self.layers, self.n_layers = restored.layers, restored.n_layers
+            self.fitted, self.steps = restored.fitted, restored.steps
+            if self.tied:
+                self.tie()
+            if self._accel is not None:
+                self._accel.pin()
+        return {
+            "calibrated": 1 if best_ppl < initial_ppl else 0,
+            "initial_ppl": round(initial_ppl, 6),
+            "final_ppl": round(best_ppl, 6),
+            "kept_epoch": kept_epoch,
+            "steps": step_idx,
+        }
 
     def adamw_sequence(
         self,
@@ -1071,6 +1154,7 @@ class TinyTransformer:
         temperature: float = 1.0,
         top_k: int = 0,
         top_p: float = 1.0,
+        min_p: float = 0.0,
         use_cache: bool = True,
     ) -> Tuple[str, ...]:
         """Return exactly n new tokens, excluding the conditioning prefix."""
@@ -1088,7 +1172,7 @@ class TinyTransformer:
             window = out[-self.ctx:]
             logits = self._logits_window(window, cache)
             nxt = sample_logits(
-                logits, rng, temperature=temperature, top_k=top_k, top_p=top_p,
+                logits, rng, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p,
             )
             out.append(int(nxt))
             generated.append(int(nxt))

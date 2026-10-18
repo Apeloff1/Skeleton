@@ -840,6 +840,48 @@ class JeevesCortex:
             return str(xf.decode(stimulus or "", n=n, seed=seed))
         return " ".join(xf.generate(stimulus or "", n=n, seed=seed))
 
+    def cooperative_speak(
+        self,
+        stimulus: str,
+        *,
+        n: int = 12,
+        seed: int = 0,
+        min_p: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Cooperatively decode across speaking and RMS mouths weighted by inverse perplexity."""
+        import math
+        from skeleton.cortex.curriculum import CORE_PAIRS
+        from skeleton.cortex.gossip import cooperative_decode
+
+        xf = self.transformer
+        rms = getattr(self, "neo_rms", None)
+        if xf is None:
+            return {"text": "", "mouths": [], "weights": []}
+        if rms is None or int(getattr(xf, "V", -1)) != int(getattr(rms, "V", -2)):
+            text = self.speak(stimulus, n=n, seed=seed)
+            return {"text": text, "mouths": ["neo"], "weights": [1.0]}
+        probe_texts = [a for a, _ in list(CORE_PAIRS)[:4]] or [stimulus or "soulslike ttk"]
+        ppl_xf = float(xf.perplexity(probe_texts))
+        ppl_rms = float(rms.perplexity(probe_texts))
+        w_xf = 1.0 / max(ppl_xf if math.isfinite(ppl_xf) else 1e6, 1e-6)
+        w_rms = 1.0 / max(ppl_rms if math.isfinite(ppl_rms) else 1e6, 1e-6)
+        total = w_xf + w_rms
+        weights = [w_xf / total, w_rms / total]
+        text = cooperative_decode(
+            (xf, rms),
+            stimulus or "",
+            n=n,
+            seed=seed,
+            weights=weights,
+            min_p=min_p,
+        )
+        return {
+            "text": text,
+            "mouths": ["neo", "neo_rms"],
+            "weights": [round(w, 4) for w in weights],
+            "ppl": {"neo": round(ppl_xf, 4), "neo_rms": round(ppl_rms, 4)},
+        }
+
     def beam(self, stimulus: str, *, n: int = 8, width: int = 4, mouth: str = "gelu") -> Dict[str, Any]:
         xf = self.mouth(mouth)
         if xf is None:

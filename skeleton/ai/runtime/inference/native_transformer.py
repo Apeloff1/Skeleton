@@ -85,14 +85,35 @@ class NativeTransformerModel:
         prompt = request.rendered_input
         prompt_sequence = self.runtime.encode(prompt)
         started = time.perf_counter()
-        stream = self.runtime.stream(
-            prompt,
+        default_policy = (
+            request.temperature == 1.0
+            and request.top_k == 0
+            and request.top_p == 1.0
+            and request.min_p == 0.0
+            and request.repetition_penalty == 1.0
+        )
+        config = (
             GenerationConfig(
                 max_new_tokens=request.max_output_tokens,
                 seed=request.seed,
                 temperature=0.0,
                 use_cache=True,
-            ),
+            )
+            if default_policy
+            else GenerationConfig(
+                max_new_tokens=request.max_output_tokens,
+                seed=request.seed,
+                temperature=request.temperature,
+                top_k=request.top_k,
+                top_p=request.top_p,
+                min_p=request.min_p,
+                repetition_penalty=request.repetition_penalty,
+                use_cache=True,
+            )
+        )
+        stream = self.runtime.stream(
+            prompt,
+            config,
         )
         for _event in stream:
             if cancel.is_set():
