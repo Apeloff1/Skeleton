@@ -19,6 +19,7 @@ import time
 from typing import Annotated, Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StringConstraints, model_validator
 
 from routes.gameforge_auth import get_current_user
@@ -1217,7 +1218,7 @@ def native_world_codex_story(
         return {
             "ok": True,
             "actual_decisions": list(body.decisions),
-            "original_story_world": story_report(source, narrative),
+            "original_story_world": jsonable_encoder(story_report(source, narrative)),
         }
     except ValueError:
         raise HTTPException(
@@ -1729,7 +1730,7 @@ def native_original_mechanics_preview(
         return {
             "ok": True,
             "program": asdict(program),
-            "initial_game_state": asdict(state),
+            "initial_game_state": jsonable_encoder(asdict(state)),
             "playable_actions": choices(program, state),
             "causal_gameplay_proofs": demonstrate_mechanics(program),
             "fixed_win_required": False,
@@ -1760,7 +1761,7 @@ def native_original_mechanics_play(
             "program_index": program.decimal_index,
             "source_digest": program.source_digest,
             "played_actions": list(body.moves),
-            "current_game_state": asdict(state),
+            "current_game_state": jsonable_encoder(asdict(state)),
             "available_actions": choices(program, state),
             "playable_after_endings": True,
             "claim": "real original game-state choices, no mandatory world victory",
@@ -1983,7 +1984,7 @@ def native_living_world_indexed_design(
         raise HTTPException(
             status_code=422, detail="Requested original game address has no valid replayable route"
         ) from None
-    return {"ok": True, **report}
+    return {"ok": True, **jsonable_encoder(report)}
 
 
 class NativeAtlasWorldRequest(BaseModel):
