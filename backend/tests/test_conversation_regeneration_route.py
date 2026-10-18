@@ -289,7 +289,10 @@ async def test_regenerate_route_rejects_stale_version_before_engine_resolution(
     thread, _user_message, assistant = _conversation()
     engine_resolutions = []
 
-    async def get_thread(*_args, **_kwargs):
+    async def regeneration_request(*_args, **_kwargs):
+        return None
+
+    async def authorize_active_thread(*_args, **_kwargs):
         return thread
 
     async def forbidden_list(*_args, **_kwargs):
@@ -307,8 +310,9 @@ async def test_regenerate_route_rejects_stale_version_before_engine_resolution(
         route,
         "conversation_authority",
         SimpleNamespace(
-            get_thread=get_thread,
-            list_messages=forbidden_list,
+            regeneration_request=regeneration_request,
+            authorize_active_thread=authorize_active_thread,
+            active_transcript=forbidden_list,
         ),
     )
     monkeypatch.setattr(
