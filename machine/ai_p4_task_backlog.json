@@ -22,7 +22,8 @@
         "skeleton/p4/production.py",
         "tests/flgb/test_p4_production.py",
         "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P4-RIGHTS-01",
@@ -42,7 +43,8 @@
         "skeleton/p4/production.py",
         "tests/flgb/test_p4_production.py",
         "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P4-LIFECYCLE-01",
@@ -64,7 +66,8 @@
         "skeleton/p4/production.py",
         "tests/flgb/test_p4_production.py",
         "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P4-SANDBOX-01",
@@ -84,7 +87,8 @@
         "skeleton/p4/production.py",
         "tests/flgb/test_p4_production.py",
         "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P4-LOCALITY-01",
@@ -106,7 +110,8 @@
         "skeleton/p4/production.py",
         "tests/flgb/test_p4_production.py",
         "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P4-CACHE-01",
@@ -129,7 +134,8 @@
         "skeleton/p4/production.py",
         "tests/flgb/test_p4_production.py",
         "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
-      ]
+      ],
+      "handled_pass": "2026-10-17"
     }
   ],
   "summary": {

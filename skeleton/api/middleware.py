@@ -164,6 +164,7 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/capabilities", "capabilities"),
     ("/api/v1/interface", "interface"),
     ("/api/v1/auth", "auth"),
+    ("/api/v1/projects", "projects"),
     ("/api/v1/cortex", "cognition"),
     ("/api/v1/health", "observability"),
     ("/api/v1/metrics", "observability"),
@@ -241,6 +242,35 @@ class GatePolicy:
                 return domain
         return None
 
+    def register_domain(self, prefix: str, domain: str) -> None:
+        """Extend-only: charter one more route prefix after construction.
+
+        Used by mount helpers (e.g. :func:`skeleton.api.agent_edge_mount.install_agent_edge`)
+        that fold a sub-surface into an app whose gate stack is already
+        installed. Never unseals anything: the root prefix and open probe
+        prefixes are refused, and an existing prefix cannot be re-chartered to
+        a different domain.
+        """
+        if not isinstance(prefix, str) or not prefix.startswith("/"):
+            raise ValueError("domain prefix must be an absolute path")
+        pref = prefix.rstrip("/")
+        if not pref:
+            raise ValueError("refusing to charter the root path as a domain")
+        if not isinstance(domain, str) or not domain.strip():
+            raise ValueError("domain must be a non-empty string")
+        if self.is_open_route(pref):
+            raise ValueError(f"refusing to charter open probe prefix {pref!r}")
+        for existing_prefix, existing_domain in self._domains:
+            if existing_prefix.rstrip("/") == pref:
+                if existing_domain != domain:
+                    raise ValueError(
+                        f"prefix {pref!r} already chartered to domain {existing_domain!r}"
+                    )
+                return
+        self._domains = tuple(
+            sorted(self._domains + ((pref, domain),), key=lambda pd: len(pd[0]), reverse=True)
+        )
+
     def body_limit(self, path: str, default: int) -> int:
         """Return the narrowest declared request-body ceiling for one route."""
 
@@ -306,9 +336,11 @@ class RequestSealMiddleware:
             return
 
         # Fail-closed credential seal (#16 HMAC) on non-open routes.
-        from skeleton.api.hmac_seal import _resolve_secret, verify_seal
+        from skeleton.api.hmac_seal import _resolve_secret, load_keyring, verify_seal
 
-        if not _resolve_secret():
+        # Gate on primary secret OR rotatable keyring (keyring-only deployments
+        # must verify, not 503). verify_seal already accepts ring keys.
+        if not _resolve_secret() and not load_keyring():
             resp = _json_response(503, {"error": "seal_unavailable"})
             await resp(scope, receive, send_with_seal)
             return
@@ -576,4 +608,10 @@ def install_gate(
     )
     app.add_middleware(RequestSealMiddleware, policy=policy)
     app.add_middleware(HeaderBoundMiddleware)
+    # Expose the live policy so extend-only mount helpers (install_agent_edge)
+    # can charter their prefix on the same gate stack.
+    try:
+        app.state.gate_policy = policy
+    except AttributeError:  # pragma: no cover - non-Starlette app objects
+        pass
     return app
