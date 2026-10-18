@@ -105,11 +105,14 @@ def audit(root: Path = ROOT) -> list[str]:
         failures.append(f"Merge Readiness missing ({exc})")
     try:
         backend = (root / WORKFLOWS / "backend-quality.yml").read_text(encoding="utf-8")
+        # Backend Quality declares defaults.run.working-directory: backend.
+        # Scanner commands are correctly relative to that working directory;
+        # require the actual invocations rather than impossible backend/backend paths.
         for required in (
             "python scripts/check_ci_workflow_tiers.py",
-            "python backend/scripts/check_workflow_permissions.py",
+            "python scripts/check_workflow_permissions.py",
             "python scripts/check_repository_python_sast.py",
-            "python backend/scripts/check_malware_iocs.py",
+            "python scripts/check_malware_iocs.py",
         ):
             if required not in backend:
                 failures.append(f"Backend Quality missing scan: {required}")
