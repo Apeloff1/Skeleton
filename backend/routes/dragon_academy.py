@@ -938,7 +938,9 @@ def native_living_world_restore(
     try:
         with sqlite3.connect(str(_database_path()), timeout=5) as db:
             db.execute("PRAGMA busy_timeout=5000")
-            return {"ok": True, **restore(db, world, owner, body.slot)}
+            # Match the actual JSON response when invoked directly as well as
+            # through FastAPI: persisted tuples are projected as JSON arrays.
+            return {"ok": True, **jsonable_encoder(restore(db, world, owner, body.slot))}
     except FileNotFoundError:
         raise HTTPException(
             status_code=404, detail="No original game save exists in this user's slot"

@@ -68,9 +68,10 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
                 app.include_router(router)
             ok += 1
         except Exception as exc:
-            detail = f"{type(exc).__name__}: {exc}"
-            if len(detail) > 300:
-                detail = detail[:297] + "..."
+            # Import exceptions can contain credentials, tokens, filesystem paths
+            # and even raw remote payloads. Report only the exception class;
+            # skipped_names may reach status endpoints and log aggregation.
+            detail = type(exc).__name__
             skipped_names.append(f"{module_path} (import_failed {detail})")
             print(
                 f"[BOOT] route import SKIPPED: {module_path} -> import_failed {detail}",
