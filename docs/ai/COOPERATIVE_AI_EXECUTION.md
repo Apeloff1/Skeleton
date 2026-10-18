@@ -16,9 +16,12 @@ A model revising an answer does not establish that it built or played a game.
 ## Enable review for a response
 
 The chat control is **off by default**. Enable **Review and refine** before
-sending the request. The current UI preset uses one critique/refinement round,
-a 512-token stage ceiling and the configured selected model. It does not
-silently activate every installed model or add a cloud provider.
+sending the request. The default preset uses one critique/refinement round,
+a 512-token stage ceiling and the configured selected model. Open **Advanced**
+to choose one to three rounds, a 64–4,096-token stage ceiling, and an exact
+available model for each role. The inventory shows current model capacities.
+Unavailable selections remain visible and block a new send until corrected.
+Changing settings performs no inference and does not activate providers.
 
 The feature requires model readiness, sufficient context and at least 256 total
 answer tokens for that four-stage preset. If unavailable, inspect readiness or
@@ -87,7 +90,9 @@ Copy both IDs from the available inventory; the placeholder pair is not a
 runnable model. Unspecified roles retain the primary selection. An override
 applies to that role in every configured round. The same model may perform all
 four roles. Different names or models do not certify independent review,
-accuracy or improved quality. Unknown fields and incomplete role selections
+accuracy or improved quality. A matching activated local model digest is also
+refused for independent semantic verification; a different digest alone does
+not establish universal weight independence. Unknown fields and incomplete role selections
 are refused.
 
 ## One budget across generation and verification
