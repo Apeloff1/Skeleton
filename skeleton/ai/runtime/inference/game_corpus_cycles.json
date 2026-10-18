@@ -361,5 +361,70 @@
       "gap": 0.02968752384185791
     },
     "source_digest": "9121fca460dd2d4e014d7a57659e932f19f0577b5672a71fa24c3d964c039a78"
+  },
+  {
+    "schema": "skeleton.game_coherent_english.v1",
+    "bytes_trained": 313347,
+    "cycle_start": 0,
+    "cycle_bytes": 313347,
+    "goal": 1000000000000,
+    "official_tracks": {
+      "visual": 1.5024384655516598,
+      "narrative": 1.4633808168149796,
+      "systems": 1.4968191332411533,
+      "review": 1.4973368152143198,
+      "practice": 1.4867418727860693,
+      "rights": 1.603466478101145,
+      "sound": 1.5302591436776942,
+      "stage": 1.501610734736527,
+      "craft": 1.421799442667733,
+      "play": 1.5621899496180067
+    },
+    "torch_best_tracks": {
+      "visual": 1.5024385452270508,
+      "narrative": 1.4633809328079224,
+      "systems": 1.4968193769454956,
+      "review": 1.4973368644714355,
+      "practice": 1.4867419004440308,
+      "rights": 1.603466510772705,
+      "sound": 1.5302590131759644,
+      "stage": 1.5016107559204102,
+      "craft": 1.4217994213104248,
+      "play": 1.5621898174285889
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 0,
+      "rejects": 32,
+      "accept_rate": 0.0
+    },
+    "model_digest": "aec9f79614ec2b80bf0711744632cd85bdbe07b39723cd06ddecf38b915832b5",
+    "seconds": 29.267,
+    "loss_focus": null,
+    "selection": "trillion-english",
+    "promotion": false,
+    "words_trained": 57308,
+    "words_kept": 0,
+    "token_count": 57322,
+    "language": "english",
+    "passages": 512,
+    "domains": 70,
+    "coherence_before": {
+      "ordered_nll": 1.8133615255355835,
+      "contradiction_nll": 1.8430490493774414,
+      "gap": 0.02968752384185791
+    },
+    "coherence_after": {
+      "ordered_nll": 1.8133615255355835,
+      "contradiction_nll": 1.8430490493774414,
+      "gap": 0.02968752384185791
+    },
+    "source_digest": "aec9f79614ec2b80bf0711744632cd85bdbe07b39723cd06ddecf38b915832b5",
+    "stop_reason": "plateau",
+    "budget_met": false,
+    "words_per_second": 1958.1098165168962,
+    "projected_seconds": 510696586.8639631
   }
 ]
