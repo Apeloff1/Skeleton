@@ -265,7 +265,8 @@ def codex_cell(address:CodexAddress,state:CodexState,
         island=local<sky
         # Aerial navigability and encounter cost respond to actual controls,
         # player route achievements and cell position, not a cosmetic label.
-        reachable=(island and (bridges>=128 or lift>=96 or
+        glider_trained=state.axis_mastery[128+EXTENSION_AXIS_INDEX["glider_lift"]]>=2
+        reachable=(island and (bridges>=128 or glider_trained or
                    "cross_sky_islands" in state.opened_gates))
         base["aerial_topology"]={
             "sky_island_present":island,
