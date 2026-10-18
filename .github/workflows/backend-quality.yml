@@ -186,7 +186,7 @@ jobs:
           PYTHONPATH=. python -m pytest -q --noconftest tests/test_instruction_policy_boundary.py
       - name: Security scanner surface preflight
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_security_scan_surface.py
+        run: python scripts/check_security_scan_surface.py
       - name: Defense control-plane contract
         if: steps.scope.outputs.full == 'true'
         working-directory: .
