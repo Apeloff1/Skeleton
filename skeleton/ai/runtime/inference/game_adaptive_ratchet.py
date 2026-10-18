@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import os
 import time
 from collections.abc import Mapping
@@ -60,12 +61,20 @@ class AdaptiveRatchet:
         if accepted:
             self.accepts += 1
             smallest = min(gains.values())
+            # The bar only rises, and it is capped so later real gains can still pass.
             self.margin = min(self.margin_cap, max(self.margin, smallest * 0.25))
-            self.scale = max(self.min_scale, self.scale * 0.998)
         else:
             self.rejects += 1
-            self.scale = max(self.min_scale, self.scale * 0.9)
         return accepted
+
+    def tighten(self, bytes_done: int, budget_bytes: int) -> float:
+        """Cosine step scale from 1 at the start of the budget to the floor at the end."""
+        if budget_bytes < 1:
+            raise ValueError("budget_bytes must be positive")
+        progress = min(1.0, max(0.0, bytes_done / budget_bytes))
+        scheduled = self.min_scale + (1.0 - self.min_scale) * 0.5 * (1.0 + math.cos(math.pi * progress))
+        self.scale = min(self.scale, scheduled)
+        return self.scale
 
     def snapshot(self) -> dict[str, float | int]:
         return {
@@ -202,9 +211,10 @@ def train_budget(
         model.load_state_dict(saved["model"])
         opt.load_state_dict(saved["optimizer"])
         ratchet.margin = float(saved["ratchet"]["margin"])
-        ratchet.scale = float(saved["ratchet"]["scale"])
         ratchet.accepts = int(saved["ratchet"]["accepts"])
         ratchet.rejects = int(saved["ratchet"]["rejects"])
+        # The schedule owns the step scale. A resumed run does not keep a collapsed value.
+        ratchet.scale = 1.0
         bytes_done = int(saved["bytes_done"])
         best_state = saved["best_state"]
         model.load_state_dict(best_state)
@@ -247,6 +257,7 @@ def train_budget(
         before = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
         opt_state = copy.deepcopy(opt.state_dict())
         warmup = min(1.0, max(bytes_done, 1) / WARMUP_BYTES)
+        ratchet.tighten(bytes_done, budget_bytes)
         opt.param_groups[0]["lr"] = ADAMW_LR * warmup * ratchet.scale
         loss = _batch_loss(model, [text for _domain, text in batch])
         opt.zero_grad(set_to_none=True)

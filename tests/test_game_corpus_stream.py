@@ -90,13 +90,13 @@ def test_ratchet_tightens_and_does_not_loosen():
     before = {"visual": 2.0, "narrative": 2.0, "systems": 2.0}
     assert ratchet.observe(before, {name: 1.5 for name in before}) is True
     tightened_margin = ratchet.margin
-    tightened_scale = ratchet.scale
     assert tightened_margin > 0
-    assert tightened_scale < 1
     tiny = {name: before[name] - tightened_margin / 2 for name in before}
     assert ratchet.observe(before, tiny) is False
     assert ratchet.margin == tightened_margin
-    assert ratchet.scale < tightened_scale
+    assert ratchet.tighten(0, 100) > ratchet.tighten(50, 100) > ratchet.tighten(100, 100)
+    assert ratchet.tighten(0, 100) == ratchet.scale
+    assert ratchet.scale == ratchet.min_scale
 
 
 def test_a_short_budget_trains_without_promoting():
