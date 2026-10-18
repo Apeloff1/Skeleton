@@ -25,6 +25,7 @@ For code that doesn't know up-front which DB a collection lives in, use the
 """
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -42,6 +43,20 @@ CORE_DB_NAME: str = _DB_NAME
 CONTENT_DB_NAME: str = f"{_DB_NAME}_content"
 SWARM_DB_NAME: str = f"{_DB_NAME}_swarm"
 
+class _ActiveLoopMotorClient(AsyncIOMotorClient):
+    """Reuse one PyMongo pool while binding each async request to its own loop.
+
+    Motor 3.7 caches the first event loop on a normal AsyncIOMotorClient. When
+    a TestClient/lifespan restart closes that loop, the same global database
+    handles otherwise schedule futures on a closed loop. Motor collection and
+    database operations delegate get_io_loop() to their owning client; using
+    the active loop preserves the canonical Mongo client and database owners.
+    """
+
+    def get_io_loop(self):
+        return asyncio.get_running_loop()
+
+
 # Single shared async client for all three logical databases.
 # ★ DEPLOYMENT FIX (2026-02): K8s liveness/readiness probes were timing out
 # because Motor was attempting eager SRV DNS resolution at module import time
@@ -49,7 +64,7 @@ SWARM_DB_NAME: str = f"{_DB_NAME}_swarm"
 # aggressive timeouts ensure failures fast-fail to JSON 5xx instead of hanging
 # the event loop. The values below preserve normal operation while keeping
 # import-time work essentially zero.
-client: AsyncIOMotorClient = AsyncIOMotorClient(
+client: AsyncIOMotorClient = _ActiveLoopMotorClient(
     MONGO_URL,
     maxPoolSize=100,
     minPoolSize=0,                       # don't pre-warm pool at startup
