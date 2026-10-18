@@ -332,7 +332,7 @@ def _lessons() -> list[tuple[str, str]]:
             rows.append(
                 (
                     "console_rom",
-                    f"A {console_name} build verifies its ROM header checksum and OAM scanline sprite budget alongside the {byte_rule} asset table.",
+                    f"A {console_name} build triggers the {role} to verify the ROM header checksum and OAM scanline sprite budget alongside the {byte_rule} asset table.",
                 )
             )
     return rows

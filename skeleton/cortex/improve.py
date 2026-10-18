@@ -303,7 +303,7 @@ def train_console_rom_assets(
                 numbers=(float(bpp), float(bpt), float(sprites), 0.88),
                 confidence=0.92,
                 seen=rounds,
-                tokens=tokens(stim + " " + " ".join(CONSOLE_ROM_ASSET_ASPECTS.get(key, ()))),
+                tokens=tokens(stim),
             )
             own.ingest(ab, stim)
             ingested_exemplars += 1

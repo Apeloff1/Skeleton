@@ -95,9 +95,6 @@ class NativeTransformerModel:
         if cancel.is_set():
             raise LocalInferenceCancelled("local generation cancelled")
 
-        self._assert_identity()
-        prompt = request.rendered_input
-        prompt_sequence = self.runtime.encode(prompt)
         started = time.perf_counter()
         default_policy = (
             request.temperature == 1.0
@@ -125,10 +122,14 @@ class NativeTransformerModel:
                 use_cache=True,
             )
         )
+        prompt = request.rendered_input
+        prompt_sequence: tuple[int, ...] = ()
         stream = None
         result = None
         active_runtime = self.runtime
         try:
+            self._assert_identity()
+            prompt_sequence = self.runtime.encode(prompt)
             stream = self.runtime.stream(
                 prompt,
                 config,
@@ -148,6 +149,7 @@ class NativeTransformerModel:
             self.backup_runtime.tokenizer.assert_unchanged()
             self.backup_runtime.assert_model_unchanged()
             active_runtime = self.backup_runtime
+            prompt_sequence = self.backup_runtime.encode(prompt)
             b_stream = self.backup_runtime.stream(prompt, config)
             for _event in b_stream:
                 if cancel.is_set():
