@@ -250,6 +250,37 @@ def test_extended_codex_impact_endpoint_checks_both_art_and_world_paths():
     assert not result["tiles"]["hardware_binary_compiled"]
 
 
+def test_advanced_world_exports_extended_c99_game_and_terrain_chunks():
+    from skeleton.ai.webcrawler.dragon_world_codex import edit
+    from skeleton.ai.webcrawler.dragon_codex_desktop import emit_codex_c99,inspect_c99_source
+    from skeleton.ai.webcrawler.dragon_codex_platforms import (
+        compile_content,content_pack,verify_content_pack,
+    )
+    address=edit("0",{
+        "sky_islands":255,"cloud_oceans":110,"wind_shear":140,
+        "skybridge_density":50,"glider_lift":200,
+        "npc_population_density":175,"volumetric_lighting":120,
+    })
+    project=emit_codex_c99(address)
+    assert "#define AXES 192" in project.source
+    assert "#define DOMAINS 24" in project.source
+    assert "cross_sky_islands" in project.source
+    assert "skills[160]<2" in project.source
+    assert "sky_altitude++" in project.source
+    assert inspect_c99_source(address,project)["verified_source"]
+    assert not project.actual_native_binary_produced
+    plan=compile_content(address,"pc_windows")
+    assert plan.original_axis_count==192
+    assert "aerial_realms" in plan.chosen_domain_names
+    assert "sky_islands" in plan.chosen_axes
+    packet=content_pack(address,"pc_windows",chunks=2)
+    assert verify_content_pack(address,packet)["verified"]
+    rooms=[item for chunk in packet["chunks"] for item in chunk["rooms"]]
+    assert any(room["sky_island"] for room in rooms)
+    assert any("glide" in room["entrances"] for room in rooms)
+    assert packet["native_binary"] is None
+
+
 def test_extended_axes_refuse_non_canonical_and_forged_identities():
     from dataclasses import replace
     from skeleton.ai.webcrawler.dragon_world_codex import (
