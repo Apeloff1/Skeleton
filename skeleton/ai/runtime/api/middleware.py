@@ -239,6 +239,35 @@ class GatePolicy:
                 return domain
         return None
 
+    def register_domain(self, prefix: str, domain: str) -> None:
+        """Extend-only: charter one more route prefix after construction.
+
+        Used by mount helpers (e.g. :func:`skeleton.api.agent_edge_mount.install_agent_edge`)
+        that fold a sub-surface into an app whose gate stack is already
+        installed. Never unseals anything: the root prefix and open probe
+        prefixes are refused, and an existing prefix cannot be re-chartered to
+        a different domain.
+        """
+        if not isinstance(prefix, str) or not prefix.startswith("/"):
+            raise ValueError("domain prefix must be an absolute path")
+        pref = prefix.rstrip("/")
+        if not pref:
+            raise ValueError("refusing to charter the root path as a domain")
+        if not isinstance(domain, str) or not domain.strip():
+            raise ValueError("domain must be a non-empty string")
+        if self.is_open_route(pref):
+            raise ValueError(f"refusing to charter open probe prefix {pref!r}")
+        for existing_prefix, existing_domain in self._domains:
+            if existing_prefix.rstrip("/") == pref:
+                if existing_domain != domain:
+                    raise ValueError(
+                        f"prefix {pref!r} already chartered to domain {existing_domain!r}"
+                    )
+                return
+        self._domains = tuple(
+            sorted(self._domains + ((pref, domain),), key=lambda pd: len(pd[0]), reverse=True)
+        )
+
     def body_limit(self, path: str, default: int) -> int:
         """Return the narrowest declared request-body ceiling for one route."""
 
@@ -574,4 +603,10 @@ def install_gate(
     )
     app.add_middleware(RequestSealMiddleware, policy=policy)
     app.add_middleware(HeaderBoundMiddleware)
+    # Expose the live policy so extend-only mount helpers (install_agent_edge)
+    # can charter their prefix on the same gate stack.
+    try:
+        app.state.gate_policy = policy
+    except AttributeError:  # pragma: no cover - non-Starlette app objects
+        pass
     return app

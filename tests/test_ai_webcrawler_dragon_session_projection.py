@@ -41,3 +41,17 @@ def test_corrupt_crawl_chain_fails_closed():
     db.commit()
     with pytest.raises(ValueError,match="integrity"):
         bridge.read("owner-a",authorized=True)
+
+
+def test_feed_cursor_must_match_the_digest_it_claims():
+    db=sqlite3.connect(":memory:")
+    bridge=DragonSessionProjection(db)
+    bridge.attach("owner-a","session-1",authorized=True,at=1)
+    first=bridge.journal.append("session-1","fetch_started","https://example.org",at=2)
+    second=bridge.journal.append("session-1","fetch_received","https://example.org",at=3)
+    page=bridge.read("owner-a",authorized=True,after_sequence=1,limit=10,expected_digest=first.digest)
+    assert [event["digest"] for event in page.events]==[second.digest]
+    with pytest.raises(ValueError,match="journal head"):
+        bridge.read("owner-a",authorized=True,after_sequence=1,expected_digest="ab"*32)
+    with pytest.raises(ValueError,match="digest cursor"):
+        bridge.read("owner-a",authorized=True,expected_digest="zz"*32)

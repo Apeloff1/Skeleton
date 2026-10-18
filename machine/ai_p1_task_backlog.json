@@ -100,7 +100,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-02",
@@ -186,7 +187,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-03",
@@ -261,7 +263,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-04",
@@ -340,7 +343,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-05",
@@ -420,7 +424,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-EVID-06",
@@ -496,7 +501,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-INTEL-01",
@@ -574,7 +580,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-INTEL-02",
@@ -654,12 +661,13 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-INTEL-03",
       "lane_id": "P1-L1",
-      "status": "blocked",
+      "status": "ready",
       "title": "Reasoning, search and stopping policy registry",
       "volume_refs": [
         "VOL-013",
@@ -729,7 +737,9 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-17T17:36:53.475042Z",
+      "unblock_note": "All dependencies done; moved to ready in deferred-task pass."
     },
     {
       "task_id": "P1-INTEL-04",
@@ -966,7 +976,7 @@
     {
       "task_id": "P1-AUTO-01",
       "lane_id": "P1-L2",
-      "status": "blocked",
+      "status": "ready",
       "title": "Canonical privileged tool transaction and sandbox",
       "volume_refs": [
         "VOL-015",
@@ -1034,7 +1044,9 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-17T17:36:53.475110Z",
+      "unblock_note": "All dependencies done; moved to ready in deferred-task pass."
     },
     {
       "task_id": "P1-AUTO-02",
@@ -1467,7 +1479,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-PROD-02",
@@ -1535,7 +1548,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-PROD-03",
@@ -1601,7 +1615,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-PROD-04",
@@ -1801,7 +1816,8 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "handled_pass": "2026-10-17"
     },
     {
       "task_id": "P1-LEARN-02",

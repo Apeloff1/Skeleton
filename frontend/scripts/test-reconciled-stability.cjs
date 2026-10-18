@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -19,7 +20,7 @@ function moduleTS(filename, mocks = {}) {
   });
   assert.equal((compilation.diagnostics || []).length, 0, filename + ' transpile diagnostics');
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', compilation.outputText)(
+  compileFunction(compilation.outputText, ['require', 'module', 'exports'])(
     name => {
       assert.ok(Object.prototype.hasOwnProperty.call(mocks, name), 'unexpected import: ' + name);
       return mocks[name];

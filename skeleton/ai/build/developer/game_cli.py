@@ -1,8 +1,8 @@
-"""Local game-development workspace commands over the canonical GameForge pipeline.
+"""Local game-development workspace commands.
 
-This is a developer transport, not a second game engine or state authority.
-Only a local operator may choose filesystem destinations. The existing forge
-projector, source-manifest, and Godot playtest own execution and evidence.
+``build`` is a transport over ``build_playable_game``, the same executor as
+``python -m skeleton game``. It is not a second GameForge pipeline. Only a
+local operator may choose filesystem destinations.
 """
 from __future__ import annotations
 
@@ -260,22 +260,27 @@ def _build(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     config = _load(root)
     if (root / "build").is_symlink() or (root / "build" / "godot").is_symlink():
         _fail("refusing symlinked build output")
-    from skeleton.context.pipeline import GameForgeRun
+    from skeleton.forge.game_builder import build_playable_game
     try:
-        response = GameForgeRun.live().execute(
-            config["vision"], era=config["era"], archetype=config["archetype"],
-            project_root=str(root / "build" / "godot"), target="godot",
-            overwrite=args.overwrite, playtest=args.playtest,
+        response = build_playable_game(
+            config["vision"],
+            era=config["era"],
+            archetype=config["archetype"],
             repair_mode=args.repair_mode,
+            playtest_mode=args.playtest,
+            out=str(root / "build" / "godot"),
+            overwrite=args.overwrite,
         )
     except (OSError, ValueError) as exc:
         raise GameCLIError(f"GameForge build rejected: {exc}") from exc
-    return {"ok": bool(response.get("succeeded")), "action": "build", "project": str(root),
+    project = response.get("project") if isinstance(response.get("project"), dict) else {}
+    receipt = project.get("source_sha256")
+    return {"ok": bool(response.get("ok")), "action": "build", "project": str(root),
             "output": str(root / "build" / "godot"),
-            "source_manifest": response.get("source_manifest"),
+            "source_manifest": {"sha256": receipt} if receipt else None,
             "playtest": response.get("playtest"),
-            "failed_stages": [s for s in (response.get("run") or {}).get("stages", [])
-                              if s.get("status") == "FAILED"]}
+            "marker": response.get("marker"),
+            "failed_stages": [] if response.get("ok") else [response.get("error") or "build failed"]}
 
 
 def _verify(root: Path, args: argparse.Namespace) -> dict[str, Any]:
@@ -357,13 +362,26 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                                    "propose", "review", "apply", "queue", "benchmark", "benchmark-matrix", "asset-gate",
                                                    "fidelity-plan", "fidelity-matrix", "display-plan", "upscale", "upscale-verify", "render-reference", "production-init",
                                                    "production-status", "production-cycle", "production-training",
+                                                   "dragon-observe-start", "dragon-observe-sync", "dragon-observe-status",
+                                                   "dragon-observe-cycle", "dragon-observe-action", "dragon-observe-lessons",
+                                            "dragon-observe-trace", "dragon-observe-coverage", "dragon-observe-revoke",
                                                    "direction-audit", "direction-revision", "direction-benchmark", "direction-shots", "direction-gameplay", "direction-campaign", "direction-campaign-reopen", "p0-acceptance",
                                                    "upscale-world", "upscale-stage", "upscale-environment", "upscale-clutter",
                                                    "upscale-foliage", "upscale-animation", "upscale-shadow",
                                                    "upscale-parallax", "upscale-music", "asset-inventory",
                                                    "upscale-review", "vividness-review", "queue-upscaled-training",
                                                    "camera-plan", "camera-render",
-                                                   "direction-audit", "direction-workorder", "production-gap-matrix"))
+                                                   "direction-audit", "direction-workorder", "production-gap-matrix",
+                                                   "dragon-review", "dragon-portfolio", "dragon-ingest", "dragon-plan", "dragon-adopt",
+                                                   "director-draft", "director-revise", "director-examine", "director-promote",
+                                                   "director-board", "director-prepare-training",
+                                            "director-session-begin", "director-session-status", "director-session-step",
+                                            "director-session-compare", "director-session-fork", "director-session-trace", "director-serve", "director-atlas-export", "director-atlas-verify",
+                                            "dragon-session-lesson", "director-bindings", "director-bindings-publish", "director-bindings-check", "dragon-lab", "dragon-policy-preview", "dragon-policy-train",
+                                            "dragon-policy-predict", "director-coverage", "director-godot-smoke", "director-loopback-e2e", "director-native-http-e2e", "director-route", "director-topology",
+                                            "director-causality", "director-story-contrast", "dragon-navigation-study", "director-dynamics-design", "director-dynamics-publish",
+                                            "director-dynamics-audit", "dragon-world-study", "dragon-world-contrast", "director-dynamics-playthrough", "director-society-design", "director-society-publish",
+                                             "director-society-audit", "dragon-society-study", "dragon-society-contrast", "director-society-stress", "director-society-acceptance"))
     jeeves.add_argument("--project", default=".")
     jeeves.add_argument("--kind", choices=("character", "dialogue", "quest", "world", "mechanic",
                                            "scene", "animation", "cutscene", "asset", "music"))
@@ -379,6 +397,27 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--target")
     jeeves.add_argument("--source")
     jeeves.add_argument("--direction-source")
+    jeeves.add_argument("--dragon-digest")
+    jeeves.add_argument("--seed", type=int)
+    jeeves.add_argument("--regions")
+    jeeves.add_argument("--revision")
+    jeeves.add_argument("--quest-types")
+    jeeves.add_argument("--stages", type=int)
+    jeeves.add_argument("--goal")
+    jeeves.add_argument("--routes", type=int)
+    jeeves.add_argument("--session")
+    jeeves.add_argument("--at", type=int)
+    jeeves.add_argument("--tail", type=int)
+    jeeves.add_argument("--destination")
+    jeeves.add_argument("--route-profile", choices=("fastest", "scenic", "quiet", "novel", "quest"))
+    jeeves.add_argument("--alternatives", type=int)
+    jeeves.add_argument("--intensity", type=int)
+    jeeves.add_argument("--include-optional", action="store_true")
+    jeeves.add_argument("--sessions")
+    jeeves.add_argument("--port", type=int)
+    jeeves.add_argument("--timeout", type=float)
+    jeeves.add_argument("--other-session")
+    jeeves.add_argument("--choice")
     jeeves.add_argument("--output")
     jeeves.add_argument("--mode", choices=("nearest", "scale2x", "remaster", "ambience", "cinematic"))
     jeeves.add_argument("--factor", type=int)
@@ -388,6 +427,11 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
     jeeves.add_argument("--page", type=int)
     jeeves.add_argument("--page-size", type=int)
     jeeves.add_argument("--repair-generated", action="store_true")
+    jeeves.add_argument("--consent", action="store_true")
+    jeeves.add_argument("--actor")
+    jeeves.add_argument("--phase")
+    jeeves.add_argument("--event")
+    jeeves.add_argument("--outcome")
     jeeves.add_argument("--pattern", choices=("wind", "breathe", "bob", "shimmer", "water"))
     jeeves.add_argument("--frames", type=int)
     jeeves.add_argument("--frame-height", type=int)
@@ -434,9 +478,25 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--evidence", options.evidence),
                                 ("--target", options.target), ("--source", options.source),
                                 ("--direction-source", options.direction_source),
+                                ("--dragon-digest", options.dragon_digest),
+                                ("--seed", options.seed), ("--regions", options.regions),
+                                ("--revision", options.revision),
+                                ("--quest-types", options.quest_types), ("--stages", options.stages),
+                                ("--goal", options.goal), ("--routes", options.routes),
+                                ("--session", options.session), ("--other-session", options.other_session),
+                                ("--at", options.at), ("--tail", options.tail),
+                                ("--destination", options.destination), ("--route-profile", options.route_profile),
+                                ("--alternatives", options.alternatives),
+                                ("--intensity", options.intensity),
+                                ("--sessions", options.sessions),
+                                ("--port", options.port),
+                                ("--timeout", options.timeout),
+                                ("--choice", options.choice),
                                 ("--output", options.output), ("--mode", options.mode),
                                 ("--factor", options.factor), ("--passes", options.passes),
                                 ("--gate", options.gate),
+                                ("--actor", options.actor), ("--phase", options.phase),
+                                ("--event", options.event), ("--outcome", options.outcome),
                                 ("--page", options.page),
                                 ("--page-size", options.page_size),
                                 ("--pattern", options.pattern),
@@ -459,13 +519,40 @@ def run_game_cli(argv: list[str]) -> dict[str, Any]:
                                 ("--pixel-aspect-den", options.pixel_aspect_den)):
                 if value is not None:
                     command.extend([flag, str(value)])
+            if options.include_optional:
+                command.append("--include-optional")
             if options.include_notes:
                 command.append("--include-notes")
             if options.dry_run:
                 command.append("--dry-run")
             if options.repair_generated:
                 command.append("--repair-generated")
-            return run_jeeves_game_cli(command, _project(options.project))
+            if options.consent:
+                command.append("--consent")
+            root = _project(options.project)
+            result = run_jeeves_game_cli(command, root)
+            # The CLI is the existing Jeeves transport: once an operator has
+            # opted in, witness its actual returns without storing prompts,
+            # files, tool arguments, chat, video, or model reasoning.
+            if not options.jeeves_action.startswith("dragon-observe-"):
+                from skeleton.developer.jeeves_dragon_observer import observe_cli_result
+                try:
+                    witness = observe_cli_result(
+                        root, command=options.jeeves_action, result=result,
+                    )
+                except (ValueError, OSError, TypeError) as exc:
+                    # A completed underlying effect is not rolled back by an
+                    # optional witness failure. Surface the observability loss.
+                    parent = root / ".jeeves" / "production" / "dragon_observer"
+                    if parent.exists():
+                        result["dragon_observer"] = {
+                            "ok": False, "observation_error": str(exc)[:250],
+                            "underlying_action_not_rolled_back": True,
+                        }
+                else:
+                    if witness is not None:
+                        result["dragon_observer"] = witness
+            return result
         if options.action == "catalog":
             from skeleton.forge.eras import list_eras
             from skeleton.forge.archetypes import default_library
