@@ -443,6 +443,19 @@ def _append_ledger(path: Path, receipt: Mapping[str, Any]) -> None:
         "selection": receipt.get("selection"),
         "promotion": False,
     }
+    for key in (
+        "words_trained",
+        "words_kept",
+        "token_count",
+        "language",
+        "passages",
+        "domains",
+        "coherence_before",
+        "coherence_after",
+        "source_digest",
+    ):
+        if key in receipt and receipt[key] is not None:
+            row[key] = receipt[key]
     if rows and rows[-1].get("model_digest") == row["model_digest"] and rows[-1].get("bytes_trained") == row["bytes_trained"]:
         rows[-1] = row
     else:
