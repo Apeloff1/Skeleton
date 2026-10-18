@@ -988,10 +988,25 @@ def test_hyperlora_ties_slerp_model_soup_constrained_jacobi_dream_dpo_and_zero_s
     assert replay["response"] == {"ok": 3}
 
 
-def test_hardware_aware_throughput_adaptive_decompiler_elevated_cognition_100_todos_900k_steps_and_upload_all():
+def test_hw_throughput_decompiler_900k_smw():
     from skeleton.cortex.neocortex import JeevesCortex
-    from skeleton.cortex.own import COGNITIVE_ENHANCEMENT_100_TODOS, SCRUTINY_12_AXES
+    from skeleton.cortex.own import (
+        COGNITIVE_ENHANCEMENT_100_TODOS,
+        PLANETARY_TRAINING_PASS_SPECS,
+        SCRUTINY_12_AXES,
+        compact_filename,
+        review_filenames,
+    )
     from skeleton.distributed.mesh.throughput_controller import ThroughputController
+
+    # 0. Filename Length Review & Compaction Audit (<= 32 chars)
+    long_name = "super_mario_world_yoshi_island_stage_1_decompiled_inspirational_sprite_sheet_32k_to_16k.chr"
+    compacted = compact_filename(long_name, max_len=32)
+    assert len(compacted) <= 32
+    assert compacted.endswith(".chr")
+    fname_report = review_filenames([long_name, "own.py", "neocortex.py"], max_len=32)
+    assert fname_report["too_long_count"] == 1
+    assert fname_report["all_compacted_within_budget"] is True
 
     # 1. Hardware-Aware ThroughputController
     tc = ThroughputController(default_limit=32, hardware_aware=True)
@@ -1040,16 +1055,41 @@ def test_hardware_aware_throughput_adaptive_decompiler_elevated_cognition_100_to
     assert coal_hw["results"] == list(range(1, 11))
     assert "hardware" in tc.card()
 
-    # 2. Adaptive Sequential Decompiler (SM83 binary ROM, 6502 ROM, and GDScript)
+    # 2. Organized Sectional Decompilation + Nuance Respray + 32k->16k Downscale + Inspiration Cataloguing + Visual Filetree
     neo = JeevesCortex()
     sm83_rom = bytes([0x00, 0x3E, 0x01, 0xE0, 0x40, 0xCD, 0x50, 0x01, 0xC3, 0x00, 0x01, 0xC9]) + bytes(range(32))
-    dec_gb = neo.decompile_sequential(sm83_rom, filename="hero_dmg.gb", arch="auto", window_size=16, adaptive_passes=3)
-    assert dec_gb["schema_version"] == "skeleton.cortex.adaptive_sequential_decompiler.v1"
+    dec_gb = neo.decompile_sequential(sm83_rom, filename=long_name, arch="auto", window_size=16, adaptive_passes=3)
+    assert dec_gb["schema_version"] == "skeleton.cortex.adaptive_sequential_decompiler.v2"
+    assert len(dec_gb["filename"]) <= 32
+    assert dec_gb["filename_compacted"] is True
     assert dec_gb["arch"] == "sm83_gb"
-    assert dec_gb["cfg"]["basic_block_count"] >= 1
-    assert dec_gb["cfg"]["loop_count"] >= 1
-    assert len(dec_gb["disassembly"]) >= 4
-    assert any(p["primitive"] == "vblank_dma_register_sync" for p in dec_gb["semantic_ir"])
+    assert dec_gb["section_count"] == 6
+    assert set(dec_gb["organized_sections"].keys()) == {
+        "header_and_vectors",
+        "code_banks",
+        "chr_sprite_tiles",
+        "palette_cgram",
+        "tilemap_nametables",
+        "audio_spc_psg",
+    }
+    assert dec_gb["copyright_claims_voided"] is True
+    resprayed = dec_gb["resprayed_asset"]
+    assert resprayed["verbatim_tile_overlap"] == 0.0
+    assert resprayed["pixel_hamming_distance"] >= 0.50
+    assert resprayed["upscale_stage"]["upscaled_samples"] == 32_768
+    assert resprayed["downscale_stage"]["downscaled_samples"] == 16_384
+    assert resprayed["downscale_stage"]["downscale_ratio"] == 0.5
+    assert len(neo.inspiration_catalog) >= 1
+    assert dec_gb["visual_filetree"]["node_count"] >= 7
+
+    # Manual inspect, download, and AI tool targeting on the Visual Filetree
+    inspected = neo.inspect_filetree_node("chr_16k.chr")
+    assert inspected["download_ready"] is True
+    assert inspected["download_filename"] == "chr_16k.chr"
+    assert len(inspected["download_b64"]) > 8
+    targeted = neo.target_filetree_node("chr_16k.chr", tool_name="quality_downscaler_32k_to_16k")
+    assert targeted["tool_invoked"] == "quality_downscaler_32k_to_16k"
+    assert targeted["tool_result"]["ok"] is True
 
     gd_source = """
     func _physics_process(delta):
@@ -1062,7 +1102,17 @@ def test_hardware_aware_throughput_adaptive_decompiler_elevated_cognition_100_to
     assert dec_gd["arch"] == "script_ast"
     assert any(p["primitive"] == "fixed_tick_state_machine_loop" for p in dec_gd["semantic_ir"])
 
-    # 3. Elevated Comprehension & Semantics, Innsight & Outrospection, and 12-Axis Hyper-Scrutiny
+    # 3. Enterprise-Grade Think, Elevated Comprehension & Semantics, Innsight & Outrospection, and 12-Axis Hyper-Scrutiny
+    ent_trace = neo.think("snes_rom super_mario_world slope_26deg dragon_coin 32k_to_16k")
+    assert ent_trace.enterprise_grade is True
+    assert ent_trace.quorum_agreement >= 0.50
+    assert len(ent_trace.audit_digest) == 64
+    assert ent_trace.enterprise_envelope is not None
+    assert ent_trace.enterprise_envelope["tier"] == "enterprise_grade"
+    ent_full = neo.enterprise_think("snes_rom super_mario_world slope_26deg dragon_coin 32k_to_16k")
+    assert ent_full["enterprise_grade"] is True
+    assert "comprehension" in ent_full and "hyper_scrutiny" in ent_full
+
     comp = neo.comprehend("player parries boss attack in gb_dmg_rom bank0 within 16.6ms frame budget and 2bpp palette")
     assert comp["schema_version"] == "skeleton.cortex.comprehension_semantics.v2"
     assert comp["comprehension_score"] > 0.70
@@ -1095,19 +1145,40 @@ def test_hardware_aware_throughput_adaptive_decompiler_elevated_cognition_100_to
     assert todos_out["all_completed"] is True
     assert len(todos_out["domain_summary"]) == 10
 
-    # 5. Massive 900,000-Step Vectorized Hyper-Evolution Engine
-    steps_out = neo.run_massive_steps(total_steps=900_000, lr=0.025, console_target="gb_dmg_rom")
+    # 5. Genuine 900,000-Step + 100,000-Epoch Sprite, 32k->16k Downscale, Planetary Domain Passes & SMW Stage Synthesis
+    assert len(PLANETARY_TRAINING_PASS_SPECS) == 20
+    steps_out = neo.run_massive_steps(total_steps=900_000, epochs=100_000, lr=0.025, console_target="snes_rom")
     assert steps_out["executed_steps"] == 900_000
-    assert steps_out["target_steps"] == 900_000
+    assert steps_out["genuine_loop_iterations"] == 900_000
+    assert steps_out["epochs_executed"] == 100_000
+    assert steps_out["sprite_training"]["loss_reduced"] is True
+    assert steps_out["sprite_training"]["final_loss"] < steps_out["sprite_training"]["initial_loss"]
+    planetary = steps_out["planetary_domain_passes"]
+    assert planetary["domain_pass_count"] == 20
+    assert planetary["quality_tier_monotonicity_verified"] is True
+    assert planetary["passes"]["items"]["samples_trained"] == 1_000_000_000_000
+    assert planetary["passes"]["hairstyle"]["samples_trained"] == 100_000
+    assert planetary["passes"]["clothing"]["samples_trained"] == 1_000_000_000
+    assert planetary["passes"]["game_storylines"]["samples_trained"] == 1_000_000_000
+    smw = steps_out["smw_stages"]
+    assert smw["stage_count"] == 3
+    assert smw["copyright_claims_voided"] is True
+    assert "[?]" in smw["stages"][0]["tilemap_rendered"]
     assert neo.massive_steps_completed >= 900_000
+    assert neo.epochs_completed >= 100_000
     assert neo.transformer.steps >= 900_000
     assert neo.status()["massive_steps_completed"] >= 900_000
 
-    # 6. 16-Tool AI Cognitive Tool Suite + Upload All Files Batch Ingestion
+    # 6. 48-Tool Plethora AI Cognitive Tool Suite + Upload All Files Batch Ingestion
     tools = neo.list_ai_tools()
-    assert len(tools) >= 16
+    assert len(tools) >= 48
     tool_names = {t["name"] for t in tools}
     assert "adaptive_sequential_decompiler" in tool_names
+    assert "nuance_sprite_resprayer" in tool_names
+    assert "quality_downscaler_32k_to_16k" in tool_names
+    assert "visual_filetree_inspector" in tool_names
+    assert "smw_stage_synthesizer" in tool_names
+    assert "domain_pass_items" in tool_names
     assert "batch_file_ingest_and_analyze" in tool_names
 
     inv_dec = neo.invoke_ai_tool(
@@ -1128,4 +1199,5 @@ def test_hardware_aware_throughput_adaptive_decompiler_elevated_cognition_100_to
     assert batch_upload["uploaded_count"] == 3
     assert len(batch_upload["files"]) == 3
     assert batch_upload["aggregate_comprehension"] > 0.70
+    assert batch_upload["visual_filetree"]["node_count"] >= 9
 

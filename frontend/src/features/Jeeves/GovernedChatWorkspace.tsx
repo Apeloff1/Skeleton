@@ -181,6 +181,8 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, UploadedFile[]>>({});
   const [attachmentConsent, setAttachmentConsent] = useState(false);
+  const [filetreeOpen, setFiletreeOpen] = useState(false);
+  const [selectedTreeNode, setSelectedTreeNode] = useState('chr_16k.chr');
   const [consentChecked, setConsentChecked] = useState(false);
   const [attachmentTypes, setAttachmentTypes] = useState<string[]>([]);
   const [checkingAttachments, setCheckingAttachments] = useState(false);
@@ -560,6 +562,8 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
                   onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
                 <MiniButton icon="cloud-upload-outline" label="Upload all files" disabled={busy || loading || creating || uploading || attached.length >= 4 || !state.ready}
                   onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
+                <MiniButton icon="folder-open-outline" label="Visual filetree" disabled={busy || loading || creating}
+                  onPress={() => setFiletreeOpen(true)} />
                 {uploading ? <View style={s.row}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>Attaching…</Text>
                   <MiniButton icon="close-outline" label="Cancel" onPress={() => uploadController.current?.abort()} /></View> :
                   <Text style={s.muted}>{draft.length > 30000 ? `${draft.length.toLocaleString()} / ${MAX_MESSAGE_LENGTH.toLocaleString()}` : attached.length ? `${attached.length} / 4 files` : 'Ask anything'}</Text>}
@@ -642,6 +646,35 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           onPress={() => { setAttachmentConsent(false); void pickAttachment(false); }} />
         <Button icon="cloud-upload-outline" label="Upload all files" primary disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
           onPress={() => { setAttachmentConsent(false); void pickAttachment(true); }} /></View>
+    </Dialog>}
+    {filetreeOpen && <Dialog title="Visual filetree" close={() => setFiletreeOpen(false)}>
+      <Text style={s.dialogBody}>Inspect, view, download, or target sectional game creation and decompilation nodes with AI tools.</Text>
+      <ScrollView style={s.dialogScroll} contentContainerStyle={s.modelList} keyboardShouldPersistTaps="handled">
+        {[
+          { name: 'hdr_vec.sec', kind: 'binary_section', detail: 'ROM header & interrupt vector table (copyright voided)', tool: 'adaptive_sequential_decompiler' },
+          { name: 'code_bnk0.asm', kind: 'disassembly', detail: 'Sectional CFG & lifted fixed-tick state-machine routines', tool: 'sectional_disassembly_organizer' },
+          { name: 'chr_16k.chr', kind: 'sprite_bank_16k', detail: 'Nuance-resprayed 32k upscale -> 16k quality downscaled sprite bank', tool: 'quality_downscaler_32k_to_16k' },
+          { name: 'pal_nuance.pal', kind: 'palette_bgr555', detail: 'Perceptual hue-shifted 15-bit BGR555 sub-palettes (0.0 overlap)', tool: 'nuance_sprite_resprayer' },
+          { name: 'smw_yoshi_1.lvl', kind: 'smw_mode1_stage', detail: 'Super Mario World Mode-1 26deg/45deg slope & Dragon Coin stage', tool: 'smw_stage_synthesizer' },
+          { name: 'insp_cat.json', kind: 'inspiration_manifest', detail: 'Clean-room copyright-voided inspirational source manifest', tool: 'inspiration_source_cataloguer' },
+        ].map(node => <TouchableOpacity key={node.name} accessibilityRole="button" accessibilityLabel={`Inspect ${node.name}`}
+          accessibilityState={{ selected: selectedTreeNode === node.name }}
+          style={[s.modelItem, selectedTreeNode === node.name && s.selectedModel]}
+          onPress={() => setSelectedTreeNode(node.name)}>
+          <View style={s.between}><Text style={s.modelName}>{node.name}</Text><Text style={s.badge}>{node.kind}</Text></View>
+          <Text style={s.modelDetails}>{node.detail}</Text>
+          <View style={s.row}>
+            <MiniButton icon="eye-outline" label="View / Inspect" onPress={() => { setSelectedTreeNode(node.name); notify(`Inspecting ${node.name}: ${node.detail}`); }} />
+            <MiniButton icon="download-outline" label="Download" onPress={() => notify(`Prepared ${node.name} download.`)} />
+            <MiniButton icon="construct-outline" label="Target with AI tool" onPress={() => {
+              setDraft(`Target filetree node /smw_snes_world/${node.name} with AI tool ${node.tool}`);
+              setFiletreeOpen(false);
+              input.current?.focus();
+            }} />
+          </View>
+        </TouchableOpacity>)}
+      </ScrollView>
+      <View style={s.dialogActions}><Button label="Close" onPress={() => setFiletreeOpen(false)} /></View>
     </Dialog>}
     {!!toast && <View pointerEvents="none" style={s.toast} accessibilityLiveRegion="polite"><Text style={s.toastText}>{toast}</Text></View>}
   </SafeAreaView>;
