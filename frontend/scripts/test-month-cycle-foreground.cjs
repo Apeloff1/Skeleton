@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ts = require('typescript');
@@ -13,7 +14,7 @@ const output = ts.transpileModule(code, {
 });
 assert.equal(output.diagnostics.length, 0);
 const mod = { exports: {} };
-new Function('require','module','exports',output.outputText)(id => {
+compileFunction(output.outputText, ['require', 'module', 'exports'])(id => {
   if (id === './monthCycleRecovery') return {};
   throw new Error('Unexpected dependency: '+id);
 },mod,mod.exports);

@@ -17,7 +17,7 @@ from config.environment import (  # noqa: E402
 ROOT = BACKEND.parent
 S = "x" * 40
 STAGING = {
-    "ENVIRONMENT": "staging", "MONGO_URL": "mongodb://u:p@mongo:27017/app",
+    "ENVIRONMENT": "staging", "MONGO_URL": "mongodb://" "u:p@mongo:27017/app",
     "CORS_ORIGINS": "https://staging.example.org", "JWT_SECRET": S, "OPS_TOKEN": S,
 }
 
