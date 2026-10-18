@@ -12,6 +12,7 @@ main{display:grid;grid-template-columns:minmax(250px,1fr) minmax(280px,1.3fr) mi
 section{background:#142f40;border:1px solid #496d78;border-radius:.6rem;padding:1rem;min-width:0}
 select,input,button,textarea{font:inherit;color:inherit;background:#21485b;border:1px solid #749da8;border-radius:.4rem;padding:.5rem;max-width:100%}
 input,select,textarea{width:100%;min-height:42px}textarea{font-family:ui-monospace,monospace;font-size:13px;min-height:240px;resize:vertical}
+input[type=checkbox]{width:auto;min-height:auto}
 button{cursor:pointer;min-height:40px;margin:.15rem}button:hover{background:#326478}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #ffdb86}
 button:disabled{opacity:.5;cursor:not-allowed}
@@ -33,6 +34,8 @@ small{color:#b9d0d3}.status{background:#254653;padding:.6rem;margin:.8rem 0;whit
 #advanced-actions button{font-size:12px}
 #advanced-state{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;max-height:220px;overflow:auto}
 #system-description{display:block;min-height:2.5rem}
+#jeeves-app-results,#jeeves-app-report{max-height:420px;overflow:auto;
+ white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 ui-monospace,monospace}
 @media(max-width:940px){main{grid-template-columns:1fr}section{min-height:0}}
 """
 SCRIPT=r"""
@@ -184,6 +187,46 @@ $("plan").addEventListener("click",async()=>{
 
 
 let jeevesAppAtlas=null;
+function jeevesDefaultArgs(action,wide=false){
+ const intent={title:"Original Studio Preview",subtitle:"Original source; bounded local preview.",
+  seed:17,width:11,height:11,levels:1,collectibles_per_level:1,hazards_per_level:1};
+ const examples={
+  "atlas.family":{family:"studio",offset:0,limit:80},
+  "atlas.search":{family:"studio",query:"editor",offset:0,limit:80},
+  "atlas.deep":{family:"studio",query:"editor",offset:0,limit:80,max_depth:4},
+  "atlas.editor":{editor:"racing"},
+  "studio.source":{path:"game/readme.md"},
+  "studio.editor.preview":{editor:"racing",settings:{}},
+  "system.triad":{seed:17,mirror_attempts:64},
+  "game.compile.original":{intent},"game.compile.native":{intent},
+  "game.mirror.review":{intent},
+  "crawler.catalog":{offset:0,limit:80},
+  "editor.preview":{editor:"racing",settings:{}},
+  "editor.template":{editor:"racing",settings:{}},
+  "inventory.search":{query:"studio",offset:0,limit:40},
+ };
+ const result=examples[action]||{};
+ if(wide&&jeevesAppwideCatalog?.registered_adapters.find(x=>x.name===action)
+     ?.required_parameters.includes("project"))
+  return {project:selectedProject||"select_current_project",...result};
+ return result;
+}
+function jeevesDescribeAction(wide=false){
+ const selector=wide?"jeeves-appwide-action":"jeeves-app-action";
+ const action=$(selector).value;
+ const descriptor=wide?jeevesAppwideCatalog?.registered_adapters.find(x=>x.name===action)
+  :jeevesAppAtlas?.operator_adapters.find(x=>x.id===action);
+ const element=$(wide?"jeeves-appwide-action-help":"jeeves-app-action-help");
+ if(!descriptor){element.textContent="Refresh capabilities to inspect a typed action.";return;}
+ element.textContent="Required: "+(descriptor.required_parameters.join(", ")||"none")+
+  ". Optional: "+(descriptor.optional_parameters.join(", ")||"none")+
+  ". "+((descriptor.operator_gate||descriptor.operator_authorization_required)
+   ?"Confirm this operation before execution.":"Read or bounded planning operation.");
+ if(descriptor.runtime_dependencies?.some(x=>x.available_by_metadata===false))
+  element.textContent+=" Required optional reference pack is unavailable; install it before running.";
+ $(wide?"jeeves-app-params":"jeeves-app-args").value=
+  JSON.stringify(jeevesDefaultArgs(action,wide),null,2);
+}
 async function jeevesAppRefresh(){
  const atlas=await api("/api/jeeves-app-atlas");
  jeevesAppAtlas=atlas;
@@ -199,7 +242,13 @@ async function jeevesAppRefresh(){
   "All projects and source commits remain governed by explicit review.",
  ].join("\n");
  $("jeeves-app-args").value="{}";
+ $("jeeves-app-execution-approval").checked=false;
+ jeevesDescribeAction();
 }
+$("jeeves-app-action").addEventListener("change",()=>{
+ $("jeeves-app-execution-approval").checked=false;
+ jeevesDescribeAction();
+});
 $("jeeves-app-refresh").addEventListener("click",async()=>{
  try{await jeevesAppRefresh();status("Jeeves app taxonomy freshly scanned.");}
  catch(error){status("App feature discovery failed: "+error.message);}
@@ -218,8 +267,15 @@ $("jeeves-app-execute").addEventListener("click",async()=>{
  try{
   const action=$("jeeves-app-action").value;
   const args=JSON.parse($("jeeves-app-args").value);
+  const descriptor=jeevesAppAtlas?.operator_adapters.find(x=>x.id===action);
+  const approved=$("jeeves-app-execution-approval").checked===true;
+  if(!descriptor)throw Error("Refresh installed capabilities before invoking an action");
+  if(descriptor.operator_authorization_required&&!approved)
+   throw Error("Confirm this bounded operation before running or staging changes");
   const response=await api("/api/jeeves-app-action",{
-   project:storyProject(),action,args});
+   project:storyProject(),action,args,operator_authorized:approved,
+   expected_catalog_digest:jeevesAppAtlas.catalog_digest});
+  $("jeeves-app-execution-approval").checked=false;
   $("jeeves-app-results").textContent=JSON.stringify(response,null,2).slice(0,45000);
   if(action==="studio.editor.stage"){
    $("proposal").textContent=response.result.proposal_id;
@@ -233,12 +289,18 @@ $("jeeves-app-execute").addEventListener("click",async()=>{
 });
 $("jeeves-app-use-editor").addEventListener("click",async()=>{
  try{
+  if(!jeevesAppAtlas)throw Error("Refresh installed capabilities before staging an edit");
+  if(!$("jeeves-app-execution-approval").checked)
+   throw Error("Confirm this operation before staging an editor proposal");
   const editor=systemEditor();
   if(!editor)throw Error("Choose a real game system editor first");
   const result=await api("/api/jeeves-app-action",{
    project:storyProject(),action:"studio.editor.stage",
+   operator_authorized:true,
+   expected_catalog_digest:jeevesAppAtlas.catalog_digest,
    args:{editor:editor.id,settings:systemSettings(),
     reason:"Jeeves reviewed original game system editor configuration proposal."}});
+  $("jeeves-app-execution-approval").checked=false;
   $("jeeves-app-results").textContent=JSON.stringify(result,null,2);
   $("proposal").textContent=result.result.proposal_id;
   status("Jeeves staged "+editor.id+" (proposal "+result.result.proposal_id+
@@ -248,12 +310,20 @@ $("jeeves-app-use-editor").addEventListener("click",async()=>{
 let storyChatSession=null;
 
 let jeevesAppSnapshot=null;
+let jeevesAppwideCatalog=null;
+$("jeeves-appwide-action").addEventListener("change",()=>{
+ $("jeeves-app-approval").checked=false;
+ jeevesDescribeAction(true);
+});
 $("jeeves-app-scan").addEventListener("click",async()=>{
  try{
-  const result=await api("/api/jeeves-appwide-status");
+  const result=await api("/api/jeeves-appwide-status?refresh=true");
   const catalog=await api("/api/jeeves-appwide-catalog");
   jeevesAppSnapshot=result.snapshot_digest;
-  setOptions("jeeves-app-action",catalog.registered_adapters.map(x=>x.name));
+  jeevesAppwideCatalog=catalog;
+  setOptions("jeeves-appwide-action",catalog.registered_adapters.map(x=>x.name));
+  $("jeeves-app-approval").checked=false;
+  jeevesDescribeAction(true);
   $("jeeves-app-report").textContent=JSON.stringify({
    scanned_regular_files:result.scanned_regular_files,
    readable_files:result.readable_files,
@@ -272,6 +342,8 @@ $("jeeves-app-search").addEventListener("click",async()=>{
  try{
   const result=await api("/api/jeeves-appwide-invoke",{
    action:"inventory.search",
+   expected_catalog_digest:jeevesAppwideCatalog?.catalog_digest,
+   expected_inventory_digest:jeevesAppSnapshot,
    params:{query:$("jeeves-app-query").value.trim(),
            domain:$("jeeves-app-domain").value||null,
            limit:50,offset:0,
@@ -283,17 +355,21 @@ $("jeeves-app-search").addEventListener("click",async()=>{
 });
 $("jeeves-app-invoke").addEventListener("click",async()=>{
  try{
-  const action=$("jeeves-app-action").value;
-  if(!action)throw Error("Scan application first to discover bound action adapters");
+  const action=$("jeeves-appwide-action").value;
+  if(!action||!jeevesAppwideCatalog)
+   throw Error("Scan application first to discover bound action adapters");
   const params=JSON.parse($("jeeves-app-params").value);
   if(!params||typeof params!=="object"||Array.isArray(params))
    throw Error("Provide a typed JSON object for capability parameters");
   const authorized=$("jeeves-app-approval").checked===true;
-  if((action==="source.propose"||action==="studio.propose"||
-      action==="learning.improvement_proposal")&&!authorized)
-   throw Error("Source changes require deliberate approval before preview");
+  const descriptor=jeevesAppwideCatalog.registered_adapters.find(x=>x.name===action);
+  if(descriptor?.operator_gate&&!authorized)
+   throw Error("Confirm this bounded operation before execution or source proposal");
   const receipt=await api("/api/jeeves-appwide-invoke",{
-   action,params,operator_authorized:authorized});
+   action,params,operator_authorized:authorized,
+   expected_catalog_digest:jeevesAppwideCatalog.catalog_digest,
+   expected_inventory_digest:jeevesAppSnapshot});
+  $("jeeves-app-approval").checked=false;
   $("jeeves-app-report").textContent=JSON.stringify(receipt,null,2).slice(0,65000);
   status("Jeeves "+action+" completed with a typed receipt. No arbitrary code execution or unreviewed app mutation.");
  }catch(error){status("Jeeves capability invocation blocked: "+error.message);}
@@ -3458,9 +3534,10 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <option value="general">Other tracked components</option>
 </select></label>
 <button id="jeeves-app-search" type="button">Search indexed source and resources</button>
-<label>Governed runtime action<select id="jeeves-app-action"></select></label>
+<label>Governed runtime action<select id="jeeves-appwide-action"></select></label>
+<p id="jeeves-appwide-action-help"><small>Scan capabilities to inspect required arguments.</small></p>
 <label>Typed action arguments JSON<textarea id="jeeves-app-params" rows="3" spellcheck="false">{}</textarea></label>
-<label>Explicit approval for a source-change proposal (never automatic commit)
+<label>Confirm the selected bounded operation or source proposal (never automatic commit)
 <input id="jeeves-app-approval" type="checkbox"></label>
 <button id="jeeves-app-invoke" type="button">Invoke reviewed capability</button>
 <pre id="jeeves-app-report" role="status" aria-live="polite"></pre>
@@ -3471,8 +3548,11 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <label>Application family<select id="jeeves-app-family"></select></label>
 <button id="jeeves-app-family-list" type="button">Inspect installed modules</button>
 <label>Typed Jeeves action<select id="jeeves-app-action"></select></label>
+<p id="jeeves-app-action-help"><small>Refresh capabilities to inspect required arguments.</small></p>
 <label>Exact action parameters (reviewable JSON)
 <textarea id="jeeves-app-args" spellcheck="false" rows="5">{}</textarea></label>
+<label>Confirm this bounded operation or editor proposal (never automatic commit)
+<input id="jeeves-app-execution-approval" type="checkbox"></label>
 <button id="jeeves-app-execute" type="button">Run bounded Jeeves capability</button>
 <button id="jeeves-app-use-editor" type="button">Jeeves: stage current editor settings for review</button>
 <p><small>For governed self-improvement, select <code>model.improvement</code> and provide baseline/candidate source digests, measurable benchmarks and rollback. This stages review only; neural weights cannot be promoted here.</small></p>
@@ -3598,8 +3678,11 @@ All writes still require exact-file review and human approval.</small></p>
 </section></main><script>__SCRIPT__</script></body></html>
 """
 def render_workspace_html(token: str)->bytes:
+    import base64
+    import html
+    import json
+    import re
     from hashlib import sha256
-    import base64,html,json,re
     if not re.fullmatch(r"[A-Za-z0-9_-]{20,150}",token):
         raise ValueError("locally secret session token required")
     script=SCRIPT.replace("__TOKEN__",json.dumps(token))

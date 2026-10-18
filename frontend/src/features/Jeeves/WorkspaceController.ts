@@ -8,6 +8,8 @@ import type {
   Conversation, Message, Workspace,
 } from './workspace';
 import type { ChatHandoff } from './workbench/types';
+import { normalizeChatCooperation, reconcileChatCooperation } from '../../product/chatCooperation';
+import type { ChatCooperationSummary } from '../../product/chatCooperation';
 
 export interface WorkspaceStorage {
   getItem(key: string): Promise<string | null>;
@@ -27,9 +29,10 @@ export type ChatResponse = {
   canonical_message_id?: string | null;
   operation_id?: string | null;
   ai_result_id?: string | null;
+  cooperation?: ChatCooperationSummary | null;
 };
 
-export type ChatProgress = { threadId: string; state: string; accepted?: boolean; transport?: 'stream' | 'poll'; serverResumeAvailable?: boolean; cursor?: NonNullable<ChatBody['resume_cursor']> };
+export type ChatProgress = { threadId: string; state: string; accepted?: boolean; transport?: 'stream' | 'poll'; serverResumeAvailable?: boolean; cursor?: NonNullable<ChatBody['resume_cursor']>; cooperation?: ChatCooperationSummary };
 export type Transport = (body: ChatBody, signal: AbortSignal, update?: (value: ChatProgress) => Promise<void>) => Promise<ChatResponse>;
 export type ChatHistoryTurn = CanonicalChatTurn;
 export type ChatHistoryResponse = ChatHistoryProjection;
@@ -421,9 +424,9 @@ export class WorkspaceController {
     const conversation = this.snapshot.workspace.conversations.find(item => item.id === running.conversationId);
     const threadId = conversation?.canonicalThreadId;
     if (!threadId || !this.hooks.cancel) { this.notify('The turn has not reached a cancellable canonical state. Check server status before trying again.'); return; }
-    this.emit({ progress: { threadId, state: 'cancelling', accepted: true } });
+    this.emit({ progress: { ...this.snapshot.progress, threadId, state: 'cancelling', accepted: true } });
     try { await this.hooks.cancel(threadId, running.messageId); if (this.running === running) this.notify('The server received Stop. Following continues until its actual terminal state is confirmed.'); }
-    catch (error) { if (this.running === running) { this.emit({ progress: { threadId, state: 'cancellation_unconfirmed' } }); this.notify(error instanceof Error ? error.message : 'Stop was not confirmed. Check the saved turn.'); } }
+    catch (error) { if (this.running === running) { this.emit({ progress: { ...this.snapshot.progress, threadId, state: 'cancellation_unconfirmed' } }); this.notify(error instanceof Error ? error.message : 'Stop was not confirmed. Check the saved turn.'); } }
   };
 
   async cancelSavedTurn(messageId: string): Promise<void> {
@@ -443,7 +446,7 @@ export class WorkspaceController {
     })));
   }
 
-  async send(attachment?: Attachment, preferences: Partial<Pick<ChatBody, 'provider_id' | 'model_id' | 'max_output_tokens' | 'crawler_context' | 'context'>> = {}): Promise<void> {
+  async send(attachment?: Attachment, preferences: Partial<Pick<ChatBody, 'provider_id' | 'model_id' | 'max_output_tokens' | 'crawler_context' | 'context' | 'cooperation'>> = {}): Promise<void> {
     if (!this.snapshot.ready || this.running) return;
     const conversation = this.active;
     if (conversation.archived) { this.notify('Restore this canonical conversation before sending another turn.'); return; }
@@ -475,6 +478,10 @@ export class WorkspaceController {
     if (preferences.context !== undefined && preferences.context.length > MAX_CONTEXT) {
       this.notify(`Jeeves request context exceeds the ${MAX_CONTEXT}-character bound.`);
       return;
+    }
+    if (preferences.cooperation) {
+      try { preferences = { ...preferences, cooperation: normalizeChatCooperation(preferences.cooperation) }; }
+      catch (error) { this.notify(error instanceof Error ? error.message : 'The response-review settings are invalid.'); return; }
     }
     const message: Message = {
       id: newId(), role: 'user', text: content, createdAt: Date.now(), status: 'pending', attachmentName: attachment?.name,
@@ -559,7 +566,9 @@ export class WorkspaceController {
     try {
       const response = await this.transport(body, running.controller.signal, async value => {
         if (this.running !== running || running.controller.signal.aborted) throw new Error('Request detached.');
-        this.emit({ progress: value });
+        const previous = this.snapshot.progress?.cooperation;
+        const cooperation = value.cooperation ? reconcileChatCooperation(previous, value.cooperation) : previous;
+        this.emit({ progress: { ...value, ...(cooperation ? { cooperation } : {}) } });
         const existing = this.snapshot.workspace.conversations.find(item => item.id === conversationId);
         const previousCursor = existing?.messages.find(item => item.id === messageId)?.retryRequest?.resume_cursor;
         if (existing?.canonicalThreadId !== value.threadId || value.cursor && (previousCursor?.last_seen_sequence !== value.cursor.last_seen_sequence || previousCursor.last_event_digest !== value.cursor.last_event_digest)) {
@@ -584,6 +593,7 @@ export class WorkspaceController {
         forms: response.forms,
         artifacts: response.artifacts || [],
         artifactCount: response.artifacts?.length || 0,
+        cooperation: response.cooperation ?? undefined,
       };
       this.change(updateConversation(this.snapshot.workspace, conversationId, c => ({
         ...c,
@@ -606,8 +616,14 @@ export class WorkspaceController {
     } catch (error) {
       if (this.running !== running) return;
       deliveryUncertain = true;
+      let cooperation = this.snapshot.progress?.cooperation;
+      if (error instanceof Error && 'cooperation' in error && error.cooperation) {
+        try { cooperation = reconcileChatCooperation(cooperation, error.cooperation as ChatCooperationSummary); }
+        catch { /* Preserve only the previously verified operation-bound receipts. */ }
+      }
       this.setMessage(conversationId, messageId, {
         status: 'failed', terminal: error instanceof Error && 'code' in error && error.code === 'chat_turn_terminal', error: error instanceof Error ? error.message.slice(0, 400) : 'Jeeves could not respond. Try again.',
+        ...(cooperation ? { cooperation } : {}),
       });
     } finally {
       if (this.running === running) {

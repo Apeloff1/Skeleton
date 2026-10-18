@@ -254,7 +254,7 @@ def audit_no_competing_root_launchers() -> None:
 
 def audit_endpoint_boundary() -> None:
     allowed = {
-        (ROOT / "frontend/utils/apiBase.ts").resolve(),
+        (ROOT / "frontend/src/utils/apiBase.ts").resolve(),
         (ROOT / "frontend/app.config.js").resolve(),
     }
     forbidden = (
@@ -281,9 +281,9 @@ def audit_endpoint_boundary() -> None:
         for token in forbidden:
             if token in text:
                 relative = path.relative_to(ROOT).as_posix()
-                FAILURES.append(f"{relative} bypasses frontend/utils/apiBase.ts with {token!r}")
+                FAILURES.append(f"{relative} bypasses frontend/src/utils/apiBase.ts with {token!r}")
 
-    resolver = read("frontend/utils/apiBase.ts")
+    resolver = read("frontend/src/utils/apiBase.ts")
     check("export const API_BASE" in resolver, "canonical backend endpoint export missing")
     check(
         "export const SKELETON_API_BASE" in resolver,
@@ -623,8 +623,8 @@ def audit_production_ingress() -> None:
 
 
 def audit_launcher_convergence() -> None:
-    launch = read("frontend/components/LaunchCascade.tsx")
-    boot = read("frontend/components/BootLauncher.tsx")
+    launch = read("frontend/src/components/LaunchCascade.tsx")
+    boot = read("frontend/src/components/BootLauncher.tsx")
     stages = read("frontend/src/boot/stages.ts")
     welcome = read("frontend/app/welcome.tsx")
     safe_mode = read("frontend/app/safe-mode.tsx")
@@ -976,7 +976,7 @@ def audit_product_control_contract() -> None:
 
 
 def audit_product_route_registry() -> None:
-    registry_text = read("frontend/utils/routeRegistry.ts")
+    registry_text = read("frontend/src/utils/routeRegistry.ts")
     catalog = read("frontend/src/product/productCatalog.ts")
     registered = set(re.findall(r"path:\s*'([^']+)'", registry_text))
 

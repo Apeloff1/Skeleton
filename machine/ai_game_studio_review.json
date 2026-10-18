@@ -13,7 +13,9 @@
     "pure": "analyze_frame_sequence(frames, source_identity=None) accepts actual runtime-produced frame projections and measured operation timings; returns quantitative findings with evidence references",
     "execute": "review_project_sequence(environment_request, actions, seed, capture_every, policy_snapshot, cancel, on_event) executes only canonical registered environment adapters",
     "api": "POST /api/game-learning/projects/{project_id}/review starts existing scoped review job; GET /api/game-learning/jobs/{job_id} reads canonical completion; GET /api/game-learning/projects/{project_id}/reviews/{job_id} rechecks current source authority; GET /api/game-learning/projects/{project_id}/reviews/{job_id}/export returns exact digest-labelled completed review JSON after the same current-source/policy/baseline checks",
-    "semantic": "analyze_executed_semantics(request, trace, source_identity, native_binding, geometry_snapshot) consumes bounded actual canonical transitions and optional approved native ABI descriptor; no screenshots or callbacks confer application authority"
+    "semantic": "analyze_executed_semantics(request, trace, source_identity, native_binding, geometry_snapshot) consumes bounded actual canonical transitions and optional approved native ABI descriptor; no screenshots or callbacks confer application authority",
+    "compare": "compare_executed_reviews(baseline,candidate,mode=same_source) defaults to strict matched current-source/frozen-policy comparison; explicit source_revision additionally requires issued original-successor workload contracts. Pure output grants no caller authority.",
+    "historical": "Existing application _load_review historical=True is an internal completed-job observation/restoration path: exact scoped admitted job, frozen file/input/result digests and live source/teacher/policy/external-origin restrictions. Public review inspect/export retains current-source authority; no arbitrary historical-source endpoint or old-world execution."
   },
   "bounds": {
     "steps": 512,
@@ -49,10 +51,14 @@
   "paired_review_extension": {
     "owner": "Existing review modules/routes and existing scoped workspace jobs; no new service, collection, authority or provider",
     "request": "Optional baseline_review_job_id selects only an actual completed same-project current-authority original unpaired review; its exact review/input digests and original policy identity are frozen before dispatch and rechecked before publication and every review-specific read. Reference-review chains are rejected to bound transitive work.",
-    "comparison": "Compare actual task return, observed success/death, instrumented control coverage and frame availability only when exact current project/head/epoch, environment request/spec, reviewer implementation, seed, planned steps, capture interval and controller protocol match. Different frozen policies are labelled policy comparison. No unpaired source-revision or arbitrary screenshot comparison.",
+    "comparison": "Default same_source comparison requires exact project/head/epoch, environment request/spec, reviewer implementation, seed, planned steps, capture interval and controller protocol. Different frozen policies remain labelled policy comparisons. Explicit source_revision mode supports only issued matched original-successor workload contracts, with stable action/observation/reward contract, workload/controller protocol, seed and actual reviewer/runtime implementation; intentional source identity drift is retained in separate baseline/candidate bindings. Mismatches or legacy evidence are inconclusive; arbitrary screenshots never become paired execution.",
     "protocol": "Explicit action digest or registered action-cycle identity is retained, alongside actual planned/observed step counts. Legacy evidence without this protocol remains readable but comparison is inconclusive.",
     "triangle": "Bounded digest-linked execution, Dragon numerical/source scrutiny and adversarial comparability/regression projections, with prioritized actual findings and explicit follow-up constraints. Deterministic roles are labelled; no model critic, quality certification, promotion, automatic mutation or invented learning score.",
-    "bounds": {"comparison_bytes": 65536, "priority_findings": 16, "role_count": 3},
+    "bounds": {
+      "comparison_bytes": 65536,
+      "priority_findings": 16,
+      "role_count": 3
+    },
     "recovery": "Baseline withdrawal, changed digest, current-source failure or missing completion fails closed; no baseline result is copied into a new owner/store. Existing fenced job recovery and physical cancellation apply."
   },
   "automated_tests_requested": false,
@@ -72,5 +78,23 @@
     "geometry_claim": "Initial authored snapshot body-aware four-neighbor geometric candidate routes. Conditional gates, timelines, one-way physics, abilities, combat and full progression remain outside an unconditional reachability claim.",
     "proposals": "Typed bounded app inspect/edit proposals bind exact source digest, actual entity/tile/counterexample IDs and current manifest/version. Writes are validated pure drafts and always require explicit subsequent scoped execution; review never edits.",
     "evidence": "Physical position and collision/control response must come from declared runtime instrumentation; source facts are labelled analytical and measured failures are labelled bounded-run observations, never general game impossibility."
+  },
+  "source_revision_quality_extension": {
+    "owner": "Existing canonical numerical review owner/mirror, scoped workspace jobs and application successor/goal owners; no new provider/service/store/promotion authority",
+    "contract_schema": "skeleton.game.studio_authoring_comparison.v1",
+    "issuance": "review_project_sequence issues the contract only for an actually executed successor request without a frozen Q policy. Bind the environment request excluding only authored tree bytes and the environment action/observation/reward contract excluding only its source-dependent environment digest. Actual source identities and protocol remain separately pinned.",
+    "controller": "Only explicit_actions or registered_action_cycle, with matching seed, planned/capture protocol and explicit action digest; no arbitrary-policy cross-source reuse.",
+    "implementation": "Reviewer implementation digest includes canonical successor runtime/world and environment request/runtime owner files, in addition to existing numerical/render/source dependencies. Material implementation drift makes old/new observations unpaired.",
+    "measurements": "Actual bounded task return and available semantic goal/death/control observations. Frame-count and wall-time changes remain advisory; easier edited objectives do not establish a better game, significance or generalization.",
+    "quality_gate": "Existing opt-in original goal policy may require configured current-source step/frame/finding bounds and no observed paired regression before packaging/export. A model explanation or single observed improvement cannot promote production or certify subjective quality.",
+    "historical_authority": "Only actual completed same-project admitted review jobs with matching frozen file/input/result identities. Preserve live direct/derived source rights, separate external-source project version/input epoch checks, teacher consent and policy snapshot pins. Exact own prepared-editor operation allowance is threaded through the same existing authorities, never an unrelated pending-write bypass.",
+    "restoration": {
+      "owner": "backend/core/game_successor.py and backend/routes/game_successor.py; existing world.edit prepared-save owner",
+      "request": "restore_review_job_id is a third mutually exclusive alternative to changes or typed edits, alongside current expected_version/spec digest and idempotency key. Existing requests omit absent fields and retain exact admitted request identities.",
+      "authority": "Load a genuine completed scoped/admitted original review with live historical authority; immutable non-editable world identity/origins must equal the current saved spec. Caller-supplied historical source trees are not accepted.",
+      "execution": "Canonical emitter validates/regenerates the reference spec, including removing optional sections absent in it. The measured-quality host additionally verifies the complete original path/content tree. Project versions and changed-file revisions continue increasing; no historical identity counter rollback.",
+      "control": "A quality goal may restore only its exact pinned rejected incumbent under explicit edit/restoration grants, spending existing finite budgets and preserving rejected evidence. Cancellation/expiry stops subsequent restoration work."
+    },
+    "qualification": "Implementation candidate only. Numerical owner evidence is not model critique, automatic model-weight learning, target-OS execution, universal emulation or enterprise-grade qualification."
   }
 }

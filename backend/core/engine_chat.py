@@ -11,6 +11,7 @@ import asyncio
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 from typing import Any, Iterable
 from uuid import uuid4
 
@@ -180,11 +181,18 @@ class EngineChat:
             raise ValueError("engine chat data_class is invalid")
         self._provider_hint: str | None = None
         self._model_hint: str | None = str(model).strip() if model else None
+        self._provider_selection: str | None = None
+        self._model_selection: str | None = None
         self._max_output_tokens: int | None = None
         self._params: dict[str, Any] = {}
         self._history: list[dict[str, str]] = []
+        # A bounded projection can eventually repeat its exact text. Keep the
+        # causal turn ordinal monotonic so eviction never reuses an old engine
+        # idempotency identity for genuinely new user work.
+        self._history_sequence = 0
         self._evidence: list[dict[str, str]] = []
         self._structured_output_schema: dict[str, Any] | None = None
+        self._cooperation: dict[str, Any] | None = None
         self._queued_prompt: str | None = None
         # One mutable conversation projection must have one in-flight turn.
         self._send_lock = asyncio.Lock()
@@ -194,16 +202,48 @@ class EngineChat:
         self._completed_explicit_response: EngineChatResponse | None = None
         self._completed_history_snapshot: tuple[tuple[str, str], ...] | None = None
 
+    def _require_idle(self) -> None:
+        """Do not mutate a turn's context while its canonical request is active."""
+
+        if self._send_lock.locked():
+            raise EngineTextError("engine chat cannot be changed during an active send")
+
     def with_model(self, provider: str, model: str) -> "EngineChat":
-        # Routing metadata only; canonical engine policy owns provider choice.
+        """Keep legacy advisory metadata; use with_selection for actual selection.
+
+        Older product callers hardcode historical cloud model names here. Those
+        hints must not disable a configured local deployment. Explicit selection
+        instead crosses the existing catalog/governance boundary below.
+        """
+        self._require_idle()
         self._provider_hint = (provider or "").strip().lower() or None
         self._model_hint = (model or "").strip() or None
+        return self
+
+    def with_selection(self, provider_id: str | None, model_id: str | None) -> "EngineChat":
+        """Select a declared catalog pair, or restore automatic routing with None.
+
+        This is a request constraint, never provider authorization. The canonical
+        engine text adapter still resolves readiness, privacy and model support.
+        """
+
+        self._require_idle()
+        if (provider_id is None) != (model_id is None):
+            raise EngineTextError("provider_id and model_id must be supplied together")
+        for value, maximum in ((provider_id, 128), (model_id, 256)):
+            if value is not None and (
+                not isinstance(value, str) or not value.strip() or len(value.strip()) > maximum
+            ):
+                raise EngineTextError("engine chat model selection is invalid")
+        self._provider_selection = None if provider_id is None else provider_id.strip()
+        self._model_selection = None if model_id is None else model_id.strip()
         return self
 
     def with_system_message(
         self,
         system_message: str,
     ) -> "EngineChat":
+        self._require_idle()
         if self.instruction_policy is not None:
             raise ValueError("instruction policy owns system instructions")
         self.system_message = str(system_message or "")
@@ -213,6 +253,7 @@ class EngineChat:
         self,
         policy: InstructionPolicy,
     ) -> "EngineChat":
+        self._require_idle()
         if not isinstance(policy, InstructionPolicy):
             raise TypeError("policy must be InstructionPolicy")
         if self.system_message and self.system_message != policy.instructions:
@@ -222,24 +263,56 @@ class EngineChat:
         return self
 
     def with_max_tokens(self, max_tokens: int) -> "EngineChat":
-        self._max_output_tokens = max(1, int(max_tokens))
+        self._require_idle()
+        if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= 131072:
+            raise EngineTextError("max_output_tokens is outside allowed range")
+        self._max_output_tokens = max_tokens
         return self
 
     def with_params(self, **params: Any) -> "EngineChat":
-        self._params.update(params)
+        self._require_idle()
+        unknown = set(params) - {"max_output_tokens", "max_tokens", "temperature"}
+        if unknown:
+            raise EngineTextError("engine text chat parameters are unsupported")
+        if (
+            "max_output_tokens" in params
+            and "max_tokens" in params
+            and params["max_output_tokens"] != params["max_tokens"]
+        ):
+            raise EngineTextError("output token limits conflict")
         raw_max = params.get(
             "max_output_tokens",
             params.get("max_tokens"),
         )
         if raw_max is not None:
-            self._max_output_tokens = max(1, int(raw_max))
+            if isinstance(raw_max, bool) or not isinstance(raw_max, int) or not 1 <= raw_max <= 131072:
+                raise EngineTextError("max_output_tokens is outside allowed range")
+        temperature = params.get("temperature")
+        if temperature is not None:
+            self._validated_temperature(temperature)
+        # Publish only after every requested parameter has been validated.
+        if raw_max is not None:
+            self._max_output_tokens = raw_max
+        self._params.update(params)
         return self
+
+    @staticmethod
+    def _validated_temperature(temperature: Any) -> float:
+        if (
+            isinstance(temperature, bool)
+            or not isinstance(temperature, (int, float))
+            or not math.isfinite(temperature)
+            or not 0 <= temperature <= 2
+        ):
+            raise EngineTextError("temperature must be finite in [0,2]")
+        return float(temperature)
 
     def with_temperature(
         self,
         temperature: float,
     ) -> "EngineChat":
-        self._params["temperature"] = float(temperature)
+        self._require_idle()
+        self._params["temperature"] = self._validated_temperature(temperature)
         return self
 
     def add_message(
@@ -247,6 +320,7 @@ class EngineChat:
         role: str,
         content: str,
     ) -> "EngineChat":
+        self._require_idle()
         normalized_role = str(role).strip().lower()
         text = str(content)
         if normalized_role == "system":
@@ -255,8 +329,7 @@ class EngineChat:
             self._queued_prompt = text
             return self
         if normalized_role == "assistant":
-            self._history.append({"role": "assistant", "content": text})
-            return self
+            return self.add_history_message("assistant", text)
         raise ValueError("engine chat role must be system, user, or assistant")
 
     def add_history_message(
@@ -266,15 +339,22 @@ class EngineChat:
     ) -> "EngineChat":
         """Add canonical prior conversation without queuing a new prompt."""
 
+        self._require_idle()
         normalized_role = str(role).strip().lower()
         text = str(content).strip()
         if normalized_role not in {"user", "assistant"}:
             raise ValueError("engine chat history role must be user or assistant")
         if not text:
             raise ValueError("engine chat history content must be non-empty")
-        self._history.append({"role": normalized_role, "content": text})
-        if len(self._history) > 1024:
+        if len(self._history) >= 100:
             raise ValueError("engine chat history exceeds maximum turn count")
+        if len(text) > 1_000_000 or (
+            sum(len(item["content"].encode("utf-8")) for item in self._history) + len(text.encode("utf-8"))
+            > 512 * 1024
+        ):
+            raise ValueError("engine chat history exceeds maximum aggregate UTF-8 bytes")
+        self._history.append({"role": normalized_role, "content": text})
+        self._history_sequence += 1
         return self
 
     def add_evidence(
@@ -286,6 +366,7 @@ class EngineChat:
     ) -> "EngineChat":
         """Attach product evidence as untrusted canonical context, not prompt."""
 
+        self._require_idle()
         source = str(source_id).strip()
         text = str(content).strip()
         normalized_kind = str(kind).strip().lower()
@@ -295,6 +376,12 @@ class EngineChat:
             raise ValueError("engine chat evidence kind is unsupported")
         if any(item["source_id"] == source for item in self._evidence):
             raise ValueError("engine chat evidence source_id must be unique")
+        if len(source) > 512 or len(text) > 200_000:
+            raise ValueError("engine chat evidence exceeds maximum source/content size")
+        if len(self._evidence) >= 256:
+            raise ValueError("engine chat evidence exceeds maximum segment count")
+        if sum(len(item["content"]) for item in self._evidence) + len(text) > 1_000_000:
+            raise ValueError("engine chat evidence exceeds maximum aggregate size")
         self._evidence.append(
             {
                 "source_id": source,
@@ -302,18 +389,26 @@ class EngineChat:
                 "kind": normalized_kind,
             }
         )
-        if len(self._evidence) > 256:
-            raise ValueError("engine chat evidence exceeds maximum segment count")
         return self
 
     def with_json_schema(self, schema: dict[str, Any]) -> "EngineChat":
         """Request actual canonical structured output; never an app-side mock."""
+        self._require_idle()
         from skeleton.skills.tool_contract import validate_json_schema
 
         encoded = json.dumps(schema, allow_nan=False, ensure_ascii=False)
         if len(encoded.encode()) > 65536:
             raise ValueError("structured output schema exceeds64KiB")
         self._structured_output_schema = validate_json_schema(json.loads(encoded))
+        return self
+
+    def with_cooperation(self, policy: dict[str, Any] | None) -> "EngineChat":
+        """Opt into finite engine-owned planning, drafting and critique stages."""
+
+        self._require_idle()
+        from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+        self._cooperation = normalize_cooperation_policy(policy)
         return self
 
     @staticmethod
@@ -338,7 +433,7 @@ class EngineChat:
         material = json.dumps(
             {
                 "session_id": self.session_id,
-                "turn_index": len(self._history),
+                "turn_index": self._history_sequence,
                 "prompt": prompt,
                 "history": self._history,
                 "evidence": self._evidence,
@@ -353,6 +448,17 @@ class EngineChat:
                 "structured_output_schema": self._structured_output_schema,
                 "data_class": self.data_class,
                 "purpose": self.purpose,
+                **({} if self._cooperation is None else {"cooperation": self._cooperation}),
+                **(
+                    {}
+                    if self._provider_selection is None
+                    else {"provider_id": self._provider_selection, "model_id": self._model_selection}
+                ),
+                **(
+                    {}
+                    if self._params.get("temperature") is None
+                    else {"temperature": self._params["temperature"]}
+                ),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -405,7 +511,11 @@ class EngineChat:
             max_output_tokens=self._max_output_tokens,
             data_class=self.data_class,
             purpose=self.purpose,
+            provider_id=self._provider_selection,
+            model_id=self._model_selection,
+            temperature=self._params.get("temperature"),
             structured_output_schema=self._structured_output_schema,
+            cooperation=self._cooperation,
         )
         if self._turn_idempotency_key is not None and self._completed_explicit_request is not None:
             if request != self._completed_explicit_request:
@@ -418,6 +528,7 @@ class EngineChat:
             raise EngineTextError("engine chat requires a canonical typed terminal response")
         self._history.append({"role": "user", "content": prompt})
         self._history.append({"role": "assistant", "content": response.text})
+        self._history_sequence += 2
         # This is a bounded rebuildable view, not the persisted conversation
         # record. Retain complete user/assistant pairs and evict oldest first.
         while (
@@ -455,16 +566,17 @@ class EngineChat:
         self,
         message: Any | None = None,
     ) -> EngineChatResponse:
-        target = message
-        consume_queued = target is None
-        if consume_queued:
+        if message is not None:
+            return await self.send_message(message)
+        # Choose and consume queued work under the same lock as execution. Two
+        # concurrent chat() calls must not both dispatch one queued user turn.
+        async with self._send_lock:
             target = self._queued_prompt
-        if target is None:
-            raise ValueError("engine chat requires a queued or explicit message")
-        response = await self.send_message(target)
-        if consume_queued and self._queued_prompt == target:
+            if target is None:
+                raise ValueError("engine chat requires a queued or explicit message")
+            response = await self._send_message_serial(target)
             self._queued_prompt = None
-        return response
+            return response
 
     async def generate(self, message: Any) -> EngineChatResponse:
         return await self.send_message(message)

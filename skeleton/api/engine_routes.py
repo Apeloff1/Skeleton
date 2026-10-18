@@ -264,6 +264,8 @@ def providers(
         "execution_mode", "network_policy", "credential_free", "capabilities",
         "context_window", "max_output_tokens", "default_output_tokens",
         "limits_source", "tokenizer", "supports_temperature", "artifact",
+        "model_family", "protocol_capabilities", "generation_limits",
+        "model_digest", "runtime_digest", "execution_profile_digest", "capacity", "runtime",
     )
     rows = [{key: value[key] for key in fields if key in value} for value in registry.statuses()]
     artifact_fields = (
@@ -277,6 +279,17 @@ def providers(
             row["artifact"] = {
                 key: artifact[key] for key in artifact_fields if key in artifact
             }
+        for field, allowed in {
+            "generation_limits": (
+                "context_window", "max_output_tokens", "max_total_tokens", "shared_context",
+                "tokenizer", "limits_source",
+            ),
+            "capacity": ("max_concurrency", "max_batch_size", "max_queue_size", "cache_entries"),
+            "runtime": ("active", "queued", "completed", "failed", "cancelled", "overloaded", "cache_hits", "cache_entries"),
+        }.items():
+            value = row.get(field)
+            if isinstance(value, dict):
+                row[field] = {key: value[key] for key in allowed if key in value}
     return {"active": registry.active_id, "available": registry.available, "providers": rows}
 
 

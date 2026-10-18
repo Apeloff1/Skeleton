@@ -7,7 +7,7 @@ context, applies bounded budgets, and delegates to the canonical engine client.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -21,6 +21,8 @@ from core.model_catalog import (
     resolve_selection,
     context_budget_for_selection,
     estimate_context_tokens,
+    cooperation_context_selection,
+    cooperation_context_budget,
     ModelSelectionError,
 )
 from core.engine_client import (
@@ -36,7 +38,7 @@ from skeleton.contracts.context import (
     ContextSegment,
     ContextTrust,
 )
-from skeleton.context.compiler import ContextCompiler, project_provider_context
+from skeleton.context.compiler import ContextCompiler, ContextCompilationError, project_provider_context
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.vault.data_governance import DataGovernanceDenied
 from skeleton.skills.tool_contract import validate_json_schema
@@ -86,8 +88,16 @@ class EngineTextRequest:
     temperature: float | None = None
 
     structured_output_schema: Mapping[str, Any] | None = None
+    cooperation: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
+        if self.cooperation is not None:
+            from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+            try:
+                object.__setattr__(self, "cooperation", normalize_cooperation_policy(self.cooperation))
+            except (TypeError, ValueError) as exc:
+                raise EngineTextError("cooperation policy is invalid") from exc
         if (self.provider_id is None) != (self.model_id is None):
             raise EngineTextError("provider_id and model_id must be supplied together")
         for field_name, maximum in (("provider_id", 128), ("model_id", 256)):
@@ -281,6 +291,7 @@ class EngineTextRequest:
                     if self.structured_output_schema is None
                     else {"structured_output_schema": self.structured_output_schema}
                 ),
+                **({} if self.cooperation is None else {"cooperation": self.cooperation}),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -348,6 +359,7 @@ def _terminal_response(
         and request.model_id is None
         and request.temperature is None
         and request.structured_output_schema is None
+        and request.cooperation is None
         and legacy_prompt in snapshot
     ):
         raise EngineTextError("chat idempotency identity was reused with different request semantics")
@@ -366,6 +378,7 @@ def _terminal_response(
         or binding.data_class != _effective_data_class(request)
     ):
         raise EngineTextError("canonical engine terminal/handoff identity diverged from request")
+    _validate_cooperation_terminal(request, terminal, binding.source_snapshot)
     return EngineTextResponse(
         text=terminal.final_output,
         operation_id=terminal.operation_id,
@@ -382,6 +395,23 @@ def _terminal_response(
         artifact_refs=terminal.artifact_refs,
         usage=dict(terminal.usage),
     )
+
+
+def _validate_cooperation_terminal(request, terminal, source_snapshot) -> None:
+    if request.cooperation is None:
+        return
+    from skeleton.intelligence.cooperation import validate_cooperation_summary
+
+    try:
+        validate_cooperation_summary(
+            terminal.usage.get("cooperation"),
+            request.cooperation,
+            source_snapshot,
+            terminal.provider_receipts,
+            expected_brief_digest=hashlib.sha256(request.prompt.encode("utf-8")).hexdigest(),
+        )
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise EngineTextError("canonical cooperation result evidence is invalid") from exc
 
 
 def _policy(request: EngineTextRequest) -> InstructionPolicy:
@@ -489,6 +519,10 @@ async def execute_engine_text(
 
     if not isinstance(request, EngineTextRequest):
         raise TypeError("request must be EngineTextRequest")
+    # Frozen dataclasses still contain caller-readable mappings. Revalidate and
+    # detach their complete nested payload before the first await so a caller
+    # cannot change recovery identity or role selections during catalog I/O.
+    request = replace(request)
     try:
         require_route_provider_transfer(
             provider_id="skeleton-engine",
@@ -579,14 +613,16 @@ async def execute_engine_text(
     catalog = await model_catalog(active_client, actor_id=request.actor_id, tenant_id=request.tenant_id)
     try:
         selection = resolve_selection(catalog, provider_id=request.provider_id, model_id=request.model_id)
+        selection = cooperation_context_selection(
+            catalog, selection, request.cooperation, output_tokens=request.max_output_tokens
+        )
         budget = context_budget_for_selection(selection, output_tokens=request.max_output_tokens)
+        budget = cooperation_context_budget(budget, request.cooperation)
         if request.temperature is not None and selection.get("supports_temperature") is not True:
             raise ModelSelectionError("model_temperature_unsupported")
     except ModelSelectionError as exc:
         raise EngineTextError("canonical model selection or context settings are unavailable") from exc
     segments = _context_segments(request, policy=policy, operation_id=operation_id, created_at=now)
-    from dataclasses import replace
-
     segments = tuple(
         replace(
             segment,
@@ -594,17 +630,20 @@ async def execute_engine_text(
         )
         for segment in segments
     )
-    envelope = ContextCompiler().compile(
-        operation_id=operation_id,
-        execution_id=execution_id,
-        turn_id=turn_id,
-        tenant_id=request.tenant_id,
-        purpose=request.purpose,
-        budget=budget,
-        segments=segments,
-        tools_enabled=False,
-        compiled_at=now,
-    )
+    try:
+        envelope = ContextCompiler().compile(
+            operation_id=operation_id,
+            execution_id=execution_id,
+            turn_id=turn_id,
+            tenant_id=request.tenant_id,
+            purpose=request.purpose,
+            budget=budget,
+            segments=segments,
+            tools_enabled=False,
+            compiled_at=now,
+        )
+    except ContextCompilationError as exc:
+        raise EngineTextContextError("current request cannot fit the selected model context policy") from exc
     expected_prompt = (
         _stable_uuid("backend-engine-prompt", operation_id + ":prompt:" + request.request_identity_digest),
         hashlib.sha256(request.prompt.encode("utf-8")).hexdigest(),
@@ -652,6 +691,7 @@ async def execute_engine_text(
         model_id=selection["selection_model_id"],
         temperature=request.temperature,
         structured_output_schema=request.structured_output_schema,
+        cooperation=request.cooperation,
         max_tool_calls=1,
         max_repeat_tool_batches=1,
         context_seed_refs=(
@@ -684,6 +724,7 @@ async def execute_engine_text(
 
     if terminal.operation_id != operation_id or terminal.execution_id != execution_id:
         raise EngineTextError("canonical engine terminal identity diverged from compiled request")
+    _validate_cooperation_terminal(request, terminal, envelope.source_snapshot)
     return EngineTextResponse(
         text=terminal.final_output,
         operation_id=terminal.operation_id,

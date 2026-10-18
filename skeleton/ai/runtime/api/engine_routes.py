@@ -264,6 +264,8 @@ def providers(
         "execution_mode", "network_policy", "credential_free", "capabilities",
         "context_window", "max_output_tokens", "default_output_tokens",
         "limits_source", "tokenizer", "supports_temperature", "artifact",
+        "model_family", "protocol_capabilities", "generation_limits",
+        "model_digest", "runtime_digest", "execution_profile_digest", "capacity", "runtime",
     )
     rows = [{key: value[key] for key in fields if key in value} for value in registry.statuses()]
     artifact_fields = (
@@ -277,6 +279,17 @@ def providers(
             row["artifact"] = {
                 key: artifact[key] for key in artifact_fields if key in artifact
             }
+        for field, allowed in {
+            "generation_limits": (
+                "context_window", "max_output_tokens", "max_total_tokens", "shared_context",
+                "tokenizer", "limits_source",
+            ),
+            "capacity": ("max_concurrency", "max_batch_size", "max_queue_size", "cache_entries"),
+            "runtime": ("active", "queued", "completed", "failed", "cancelled", "overloaded", "cache_hits", "cache_entries"),
+        }.items():
+            value = row.get(field)
+            if isinstance(value, dict):
+                row[field] = {key: value[key] for key in allowed if key in value}
     return {"active": registry.active_id, "available": registry.available, "providers": rows}
 
 
@@ -846,6 +859,41 @@ async def synthesize_engine_speech(
     }
 
 
+def authorize_execution_events(
+    request: Request,
+    execution_id: str,
+    *,
+    actor_id: str,
+    tenant_id: str,
+    service: EngineExecutionService | None = None,
+    service_token: str | None = None,
+) -> tuple[str, dict[str, Any]]:
+    """Single source of truth for execution-events access.
+
+    Verifies the bearer service token + gate attester, then the
+    ``engine:events`` grant and actor/tenant ownership via
+    ``EngineExecutionService.events``. Shared by this route and the realtime
+    ``GET /api/v1/events?job_id=`` stream (Jenkins S1-1). Raises
+    ``HTTPException`` on any failure; returns ``(principal, snapshot)``.
+    """
+    if service is None:
+        service = _engine_service()
+    if service_token is None:
+        service_token = _engine_service_token()
+    principal = _verified_service_principal(request, service_token)
+    try:
+        snapshot = service.events(
+            execution_id,
+            verified_service_principal=principal,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+    return principal, snapshot
+
+
 @router.get("/executions/{execution_id}/events")
 def execution_events(
     execution_id: str,
@@ -855,22 +903,29 @@ def execution_events(
     service: EngineExecutionService = Depends(_engine_service),
     service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request, service_token)
-    try:
-        return service.events(
-            execution_id,
-            verified_service_principal=principal,
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-        )
-    except Exception as exc:
-        _raise_engine_error(exc)
-        raise
+    principal, snapshot = authorize_execution_events(
+        request,
+        execution_id,
+        actor_id=actor_id,
+        tenant_id=tenant_id,
+        service=service,
+        service_token=service_token,
+    )
+    # ADR-realtime-transport (#4101): with ``Accept: text/event-stream`` this
+    # route is the execution-scoped filtered view of ``/api/v1/events`` and
+    # emits the same v1 envelope. Authorization above is unchanged; JSON
+    # callers keep the existing response.
+    from skeleton.api.realtime_routes import execution_stream_or_none
+
+    stream = execution_stream_or_none(request, execution_id, principal=str(principal))
+    # A Response instance bypasses the dict response model (FastAPI contract).
+    return snapshot if stream is None else stream  # type: ignore[return-value]
 
 
 __all__ = [
     "_engine_coordinator",
     "_engine_service",
     "_engine_service_token",
+    "authorize_execution_events",
     "router",
 ]

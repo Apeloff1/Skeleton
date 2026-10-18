@@ -58,6 +58,60 @@ def digest(value: object) -> str:
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
 
+def cooperation_result_projection(result, *, policy, source_snapshot, expected_brief_digest=None):
+    """Expose only canonical, receipt-bound public review progress metadata."""
+
+    if policy is None:
+        return None
+    from skeleton.intelligence.cooperation import validate_cooperation_summary
+
+    try:
+        return validate_cooperation_summary(
+            result.usage.get("cooperation"),
+            policy,
+            source_snapshot,
+            result.provider_receipts,
+            expected_brief_digest=expected_brief_digest,
+        )
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise EngineProtocolError("canonical cooperation result evidence is invalid") from exc
+
+
+def cooperation_progress_projection(status, *, command):
+    """Read real engine checkpoint progress without creating another journal."""
+
+    if command is None or status.get("cooperation") is None:
+        return None
+    policy = command.execution_request.context_policy.get("cooperation")
+    if policy is None:
+        raise EngineProtocolError("engine returned unrequested cooperation progress")
+    if (
+        status.get("operation_id") != command.operation.operation_id
+        or status.get("execution_id") != command.execution_request.execution_id
+    ):
+        raise EngineProtocolError("engine cooperation progress belongs to a different execution")
+    receipts = status.get("provider_receipts")
+    if (
+        not isinstance(receipts, list)
+        or len(receipts) > 64
+        or any(not isinstance(ref, str) or not ref or len(ref) > 2048 for ref in receipts)
+    ):
+        raise EngineProtocolError("engine cooperation progress receipts are invalid")
+    from skeleton.intelligence.cooperation import validate_cooperation_summary
+
+    try:
+        return validate_cooperation_summary(
+            status["cooperation"],
+            policy,
+            command.compiled_context.source_snapshot,
+            receipts,
+            require_complete=False,
+            expected_brief_digest=command.execution_request.context_policy.get("cooperation_brief_digest"),
+        )
+    except (TypeError, ValueError) as exc:
+        raise EngineProtocolError("canonical cooperation progress evidence is invalid") from exc
+
+
 def prepare_metadata(
     command: EngineExecutionCommand, *, request_digest: str, dependencies: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:

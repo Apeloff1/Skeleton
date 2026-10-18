@@ -1,0 +1,7 @@
+{
+  "operation": "api-duplicate-json-refusal",
+  "http_status": 400,
+  "response": {
+    "error": "malformed local editor JSON"
+  }
+}

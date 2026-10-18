@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "7bbe8375bce83294c687cdaa8fac083d8e787694",
+      "source_git_object_sha": "f73b278a1736a538ec09ee7b65889b2b2231695c",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -94,11 +94,43 @@
       ]
     },
     {
+      "id": "AIFT-PROVIDER-RUNTIME-LEGACY-ALIAS",
+      "source": "skeleton/provider_runtime.py",
+      "destination": "skeleton/ai/runtime/provider_runtime.py",
+      "kind": "file",
+      "source_git_object_sha": "f73b278a1736a538ec09ee7b65889b2b2231695c",
+      "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-PROV-02",
+        "AIQ-S2-PROTO-02",
+        "AIQ-S2-PROTO-03",
+        "AIQ-S7-E2E-01"
+      ],
+      "parity_mode": "compatibility_facade",
+      "facade_required_import": "from skeleton.provider_runtime import",
+      "note": "Retain historical skeleton.ai.runtime.provider_runtime imports by re-exporting canonical public API and delegating attribute reads to skeleton.provider_runtime. The alias owns no SDK client, producer, model policy, credential, or state. AIFT-PROVIDER-RUNTIME continues to govern the existing skeleton/ai/providers/runtime.py facade; both aliases reference the same unchanged canonical owner.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "canonical_provider_owner_retained_with_non_owning_legacy_import_alias",
+      "volume_refs": [
+        "VOL-004",
+        "VOL-007"
+      ]
+    },
+    {
       "id": "AIFT-CONTRACTS",
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "fe1521c09ade4dd3f23dd9481361fb8238d41e74",
+      "source_git_object_sha": "311384edd079433ad8eb1917367288c46ca6b7cc",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -171,6 +203,12 @@
           "path": "__init__.py",
           "mode": "compatibility_facade",
           "facade_required_import": "from .execution_authority import ("
+        },
+        {
+          "path": "projects.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.contracts import projects as _canonical",
+          "note": "Existing canonical Projects re-export preserves class/schema identity from skeleton/contracts/projects.py; retain the non-owning facade rather than copying a second implementation."
         }
       ]
     },
@@ -179,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "a92e1a9c8ede0839b754657499f39ddb8684bbc8",
+      "source_git_object_sha": "73f7c8a0308d59465bc3e4333077334d25f99166",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -360,7 +398,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "c4160c6ef97343a90fe1b7ad0ab4bf2aca829fff",
+      "source_git_object_sha": "8f825d931a97903cccdce7e765f4028f812ceaff",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -477,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "228682dd7d442478990d2a4e7aad2c6f5d48cf00",
+      "source_git_object_sha": "2b03ae357bb6739156b22f26f995ab52cb4e5eed",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -552,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "8458530a68722bbd145e5a9454a515af002876ee",
+      "source_git_object_sha": "701dcaa9b1a7b79b5ec3ad8c4df2c32668db90aa",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -576,13 +614,21 @@
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
-        "cutover:parity-ready"
+        "cutover:owner-sensitive"
       ],
-      "move_batch": "B1-core-runtime",
+      "move_batch": "B3-owner-sensitive",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
         "VOL-004",
         "VOL-020"
+      ],
+      "parity_exceptions": [
+        {
+          "path": "cortex_mount_guard.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.api.cortex_mount_guard import (",
+          "note": "Existing governed re-export retains the single canonical startup guard and current restricted-route identity instead of an independent copied implementation."
+        }
       ]
     },
     {
@@ -696,7 +742,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "ac2bef0bc5e77e0e1e078f18d53fd8cd5c955527",
+      "source_git_object_sha": "a67b5e17338c0f287e0469658e0ef60a3d415a3a",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -843,7 +889,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "ed5f01f4f582622ad18448fdc128dee50bc92371",
+      "source_git_object_sha": "5e86300d17acb3d437c43fc3edc251217094ba6b",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -948,7 +994,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "e81bed1065ad6f5ac8cec82aa24613a56570c1a1",
+      "source_git_object_sha": "22e102e21dfd07bf1648ca8e50e88a07687274ff",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -1453,7 +1499,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "63329b943ddb840c001d5572a4bf2e0a96661233",
+      "source_git_object_sha": "b919869f2a1b22c90c2e2c85b01c2325dacf819a",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1791,7 +1837,7 @@
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "350d9aa2a27bed74711d4dd7e022d213e4870c8b",
+      "source_git_object_sha": "8bcdd8337a2a885144b7fcfdbdaa4ef420205b5a",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",
@@ -1906,7 +1952,7 @@
       "source": "skeleton/gate_plane",
       "destination": "skeleton/ai/runtime/policy/gate_plane",
       "kind": "tree",
-      "source_git_object_sha": "cc2d5b1e8bea62695b4187c2c674544512a93a74",
+      "source_git_object_sha": "4ecc7f3a7bc33a43a6739ddbf29c13cd346366d1",
       "role": "Admission, proxy, chaos, and gate evidence are deterministic policy/reliability controls around AI execution.",
       "work_package_refs": [
         "WP-W14",
@@ -2282,7 +2328,7 @@
       "source": "skeleton/state",
       "destination": "skeleton/ai/runtime/state",
       "kind": "tree",
-      "source_git_object_sha": "d5f727abee13befa9255a8358d6e9ce24f3172f9",
+      "source_git_object_sha": "5459a636fab40c0acc2ec5a970911e842758b2f4",
       "role": "Durable run/checkpoint state is engine-owned state/recovery infrastructure and belongs beside canonical persistence.",
       "work_package_refs": [
         "WP-W03",
@@ -2318,7 +2364,7 @@
       "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "eec4dbb2cf19e3238ffe7dbd5789bc8f855f22ac",
+      "source_git_object_sha": "2b846c1f529b5f34665aeab90fb0b4bb8e0bb16b",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -3228,7 +3274,7 @@
       "source": "skeleton/config",
       "destination": "skeleton/ai/runtime/config",
       "kind": "tree",
-      "source_git_object_sha": "13f1b59dff5ca688f80925468dd2026c138a035f",
+      "source_git_object_sha": "49412bb37e6ab37b439f202c9a6dfc1bb64d8043",
       "role": "typed engine configuration, secret references, immutable settings and redacted configuration snapshots",
       "work_package_refs": [
         "WP-W00",
@@ -3378,7 +3424,7 @@
       "source": "skeleton/architecture.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture.py",
       "kind": "file",
-      "source_git_object_sha": "8d381502beb2195996a1313f5a40c9f20ade017d",
+      "source_git_object_sha": "e1a0b33ab972b56892658a28f0fa4f85a1c30e7c",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",
@@ -5120,7 +5166,7 @@
       "source": "backend/core/agent_ledger.py",
       "destination": "skeleton/ai/compat/backend_core/agent_ledger.py",
       "kind": "file",
-      "source_git_object_sha": "9409bbbdbee19dd40803d5c8a9bdb237e599127a",
+      "source_git_object_sha": "1c4765b138792b22b78231e287b4faeadb0f9e10",
       "role": "Legacy agent ledger staged for convergence into canonical state/agent ownership.",
       "work_package_refs": [
         "WP-W03",
@@ -5574,7 +5620,7 @@
       "source": "skeleton/storage",
       "destination": "skeleton/ai/runtime/storage",
       "kind": "tree",
-      "source_git_object_sha": "49d31909a92191cef6a78d428abfc6d7f6f6a2a2",
+      "source_git_object_sha": "c811d4eb037296abaa4eda37ca2d9347e729d6ad",
       "role": "governed content addressing, cache identity, and durable saga compensation state",
       "work_package_refs": [
         "WP-W03",
@@ -6216,7 +6262,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending fresh implementation signoff for the reconciled 179-mapping current-main payload after exact-head CI and full object/parity audit.",
+    "statement": "Pending fresh implementation signoff for the reconciled 180-mapping current-main payload after exact-head CI and full object/parity audit.",
     "signature_method": null
   },
   "verification_signoff": {
@@ -7256,6 +7302,21 @@
       "path": "skeleton/volumes",
       "owner": "masterplan volume organs",
       "reason": "per-volume construction organs referenced by masterplan implementation_paths; retained outside the AI tree pending explicit per-volume cutover."
+    },
+    {
+      "path": "skeleton/app_services",
+      "owner": "Existing application-foundation service adapters",
+      "reason": "Existing in-process application auth/projects/build-job/assets ports and adapters remain canonical here per docs/contracts/job_queue.md and docs/architecture/c4/02-container.md; no HTTP entry, model provider or new service/state owner is introduced."
+    },
+    {
+      "path": "skeleton/client",
+      "owner": "Existing typed application HTTP/SSE client SDK",
+      "reason": "Canonical client SDK remains outside AI implementation ownership per docs/architecture/c4/02-container.md and accepted docs/architecture/ADR-realtime-transport.md; it consumes existing authenticated application/engine routes and never owns model execution."
+    },
+    {
+      "path": "skeleton/realtime",
+      "owner": "Existing canonical application SSE and presence transport",
+      "reason": "Accepted docs/architecture/ADR-realtime-transport.md retains the shared event envelope, bounded hub, authorization/presence, SLO and secret-guard implementation here; transport adds no competing model/runtime or durable state authority."
     }
   ],
   "classification_coverage": {
@@ -7337,7 +7398,7 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 179,
+    "current_mapping_count": 180,
     "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
@@ -7487,12 +7548,12 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 179,
+    "governed_mapping_count": 180,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 123,
+    "retained_outside_ai_tree_count": 126,
     "batch_counts": {
-      "B3-owner-sensitive": 9,
-      "B1-core-runtime": 72,
+      "B3-owner-sensitive": 11,
+      "B1-core-runtime": 71,
       "B2-domain-build": 14,
       "B4-research-quarantine": 56,
       "B3-compat-convergence": 28
@@ -7502,7 +7563,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 178
+    "native_ai_owner_count": 60
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8002,6 +8063,56 @@
         ]
       },
       "policy": "Replace stale or shorthand mature-volume implementation paths with current repository owners and bind newly exposed governed AI owners without changing runtime behavior, cutover authority, implementation maturity, completion signatures, or independent verification."
+    },
+    "current_main_source_parity_2026_10_18": {
+      "base_git_sha": "f511c704ec07816697a9df34c5fc622c02565b21",
+      "scope": "Restore already-declared staged-mirror parity for existing canonical current-main members; preserve intentional Projects facade and every existing overlay/source exclusion. Retain existing application services/client/realtime outside AI; explicitly classify eight existing AI-native SDK/ROM training modules without moving or deleting them.",
+      "mirrored_new_members": 64,
+      "updated_existing_mirrors": [
+        "skeleton/ai/runtime/policy/gate_plane/agent_edge/gateway.py",
+        "skeleton/ai/compat/backend_core/agent_ledger.py",
+        "skeleton/ai/agents/jeeves/agent/semantic_frontier.py",
+        "skeleton/ai/agents/jeeves/agent/semantic_lenses.py",
+        "skeleton/ai/agents/jeeves/agent/semantic_maximal.py",
+        "skeleton/ai/agents/jeeves/game_emulator_training_lab.py",
+        "skeleton/ai/agents/jeeves/game_learning_cli.py",
+        "skeleton/ai/runtime/api/middleware.py",
+        "skeleton/ai/runtime/api/server.py",
+        "skeleton/ai/build/developer/cli.py",
+        "skeleton/ai/build/developer/jeeves_game_authoring.py",
+        "skeleton/ai/build/developer/jeeves_game_cli.py"
+      ],
+      "preserved_projects_facade": "skeleton/ai/runtime/contracts/projects.py",
+      "native_training_paths": [
+        "skeleton/ai/training/joint_learning_custody.py",
+        "skeleton/ai/training/rom_fleet_audit.py",
+        "skeleton/ai/training/rom_inventory_snapshot.py",
+        "skeleton/ai/training/rom_study.py",
+        "skeleton/ai/training/rom_triangle_campaign.py",
+        "skeleton/ai/training/rom_triangle_lens_progress.py",
+        "skeleton/ai/training/sdk_custody_drift.py",
+        "skeleton/ai/training/sdk_study.py"
+      ],
+      "retained_application_paths": [
+        "skeleton/app_services",
+        "skeleton/client",
+        "skeleton/realtime"
+      ],
+      "source_pin_policy": "Active dirty canonical source mappings retain their existing object pins until the final frozen indexed source-tree refresh; no source retirement, import inversion, independent signoff or completion authority is granted by this parity repair.",
+      "preserved_facades": [
+        "skeleton/ai/runtime/contracts/projects.py",
+        "skeleton/ai/runtime/api/cortex_mount_guard.py"
+      ],
+      "api_mapping_sensitivity": "Existing canonical guard re-export is now explicitly facade-governed; apply existing owner-sensitive cutover tag/batch without import inversion or ownership change."
+    },
+    "provider_runtime_legacy_alias_2026_10_18": {
+      "mapping_id": "AIFT-PROVIDER-RUNTIME-LEGACY-ALIAS",
+      "canonical_owner": "skeleton/provider_runtime.py",
+      "legacy_alias": "skeleton/ai/runtime/provider_runtime.py",
+      "existing_governed_facade_preserved": "skeleton/ai/providers/runtime.py",
+      "parity_mode": "compatibility_facade",
+      "authority": "Existing canonical provider owner and explicit non-owning alias; no provider, service, state-store or model-policy ownership cutover. Final canonical source object refresh and exact-head validation remain required.",
+      "source_pin_policy": "Both provider aliases retain the same canonical source Git object pin and must refresh together against the frozen canonical source."
     }
   },
   "native_ai_owners": [
@@ -10171,6 +10282,5 @@
         "VOL-006"
       ]
     }
-
   ]
 }

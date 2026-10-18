@@ -1,0 +1,36 @@
+{
+  "action": "forge.kinds",
+  "canonical_catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+  "catalog_digest": "d8e98ebfe70a59552b4c82275ab646e5f132f2fe6c8f84634e17d83328ca0364",
+  "catalog_pin_requested": true,
+  "digest": "e2a6628d2e2ce3860815340078066011f0cb4aa46c042dc1b75caabda8db86cb",
+  "effect": "read",
+  "input_digest": "0424f03b5196949c069435829cfd54921fc3678e3b74188de97e2d3eeadae3e1",
+  "inventory_digest": "75dcbb220b02ea8601a58ecdc3d67f57f1c2983dc9b2547e518b38f209ea333a",
+  "operator_authorized": false,
+  "read_only_or_review_only": true,
+  "result": {
+    "canonical_adapter": "forge.kinds",
+    "canonical_receipt_digest": "28f0f8b062f783b9e4f28fdc4e37a73f15bfda063a7da6fe56359b01f2d537ce",
+    "result": {
+      "blueprint_materialization_executed": false,
+      "component_kinds": [
+        "collapse",
+        "enemy_spawner",
+        "extract",
+        "heat",
+        "jeeves",
+        "player",
+        "sink",
+        "source",
+        "state_store",
+        "transform",
+        "weapon_forge"
+      ]
+    },
+    "source_committed": false,
+    "weights_changed": false
+  },
+  "schema": "skeleton.ai.jeeves_appwide_action_receipt.v1",
+  "unregistered_execution_denied": true
+}

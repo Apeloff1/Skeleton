@@ -77,6 +77,7 @@ export const ROUTE_REGISTRY: readonly RouteEntry[] = [
   { path: '/lang-recommend', title: 'Language Recommend', category: 'code' },
 
   { path: '/jeeves', title: 'Jeeves', category: 'ai' },
+  { path: '/ai-models', title: 'Observed Model Inventory', category: 'ai' },
   { path: '/jeeves-hub', title: 'Jeeves Hub', category: 'ai' },
   { path: '/jeeves-eq', title: 'Jeeves EQ', category: 'ai' },
   { path: '/jeeves-level', title: 'Jeeves Level', category: 'ai' },

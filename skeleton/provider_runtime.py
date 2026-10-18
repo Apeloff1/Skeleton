@@ -26,7 +26,7 @@ from collections import deque
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from importlib import metadata as package_metadata
 from importlib.util import find_spec
@@ -62,6 +62,7 @@ from skeleton.providers.contract import (
     load_provider_architecture,
 )
 from skeleton.shells.cancellation import CancellationToken
+from skeleton.skills.tool_contract import ToolContractError, validate_json_value
 from skeleton.vault.data_governance import (
     DataGovernanceDenied,
     ProviderTransferRequest,
@@ -545,8 +546,21 @@ class FailoverProviderAdapter(ProviderAdapter):
         return replace(request, model=adapter.model)
 
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        if not isinstance(request, ProviderRequest):
+            raise TypeError("request must be ProviderRequest")
+        if not isinstance(request.resource_budget, ResourceBudget):
+            raise ProviderPolicyError("model provider resource budget is invalid")
+        # One operation deadline covers every route. A failure near the end
+        # of the primary call cannot purchase a fresh wall-time budget.
+        route_deadline = datetime.now(UTC) + timedelta(seconds=request.resource_budget.max_wall_seconds)
+        if request.deadline is not None:
+            _remaining_provider_timeout(request, request.resource_budget.max_wall_seconds)
+            route_deadline = min(route_deadline, request.deadline.astimezone(UTC))
+        request = replace(request, deadline=route_deadline)
+        remaining_attempts = request.resource_budget.max_provider_attempts
         last_error: ProviderError | None = None
-        for index, adapter in enumerate((self.primary, *self.fallbacks)):
+        candidates = (self.primary, *self.fallbacks)
+        for index, adapter in enumerate(candidates):
             routed = self._request_for(adapter, request)
             if routed is None:
                 continue
@@ -554,12 +568,36 @@ class FailoverProviderAdapter(ProviderAdapter):
                 self._telemetry.unavailable_skips += 1
                 self._telemetry.last_failure_kind = "unavailable"
                 continue
+            _remaining_provider_timeout(routed, request.resource_budget.max_wall_seconds)
+            configured_attempts = getattr(adapter, "max_retries", 0) + 1
+            if type(configured_attempts) is not int or configured_attempts < 1:
+                raise ProviderPolicyError("declared provider attempt limit is invalid")
+            if remaining_attempts < 1:
+                self._telemetry.policy_denials += 1
+                self._telemetry.last_failure_kind = "attempt_budget"
+                raise ProviderPolicyError("remaining provider-attempt budget cannot cover declared route")
+            later_routes = sum(
+                self._request_for(candidate, request) is not None for candidate in candidates[index + 1 :]
+            )
+            reserved_attempts = min(configured_attempts, max(1, remaining_attempts - later_routes))
+            routed = replace(
+                routed,
+                resource_budget=replace(routed.resource_budget, max_provider_attempts=reserved_attempts),
+            )
+            # A failed/ambiguous invocation may have used every admitted SDK
+            # retry. Reserve that ceiling before entering another provider.
+            remaining_attempts -= reserved_attempts
             if index == 0:
                 self._telemetry.primary_attempts += 1
             else:
                 self._telemetry.failover_attempts += 1
             try:
-                response = await adapter.generate(routed)
+                response = await _await_bounded_provider_call(
+                    lambda selected=adapter, bound_request=routed: selected.generate(bound_request),
+                    deadline=route_deadline,
+                    configured_timeout=request.resource_budget.max_wall_seconds,
+                    label="model provider route",
+                )
             except ProviderPolicyError:
                 self._telemetry.policy_denials += 1
                 self._telemetry.last_failure_kind = "policy"
@@ -578,6 +616,10 @@ class FailoverProviderAdapter(ProviderAdapter):
                 self._telemetry.last_failure_kind = "invocation"
                 last_error = exc
                 continue
+            if not isinstance(response, ProviderResponse) or (
+                response.provider != adapter.provider_id or response.model != (routed.model or adapter.model)
+            ):
+                raise ProviderProtocolViolationError("model provider response differs from selected route")
             if index == 0:
                 self._telemetry.primary_successes += 1
             else:
@@ -806,6 +848,8 @@ def _provider_tool_choice_payload(
     choice = str(request.tool_choice or "auto").strip().lower()
     if choice not in {"none", "auto", "required", "specific"}:
         raise ProviderPolicyError("model provider tool_choice is invalid")
+    if request.specific_tool_id is not None and choice != "specific":
+        raise ProviderPolicyError("specific_tool_id requires tool_choice='specific'")
     offered = {tool.tool_id for tool in tools}
     if not offered:
         if choice in {"required", "specific"}:
@@ -816,8 +860,6 @@ def _provider_tool_choice_payload(
         if not tool_id or tool_id not in offered:
             raise ProviderPolicyError("specific provider tool choice must reference an offered tool")
         return {"type": "function", "name": tool_id}
-    if request.specific_tool_id is not None:
-        raise ProviderPolicyError("specific_tool_id requires tool_choice='specific'")
     return choice
 
 
@@ -1093,6 +1135,19 @@ def _provider_billing_metadata(
     return candidates[0][1], "USD"
 
 
+def _exact_usage_token_count(value: object) -> int | None:
+    """Never truncate fractional or non-finite provider accounting metadata."""
+    if type(value) is int:
+        return value if value >= 0 else None
+    if isinstance(value, str) and value and value.isascii() and value.isdecimal():
+        try:
+            return int(value)
+        except (ValueError, OverflowError):
+            # Includes Python's bounded-decimal conversion protection.
+            return None
+    return None
+
+
 def _normalized_provider_usage(
     response: object,
     *,
@@ -1120,23 +1175,14 @@ def _normalized_provider_usage(
             _provider_field(output_details, "reasoning_tokens", None) if output_details is not None else None
         )
 
-    def token(value: object) -> int | None:
-        if isinstance(value, bool) or value is None:
-            return None
-        try:
-            parsed = int(value)
-        except (TypeError, ValueError):
-            return None
-        return parsed if parsed >= 0 else None
-
     estimated = format(float(estimated_cost_usd), ".12g") if float(estimated_cost_usd) > 0 else None
     try:
         return ProviderUsage(
-            input_tokens=token(input_tokens),
-            output_tokens=token(output_tokens),
-            cached_input_tokens=token(cached_tokens),
-            reasoning_tokens=token(reasoning_tokens),
-            total_tokens=token(total),
+            input_tokens=_exact_usage_token_count(input_tokens),
+            output_tokens=_exact_usage_token_count(output_tokens),
+            cached_input_tokens=_exact_usage_token_count(cached_tokens),
+            reasoning_tokens=_exact_usage_token_count(reasoning_tokens),
+            total_tokens=_exact_usage_token_count(total),
             estimated_cost=estimated,
             billed_cost=billed_cost,
             currency=(
@@ -1208,6 +1254,7 @@ def _normalize_provider_interaction(
         response,
         tool_calls=tool_calls,
     )
+    _validate_response_protocol(request, tools, tool_calls, structured, finish)
     usage = _normalized_provider_usage(
         response,
         estimated_cost_usd=request.estimated_cost_usd,
@@ -1229,6 +1276,46 @@ def _normalize_provider_interaction(
     ):
         raise ProviderProtocolViolationError("model provider returned no normalized output")
     return normalized_text, structured, tool_calls, finish, usage
+
+
+def _validate_response_protocol(
+    request: ProviderRequest,
+    tools: tuple[ProviderToolDefinition, ...],
+    calls: tuple[ProviderToolCall, ...],
+    structured: Mapping[str, Any] | None,
+    finish: FinishReason,
+) -> None:
+    """Conformance is verified after normalization, never inferred from prose."""
+    choice = str(request.tool_choice or "auto").strip().lower()
+    _provider_tool_choice_payload(request, tools)
+    blocked = finish in {
+        FinishReason.REFUSAL,
+        FinishReason.CONTENT_FILTERED,
+        FinishReason.CANCELLED,
+        FinishReason.DEADLINE,
+    }
+    if choice == "none" and calls:
+        raise ProviderProtocolViolationError("provider returned tools when tool_choice is none")
+    if choice in {"required", "specific"} and not calls and not blocked:
+        raise ProviderProtocolViolationError("provider omitted required tool calls")
+    if choice == "specific" and any(call.tool_id != str(request.specific_tool_id).strip() for call in calls):
+        raise ProviderProtocolViolationError("provider returned a different specific tool")
+    offered = {tool.tool_id: tool for tool in tools}
+    try:
+        for call in calls:
+            definition = offered.get(call.tool_id)
+            if definition is None:
+                raise ProviderProtocolViolationError("provider returned an undeclared tool")
+            validate_json_value(definition.input_schema, call.arguments, path="provider_tool.arguments")
+        if request.structured_output_schema is not None:
+            if structured is None and not calls and not blocked:
+                raise ProviderProtocolViolationError("provider omitted requested structured output")
+            if structured is not None:
+                validate_json_value(
+                    request.structured_output_schema, dict(structured), path="provider_structured_output"
+                )
+    except ToolContractError as exc:
+        raise ProviderProtocolViolationError("provider output violates the admitted schema") from exc
 
 
 def _effective_governance_fields(
@@ -1654,13 +1741,8 @@ def _provider_usage_estimate(
 
 
 def _usage_int(value: object, fallback: int) -> int:
-    if isinstance(value, bool):
-        return fallback
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        return fallback
-    return parsed if parsed >= 0 else fallback
+    parsed = _exact_usage_token_count(value)
+    return fallback if parsed is None else parsed
 
 
 def _actual_provider_usage(
@@ -2091,23 +2173,31 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if request.max_output_tokens is not None
             else min(4_096, request.resource_budget.max_output_tokens)
         )
+        if requested_output < 1:
+            raise ProviderPolicyError("model provider requires a positive admitted output allowance")
         request_timeout = _remaining_provider_timeout(
             request,
             self.timeout_seconds,
         )
+        attempt_limit = min(self.max_retries + 1, request.resource_budget.max_provider_attempts)
         lease, estimate = _admit_provider_request(
             self.admission_runtime,
             request,
             tenant_id=effective_tenant_id,
             requested_output_tokens=requested_output,
             timeout_seconds=request_timeout,
-            provider_attempts=self.max_retries + 1,
+            provider_attempts=attempt_limit,
         )
 
         started = time.perf_counter()
         dispatched = False
         try:
             client = self._get_client()
+            if attempt_limit != self.max_retries + 1:
+                configure = getattr(client, "with_options", None)
+                if not callable(configure):
+                    raise ProviderPolicyError("provider client cannot enforce admitted retry limit")
+                client = configure(max_retries=attempt_limit - 1)
             messages: list[dict[str, str]] = [message.as_openai_input() for message in request.history]
             messages.append({"role": "user", "content": request.prompt})
 
@@ -2116,9 +2206,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 "model": model,
                 "instructions": request.instructions,
                 "input": messages,
+                "max_output_tokens": requested_output,
             }
-            if request.max_output_tokens is not None:
-                kwargs["max_output_tokens"] = request.max_output_tokens
             if request.temperature is not None:
                 kwargs["temperature"] = request.temperature
             if tools:
@@ -2180,6 +2269,9 @@ class OpenAIProviderAdapter(ProviderAdapter):
             estimate=estimate,
             wall_seconds=latency_seconds,
             normalized_usage=usage,
+            # The SDK owns transport retry accounting. Charge its admitted
+            # ceiling conservatively rather than report an unobserved one.
+            attempts_used=attempt_limit,
         )
         try:
             _finalize_provider_usage(
@@ -2865,17 +2957,20 @@ class OpenAISyncProviderAdapter:
             if request.max_output_tokens is not None
             else min(4_096, request.resource_budget.max_output_tokens)
         )
+        if requested_output < 1:
+            raise ProviderPolicyError("model provider requires a positive admitted output allowance")
         request_timeout = _remaining_provider_timeout(
             request,
             self.timeout_seconds,
         )
+        attempt_limit = min(self.max_retries + 1, request.resource_budget.max_provider_attempts)
         lease, estimate = _admit_provider_request(
             self.admission_runtime,
             request,
             tenant_id=effective_tenant_id,
             requested_output_tokens=requested_output,
             timeout_seconds=request_timeout,
-            provider_attempts=self.max_retries + 1,
+            provider_attempts=attempt_limit,
         )
 
         if not self.api_key:
@@ -2889,9 +2984,8 @@ class OpenAISyncProviderAdapter:
             "model": model,
             "instructions": request.instructions,
             "input": messages,
+            "max_output_tokens": requested_output,
         }
-        if request.max_output_tokens is not None:
-            body["max_output_tokens"] = request.max_output_tokens
         if request.temperature is not None:
             body["temperature"] = request.temperature
         if tools:
@@ -2920,7 +3014,7 @@ class OpenAISyncProviderAdapter:
         attempts_used = 0
         dispatched = False
         try:
-            for _attempt in range(self.max_retries + 1):
+            for _attempt in range(attempt_limit):
                 if cancellation is not None:
                     cancellation.require_active()
                 attempts_used += 1
@@ -3162,6 +3256,7 @@ class ProviderRegistry:
                 raise ProviderUnavailableError(
                     "local provider requires exactly one artifact or deployment manifest"
                 )
+            capacity = _local_execution_capacity()
             if deployment_path:
                 try:
                     from skeleton.ai.runtime.inference.deployment import (
@@ -3174,6 +3269,7 @@ class ProviderRegistry:
                         cache_size=_env_int("AI_LOCAL_MODEL_CACHE_SIZE", 0, minimum=0),
                         default_seed=_env_int("AI_LOCAL_MODEL_SEED", 0, minimum=0),
                         rehash_artifacts_each_run=True,
+                        **capacity,
                     )
                 except (LocalModelDeploymentError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
@@ -3201,6 +3297,7 @@ class ProviderRegistry:
                     LocalInferenceEngine(
                         loaded.model,
                         cache_size=cache_size,
+                        **capacity,
                     ),
                     default_seed=default_seed,
                     artifact_status=loaded.receipt.as_dict(),
@@ -3415,22 +3512,34 @@ class ProviderRegistry:
     def statuses(self) -> list[dict[str, Any]]:
         statuses = []
         for provider_id, adapter in sorted(self._adapters.items()):
-            status = adapter.status()
             local = provider_id == "local"
-            artifact = status.get("artifact")
+            try:
+                status = adapter.status()
+            except (OSError, ValueError, RuntimeError):
+                if not local:
+                    raise
+                # Health/model discovery remains readable after local weight
+                # drift; the affected route is explicitly unavailable.
+                status = {
+                    "id": provider_id,
+                    "model": getattr(adapter, "model", None),
+                    "available": False,
+                    "readiness_code": "local_artifact_identity_invalid",
+                }
             context_window = 16_384 if local else 128_000
             tokenizer = "approximate_text"
+            output_limit = 8_192 if local else 16_384
+            limits_source = "engine_chat_policy"
             if local:
-                tokenizer = (
-                    "reference_tokens"
-                    if isinstance(artifact, Mapping) and artifact.get("schema") == "reference_ngram"
-                    else "utf8_bytes"
-                )
-                engine = getattr(adapter, "engine", None)
-                model_config = getattr(getattr(engine, "model", None), "config", None)
-                actual_context = getattr(model_config, "context_size", None)
-                if isinstance(actual_context, int) and not isinstance(actual_context, bool):
-                    context_window = min(context_window, actual_context)
+                limits = status.get("generation_limits")
+                if isinstance(limits, Mapping):
+                    context_window = limits["context_window"]
+                    output_limit = limits["max_output_tokens"]
+                    tokenizer = limits["tokenizer"]
+                    limits_source = limits["limits_source"]
+                else:
+                    tokenizer = "utf8_bytes_upper_bound"
+            protocols = status.get("protocol_capabilities", ["text-generation"])
             status.update(
                 {
                     "configured": (
@@ -3440,18 +3549,21 @@ class ProviderRegistry:
                     ),
                     "credential_free": local,
                     "execution_mode": "local" if local else "hosted",
-                    "capabilities": ["text-generation"],
+                    "capabilities": list(protocols),
                     "context_window": context_window,
-                    "max_output_tokens": (min(8_192, context_window // 2) if local else 16_384),
-                    "default_output_tokens": (min(256, max(1, context_window // 4)) if local else 4_096),
-                    "limits_source": "engine_chat_policy",
+                    "max_output_tokens": output_limit,
+                    "default_output_tokens": (
+                        min(256, output_limit, max(1, context_window // 4)) if local else 4_096
+                    ),
+                    "limits_source": limits_source,
                     "tokenizer": tokenizer,
                     "supports_temperature": not local
                     and _supports_temperature(getattr(adapter, "model", None)),
                     "readiness_code": (
                         "ready"
                         if status["available"]
-                        else getattr(
+                        else status.get("readiness_code")
+                        or getattr(
                             adapter,
                             "readiness_code",
                             (
@@ -3511,13 +3623,31 @@ def _execution_source_identity() -> dict[str, object]:
     paths = (
         "provider_runtime.py",
         "intelligence/execution_runtime.py",
+        "intelligence/cooperation.py",
+        "intelligence/verification_runtime.py",
+        "intelligence/verification_policy.py",
         "ai/runtime/inference/local.py",
+        "ai/runtime/inference/artifact.py",
         "ai/runtime/inference/neural.py",
+        "ai/runtime/inference/native_runtime.py",
+        "ai/runtime/inference/native_transformer.py",
         "ai/runtime/inference/llama_cpp.py",
         "ai/runtime/inference/deployment.py",
+        "cortex/attn.py",
+        "cortex/bpe.py",
+        "cortex/transformer.py",
     )
     try:
-        sources = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in paths}
+        native_sources = tuple(
+            path.relative_to(root).as_posix()
+            for path in sorted((root / "ai/model_runtime").rglob("*.py"))
+            if "__pycache__" not in path.parts
+        )
+        if not native_sources:
+            raise OSError("canonical native model runtime sources are unavailable")
+        sources = {
+            name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in (*paths, *native_sources)
+        }
     except OSError as exc:
         raise ProviderPolicyError("canonical provider source identity is unavailable") from exc
     packages = {}
@@ -3612,6 +3742,8 @@ def provider_execution_identity(adapter: ProviderAdapter) -> dict[str, object]:
                 },
                 "default_seed": getattr(route, "default_seed", None),
                 "capacity": status.get("capacity"),
+                "protocol_capabilities": status.get("protocol_capabilities"),
+                "generation_limits": status.get("generation_limits"),
             }
             for name in ("runtime_digest", "execution_profile_digest"):
                 value = activation[name]
@@ -3655,6 +3787,25 @@ def provider_response_matches_identity(
         and route.get("model_id") == model_id
         for route in routes
     )
+
+
+def _local_execution_capacity() -> dict[str, int]:
+    """Operator-only fixed admission limits; invalid configuration fails closed."""
+    resolved = {}
+    for key, name, default, minimum, maximum in (
+        ("max_concurrency", "AI_LOCAL_MODEL_MAX_CONCURRENCY", 1, 1, 32),
+        ("max_queue_size", "AI_LOCAL_MODEL_MAX_QUEUE_SIZE", 256, 0, 65536),
+        ("max_batch_size", "AI_LOCAL_MODEL_MAX_BATCH_SIZE", 256, 1, 4096),
+    ):
+        raw = os.getenv(name)
+        try:
+            value = default if raw is None else int(raw)
+        except ValueError as exc:
+            raise ProviderUnavailableError("local provider capacity configuration is invalid") from exc
+        if not minimum <= value <= maximum:
+            raise ProviderUnavailableError("local provider capacity configuration is out of bounds")
+        resolved[key] = value
+    return resolved
 
 
 def _env_float(name: str, default: float, *, minimum: float) -> float:

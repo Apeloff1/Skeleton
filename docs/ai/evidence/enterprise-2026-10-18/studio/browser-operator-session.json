@@ -1,0 +1,58 @@
+{
+  "source_catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+  "operations": [
+    {
+      "operation": "cold_workbench_open",
+      "active_project": "coherence",
+      "canonical_actions": 29
+    },
+    {
+      "operation": "confirm_before_compile",
+      "status": "Jeeves app action denied: Confirm this bounded operation before running or staging changes"
+    },
+    {
+      "operation": "canonical_native_source_compile",
+      "digest": "43ddabea29e4028464a5d09b7e430bc3e042cfdab4555c1c6cca0bf9f95fa676",
+      "gameplay_proof_executed": true,
+      "native_source_manifest_digest": "014fdc775f31948fb65a2c9a7b06ad60a19ba6c816c4622877d0a7cc066c3f5f",
+      "confirmation_reset": true
+    },
+    {
+      "operation": "fresh_whole_app_scan",
+      "appwide_actions": 36,
+      "canonical_selector_unchanged": "game.compile.native"
+    },
+    {
+      "operation": "appwide_canonical_forge_forwarding",
+      "digest": "e2a6628d2e2ce3860815340078066011f0cb4aa46c042dc1b75caabda8db86cb",
+      "component_kinds": [
+        "collapse",
+        "enemy_spawner",
+        "extract",
+        "heat",
+        "jeeves",
+        "player",
+        "sink",
+        "source",
+        "state_store",
+        "transform",
+        "weapon_forge"
+      ]
+    },
+    {
+      "operation": "appwide_current_project_mirror",
+      "digest": "9ceab6bfd972fc63c4661b24c3bde13a672631e6be6ce2bb8c7cf557d0dddac3",
+      "gameplay_proof_executed": true,
+      "mirror_receipt_digest": "e550a82b85735c9c08e2b2e8d7257b830f0bebb3b40a57357cb89f8bb1ac543d"
+    },
+    {
+      "operation": "catalog_pinned_role_exercise",
+      "digest": "d3c9cd4266a430013549c5eb86dec1a64b19975eb19192231a0287b785c3b716",
+      "part_count": 8,
+      "model_calls_performed": 0
+    }
+  ],
+  "page_errors": [],
+  "automated_test_suite": false,
+  "observed_via_actual_browser": true
+}

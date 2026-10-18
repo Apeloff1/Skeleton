@@ -1,4 +1,5 @@
 """Adapter from Skeleton's repository-owned transformer to local inference."""
+
 from __future__ import annotations
 
 import hashlib
@@ -6,7 +7,11 @@ import json
 import threading
 import time
 
-from skeleton.ai.model_runtime import GenerationConfig, NativeLLMRuntime, RuntimeContractError
+from skeleton.ai.model_runtime import (
+    GenerationConfig,
+    NativeLLMRuntime,
+    RuntimeContractError,
+)
 
 from .local import (
     LocalInferenceCancelled,
@@ -19,6 +24,10 @@ from .local import (
 
 class NativeTransformerModel:
     """Expose NativeLLMRuntime through the canonical LocalModelBackend contract."""
+
+    model_family = "native_transformer"
+    protocol_capabilities = ("text-generation",)
+    tokenizer_kind = "native_tokenizer"
 
     def __init__(self, runtime: NativeLLMRuntime, *, model_id: str = "skeleton-native-transformer") -> None:
         if not isinstance(runtime, NativeLLMRuntime):
@@ -37,7 +46,15 @@ class NativeTransformerModel:
 
     @property
     def runtime_digest(self) -> str:
+        self._assert_identity()
         return self._runtime_digest
+
+    def assert_identity(self) -> None:
+        self._assert_identity()
+
+    def count_input_tokens(self, request: LocalInferenceRequest) -> int:
+        self._assert_identity()
+        return len(self.runtime.encode(request.rendered_input).token_ids)
 
     def _compute_runtime_digest(self) -> str:
         payload = {
@@ -85,6 +102,11 @@ class NativeTransformerModel:
         prompt = request.rendered_input
         prompt_sequence = self.runtime.encode(prompt)
         started = time.perf_counter()
+
+        def interrupt() -> None:
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local generation cancelled")
+
         stream = self.runtime.stream(
             prompt,
             GenerationConfig(
@@ -93,10 +115,11 @@ class NativeTransformerModel:
                 temperature=0.0,
                 use_cache=True,
             ),
+            interrupt=interrupt,
         )
-        for _event in stream:
-            if cancel.is_set():
-                raise LocalInferenceCancelled("local generation cancelled")
+        with stream:
+            for _event in stream:
+                interrupt()
         result = stream.result
         if result is None:
             raise RuntimeError("native transformer completed without a terminal result")
@@ -105,17 +128,13 @@ class NativeTransformerModel:
         text = result.text
         output_tokens = len(result.generated_ids)
         finish_reason = (
-            result.finish_reason
-            if result.finish_reason in {"completed", "length"}
-            else "completed"
+            result.finish_reason if result.finish_reason in {"completed", "length"} else "completed"
         )
         stop_index = self._first_stop_index(text, request.stop)
         if stop_index is not None:
             text = text[:stop_index]
-            # String stops are a compatibility surface above token generation.
-            # Re-tokenize the published prefix so usage and response identity
-            # describe exactly the content returned to the caller.
-            output_tokens = 0 if not text else len(self.runtime.tokenizer.encode_ids(text))
+            # Usage accounts for actual generation work, including a stop
+            # delimiter that is withheld from the published text.
             finish_reason = "completed"
 
         published_digest = hashlib.sha256(

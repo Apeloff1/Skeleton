@@ -1,3 +1,5 @@
+import { normalizeChatCooperation, type ChatCooperationPolicy, type ChatCooperationSummary } from '../../product/chatCooperation';
+
 /** Device-local conversation data. No attachment bytes cross the persistence boundary. */
 export const WORKSPACE_KEY = '@tutolage/jeeves-workspace:v1';
 export const LEGACY_KEY = '@tutolage/jeeves-chat:v2';
@@ -34,6 +36,8 @@ export type Message = {
   retryRequest?: Omit<ChatBody, 'message' | 'client_message_id' | 'image_base64' | 'pdf_base64'>;
   terminal?: boolean;
   error?: string;
+  /** Current server observation only; excluded from device persistence. */
+  cooperation?: ChatCooperationSummary;
 };
 
 export type Conversation = {
@@ -73,6 +77,7 @@ export type ChatBody = {
   model_id?: string;
   max_output_tokens?: number;
   crawler_context?: { query: string; max_documents: number; max_characters: number };
+  cooperation?: ChatCooperationPolicy;
   resume_existing?: boolean;
   resume_only?: boolean;
   resume_cursor?: { operation_id: string; last_seen_sequence: number; last_event_digest: string | null };
@@ -91,6 +96,7 @@ export type CanonicalChatTurn = {
   canonical_thread_id?: string | null;
   canonical_user_message_id?: string | null;
   canonical_assistant_message_id?: string | null;
+  cooperation?: ChatCooperationSummary;
 };
 
 export type ChatHistoryProjection = {
@@ -103,7 +109,7 @@ export type ChatHistoryProjection = {
   canonical_thread_id?: string | null;
   thread_title?: string;
   thread_state?: string;
-  pending_turns?: { client_message_id: string; text: string; created_at: number; terminal: boolean }[];
+  pending_turns?: { client_message_id: string; text: string; created_at: number; terminal: boolean; cooperation?: ChatCooperationSummary }[];
 };
 
 export function newId(): string {
@@ -164,6 +170,12 @@ function restoreRetryRequest(value: unknown): Message['retryRequest'] {
   if (!item || !sessionIdentity(item.session_id)
       || typeof item.context !== 'string' || item.context.length > MAX_CONTEXT
       || typeof item.force_all_forms !== 'boolean') return undefined;
+  let cooperation: ChatCooperationPolicy | undefined;
+  let reviewSettingsInvalid = false;
+  if (item.cooperation !== undefined) {
+    try { cooperation = normalizeChatCooperation(item.cooperation); }
+    catch { reviewSettingsInvalid = true; }
+  }
   return {
     session_id: item.session_id as string,
     context: item.context,
@@ -172,7 +184,8 @@ function restoreRetryRequest(value: unknown): Message['retryRequest'] {
     ...(typeof item.provider_id === 'string' && item.provider_id.length <= 128 && typeof item.model_id === 'string' && item.model_id.length <= 256 ? { provider_id: item.provider_id, model_id: item.model_id } : {}),
     ...(Number.isSafeInteger(item.max_output_tokens) && (item.max_output_tokens as number) > 0 && (item.max_output_tokens as number) <= 65536 ? { max_output_tokens: item.max_output_tokens as number } : {}),
     ...(item.resume_existing === true ? { resume_existing: true } : {}),
-    ...(item.resume_only === true ? { resume_only: true } : {}),
+    ...(item.resume_only === true || reviewSettingsInvalid ? { resume_only: true } : {}),
+    ...(cooperation ? { cooperation } : {}),
     ...restoreCrawlerContext(item.crawler_context),
     ...restoreCursor(item.resume_cursor),
   };
@@ -391,6 +404,7 @@ export function projectCanonicalHistory(
       status: 'complete',
       error: undefined,
       retryRequest: undefined,
+      cooperation: undefined,
     });
 
     const localAssistant = localById.get(assistantId);
@@ -402,6 +416,7 @@ export function projectCanonicalHistory(
       createdAt: baseTimestamp + 1,
       status: 'complete',
       error: undefined,
+      cooperation: turn.cooperation,
     });
   });
 
@@ -416,6 +431,7 @@ export function projectCanonicalHistory(
     const index = unresolved.findIndex(message => message.id === turn.client_message_id);
     const previous = index >= 0 ? unresolved[index] : undefined;
     const message: Message = { ...previous, id: turn.client_message_id, role: 'user', text: turn.text.slice(0, MAX_TEXT), createdAt: turn.created_at, status: 'failed', terminal: turn.terminal,
+      cooperation: turn.cooperation ?? previous?.cooperation,
       error: turn.terminal ? 'This turn ended without a reply. You can send a new message.' : 'This saved turn has no confirmed answer yet. Resume to follow its actual state.',
       retryRequest: previous?.retryRequest || { session_id: projection.session_id, canonical_thread_id: projection.session_id, context: '', force_all_forms: false, resume_existing: true, resume_only: true } };
     if (index >= 0) unresolved[index] = message; else unresolved.push(message);

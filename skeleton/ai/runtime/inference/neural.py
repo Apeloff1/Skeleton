@@ -202,6 +202,14 @@ class NeuralTrainingReceipt:
 class NumpyRecurrentLM:
     """Small byte-level Elman RNN with deterministic local training."""
 
+    model_family = "numpy_recurrent_baseline"
+    protocol_capabilities = ("text-generation",)
+    tokenizer_kind = "utf8_byte_tokens"
+
+    @staticmethod
+    def count_input_tokens(request: LocalInferenceRequest) -> int:
+        return len(request.rendered_input.encode("utf-8")) + 1
+
     def __init__(
         self,
         *,
