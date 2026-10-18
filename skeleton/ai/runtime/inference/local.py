@@ -100,6 +100,11 @@ class LocalInferenceRequest:
     tools: tuple[Mapping[str, Any], ...] = ()
     structured_output_schema: Mapping[str, Any] | None = None
     context_digest: str | None = None
+    temperature: float = 1.0
+    top_k: int = 0
+    top_p: float = 1.0
+    min_p: float = 0.0
+    repetition_penalty: float = 1.0
 
     def __post_init__(self) -> None:
         if not isinstance(self.prompt, str) or not self.prompt.strip():
@@ -144,6 +149,40 @@ class LocalInferenceRequest:
             len(self.context_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.context_digest)
         ):
             raise ValueError("context_digest must be lowercase sha256")
+        if (
+            isinstance(self.temperature, bool)
+            or not isinstance(self.temperature, (int, float))
+            or not math.isfinite(float(self.temperature))
+            or not 0.0 <= float(self.temperature) <= 100.0
+        ):
+            raise ValueError("temperature outside supported range")
+        if isinstance(self.top_k, bool) or not isinstance(self.top_k, int) or self.top_k < 0:
+            raise ValueError("top_k must be a non-negative integer")
+        if (
+            isinstance(self.top_p, bool)
+            or not isinstance(self.top_p, (int, float))
+            or not math.isfinite(float(self.top_p))
+            or not 0.0 < float(self.top_p) <= 1.0
+        ):
+            raise ValueError("top_p outside supported range")
+        if (
+            isinstance(self.min_p, bool)
+            or not isinstance(self.min_p, (int, float))
+            or not math.isfinite(float(self.min_p))
+            or not 0.0 <= float(self.min_p) <= 1.0
+        ):
+            raise ValueError("min_p outside supported range")
+        if (
+            isinstance(self.repetition_penalty, bool)
+            or not isinstance(self.repetition_penalty, (int, float))
+            or not math.isfinite(float(self.repetition_penalty))
+            or not 0.01 <= float(self.repetition_penalty) <= 100.0
+        ):
+            raise ValueError("repetition_penalty outside supported range")
+        object.__setattr__(self, "temperature", float(self.temperature))
+        object.__setattr__(self, "top_p", float(self.top_p))
+        object.__setattr__(self, "min_p", float(self.min_p))
+        object.__setattr__(self, "repetition_penalty", float(self.repetition_penalty))
 
     @property
     def rendered_input(self) -> str:
@@ -169,6 +208,17 @@ class LocalInferenceRequest:
                 "structured_output_schema": self.structured_output_schema,
                 "context_digest": self.context_digest,
             }
+            | (
+                {"temperature": self.temperature} if self.temperature != 1.0 else {}
+            )
+            | ({"top_k": self.top_k} if self.top_k else {})
+            | ({"top_p": self.top_p} if self.top_p != 1.0 else {})
+            | ({"min_p": self.min_p} if self.min_p != 0.0 else {})
+            | (
+                {"repetition_penalty": self.repetition_penalty}
+                if self.repetition_penalty != 1.0
+                else {}
+            )
         )
 
 

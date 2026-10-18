@@ -242,6 +242,7 @@ class GenerationConfig:
     suppress_token_ids: tuple[int, ...] = ()
     stop_strings: tuple[str, ...] = ()
     include_stop_tokens: bool = True
+    min_p: float = 0.0
 
     @classmethod
     def from_dict(
@@ -301,6 +302,13 @@ class GenerationConfig:
             or not 0.0 < float(self.top_p) <= 1.0
         ):
             raise RuntimeContractError("top_p outside supported range")
+        if (
+            isinstance(self.min_p, bool)
+            or not isinstance(self.min_p, (int, float))
+            or not math.isfinite(float(self.min_p))
+            or not 0.0 <= float(self.min_p) <= 1.0
+        ):
+            raise RuntimeContractError("min_p outside supported range")
         if not isinstance(self.use_cache, bool):
             raise RuntimeContractError("use_cache must be boolean")
         for name in ("stop_token_ids", "suppress_token_ids"):
@@ -344,6 +352,8 @@ class GenerationConfig:
             result["stop_strings"] = list(self.stop_strings)
         if not self.include_stop_tokens:
             result["include_stop_tokens"] = False
+        if float(self.min_p) != 0.0:
+            result["min_p"] = float(self.min_p)
         return result
 
 
