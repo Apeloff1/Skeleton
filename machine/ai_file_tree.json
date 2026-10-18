@@ -477,7 +477,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "1f9fef8aee1a5aaedae0f0c7b85672f7beaee5a1",
+      "source_git_object_sha": "228682dd7d442478990d2a4e7aad2c6f5d48cf00",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -552,7 +552,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "9685d3aec944c3373e682329c01fa6d857eefc3b",
+      "source_git_object_sha": "8458530a68722bbd145e5a9454a515af002876ee",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -696,7 +696,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "5c68d4790b32da5246aca4f727e90c8771344ea7",
+      "source_git_object_sha": "ac2bef0bc5e77e0e1e078f18d53fd8cd5c955527",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1223,7 +1223,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "e74d01b60d1d0e94dc1d5100b3743d665f3c6cd4",
+      "source_git_object_sha": "e41db4d8117306e8ccd952e730da50847f9a3bb4",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1380,7 +1380,7 @@
       "source": "skeleton/repo_intelligence",
       "destination": "skeleton/ai/build/repo_intelligence",
       "kind": "tree",
-      "source_git_object_sha": "c3b1764e0aa2d6af8dc280e5ddda873b7cd505f7",
+      "source_git_object_sha": "fb0afa7ae646bd6171595de570270ec1b0434662",
       "role": "repository intelligence for build/control workflows",
       "work_package_refs": [
         "WP-W00",
@@ -1791,7 +1791,7 @@
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "ae809fbf970d053d3ac12161509fe731a9b52abe",
+      "source_git_object_sha": "350d9aa2a27bed74711d4dd7e022d213e4870c8b",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",
@@ -3378,7 +3378,7 @@
       "source": "skeleton/architecture.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture.py",
       "kind": "file",
-      "source_git_object_sha": "fa5ce86b5a439b89b45cf505c45527758bce7f9f",
+      "source_git_object_sha": "8d381502beb2195996a1313f5a40c9f20ade017d",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",
@@ -4833,7 +4833,7 @@
       "source": "backend/gameforge/jeeves",
       "destination": "skeleton/ai/research/legacy/gameforge/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "1ca6b7410ea19a92f838d5c5f4a2cb69c4e4cbfe",
+      "source_git_object_sha": "0b4e2c99931fa6323ff18a810bb686a783de5a34",
       "role": "Legacy GameForge Jeeves implementation/status lineage retained as non-authoritative evidence.",
       "work_package_refs": [
         "WP-W11",
@@ -5769,7 +5769,15 @@
         "jeeves_boomerang_queue.py",
         "jeeves_studio_curriculum.py",
         "jeeves_studio_multifactor_corpus.py",
-        "jeeves_studio_rule_corpus.py"
+        "jeeves_studio_rule_corpus.py",
+        "joint_learning_custody.py",
+        "rom_fleet_audit.py",
+        "rom_inventory_snapshot.py",
+        "rom_study.py",
+        "rom_triangle_campaign.py",
+        "rom_triangle_lens_progress.py",
+        "sdk_custody_drift.py",
+        "sdk_study.py"
       ],
       "overlay_note": "Current main already implements these governed AI-only training modules. Declare their existing placement without copying them into the legacy tree or changing training authority."
     },
@@ -6129,7 +6137,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "63a2962e366b9f4ea565ca6200b0edc099994db9",
+      "source_git_object_sha": "ce8c9c6fe748cd6ddf0b039e44c091da225cfcb5",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",
@@ -6528,7 +6536,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_52_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_178_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7494,7 +7502,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 52
+    "native_ai_owner_count": 178
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8776,6 +8784,1393 @@
         "VOL-006",
         "VOL-072"
       ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-JOINT-LEARNING-CUSTODY",
+      "path": "skeleton/ai/training/joint_learning_custody.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Read-only joint SDK and ROM custody checkpoint. Cannot grant rights, load ROMs, train, or promote weights.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-FLEET-AUDIT",
+      "path": "skeleton/ai/training/rom_fleet_audit.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Read-only accounting of completed ROM training evidence across a frozen, operator-approved fleet.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-INVENTORY-SNAPSHOT",
+      "path": "skeleton/ai/training/rom_inventory_snapshot.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Append-only frozen ROM inventory snapshot. Selected pages are rehashed; ROM bytes stay on the machine.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-STUDY",
+      "path": "skeleton/ai/training/rom_study.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Rights-gated local ROM inventory and tabular emulator policy training. Does not download ROMs or promote speaking-model weights.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-TRIANGLE-CAMPAIGN",
+      "path": "skeleton/ai/training/rom_triangle_campaign.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Foreground ROM, native gameplay, Dragon, and independent model review campaign using the existing rights and triangle gates.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-ROM-TRIANGLE-LENS-PROGRESS",
+      "path": "skeleton/ai/training/rom_triangle_lens_progress.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Read-only custody-verified progress audit for a 200-lens Jeeves session. Progress is not a replay of model outputs.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SDK-CUSTODY-DRIFT",
+      "path": "skeleton/ai/training/sdk_custody_drift.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Versioned redacted SDK source-drift snapshots. Unkeyed digests are integrity pins, not signatures or rights grants.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SDK-STUDY",
+      "path": "skeleton/ai/training/sdk_study.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Operator-gated SDK evidence intake into the existing multidomain trainer. Does not run compilers or modify model weights.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-JEEVES-ADVENTURE-SYSTEMS-EXTENDED-PY",
+      "path": "skeleton/ai/agents/jeeves/adventure_systems_extended.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Extended adventure systems: additional puzzle types, state machines, and fairness tooling. Companion to adventure_game_capability. Data-only.",
+      "volume_refs": [
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-JEEVES-DESIGN-BIBLE-ASSETS-EXTENDED-PY",
+      "path": "skeleton/ai/agents/jeeves/design_bible_assets_extended.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Design bible section templates and asset quality checklists. Companion material for full creation and adventure capabilities.",
+      "volume_refs": [
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-JEEVES-PRODUCTION-PLANNING-EXTENDED-PY",
+      "path": "skeleton/ai/agents/jeeves/production_planning_extended.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Production planning extensions: risk matrices, resource outlines, milestone templates. Companion to full_game_creation_capability. Data-only.",
+      "volume_refs": [
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CLEAN-ROOM-TRANSFORMATION-PY",
+      "path": "skeleton/ai/forge/clean_room_transformation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: clean_room_transformation.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-CLEAN-ROOM-TRANSFORMATION-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/clean_room_transformation.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: clean_room_transformation.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-FORGE-10000-CYCLE-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/forge_10000_cycle.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: forge_10000_cycle.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-FORGE-1000-CYCLE-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/forge_1000_cycle.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: forge_1000_cycle.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-FORGE-100-CYCLE-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/forge_100_cycle.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: forge_100_cycle.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-PROMOTION-ARBITRATION-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/promotion_arbitration.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: promotion_arbitration.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-QUALITY-DELTA-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/quality_delta.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: quality_delta.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-RIGHTS-FINGERPRINT-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/rights_fingerprint.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: rights_fingerprint.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-RIVAL-CHALLENGER-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/rival_challenger.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: rival_challenger.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-RIVAL-PROPOSER-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/rival_proposer.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: rival_proposer.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-RIVAL-VERIFIER-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/rival_verifier.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: rival_verifier.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-SOURCE-PROVENANCE-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/source_provenance.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: source_provenance.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-CONTRACTS-STOP-POLICY-SCHEMA-JSON",
+      "path": "skeleton/ai/forge/contracts/stop_policy.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: stop_policy.schema.json.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-FLGB-FORGE-RUNTIME-PY",
+      "path": "skeleton/ai/forge/flgb_forge_runtime.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "FLGB-17 adversarial forge, rights-clean-room, and promotion contracts.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-FORGE-10000-CYCLE-PY",
+      "path": "skeleton/ai/forge/forge_10000_cycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: forge_10000_cycle.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-FORGE-1000-CYCLE-PY",
+      "path": "skeleton/ai/forge/forge_1000_cycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: forge_1000_cycle.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-FORGE-100-CYCLE-PY",
+      "path": "skeleton/ai/forge/forge_100_cycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: forge_100_cycle.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-PROMOTION-ARBITRATION-PY",
+      "path": "skeleton/ai/forge/promotion_arbitration.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: promotion_arbitration.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-QUALITY-DELTA-PY",
+      "path": "skeleton/ai/forge/quality_delta.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: quality_delta.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-RIGHTS-FINGERPRINT-PY",
+      "path": "skeleton/ai/forge/rights_fingerprint.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: rights_fingerprint.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-RIVAL-CHALLENGER-PY",
+      "path": "skeleton/ai/forge/rival_challenger.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: rival_challenger.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-RIVAL-PROPOSER-PY",
+      "path": "skeleton/ai/forge/rival_proposer.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: rival_proposer.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-RIVAL-VERIFIER-PY",
+      "path": "skeleton/ai/forge/rival_verifier.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: rival_verifier.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-SOURCE-PROVENANCE-PY",
+      "path": "skeleton/ai/forge/source_provenance.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: source_provenance.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-FORGE-STOP-POLICY-PY",
+      "path": "skeleton/ai/forge/stop_policy.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: stop_policy.py.",
+      "volume_refs": [
+        "VOL-023"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PR-AUTOMATION-EVENT-SCHEMA-FENCE-PY",
+      "path": "skeleton/ai/build/pr_automation/event_schema_fence.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Fail closed when a workflow event schema digest drifts. Parent #80.",
+      "volume_refs": [
+        "VOL-022"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-ADMISSION-PY",
+      "path": "skeleton/ai/runtime/provenance/admission.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Fail-closed runtime admission from provenance trust evidence.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-ALGORITHM-LIFECYCLE-PY",
+      "path": "skeleton/ai/runtime/provenance/algorithm_lifecycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Digest lifecycle policy for long-horizon receipt issuance and verification.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-ARCHIVE-PY",
+      "path": "skeleton/ai/runtime/provenance/archive.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Archival bundles and predecessor-linked re-attestation.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-ATTESTATION-PY",
+      "path": "skeleton/ai/runtime/provenance/attestation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Portable, offline-verifiable AI execution attestations. The statement is authoritative. Witnesses only attest observation of its digest; they are not storage for the statement itself.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-COMMITMENTS-PY",
+      "path": "skeleton/ai/runtime/provenance/commitments.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Typed cryptographic commitments for durable AI provenance. Bare digest strings are deliberately avoided at interchange boundaries. Every commitment names its algorithm and canonicalization profile so future readers never have to infer crypt",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-CRYPTO-BACKENDS-PY",
+      "path": "skeleton/ai/runtime/provenance/crypto_backends.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Approved cryptography-backed provenance signers.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-CRYPTO-INVENTORY-PY",
+      "path": "skeleton/ai/runtime/provenance/crypto_inventory.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Cryptographic inventory and lifecycle policy for provenance issuance.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-EXECUTION-RECEIPT-PY",
+      "path": "skeleton/ai/runtime/provenance/execution_receipt.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Algorithm-agile, predecessor-linked execution receipts. This module is deliberately network-independent. It wraps immutable execution commitments without changing the historical receipt they attest.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-HORIZON-ASSESSMENT-PY",
+      "path": "skeleton/ai/runtime/provenance/horizon_assessment.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Evaluate native replay contracts against decade-horizon engineering signals.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-HORIZON-SIGNALS-PY",
+      "path": "skeleton/ai/runtime/provenance/horizon_signals.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Decade-horizon signals for long-lived AI execution and provenance contracts. These are engineering migration horizons, not forecasts. They keep durable receipts explicit about which evolution seams must remain available as cryptography, mod",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-KEY-LIFECYCLE-PY",
+      "path": "skeleton/ai/runtime/provenance/key_lifecycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Key lifecycle and revocation policy for provenance verification.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-PORTABLE-BUNDLE-PY",
+      "path": "skeleton/ai/runtime/provenance/portable_bundle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Self-contained provenance export and offline verification.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-QUORUM-PY",
+      "path": "skeleton/ai/runtime/provenance/quorum.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Threshold and diversity requirements for provenance signatures.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-RECEIPT-MIGRATION-PY",
+      "path": "skeleton/ai/runtime/provenance/receipt_migration.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Versioned receipt migration with explicit semantic-preservation declarations.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-RUNTIME-BRIDGE-PY",
+      "path": "skeleton/ai/runtime/provenance/runtime_bridge.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Convert native deterministic replay receipts into portable attestations.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-SIGNATURE-CAPABILITIES-PY",
+      "path": "skeleton/ai/runtime/provenance/signature_capabilities.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Signature capability negotiation for provenance envelopes.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-SIGNED-ENVELOPE-PY",
+      "path": "skeleton/ai/runtime/provenance/signed_envelope.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Signed provenance envelopes with hybrid-signature policy.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-PROVENANCE-TRUST-POLICY-PY",
+      "path": "skeleton/ai/runtime/provenance/trust_policy.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Policy evaluation for provenance trust decisions.",
+      "volume_refs": [
+        "VOL-038"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-INIT-PY",
+      "path": "skeleton/ai/training/__init__.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Governed FLGB-07 training and candidate-weight contracts.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-ADAPTER-TRAINING-PY",
+      "path": "skeleton/ai/training/adapter_training.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: adapter_training.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-BITEMPORAL-AUTHORITY-PY",
+      "path": "skeleton/ai/training/bitemporal_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Bitemporal truth: valid-time and knowledge-time are separate authority axes.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CANDIDATE-WEIGHTS-PY",
+      "path": "skeleton/ai/training/candidate_weights.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: candidate_weights.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CHECKPOINT-LINEAGE-PY",
+      "path": "skeleton/ai/training/checkpoint_lineage.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: checkpoint_lineage.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTAMINATION-SCAN-PY",
+      "path": "skeleton/ai/training/contamination_scan.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: contamination_scan.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-ADAPTER-TRAINING-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/adapter_training.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: adapter_training.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-CANDIDATE-WEIGHTS-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/candidate_weights.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: candidate_weights.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-CHECKPOINT-LINEAGE-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/checkpoint_lineage.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: checkpoint_lineage.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-CONTAMINATION-SCAN-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/contamination_scan.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: contamination_scan.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-DATASET-LINEAGE-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/dataset_lineage.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: dataset_lineage.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-DATASET-RIGHTS-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/dataset_rights.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: dataset_rights.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-DEDUPLICATION-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/deduplication.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: deduplication.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-DISTILLATION-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/distillation.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: distillation.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-MIRROR-ROOM-EVALUATION-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/mirror_room_evaluation.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: mirror_room_evaluation.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-POST-TRAINING-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/post_training.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: post_training.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-PROMOTION-GATE-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/promotion_gate.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: promotion_gate.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-CONTRACTS-TRAINING-MANIFEST-SCHEMA-JSON",
+      "path": "skeleton/ai/training/contracts/training_manifest.schema.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: training_manifest.schema.json.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-DATASET-LINEAGE-PY",
+      "path": "skeleton/ai/training/dataset_lineage.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: dataset_lineage.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-DATASET-RIGHTS-PY",
+      "path": "skeleton/ai/training/dataset_rights.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: dataset_rights.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-DEDUPLICATION-PY",
+      "path": "skeleton/ai/training/deduplication.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: deduplication.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-DISTILLATION-PY",
+      "path": "skeleton/ai/training/distillation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: distillation.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-FLGB-TRAINING-RUNTIME-PY",
+      "path": "skeleton/ai/training/flgb_training_runtime.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "FLGB-07 governed dataset, training, candidate-weight, and promotion contracts.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-LIFECYCLE-PROOF-PY",
+      "path": "skeleton/ai/training/lifecycle_proof.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Proof-carrying lifecycle chain for governed AI self-improvement.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-MIRROR-ROOM-EVALUATION-PY",
+      "path": "skeleton/ai/training/mirror_room_evaluation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: mirror_room_evaluation.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-MODEL-RELEASE-JOURNAL-PY",
+      "path": "skeleton/ai/training/model_release_journal.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Durable model-release evidence handoff for shadow-trained candidates. The canonical model-serving plane remains the owner of weight admission, publication, rollback and activation. This journal records exact proposal, operator-approval, ext",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-PROJECT-LEARNING-PY",
+      "path": "skeleton/ai/training/project_learning.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Explicit approval boundary from successful project outcomes to FLGB-07 datasets.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-PROJECT-LEARNING-RUN-PY",
+      "path": "skeleton/ai/training/project_learning_run.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Build candidate-only FLGB-07 manifests from explicitly admitted project outcomes.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-PROMOTION-GATE-PY",
+      "path": "skeleton/ai/training/promotion_gate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: promotion_gate.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-PROMOTION-LIFECYCLE-PY",
+      "path": "skeleton/ai/training/promotion_lifecycle.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Independent promotion, runtime admission, and rollback proof chain.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-CANDIDATE-GATE-PY",
+      "path": "skeleton/ai/training/shadow_candidate_gate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Model-improvement handoff: shadow evidence -> trained candidate -> host decision. This module binds a reviewed shadow intake to the canonical dataset/training lineage, candidate weights, independent champion/challenger comparisons and quali",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-IDLE-TRAINING-PY",
+      "path": "skeleton/ai/training/shadow_idle_training.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Idle-only shadow training dispatcher with fenced leases and staged custody. The dispatcher does not train or promote models by itself. Callers supply an actual trainer that produces a dataset revision, manifest and native candidate checkpoi",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-NATIVE-TRAINER-PY",
+      "path": "skeleton/ai/training/shadow_native_trainer.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Materialized candidate-only native transformer training from shadow intake. The trainer clones a pinned champion, consumes only a content-addressed local UTF-8 training corpus, performs bounded TinyTransformer SGD, and atomically stores nat",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-TRAINING-HANDOFF-PY",
+      "path": "skeleton/ai/training/shadow_training_handoff.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Bind shadow acquisition to real candidate training artifacts. This is the missing custody bridge between an idle Dragon knowledge lease and a materialized candidate model. It binds source content to a dataset revision, a candidate-only Trai",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-WEIGHT-INTAKE-PY",
+      "path": "skeleton/ai/training/shadow_weight_intake.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Pre-training shadow knowledge intake, deduplication and idle-only leasing. Incoming Dragon/crawler knowledge belongs in a *shadow evidence queue*, not in durable tensor weights. A bounded independent-origin qualification decides which obser",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-WEIGHT-LEDGER-PY",
+      "path": "skeleton/ai/training/shadow_weight_ledger.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Durable SQLite lifecycle for candidate/shadow/active model weights. Writes are single-transaction, revision-checked and append audit-chain events. No background worker or silent promotion: a separately authenticated native runtime admission",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-WEIGHT-PIPELINE-PY",
+      "path": "skeleton/ai/training/shadow_weight_pipeline.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Evidence-first shadow-weight intake owned by the canonical training plane. A source claim is NOT a weight shard and a shadow admission is NOT a trained model. This boundary deliberately separates acquisition, independent source corroboratio",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-WEIGHT-STORE-PY",
+      "path": "skeleton/ai/training/shadow_weight_store.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "SQLite authority for the shadow-weight evidence queue. A host supplies the database path. Commits are atomic: a transition is copied into a detached pipeline, recorded and committed before the serving reference is replaced. Reopening valida",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-SHADOW-WEIGHTS-PY",
+      "path": "skeleton/ai/training/shadow_weights.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Evidence-bound shadow weights: staged knowledge never silently becomes active model state. This module is deliberately independent of model loading. A shadow candidate may be collected and assessed repeatedly, but only a positively adjudica",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-ABSTENTION-PY",
+      "path": "skeleton/ai/training/temporal_abstention.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Fail-closed abstention policy for unresolved temporal evidence.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-ADMISSION-PY",
+      "path": "skeleton/ai/training/temporal_admission.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Transactional boundary between temporal learning authority and candidate training.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-BENCHMARK-PY",
+      "path": "skeleton/ai/training/temporal_benchmark.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Temporal competence benchmark receipts for evolving knowledge.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-BUDGET-PY",
+      "path": "skeleton/ai/training/temporal_budget.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Resource and cardinality budgets for temporal evidence planes.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-CAUSALITY-PY",
+      "path": "skeleton/ai/training/temporal_causality.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Causal chronology authority: precedence is not causation.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-CERTIFICATE-PY",
+      "path": "skeleton/ai/training/temporal_certificate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Single proof-carrying temporal decision certificate for promotion boundaries.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-CERTIFICATE-REGISTRY-PY",
+      "path": "skeleton/ai/training/temporal_certificate_registry.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Replay, expiry, and supersession registry for temporal decision certificates.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-CONSISTENCY-PY",
+      "path": "skeleton/ai/training/temporal_consistency.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Composite proof that temporal evidence is internally consistent.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-COUNTERFACTUAL-PY",
+      "path": "skeleton/ai/training/temporal_counterfactual.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Isolate hypothetical timelines from observed temporal evidence.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-CUSTODY-PY",
+      "path": "skeleton/ai/training/temporal_custody.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Append-only custody chain for temporal authority artifacts.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-DRIFT-PY",
+      "path": "skeleton/ai/training/temporal_drift.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Deterministic temporal drift, calibration, and adaptive-window authority.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-EDITING-PY",
+      "path": "skeleton/ai/training/temporal_editing.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Temporal knowledge-edit authority preserving history and ripple consistency.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-ENSEMBLE-PY",
+      "path": "skeleton/ai/training/temporal_ensemble.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Multi-detector temporal drift ensemble with fail-closed disagreement.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-FACTS-PY",
+      "path": "skeleton/ai/training/temporal_facts.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Validity-aware temporal facts and leakage-safe historical snapshots.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-FRESHNESS-PY",
+      "path": "skeleton/ai/training/temporal_freshness.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Freshness and supersession policy for mixed-current/outdated retrieval corpora.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-INTELLIGENCE-PY",
+      "path": "skeleton/ai/training/temporal_intelligence.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Higher-order temporal intelligence over year/era/decade evidence.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-INTERVALS-PY",
+      "path": "skeleton/ai/training/temporal_intervals.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Deterministic interval algebra for temporal facts and claims.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-INVARIANTS-PY",
+      "path": "skeleton/ai/training/temporal_invariants.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Regime-transfer invariants for temporal evidence authority.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-LEARNING-CONTROL-PY",
+      "path": "skeleton/ai/training/temporal_learning_control.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Temporal learning-control policy: decide what may enter durable weights.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-PROMOTION-PY",
+      "path": "skeleton/ai/training/temporal_promotion.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Bind qualified temporal evidence into candidate promotion admission.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-PROVENANCE-PY",
+      "path": "skeleton/ai/training/temporal_provenance.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Detect provenance echoes so copied sources do not fake corroboration.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-QUARANTINE-PY",
+      "path": "skeleton/ai/training/temporal_quarantine.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Quarantine contradictory or hypothetical temporal evidence before learning.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-REPLAY-PY",
+      "path": "skeleton/ai/training/temporal_replay.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Replay-resistant registry for temporal authority receipts.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-RESEARCH-AUTHORITY-PY",
+      "path": "skeleton/ai/training/temporal_research_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Research-backed composition gate for temporal learning authority.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-RETRIEVAL-PY",
+      "path": "skeleton/ai/training/temporal_retrieval.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Leakage-safe temporal retrieval and evidence qualification.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-REVOCATION-PY",
+      "path": "skeleton/ai/training/temporal_revocation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Epoch-bound revocation for temporal certificates and training admissions.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-SIGNALS-PY",
+      "path": "skeleton/ai/training/temporal_signals.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Deterministic year- and decade-aware evidence signals for governed AI.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TEMPORAL-UNCERTAINTY-PY",
+      "path": "skeleton/ai/training/temporal_uncertainty.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Distribution-free temporal uncertainty sets with rolling calibration.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-TRAINING-MANIFEST-PY",
+      "path": "skeleton/ai/training/training_manifest.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical native overlay outside the staged legacy mirror: training_manifest.py.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-JEEVES-STUDIO-CURRICULUM-PY",
+      "path": "skeleton/ai/training/jeeves_studio_curriculum.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Replay-verified original-engine experience for checkpoint-derived Jeeves training. Only source-authoritative runtime transitions produce model text. The fixed Pareto holdout remains separate; this producer provides *training-only* experienc",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-JEEVES-STUDIO-MULTIFACTOR-CORPUS-PY",
+      "path": "skeleton/ai/training/jeeves_studio_multifactor_corpus.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Rights-cleared, independently replayed multi-factor Jeeves neural corpus. This feeds *training-only text* to the existing production-checkpoint- derived candidate optimizer through load_studio_curriculum. A label is only a state/action/rewa",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-JEEVES-STUDIO-RULE-CORPUS-PY",
+      "path": "skeleton/ai/training/jeeves_studio_rule_corpus.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Replay-verified multi-circumstance game-rule data for Jeeves candidates. No agent-supplied observation, score, reward or LM label is admitted. Every scenario source and every action is reconstructed with canonical game rules. The resulting ",
+      "volume_refs": [
+        "VOL-006"
+      ]
     }
+
   ]
 }
