@@ -7,6 +7,8 @@ directories broke the fail-closed app-assembly validator.
 
 from __future__ import annotations
 
+import json
+import re
 import unittest
 from pathlib import Path
 
@@ -59,6 +61,20 @@ class AppAssemblySourcePathsTests(unittest.TestCase):
         self.assertIn("export const API_BASE", resolver)
         self.assertIn("export const SKELETON_API_BASE", resolver)
         self.assertIn("from './apiBase'", client)
+
+
+    def test_construction_manual_tracks_active_bootstrap_contract(self) -> None:
+        construction = json.loads((ROOT / "machine/ai_app_construction.json").read_text(encoding="utf-8"))
+        architecture = json.loads((ROOT / "machine/architecture.json").read_text(encoding="utf-8"))
+        manual = (ROOT / "docs/AI_APP_CONSTRUCTION_MANUAL.md").read_text(encoding="utf-8")
+        bootstrap = manual.split("## Mandatory bootstrap", 1)[1].split(
+            "Do not infer architecture", 1
+        )[0]
+        ordered_sources = re.findall(r"(?m)^\\d+\\. \\u0060([^\\u0060]+)\\u0060$", bootstrap)
+        self.assertEqual(ordered_sources, construction["provider_bootstrap"]["must_read"])
+        self.assertIn(f"Architecture tag: \`{architecture['architecture_tag']}\`", manual)
+        self.assertIn(f"Construction version: \`{construction['construction_version']}\`", manual)
+        self.assertIn("| Runtime model provider boundary | \`skeleton/provider_runtime.py\`", manual)
 
 
 if __name__ == "__main__":
