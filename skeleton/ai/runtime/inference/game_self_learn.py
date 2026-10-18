@@ -56,6 +56,7 @@ GAME_CREATION_STAGES: dict[str, tuple[str, ...]] = {
         "art_scale",
         "scale",
         "clothing",
+        "console_rom",
     ),
     "stage_3_narrative_economy_av": (
         "story",
@@ -98,6 +99,13 @@ _PHASES = ("approach", "threat", "choice", "resolution", "rest")
 _PLACES = ("winter court", "harbor lane", "hearth hall", "field gate", "dusk stair")
 _REGIONS = ("hand", "torso", "head", "back")
 _FAILURES = ("missed tell", "late press", "empty resource", "blocked route")
+_CONSOLES = (
+    ("8-bit cartridge", "2bpp planar tile", "16 bytes per 8x8 tile", "4-colour sub-palette"),
+    ("handheld DMG cart", "2bpp planar tile", "96 bytes for six tiles", "4-shade monochrome ramp"),
+    ("16-bit console cart", "4bpp planar tile", "32 bytes per 8x8 tile", "15-bit BGR555 palette"),
+    ("early 3D disc", "CLUT indexed texture", "4KB TMEM micro-cache", "fixed-point vertex snap"),
+    ("64-bit console disc", "swizzled 4x4 block texture", "32-byte DMA cache line", "ADPCM stream buffer"),
+)
 
 
 def held_windows() -> tuple[str, ...]:
@@ -311,6 +319,20 @@ def _lessons() -> list[tuple[str, str]]:
                 (
                     "world",
                     f"The {role} can walk the {place} once and name its landmark. If the landmark cannot be named, the layout is not ready for a second route.",
+                )
+            )
+    for console_name, tile_fmt, byte_rule, pal_rule in _CONSOLES:
+        for role in _ROLES:
+            rows.append(
+                (
+                    "console_rom",
+                    f"On an {console_name}, the {role} packs each {tile_fmt} at {byte_rule} and binds the {pal_rule} before linking the ROM bank.",
+                )
+            )
+            rows.append(
+                (
+                    "console_rom",
+                    f"A {console_name} build verifies its ROM header checksum and OAM scanline sprite budget alongside the {byte_rule} asset table.",
                 )
             )
     return rows
@@ -916,3 +938,139 @@ def finetune_for_game_creation(
         "promoted": False,
     }
 
+
+def spaced_repetition_schedule(
+    concept_loss: Mapping[str, float],
+    *,
+    previous_loss: Mapping[str, float] | None = None,
+    streaks: Mapping[str, int] | None = None,
+    max_repetitions: int = 4,
+) -> tuple[dict[str, object], ...]:
+    """Compute an Ebbinghaus/SM-2 spaced-repetition schedule across concepts."""
+    if not concept_loss:
+        raise ValueError("concept_loss must not be empty")
+    if isinstance(max_repetitions, bool) or not isinstance(max_repetitions, int) or max_repetitions < 1:
+        raise ValueError("max_repetitions must be a positive int")
+    mean_loss = sum(float(v) for v in concept_loss.values()) / max(1, len(concept_loss))
+    items: list[dict[str, object]] = []
+    for concept, raw_loss in concept_loss.items():
+        loss = float(raw_loss)
+        prev = float(previous_loss[concept]) if (previous_loss and concept in previous_loss) else loss
+        velocity = prev - loss
+        streak = int(streaks[concept]) if (streaks and concept in streaks) else 0
+        easiness = max(1.3, min(3.2, 2.5 - 0.25 * max(0.0, loss - mean_loss) + 0.1 * streak))
+        urgency = (loss / max(0.25, mean_loss)) * (1.0 / max(1.0, easiness * 0.5))
+        if velocity < 0.0:
+            urgency *= 1.25
+        if urgency >= 1.35:
+            reps = max_repetitions
+        elif urgency >= 1.05:
+            reps = max(1, max_repetitions - 1)
+        elif urgency >= 0.80:
+            reps = max(1, max_repetitions - 2)
+        else:
+            reps = 1
+        items.append({
+            "concept": concept,
+            "loss": round(loss, 6),
+            "velocity": round(velocity, 6),
+            "streak": streak,
+            "easiness": round(easiness, 4),
+            "urgency": round(urgency, 6),
+            "repetitions": reps,
+        })
+    items.sort(key=lambda r: (-float(r["urgency"]), -float(r["loss"]), str(r["concept"])))
+    return tuple(items)
+
+
+def automated_repetition_training(
+    model: object,
+    *,
+    cycles: int = 2,
+    max_repetitions: int = 3,
+    top_focus: int = 5,
+    learning_rate: float = 0.02,
+    optimizer: str = "adamw",
+    weight_decay: float = 0.01,
+    gradient_clip: float = 1.0,
+    eval_documents: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Execute multi-cycle spaced-repetition training with non-regression ratchet rollback."""
+    if isinstance(cycles, bool) or not isinstance(cycles, int) or not 1 <= cycles <= 8:
+        raise ValueError("cycles must be an int in [1, 8]")
+    grouped = practice_by_concept()
+    eval_set = tuple(eval_documents) if eval_documents is not None else practice_documents()[:32]
+    if not eval_set:
+        raise ValueError("eval_documents must not be empty")
+
+    initial_eval = _eval_loss(model, eval_set)
+    current_losses = concept_losses(model)
+    prev_losses: dict[str, float] | None = None
+    streaks: dict[str, int] = {k: 0 for k in grouped}
+    cycle_logs: list[dict[str, object]] = []
+    total_docs = 0
+
+    for c_idx in range(cycles):
+        schedule_rows = spaced_repetition_schedule(
+            current_losses,
+            previous_loss=prev_losses,
+            streaks=streaks,
+            max_repetitions=max_repetitions,
+        )
+        batch: list[str] = []
+        for idx, row in enumerate(schedule_rows):
+            concept = str(row["concept"])
+            reps = int(row["repetitions"]) if idx < top_focus else 1
+            batch.extend(grouped[concept][:16] * reps)
+
+        saved = _save_model_state(model)
+        before_cycle_eval = _eval_loss(model, eval_set)
+        cycle_lr = float(learning_rate) * (0.90 ** c_idx)
+        _train_model_on_docs(
+            model,
+            batch,
+            epochs=1,
+            lr=cycle_lr,
+            optimizer=optimizer,
+            weight_decay=weight_decay,
+            gradient_clip=gradient_clip,
+            holdout=eval_set,
+        )
+        after_cycle_eval = _eval_loss(model, eval_set)
+        kept = True
+        if after_cycle_eval > before_cycle_eval:
+            _restore_model_state(model, saved)
+            after_cycle_eval = before_cycle_eval
+            kept = False
+
+        next_losses = concept_losses(model)
+        for k, after_v in next_losses.items():
+            if after_v <= current_losses.get(k, after_v):
+                streaks[k] = streaks.get(k, 0) + 1
+            else:
+                streaks[k] = 0
+        prev_losses = dict(current_losses)
+        current_losses = next_losses
+        total_docs += len(batch)
+        cycle_logs.append({
+            "cycle": c_idx + 1,
+            "scheduled_documents": len(batch),
+            "top_urgent_concepts": tuple(str(r["concept"]) for r in schedule_rows[:top_focus]),
+            "eval_before": round(before_cycle_eval, 6),
+            "eval_after": round(after_cycle_eval, 6),
+            "kept": kept,
+        })
+
+    final_eval = _eval_loss(model, eval_set)
+    return {
+        "schema_version": "skeleton.game_self_learn.repetition.v1",
+        "cycles": cycles,
+        "total_scheduled_documents": total_docs,
+        "initial_eval_loss": round(initial_eval, 6),
+        "final_eval_loss": round(final_eval, 6),
+        "improved": final_eval < initial_eval,
+        "cycle_logs": tuple(cycle_logs),
+        "streaks": streaks,
+        "holdout_isolated": True,
+        "promoted": False,
+    }

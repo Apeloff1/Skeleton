@@ -287,3 +287,138 @@ def cooperative_decode(
         generated.append(nxt)
     itos = list(getattr(primary, "itos", ()))
     return " ".join(itos[i] if 0 <= i < len(itos) else UNK for i in generated)
+
+
+def redundant_consensus_decode(
+    models: Sequence[Any],
+    prefix: str,
+    *,
+    n: int = 12,
+    seed: int = 0,
+    weights: Optional[Sequence[float]] = None,
+    temperature: float = 1.0,
+    min_p: float = 0.05,
+) -> Dict[str, Any]:
+    """Quorum/consensus decoding across a redundant transformer ring with fault isolation.
+
+    Filters out models with non-finite weights or mismatched vocabularies,
+    computes per-step token distributions across all healthy members, tracks
+    top-1 token agreement (quorum ratio), and dynamically downweights members
+    whose step logits are high-entropy or non-finite.
+    """
+    import math
+    import random
+    from skeleton.cortex.attn import sample_logits, softmax
+    from skeleton.cortex.transformer import UNK, KVCache
+
+    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+        raise ValueError("n must be a nonnegative integer")
+    candidates = [m for m in models if m is not None]
+    if not candidates:
+        return {"text": "", "healthy_models": 0, "quorum_agreement": 0.0, "degraded_models": 0}
+
+    primary_itos = list(getattr(candidates[0], "itos", ()))
+    healthy: List[Any] = []
+    healthy_weights: List[float] = []
+    degraded = 0
+    for idx, m in enumerate(candidates):
+        if list(getattr(m, "itos", ())) != primary_itos:
+            degraded += 1
+            continue
+        if hasattr(m, "validate_finite_weights"):
+            try:
+                if not m.validate_finite_weights().get("healthy", False):
+                    if hasattr(m, "restore_from_standby"):
+                        m.restore_from_standby()
+                    if not m.validate_finite_weights().get("healthy", False):
+                        degraded += 1
+                        continue
+            except Exception:
+                degraded += 1
+                continue
+        healthy.append(m)
+        w = float(weights[idx]) if (weights is not None and idx < len(weights)) else 1.0
+        healthy_weights.append(max(1e-6, w))
+
+    if not healthy:
+        raise RuntimeError("no healthy transformers available in redundant consensus ring")
+
+    w_sum = sum(healthy_weights)
+    base_weights = [w / w_sum for w in healthy_weights]
+    lead = healthy[0]
+    ids = list(lead._ids(prefix or "")) or [int(getattr(lead, "unk", 0))]
+    caches = [
+        KVCache(int(m.n_layers), int(m.ctx))
+        if (hasattr(m, "_logits_window") and not getattr(m, "use_mod", False))
+        else None
+        for m in healthy
+    ]
+    vocab = int(getattr(lead, "V", len(primary_itos)))
+    rng = random.Random(int(seed) & 0xFFFFFFFF)
+    generated: List[int] = []
+    agreements: List[float] = []
+    step_failovers = 0
+
+    for _ in range(n):
+        step_probs: List[List[float]] = []
+        step_w: List[float] = []
+        top1_votes: Dict[int, int] = {}
+        for m_idx, model in enumerate(healthy):
+            ctx = int(getattr(model, "ctx", 6) or 6)
+            window = [int(t) for t in ids][-ctx:] or [0]
+            cache = caches[m_idx]
+            try:
+                logits = (
+                    list(model._logits_window(window, cache))
+                    if cache is not None
+                    else list(model._logits(window))
+                )
+                if not all(math.isfinite(x) for x in logits):
+                    step_failovers += 1
+                    continue
+                probs = softmax(logits)
+                entropy = -sum(p * math.log(max(p, 1e-12)) for p in probs)
+                conf_scale = 1.0 / (1.0 + max(0.0, entropy) * 0.25)
+                step_probs.append(probs)
+                step_w.append(base_weights[m_idx] * conf_scale)
+                top_tok = max(range(vocab), key=lambda i: probs[i])
+                top1_votes[top_tok] = top1_votes.get(top_tok, 0) + 1
+            except Exception:
+                step_failovers += 1
+                continue
+
+        if not step_probs:
+            raise RuntimeError("all redundant transformers failed during step decode")
+
+        sw_total = sum(step_w) or 1.0
+        fused = [0.0] * vocab
+        for probs, w in zip(step_probs, step_w):
+            nw = w / sw_total
+            for v in range(vocab):
+                fused[v] += nw * probs[v]
+        fused_logits = [math.log(max(p, 1e-12)) for p in fused]
+        nxt = int(
+            sample_logits(
+                fused_logits,
+                rng,
+                temperature=temperature,
+                min_p=min_p,
+            )
+        )
+        ids.append(nxt)
+        generated.append(nxt)
+        max_vote = max(top1_votes.values()) if top1_votes else 1
+        agreements.append(max_vote / max(1, len(step_probs)))
+
+    text = " ".join(
+        primary_itos[i] if 0 <= i < len(primary_itos) else UNK
+        for i in generated
+    )
+    return {
+        "text": text,
+        "token_ids": generated,
+        "healthy_models": len(healthy),
+        "degraded_models": degraded,
+        "step_failovers": step_failovers,
+        "quorum_agreement": round(sum(agreements) / max(1, len(agreements)), 4),
+    }

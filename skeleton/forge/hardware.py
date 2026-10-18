@@ -248,3 +248,414 @@ def attach(pack: Dict[str, Any], generation: Optional[str] = None) -> Dict[str, 
 
 def list_generations() -> List[str]:
     return list(GEN_ORDER)
+
+
+CONSOLE_ROM_PROFILES: Dict[str, Dict[str, Any]] = {
+    "nes_rom": {
+        "key": "nes_rom",
+        "generation": "8bit",
+        "console": "NES / Famicom",
+        "rom_extension": ".nes",
+        "header_format": "iNES 16-byte header (4E 45 53 1A)",
+        "tile_bpp": 2,
+        "bytes_per_8x8_tile": 16,
+        "tile_encoding": "2bpp planar CHR (plane0 8B + plane1 8B)",
+        "vram_kb": 16,
+        "max_sprites_total": 64,
+        "max_sprites_per_scanline": 8,
+        "colors_on_screen": 25,
+        "sub_palette_colors": 4,
+        "viewport": [256, 240],
+        "audio_channels": "2x Pulse, 1x Triangle, 1x Noise, 1x DPCM (2A03)",
+        "rom_alignment_bytes": 16384,
+        "checksum_rule": "PRG/CHR bank CRC32 + mapper mirror bits",
+    },
+    "gb_dmg_rom": {
+        "key": "gb_dmg_rom",
+        "generation": "8bit",
+        "console": "Game Boy (DMG)",
+        "rom_extension": ".gb",
+        "header_format": "Cartridge header 0x0100..0x014F, checksum 0x0134..0x014D",
+        "tile_bpp": 2,
+        "bytes_per_8x8_tile": 16,
+        "six_tile_symbol_bytes": 96,
+        "linker_bank0_symbol_addr": "00:0200",
+        "tile_encoding": "2bpp row-interleaved planar (2 bytes per 8px row)",
+        "vram_kb": 8,
+        "max_sprites_total": 40,
+        "max_sprites_per_scanline": 10,
+        "colors_on_screen": 4,
+        "sub_palette_colors": 4,
+        "viewport": [160, 144],
+        "audio_channels": "2x Square, 1x Programmable Wave, 1x Noise (DMG APU)",
+        "rom_alignment_bytes": 32768,
+        "checksum_rule": "x = x - byte - 1 over 0x0134..0x014C stored at 0x014D",
+    },
+    "gbc_rom": {
+        "key": "gbc_rom",
+        "generation": "8bit",
+        "console": "Game Boy Color (CGB)",
+        "rom_extension": ".gbc",
+        "header_format": "CGB flag 0x0143 (0x80/0xC0) + header checksum 0x014D",
+        "tile_bpp": 2,
+        "bytes_per_8x8_tile": 16,
+        "tile_encoding": "Dual-bank 2bpp planar + BG attribute map (palette/bank/flip/priority)",
+        "vram_kb": 16,
+        "max_sprites_total": 40,
+        "max_sprites_per_scanline": 10,
+        "colors_on_screen": 56,
+        "sub_palette_colors": 4,
+        "viewport": [160, 144],
+        "audio_channels": "2x Square, 1x Wave RAM, 1x Noise + HDMA HBlank transfer",
+        "rom_alignment_bytes": 32768,
+        "checksum_rule": "Header complement check at 0x014D + 16-bit global sum 0x014E..0x014F",
+    },
+    "sms_rom": {
+        "key": "sms_rom",
+        "generation": "8bit",
+        "console": "Sega Master System",
+        "rom_extension": ".sms",
+        "header_format": "TMR SEGA signature at 0x7FF0..0x7FFF",
+        "tile_bpp": 4,
+        "bytes_per_8x8_tile": 32,
+        "tile_encoding": "4bpp bitplane interleaved (4 bytes per row)",
+        "vram_kb": 16,
+        "max_sprites_total": 64,
+        "max_sprites_per_scanline": 8,
+        "colors_on_screen": 32,
+        "sub_palette_colors": 16,
+        "viewport": [256, 192],
+        "audio_channels": "3x Square + 1x Noise (SN76489 PSG) + optional YM2413 FM",
+        "rom_alignment_bytes": 16384,
+        "checksum_rule": "16-bit ROM checksum at 0x7FFA..0x7FFB",
+    },
+    "snes_rom": {
+        "key": "snes_rom",
+        "generation": "16bit",
+        "console": "SNES / Super Famicom",
+        "rom_extension": ".sfc",
+        "header_format": "LoROM 0x7FC0 / HiROM 0xFFC0 internal registration header",
+        "tile_bpp": 4,
+        "bytes_per_8x8_tile": 32,
+        "tile_encoding": "4bpp/8bpp bitplane pairs + Mode-7 8bpp affine matrix tiles",
+        "vram_kb": 64,
+        "max_sprites_total": 128,
+        "max_sprites_per_scanline": 32,
+        "colors_on_screen": 256,
+        "sub_palette_colors": 16,
+        "viewport": [256, 224],
+        "audio_channels": "8-channel Sony SPC700 BRR ADPCM (16-sample loop block aligned)",
+        "rom_alignment_bytes": 32768,
+        "checksum_rule": "Checksum + Complement == 0xFFFF at header +0x1C..0x1F",
+    },
+    "genesis_rom": {
+        "key": "genesis_rom",
+        "generation": "16bit",
+        "console": "Sega Genesis / Mega Drive",
+        "rom_extension": ".md",
+        "header_format": "68000 vector table 0x0000..0x00FF + SEGA header 0x0100..0x01FF",
+        "tile_bpp": 4,
+        "bytes_per_8x8_tile": 32,
+        "tile_encoding": "4bpp linear nybble-packed (2 pixels per byte)",
+        "vram_kb": 64,
+        "max_sprites_total": 80,
+        "max_sprites_per_scanline": 20,
+        "colors_on_screen": 64,
+        "sub_palette_colors": 16,
+        "viewport": [320, 224],
+        "audio_channels": "6-channel YM2612 FM synth + 4-channel SN76489 PSG + Z80 PCM",
+        "rom_alignment_bytes": 65536,
+        "checksum_rule": "16-bit big-endian word sum from 0x0200..EOF stored at 0x018E",
+    },
+    "gba_rom": {
+        "key": "gba_rom",
+        "generation": "16bit",
+        "console": "Game Boy Advance",
+        "rom_extension": ".gba",
+        "header_format": "ARM7TDMI branch + Nintendo logo 0x04..0x9F + complement 0xBD",
+        "tile_bpp": 4,
+        "bytes_per_8x8_tile": 32,
+        "tile_encoding": "4bpp/8bpp linear packed 1D/2D OBJ & BG character blocks",
+        "vram_kb": 96,
+        "max_sprites_total": 128,
+        "max_sprites_per_scanline": 128,
+        "colors_on_screen": 512,
+        "sub_palette_colors": 16,
+        "viewport": [240, 160],
+        "audio_channels": "2x 8-bit DMA DirectSound FIFO + 4x legacy DMG synth channels",
+        "rom_alignment_bytes": 32768,
+        "checksum_rule": "Header complement sum -(sum(0xA0..0xBC) + 0x19) & 0xFF at 0xBD",
+    },
+    "ps1_iso": {
+        "key": "ps1_iso",
+        "generation": "early3d",
+        "console": "PlayStation 1 (PSX)",
+        "rom_extension": ".bin",
+        "header_format": "ISO9660 CD-ROM XA Mode 2 Form 1/2 (2048/2352-byte sectors) + SYSTEM.CNF",
+        "tile_bpp": 8,
+        "bytes_per_8x8_tile": 64,
+        "tile_encoding": "4-bit/8-bit CLUT indexed TIM textures in 1024x512 16-bit VRAM",
+        "vram_kb": 1024,
+        "max_sprites_total": 4000,
+        "max_sprites_per_scanline": 256,
+        "max_poly": 3000,
+        "colors_on_screen": 65536,
+        "sub_palette_colors": 256,
+        "viewport": [320, 240],
+        "audio_channels": "24-channel SPU ADPCM (.VAG 28-sample blocks) + CD-XA streaming",
+        "rom_alignment_bytes": 2048,
+        "checksum_rule": "EDC/ECC sector syndromes + GTE integer vertex-snap bounds",
+    },
+    "n64_z64": {
+        "key": "n64_z64",
+        "generation": "early3d",
+        "console": "Nintendo 64",
+        "rom_extension": ".z64",
+        "header_format": "Big-endian PI BSD DOM1 header 0x80371240 + IPL3 bootcode + CRC1/CRC2",
+        "tile_bpp": 8,
+        "bytes_per_8x8_tile": 64,
+        "tile_encoding": "CI4/CI8/RGBA16 micro-textures strictly fitting 4KB (4096B) RDP TMEM",
+        "vram_kb": 4096,
+        "tmem_bytes": 4096,
+        "max_sprites_total": 1024,
+        "max_sprites_per_scanline": 256,
+        "max_poly": 3000,
+        "colors_on_screen": 65536,
+        "sub_palette_colors": 256,
+        "viewport": [320, 240],
+        "audio_channels": "RSP microcode mixed 16–24 channel VADPCM audio",
+        "rom_alignment_bytes": 64,
+        "checksum_rule": "CIC-NUS-6102 dual 32-bit CRC at 0x0010..0x0017 over 0x1000..0x101000",
+    },
+    "saturn_iso": {
+        "key": "saturn_iso",
+        "generation": "early3d",
+        "console": "Sega Saturn",
+        "rom_extension": ".iso",
+        "header_format": "SEGA SEGASATURN IP.BIN system area + SH-2 master/slave vectors",
+        "tile_bpp": 8,
+        "bytes_per_8x8_tile": 64,
+        "tile_encoding": "VDP1 distorted quad textures + VDP2 multi-scroll cell planes",
+        "vram_kb": 1536,
+        "max_sprites_total": 2048,
+        "max_sprites_per_scanline": 256,
+        "max_poly": 3000,
+        "colors_on_screen": 65536,
+        "sub_palette_colors": 256,
+        "viewport": [320, 224],
+        "audio_channels": "32-channel Yamaha YMF292 SCSP PCM/FM + 68EC000 sound CPU",
+        "rom_alignment_bytes": 2048,
+        "checksum_rule": "2048-byte ISO sector boundary + VDP1 command table termination bit",
+    },
+    "ps2_iso": {
+        "key": "ps2_iso",
+        "generation": "64bit",
+        "console": "PlayStation 2",
+        "rom_extension": ".iso",
+        "header_format": "ISO9660/UDF DVD-ROM + SYSTEM.CNF BOOT2 = cdrom0:\\SLUS_xxx.xx;1",
+        "tile_bpp": 8,
+        "bytes_per_8x8_tile": 64,
+        "tile_encoding": "PSMCT32/PSMT8/PSMT4 swizzled GS 4MB eDRAM page/block textures",
+        "vram_kb": 4096,
+        "max_sprites_total": 8192,
+        "max_sprites_per_scanline": 512,
+        "max_poly": 10000,
+        "colors_on_screen": 16777216,
+        "sub_palette_colors": 256,
+        "viewport": [640, 448],
+        "audio_channels": "48-channel SPU2 ADPCM + IOP streaming",
+        "rom_alignment_bytes": 2048,
+        "checksum_rule": "128-bit QW (16-byte) DMA VIF/GIF packet alignment",
+    },
+    "gamecube_gcm": {
+        "key": "gamecube_gcm",
+        "generation": "64bit",
+        "console": "Nintendo GameCube",
+        "rom_extension": ".gcm",
+        "header_format": "boot.bin magic 0xC2339F3D + bi2.bin + apploader.img + main.dol",
+        "tile_bpp": 4,
+        "bytes_per_8x8_tile": 32,
+        "tile_encoding": "GX 4x4 tiled CMPR (S3TC/DXT1) & RGB5A3 32-byte cache-line blocks",
+        "vram_kb": 3072,
+        "max_sprites_total": 8192,
+        "max_sprites_per_scanline": 512,
+        "max_poly": 10000,
+        "colors_on_screen": 16777216,
+        "sub_palette_colors": 256,
+        "viewport": [640, 480],
+        "audio_channels": "64-channel Macronix DSP 4-bit ADPCM (.dsp)",
+        "rom_alignment_bytes": 32,
+        "checksum_rule": "32-byte DVD DMA & GX FIFO burst alignment",
+    },
+    "dreamcast_gdi": {
+        "key": "dreamcast_gdi",
+        "generation": "64bit",
+        "console": "Sega Dreamcast",
+        "rom_extension": ".gdi",
+        "header_format": "SEGA SEGAKATANA IP.BIN + 1ST_READ.BIN SH-4 little-endian binary",
+        "tile_bpp": 16,
+        "bytes_per_8x8_tile": 128,
+        "tile_encoding": "PowerVR2 CLX2 Morton-twiddled + VQ codebook compressed ARGB1555/RGB565",
+        "vram_kb": 8192,
+        "max_sprites_total": 8192,
+        "max_sprites_per_scanline": 512,
+        "max_poly": 10000,
+        "colors_on_screen": 16777216,
+        "sub_palette_colors": 256,
+        "viewport": [640, 480],
+        "audio_channels": "64-channel Yamaha AICA 4-bit ADPCM + ARM7 sound CPU",
+        "rom_alignment_bytes": 32,
+        "checksum_rule": "32-byte SH-4 Store Queue tile-accelerator burst alignment",
+    },
+    "modern_console_pkg": {
+        "key": "modern_console_pkg",
+        "generation": "modern",
+        "console": "PS5 / Xbox Series X / PC",
+        "rom_extension": ".pkg",
+        "header_format": "Signed content-addressed chunk manifest + Kraken/BCPack stream table",
+        "tile_bpp": 8,
+        "bytes_per_8x8_tile": 64,
+        "tile_encoding": "BC1–BC7 block-compressed PBR textures with power-of-two halving ladder",
+        "vram_kb": 16 * 1024 * 1024,
+        "max_sprites_total": 65536,
+        "max_sprites_per_scanline": 4096,
+        "max_poly": 10_000_000,
+        "colors_on_screen": 1_073_741_824,
+        "sub_palette_colors": 1024,
+        "viewport": [1280, 720],
+        "audio_channels": "Object-based 3D spatial audio bus with occlusion & reverb impulse",
+        "rom_alignment_bytes": 4096,
+        "checksum_rule": "SHA-256 Merkle chunk tree + zero 65536-bitmap allocation guard",
+    },
+}
+
+_CONSOLE_ALIAS: Dict[str, str] = {
+    "nes": "nes_rom", "famicom": "nes_rom", "nesrom": "nes_rom", "ines": "nes_rom",
+    "gb": "gb_dmg_rom", "dmg": "gb_dmg_rom", "gameboy": "gb_dmg_rom", "gbdmgrom": "gb_dmg_rom",
+    "gbc": "gbc_rom", "cgb": "gbc_rom", "gameboycolor": "gbc_rom", "gbcrom": "gbc_rom",
+    "sms": "sms_rom", "mastersystem": "sms_rom", "smsrom": "sms_rom",
+    "snes": "snes_rom", "sfc": "snes_rom", "superfamicom": "snes_rom", "snesrom": "snes_rom",
+    "genesis": "genesis_rom", "megadrive": "genesis_rom", "md": "genesis_rom", "genesisrom": "genesis_rom",
+    "gba": "gba_rom", "gameboyadvance": "gba_rom", "gbarom": "gba_rom",
+    "ps1": "ps1_iso", "psx": "ps1_iso", "playstation1": "ps1_iso", "ps1iso": "ps1_iso",
+    "n64": "n64_z64", "z64": "n64_z64", "nintendo64": "n64_z64", "n64z64": "n64_z64",
+    "saturn": "saturn_iso", "segasaturn": "saturn_iso", "saturniso": "saturn_iso",
+    "ps2": "ps2_iso", "playstation2": "ps2_iso", "ps2iso": "ps2_iso",
+    "gamecube": "gamecube_gcm", "gc": "gamecube_gcm", "gcm": "gamecube_gcm", "gamecubegcm": "gamecube_gcm",
+    "dreamcast": "dreamcast_gdi", "dc": "dreamcast_gdi", "gdi": "dreamcast_gdi", "dreamcastgdi": "dreamcast_gdi",
+    "modern": "modern_console_pkg", "ps5": "modern_console_pkg", "seriesx": "modern_console_pkg", "modernconsolepkg": "modern_console_pkg",
+}
+
+
+def list_console_rom_profiles() -> List[str]:
+    """Return all canonical console and ROM profile keys in hardware order."""
+    return list(CONSOLE_ROM_PROFILES.keys())
+
+
+def get_console_rom_profile(key: Optional[str]) -> Dict[str, Any]:
+    """Resolve a console or ROM profile by key or platform alias."""
+    if not key or not isinstance(key, str):
+        return dict(CONSOLE_ROM_PROFILES["gb_dmg_rom"])
+    norm = key.strip().lower().replace("-", "").replace("_", "").replace(" ", "").replace(".", "")
+    resolved = _CONSOLE_ROM_KEY = CONSOLE_ROM_PROFILES.get(key.strip().lower())
+    if resolved is not None:
+        return dict(resolved)
+    alias_target = _CONSOLE_ALIAS.get(norm)
+    if alias_target is not None:
+        return dict(CONSOLE_ROM_PROFILES[alias_target])
+    raise ValueError(f"unknown console/ROM profile {key!r}")
+
+
+def validate_rom_asset_budget(profile_key: str, asset_spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate sprite, tile, palette, VRAM, and polygon budgets against a console/ROM profile."""
+    profile = get_console_rom_profile(profile_key)
+    gen_spec = get_generation(profile["generation"])
+    spec = dict(asset_spec or {})
+
+    violations: List[str] = []
+    tile_count = int(spec.get("tile_count") or 0)
+    bytes_per_tile = int(profile["bytes_per_8x8_tile"])
+    tile_bytes = int(spec.get("tile_bytes") or (tile_count * bytes_per_tile))
+    vram_limit_bytes = int(profile["vram_kb"]) * _KB
+
+    if tile_count > 0 and spec.get("tile_bytes") is not None:
+        expected_bytes = tile_count * bytes_per_tile
+        if int(spec["tile_bytes"]) != expected_bytes:
+            violations.append(
+                f"tile_bytes={spec['tile_bytes']} does not match {tile_count} tiles * {bytes_per_tile}B ({expected_bytes}B)"
+            )
+
+    if tile_bytes > vram_limit_bytes:
+        violations.append(f"tile_bytes={tile_bytes}B exceeds VRAM ceiling {vram_limit_bytes}B")
+
+    if "tmem_bytes" in profile and int(spec.get("texture_bytes") or 0) > int(profile["tmem_bytes"]):
+        violations.append(
+            f"texture_bytes={spec.get('texture_bytes')}B exceeds N64 TMEM ceiling {profile['tmem_bytes']}B"
+        )
+
+    sprites_total = int(spec.get("sprites_total") or 0)
+    if sprites_total > int(profile["max_sprites_total"]):
+        violations.append(
+            f"sprites_total={sprites_total} exceeds hardware OAM limit {profile['max_sprites_total']}"
+        )
+
+    sprites_scanline = int(spec.get("sprites_per_scanline") or 0)
+    if sprites_scanline > int(profile["max_sprites_per_scanline"]):
+        violations.append(
+            f"sprites_per_scanline={sprites_scanline} exceeds scanline limit {profile['max_sprites_per_scanline']}"
+        )
+
+    palette_colors = int(spec.get("palette_colors") or 0)
+    if palette_colors > int(profile["colors_on_screen"]):
+        violations.append(
+            f"palette_colors={palette_colors} exceeds on-screen color limit {profile['colors_on_screen']}"
+        )
+
+    poly_count = int(spec.get("poly_count") or 0)
+    max_poly = int(profile.get("max_poly", gen_spec["max_poly"]))
+    if poly_count > max_poly:
+        violations.append(f"poly_count={poly_count} exceeds polygon budget {max_poly}")
+
+    alloc_tier = int(spec.get("allocated_bitmap_dim") or 0)
+    if alloc_tier >= 65536:
+        violations.append("allocated_bitmap_dim=65536 violates scale-ladder divisor-only rule")
+
+    return {
+        "valid": len(violations) == 0,
+        "profile_key": profile["key"],
+        "console": profile["console"],
+        "generation": profile["generation"],
+        "tile_bytes": tile_bytes,
+        "vram_utilization": round(tile_bytes / max(1, vram_limit_bytes), 4),
+        "violations": violations,
+    }
+
+
+def compile_console_rom_envelope(profile_key: str) -> Dict[str, Any]:
+    """Compile a complete hardware + ROM asset contract envelope for a target console."""
+    profile = get_console_rom_profile(profile_key)
+    gen_spec = get_generation(profile["generation"])
+    pal = palette(profile["generation"], n=min(16, max(4, int(profile["sub_palette_colors"]))))
+    return {
+        "schema_version": "skeleton.console_rom_envelope.v1",
+        "profile_key": profile["key"],
+        "console": profile["console"],
+        "generation": profile["generation"],
+        "rom_extension": profile["rom_extension"],
+        "header_format": profile["header_format"],
+        "tile_bpp": profile["tile_bpp"],
+        "bytes_per_8x8_tile": profile["bytes_per_8x8_tile"],
+        "tile_encoding": profile["tile_encoding"],
+        "vram_kb": profile["vram_kb"],
+        "max_sprites_total": profile["max_sprites_total"],
+        "max_sprites_per_scanline": profile["max_sprites_per_scanline"],
+        "colors_on_screen": profile["colors_on_screen"],
+        "sub_palette_colors": profile["sub_palette_colors"],
+        "viewport": list(profile["viewport"]),
+        "audio_channels": profile["audio_channels"],
+        "rom_alignment_bytes": profile["rom_alignment_bytes"],
+        "checksum_rule": profile["checksum_rule"],
+        "palette": pal,
+        "storage_bytes": list(gen_spec["storage_bytes"]),
+        "asset_capacity": gen_spec["asset_capacity"],
+    }

@@ -125,3 +125,45 @@ def test_multi_stage_game_creation_finetune_and_mastery_report():
     assert 0.0 < float(mastery["mastery_index"]) <= 1.0
     cross = cross_curriculum_losses(model)
     assert "english_pareto_train" in cross and "az_train" in cross and "pareto_v2_train" in cross
+
+
+def test_console_rom_practice_and_automated_repetition_training():
+    from skeleton.ai.runtime.inference.game_self_learn import (
+        automated_repetition_training,
+        leaks_any_holdout,
+        practice_by_concept,
+        spaced_repetition_schedule,
+    )
+    from skeleton.ai.runtime.inference.neural import NeuralLMConfig, NumpyRecurrentLM
+
+    grouped = practice_by_concept()
+    assert "console_rom" in grouped
+    assert len(grouped["console_rom"]) >= 40
+    for line in grouped["console_rom"]:
+        assert leaks_any_holdout(line) is False
+
+    sched = spaced_repetition_schedule(
+        {"console_rom": 4.2, "tick": 2.0, "logic": 1.1},
+        previous_loss={"console_rom": 3.8, "tick": 2.5, "logic": 1.2},
+        streaks={"console_rom": 0, "tick": 2, "logic": 4},
+        max_repetitions=4,
+    )
+    assert sched[0]["concept"] == "console_rom"
+    assert sched[0]["repetitions"] == 4
+
+    model = NumpyRecurrentLM(model_id="rep-train-test", config=NeuralLMConfig(hidden_size=8, seed=19))
+    eval_sample = grouped["console_rom"][:4]
+    rep_out = automated_repetition_training(
+        model,
+        cycles=2,
+        max_repetitions=3,
+        top_focus=3,
+        learning_rate=0.04,
+        optimizer="adamw",
+        weight_decay=0.01,
+        eval_documents=eval_sample,
+    )
+    assert rep_out["improved"] is True
+    assert rep_out["final_eval_loss"] < rep_out["initial_eval_loss"]
+    assert rep_out["holdout_isolated"] is True
+    assert rep_out["promoted"] is False

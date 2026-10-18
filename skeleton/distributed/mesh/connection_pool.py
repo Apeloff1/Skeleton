@@ -44,9 +44,15 @@ class Pool:
 class ConnectionPool:
     """Per-upstream connection pooling."""
 
-    def __init__(self, connector: Optional[Callable[[str], Any]] = None):
+    def __init__(
+        self,
+        connector: Optional[Callable[[str], Any]] = None,
+        *,
+        health_check: Optional[Callable[[Connection], bool]] = None,
+    ):
         self._pools: Dict[str, Pool] = {}
         self._connector = connector or (lambda upstream: {"conn": upstream})
+        self._health_check = health_check
 
     def _pool(self, upstream: str) -> Pool:
         return self._pools.setdefault(upstream, Pool(upstream=upstream))
@@ -55,6 +61,9 @@ class ConnectionPool:
         now_ok = []
         for conn in pool.available:
             if conn.broken or conn.age_s() > pool.max_lifetime_s or conn.idle_s() > pool.idle_timeout_s:
+                continue
+            if self._health_check is not None and not self._health_check(conn):
+                conn.broken = True
                 continue
             now_ok.append(conn)
         pool.available = now_ok

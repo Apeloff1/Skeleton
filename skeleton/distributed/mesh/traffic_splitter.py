@@ -13,6 +13,15 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
+PRIORITY_TIERS: Dict[str, int] = {
+    "critical": 0,
+    "heavy": 1,
+    "normal": 2,
+    "background": 3,
+    "shed_first": 4,
+}
+
+
 @dataclass
 class Backend:
     name: str
@@ -26,10 +35,26 @@ class Backend:
     in_flight: int = 0
     max_concurrency: int = 0
     base_weight: int = 0
+    circuit_state: str = "closed"
+    consecutive_errors: int = 0
+    circuit_trip_threshold: int = 5
+    circuit_cooldown_ms: float = 5000.0
+    circuit_opened_ns: int = 0
+    half_open_successes: int = 0
+    half_open_required_successes: int = 2
+    rate_limit_rps: float = 0.0
+    burst_capacity: float = 0.0
+    _tokens: float = 0.0
+    _last_refill_ns: int = 0
 
     def __post_init__(self) -> None:
         if self.base_weight <= 0:
             self.base_weight = max(1, int(self.weight))
+        if self.rate_limit_rps > 0.0:
+            if self.burst_capacity <= 0.0:
+                self.burst_capacity = max(1.0, self.rate_limit_rps)
+            self._tokens = self.burst_capacity
+            self._last_refill_ns = time.time_ns()
 
     def error_rate(self) -> float:
         return self.errors / self.requests if self.requests else 0.0
@@ -37,17 +62,53 @@ class Backend:
     def mean_latency(self) -> float:
         return self.total_latency_ms / self.requests if self.requests else 0.0
 
-    def has_capacity(self) -> bool:
-        if not self.healthy or self.weight <= 0:
-            return False
-        if self.max_concurrency > 0 and self.in_flight >= self.max_concurrency:
+    def _check_circuit(self) -> bool:
+        if self.circuit_state == "open":
+            elapsed_ms = (time.time_ns() - self.circuit_opened_ns) / 1e6
+            if elapsed_ms >= self.circuit_cooldown_ms:
+                self.circuit_state = "half_open"
+                self.half_open_successes = 0
+            else:
+                return False
+        if self.circuit_state == "half_open" and self.in_flight >= 1:
             return False
         return True
 
-    def effective_weight(self, *, latency_budget_ms: float = 0.0) -> float:
-        if not self.has_capacity():
+    def _consume_token(self) -> bool:
+        if self.rate_limit_rps <= 0.0:
+            return True
+        now = time.time_ns()
+        elapsed_s = max(0.0, (now - self._last_refill_ns) / 1e9)
+        self._last_refill_ns = now
+        cap = self.burst_capacity if self.burst_capacity > 0.0 else self.rate_limit_rps
+        self._tokens = min(cap, self._tokens + elapsed_s * self.rate_limit_rps)
+        if self._tokens < 1.0:
+            return False
+        self._tokens -= 1.0
+        return True
+
+    def has_capacity(self, *, priority: str = "normal") -> bool:
+        if not self.healthy or self.weight <= 0:
+            return False
+        if not self._check_circuit():
+            return False
+        if self.max_concurrency > 0:
+            if self.in_flight >= self.max_concurrency:
+                return False
+            util = float(self.in_flight) / float(self.max_concurrency)
+            tier = PRIORITY_TIERS.get(str(priority).lower(), 2)
+            if tier >= 3 and util >= 0.75:
+                return False
+            if tier == 2 and self.max_concurrency >= 4 and util >= 0.90:
+                return False
+        return True
+
+    def effective_weight(self, *, latency_budget_ms: float = 0.0, priority: str = "normal") -> float:
+        if not self.has_capacity(priority=priority):
             return 0.0
         reliability = max(0.05, 1.0 - min(0.95, self.error_rate()))
+        if self.circuit_state == "half_open":
+            reliability *= 0.25
         quality = max(0.05, float(self.quality_score))
         lat_factor = 1.0
         obs_lat = self.ewma_latency_ms if self.ewma_latency_ms > 0.0 else self.mean_latency()
@@ -64,6 +125,8 @@ class Backend:
             "name": self.name,
             "weight": self.weight,
             "healthy": self.healthy,
+            "circuit_state": self.circuit_state,
+            "consecutive_errors": self.consecutive_errors,
             "requests": self.requests,
             "error_rate": round(self.error_rate(), 4),
             "mean_latency_ms": round(self.mean_latency(), 2),
@@ -102,6 +165,10 @@ class TrafficSplitter:
         *,
         max_concurrency: int = 0,
         quality_score: float = 1.0,
+        circuit_trip_threshold: int = 5,
+        circuit_cooldown_ms: float = 5000.0,
+        rate_limit_rps: float = 0.0,
+        burst_capacity: float = 0.0,
     ) -> Backend:
         b = Backend(
             name=name,
@@ -109,9 +176,41 @@ class TrafficSplitter:
             max_concurrency=max(0, int(max_concurrency)),
             quality_score=max(0.05, float(quality_score)),
             base_weight=max(1, int(weight)),
+            circuit_trip_threshold=max(0, int(circuit_trip_threshold)),
+            circuit_cooldown_ms=max(1.0, float(circuit_cooldown_ms)),
+            rate_limit_rps=max(0.0, float(rate_limit_rps)),
+            burst_capacity=max(0.0, float(burst_capacity)),
         )
         self._backends[name] = b
         return b
+
+    def configure_circuit_breaker(
+        self,
+        name: str,
+        *,
+        trip_threshold: int = 5,
+        cooldown_ms: float = 5000.0,
+        half_open_required_successes: int = 2,
+    ) -> None:
+        if name in self._backends:
+            b = self._backends[name]
+            b.circuit_trip_threshold = max(0, int(trip_threshold))
+            b.circuit_cooldown_ms = max(1.0, float(cooldown_ms))
+            b.half_open_required_successes = max(1, int(half_open_required_successes))
+
+    def configure_rate_limit(
+        self,
+        name: str,
+        *,
+        rate_limit_rps: float,
+        burst_capacity: Optional[float] = None,
+    ) -> None:
+        if name in self._backends:
+            b = self._backends[name]
+            b.rate_limit_rps = max(0.0, float(rate_limit_rps))
+            b.burst_capacity = float(burst_capacity) if burst_capacity is not None else max(1.0, b.rate_limit_rps)
+            b._tokens = b.burst_capacity
+            b._last_refill_ns = time.time_ns()
 
     def set_weight(self, name: str, weight: int) -> None:
         self._backends[name].weight = max(0, weight)
@@ -124,6 +223,9 @@ class TrafficSplitter:
 
     def mark_health(self, name: str, healthy: bool) -> None:
         self._backends[name].healthy = healthy
+        if healthy and self._backends[name].circuit_state == "open":
+            self._backends[name].circuit_state = "closed"
+            self._backends[name].consecutive_errors = 0
 
     def enable_shadow(self, backend: str) -> None:
         self._shadow = backend
@@ -137,16 +239,18 @@ class TrafficSplitter:
         *,
         latency_aware: bool = False,
         latency_budget_ms: float = 100.0,
+        priority: str = "normal",
     ) -> Optional[str]:
         if session_id and session_id in self._sticky:
             name = self._sticky[session_id]
-            if name in self._backends and self._backends[name].has_capacity():
-                return name
-        pool = [b for b in self._backends.values() if b.has_capacity()]
+            if name in self._backends and self._backends[name].has_capacity(priority=priority):
+                if self._backends[name]._consume_token():
+                    return name
+        pool = [b for b in self._backends.values() if b.has_capacity(priority=priority)]
         if not pool:
             return None
         if latency_aware:
-            weights = [b.effective_weight(latency_budget_ms=latency_budget_ms) for b in pool]
+            weights = [b.effective_weight(latency_budget_ms=latency_budget_ms, priority=priority) for b in pool]
         else:
             weights = [float(b.weight) for b in pool]
         total = sum(weights)
@@ -156,14 +260,54 @@ class TrafficSplitter:
         acc = 0.0
         for b, w in zip(pool, weights):
             acc += w
-            if roll <= acc:
+            if roll <= acc and b._consume_token():
                 if session_id:
                     self._sticky[session_id] = b.name
                 return b.name
-        chosen = pool[-1].name
+        for b in reversed(pool):
+            if b._consume_token():
+                if session_id:
+                    self._sticky[session_id] = b.name
+                return b.name
+        return None
+
+    def route_heavy_task(
+        self,
+        session_id: Optional[str] = None,
+        *,
+        latency_budget_ms: float = 150.0,
+    ) -> Dict[str, Any]:
+        """Select a primary backend and a distinct healthy backup backend for heavy tasks."""
+        pool = [b for b in self._backends.values() if b.has_capacity(priority="heavy")]
+        if not pool:
+            return {"primary": None, "backup": None, "backup_available": False}
+        ranked = sorted(
+            pool,
+            key=lambda b: b.effective_weight(latency_budget_ms=latency_budget_ms, priority="heavy"),
+            reverse=True,
+        )
+        primary_b = None
+        if session_id and session_id in self._sticky:
+            sticky_name = self._sticky[session_id]
+            for b in ranked:
+                if b.name == sticky_name and b._consume_token():
+                    primary_b = b
+                    break
+        if primary_b is None:
+            for b in ranked:
+                if b._consume_token():
+                    primary_b = b
+                    break
+        if primary_b is None:
+            return {"primary": None, "backup": None, "backup_available": False}
         if session_id:
-            self._sticky[session_id] = chosen
-        return chosen
+            self._sticky[session_id] = primary_b.name
+        backup_b = next((b for b in ranked if b.name != primary_b.name), None)
+        return {
+            "primary": primary_b.name,
+            "backup": backup_b.name if backup_b is not None else None,
+            "backup_available": backup_b is not None,
+        }
 
     def acquire_route(
         self,
@@ -171,11 +315,13 @@ class TrafficSplitter:
         *,
         latency_aware: bool = True,
         latency_budget_ms: float = 100.0,
+        priority: str = "normal",
     ) -> Optional[str]:
         chosen = self.route(
             session_id=session_id,
             latency_aware=latency_aware,
             latency_budget_ms=latency_budget_ms,
+            priority=priority,
         )
         if chosen is not None and chosen in self._backends:
             self._backends[chosen].in_flight += 1
@@ -231,6 +377,19 @@ class TrafficSplitter:
             b.ewma_latency_ms = (1.0 - alpha) * b.ewma_latency_ms + alpha * lat
         if error:
             b.errors += 1
+            b.consecutive_errors += 1
+            if b.circuit_state == "half_open" or (
+                b.circuit_trip_threshold > 0 and b.consecutive_errors >= b.circuit_trip_threshold
+            ):
+                b.circuit_state = "open"
+                b.circuit_opened_ns = time.time_ns()
+                b.half_open_successes = 0
+        else:
+            b.consecutive_errors = 0
+            if b.circuit_state == "half_open":
+                b.half_open_successes += 1
+                if b.half_open_successes >= b.half_open_required_successes:
+                    b.circuit_state = "closed"
         if self._shadow and backend != self._shadow:
             self._shadow_log.append({
                 "primary": backend, "shadow": self._shadow,

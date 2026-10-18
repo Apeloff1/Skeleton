@@ -131,6 +131,10 @@ class JeevesCortex:
             vocab=gameforge_vocab(), dim=8, ctx=8, seed=23,
             n_heads=2, n_layers=2, d_ff=32, norm="rms", ffn_kind="swiglu",
         )
+        self.backup_transformer = TinyTransformer(
+            vocab=gameforge_vocab(), dim=8, ctx=8, seed=29,
+            n_heads=2, n_layers=2, d_ff=32, norm="ln", ffn_kind="gelu",
+        )
         self._device_info = probe()
         dim = int(getattr(self.transformer, "dim", 8) or 8)
         self.callosum = CorpusCallosum(dim=dim, seed=17)
@@ -141,8 +145,17 @@ class JeevesCortex:
         self.bpe = gameforge_bpe(merges=64)
         self.transformer.bpe = self.bpe
         self.neo_rms.bpe = self.bpe
+        self.backup_transformer.bpe = self.bpe
         if hasattr(self.transformer, "tie"):
             self.transformer.tie()
+        if hasattr(self.backup_transformer, "tie"):
+            self.backup_transformer.tie()
+        if hasattr(self.transformer, "checkpoint_redundant_standby"):
+            self.transformer.checkpoint_redundant_standby()
+        if hasattr(self.neo_rms, "checkpoint_redundant_standby"):
+            self.neo_rms.checkpoint_redundant_standby()
+        if hasattr(self.backup_transformer, "checkpoint_redundant_standby"):
+            self.backup_transformer.checkpoint_redundant_standby()
         for port in self.slots.values():
             xf = getattr(port, "transformer", None)
             if xf is not None:
@@ -152,8 +165,10 @@ class JeevesCortex:
         self._seal: Dict[str, Any] = {}
         from skeleton.cortex.contact import ContactEngine
         from skeleton.cortex.genos import Genos
+        from skeleton.cortex.own import RepetitionTrainingAutomation
         self.contact_engine = ContactEngine()
         self.genos_engine = Genos()
+        self.repetition_automation = RepetitionTrainingAutomation()
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -669,6 +684,7 @@ class JeevesCortex:
                 adaptive_gossip(xf, rms, eval_texts, max_alpha=0.20)
             if apply_gaming:
                 self.apply_gaming_weights(rounds=max(1, rounds // 2))
+            self.sync_backup_transformer()
             return {"sleep": sleep_info, "pulse": pulse, "lr_used": round(base_lr, 4)}
 
         verdict = ratchet.step(self, _inner_step)
@@ -743,6 +759,7 @@ class JeevesCortex:
             self.surpass(slot)
 
         sleep_out = self.sleep_cycle(n=8)
+        self.sync_backup_transformer()
         seal = self.elect_mouth(texts=eval_texts)
         cap_out = self.upgrade_capacity(extra_layers=1, lora_rank=4) if grow_capacity else None
         from skeleton.cortex.metrics import evaluate as _eval_metrics
@@ -1040,6 +1057,7 @@ class JeevesCortex:
             "lms": lms,
             "transformer": self.transformer.snapshot(),
             "neo_rms": self.neo_rms.snapshot() if getattr(self, "neo_rms", None) is not None else None,
+            "backup_transformer": self.backup_transformer.snapshot() if getattr(self, "backup_transformer", None) is not None else None,
             "callosum": self.callosum.snapshot(),
             "moe": self.moe.snapshot(),
             "sleep": self.sleep.snapshot(),
@@ -1123,6 +1141,14 @@ class JeevesCortex:
             else:
                 from skeleton.cortex.transformer import TinyTransformer
                 self.neo_rms = TinyTransformer.from_snapshot(rms_snapshot)
+        if blob.get("backup_transformer"):
+            backup_snap = blob["backup_transformer"]
+            if (backup_snap or {}).get("kind") == "torch-stack":
+                from skeleton.cortex.torch_lm import TorchTransformer
+                self.backup_transformer = TorchTransformer.from_snapshot(backup_snap)
+            else:
+                from skeleton.cortex.transformer import TinyTransformer
+                self.backup_transformer = TinyTransformer.from_snapshot(backup_snap)
         if blob.get("winner"):
             self._winner_mouth = str(blob.get("winner") or "neo")
         if "mouth_override" in blob:
@@ -1149,6 +1175,8 @@ class JeevesCortex:
             self.transformer.bpe = self.bpe
             if getattr(self, "neo_rms", None) is not None:
                 self.neo_rms.bpe = self.bpe
+            if getattr(self, "backup_transformer", None) is not None:
+                self.backup_transformer.bpe = self.bpe
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:
@@ -1207,11 +1235,221 @@ class JeevesCortex:
         key = str(name or "gelu").lower()
         if key in {"rms", "swiglu", "neo_rms"}:
             return getattr(self, "neo_rms", None) or self.transformer
+        if key in {"backup", "standby", "backup_transformer"}:
+            return getattr(self, "backup_transformer", None) or getattr(self, "neo_rms", None) or self.transformer
         if key in {"pfc", "midbrain", "left", "right"}:
             port = (getattr(self, "slots", {}) or {}).get(key)
             xf = getattr(port, "transformer", None) if port is not None else None
             return xf or self.transformer
         return self.transformer
+
+    def sync_backup_transformer(self) -> Dict[str, Any]:
+        """Synchronize the hot-standby backup transformer from the healthiest trained mouth."""
+        from skeleton.cortex.gossip import absorb_mouth
+
+        xf = self.transformer
+        rms = getattr(self, "neo_rms", None)
+        backup = getattr(self, "backup_transformer", None)
+        if backup is None:
+            return {"synced": 0, "reason": "no-backup"}
+
+        xf_healthy = bool(xf is not None and (not hasattr(xf, "validate_finite_weights") or xf.validate_finite_weights().get("healthy", True)))
+        rms_healthy = bool(rms is not None and (not hasattr(rms, "validate_finite_weights") or rms.validate_finite_weights().get("healthy", True)))
+
+        if xf_healthy and xf is not None:
+            if hasattr(xf, "checkpoint_redundant_standby"):
+                xf.checkpoint_redundant_standby()
+            snap = xf.snapshot()
+            restored = type(backup).from_snapshot(snap)
+            backup.E, backup.P, backup.Wout, backup.bout = restored.E, restored.P, restored.Wout, restored.bout
+            backup.layers, backup.n_layers = restored.layers, restored.n_layers
+            backup.fitted, backup.steps = restored.fitted, restored.steps
+            if getattr(xf, "tied", False) and hasattr(backup, "tie"):
+                backup.tie()
+            if rms_healthy and rms is not None and int(getattr(rms, "steps", 0) or 0) > 0:
+                absorb_mouth(backup, rms, alpha=0.15)
+            if hasattr(backup, "checkpoint_redundant_standby"):
+                backup.checkpoint_redundant_standby()
+            return {"synced": 1, "source": "transformer", "steps": backup.steps, "layers": backup.n_layers}
+
+        if rms_healthy and rms is not None:
+            if hasattr(rms, "checkpoint_redundant_standby"):
+                rms.checkpoint_redundant_standby()
+            snap = rms.snapshot()
+            restored = type(backup).from_snapshot(snap)
+            backup.E, backup.P, backup.Wout, backup.bout = restored.E, restored.P, restored.Wout, restored.bout
+            backup.layers, backup.n_layers = restored.layers, restored.n_layers
+            backup.fitted, backup.steps = restored.fitted, restored.steps
+            if hasattr(backup, "checkpoint_redundant_standby"):
+                backup.checkpoint_redundant_standby()
+            return {"synced": 1, "source": "neo_rms", "steps": backup.steps, "layers": backup.n_layers}
+
+        return {"synced": 0, "reason": "sources-unhealthy"}
+
+    def redundant_transformers(self) -> Dict[str, Any]:
+        """Return health and capacity diagnostics across the redundant transformer ring."""
+        ring: Dict[str, Dict[str, Any]] = {}
+        members = [
+            ("neo", self.transformer),
+            ("neo_rms", getattr(self, "neo_rms", None)),
+            ("backup", getattr(self, "backup_transformer", None)),
+        ]
+        for slot in SLOTS:
+            port = self.slots.get(slot)
+            xf = getattr(port, "transformer", None) if port is not None else None
+            if xf is not None:
+                members.append((f"slot_{slot}", xf))
+
+        healthy_count = 0
+        for name, model in members:
+            if model is None:
+                continue
+            health = (
+                model.validate_finite_weights()
+                if hasattr(model, "validate_finite_weights")
+                else {"healthy": True, "nonfinite_count": 0, "checked_parameters": 0}
+            )
+            if health.get("healthy"):
+                healthy_count += 1
+            ring[name] = {
+                "healthy": bool(health.get("healthy")),
+                "nonfinite_count": int(health.get("nonfinite_count", 0)),
+                "dim": int(getattr(model, "dim", 0) or 0),
+                "n_layers": int(getattr(model, "n_layers", 1) or 1),
+                "steps": int(getattr(model, "steps", 0) or 0),
+                "fitted": int(getattr(model, "fitted", 0) or 0),
+                "norm": str(getattr(model, "norm", "ln") or "ln"),
+                "ffn_kind": str(getattr(model, "ffn_kind", "gelu") or "gelu"),
+            }
+        return {
+            "total_models": len(ring),
+            "healthy_models": healthy_count,
+            "quorum_ready": healthy_count >= 2,
+            "ring": ring,
+        }
+
+    def backup_infer(
+        self,
+        stimulus: str,
+        *,
+        n: int = 16,
+        seed: int = 0,
+        consensus: bool = True,
+        min_p: float = 0.05,
+    ) -> Dict[str, Any]:
+        """Redundant backup inference for heavy tasks with automatic health repair and quorum consensus."""
+        import math
+        from skeleton.cortex.curriculum import CORE_PAIRS
+        from skeleton.cortex.gossip import redundant_consensus_decode
+
+        stim = stimulus or ""
+        xf = self.transformer
+        rms = getattr(self, "neo_rms", None)
+        backup = getattr(self, "backup_transformer", None)
+
+        backups = [m for m in (rms, backup) if m is not None]
+        for slot in SLOTS:
+            port = self.slots.get(slot)
+            s_xf = getattr(port, "transformer", None) if port is not None else None
+            if s_xf is not None and int(getattr(s_xf, "V", -1)) == int(getattr(xf, "V", -2)):
+                backups.append(s_xf)
+
+        heavy_out = xf.heavy_task_infer(
+            stim,
+            n=n,
+            seed=seed,
+            backup_models=backups,
+            min_p=min_p,
+        )
+
+        consensus_out = None
+        if consensus:
+            ring_models = [xf] + backups[:3]
+            probe_texts = [a for a, _ in list(CORE_PAIRS)[:4]] or [stim or "soulslike ttk"]
+            weights = []
+            for m in ring_models:
+                try:
+                    ppl = float(m.perplexity(probe_texts))
+                    weights.append(1.0 / max(ppl if math.isfinite(ppl) else 1e6, 1e-6))
+                except Exception:
+                    weights.append(1e-6)
+            consensus_out = redundant_consensus_decode(
+                ring_models,
+                stim,
+                n=n,
+                seed=seed,
+                weights=weights,
+                min_p=min_p,
+            )
+
+        trace = self.think(stim)
+        winner_text = (
+            consensus_out["text"]
+            if (consensus_out and consensus_out.get("quorum_agreement", 0.0) >= 0.5)
+            else heavy_out["text"]
+        )
+        return {
+            "kind": "heavy-backup-inference",
+            "stimulus": stim[:160],
+            "text": winner_text,
+            "heavy_chunked": heavy_out,
+            "consensus": consensus_out,
+            "used_backup": bool(heavy_out.get("used_backup") or (consensus_out and consensus_out.get("step_failovers", 0) > 0)),
+            "repaired_from_standby": bool(heavy_out.get("repaired_from_standby")),
+            "failover_reason": heavy_out.get("failover_reason"),
+            "hive_confidence": round(trace.hive_value, 4),
+            "ring_status": self.redundant_transformers(),
+        }
+
+    def parse_shadow_weights(self) -> Dict[str, Any]:
+        """Parse shadow vs. teacher trial statistics, transformer layer deltas, LoRA, and MoE heads."""
+        from skeleton.cortex.own import parse_shadow_weights
+        return parse_shadow_weights(self)
+
+    def create_hyperweights(
+        self,
+        *,
+        alpha: float = 0.30,
+        rank: int = 4,
+        tag_filter: Optional[Sequence[str]] = None,
+    ) -> Dict[str, Any]:
+        """Synthesize a content-addressed Hyperweight Bundle from verified shadow weights and MoE priors."""
+        from skeleton.cortex.own import create_hyperweights
+        return create_hyperweights(self, alpha=alpha, rank=rank, tag_filter=tag_filter)
+
+    def apply_hyperweights(self, bundle: Dict[str, Any], *, blend: float = 0.25) -> Dict[str, Any]:
+        """Apply a Hyperweight Bundle with coherence-gated rollback protection."""
+        from skeleton.cortex.own import apply_hyperweights
+        return apply_hyperweights(self, bundle, blend=blend)
+
+    def run_repetition_automation(
+        self,
+        stimuli: Optional[Sequence[str]] = None,
+        *,
+        cycles: int = 2,
+        top_k: int = 8,
+        base_lr: float = 0.035,
+        synthesize_hyperweights: bool = True,
+    ) -> Dict[str, Any]:
+        """Execute automated spaced-repetition training, shadow parsing, and hyperweight synthesis."""
+        return self.repetition_automation.run_cycle(
+            self,
+            stimuli,
+            cycles=cycles,
+            top_k=top_k,
+            base_lr=base_lr,
+            synthesize_hyperweights=synthesize_hyperweights,
+        )
+
+    def train_console_rom_assets(
+        self,
+        *,
+        consoles: Optional[Sequence[str]] = None,
+        rounds: int = 2,
+    ) -> Dict[str, Any]:
+        """Train across the console and ROM asset engineering suite (8-bit DMG/NES to modern)."""
+        from skeleton.cortex.improve import train_console_rom_assets
+        return train_console_rom_assets(self, consoles=consoles, rounds=rounds)
 
     def speaking_name(self) -> str:
         if self._mouth_override:

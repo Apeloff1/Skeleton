@@ -40,9 +40,18 @@ class ThroughputController:
             self._lanes[subsystem] = Lane(subsystem=subsystem, target_latency_ms=target_latency_ms)
         return self._lanes[subsystem]
 
-    def acquire(self, subsystem: str) -> bool:
+    def acquire(self, subsystem: str, *, priority: str = "normal") -> bool:
         lane = self.lane(subsystem)
-        if lane.inflight >= int(lane.limit):
+        eff_limit = max(1, int(lane.limit))
+        if lane.inflight >= eff_limit:
+            self._rejected += 1
+            return False
+        prio = str(priority or "normal").lower()
+        util = float(lane.inflight) / float(eff_limit)
+        if prio in {"background", "shed_first"} and eff_limit >= 2 and util >= 0.75:
+            self._rejected += 1
+            return False
+        if prio == "normal" and eff_limit >= 4 and util >= 0.90:
             self._rejected += 1
             return False
         lane.inflight += 1
@@ -67,9 +76,9 @@ class ThroughputController:
             lane.limit = min(lane.max_limit, lane.limit + step / max(1, int(lane.limit)))
             lane.successes += 1
 
-    def execute(self, subsystem: str, fn: Callable[[], Any]) -> Dict[str, Any]:
-        if not self.acquire(subsystem):
-            return {"executed": False, "reason": "concurrency limit"}
+    def execute(self, subsystem: str, fn: Callable[[], Any], *, priority: str = "normal") -> Dict[str, Any]:
+        if not self.acquire(subsystem, priority=priority):
+            return {"executed": False, "reason": "concurrency limit", "priority": priority}
         start = time.time_ns()
         error = False
         result: Any = None
@@ -82,7 +91,7 @@ class ThroughputController:
         self.release(subsystem, latency_ms, error)
         if error:
             raise result
-        return {"executed": True, "result": result, "latency_ms": round(latency_ms, 2)}
+        return {"executed": True, "result": result, "latency_ms": round(latency_ms, 2), "priority": priority}
 
     def current_limit(self, subsystem: str) -> float:
         return self.lane(subsystem).limit

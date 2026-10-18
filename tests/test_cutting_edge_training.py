@@ -579,3 +579,257 @@ def test_cortex_game_creation_finetune_planner_qa_and_closed_loop_build():
     splitter.record("stage-fast", latency_ms=12.0, error=False)
     routed = splitter.route_game_stage("spec_compile", session_id="game-sess-1", remaining_deadline_s=30.0)
     assert routed == "stage-fast"
+
+
+def test_transformer_redundancies_standby_self_healing_and_backup_inference():
+    import threading
+    from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+    from skeleton.ai.runtime.inference.native_transformer import NativeTransformerModel
+    from skeleton.cortex.gossip import redundant_consensus_decode
+    from skeleton.cortex.neocortex import JeevesCortex
+
+    # 1. TinyTransformer standby checkpoint, NaN self-healing, and heavy_task_infer
+    primary = _mouth(seed=31)
+    backup1 = _mouth(seed=37, norm="rms", ffn_kind="swiglu")
+    backup2 = _mouth(seed=41)
+    corpus = ["alpha beta gamma delta", "beta gamma alpha"]
+    primary.specialized_calibrate(corpus, epochs=2, lr=0.03)
+    backup1.specialized_calibrate(corpus, epochs=2, lr=0.03)
+    backup2.specialized_calibrate(corpus, epochs=2, lr=0.03)
+
+    chk = primary.checkpoint_redundant_standby()
+    assert chk["checkpointed"] == 1
+    assert primary.validate_finite_weights()["healthy"] is True
+
+    # Inject a non-finite weight into primary and verify heavy_task_infer self-heals from standby
+    primary.layers[0].Wq[0][0] = float("nan")
+    assert primary.validate_finite_weights()["healthy"] is False
+    heavy_out = primary.heavy_task_infer(
+        "alpha beta",
+        n=12,
+        seed=5,
+        backup_models=[backup1, backup2],
+        chunk_tokens=4,
+    )
+    assert heavy_out["is_heavy_task"] is True
+    assert heavy_out["repaired_from_standby"] is True
+    assert heavy_out["primary_healthy"] is True
+    assert heavy_out["chunks_processed"] == 3
+    assert len(heavy_out["token_ids"]) == 12
+
+    # If standby is cleared and primary is corrupted, heavy_task_infer fails over to backup1
+    primary._standby_snapshot = None
+    primary.layers[0].Wq[0][0] = float("nan")
+    failover_out = primary.heavy_task_infer(
+        "alpha beta",
+        n=8,
+        seed=5,
+        backup_models=[backup1, backup2],
+    )
+    assert failover_out["used_backup"] is True
+    assert failover_out["failover_reason"] == "primary-nonfinite-weights"
+    assert len(failover_out["token_ids"]) == 8
+
+    # 2. Quorum consensus decode filters degraded models and tracks agreement
+    cons = redundant_consensus_decode([primary, backup1, backup2], "alpha", n=6, seed=3)
+    assert cons["healthy_models"] == 2
+    assert cons["degraded_models"] == 1
+    assert 0.0 < cons["quorum_agreement"] <= 1.0
+
+    # 3. JeevesCortex redundant transformer ring & backup_infer
+    neo = JeevesCortex()
+    neo.train(epochs=1)
+    sync_res = neo.sync_backup_transformer()
+    assert sync_res["synced"] == 1
+    ring = neo.redundant_transformers()
+    assert ring["total_models"] >= 6
+    assert ring["quorum_ready"] is True
+
+    bi = neo.backup_infer("soulslike extraction ttk elite dread", n=12, seed=7, consensus=True)
+    assert bi["kind"] == "heavy-backup-inference"
+    assert isinstance(bi["text"], str)
+    assert bi["consensus"]["healthy_models"] >= 3
+
+    # 4. NativeTransformerModel backup_runtime failover
+    good_rt = NativeLLMRuntime(backup1)
+    bad_lm = _mouth(seed=53)
+    bad_rt = NativeLLMRuntime(bad_lm)
+    # Mutate bad_lm after NativeLLMRuntime creation so primary triggers RuntimeContractError and fails over to backup_runtime
+    bad_lm.E[0][0] += 0.5
+    native_with_backup = NativeTransformerModel(bad_rt, model_id="redundant-native", backup_runtime=good_rt)
+    req = LocalInferenceRequest(prompt="alpha", max_output_tokens=3, seed=2)
+    res = native_with_backup.infer(req, threading.Event())
+    assert res.output_tokens >= 1
+    assert native_with_backup.backup_failover_count == 1
+
+
+def test_repetition_automation_shadow_weight_parsing_and_hyperweights():
+    from skeleton.cortex.neocortex import JeevesCortex
+
+    neo = JeevesCortex()
+    neo.train(epochs=1)
+
+    # 1. Parse shadow weights
+    parsed = neo.parse_shadow_weights()
+    assert parsed["kind"] == "shadow-weight-parse"
+    assert "own" in parsed["slot_metrics"]
+    assert len(parsed["shadow_digest"]) == 64
+    assert len(parsed["layer_deltas"]) >= 1
+
+    # 2. Create and apply hyperweights
+    bundle = neo.create_hyperweights(alpha=0.30, rank=4)
+    assert bundle["kind"] == "hyperweight-bundle"
+    assert bundle["schema_version"] == "skeleton.cortex.hyperweights.v1"
+    assert len(bundle["bundle_digest"]) == 64
+    assert len(bundle["layer_hyper_projections"]) == neo.transformer.n_layers
+
+    applied = neo.apply_hyperweights(bundle, blend=0.20)
+    assert applied["kind"] == "hyperweight-apply"
+    assert applied["applied"] == 1
+    assert applied["final_ppl"] <= applied["before_ppl"] * 1.05
+
+    # 3. Run full spaced-repetition training automation
+    auto = neo.run_repetition_automation(cycles=2, top_k=6, synthesize_hyperweights=True)
+    assert auto["kind"] == "repetition-training-automation"
+    assert auto["cycles_executed"] == 2
+    assert auto["total_repetitions"] >= 12
+    assert auto["tracked_cards"] >= 6
+    assert auto["hyperweights"]["schema_version"] == "skeleton.cortex.hyperweights.v1"
+
+
+def test_traffic_hardening_circuit_breaker_priority_shedding_and_heavy_hedging():
+    from skeleton.distributed.mesh.connection_pool import ConnectionPool
+    from skeleton.distributed.mesh.deduplicator import Deduplicator
+    from skeleton.distributed.mesh.request_hedging import RequestHedger
+    from skeleton.distributed.mesh.throughput_controller import ThroughputController
+    from skeleton.distributed.mesh.traffic_splitter import TrafficSplitter
+
+    # 1. TrafficSplitter circuit breaker & priority load shedding & heavy task routing
+    splitter = TrafficSplitter(rng=random.Random(11))
+    splitter.add_backend(
+        "primary-a",
+        weight=100,
+        max_concurrency=4,
+        circuit_trip_threshold=3,
+        circuit_cooldown_ms=50.0,
+    )
+    splitter.add_backend(
+        "backup-b",
+        weight=90,
+        max_concurrency=4,
+        circuit_trip_threshold=3,
+        circuit_cooldown_ms=50.0,
+    )
+
+    heavy_pair = splitter.route_heavy_task("sess-heavy")
+    assert heavy_pair["primary"] == "primary-a"
+    assert heavy_pair["backup"] == "backup-b"
+    assert heavy_pair["backup_available"] is True
+
+    # Trip circuit on primary-a after 3 consecutive errors
+    for _ in range(3):
+        splitter.record("primary-a", latency_ms=80.0, error=True)
+    assert splitter._backends["primary-a"].circuit_state == "open"
+    assert splitter.route() == "backup-b"
+
+    # Priority shedding on backup-b when 3/4 slots (75%) are occupied
+    splitter._backends["backup-b"].in_flight = 3
+    assert splitter.route(priority="background") is None
+    assert splitter.route(priority="critical") == "backup-b"
+    splitter._backends["backup-b"].in_flight = 0
+
+    # 2. RequestHedger execute_heavy multi-backup cascade
+    hedger = RequestHedger()
+    heavy_res = hedger.execute_heavy(
+        "heavy_infer",
+        primary=lambda: (_ for _ in ()).throw(RuntimeError("primary OOM")),
+        backups=[
+            lambda: (_ for _ in ()).throw(RuntimeError("backup-1 busy")),
+            lambda: "backup-2-recovered",
+        ],
+    )
+    assert heavy_res["result"] == "backup-2-recovered"
+    assert heavy_res["used_backup"] is True
+    assert heavy_res["backup_tier"] == 2
+
+    # 3. ThroughputController priority-aware admission
+    tc = ThroughputController()
+    lane = tc.lane("cortex")
+    lane.limit = 4.0
+    lane.inflight = 3  # 75% utilization
+    assert tc.acquire("cortex", priority="background") is False
+    assert tc.acquire("cortex", priority="heavy") is True
+
+    # 4. ConnectionPool health check & Deduplicator bounded eviction
+    pool = ConnectionPool(health_check=lambda c: not c.broken)
+    pool.warm("model-srv:9000", count=2)
+    pool._pool("model-srv:9000").available[0].broken = True
+    chk = pool.checkout("model-srv:9000")
+    assert chk["acquired"] is True
+    assert len(pool._pool("model-srv:9000").available) == 0
+
+    dedup = Deduplicator(retention_s=3600.0, max_entries=3)
+    for idx in range(5):
+        dedup.execute(f"k-{idx}", {"id": idx}, lambda i=idx: f"ok-{i}")
+    assert dedup.card()["records"] <= 3
+    assert dedup._evictions >= 2
+
+
+def test_console_and_rom_asset_training_and_budget_validation():
+    from skeleton.cortex.improve import CONSOLE_ROM_ASSET_ASPECTS, console_rom_asset_corpus
+    from skeleton.cortex.neocortex import JeevesCortex
+    from skeleton.forge.hardware import (
+        CONSOLE_ROM_PROFILES,
+        compile_console_rom_envelope,
+        get_console_rom_profile,
+        list_console_rom_profiles,
+        validate_rom_asset_budget,
+    )
+
+    profiles = list_console_rom_profiles()
+    assert len(profiles) >= 14
+    assert "gb_dmg_rom" in CONSOLE_ROM_PROFILES
+    assert "nes_rom" in CONSOLE_ROM_PROFILES
+    assert "snes_rom" in CONSOLE_ROM_PROFILES
+    assert "genesis_rom" in CONSOLE_ROM_PROFILES
+    assert "ps1_iso" in CONSOLE_ROM_PROFILES
+    assert "n64_z64" in CONSOLE_ROM_PROFILES
+
+    gb_prof = get_console_rom_profile("gameboy")
+    assert gb_prof["key"] == "gb_dmg_rom"
+    assert gb_prof["bytes_per_8x8_tile"] == 16
+    assert gb_prof["six_tile_symbol_bytes"] == 96
+    assert gb_prof["linker_bank0_symbol_addr"] == "00:0200"
+
+    valid_gb = validate_rom_asset_budget(
+        "gb_dmg_rom",
+        {"tile_count": 6, "tile_bytes": 96, "sprites_total": 40, "sprites_per_scanline": 10, "palette_colors": 4},
+    )
+    assert valid_gb["valid"] is True
+
+    invalid_gb = validate_rom_asset_budget(
+        "gb_dmg_rom",
+        {"tile_count": 6, "tile_bytes": 80, "sprites_total": 48, "allocated_bitmap_dim": 65536},
+    )
+    assert invalid_gb["valid"] is False
+    assert len(invalid_gb["violations"]) == 3
+
+    invalid_n64 = validate_rom_asset_budget("n64_z64", {"texture_bytes": 8192})
+    assert invalid_n64["valid"] is False
+
+    env = compile_console_rom_envelope("snes")
+    assert env["profile_key"] == "snes_rom"
+    assert env["rom_extension"] == ".sfc"
+    assert len(env["palette"]) >= 4
+
+    rom_corpus = console_rom_asset_corpus()
+    assert len(CONSOLE_ROM_ASSET_ASPECTS) >= 14
+    assert len(rom_corpus) >= 30
+
+    neo = JeevesCortex()
+    rom_train = neo.train_console_rom_assets(rounds=1)
+    assert rom_train["trained"] == 1
+    assert rom_train["console_count"] >= 14
+    assert rom_train["ingested_exemplars"] >= 14
+    recall_gb = neo.recall("gb_dmg_rom Game Boy 8bit rom asset tile sprite palette")
+    assert len(recall_gb["hits"]) >= 1

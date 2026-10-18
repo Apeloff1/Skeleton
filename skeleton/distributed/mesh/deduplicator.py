@@ -27,11 +27,13 @@ class IdempotencyRecord:
 class Deduplicator:
     """Idempotency-key request deduplication."""
 
-    def __init__(self, retention_s: float = 86400.0):
+    def __init__(self, retention_s: float = 86400.0, *, max_entries: int = 10_000):
         self.retention_s = retention_s
+        self.max_entries = max(1, int(max_entries))
         self._records: Dict[str, IdempotencyRecord] = {}
         self._hits = 0
         self._conflicts = 0
+        self._evictions = 0
 
     def _hash_payload(self, payload: Dict[str, Any]) -> str:
         return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:16]
@@ -41,6 +43,12 @@ class Deduplicator:
         expired = [k for k, r in self._records.items() if r.created_ns < cutoff]
         for k in expired:
             del self._records[k]
+        if len(self._records) > self.max_entries:
+            overflow = len(self._records) - self.max_entries
+            oldest_keys = sorted(self._records, key=lambda k: self._records[k].created_ns)[:overflow]
+            for k in oldest_keys:
+                del self._records[k]
+                self._evictions += 1
 
     def execute(self, key: str, payload: Dict[str, Any],
                 fn: Callable[[], Any]) -> Dict[str, Any]:
