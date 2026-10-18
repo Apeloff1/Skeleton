@@ -135,28 +135,18 @@ def iter_route_paths(app: object) -> list[str]:
 
 
 def reject_cortex_secret_routes(app: object) -> None:
-    """Refuse app startup if a registered HTTP path exposes cortex secrets."""
+    """Refuse startup if any inspectable route reaches cortex secrets.
+
+    Includes FastAPI lazy routers, structural candidates and nested mounts;
+    opaque/uninspectable entries are rejected by iter_route_paths.
+    """
     for path in iter_route_paths(app):
-        if _is_secrets(path):
-            raise RuntimeError(
-                "unchartered cortex secrets HTTP route is forbidden: "
-                "keep cortex_routes unmounted"
-            )
+        _reject_secret_path(path)
+
+
 def _reject_secret_path(path: str) -> None:
-    # Starlette provides decoded ASGI paths; also inspect percent-encoded
-    # aliases so registration spelling cannot bypass the source guard.
-    decoded = path
-    for _ in range(3):
-        expanded = unquote(decoded)
-        if expanded == decoded:
-            break
-        decoded = expanded
-    # Multiple separators are normalized by some ingress stacks, so do
-    # not let an alias slip past before the request reaches Starlette.
-    normalized = "/" + "/".join(
-        segment for segment in decoded.casefold().split("/") if segment
-    )
-    if normalized == "/api/v1/secrets" or normalized.startswith("/api/v1/secrets/"):
+    """Reject normalized and multiply percent-decoded cortex secret aliases."""
+    if _is_secrets(path):
         raise RuntimeError(
             "unchartered cortex secrets HTTP route is forbidden: "
             "keep cortex_routes unmounted"
