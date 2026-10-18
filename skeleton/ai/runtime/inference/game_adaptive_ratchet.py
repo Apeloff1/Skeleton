@@ -331,6 +331,7 @@ def train_budget(
     checkpoint_dir: Path | str = Path(".skeleton/game-corpus-199"),
     hidden: int = HIDDEN,
     chunk_docs: int = 192,
+    min_scale: float = 0.25,
     ledger_path: Path | str | None = None,
     log: Any = None,
 ) -> dict[str, Any]:
@@ -345,6 +346,9 @@ def train_budget(
         raise ValueError("additional_bytes must be a positive int")
     if not isinstance(peak_lr, (int, float)) or isinstance(peak_lr, bool) or not 0.0 < float(peak_lr) <= 1.0:
         raise ValueError("peak_lr must be in (0, 1]")
+    if isinstance(min_scale, bool) or not isinstance(min_scale, (int, float)) or not 0.0 < float(min_scale) <= 1.0:
+        raise ValueError("min_scale must be in (0, 1]")
+    min_scale = float(min_scale)
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     pause = root / "PAUSE"
@@ -356,7 +360,7 @@ def train_budget(
     parameters = [p for p in model.parameters() if p.requires_grad]
     peak_lr = float(peak_lr)
     opt = _fresh_optimizer(parameters, peak_lr)
-    ratchet = AdaptiveRatchet()
+    ratchet = AdaptiveRatchet(min_scale=min_scale)
     mastery = SamMatrix()
     stream = CorpusStream()
     replay: deque[tuple[str, str]] = deque(maxlen=256)
@@ -384,7 +388,7 @@ def train_budget(
             cycle_start = int(saved.get("cycle_start", bytes_done))
         else:
             opt = _fresh_optimizer(parameters, peak_lr)
-            ratchet = AdaptiveRatchet()
+            ratchet = AdaptiveRatchet(min_scale=min_scale)
             cycle_start = bytes_done
     else:
         goal = additional_bytes if additional_bytes is not None else budget_bytes
@@ -475,7 +479,9 @@ def train_budget(
                 replay.append(item)
         else:
             model.load_state_dict(before)
-            opt.load_state_dict(opt_state)
+            # A rejected step's moments would replay the same overshoot.
+            # The next chunk gets a fresh Adam step at the current rate.
+            opt = _fresh_optimizer(parameters, peak_lr)
             _pin(model)
         bytes_done += batch_bytes
         if log is not None and (bytes_done // (8 * 1024 * 1024) != (bytes_done - batch_bytes) // (8 * 1024 * 1024) or bytes_done >= goal):
@@ -557,6 +563,7 @@ def main() -> None:
                 additional_bytes=BUDGET_BYTES,
                 peak_lr=3e-4,
                 chunk_docs=96,
+                min_scale=1.0,
                 ledger_path=Path("skeleton/ai/runtime/inference/game_corpus_cycles.json"),
                 log=sys.stdout,
             ),
