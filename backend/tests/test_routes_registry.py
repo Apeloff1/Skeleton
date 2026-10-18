@@ -16,6 +16,8 @@ import pytest
 from fastapi import FastAPI
 
 from core.routes_registry import KNOWN_ROUTES, KNOWN_ROUTES_WITH_PREFIX, register_routes
+from routes import registry_health
+from routes.registry_health import CRITICAL_BOOT_ROUTERS
 
 
 def _flat_pairs():
@@ -60,17 +62,6 @@ def test_each_module_importable(module_path: str, attr: str, prefix):
 # Formerly silent boot regressions (#4133). These eight first-party routers are
 # shipped with the application; an import failure must not be skipped as if the
 # missing endpoint were an optional third-party plugin.
-CRITICAL_BOOT_ROUTERS = (
-    "routes.creator_economy",
-    "routes.marketplace",
-    "routes.git_operations",
-    "routes.jeeves_media",
-    "routes.lafs",
-    "routes.sorting_vault",
-    "routes.swarm_cold_legion",
-    "routes.swarm_hub",
-)
-
 
 @pytest.mark.parametrize("module_path", CRITICAL_BOOT_ROUTERS)
 def test_critical_product_router_is_mounted_and_never_silently_skipped(module_path: str) -> None:
@@ -81,3 +72,42 @@ def test_critical_product_router_is_mounted_and_never_silently_skipped(module_pa
     assert report["skipped"] == 0, report["skipped_names"]
     assert report["ok"] == 1
     assert len(app.routes) > 4, f"mounted {module_path} declares no reachable endpoints"
+
+
+def test_critical_route_readiness_requires_real_registry_report(monkeypatch) -> None:
+    monkeypatch.setattr(
+        registry_health,
+        "_LAST_REPORT",
+        {"ok": 0, "skipped": 0, "skipped_names": [], "at": 0.0},
+    )
+    status = registry_health.critical_router_readiness()
+    assert status["ok"] is False
+    assert status["report_available"] is False
+
+
+def test_critical_route_readiness_fails_closed_on_import_skip(monkeypatch) -> None:
+    monkeypatch.setattr(
+        registry_health,
+        "_LAST_REPORT",
+        {
+            "ok": 200,
+            "skipped": 1,
+            "skipped_names": ["routes.lafs (import_failed RuntimeError: dependency unavailable)"],
+            "at": 1.0,
+        },
+    )
+    status = registry_health.critical_router_readiness()
+    assert status["ok"] is False
+    assert status["report_available"] is True
+    assert status["missing"] == ["routes.lafs"]
+    assert "RuntimeError" not in str(status)
+
+
+def test_critical_route_readiness_accepts_complete_report(monkeypatch) -> None:
+    monkeypatch.setattr(
+        registry_health,
+        "_LAST_REPORT",
+        {"ok": 200, "skipped": 0, "skipped_names": [], "at": 1.0},
+    )
+    status = registry_health.critical_router_readiness()
+    assert status == {"ok": True, "missing": [], "report_available": True}
