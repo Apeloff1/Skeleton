@@ -45,5 +45,38 @@
     },
     "promotion": false,
     "note": "Long pass ids, a million away from the reserved 13-digit measurement ids. Kept weights are the best holdout state. Further fresh Adam steps at 3e-4 raised a track, and smaller rates did too, so the rest of the 199 MiB budget was not applied."
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "bytes_trained": 335578717,
+    "cycle_start": 335229564,
+    "cycle_bytes": 349153,
+    "goal": 343618172,
+    "official_tracks": {
+      "visual": 1.5055037017735209,
+      "narrative": 1.4767407712552283,
+      "systems": 1.51098586405026,
+      "review": 1.5594443256757207,
+      "practice": 1.5272560882968464
+    },
+    "torch_best_tracks": {
+      "visual": 1.5055036544799805,
+      "narrative": 1.4767405986785889,
+      "systems": 1.5109859704971313,
+      "review": 1.5594444274902344,
+      "practice": 1.5272561311721802
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0005,
+      "accepts": 20,
+      "rejects": 86,
+      "accept_rate": 0.0
+    },
+    "model_digest": "0e45ff72aaea58646e918e9a0442c3df30ee6912a060a663674c463531c1da75",
+    "seconds": 5.795,
+    "promotion": false,
+    "note": "Focus fine-tune. Legal and coding weighted at 3, proofreading, syntax, errors, crash, and lint at 2.5, plus tutorial, achievement, navigation, moderation, analytics, subtitles, and photo mode. AdamW peak 3e-5. All five tracks fell. The cycle stopped after 64 rejected chunks and kept this state. The separate local transformer holdout logprob moved from -5.617680 to -5.448432 over 827 steps and was kept as a candidate, not a serving model."
   }
 ]
