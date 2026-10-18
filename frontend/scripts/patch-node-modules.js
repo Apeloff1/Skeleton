@@ -13,6 +13,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -244,6 +245,66 @@ function patchNodeForgeNestedDigestAlgorithm() {
   );
 }
 
+function patchSprintfFormatBounds() {
+  const pkgPath = path.join(ROOT, 'node_modules/sprintf-js/package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  const version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
+  if (version !== '1.0.3') {
+    throw new Error(`[patch-node-modules] sprintf-js ${version} requires security patch review`);
+  }
+
+  // CVE-2026-97058 / GHSA-hp3w-g68c-fv3c has no patched npm release.
+  // Cap numeric precision before native Number formatting can throw for an
+  // otherwise valid format string. Cap width before invoking argument functions
+  // or the width-dependent Array(...).join allocation. Ordinary argparse help
+  // formatting remains inside the numeric 100 / width 16 KiB limits. General
+  // precision has a minimum of 1; exponential/fixed precision may be zero.
+  const rel = 'node_modules/sprintf-js/src/sprintf.js';
+  const target = path.join(ROOT, rel);
+  const source = fs.readFileSync(target, 'utf8');
+  const before = 'match = parse_tree[i] // convenience purposes only';
+  const after = `${before}
+                match = match.slice(0)
+                if (match[6] !== undefined) {
+                    if (!/^\\d+$/.test(match[6])) {
+                        throw new RangeError('[sprintf] invalid format width')
+                    }
+                    match[6] = String(Math.min(16384, Number(match[6])))
+                }
+                if (/^[efg]$/.test(match[8]) && match[7] !== undefined) {
+                    if (!/^\\d+$/.test(match[7])) {
+                        throw new RangeError('[sprintf] invalid numeric precision')
+                    }
+                    match[7] = String(Math.min(100, Math.max(match[8] === 'g' ? 1 : 0, Number(match[7]))))
+                }`;
+  const digest = value => crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+  const hardenedDigest = 'b84000c68153570c8cdc4e0f62b8f96327ec34a1e7665cdf06d3cd3ca0770821';
+  const sourceDigest = digest(source);
+  if (sourceDigest === hardenedDigest) {
+    skipped++;
+    return;
+  }
+  const pristineDigest = '9904b0d448280bfdfcb0329bdac995883033597727404f9c058d051d9174b7c7';
+  const previousDigest = '06e1ea7943ecf8d5cc342d816240156476d11effe844f6fd6504c266b2d70a1b';
+  if (sourceDigest !== pristineDigest && sourceDigest !== previousDigest) {
+    throw new Error('[patch-node-modules] sprintf-js security source changed; review required');
+  }
+  // Upgrade only the exact earlier local patch; the resulting full source must
+  // still match the final digest. All other source variants fail closed.
+  const hardened = sourceDigest === previousDigest
+    ? source.replace(
+      'match[7] = String(Math.min(100, Number(match[7])))',
+      "match[7] = String(Math.min(100, Math.max(match[8] === 'g' ? 1 : 0, Number(match[7]))))",
+    )
+    : source.replace(before, after);
+  if (hardened === source || digest(hardened) !== hardenedDigest) {
+    throw new Error('[patch-node-modules] failed to harden sprintf-js formatting bounds');
+  }
+  fs.writeFileSync(target, hardened, 'utf8');
+  patched++;
+  console.log(`[patch-node-modules] ✓ security ${rel}`);
+}
+
 function patchWorkletsStaticRendering() {
   const pkgPath = path.join(ROOT, 'node_modules/react-native-worklets/package.json');
   if (!fs.existsSync(pkgPath)) {
@@ -371,6 +432,7 @@ patchImageSizeDoS();
 patchBracesDepthDoS();
 patchHttpCacheSemanticsMaxStale();
 patchNodeForgeNestedDigestAlgorithm();
+patchSprintfFormatBounds();
 patchWorkletsStaticRendering();
 patchReactNativeRnGetPolyfillsExport();
 patchExpoStaticIndexPath();

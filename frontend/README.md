@@ -1,7 +1,8 @@
 # Skeleton frontend
 
 Expo/React Native web application for the product hub, Jeeves chat, Dragon crawler
-and game studio. Routes live in `app/`; stateful workspaces live in `features/`.
+and game studio. Routes live in `app/`; stateful workspaces live in `src/features/`. Shared product clients and the canonical
+HTTP transport live under `src/product/` and `src/utils/`; keep route entrypoints in `app/`.
 
 ## First install
 

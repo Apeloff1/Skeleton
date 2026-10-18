@@ -5289,6 +5289,12 @@
       "semantic_verification": "Canonical SemanticVerificationRuntime uses parent-bound request/response/resolver callbacks: inherited tenant, classification, purpose, operation/execution/context/source/compiler identity, monotonic deadline, finite remaining token/cost/attempt/model-turn grant. Charge actual response before verdict parsing, including invalid replies. Missing or overlapping generator/verifier identities fail closed; no critique becomes independent proof.",
       "semantic_recovery": "Same canonical execution checkpoint stores immutable claim identity and bounded typed semantic responses atomically with resource settlement. Exact claim/request/receipt/source-bound responses are parsed again without provider redispatch or double charging; unresolved dispatched reservations remain uncertain and may not dispatch implicitly on recovery.",
       "cost_unknown": "Unknown usage retains finite reservations; estimated token counts never replenish grants. Hosted unknown-cost requests require positive allocated cost shares within the original grant; local routes explicitly permit documented zero cost. Conservative accounting is not a vendor billing guarantee."
+    },
+    "terminal_failure_projection": "New non-success results persist bounded usage.error_code. Existing immutable results may project a bounded cause only from usage.error_code or an exactly matching stream-terminal:<own execution>:<own non-success status>:<cause> receipt; never rewrite old results or infer errors from generated text.",
+    "provider_compatibility_identity": {
+      "owner": "skeleton/provider_runtime.py",
+      "legacy_alias": "skeleton/ai/runtime/provider_runtime.py",
+      "policy": "Non-owning re-export of canonical public classes/functions with attribute lookup delegation for existing private imports. No copied SDK, credentials, registry state, network implementation or alternate provider class identity. Existing skeleton/ai/providers/runtime.py facade remains non-owning."
     }
   },
   "conversation_runtime_contract": {

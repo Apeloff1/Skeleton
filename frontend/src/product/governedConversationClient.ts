@@ -3,6 +3,7 @@ import api, { type ApiResult } from '../utils/apiClient';
 import { validateConversationProjection } from './conversationProjection';
 import { authHeaders } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';
+import { normalizeChatCooperation, type ChatCooperationPolicy, type ChatCooperationSummary } from './chatCooperation';
 
 export type ConversationRequestOptions = {
   signal?: AbortSignal;
@@ -60,6 +61,43 @@ export type ConversationMessage = {
   data_class: 'public' | 'internal' | 'confidential' | 'restricted';
 };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function invalidConversation(message: string): never {
+  throw new ChatClientError(message, { kind: 'protocol', code: 'invalid_conversation', retryable: false });
+}
+
+export function validateConversationThread(thread: ConversationThread, expectedId?: string): ConversationThread {
+  if (!thread || thread.schema_version !== 1 || !UUID.test(thread.thread_id) || expectedId !== undefined && thread.thread_id !== expectedId
+    || !UUID.test(thread.active_branch_id) || !Number.isSafeInteger(thread.version) || thread.version < 1
+    || !Number.isSafeInteger(thread.message_sequence) || thread.message_sequence < 0
+    || !['active', 'archived', 'deleting', 'deleted'].includes(thread.state)
+    || typeof thread.title !== 'string' || !thread.title.trim() || thread.title.length > 200
+    || !Number.isFinite(Date.parse(thread.created_at)) || !Number.isFinite(Date.parse(thread.updated_at))) invalidConversation('The saved conversation metadata is invalid. Refresh before changing it.');
+  return thread;
+}
+
+export function validateConversationMessage(message: ConversationMessage, expectedThreadId?: string): ConversationMessage {
+  if (!message || message.schema_version !== 1 || !UUID.test(message.message_id) || !UUID.test(message.thread_id)
+    || expectedThreadId !== undefined && message.thread_id !== expectedThreadId || !UUID.test(message.branch_id)
+    || !Number.isSafeInteger(message.sequence) || message.sequence < 1
+    || !['user', 'assistant', 'tool', 'system-derived'].includes(message.author_type)
+    || !Number.isFinite(Date.parse(message.created_at)) || typeof message.idempotency_key !== 'string' || !message.idempotency_key || message.idempotency_key.length > 1024
+    || message.content != null && (typeof message.content !== 'string' || !message.content.trim() || message.content.length > 100000)
+    || message.content == null && (typeof message.content_ref !== 'string' || !message.content_ref || message.content_ref.length > 1024)) invalidConversation('The saved message envelope is invalid. Reopen its canonical conversation.');
+  for (const key of ['attachment_refs', 'tool_receipt_refs', 'provider_receipt_refs', 'citation_refs', 'artifact_refs', 'memory_refs'] as const) {
+    const references = message[key];
+    if (key === 'memory_refs' && references === undefined) continue;
+    if (!Array.isArray(references) || references.length > 256 || references.some(value => typeof value !== 'string' || !value || value.length > 512)
+      || new Set(references).size !== references.length) invalidConversation('The saved message contains invalid evidence references.');
+  }
+  if (message.context_digest != null && (typeof message.context_digest !== 'string' || !/^[0-9a-f]{64}$/.test(message.context_digest))) invalidConversation('The message context digest is invalid.');
+  const sources = message.context_source_snapshot;
+  if (sources !== undefined && (!Array.isArray(sources) || sources.length > 256 || sources.some(value => !Array.isArray(value) || value.length !== 2
+    || typeof value[0] !== 'string' || !UUID.test(value[0]) || typeof value[1] !== 'string' || !/^[0-9a-f]{64}$/.test(value[1])))) invalidConversation('The message context source snapshot is invalid.');
+  if (sources?.some((value, index) => index > 0 && value[0] <= sources[index - 1][0])) invalidConversation('The context source snapshot is repeated or out of order.');
+  return message;
+}
+
 async function requireData<T>(promise: Promise<ApiResult<T>>, message: string): Promise<T> {
   const result = await promise;
   if (!result.ok || result.data === null) throw chatApiError(result, message);
@@ -79,7 +117,7 @@ export async function createConversation(input: {
     }, requestOptions(input)),
     'Could not create conversation.',
   );
-  return data.thread;
+  return validateConversationThread(data.thread);
 }
 
 export async function listConversations(input: {
@@ -111,7 +149,7 @@ export async function getConversation(threadId: string, input: ConversationReque
     ),
     'Could not load conversation.',
   );
-  return data.thread;
+  return validateConversationThread(data.thread, threadId);
 }
 
 export async function listConversationMessages(
@@ -136,6 +174,14 @@ export async function listConversationMessages(
     ),
     'Could not load conversation messages.',
   );
+  if (!Array.isArray(data.messages) || data.messages.length > 1000) invalidConversation('The saved message page exceeds its bounds.');
+  let previous = input.afterSequence ?? 0;
+  for (const message of data.messages) {
+    validateConversationMessage(message, threadId);
+    if (message.sequence <= previous) invalidConversation('The saved message page is not ordered.');
+    previous = message.sequence;
+  }
+  if (data.next_after_sequence !== null && (!data.messages.length || data.next_after_sequence !== previous)) invalidConversation('The saved message page cursor is invalid.');
   return {
     messages: data.messages,
     nextAfterSequence: data.next_after_sequence,
@@ -178,7 +224,7 @@ export async function reconstructConversation(
       afterSequence = page.nextAfterSequence;
     }
     const current = await getConversation(threadId, input);
-    if (current.version !== thread.version || current.active_branch_id !== thread.active_branch_id) continue;
+    if (current.version !== thread.version || current.active_branch_id !== thread.active_branch_id || current.message_sequence !== thread.message_sequence) continue;
     const projection = validateConversationProjection(current, messages);
     return { thread: current, messages: projection.messages, lastSequence: projection.lastSequence };
   }
@@ -345,6 +391,7 @@ export type ConversationTurn = {
   engine_memory_refs?: string[];
   engine_evidence_refs?: string[];
   engine_artifact_refs?: string[];
+  cooperation?: ChatCooperationSummary | null;
   thread?: ConversationThread;
   user_message?: ConversationMessage;
   assistant_message?: ConversationMessage;
@@ -377,6 +424,7 @@ export async function startConversationTurn(
     attachmentRefs?: string[];
     maxOutputTokens?: number;
     temperature?: number;
+    cooperation?: ChatCooperationPolicy;
   },
 ): Promise<ConversationTurn> {
   const data = await requireData(
@@ -394,6 +442,7 @@ export async function startConversationTurn(
         attachment_refs: input.attachmentRefs ?? [],
         max_output_tokens: input.maxOutputTokens,
         temperature: input.temperature,
+        ...(input.cooperation ? { cooperation: normalizeChatCooperation(input.cooperation) } : {}),
         response_mode: input.deferred === false ? 'wait' : 'deferred',
       },
       {
@@ -555,6 +604,13 @@ export async function listConversationPage(input: {
   if (!Array.isArray(data.threads) || data.threads.length > 200) {
     throw new ChatClientError('Conversation list is invalid.', { code: 'invalid_projection' });
   }
+  const seen = new Set<string>();
+  for (const thread of data.threads) {
+    validateConversationThread(thread);
+    if (seen.has(thread.thread_id)) invalidConversation('The conversation library repeats a saved identity.');
+    seen.add(thread.thread_id);
+  }
+  if (data.next_cursor != null && (typeof data.next_cursor !== 'string' || data.next_cursor.length > 4096)) invalidConversation('The conversation library cursor is invalid.');
   return { threads: data.threads, nextCursor: data.next_cursor ?? null };
 }
 

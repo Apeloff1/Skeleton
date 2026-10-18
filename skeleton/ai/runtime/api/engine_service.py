@@ -21,6 +21,7 @@ from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.contracts.ai_execution import (
     AIExecutionRequest,
     ExecutionState,
+    execution_failure_code,
 )
 from skeleton.contracts.operation import (
     OperationEnvelope,
@@ -963,6 +964,7 @@ class EngineExecutionStatus:
     schema_version: int = 1
     cooperation: Mapping[str, Any] | None = None
     provider_receipts: tuple[str, ...] = ()
+    result_status: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -978,6 +980,7 @@ class EngineExecutionStatus:
             "cancellation_requested": self.cancellation_requested,
             "cooperation": None if self.cooperation is None else dict(self.cooperation),
             "provider_receipts": list(self.provider_receipts),
+            "result_status": self.result_status,
         }
 
 
@@ -2939,10 +2942,8 @@ class EngineExecutionService:
                 if not isinstance(raw_refs, list) or any(not isinstance(ref, str) for ref in raw_refs):
                     raise EngineServiceError("cooperative progress provider receipts are invalid")
                 provider_receipts = tuple(raw_refs)
-        if result is not None and result.status in {"failed", "cancelled"}:
-            raw = result.usage.get("error_code")
-            if isinstance(raw, str):
-                failure_code = raw
+        if result is not None:
+            failure_code = execution_failure_code(result.as_dict())
         return EngineExecutionStatus(
             operation_id=stored.command.operation.operation_id,
             execution_id=execution.execution_id,
@@ -2959,6 +2960,7 @@ class EngineExecutionService:
             cancellation_requested=execution.cancellation_requested,
             cooperation=cooperation,
             provider_receipts=provider_receipts,
+            result_status=None if result is None else result.status,
         )
 
     def cancel(

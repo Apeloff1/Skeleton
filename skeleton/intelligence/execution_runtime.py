@@ -2875,8 +2875,20 @@ class CognitiveExecutionRuntime:
         generator_identities = [binding["generator"]]
         if isinstance(binding.get("cooperation"), Mapping):
             generator_identities.extend(binding["cooperation"]["role_providers"].values())
+        verifier_weights = {
+            row["local_activation"]["model_digest"]
+            for row in binding["verifier"]["routes"]
+            if isinstance(row.get("local_activation"), Mapping)
+            and isinstance(row["local_activation"].get("model_digest"), str)
+        }
         if any(
             verifier_routes.intersection((row["provider_id"], row["model_id"]) for row in identity["routes"])
+            or verifier_weights.intersection(
+                row["local_activation"]["model_digest"]
+                for row in identity["routes"]
+                if isinstance(row.get("local_activation"), Mapping)
+                and isinstance(row["local_activation"].get("model_digest"), str)
+            )
             for identity in generator_identities
         ):
             raise _VerificationStopped("semantic_verifier_not_independent")
@@ -3656,7 +3668,7 @@ class CognitiveExecutionRuntime:
             evidence_refs=(() if verification is None else verification.evidence_refs),
             provider_receipts=tuple(str(item) for item in payload.get("provider_receipts", [])),
             tool_receipts=tuple(str(item) for item in payload.get("tool_receipts", [])),
-            usage=self._execution_usage(payload),
+            usage={**self._execution_usage(payload), "error_code": error_code},
             stream_terminal_event=terminal_event,
             completed_at=(datetime.now(UTC) if now is None else now.astimezone(UTC)),
         )

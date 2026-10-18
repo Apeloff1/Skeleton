@@ -11,7 +11,7 @@ export interface RouteEntry {
   heavy?: boolean;
 }
 
-export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
+export const ROUTE_REGISTRY: readonly RouteEntry[] = [
   { path: '/', title: 'Entry (redirect)', category: 'core' },
   { path: '/welcome', title: 'Welcome / Starfall', category: 'core' },
   { path: '/hub', title: 'Ultimate Hub', category: 'core', heavy: true },
@@ -77,6 +77,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/lang-recommend', title: 'Language Recommend', category: 'code' },
 
   { path: '/jeeves', title: 'Jeeves', category: 'ai' },
+  { path: '/ai-models', title: 'Observed Model Inventory', category: 'ai' },
   { path: '/jeeves-hub', title: 'Jeeves Hub', category: 'ai' },
   { path: '/jeeves-eq', title: 'Jeeves EQ', category: 'ai' },
   { path: '/jeeves-level', title: 'Jeeves Level', category: 'ai' },

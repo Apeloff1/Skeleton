@@ -26,9 +26,7 @@ async def _review_input(scope, project, binding, body):
     if body.get("baseline_review_job_id"):
         baseline = await _load_review(scope, project["project_id"], body["baseline_review_job_id"])
         if baseline["status"] != "completed":
-            raise GameLearningError(
-                "review_baseline_incomplete", "Choose a completed reference review.", 409
-            )
+            raise GameLearningError("review_baseline_incomplete", "Choose a completed reference review.", 409)
         if baseline["input"].get("review_baseline"):
             raise GameLearningError(
                 "review_baseline_chained",
@@ -57,9 +55,7 @@ async def _policy(scope, job):
         return None
     saved = await workspace._admitted_policy(scope, job["project_id"], pinned["policy_id"])
     if saved["snapshot"]["snapshot_digest"] != pinned["snapshot_digest"]:
-        raise GameLearningError(
-            "review_policy_changed", "The exact reviewed policy is unavailable.", 409
-        )
+        raise GameLearningError("review_policy_changed", "The exact reviewed policy is unavailable.", 409)
     return saved["snapshot"]
 
 
@@ -77,26 +73,64 @@ def _checked_result(job):
         or identity.get("input_digest") != _digest(job["input"])
         or identity.get("job_id") != job["job_id"]
     ):
-        raise GameLearningError(
-            "review_evidence_corrupt", "The immutable review evidence differs.", 503
-        )
+        raise GameLearningError("review_evidence_corrupt", "The immutable review evidence differs.", 503)
     return result
 
 
-async def _load_review(scope, project_id, job_id):
-    job = await workspace.jobs.find_one(
-        {"_id": job_id, **scope, "project_id": project_id, "kind": "review"}
-    )
+async def _load_review(scope, project_id, job_id, *, historical=False, allowed_editor_operation_id=None):
+    job = await workspace.jobs.find_one({"_id": job_id, **scope, "project_id": project_id, "kind": "review"})
     if job is None:
-        raise GameLearningError(
-            "review_not_found", "This scoped studio review is unavailable.", 404
+        raise GameLearningError("review_not_found", "This scoped studio review is unavailable.", 404)
+    if historical:
+        # Historical observations may inform a source-revision comparison, but
+        # never authorize execution against the old world. Preserve live source,
+        # teacher and policy revocation while verifying its frozen file binding.
+        project = await workspace._project(project_id, scope)
+        binding = job["input"]
+        if (
+            job["status"] != "completed"
+            or binding.get("project_id") != project_id
+            or not isinstance(binding.get("files"), list)
+            or _digest(binding["files"]) != binding.get("tree_digest")
+        ):
+            raise GameLearningError(
+                "review_history_corrupt", "The completed historical source binding differs.", 503
+            )
+        dependencies = [{**ref, "project_id": project_id} for ref in binding.get("sources", [])]
+        dependencies += binding.get("derived_sources", [])
+        options = (
+            {"allowed_editor_operation_id": allowed_editor_operation_id}
+            if allowed_editor_operation_id
+            else {}
         )
-    project = await workspace._authority(scope, job["input"])
+        await workspace._external_authority(
+            scope,
+            {"derived_sources": dependencies, "external_sources": binding.get("external_sources", [])},
+            **options,
+        )
+        await workspace._derived_demonstration_authority(scope, binding, **options)
+        if binding.get("demonstrations") or binding.get("inherited_demonstrations"):
+            await workspace._demonstration_authority(scope, binding, **options)
+        for role in ("parent_policy", "generation_policy", "review_policy", "review_baseline_policy"):
+            pin = binding.get(role)
+            if pin:
+                policy = await workspace._admitted_policy(
+                    scope,
+                    pin.get("project_id", project_id),
+                    pin["policy_id"],
+                    allow_environment_changed=True,
+                    **options,
+                )
+                if policy["snapshot"]["snapshot_digest"] != pin["snapshot_digest"]:
+                    raise GameLearningError(
+                        "review_policy_changed", "Historical review policy identity differs.", 409
+                    )
+    else:
+        project = await workspace._authority(scope, job["input"])
     if job_id not in project["job_ids"]:
-        raise GameLearningError(
-            "review_not_found", "This review was not admitted to the project.", 404
-        )
-    await _policy(scope, job)
+        raise GameLearningError("review_not_found", "This review was not admitted to the project.", 404)
+    if not historical:
+        await _policy(scope, job)
     if job["status"] == "completed":
         _checked_result(job)
     return job
@@ -203,7 +237,5 @@ async def read_review(scope, project_id, job_id):
             comparison.get("baseline_job_id") != pin["job_id"]
             or comparison.get("baseline_review_digest") != pin["review_digest"]
         ):
-            raise GameLearningError(
-                "review_evidence_corrupt", "The review reference binding differs.", 503
-            )
+            raise GameLearningError("review_evidence_corrupt", "The review reference binding differs.", 503)
     return {"job": public, "review": job.get("result") if job["status"] == "completed" else None}

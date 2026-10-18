@@ -32,7 +32,7 @@ from skeleton.api.engine_service import (
     EngineContextHandoff,
     EngineExecutionCommand,
 )
-from skeleton.contracts.ai_execution import AIExecutionRequest
+from skeleton.contracts.ai_execution import AIExecutionRequest, execution_failure_code
 from skeleton.contracts.context import ContextEnvelope
 from skeleton.contracts.memory_record import MemoryKind
 from skeleton.context.compiler import project_provider_context
@@ -429,8 +429,8 @@ class EngineTerminalResult:
         body = _json_object(payload, "result")
         status = _text(body.get("status"), "result.status", maximum=64)
         if status != "completed":
-            usage = _json_object(body.get("usage", {}), "result.usage")
-            failure_code = None if usage.get("error_code") is None else str(usage["error_code"])
+            _json_object(body.get("usage", {}), "result.usage")
+            failure_code = execution_failure_code(body)
             raise EngineExecutionFailed(
                 "engine execution did not complete successfully"
                 + (" (" + failure_code + ")" if failure_code else ""),
@@ -1979,12 +1979,9 @@ class EngineClient:
         if result is None:
             raise EngineProtocolError("terminal engine execution is missing result event")
         if state != "completed":
-            usage = result.get("usage")
-            failure_code = (
-                str(usage.get("error_code"))
-                if isinstance(usage, Mapping) and usage.get("error_code") is not None
-                else (None if status.get("failure_code") is None else str(status["failure_code"]))
-            )
+            failure_code = execution_failure_code(result)
+            if failure_code is None and status.get("failure_code") is not None:
+                failure_code = str(status["failure_code"])
             raise EngineExecutionFailed(
                 "engine execution reached non-success terminal state"
                 + (" (" + failure_code + ")" if failure_code else ""),

@@ -1,0 +1,35 @@
+{
+  "operation": "api-current-catalog-read",
+  "http_status": 200,
+  "response": {
+    "action": "studio.tree",
+    "arguments_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+    "catalog_pin_requested": true,
+    "digest": "f8d71c97e6672c3fecc4622da78810047e6fe5afc98f5e19439b45143c28e0f2",
+    "effect": "read",
+    "human_approval_still_required_for_commits": true,
+    "model_weights_changed": false,
+    "network_calls_by_dispatch": false,
+    "project": "coherence",
+    "request_digest": "63b0f01961bd1e774b7436a1fd16d50eec404bc2ab003e02870faae585912f3d",
+    "result": {
+      "active": "coherence",
+      "current": [
+        {
+          "files": 2,
+          "ref": "coherence"
+        }
+      ],
+      "demos": [],
+      "previous": [],
+      "review_proposals": 1,
+      "revision": 1,
+      "schema": "skeleton.game_builder.workbench_trees.v1",
+      "training_quarantine": 0
+    },
+    "runtime_adapter_executed": true,
+    "schema": "skeleton.game_builder.jeeves_capability_action.v1",
+    "source_files_committed": false
+  }
+}

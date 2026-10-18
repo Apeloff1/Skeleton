@@ -8,60 +8,91 @@ is exposed over HTTP, and no external listener is permitted.
 """
 from __future__ import annotations
 
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-from urllib.parse import urlsplit, parse_qs
 import json
 import secrets
-from base64 import b64encode
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
-from .game_project_workspace import GameWorkspace, WorkspaceError
-from .game_workspace_ui import render_workspace_html
-from .game_prompt_router import route_game_prompt,ingest_ai_draft
-from .system_editors import catalog as system_editor_catalog, editor_source, editor_path, preview_editor, make_editor_document
-from .system_editor_assembly import assemble_workspace_systems
-from .advanced_gameplay_runtime import (
-    run_advanced_session, verify_advanced_session, ACTION_HELP,
-)
-from .advanced_level_scenes import make_advanced_scene, scene_path, validate_advanced_scene
-from .advanced_puzzle_solver import solve_advanced_puzzle
-from .advanced_fighting_rollback import (run_peer_fight,verify_peer_fight,
-    reconcile_peer_prediction,verify_peer_reconciliation)
-from .advanced_rhythm_longrun import (run_long_rhythm,verify_long_rhythm,continue_long_rhythm)
-from .advanced_rhythm_runtime import default_layout as rhythm_default_layout
-from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
-from .advanced_roguelike_longrun import (replay_long_roguelike,
-    continue_long_roguelike,verify_long_roguelike)
-from .advanced_world_planner import plan_original_world
-from .advanced_stealth_planner import plan_stealth_route
-from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
-from .advanced_sports_coach import plan_original_sports_match, verify_original_sports_plan
-from .advanced_maze_planner import plan_original_maze, verify_original_maze_plan
-from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg_plan
-from .advanced_npc_society_planner import (
-    plan_original_civic_milestone, verify_original_civic_plan,
-)
+from .advanced_colony_godot import render_colony_godot_package
+from .advanced_deck_godot import render_deck_godot_package
+from .advanced_defense_godot import render_defense_godot_package
 from .advanced_ecosystem_planner import (
-    plan_original_ecology, verify_original_ecology_plan,
+    plan_original_ecology,
+    verify_original_ecology_plan,
 )
-from .advanced_procedural_world_planner import (
-    plan_original_frontier,verify_original_frontier_plan,
+from .advanced_factory_godot import render_factory_godot_package
+from .advanced_farming_godot import render_farming_godot_package
+from .advanced_fighting_rollback import (
+    reconcile_peer_prediction,
+    run_peer_fight,
+    verify_peer_fight,
+    verify_peer_reconciliation,
+)
+from .advanced_gameplay_runtime import (
+    ACTION_HELP,
+    run_advanced_session,
+    verify_advanced_session,
+)
+from .advanced_gameplay_save import (
+    continue_advanced_savegame,
+    export_advanced_savegame,
+    import_advanced_savegame,
 )
 from .advanced_godot_export import (
-    render_advanced_godot_package, archive_advanced_godot_package,
+    archive_advanced_godot_package,
+    render_advanced_godot_package,
 )
+from .advanced_level_scenes import (
+    make_advanced_scene,
+    scene_path,
+    validate_advanced_scene,
+)
+from .advanced_maze_planner import plan_original_maze, verify_original_maze_plan
+from .advanced_npc_society_planner import (
+    plan_original_civic_milestone,
+    verify_original_civic_plan,
+)
+from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
 from .advanced_platformer_godot import render_platformer_godot_package
-from .advanced_deck_godot import render_deck_godot_package
-from .advanced_shooter_godot import render_shooter_godot_package
-from .advanced_tactics_godot import render_tactics_godot_package
-from .advanced_defense_godot import render_defense_godot_package
+from .advanced_procedural_world_planner import (
+    plan_original_frontier,
+    verify_original_frontier_plan,
+)
+from .advanced_puzzle_solver import solve_advanced_puzzle
 from .advanced_racing_godot import render_racing_godot_package
+from .advanced_rhythm_audio import original_audio_receipt, render_original_beat_wav
+from .advanced_rhythm_longrun import (
+    continue_long_rhythm,
+    run_long_rhythm,
+    verify_long_rhythm,
+)
+from .advanced_rhythm_runtime import default_layout as rhythm_default_layout
+from .advanced_roguelike_longrun import (
+    continue_long_roguelike,
+    replay_long_roguelike,
+    verify_long_roguelike,
+)
+from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg_plan
+from .advanced_shooter_godot import render_shooter_godot_package
+from .advanced_sports_coach import (
+    plan_original_sports_match,
+    verify_original_sports_plan,
+)
+from .advanced_stealth_planner import plan_stealth_route
 from .advanced_survival_godot import render_survival_godot_package
-from .advanced_farming_godot import render_farming_godot_package
-from .advanced_factory_godot import render_factory_godot_package
-from .advanced_colony_godot import render_colony_godot_package
-from .advanced_gameplay_save import (
-    export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
+from .advanced_tactics_godot import render_tactics_godot_package
+from .advanced_world_planner import plan_original_world
+from .game_project_workspace import GameWorkspace, WorkspaceError
+from .game_prompt_router import ingest_ai_draft, route_game_prompt
+from .game_workspace_ui import render_workspace_html
+from .system_editor_assembly import assemble_workspace_systems
+from .system_editors import catalog as system_editor_catalog
+from .system_editors import (
+    editor_path,
+    editor_source,
+    make_editor_document,
+    preview_editor,
 )
 
 
@@ -82,17 +113,24 @@ class _LocalStudioServer(ThreadingHTTPServer):
         import threading
         self.appwide_scan_lock=threading.RLock()
 
-    def jeeves_appwide(self):
+    def jeeves_appwide(self, *, refresh=False):
         """Lazy full checkout scan: ordinary Game Studio pages remain fast."""
         with self.appwide_scan_lock:
-            if self.appwide_runtime is None:
+            if self.appwide_runtime is None or refresh:
                 from .jeeves_appwide_fabric import (
-                    AppwideInventory,JeevesAppwideRuntime)
+                    AppwideInventory,
+                    JeevesAppwideRuntime,
+                )
                 inventory=AppwideInventory(self.appwide_repo_root)
                 inventory.scan()
                 self.appwide_runtime=JeevesAppwideRuntime(
                     inventory,workspace=self.workspace)
             return self.appwide_runtime
+
+    def get_request(self):
+        connection, address = super().get_request()
+        connection.settimeout(15)
+        return connection, address
 
 
 class _StudioHandler(BaseHTTPRequestHandler):
@@ -122,7 +160,7 @@ class _StudioHandler(BaseHTTPRequestHandler):
 
     def _json(self,status: int,value):
         data=(json.dumps(value,ensure_ascii=False,sort_keys=True,
-                         separators=(",",":"))+"\n").encode("utf-8")
+                         separators=(",",":"),allow_nan=False)+"\n").encode("utf-8")
         self._send(status,data)
 
     def _allowed(self,mutation=False):
@@ -150,9 +188,22 @@ class _StudioHandler(BaseHTTPRequestHandler):
         count=int(size)
         if not 0<count<=320000:
             raise WorkspaceError("mutation request exceeds bounded input size")
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise WorkspaceError("duplicate JSON object field")
+                result[key] = value
+            return result
+
+        def finite_constant(_value):
+            raise WorkspaceError("finite JSON numbers required")
+
         try:
-            body=json.loads(self.rfile.read(count).decode("utf-8","strict"))
-        except (UnicodeError,ValueError) as exc:
+            body=json.loads(self.rfile.read(count).decode("utf-8","strict"),
+                            object_pairs_hook=unique_object,
+                            parse_constant=finite_constant)
+        except (UnicodeError,ValueError,RecursionError) as exc:
             raise WorkspaceError("malformed local editor JSON") from exc
         if type(body) is not dict:
             raise WorkspaceError("typed JSON object required")
@@ -161,11 +212,13 @@ class _StudioHandler(BaseHTTPRequestHandler):
     def _handle(self,action):
         try:
             action()
+        except (BrokenPipeError,ConnectionResetError,TimeoutError):
+            self.close_connection=True
         except PermissionError as exc:
             self._json(403,{"error":str(exc)})
         except (WorkspaceError,ValueError,TypeError,KeyError,OSError) as exc:
             self._json(400,{"error":str(exc)})
-        except Exception:
+        except Exception:  # noqa: BLE001 - public boundary must not expose private source/tracebacks
             # Fail closed: no traceback, filesystem path, or secret leaks.
             self._json(500,{"error":"local studio operation failed"})
 
@@ -216,9 +269,11 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200,app_atlas(
                 family=family,offset=int(params.get("offset",0)),
                 limit=int(params.get("limit",80)),
-                query=params.get("query") or None))
+                query=params.get("query") or None,
+                expected_catalog_digest=params.get("expected_catalog_digest") or None))
         if path=="/api/jeeves-appwide-status":
-            return self._json(200,self.server.jeeves_appwide().inventory.report())
+            return self._json(200,self.server.jeeves_appwide(
+                refresh=params.get("refresh") == "true").inventory.report())
         if path=="/api/jeeves-appwide-catalog":
             return self._json(200,self.server.jeeves_appwide().catalog())
         if path=="/api/story-memory-page":
@@ -261,14 +316,18 @@ class _StudioHandler(BaseHTTPRequestHandler):
             from .jeeves_app_runtime import dispatch_app_action
             return self._json(200,dispatch_app_action(
                 studio,values["project"],values["action"],
-                values["args"],authorized=True))
+                values["args"],
+                authorized=values.get("operator_authorized") is True,
+                expected_catalog_digest=values.get("expected_catalog_digest")))
         if path=="/api/jeeves-appwide-invoke":
             action=values.get("action")
             params=values.get("params",{})
             operator_approved=values.get("operator_authorized") is True
             # A local session token is not the same as approval to modify code.
             receipt=self.server.jeeves_appwide().invoke(
-                action,params,authorized=operator_approved)
+                action,params,authorized=operator_approved,
+                expected_catalog_digest=values.get("expected_catalog_digest"),
+                expected_inventory_digest=values.get("expected_inventory_digest"))
             return self._json(200,receipt)
         if path=="/api/jeeves-chapter-chat":
             from .jeeves_chapter_chat import chat_turn
@@ -296,10 +355,11 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200,retrieve_bookmarks(
                 studio,values["project"],values["references"]))
         if path=="/api/story-pixel-proof":
+            import binascii
+            from base64 import b64decode
+
             from .story_asset_pixels import inspect_png_against_canon
             from .story_workspace import load_story_workspace
-            from base64 import b64decode
-            import binascii
             bible,_,_=load_story_workspace(studio,values["project"])
             if bible is None:
                 raise WorkspaceError("approved original world design required")
@@ -322,8 +382,8 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200,asset_identity_history(
                 studio,values["project"],values["asset"]))
         if path=="/api/story-highlight-source":
-            from .story_workspace import load_story_workspace,load_continuity_contract
             from .story_chapter_context import highlight_source
+            from .story_workspace import load_continuity_contract, load_story_workspace
             bible,scenes,_=load_story_workspace(studio,values["project"])
             contract=load_continuity_contract(studio,values["project"])
             if bible is None or contract is None:
@@ -331,8 +391,8 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200,highlight_source(
                 bible,contract,scenes,values["highlight"]))
         if path=="/api/story-chapter-context":
-            from .story_workspace import load_story_workspace, load_continuity_contract
             from .story_chapter_context import chapter_context
+            from .story_workspace import load_continuity_contract, load_story_workspace
             bible,scenes,_=load_story_workspace(studio,values["project"])
             contract=load_continuity_contract(studio,values["project"])
             if bible is None or contract is None:
@@ -377,11 +437,13 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 region=values["region"],prompt=values["prompt"],
                 max_bookmarks=values.get("max_bookmarks",48)))
         if path=="/api/story-sign":
-            from .story_canon_fabric import BIBLE,SCENE,sign
+            from .story_canon_fabric import BIBLE, SCENE, sign
+            from .story_continuity_assurance import CONTRACT, seal_production_scene
             from .story_workspace import (
-                validate_story_workspace_source,load_story_workspace,
-                load_continuity_contract)
-            from .story_continuity_assurance import CONTRACT,seal_production_scene
+                load_continuity_contract,
+                load_story_workspace,
+                validate_story_workspace_source,
+            )
             source_path=values["path"]
             schema=(BIBLE if source_path=="game/story_bible.json"
                     else CONTRACT if source_path=="game/continuity_contract.json"

@@ -658,6 +658,58 @@ async def _replayed_cooperation(*, thread, user_message, assistant_message, tena
         return None
 
 
+async def _terminal_chat_evidence(
+    *, thread, user_message, tenant_id, owner_id, terminal_state, command=None, status=None
+):
+    """Recover optional public terminal evidence from its original engine only."""
+
+    empty = {"cooperation": None, "engine_provider_receipts": [], "failure_code": None}
+
+    async def project():
+        nonlocal command, status
+        operation_id, execution_id = _chat_turn_ids(thread.thread_id, user_message.message_id)
+        if status is None:
+            client = EngineClient.from_env()
+            if client is None:
+                return empty
+            status = await client.status(
+                execution_id, actor_id=owner_id, tenant_id=tenant_id, trace_id="chat:" + operation_id
+            )
+        if (
+            status.get("operation_id") != operation_id
+            or status.get("execution_id") != execution_id
+            or not (
+                status.get("execution_state") == terminal_state
+                or (
+                    terminal_state == "failed"
+                    and status.get("execution_state") == "completed"
+                    and status.get("result_status") == "degraded"
+                )
+            )
+        ):
+            return empty
+        code = status.get("failure_code")
+        if not isinstance(code, str) or re.fullmatch(r"[a-z0-9_]{1,128}", code) is None:
+            code = None
+        if command is None:
+            _metadata, command = await read_prepared(
+                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+            )
+        cooperation = cooperation_progress_projection(status, command=command)
+        return {
+            "cooperation": cooperation,
+            "engine_provider_receipts": [] if cooperation is None else list(status["provider_receipts"]),
+            "failure_code": code,
+        }
+
+    try:
+        return await asyncio.wait_for(project(), timeout=2)
+    except Exception:
+        # Historical terminal conversations stay readable during engine loss.
+        logger.warning("chat terminal evidence unavailable thread=%s", thread.thread_id)
+        return empty
+
+
 def _compile_chat_context(
     *,
     thread,
@@ -1814,6 +1866,7 @@ async def ai_chat(
     response_acceptance = None
     if engine_client is not None:
         engine_started = time.monotonic()
+        command = prepared_command
         try:
             engine_result = None
             if retrying_incomplete_turn and request.response_mode == "wait":
@@ -2002,6 +2055,14 @@ async def ai_chat(
                     execution_id,
                 )
             await _release_chat_turn_execution(turn_lease)
+            terminal_evidence = await _terminal_chat_evidence(
+                thread=thread,
+                user_message=user_message,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                terminal_state=("cancelled" if exc.status == "cancelled" else "failed"),
+                command=command,
+            )
             return {
                 "success": False,
                 "response": "The AI execution could not be safely completed. Retry the request.",
@@ -2010,6 +2071,8 @@ async def ai_chat(
                 "model": "engine-routed",
                 "error": "AI execution failed",
                 "error_code": exc.failure_code or "engine_execution_failed",
+                **terminal_evidence,
+                "failure_code": exc.failure_code or terminal_evidence["failure_code"],
                 "operation_id": operation_id,
                 "turn_state": (None if chat_turn is None else chat_turn.snapshot.state.value),
                 "engine_execution_id": execution_id,
@@ -2457,11 +2520,19 @@ async def get_ai_chat_turn(
                 )
             except Exception as exc:
                 raise _chat_error(exc) from exc
+        terminal_evidence = await _terminal_chat_evidence(
+            thread=thread,
+            user_message=user_message,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            terminal_state=state,
+        )
         return {
             "success": False,
             "accepted": True,
             "terminal": True,
             "state": state,
+            **terminal_evidence,
             "response": None,
             "ai_generated": False,
             "provider": "skeleton-engine",
@@ -2631,12 +2702,22 @@ async def get_ai_chat_turn(
                     failure_code=exc.failure_code,
                 )
             await _release_chat_turn_execution(poll_lease)
+            terminal_evidence = await _terminal_chat_evidence(
+                thread=latest_thread,
+                user_message=user_message,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                terminal_state=("cancelled" if exc.status == "cancelled" else "failed"),
+                command=prepared_command,
+                status=engine_status,
+            )
             return {
                 "success": False,
                 "accepted": True,
                 "terminal": True,
                 "state": ("cancelled" if exc.status == "cancelled" else "failed"),
-                "failure_code": exc.failure_code,
+                **terminal_evidence,
+                "failure_code": exc.failure_code or terminal_evidence["failure_code"],
                 "response": None,
                 "ai_generated": False,
                 "provider": "skeleton-engine",

@@ -1,0 +1,1166 @@
+{
+  "action": "system.triad",
+  "arguments_digest": "03ee349a6487d44c295ada69343ed62aee58fb6f99bd447e611800b20a430756",
+  "catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+  "catalog_pin_requested": true,
+  "digest": "d3c9cd4266a430013549c5eb86dec1a64b19975eb19192231a0287b785c3b716",
+  "effect": "simulate",
+  "human_approval_still_required_for_commits": true,
+  "model_weights_changed": false,
+  "network_calls_by_dispatch": false,
+  "project": "coherence",
+  "request_digest": "1299daaf299cd0670eb7c3a75ed78ed3c33550be6723ee017ce99098a5886364",
+  "result": {
+    "catalog": [
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "companion.practice",
+        "jeeves": "companion.practice",
+        "tool_id": "companion.practice"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "game.browser",
+        "jeeves": "game.browser",
+        "tool_id": "game.browser"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "game.editor",
+        "jeeves": "game.editor",
+        "tool_id": "game.editor"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "game.godot",
+        "jeeves": "game.godot",
+        "tool_id": "game.godot"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "game.simulate",
+        "jeeves": "game.native_recipe",
+        "tool_id": "game.native_recipe"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "game.simulate",
+        "jeeves": "game.simulate",
+        "tool_id": "game.simulate"
+      },
+      {
+        "adversarial": "mirror.originality",
+        "dragon": "knowledge.search",
+        "jeeves": "knowledge.search",
+        "tool_id": "knowledge.search"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "game.simulate",
+        "jeeves": "mirror.fuzz",
+        "tool_id": "mirror.fuzz"
+      },
+      {
+        "adversarial": "mirror.originality",
+        "dragon": "knowledge.search",
+        "jeeves": "mirror.originality",
+        "tool_id": "mirror.originality"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "game.godot",
+        "jeeves": "package.source",
+        "tool_id": "package.source"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "companion.practice",
+        "jeeves": "release.assess",
+        "tool_id": "release.assess"
+      },
+      {
+        "adversarial": "rights.check",
+        "dragon": "knowledge.search",
+        "jeeves": "rights.check",
+        "tool_id": "rights.check"
+      },
+      {
+        "adversarial": "story.mirror",
+        "dragon": "story.generate",
+        "jeeves": "story.generate",
+        "tool_id": "story.generate"
+      },
+      {
+        "adversarial": "story.mirror",
+        "dragon": "story.simulate",
+        "jeeves": "story.mirror",
+        "tool_id": "story.mirror"
+      },
+      {
+        "adversarial": "story.mirror",
+        "dragon": "story.native",
+        "jeeves": "story.native",
+        "tool_id": "story.native"
+      },
+      {
+        "adversarial": "story.mirror",
+        "dragon": "story.simulate",
+        "jeeves": "story.simulate",
+        "tool_id": "story.simulate"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "world.authored",
+        "jeeves": "world.authored",
+        "tool_id": "world.authored"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "world.generate",
+        "jeeves": "world.generate",
+        "tool_id": "world.generate"
+      },
+      {
+        "adversarial": "mirror.fuzz",
+        "dragon": "world.tiled",
+        "jeeves": "world.tiled",
+        "tool_id": "world.tiled"
+      }
+    ],
+    "catalog_binding_does_not_mean_every_tool_was_executed": true,
+    "catalog_count": 19,
+    "digest": "f2375cf90f8e466971ce0e1c7322e94f3bcc7ffc1e4759a364a74bfa23a94594",
+    "evidence_scope": "bounded original maze, procedural assets, music and reference integrity",
+    "execution_kind": "deterministic_local_adapter_exercise",
+    "human_review_forged": false,
+    "independent_model_review": false,
+    "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+    "inputs": {
+      "knowledge_lineage_digest": "ca5b495b32d0df4c7bb311eae2c394134861fa706682e4b4e5ad2ff94a4038af",
+      "mirror_attempts": 64,
+      "seed": 17,
+      "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4",
+      "tool_catalog_digest": "9156901e2d12fa4952623e0599aeda09f19df3b4a7d00adc20ca325c75b80b8b"
+    },
+    "knowledge_lineage": {
+      "automatic_training_authorized": false,
+      "digest": "ca5b495b32d0df4c7bb311eae2c394134861fa706682e4b4e5ad2ff94a4038af",
+      "manifest_sha256": "76677d00545aff163302281e291314784c176ebc0eda17ec32c01273c7bd273d",
+      "measured_gameplay_evidence": false,
+      "provenance_kind": "generated_design_reference",
+      "sources": [
+        {
+          "compressed_sha256": "e97d5da8c087ab07b19254d46c6cc720ac1645ddbb84656c91cf5b6cdfffb1cf",
+          "content_class": "generated design-reference text; not measured gameplay evidence",
+          "decoded_bytes": 26342223,
+          "decoded_sha256": "c26bcc164c09989f76d6e69cbfd4afb4987644f298752c7020bd0b04700a45b1",
+          "path": "data/game_building/pareto/game_design_pareto_corpus.txt.gz",
+          "rows": 200000,
+          "source_commit": "51ba74f51ad9f63ab09e1805b8ee886b9e6ab436",
+          "training_authorized": false
+        },
+        {
+          "compressed_sha256": "a33862bb139b5bc658d17d3becf155fb5a625b69257c6cdcd924f51457169275",
+          "content_class": "generated design-reference text; not measured gameplay evidence",
+          "decoded_bytes": 20796390,
+          "decoded_sha256": "8d2efe8f539bb36e9f3aa3b86add8fb3ef931ab6dd356ced21611335e1ce3c5f",
+          "path": "data/game_building/math_physics/game_math_physics_corpus.txt.gz",
+          "rows": 150000,
+          "source_commit": "51ba74f51ad9f63ab09e1805b8ee886b9e6ab436",
+          "training_authorized": false
+        }
+      ]
+    },
+    "model_calls_performed": 0,
+    "part_count": 8,
+    "parts": [
+      {
+        "connected": true,
+        "digest": "79b9b61e2f49d9dad223cb5b17bfec88b830ea32858e2d4434651d1788a7941c",
+        "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+        "lanes": {
+          "adversarial": {
+            "digest": "37b45a37ff671083e719c2c62b808235fc89441c10d549dbfe8cad3f7bde9c4c",
+            "evidence": {
+              "forged_replay_rejected": true,
+              "rejected_tamper": true
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "adversarial",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "dragon": {
+            "digest": "9426c33ffa6d4916bd3763340027df7a9238bdb2d9ed39a92d56b4cd142a8a22",
+            "evidence": {
+              "insight_digest": "75544a7972ebb3fafba2a0e1796494080a067256d1e95eab406dc916d6f09cd9",
+              "learned_model_weights": false,
+              "verified_experience": 24
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "dragon",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "jeeves": {
+            "digest": "03a870ff124bbf78b0723d1916b3917c7f9c42bf66557c6b480a36e6e0f94a5a",
+            "evidence": {
+              "actions": 42,
+              "proof_status": "won",
+              "world_digest": "fa481746e4cd864f5019e9939a2a4c0640b1aebb737cd63fe3fe16b98f8a3d90"
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "jeeves",
+            "promotion": false,
+            "weights_changed": false
+          }
+        },
+        "part": "game_logic",
+        "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4"
+      },
+      {
+        "connected": true,
+        "digest": "6ad7b2f5612d90e4aa903b6a2c9a281c791522bb2d9ed1b2eeba76432a559110",
+        "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+        "lanes": {
+          "adversarial": {
+            "digest": "93e7c8911b86bb80de2ff42da51e449b77352d3e1976f36e9fd31cc47b303fb8",
+            "evidence": {
+              "holdout_absent_from_admitted": true,
+              "holdout_ids": [
+                "math-fixed_timestep",
+                "pareto-02809c5b"
+              ],
+              "independent_quality_or_originality_review": false,
+              "injected_holdout_rejected": true,
+              "rejected_tamper": true,
+              "verification_kind": "local_reference_partition_integrity"
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "adversarial",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "dragon": {
+            "digest": "a1b6869a86662c68c00789aa69c4cadc9d61e3560414aad158dd6ba30efbe654",
+            "evidence": {
+              "almanac_promoted": false,
+              "crawl_performed": false,
+              "observed_terms": 55,
+              "training_authorized": false
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "dragon",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "jeeves": {
+            "digest": "6c0040db1a0c42b1581aa731afc3cbed869304d012c58440a4fe86bb6f408fa1",
+            "evidence": {
+              "admitted_digest": "eb6088191d68a1dc195806d347fca91218c993ac01da54d981cdb500d693d1a8",
+              "admitted_laws": 23,
+              "serving_transformers_updated": false
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "jeeves",
+            "promotion": false,
+            "weights_changed": false
+          }
+        },
+        "part": "game_knowledge",
+        "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4"
+      },
+      {
+        "connected": true,
+        "digest": "4d70ba8b671002b69f3029b356b2d5a242ad7915a78a57df8be2af2396e49766",
+        "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+        "lanes": {
+          "adversarial": {
+            "digest": "0d1ca5053129c36e2db829f72a8e6525815fd3b92649ee538ab37fd5cf67d30c",
+            "evidence": {
+              "attempts": 64,
+              "failed_count": 0,
+              "families": [
+                "deterministic-single-transition",
+                "forged-world-identity",
+                "inflated-health-state",
+                "injected-game-action",
+                "tampered-proof-action",
+                "tampered-proof-chain",
+                "tampered-proof-final-state",
+                "tampered-release-manifest",
+                "tampered-source-file",
+                "terminal-replay-overflow",
+                "unauthorized-game-action",
+                "valid-prefix-replay"
+              ],
+              "forged_package_rejected": true,
+              "human_ux_reviewed": false,
+              "mirror_passed": true,
+              "native_hardware_reviewed": false,
+              "rejected_tamper": true
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "adversarial",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "dragon": {
+            "digest": "19f30b17fe7255d1deb7497819a2cf5bb304d07cf78da1c83ae7d0cf2cb57c08",
+            "evidence": {
+              "observation": "Replay solved 1 original level(s) in 42 turns, collecting 1 objective(s), with 1 hazard tile(s) and 49 traversable tiles. No human player was tested.",
+              "safe_solution_turns": 42
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "dragon",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "jeeves": {
+            "digest": "06218fb31fb0f2c6554112ebc1128c85229288dedb96fa92b1f31f934cbeb8b5",
+            "evidence": {
+              "levels": 1,
+              "package_digest": "a0f8c01485b0fda09ebde8ec86bc68e0037574176692fb050f3e58fbee39e113"
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "jeeves",
+            "promotion": false,
+            "weights_changed": false
+          }
+        },
+        "part": "gameplay",
+        "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4"
+      },
+      {
+        "connected": true,
+        "digest": "2c5349e2da3e5510329e51c660f40561f2078908280da454dac58ff5bafacd62",
+        "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+        "lanes": {
+          "adversarial": {
+            "digest": "8b17ce5b7c10845ea0e741126b195721d12f792cef5d7da364bd50758d412c3b",
+            "evidence": {
+              "foreign_color_rejected": true,
+              "rejected_tamper": true
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "adversarial",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "dragon": {
+            "digest": "8dee1d7bdc594596c6fa9dbf81d81e360122acb287d22a1bb1aa38c4fdc89104",
+            "evidence": {
+              "colors_per_theme": [
+                8
+              ],
+              "commercial_sprite_sheet_copied": false,
+              "themes": [
+                "cyber",
+                "desert",
+                "fantasy",
+                "forest",
+                "ice",
+                "space"
+              ]
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "dragon",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "jeeves": {
+            "digest": "96c50e830b1c5f9d672a3417422849c7959dc8edfca881c03a3c63bf1658e21a",
+            "evidence": {
+              "model_super_resolution": false,
+              "native_hardware_qualified": false,
+              "target_id": "game_boy",
+              "techniques": [
+                "integer-nearest",
+                "scale2x-edge-aware"
+              ]
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "jeeves",
+            "promotion": false,
+            "weights_changed": false
+          }
+        },
+        "part": "asset_style",
+        "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4"
+      },
+      {
+        "connected": true,
+        "digest": "b6809786be1791a529bea8ac9c85aec07ace7914ffb9995000b9b002f8db669a",
+        "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+        "lanes": {
+          "adversarial": {
+            "digest": "c217240f53f1b9dac891ba18cbff208b8ccb3372b1a4f3d11bc56aabdb767a26",
+            "evidence": {
+              "other_seed_rejected": true,
+              "rejected_tamper": true,
+              "seed_rebuild_matches": true
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "adversarial",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "dragon": {
+            "digest": "f0091f95a49e1cb6e36e8c19eb2c6116249b3c7af4c84b2efc9fa08f023e52a4",
+            "evidence": {
+              "atlas_digest": "80d6f5479646717631eb5b2f76f310e5e764db5821ec20689d2f3bd06f285f90",
+              "atlas_sprites": 7,
+              "frames": 4,
+              "kinds": [
+                "hero",
+                "enemy",
+                "collectible",
+                "plant",
+                "rock",
+                "portal",
+                "chest"
+              ]
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "dragon",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "jeeves": {
+            "digest": "cc99a95b9a3a6109d3c0436ec8a9b1458389732ac935e1f5eb444dee296c97ee",
+            "evidence": {
+              "display_scale": 8,
+              "display_svg_digest": "c65e4b2215f1b68f7e40eb2d0d3ccbc320f39dba5fccdf0de34e4870bcf7c8ed",
+              "native_svg_digest": "3ae5530621305e5564edbea9a6925e9c9229ba969df142e3faa898b02fe8ac13",
+              "viewbox_unchanged": true
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "jeeves",
+            "promotion": false,
+            "weights_changed": false
+          }
+        },
+        "part": "asset_generation",
+        "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4"
+      },
+      {
+        "connected": true,
+        "digest": "0465a815f1f3f6470b54fb57be7644453e1e5f2be0e5a3d4ca7780338ee4e4ad",
+        "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+        "lanes": {
+          "adversarial": {
+            "digest": "c2741f67f40194d2bea2eae8d3756acab740b6214cb84a1a229c478c5cd256db",
+            "evidence": {
+              "forged_color_rejected": true,
+              "rejected_tamper": true
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "adversarial",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "dragon": {
+            "digest": "77d2582d0fcb13c08a3a7ca1b9ec849c7cd54a9f2c4dd1c0a7ca4cf570aae470",
+            "evidence": {
+              "new_colors_observed": 0,
+              "output_dimension": 32,
+              "source_colors": 7
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "dragon",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "jeeves": {
+            "digest": "1566115ae476eac341f1fcfdbf8d08a5c8452f3ad6923d5bcd0df5e2c92ad9fc",
+            "evidence": {
+              "factor": 4,
+              "nearest_bytes": 4096,
+              "palette_preserved": true,
+              "scale2x_bytes": 4096
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "jeeves",
+            "promotion": false,
+            "weights_changed": false
+          }
+        },
+        "part": "asset_upscale",
+        "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4"
+      },
+      {
+        "connected": true,
+        "digest": "416467228e896a76ef21fe49388d094c459027e41935ba7e5b131fab942a5dcb",
+        "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+        "lanes": {
+          "adversarial": {
+            "digest": "3bbf3e72328e71b4376f6c09cefab599834263af9dbe78120335d30853bb3cfa",
+            "evidence": {
+              "rejected_tamper": true,
+              "unknown_mode_rejected": true
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "adversarial",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "dragon": {
+            "digest": "b8010c7ae68ee3b0b38ac0f2e14ba1670b915b1f0679d5e71050e0c3c83ac611",
+            "evidence": {
+              "distinct_fingerprints": 6,
+              "modes": [
+                {
+                  "bpm": 148,
+                  "mode": "arena",
+                  "notes": 12
+                },
+                {
+                  "bpm": 124,
+                  "mode": "platform",
+                  "notes": 12
+                },
+                {
+                  "bpm": 100,
+                  "mode": "adventure",
+                  "notes": 12
+                },
+                {
+                  "bpm": 84,
+                  "mode": "dungeon",
+                  "notes": 5
+                },
+                {
+                  "bpm": 92,
+                  "mode": "tactics",
+                  "notes": 12
+                },
+                {
+                  "bpm": 174,
+                  "mode": "racer",
+                  "notes": 12
+                }
+              ]
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "dragon",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "jeeves": {
+            "digest": "d8a608592f2d4e7492292ee7f1fb5a12ebe9a326eed08655ebdd0ec44e074ba8",
+            "evidence": {
+              "commercial_stem_copied": false,
+              "effects": {
+                "dash": 4896,
+                "hit": 8864,
+                "jump": 7100,
+                "pickup": 6218,
+                "win": 26504
+              },
+              "tempos": {
+                "84": {
+                  "aligned": true,
+                  "notes": 16,
+                  "quarter_seconds": 0.71429,
+                  "wav_bytes": 365528
+                },
+                "120": {
+                  "aligned": true,
+                  "notes": 16,
+                  "quarter_seconds": 0.5,
+                  "wav_bytes": 256844
+                },
+                "174": {
+                  "aligned": true,
+                  "notes": 16,
+                  "quarter_seconds": 0.34483,
+                  "wav_bytes": 178140
+                }
+              }
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "jeeves",
+            "promotion": false,
+            "weights_changed": false
+          }
+        },
+        "part": "music_generation",
+        "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4"
+      },
+      {
+        "connected": true,
+        "digest": "b17164238dadf451c90421ca147d4f9fffe27112f6a228e545c86c3e8904d158",
+        "input_digest": "09de68658c457e52c6b5ba87e9b8282e178588301e553c879fa425d17c8490ee",
+        "lanes": {
+          "adversarial": {
+            "digest": "5df36d8c04791b15c573110226e47937fe781834c5f3abe7ff7b6833babfa52e",
+            "evidence": {
+              "drifted_frame_step_rejected": true,
+              "drifted_gap_rejected": true,
+              "rejected_tamper": true
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "adversarial",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "dragon": {
+            "digest": "983d376a41ed6c03823a091ea714c994d7bc3ee5187fc472815866233c4247e7",
+            "evidence": {
+              "frames_follow_bpm": true,
+              "frames_per_step": {
+                "adventure": 9,
+                "arena": 6,
+                "dungeon": 11,
+                "platform": 7,
+                "racer": 5,
+                "tactics": 10
+              }
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "dragon",
+            "promotion": false,
+            "weights_changed": false
+          },
+          "jeeves": {
+            "digest": "a347a7b5f4114ce374e08a6aabe67edf8ded5ed67d3846cd5074d775536d0314",
+            "evidence": {
+              "aligned_tempos": 3,
+              "quarter_note_rule": "60/bpm"
+            },
+            "execution_kind": "deterministic_local_adapter",
+            "human_review_forged": false,
+            "independent_model_review": false,
+            "model_call_performed": false,
+            "owner": "jeeves",
+            "promotion": false,
+            "weights_changed": false
+          }
+        },
+        "part": "music_timing",
+        "source_lineage_digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4"
+      }
+    ],
+    "perfect_builder_claimed": false,
+    "reviewed_knowledge_promoted": false,
+    "roles": [
+      "jeeves",
+      "dragon",
+      "adversarial"
+    ],
+    "schema": "skeleton.game_builder.role_triad.v1",
+    "serving_transformers_updated": false,
+    "source_lineage": {
+      "arbitrary_transitive_dependency_closure_attested": false,
+      "digest": "f785e1e0d4106ebb9c754e884e36b1a8ca5b9efdd0aa38c00f0f54b18dfcedf4",
+      "identity_kind": "installed_source_bytes",
+      "loaded_runtime_or_standard_library_attested": false,
+      "scope": "listed exercised owners and explicit domain dependencies",
+      "sources": [
+        {
+          "bytes": 30158,
+          "path": "skeleton/ai/game_builder/studio_role_triad.py",
+          "sha256": "2f8c2f7a81193e725a76a69fc93ff6e978197cefd32398061b7e0c1cf2c8e3ef"
+        },
+        {
+          "bytes": 36251,
+          "path": "skeleton/ai/game_builder/contracts.py",
+          "sha256": "fe03e27a9b3a284601bbd53c49aa21e0d78fe30a39f56462ae04e173e129721c"
+        },
+        {
+          "bytes": 13026,
+          "path": "skeleton/ai/game_builder/studio_tool_fabric.py",
+          "sha256": "b89cd5ae4a95adc2dcb0496a883b867a286995734303b7996fe656f562c1a34d"
+        },
+        {
+          "bytes": 8433,
+          "path": "skeleton/ai/game_builder/playable_compiler.py",
+          "sha256": "9f8c4f9d0aec22f84e796b37b962e4bef43c3770267515df51593905b19b5302"
+        },
+        {
+          "bytes": 15512,
+          "path": "skeleton/ai/game_builder/playable_world.py",
+          "sha256": "852110942db688845d0756a12f08e935eff23be0a3beeaff3c3eccda9f553ee6"
+        },
+        {
+          "bytes": 22808,
+          "path": "skeleton/ai/game_builder/playable_simulation.py",
+          "sha256": "8cc1122ddb0df0b5b712ce6eec67256bc5422f137de5342005cdc724978714c4"
+        },
+        {
+          "bytes": 28295,
+          "path": "skeleton/ai/game_builder/playable_export.py",
+          "sha256": "1eb5c71c378ebc3df6acb2bc08975af71edef7f519d4aa0b74bc73ffc501a115"
+        },
+        {
+          "bytes": 17147,
+          "path": "skeleton/ai/game_builder/tile_editor_export.py",
+          "sha256": "3fb60743fd563ec08a37dc741f9e99e820b218410a6b6ada3a4f041b635acecc"
+        },
+        {
+          "bytes": 11209,
+          "path": "skeleton/ai/game_builder/mirror_room_runtime.py",
+          "sha256": "0d8181b1c1dc8c9c185aeeb216c16a25647e4515052ee9fa47c977799da506aa"
+        },
+        {
+          "bytes": 8583,
+          "path": "skeleton/ai/game_builder/companion_curriculum.py",
+          "sha256": "5a3bb6426f64601f0b6c8799d639a16836f1403a2404a76b557a4ea1741b102d"
+        },
+        {
+          "bytes": 37892,
+          "path": "skeleton/ai/game_builder/dual_runtime_export.py",
+          "sha256": "1b172a07fc249c78acee9c101ae724f419610ccb24077739c01897b2392a1f91"
+        },
+        {
+          "bytes": 5457,
+          "path": "skeleton/ai/game_builder/studio_native_psg.py",
+          "sha256": "9687b6605130e6b7971bbe5f0282251096d3668fe5265e21fc33b9770b6b5d86"
+        },
+        {
+          "bytes": 3810,
+          "path": "skeleton/ai/webcrawler/dragon_chip_music.py",
+          "sha256": "a6de083deeaf7969def73afa472b8e6d88656e272d80a01cc85443f179fb85d4"
+        },
+        {
+          "bytes": 12578,
+          "path": "skeleton/ai/webcrawler/dragon_game_blueprints.py",
+          "sha256": "fafb0af143294c5b028cde8e5c82478428a8fa4bb1dbe5a52b17208a6aaf00f3"
+        },
+        {
+          "bytes": 10135,
+          "path": "skeleton/ai/webcrawler/game_scale_assets.py",
+          "sha256": "a4a4026deddd10a1b7443e41558ff84fce26f8283b53367df75954078cdfc440"
+        },
+        {
+          "bytes": 18275,
+          "path": "skeleton/developer/jeeves_game_upscale.py",
+          "sha256": "eee44cb487dbda132b183809f56271bb2f2c99b1d044c7908012014933e6b08b"
+        }
+      ]
+    },
+    "tool_contracts": [
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "generate original training-game variation proposals",
+        "license_id": "project-original",
+        "phases": [
+          "original",
+          "stepping_stone"
+        ],
+        "resource_units": 5,
+        "side_effects": [],
+        "tool_id": "companion.practice"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "render an offline browser-playable original game",
+        "license_id": "project-original",
+        "phases": [
+          "consumer",
+          "stepping_stone"
+        ],
+        "resource_units": 9,
+        "side_effects": [],
+        "tool_id": "game.browser"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "provide an offline map painting and editing surface",
+        "license_id": "project-original",
+        "phases": [
+          "original",
+          "stepping_stone"
+        ],
+        "resource_units": 6,
+        "side_effects": [],
+        "tool_id": "game.editor"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "render Godot 4 source project from same world",
+        "license_id": "project-original",
+        "phases": [
+          "consumer",
+          "stepping_stone"
+        ],
+        "resource_units": 10,
+        "side_effects": [],
+        "tool_id": "game.godot"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "generate local Godot export instructions, not launch a build",
+        "license_id": "project-original",
+        "phases": [
+          "consumer"
+        ],
+        "resource_units": 2,
+        "side_effects": [],
+        "tool_id": "game.native_recipe"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "mirror_room",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "execute deterministic Python game-state transitions",
+        "license_id": "project-original",
+        "phases": [
+          "review",
+          "stepping_stone"
+        ],
+        "resource_units": 5,
+        "side_effects": [],
+        "tool_id": "game.simulate"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "search locally reviewed game-building knowledge",
+        "license_id": "project-original",
+        "phases": [
+          "original",
+          "research"
+        ],
+        "resource_units": 2,
+        "side_effects": [],
+        "tool_id": "knowledge.search"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "jeeves",
+          "mirror_room",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "run deterministic adversarial gameplay and proof probes",
+        "license_id": "project-original",
+        "phases": [
+          "review"
+        ],
+        "resource_units": 22,
+        "side_effects": [],
+        "tool_id": "mirror.fuzz"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "jeeves",
+          "mirror_room",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "inspect rights/similarity alerts without copying sources",
+        "license_id": "project-original",
+        "phases": [
+          "review"
+        ],
+        "resource_units": 8,
+        "side_effects": [],
+        "tool_id": "mirror.originality"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "assemble content-addressed source project deliverables",
+        "license_id": "project-original",
+        "phases": [
+          "consumer"
+        ],
+        "resource_units": 10,
+        "side_effects": [
+          "filesystem"
+        ],
+        "tool_id": "package.source"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "jeeves",
+          "mirror_room",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "evaluate consumer release evidence and blocked certifications",
+        "license_id": "project-original",
+        "phases": [
+          "consumer",
+          "review"
+        ],
+        "resource_units": 7,
+        "side_effects": [],
+        "tool_id": "release.assess"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "jeeves",
+          "mirror_room",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "check source rights using canonical rights governance",
+        "license_id": "project-original",
+        "phases": [
+          "consumer",
+          "research",
+          "review"
+        ],
+        "resource_units": 3,
+        "side_effects": [],
+        "tool_id": "rights.check"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "construct deterministic original regions, citizens, factions and quests",
+        "license_id": "project-original",
+        "phases": [
+          "original",
+          "stepping_stone"
+        ],
+        "resource_units": 18,
+        "side_effects": [],
+        "tool_id": "story.generate"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "jeeves",
+          "mirror_room",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "adversarially attack story action state, NPC rights and replay integrity",
+        "license_id": "project-original",
+        "phases": [
+          "review"
+        ],
+        "resource_units": 26,
+        "side_effects": [],
+        "tool_id": "story.mirror"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "compile independent offline browser and Godot living-world RPG sources",
+        "license_id": "project-original",
+        "phases": [
+          "consumer",
+          "stepping_stone"
+        ],
+        "resource_units": 12,
+        "side_effects": [],
+        "tool_id": "story.native"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "execute actual NPC schedule, quest, dialogue and branching-choice story proof",
+        "license_id": "project-original",
+        "phases": [
+          "stepping_stone"
+        ],
+        "resource_units": 18,
+        "side_effects": [],
+        "tool_id": "story.simulate"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "validate human-authored game editor geometry",
+        "license_id": "project-original",
+        "phases": [
+          "original",
+          "stepping_stone"
+        ],
+        "resource_units": 10,
+        "side_effects": [],
+        "tool_id": "world.authored"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "companion",
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "generate original bounded, replay-proved game levels",
+        "license_id": "project-original",
+        "phases": [
+          "original",
+          "stepping_stone"
+        ],
+        "resource_units": 15,
+        "side_effects": [],
+        "tool_id": "world.generate"
+      },
+      {
+        "access": "builtin",
+        "actors": [
+          "dragon",
+          "jeeves",
+          "operator"
+        ],
+        "adapter_digest": null,
+        "capability": "import original numeric geometry from local Tiled JSON and prove gameplay",
+        "license_id": "project-original",
+        "phases": [
+          "original"
+        ],
+        "resource_units": 13,
+        "side_effects": [],
+        "tool_id": "world.tiled"
+      }
+    ],
+    "weights_changed": false
+  },
+  "runtime_adapter_executed": true,
+  "schema": "skeleton.game_builder.jeeves_capability_action.v1",
+  "source_files_committed": false
+}

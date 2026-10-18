@@ -681,7 +681,7 @@
     "Do not discard branches with unique commits without reviewing their file-level changes.",
     "Do not blindly merge non-mergeable integration PRs; reconcile overlapping files first.",
     "Use skeleton/app/manifest.json as the canonical runtime topology contract.",
-    "Frontend network clients must resolve application endpoints through frontend/utils/apiBase.ts.",
+    "Frontend network clients must resolve application endpoints through frontend/src/utils/apiBase.ts.",
     "Normal, first-run, and recovery launch paths must converge on /product.",
     "Keep source bind mounts in docker-compose.hot.yml; canonical docker-compose.yml is image-based.",
     "Read machine/state_topology.json before changing authoritative or derived state ownership.",
@@ -696,7 +696,7 @@
     "compatibility_shell": "/hub",
     "backend_api": "/api/*",
     "engine_api": "/api/v1/*",
-    "frontend_endpoint_resolver": "frontend/utils/apiBase.ts",
+    "frontend_endpoint_resolver": "frontend/src/utils/apiBase.ts",
     "production_ingress": "frontend/nginx.conf",
     "compose": "docker-compose.yml",
     "hot_overlay": "docker-compose.hot.yml",
@@ -807,7 +807,7 @@
       "qualification": "manifest admission is not trained-model or runtime qualification"
     },
     "session_adapter": "skeleton/app/local_ai.py",
-    "runtime_status_projection": "frontend/features/Jeeves/JeevesRuntimeStatus.tsx reads existing /api/ai/providers and /api/jeeves/free-tier; never selects a provider",
+    "runtime_status_projection": "frontend/src/features/Jeeves/JeevesRuntimeStatus.tsx reads existing /api/ai/chat/readiness; never executes or selects a provider",
     "durable_status_recovery": "expired or failed tickets may project a verified committed SQLite receipt; uncommitted work is never inferred"
   }
 }

@@ -12,21 +12,21 @@ as functioning runtime adapters.
 """
 from __future__ import annotations
 
-from dataclasses import fields
-from pathlib import Path
+import json
+import math
 import re
+from hashlib import sha256
+from pathlib import Path
 
 from .contracts import canonical_digest
-from .game_project_workspace import GameWorkspace, WorkspaceError
-from .system_editors import (
-    catalog as system_catalog, editor_spec, editor_source,
-    editor_path, preview_editor)
-from .system_editor_assembly import assemble_workspace_systems
+from .game_project_workspace import GameWorkspace
 from .game_prompt_router import route_game_prompt
-from .studio_tool_fabric import (
-    ToolFabric, ToolRequest, Actor, Phase)
-from .studio_execution_plane import EXECUTABLE_TOOLS
 from .jeeves_production_director import work_order
+from .studio_execution_plane import EXECUTABLE_TOOLS
+from .studio_tool_fabric import Actor, Phase, ToolFabric, ToolRequest
+from .system_editor_assembly import assemble_workspace_systems
+from .system_editors import catalog as system_catalog
+from .system_editors import editor_path, editor_source, editor_spec, preview_editor
 
 ATLAS_SCHEMA = "skeleton.game_builder.jeeves_app_atlas.v1"
 ACTION_SCHEMA = "skeleton.game_builder.jeeves_capability_action.v1"
@@ -42,7 +42,7 @@ IDENT = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 FILTER = re.compile(r"^[a-zA-Z0-9_.-]{1,100}$")
 PROTECTED = re.compile(
     r"(^|[_.-])(secret|credential|password|api.?key|token|private|vault|"
-    r"ssh|oauth|session|cookie|auth|license.?key)([_.-]|$)",re.I)
+    r"ssh|oauth|session|cookie|auth|license.?key)([_.-]|$)",re.IGNORECASE)
 WRITE_ROOTS = ("systems/", "story/", "scenes/", "game/", "missions/",
                "world/", "npc/", "npcs/", "assets/", "design/",
                "dialogue/", "cinematics/", "engine/", "almanacs/", "notes/")
@@ -97,10 +97,10 @@ SURFACES = {
 # They are metadata-only: not magically importable or writable Python modules.
 EXTERNAL_SURFACES = {
     "frontend": ("frontend","React / React Native app, presentation and navigation"),
-    "frontend_features": ("frontend/features","user-visible UI feature implementations"),
-    "frontend_components": ("frontend/components","shared visual/editor components"),
-    "frontend_services": ("frontend/services","typed client app services"),
-    "frontend_state": ("frontend/state","app state and user/session interactions"),
+    "frontend_features": ("frontend/src/features","user-visible UI feature implementations"),
+    "frontend_components": ("frontend/src/components","shared visual/editor components"),
+    "frontend_services": ("frontend/src/services","typed client app services"),
+    "frontend_state": ("frontend/src/state","app state and user/session interactions"),
     "backend": ("backend","API, model services and native gameforge"),
     "backend_routes": ("backend/routes","app-facing API route implementations"),
     "backend_services": ("backend/services","backend service orchestration"),
@@ -158,7 +158,7 @@ ACTION_DEFS = (
     ("game.console.source.stage", "Generate authentic console assembly/C and stage one exact source for human approval", "propose", True),
     ("game.console.source.stage.artwork", "Compile six exact original 8x8 sprite tile arrays into reviewed native console source", "propose", True),
     ("game.mirror.review", "Run original game browser/native replay plus the independent adversarial mirror", "simulate", True),
-    ("system.triad", "Connect every game-builder part through Jeeves, Dragon, and its adversarial counterpart", "simulate", True),
+    ("system.triad", "Exercise bounded gameplay, assets, music and reference integrity through deterministic role adapters", "simulate", True),
     ("tool.fabric", "Inspect actual game tool contracts versus executable handlers", "read", False),
     ("tool.plan", "Validate a finite typed Jeeves tool plan without executing it", "plan", True),
     ("companion.simulate", "Rehearse consent-bound Dragon growth and idle state transitions", "simulate", False),
@@ -166,6 +166,176 @@ ACTION_DEFS = (
     ("model.improvement", "Prepare an evidence-bound shadow/model enhancement review, never promote weights", "propose", False),
 )
 ACTIONS = {item[0]: item for item in ACTION_DEFS}
+_ACTION_PARAMETERS = {
+    "atlas.summary": ((), ()),
+    "atlas.family": (("family", "offset", "limit"), ()),
+    "atlas.search": (("family", "query", "offset", "limit"), ()),
+    "atlas.deep": (("family", "query", "offset", "limit", "max_depth"), ()),
+    "atlas.editor": (("editor",), ()),
+    "studio.tree": ((), ()),
+    "studio.source": (("path",), ()),
+    "studio.editor.catalog": ((), ()),
+    "studio.editor.preview": (("editor", "settings"), ()),
+    "studio.editor.stage": (("editor", "settings", "reason"), ()),
+    "studio.source.propose": (("path", "content", "expected_sha256", "reason"), ()),
+    "studio.assembly": ((), ()),
+    "studio.route": (("prompt",), ()),
+    "jeeves.director": (("prompt", "cast", "region", "act", "scene"), ()),
+    "jeeves.chapter_chat": (("prompt", "session", "cast", "region"), ()),
+    "forge.kinds": ((), ()),
+    "forge.graph": (("name", "components", "wires"), ()),
+    "game.compile.original": (("intent",), ()),
+    "game.compile.native": (("intent",), ()),
+    "game.mirror.review": (("intent",), ()),
+    "game.console.catalog": ((), ()),
+    "system.triad": (("seed", "mirror_attempts"), ()),
+    "tool.fabric": ((), ()),
+    "tool.plan": (("phase", "tools", "input_digest", "rationale"), ()),
+    "companion.simulate": (("owner", "events"), ()),
+    "crawler.catalog": (("offset", "limit"), ()),
+    "model.improvement": (("target_family", "baseline_sha256", "candidate_sha256",
+                           "hypothesis", "metrics", "rollback_plan"), ()),
+}
+_CONSOLE_FIELDS = (
+    "intent", "target", "source_platform", "rights_evidence_sha256",
+    "creative_identity", "style", "contrast", "animation_frames",
+    "source_file", "expected_sha256", "reason",
+)
+_ACTION_PARAMETERS["game.console.source.stage"] = (
+    _CONSOLE_FIELDS, ("animation_fps", "music_density"))
+_ACTION_PARAMETERS["game.console.source.stage.artwork"] = (
+    (*_CONSOLE_FIELDS, "artist_tiles"), ("animation_fps", "music_density"))
+_CATALOG_OWNERS = (
+    "jeeves_app_runtime.py", "jeeves_appwide_fabric.py", "studio_tool_fabric.py",
+    "studio_execution_plane.py", "studio_role_triad.py", "system_editors.py",
+    "game_workspace_server.py", "game_workspace_ui.py",
+    "contracts.py", "game_project_workspace.py", "game_prompt_router.py",
+    "system_editor_assembly.py", "jeeves_production_director.py", "jeeves_chapter_chat.py",
+    "jeeves_capability_intelligence.py", "jeeves_completion_census.py",
+    "advanced_rpg_planner.py", "advanced_world_planner.py", "playable_compiler.py",
+    "playable_simulation.py", "playable_world.py", "playable_export.py", "tile_editor_export.py",
+    "dual_runtime_export.py", "advanced_gameplay_runtime.py",
+    "mirror_room_runtime.py", "companion_curriculum.py", "studio_asset_pipeline.py",
+    "studio_sprite_authoring.py", "studio_native_psg.py", "game_boy_native_export.py",
+    "game_boy_color_native_export.py", "nes_native_export.py", "sms_native_export.py",
+    "sega_8bit_native_export.py", "port_planner.py", "platform_registry.py",
+)
+_CATALOG_DEPENDENCIES = (
+    "skeleton/ai/forge/universal.py",
+    "skeleton/ai/webcrawler/dragon_companion_runtime.py",
+    "skeleton/ai/webcrawler/dragon_visual_state.py",
+    "skeleton/ai/webcrawler/active_research.py",
+    "skeleton/ai/webcrawler/dragon_chip_music.py",
+    "skeleton/ai/webcrawler/dragon_game_blueprints.py",
+    "skeleton/ai/webcrawler/game_scale_assets.py",
+    "skeleton/developer/jeeves_game_upscale.py",
+    "skeleton/jeeves/game_console_assets.py",
+)
+
+
+def capability_catalog():
+    """Bind explicit adapter contracts to installed owner bytes.
+
+    This catalog is suitable for composing a subsequent typed request. It is
+    neither model readiness nor permission to execute a discovered source file.
+    """
+    sources = []
+    paths = ["skeleton/ai/game_builder/" + name for name in _CATALOG_OWNERS]
+    paths.extend(_CATALOG_DEPENDENCIES)
+    for relative in paths:
+        target = REPO_ROOT / relative
+        if target.is_symlink() or not target.is_file():
+            raise JeevesAppCapabilityError("installed capability owner unavailable")
+        with target.open("rb") as handle:
+            raw = handle.read(1024 * 1024 + 1)
+        if len(raw) > 1024 * 1024:
+            raise JeevesAppCapabilityError("capability owner exceeds source identity budget")
+        sources.append({"path": relative,
+                        "sha256": sha256(raw).hexdigest(), "bytes": len(raw)})
+    body = {
+        "schema": "skeleton.game_builder.jeeves_capability_catalog.v1",
+        "actions": _action_index(),
+        "tools": _tool_contracts(),
+        "editors_digest": canonical_digest(system_catalog()),
+        "source_owners": sources,
+        "source_identity_kind": "installed_owner_bytes_not_model_readiness",
+        "source_identity_scope": "listed adapters and explicit domain dependencies",
+        "arbitrary_transitive_dependency_closure_attested": False,
+        "loaded_runtime_or_standard_library_attested": False,
+        "argument_limits": {"top_level_fields": 16, "depth": 16,
+                            "nodes": 16_384, "canonical_json_bytes": 256_000},
+        "surfaces": {key: _family_display(key) for key in sorted(SURFACES)},
+        "source_discovery_grants_execution": False,
+        "model_readiness_attested": False,
+    }
+    return {**body, "digest": canonical_digest(body)}
+
+
+def _catalog_match(expected):
+    catalog = capability_catalog()
+    if expected is not None:
+        _sha(expected, "capability catalog")
+        if expected != catalog["digest"]:
+            raise JeevesAppCapabilityError("capability catalog changed; refresh before execution")
+    return catalog
+
+
+def _bounded_arguments(value):
+    """Reject deeply nested or oversized model/tool data before any adapter."""
+    if type(value) is not dict or len(value) > 16:
+        raise JeevesAppCapabilityError("bounded typed Jeeves action arguments required")
+    stack = [(value, 0)]
+    nodes = 0
+    while stack:
+        item, depth = stack.pop()
+        nodes += 1
+        if depth > 16 or nodes > 16_384:
+            raise JeevesAppCapabilityError("action data exceeds structural limits")
+        if type(item) is dict:
+            if len(item) > 128 or any(type(key) is not str or len(key) > 160
+                                       for key in item):
+                raise JeevesAppCapabilityError("bounded string action keys required")
+            stack.extend((child, depth + 1) for child in item.values())
+        elif type(item) is list:
+            if len(item) > 8192:
+                raise JeevesAppCapabilityError("action list exceeds item budget")
+            stack.extend((child, depth + 1) for child in item)
+        elif type(item) is str:
+            if len(item) > 128_000:
+                raise JeevesAppCapabilityError("action text exceeds source budget")
+        elif item is None or type(item) in (bool, int):
+            if type(item) is int and item.bit_length() > 64:
+                raise JeevesAppCapabilityError("action integer exceeds numeric budget")
+        elif type(item) is float and math.isfinite(item):
+            pass
+        else:
+            raise JeevesAppCapabilityError("finite JSON action data required")
+    encoded = json.dumps(value, sort_keys=True, ensure_ascii=True,
+                         separators=(",", ":"), allow_nan=False)
+    if len(encoded.encode("utf-8")) > 256_000:
+        raise JeevesAppCapabilityError("action data exceeds context byte budget")
+    return json.loads(encoded)
+
+
+def compose_app_request(workspace, project, action, args, *,
+                        expected_catalog_digest=None):
+    """Freeze a selected-project request without granting or using authority."""
+    _project(workspace, project)
+    if type(action) is not str or action not in ACTIONS:
+        raise JeevesAppCapabilityError("unregistered Jeeves app action")
+    arguments = _bounded_arguments(args)
+    required, optional = _ACTION_PARAMETERS[action]
+    if not set(required) <= set(arguments) or set(arguments) - set(required) - set(optional):
+        raise JeevesAppCapabilityError("missing or unsupported parameters for " + action)
+    catalog = _catalog_match(expected_catalog_digest)
+    body = {
+        "schema": REQUEST_SCHEMA, "project": project, "action": action,
+        "args": arguments, "arguments_digest": canonical_digest(arguments),
+        "catalog_digest": catalog["digest"], "effect": ACTIONS[action][2],
+        "operator_authorization_required": ACTIONS[action][3],
+        "authority_granted": False, "execution_performed": False,
+    }
+    return {**body, "digest": canonical_digest(body)}
 
 
 def _exact(value, fields, name):
@@ -214,25 +384,26 @@ def _entries(family, *, offset=0, limit=80, prefix=None):
         _plain(prefix,"source module filter",64)
         if not FILTER.fullmatch(prefix):
             raise JeevesAppCapabilityError("unsafe source module filter")
-    relative=SURFACES[family][0]
     root=_safe_dir(_family_root(family))
     entries=[]
     # os.scandir/Path.iterdir are bounded by per-directory maximum. Only
     # metadata of Python/source directories is visible, not raw code.
-    for candidate in root.iterdir():
+    for inspected, candidate in enumerate(root.iterdir(), start=1):
+        if inspected > MAX_MODULES:
+            raise JeevesAppCapabilityError("directory exceeds bounded capability scan")
         if candidate.is_symlink() or candidate.name.startswith(".") or \
            PROTECTED.search(candidate.name):
             continue
-        if (candidate.is_dir() or candidate.suffix in (".py",".json",".md",
-                ".ts",".js",".tsx",".jsx",".css",".html",".gd",".yml",".yaml")):
-            if prefix is None or prefix.lower() in candidate.name.lower():
-                entries.append({
-                    "name":candidate.name,
-                    "type":"family" if candidate.is_dir() else "module",
-                    "relative_path":_family_display(family)+"/"+candidate.name,
-                    "execution_adapter":False,
-                    "access":"discoverable_only",
-                })
+        if ((candidate.is_dir() or candidate.suffix in (".py",".json",".md",
+                ".ts",".js",".tsx",".jsx",".css",".html",".gd",".yml",".yaml"))
+                and (prefix is None or prefix.lower() in candidate.name.lower())):
+            entries.append({
+                "name":candidate.name,
+                "type":"family" if candidate.is_dir() else "module",
+                "relative_path":_family_display(family)+"/"+candidate.name,
+                "execution_adapter":False,
+                "access":"discoverable_only",
+            })
         if len(entries)>MAX_MODULES:
             raise JeevesAppCapabilityError("inventory too large: request a narrower family")
     entries.sort(key=lambda x:(x["type"],x["name"]))
@@ -259,17 +430,20 @@ def _deep_entries(family, *, query=None, offset=0, limit=80, max_depth=8):
         _plain(query,"nested feature search",64)
         if not FILTER.fullmatch(query):
             raise JeevesAppCapabilityError("unsafe nested feature query")
-    relative=SURFACES[family][0]
     start=_safe_dir(_family_root(family))
     stack=[(start,0)]
     entries=[]
     visited=0
+    examined=depth_truncated=0
     while stack:
         directory,depth=stack.pop()
         visited+=1
         if visited>MAX_MODULES:
             raise JeevesAppCapabilityError("feature walk exceeded bounded directory budget")
         for candidate in directory.iterdir():
+            examined += 1
+            if examined > MAX_MODULES * 4:
+                raise JeevesAppCapabilityError("nested capability entry budget exceeded")
             if candidate.is_symlink() or candidate.name.startswith(".") or \
                PROTECTED.search(candidate.name) or \
                candidate.name in ("__pycache__","node_modules","venv",".venv",
@@ -278,6 +452,8 @@ def _deep_entries(family, *, query=None, offset=0, limit=80, max_depth=8):
             if candidate.is_dir():
                 if depth<max_depth:
                     stack.append((candidate,depth+1))
+                else:
+                    depth_truncated += 1
                 typ="directory"
             elif candidate.suffix in (".py",".json",".md",".ts",".js",
                                        ".tsx",".jsx",".css",".html",".gd",".yml",".yaml"):
@@ -299,6 +475,8 @@ def _deep_entries(family, *, query=None, offset=0, limit=80, max_depth=8):
         "family":family,"path":_family_display(family),
         "matching_entries":len(entries),
         "source_directories_visited":visited,
+        "source_entries_examined":examined,
+        "depth_truncated_directories":depth_truncated,
         "scanned_to_depth":max_depth,
         "offset":offset,"limit":limit,
         "entries":entries[offset:offset+limit],
@@ -310,17 +488,34 @@ def _deep_entries(family, *, query=None, offset=0, limit=80, max_depth=8):
 
 
 def _action_index():
+    if set(_ACTION_PARAMETERS) != set(ACTIONS):
+        raise JeevesAppCapabilityError("capability parameter catalog drifted from adapters")
     return [{
         "id":key,"description":description,"effect":effect,
         "operator_authorization_required":requires,
         "executable_local_adapter":True,
         "human_source_commit_delegated":False,
         "network_or_provider_access":False,
+        "model_invocation_by_adapter":False,
+        "required_parameters":list(_ACTION_PARAMETERS[key][0]),
+        "optional_parameters":list(_ACTION_PARAMETERS[key][1]),
+        "runtime_dependencies": ([{
+            "kind":"optional_installed_reference_pack",
+            "available_by_metadata":all((REPO_ROOT/path).is_file()
+                                        and not (REPO_ROOT/path).is_symlink()
+                                        for path in (
+                "data/game_building/manifest.json",
+                "data/game_building/pareto/game_design_pareto_corpus.txt.gz",
+                "data/game_building/math_physics/game_math_physics_corpus.txt.gz")),
+            "content_verified_at_execution":True,
+        }] if key == "system.triad" else []),
     } for key,description,effect,requires in ACTION_DEFS]
 
 
-def app_atlas(*, family=None, offset=0, limit=80, query=None):
+def app_atlas(*, family=None, offset=0, limit=80, query=None,
+              expected_catalog_digest=None):
     """Live feature taxonomy with truthful adapter coverage and source pages."""
+    catalog = _catalog_match(expected_catalog_digest)
     names=sorted(SURFACES)
     if family is not None:
         payload=_entries(family,offset=offset,limit=limit,prefix=query)
@@ -333,7 +528,7 @@ def app_atlas(*, family=None, offset=0, limit=80, query=None):
             "families":[{
                 "id":key,"path":_family_display(key),
                 "description":SURFACES[key][1],
-                "present":_family_root(key).is_dir(),
+                "present":_family_root(key).is_dir() and not _family_root(key).is_symlink(),
                 "source_executable_by_name":False,
             } for key in names],
             "family_count":len(names),"operator_adapters":_action_index(),
@@ -341,8 +536,9 @@ def app_atlas(*, family=None, offset=0, limit=80, query=None):
             "local_executable_game_tools":sorted(EXECUTABLE_TOOLS),
             "all_source_modules_executable":False,
             "coverage_interpretation":"cataloged != wired != tested != publishable",
+            "catalog_source_owners":catalog["source_owners"],
         }
-    body={"schema":ATLAS_SCHEMA,**payload}
+    body={"schema":ATLAS_SCHEMA,"catalog_digest":catalog["digest"],**payload}
     return {**body,"digest":canonical_digest(body)}
 
 
@@ -403,10 +599,9 @@ def _compile_original_game(project,args,mode):
              "starting_health")
     if set(values)-set(allowed) or not {"title","subtitle","seed"}<=set(values):
         raise JeevesAppCapabilityError("unrecognized/absent original game parameters")
-    from .playable_world import GameBuildIntent
-    from .playable_compiler import compile_original_game
     from .dual_runtime_export import render_dual_runtime_package
-    from .playable_export import PlayableHTML
+    from .playable_compiler import compile_original_game
+    from .playable_world import GameBuildIntent
     intent=GameBuildIntent(project_id=project,**values)
     # Additional app/Jeeves request budget: the game compiler itself supports
     # larger bounded worlds; the app agent is deliberately constrained.
@@ -453,27 +648,23 @@ def _stage_console_art_source(workspace, project, args, *, with_artist=False):
     supplies an authorship-document digest as a *reference*, not as proof of
     independently adjudicated IP rights. One source file per reviewed edit.
     """
-    fields = (
-        "intent", "target", "source_platform", "rights_evidence_sha256",
-        "creative_identity", "style", "contrast", "animation_frames",
-        "source_file", "expected_sha256", "reason",
-    )
+    fields = _CONSOLE_FIELDS
     optional = tuple(
         name for name in ("animation_fps", "music_density") if name in args
     )
     _exact(args, (*fields, *optional, "artist_tiles")
            if with_artist else (*fields, *optional),
            "original native source production")
+    from .game_boy_color_native_export import compile_native_game_boy_color
+    from .game_boy_native_export import compile_native_game_boy
+    from .nes_native_export import compile_native_nes
+    from .platform_registry import default_registry
     from .playable_world import GameBuildIntent, generate_playable_world
     from .port_planner import HomebrewSource
-    from .platform_registry import default_registry
-    from .studio_asset_pipeline import ArtDirection, render_studio_art, _palette
-    from .studio_sprite_authoring import typed_artist_tiles
-    from .game_boy_native_export import compile_native_game_boy
-    from .game_boy_color_native_export import compile_native_game_boy_color
-    from .nes_native_export import compile_native_nes
-    from .sms_native_export import compile_native_sms
     from .sega_8bit_native_export import compile_native_sega_8bit
+    from .sms_native_export import compile_native_sms
+    from .studio_asset_pipeline import ArtDirection, _palette, render_studio_art
+    from .studio_sprite_authoring import typed_artist_tiles
 
     targets = {
         "nintendo_game_boy": "main.asm",
@@ -528,6 +719,7 @@ def _stage_console_art_source(workspace, project, args, *, with_artist=False):
     if target in ("nintendo_game_boy", "nintendo_game_boy_color",
                   "nintendo_famicom"):
         from skeleton.jeeves.game_console_assets import decode_tiles
+
         from .studio_native_psg import compose_native_psg
         hero_frames = decode_tiles(
             dict(pack.files)["tiles/hero_animation.bin"], pack.codec,
@@ -570,13 +762,13 @@ def _stage_console_art_source(workspace, project, args, *, with_artist=False):
     expected_art = canonical_digest([list(tile) for tile in pack.runtime_tiles])
     if manifest.get("generated_runtime_art_tile_digest") != expected_art:
         raise JeevesAppCapabilityError("native producer omitted or mutated original sprite pixels")
-    if psg is not None:
-        if (manifest.get("native_hero_animation_frames") != art.animation_frames
+    if (psg is not None
+            and (manifest.get("native_hero_animation_frames") != art.animation_frames
                 or manifest.get("native_hero_animation_frame_delay") != frame_delay
                 or manifest.get("native_psg_score_digest") != psg.digest
                 or manifest.get("original_native_psg_integrated")
-                != (psg.density > 0)):
-            raise JeevesAppCapabilityError("generated native animation/audio content lost")
+                != (psg.density > 0))):
+        raise JeevesAppCapabilityError("generated native animation/audio content lost")
     if len(text.encode("utf-8")) > 240_000:
         raise JeevesAppCapabilityError("generated native file exceeds reviewed source capacity")
     path = "game/native/" + target + "/" + targets[target]
@@ -655,7 +847,11 @@ def _propose_source(workspace,project,args,authorized):
 def _simulate_companion(args):
     _exact(args,("owner","events"),"Dragon companion rehearsal")
     from skeleton.ai.webcrawler.dragon_companion_runtime import (
-        new_companion, transition, DragonEvent, animation_frame)
+        DragonEvent,
+        animation_frame,
+        new_companion,
+        transition,
+    )
     owner=_plain(args["owner"],"companion owner",128)
     events=args["events"]
     if type(events) is not list or len(events)>16:
@@ -697,7 +893,7 @@ def _review_forge_graph(args):
         raise JeevesAppCapabilityError("finite original forge components required")
     if type(wires) is not list or len(wires)>128:
         raise JeevesAppCapabilityError("bounded forge port connections required")
-    from skeleton.ai.forge.universal import Forge, Blueprint
+    from skeleton.ai.forge.universal import Blueprint, Forge
     forge=Forge()
     # Pure, ephemeral graph; no new on-disk project, no event bus.
     blueprint=Blueprint(blueprint_id="jeeves_ephemeral",name=name,created_at=0.0)
@@ -804,18 +1000,23 @@ def _improvement_proposal(project,args):
     return {**body,"digest":canonical_digest(body)}
 
 
-def dispatch_app_action(workspace,project,action,args,*,authorized=False):
+def dispatch_app_action(workspace,project,action,args,*,authorized=False,
+                        expected_catalog_digest=None):
     """One exact typed capability invocation; no free-form model tool execution."""
     _project(workspace,project)
     if type(action) is not str or action not in ACTIONS:
         raise JeevesAppCapabilityError("unregistered Jeeves app action")
-    if type(args) is not dict or len(args)>12:
+    if type(args) is not dict or len(args)>16:
         raise JeevesAppCapabilityError("bounded typed Jeeves action arguments required")
     if type(authorized) is not bool:
         raise JeevesAppCapabilityError("explicit actor authorization required")
     _,_,effect,needs_operator=ACTIONS[action]
     if needs_operator and not authorized:
         raise PermissionError("operator authorization is required for this capability")
+    request = compose_app_request(
+        workspace, project, action, args,
+        expected_catalog_digest=expected_catalog_digest)
+    args = request["args"]
     if action=="atlas.summary":
         _exact(args,(),"app summary request")
         result=app_atlas()
@@ -920,9 +1121,17 @@ def dispatch_app_action(workspace,project,action,args,*,authorized=False):
         result=_improvement_proposal(project,args)
     else:
         raise JeevesAppCapabilityError("no audited adapter installed for action")
+    _project(workspace, project)
+    if canonical_digest(args) != request["arguments_digest"]:
+        raise JeevesAppCapabilityError("adapter changed its frozen request arguments")
+    if capability_catalog()["digest"] != request["catalog_digest"]:
+        raise JeevesAppCapabilityError("capability source changed during dispatch; refresh evidence")
     body={
         "schema":ACTION_SCHEMA,"project":project,"action":action,
-        "effect":effect,"arguments_digest":canonical_digest(args),
+        "catalog_digest":request["catalog_digest"],
+        "request_digest":request["digest"],
+        "catalog_pin_requested":expected_catalog_digest is not None,
+        "effect":effect,"arguments_digest":request["arguments_digest"],
         "result":result,
         "runtime_adapter_executed":True,
         "source_files_committed":False,

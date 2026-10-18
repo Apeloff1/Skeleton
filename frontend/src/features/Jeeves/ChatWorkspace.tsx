@@ -8,10 +8,16 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import StudioLoginGate from '../../auth/StudioLoginGate';
 import { getAuthToken } from '../../auth/gameforgeAuth';
-import { accountChatStorage, archiveCanonicalChat, deleteCanonicalChat, renameCanonicalChat, cancelCanonicalChat, canonicalChatHistory, canonicalChatLibrary, getChatReadiness, exportCanonicalChat, sendCanonicalChat, verifiedChatScope, type ChatReadiness } from '../../product/chatSessionClient';
+import { accountChatStorage, archiveCanonicalChat, deleteCanonicalChat, renameCanonicalChat, cancelCanonicalChat, canonicalChatHistory, canonicalChatLibrary, exportCanonicalChat, sendCanonicalChat, verifiedChatScope } from '../../product/chatSessionClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
 import JeevesRuntimeStatus from './JeevesRuntimeStatus';
+import ChatModelCapabilities from './ChatModelCapabilities';
+import ChatCooperationDetails from './ChatCooperationDetails';
+import ChatResponseReviewControl from './ChatResponseReviewControl';
+import { cooperationConfigurationIssues, reviewedResponsePolicy } from '../../product/chatCooperation';
+import { useChatReadiness } from '../../product/useChatReadiness';
+import { chatProgressLabel } from '../../product/chatProgress';
 import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
@@ -70,6 +76,7 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
       </View>
       {!user && message.model && <Text style={s.metadata}>{message.model}{message.tier ? ` · ${message.tier}` : ''}</Text>}
       <MessageContent text={message.text} notify={controller.notify} />
+      {message.cooperation && <ChatCooperationDetails summary={message.cooperation} stopped={user && failed && message.terminal === true} />}
       {!user && message.status === 'complete' && <ChatTaskActions
         text={message.text} conversationId={controller.active.id}
         messageId={message.id} notify={controller.notify} />}
@@ -154,7 +161,10 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     accountChatStorage(scope), sendCanonicalChat, canonicalChatHistory,
     { cancel: cancelCanonicalChat, library: canonicalChatLibrary, archive: archiveCanonicalChat, remove: deleteCanonicalChat, rename: renameCanonicalChat },
   ));
-  const [readiness, setReadiness] = useState<ChatReadiness | null>(null);
+  const { readiness, refresh: refreshModels } = useChatReadiness();
+  const [reviewResponse, setReviewResponse] = useState(false);
+  const [reviewPolicy, setReviewPolicy] = useState(reviewedResponsePolicy);
+  const [reviewFieldError, setReviewFieldError] = useState<string | null>(null);
   const [model, setModel] = useState<string>('automatic');
   const [modelPicker, setModelPicker] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -162,12 +172,11 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
   const [knowledge, setKnowledge] = useState(false);
   const [knowledgeQuery, setKnowledgeQuery] = useState('');
   const selectedModel = readiness?.models.models.find(row => row.id === model);
-  const modelReady = readiness?.available === true && (model === 'automatic' ? readiness.models.automatic_available : selectedModel?.selectable === true);
-  const refreshModels = React.useCallback(async () => {
-    try { const value = await getChatReadiness(); if (scope.token !== getAuthToken()) return; setReadiness(value); }
-    catch { if (scope.token === getAuthToken()) setReadiness(null); }
-  }, [scope.token]);
-  useFocusEffect(React.useCallback(() => { void refreshModels(); }, [refreshModels]));
+  const modelReady = readiness?.available === true && (model === 'automatic' ? readiness.models.automatic_available : selectedModel?.selectable === true && selectedModel.available);
+  const answerTokenLimit = selectedModel ? Math.min(outputTokens, selectedModel.max_output_tokens, 16384) : undefined;
+  const reviewAvailable = readiness?.capabilities.cooperative_review === true;
+  const reviewIssues = cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], answerTokenLimit);
+  const reviewBudgetReady = !reviewResponse || reviewAvailable && !reviewFieldError && reviewIssues.length === 0;
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const conversation = controller.active;
   const busy = snapshot.busyId !== null;
@@ -201,6 +210,8 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
 
   const send = () => {
     if (!snapshot.ready || busy || !conversation.draft.trim()) return;
+    if (reviewResponse && !reviewAvailable) { controller.notify('Response review is unavailable. Refresh readiness or turn off review to continue.'); return; }
+    if (!reviewBudgetReady) { controller.notify(reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.'); return; }
     if (!modelReady) { controller.notify('Choose a ready model or open Setup to finish the AI connection.'); return; }
     if (knowledge && !knowledgeQuery.trim()) { controller.notify('Enter a query for the explicit captured-knowledge context.'); return; }
     let requestContext: string;
@@ -212,7 +223,8 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     }
     const pending = controller.send(undefined, {
       context: requestContext,
-      ...(selectedModel ? { provider_id: selectedModel.provider_id, model_id: selectedModel.model_id, max_output_tokens: Math.min(outputTokens, selectedModel.max_output_tokens, 16384) } : {}),
+      ...(reviewResponse ? { cooperation: reviewPolicy } : {}),
+      ...(selectedModel ? { provider_id: selectedModel.provider_id, model_id: selectedModel.model_id, max_output_tokens: answerTokenLimit } : {}),
       ...(knowledge ? { crawler_context: { query: knowledgeQuery.trim(), max_documents: 4, max_characters: 16000 } } : {}),
     });
     void pending;
@@ -263,7 +275,8 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
           <Text style={s.emptyText}>Replies come from the configured AI engine. Its real state is shown while a turn runs; the final answer appears when it is committed to your conversation.</Text>
         </View>}
         {conversation.messages.map(message => <MessageCard key={message.id} message={message} controller={controller} busy={busy} />)}
-        {busy && <View style={s.composing}><ActivityIndicator color={C.purple} /><Text style={s.small}>{chatStateLabel(snapshot.progress?.state)}</Text><Button icon="stop-outline" label={snapshot.progress?.state === 'cancelling' ? 'Stopping…' : 'Stop'} disabled={snapshot.progress?.state === 'cancelling'} onPress={() => { void controller.cancel(); }} /></View>}
+        {busy && snapshot.progress?.cooperation && <ChatCooperationDetails summary={snapshot.progress.cooperation} />}
+        {busy && <View style={s.composing}><ActivityIndicator color={C.purple} /><Text style={s.small}>{chatProgressLabel(snapshot.progress?.state)}</Text><Button icon="stop-outline" label={snapshot.progress?.state === 'cancelling' ? 'Stopping…' : 'Stop'} disabled={snapshot.progress?.state === 'cancelling'} onPress={() => { void controller.cancel(); }} /></View>}
       </ScrollView>
       <View style={s.composer} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}>
         {knowledge && <View style={{ gap: 6 }}><Text style={s.small}>Explicitly retrieve from your captured sources for this message. External text remains source material.</Text><TextInput accessibilityLabel="Captured knowledge query" value={knowledgeQuery} onChangeText={setKnowledgeQuery} maxLength={1024} style={s.field} placeholder="Search your captured sources…" placeholderTextColor={C.muted} /></View>}
@@ -275,8 +288,11 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
         <View style={s.composerActions}>
           <Button icon="library-outline" label="Captured context" selected={knowledge} disabled={busy || readiness?.capabilities.crawler_context !== true || readiness?.checks.crawler?.available !== true} onPress={() => setKnowledge(value => !value)} />
           <View style={s.flex} />
-          <TouchableOpacity onPress={send} disabled={busy || !modelReady || !conversation.draft.trim()} style={[s.send, (busy || !modelReady || !conversation.draft.trim()) && s.disabled]} accessibilityRole="button" accessibilityLabel="Send message" testID="chat-send"><Ionicons name="arrow-up" size={22} color={C.bg} /></TouchableOpacity>
+          <TouchableOpacity onPress={send} disabled={busy || !modelReady || !reviewBudgetReady || !conversation.draft.trim()} style={[s.send, (busy || !modelReady || !reviewBudgetReady || !conversation.draft.trim()) && s.disabled]} accessibilityRole="button" accessibilityLabel="Send message" testID="chat-send"><Ionicons name="arrow-up" size={22} color={C.bg} /></TouchableOpacity>
         </View>
+        <ChatResponseReviewControl enabled={reviewResponse} change={setReviewResponse} disabled={busy} available={reviewAvailable} answerTokenLimit={answerTokenLimit}
+          policy={reviewPolicy} changePolicy={setReviewPolicy} models={readiness?.models.models ?? []} mainModel={selectedModel}
+          fieldError={reviewFieldError} changeFieldError={setReviewFieldError} issues={reviewIssues} refreshModels={refreshModels} />
         <Text style={s.composerHint}>{`${conversation.draft.length.toLocaleString()} / 16,000 · Text chat · Saved account history${Platform.OS === 'web' ? ' · Ctrl/Cmd+Enter to send' : ''}`}</Text>
       </View>
     </KeyboardAvoidingView>}
@@ -287,7 +303,7 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
       <Button icon="refresh-outline" label="Refresh models" onPress={() => void refreshModels()} />
       <Button icon="git-branch-outline" label="Automatic engine route" selected={model === 'automatic'} disabled={!readiness?.models.automatic_available} onPress={() => { setModel('automatic'); setModelPicker(false); }} />
       {!readiness && <Text style={s.error}>The configured model catalog could not be observed. Open Setup and refresh.</Text>}
-      {readiness?.models.models.map(row => <View key={row.id} style={s.artifact}><Text style={s.label}>{row.label}</Text><Text style={s.small}>{row.readiness.message}{row.credential_free ? ' · Local, no hosted credential required' : ''}</Text>{row.readiness.action && <Text style={s.small}>{row.readiness.action}</Text>}<Text style={s.small}>Context {row.context_window.toLocaleString()} tokens · Output up to {row.max_output_tokens.toLocaleString()}</Text><Button icon="checkmark-outline" label={row.selectable ? model === row.id ? 'Selected' : 'Use model' : 'Unavailable'} disabled={!row.selectable} selected={model === row.id} onPress={() => { setModel(row.id); setOutputTokens(Math.min(row.default_output_tokens, row.max_output_tokens, 16384)); }} /></View>)}
+      {readiness?.models.models.map(row => <View key={row.id} style={s.artifact}><Text style={s.label}>{row.label}</Text><Text style={s.small}>{row.readiness.message}{row.credential_free ? ' · Local, no hosted credential required' : ''}</Text>{row.readiness.action && <Text style={s.small}>{row.readiness.action}</Text>}<ChatModelCapabilities modelFamily={row.model_family} capabilities={row.capabilities} contextWindow={row.context_window} outputLimit={row.max_output_tokens} /><Button icon="checkmark-outline" label={row.selectable ? model === row.id ? 'Selected' : 'Use model' : 'Unavailable'} disabled={!row.selectable} selected={model === row.id} onPress={() => { setModel(row.id); setOutputTokens(Math.min(row.default_output_tokens, row.max_output_tokens, 16384)); setModelPicker(false); }} /></View>)}
       {selectedModel && <><Text style={s.label}>Maximum answer tokens</Text><View style={s.row}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= selectedModel.max_output_tokens).map(value => <Button key={value} icon="text-outline" label={String(value)} selected={outputTokens === value} onPress={() => setOutputTokens(value)} />)}</View></>}
       <Text style={s.small}>Attachments and all-forms generation are unavailable in canonical chat. No file is uploaded from this screen.</Text>
       <Button icon="settings-outline" label="Setup & readiness" onPress={() => { setModelPicker(false); router.push('/setup' as never); }} />
@@ -309,9 +325,6 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
   </SafeAreaView>;
 }
 
-function chatStateLabel(state?: string): string {
-  return ({ connecting: 'Connecting to your conversation…', prepared: 'Conversation saved; preparing admission…', reconnecting: 'Connection interrupted; reconnecting to the saved turn…', awaiting_admission: 'Saved; waiting for engine admission…', admitted: 'Turn admitted', accepted: 'Turn accepted', context_compiling: 'Preparing the authorized context…', routing: 'Selecting the configured model…', model_running: 'Model is running…', verifying: 'Checking the actual result…', finalizing: 'Saving the final answer…', finalization_in_progress: 'Saving the final answer…', cancelling: 'Stop requested; waiting for confirmation…', cancellation_unconfirmed: 'Stop not confirmed; checking server…' } as Record<string, string>)[state || ''] || (state ? `Server state: ${state.replaceAll('_', ' ')}` : 'Following the saved turn…');
-}
 function AccountChat() {
   const router = useRouter();
   const [scope, setScope] = useState<{ key: string; token: string } | null>(null);

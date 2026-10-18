@@ -778,7 +778,7 @@ def studio_application_schemas() -> dict[str, Any]:
     }
     shapes["world.edit"][
         "x-invariants"
-    ] = "Select exactly one of complete changes or1..64 typed edits. set_field targets only an existing editable field; upsert_entity uses a complete inspected entity; remove_entity uses exact ID; paint_terrain changes at most256 existing cells. Full canonical geometry/mechanics validation and exact spec/version CAS still apply. Origins and runtime identity are immutable."
+    ] = "Select exactly one of complete changes,1..64 typed edits,or restore_review_job_id referencing an actual completed scoped original review. Restoration rechecks live source/teacher/policy authority and preserves immutable world identity/origins, including removal of optional sections absent in the reference; source revisions remain monotonic. set_field targets only an existing editable field; upsert_entity uses a complete inspected entity; remove_entity uses exact ID; paint_terrain changes at most256 existing cells. Full canonical geometry/mechanics validation and exact spec/version CAS still apply."
     shapes["world.edit"]["x-owner-edit-examples"] = [
         {"op": "set_field", "path": ["mechanics", "movement", "max_speed"], "value": 175},
         {"op": "set_field", "path": ["fidelity"], "value": {"profile": "enhanced"}},

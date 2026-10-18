@@ -153,7 +153,7 @@
     "skeleton/app/plan.py",
     "skeleton/api/server.py",
     "frontend/app/product.tsx",
-    "frontend/utils/apiBase.ts",
+    "frontend/src/utils/apiBase.ts",
     "frontend/nginx.conf",
     "backend/core/product_kernel.py",
     "backend/core/canonical_product_policy.py",

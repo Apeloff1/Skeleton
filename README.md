@@ -168,6 +168,18 @@ Original-world completion tracks saved edits, positive simulation, measured revi
 a compiled desktop package, and source/package export preparation. The console
 editor reports approved cores, content and toolchain readiness separately.
 
+Enable **Review and refine** in chat for a bounded plan, draft, critique and
+refinement workflow. The stages share the original request, source snapshot,
+deadline and resource allowance. Live progress and final details show actual
+provider receipts and model identities. Configure roles and recovery using the
+[cooperative AI guide](docs/ai/COOPERATIVE_AI_EXECUTION.md).
+
+Studio goals can opt into [measured quality refinement](docs/ai/STUDIO_MEASURED_QUALITY.md):
+pin a baseline review, edit the original source, compare a candidate under the
+same simulation protocol, and restore the baseline source when a candidate
+regresses. Lessons retain their source and review references for compatible
+future work. Continuation uses the existing finite grant.
+
 See [crawler, builder and training operations](docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md)
 and [native prerequisites](docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).
 The [creation capability index](docs/creation/CAPABILITY_INDEX.md) covers design
