@@ -189,6 +189,23 @@ def app_and_calls(monkeypatch):
     return app, calls
 
 
+
+def test_presence_http_snapshot_is_scoped_to_verified_attester(app_and_calls):
+    app, _calls = app_and_calls
+    hub = app.state.realtime_hub
+    hub.presence("join", client_id="private-a", principal="alice", meta={"note": "alice"})
+    hub.presence("join", client_id="private-b", principal="bob", meta={"note": "bob"})
+    client = TestClient(app)
+    alice = client.get("/api/v1/presence?scope=app", headers={"x-zaibatsu-attester": "alice"})
+    bob = client.get("/api/v1/presence?scope=app", headers={"x-zaibatsu-attester": "bob"})
+    missing = client.get("/api/v1/presence?scope=app")
+    assert alice.status_code == bob.status_code == 200
+    assert [m["client_id"] for m in alice.json()["members"]] == ["private-a"]
+    assert [m["client_id"] for m in bob.json()["members"]] == ["private-b"]
+    assert missing.status_code == 401
+
+
+
 def test_job_id_stream_requires_actor_and_tenant(app_and_calls):
     app, calls = app_and_calls
     r = TestClient(app).get("/api/v1/events?job_id=job-a", headers={"x-zaibatsu-attester": "bob"})
