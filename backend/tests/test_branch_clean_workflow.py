@@ -134,7 +134,7 @@ def test_branch_cleanup_trigger_is_bounded() -> None:
     assert "on:\n  workflow_dispatch:" in trigger
     assert "workflow_run:" not in trigger
     assert "schedule:" not in trigger
-    assert "group: branch-clean-v4-\u0024{{ github.repository }}" in trigger
+    assert "group: branch-clean-v4-${{ github.repository }}" in trigger
     assert "cancel-in-progress: false" in trigger
     assert "runs-on: ubuntu-24.04-arm" in text
     assert "timeout-minutes: 15" in text
