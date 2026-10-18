@@ -14,10 +14,16 @@ import json
 import math
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from skeleton.cortex.distill import Ability, distill_dialect
+from skeleton.cortex.distill import Ability
 from skeleton.cortex.laws import check
-from skeleton.cortex.port import Thought, jaccard, tokens
+from skeleton.cortex.port import Thought, fingerprint, jaccard, tokens
 from skeleton.forge.eras import ERA_IDS
+
+
+def distill_dialect(text: str) -> str:
+    """Normalize arbitrary text into compact house-dialect tokens."""
+    toks = tokens(str(text or ""))
+    return (" ".join(toks) if toks else str(text or "").strip())[:160]
 
 def _era_hit(tags: Iterable[str], stim_toks: set) -> bool:
     tagset = set(tags or ())
@@ -1414,17 +1420,20 @@ class AdaptiveSequentialDecompiler:
         semantic_summary = " ; ".join(p["primitive"] for p in lifted_primitives)
 
         if neo is not None and hasattr(neo, "own"):
+            stim_str = f"decompile {filename} {detected_arch} {semantic_summary}"
             neo.own.ingest(
                 Ability(
-                    id=f"decomp:{digest[:12]}",
-                    name=f"decompiled_{detected_arch}",
-                    source="own:decompiler",
+                    slot="left",
+                    stimulus_fp=fingerprint(stim_str),
+                    signature=f"decomp:{digest[:12]}",
+                    kind="decompiler",
+                    text=f"ARCH {detected_arch} | PRIMITIVES {semantic_summary}"[:160],
                     tags=("decompiler", detected_arch, "cfg", "game_loop"),
-                    pattern=f"ARCH {detected_arch} | PRIMITIVES {semantic_summary}",
-                    confidence=pass_history[-1]["confidence"],
                     numbers=(float(len(raw)), float(len(instructions)), float(len(basic_blocks))),
+                    confidence=pass_history[-1]["confidence"],
+                    tokens=tokens(stim_str),
                 ),
-                stimulus=f"decompile {filename} {detected_arch} {semantic_summary}",
+                stimulus=stim_str,
             )
 
         return {
