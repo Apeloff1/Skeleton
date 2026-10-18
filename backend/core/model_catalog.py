@@ -10,6 +10,7 @@ import hashlib
 import asyncio
 import json
 import re
+from dataclasses import replace
 from collections.abc import Mapping
 from typing import Any
 
@@ -71,6 +72,10 @@ _READINESS = {
         "The local model artifact could not be loaded safely.",
         "Ask an administrator to replace the artifact with a valid governed model and restart the engine.",
     ),
+    "local_artifact_identity_invalid": (
+        "The activated local model identity changed.",
+        "Ask an administrator to verify its artifact and restart the engine.",
+    ),
     "local_external_fallback_denied": (
         "Local mode contains an unsupported hosted fallback configuration.",
         "Ask an administrator to remove external fallback settings from local mode.",
@@ -110,6 +115,14 @@ _READINESS = {
     "model_temperature_unsupported": (
         "The selected model does not support temperature settings.",
         "Use its default sampling settings or choose a supported model.",
+    ),
+    "cooperation_budget_insufficient": (
+        "The selected output allowance is too small for every requested review stage.",
+        "Increase the output allowance or choose fewer review rounds.",
+    ),
+    "cooperation_context_too_small": (
+        "The selected context cannot reserve enough room for review artifacts and control policy.",
+        "Choose a larger model context or a smaller output allowance.",
     ),
 }
 
@@ -155,7 +168,9 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
     schema = _text(value.get("schema"), maximum=128)
     if schema not in {
         "reference_ngram",
+        "skeleton.reference_ngram.v1",
         "skeleton.numpy_recurrent_lm.v1",
+        "skeleton.ai.native-llm-runtime.v2",
         "skeleton.local_model.deployment.v1",
     }:
         raise EngineProtocolError("model catalog artifact schema is unsupported")
@@ -194,7 +209,10 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
         "schema": schema,
         "model_id": artifact_model,
         **digests,
-        "artifact_bytes": _integer(value.get("artifact_bytes"), maximum=128 * 1024 * 1024),
+        "artifact_bytes": _integer(
+            value.get("artifact_bytes"),
+            maximum=1024**4 if schema == "skeleton.ai.native-llm-runtime.v2" else 128 * 1024 * 1024,
+        ),
         "reference": reference,
     }
 
@@ -280,17 +298,25 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
                 raise EngineProtocolError("ready provider has no model identity")
             continue
         context_window = _integer(raw.get("context_window"), maximum=1_048_576)
-        max_output = _integer(raw.get("max_output_tokens"), maximum=16_384)
+        max_output = _integer(raw.get("max_output_tokens"), maximum=131_072)
         default_output = _integer(raw.get("default_output_tokens"), maximum=max_output)
-        if raw.get("limits_source") != "engine_chat_policy":
+        limits_source = raw.get("limits_source")
+        if limits_source not in {"engine_chat_policy", "activated_local_backend"} or (
+            not local and limits_source != "engine_chat_policy"
+        ):
             raise EngineProtocolError("model inventory context/output capacity is invalid")
         if max_output >= context_window or default_output + 3072 >= context_window:
             available, code = False, "model_context_too_small"
             providers[-1].update(available=False, readiness=readiness(code))
         tokenizer = raw.get("tokenizer")
-        if tokenizer not in {"utf8_bytes", "reference_tokens", "approximate_text"} or (
-            not local and tokenizer != "approximate_text"
-        ):
+        if tokenizer not in {
+            "utf8_bytes",
+            "reference_tokens",
+            "approximate_text",
+            "native_tokenizer",
+            "utf8_byte_tokens",
+            "utf8_bytes_upper_bound",
+        } or (not local and tokenizer != "approximate_text"):
             raise EngineProtocolError("model inventory tokenizer profile is invalid")
         capabilities = raw.get("capabilities")
         supports_temperature = raw.get("supports_temperature")
@@ -302,6 +328,8 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             "image-variation",
             "image-editing",
             "speech-synthesis",
+            "tool-calls",
+            "structured-output",
         }
         if (
             not isinstance(capabilities, list)
@@ -328,13 +356,25 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             "context_window": context_window,
             "max_output_tokens": max_output,
             "default_output_tokens": default_output,
-            "limits_source": "engine_chat_policy",
+            "limits_source": limits_source,
             "tokenizer": tokenizer,
             "capabilities": list(capabilities),
             "supports_temperature": supports_temperature,
             "readiness": readiness(code),
             "activation": activation,
         }
+        family = raw.get("model_family")
+        if family is not None:
+            if family not in {
+                "native_transformer",
+                "gguf_open_weight",
+                "numpy_recurrent_baseline",
+                "reference_ngram",
+                "operator_callable",
+                "unavailable",
+            }:
+                raise EngineProtocolError("model inventory family is invalid")
+            row["model_family"] = family
         models.append(row)
         if row["active"]:
             active = {"provider_id": provider_id, "model_id": model_id}
@@ -417,7 +457,7 @@ def resolve_selection(
             raise ModelSelectionError("model_selection_unavailable", status_code=503)
         return {
             **selected,
-            "context_tokenizer": selected["tokenizer"],
+            "context_tokenizer": _context_tokenizer(selected["tokenizer"]),
             "selection_mode": "explicit",
             "selection_provider_id": provider_id,
             "selection_model_id": model_id,
@@ -434,7 +474,7 @@ def resolve_selection(
     if not ready:
         raise ModelSelectionError("no_ready_model", status_code=503)
     selected = next((row for row in ready if row["active"]), ready[0])
-    profiles = {row["tokenizer"] for row in routes}
+    profiles = {_context_tokenizer(row["tokenizer"]) for row in routes}
     context_tokenizer = next(iter(profiles)) if len(profiles) == 1 else "utf8_bytes"
     # Automatic routing can use only declared fallbacks. Compile to the lowest
     # capacity among those routes while leaving dispatch selection unset.
@@ -449,6 +489,14 @@ def resolve_selection(
         "selection_provider_id": None,
         "selection_model_id": None,
     }
+
+
+def _context_tokenizer(profile: str) -> str:
+    """The backend never impersonates an engine-owned native tokenizer."""
+
+    if profile in {"native_tokenizer", "utf8_byte_tokens", "utf8_bytes_upper_bound"}:
+        return "utf8_bytes"
+    return profile
 
 
 def context_budget_for_selection(
@@ -472,6 +520,63 @@ def context_budget_for_selection(
         max_artifact_tokens=min(16_000, input_capacity),
         max_tool_result_tokens=min(16_000, input_capacity),
     )
+
+
+def cooperation_context_selection(
+    catalog: Mapping[str, Any],
+    selection: Mapping[str, Any],
+    cooperation: Mapping[str, Any] | None,
+    *,
+    output_tokens: int | None = None,
+) -> dict[str, Any]:
+    """Fit one immutable context to every explicitly selected cooperative role.
+
+    Role identity is resolved through the same scoped inventory as ordinary
+    chat. Output remains the primary operation's aggregate allowance; this
+    projection never multiplies it by the number of model stages.
+    """
+
+    if cooperation is None:
+        return dict(selection)
+    from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+    policy = normalize_cooperation_policy(cooperation)
+    output = selection["default_output_tokens"] if output_tokens is None else output_tokens
+    if type(output) is not int or output < 64 * (2 + 2 * policy["review_rounds"]):
+        raise ModelSelectionError("cooperation_budget_insufficient")
+    rows = [selection]
+    for pair in policy["roles"].values():
+        row = resolve_selection(catalog, provider_id=pair["provider_id"], model_id=pair["model_id"])
+        # The requested stage limit is a ceiling, not a new operation budget.
+        context_budget_for_selection(
+            row,
+            output_tokens=min(policy["max_stage_output_tokens"], row["max_output_tokens"]),
+        )
+        rows.append(row)
+    profiles = {row["context_tokenizer"] for row in rows}
+    return {
+        **selection,
+        "context_window": min(row["context_window"] for row in rows),
+        "context_tokenizer": next(iter(profiles)) if len(profiles) == 1 else "utf8_bytes",
+        "supports_temperature": all(row["supports_temperature"] for row in rows),
+    }
+
+
+def cooperation_context_budget(budget: ContextBudget, cooperation: Mapping[str, Any] | None) -> ContextBudget:
+    """Reserve finite compiler slack for generated review material and framing."""
+
+    if cooperation is None:
+        return budget
+    from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+    policy = normalize_cooperation_policy(cooperation)
+    stages = 2 + 2 * policy["review_rounds"]
+    stage_output = min(policy["max_stage_output_tokens"], budget.reserved_output_tokens // stages)
+    headroom = min(4096, max(1024, 2 * stage_output + 128 * stages))
+    reserve = budget.reserved_policy_tokens + headroom
+    if reserve + 512 >= budget.input_capacity(tools_enabled=False):
+        raise ModelSelectionError("cooperation_context_too_small")
+    return replace(budget, reserved_policy_tokens=reserve)
 
 
 def estimate_context_tokens(text: str, selection: Mapping[str, Any]) -> int:

@@ -17,6 +17,8 @@ import base64
 import binascii
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import math
 import os
 from time import monotonic
@@ -524,11 +526,26 @@ def command_from_context(
     context_seed_refs: Sequence[str] = (),
     memory_write_intent: Mapping[str, Any] | None = None,
     structured_output_schema: Mapping[str, Any] | None = None,
+    cooperation: Mapping[str, Any] | None = None,
 ) -> EngineExecutionCommand:
     """Build a digest-bound engine command from one immutable context snapshot."""
 
     if not isinstance(context, ContextEnvelope):
         raise TypeError("context must be ContextEnvelope")
+    normalized_cooperation = None
+    if cooperation is not None:
+        from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+        try:
+            normalized_cooperation = normalize_cooperation_policy(cooperation)
+        except (TypeError, ValueError) as exc:
+            raise EngineProtocolError("cooperation policy is invalid") from exc
+        if tools:
+            raise EngineProtocolError("cooperative text review cannot execute tools")
+        max_model_turns = max(
+            _positive_int(max_model_turns, "max_model_turns", maximum=64),
+            2 + 2 * normalized_cooperation["review_rounds"],
+        )
     actor = _text(actor_id, "actor_id", maximum=512)
     cap = _text(capability, "capability", maximum=256)
     idem = _text(idempotency_key, "idempotency_key", maximum=1024)
@@ -808,6 +825,13 @@ def command_from_context(
     }
     if resolved_output_tokens > 0:
         resource_budget["max_output_tokens"] = resolved_output_tokens
+    if normalized_cooperation is not None:
+        # Each finite stage is admitted once; this increases neither aggregate
+        # output tokens nor the operation's original wall/cost allowance.
+        resource_budget["max_provider_attempts"] = 2 + 2 * normalized_cooperation["review_rounds"]
+        if resolved_output_tokens < 64 * resource_budget["max_provider_attempts"]:
+            raise EngineProtocolError("output allowance cannot cover every cooperation stage")
+        resource_budget["max_input_tokens"] = input_capacity * resource_budget["max_provider_attempts"]
     stop_policy = {
         "max_repeat_tool_batches": _positive_int(
             max_repeat_tool_batches,
@@ -885,12 +909,24 @@ def command_from_context(
 
     if structured_output_schema is not None:
         from skeleton.skills.tool_contract import validate_json_schema
-        import json
 
         encoded_schema = json.dumps(dict(structured_output_schema), allow_nan=False, ensure_ascii=False)
         if len(encoded_schema.encode()) > 65536:
             raise EngineProtocolError("structured output schema exceeds64KiB")
         context_policy["structured_output_schema"] = validate_json_schema(json.loads(encoded_schema))
+    if normalized_cooperation is not None:
+        context_policy["cooperation"] = normalized_cooperation
+        context_policy["provider_input_limit"] = input_capacity
+        context_policy["cooperation_brief_digest"] = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+        context_policy["cooperation_history_digest"] = hashlib.sha256(
+            json.dumps(
+                [{"role": role, "content": content} for role, content in normalized_history],
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
     execution_request = AIExecutionRequest(
         operation_id=context.operation_id,
         execution_id=context.execution_id,

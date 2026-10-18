@@ -31,8 +31,13 @@ from typing import Any, Protocol
 from skeleton.provider_runtime import (
     ProviderAdapter,
     ProviderPolicyError,
+    ProviderProtocolViolationError,
     ProviderRequest,
     ProviderResponse,
+    ProviderUnavailableError,
+    _provider_tool_choice_payload,
+    _provider_tool_definitions,
+    _validate_request,
 )
 from skeleton.providers.contract import FinishReason, ProviderToolCall, ProviderUsage
 from skeleton.skills.tool_contract import ToolContractError, validate_json_value
@@ -43,6 +48,10 @@ _EOS = "<|eos|>"
 
 class LocalInferenceCancelled(RuntimeError):
     """Cooperative local inference cancellation was observed."""
+
+
+class LocalInferenceOverloaded(ProviderUnavailableError):
+    """The configured local worker and waiting capacity is already reserved."""
 
 
 def _stable_json(value: object) -> str:
@@ -100,6 +109,8 @@ class LocalInferenceRequest:
     tools: tuple[Mapping[str, Any], ...] = ()
     structured_output_schema: Mapping[str, Any] | None = None
     context_digest: str | None = None
+    tool_choice: str = "auto"
+    specific_tool_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.prompt, str) or not self.prompt.strip():
@@ -131,7 +142,31 @@ class LocalInferenceRequest:
             len(marker) > 256 or any(0xD800 <= ord(char) <= 0xDFFF for char in marker) for marker in self.stop
         ):
             raise ValueError("stop supports at most 16 valid Unicode markers of 256 characters")
-        object.__setattr__(self, "tools", tuple(dict(item) for item in self.tools))
+        tools = tuple(json.loads(_stable_json(dict(item))) for item in self.tools)
+        if len(tools) > 256:
+            raise ValueError("local inference supports at most 256 offered tools")
+        if len(_stable_json(tools).encode("utf-8")) > 512 * 1024:
+            raise ValueError("local inference tools exceed size limit")
+        ids = [item.get("tool_id") for item in tools]
+        if any(not isinstance(tool_id, str) or not tool_id.strip() for tool_id in ids) or len(ids) != len(
+            set(ids)
+        ):
+            raise ValueError("local tools must have unique non-empty string tool_id values")
+        if self.tool_choice not in {"none", "auto", "required", "specific"}:
+            raise ValueError("invalid local tool_choice")
+        offered = {item.get("tool_id") for item in tools}
+        if self.tool_choice in {"required", "specific"} and not offered:
+            raise ValueError("local tool choice requires offered tools")
+        if self.tool_choice == "specific":
+            if not isinstance(self.specific_tool_id, str) or self.specific_tool_id not in offered:
+                raise ValueError("specific local tool choice must reference an offered tool")
+        elif self.specific_tool_id is not None:
+            raise ValueError("specific_tool_id requires specific local tool choice")
+        if self.tool_choice == "none":
+            tools = ()
+        elif self.tool_choice == "specific":
+            tools = tuple(item for item in tools if item["tool_id"] == self.specific_tool_id)
+        object.__setattr__(self, "tools", tools)
         if self.structured_output_schema is not None:
             if not isinstance(self.structured_output_schema, Mapping):
                 raise TypeError("structured_output_schema must be an object")
@@ -139,7 +174,7 @@ class LocalInferenceRequest:
             encoded = _stable_json(schema)
             if len(encoded.encode("utf-8")) > 512 * 1024:
                 raise ValueError("structured_output_schema exceeds size limit")
-            object.__setattr__(self, "structured_output_schema", schema)
+            object.__setattr__(self, "structured_output_schema", json.loads(encoded))
         if self.context_digest is not None and (
             len(self.context_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.context_digest)
         ):
@@ -168,6 +203,8 @@ class LocalInferenceRequest:
                 "tools": self.tools,
                 "structured_output_schema": self.structured_output_schema,
                 "context_digest": self.context_digest,
+                "tool_choice": self.tool_choice,
+                "specific_tool_id": self.specific_tool_id,
             }
         )
 
@@ -186,10 +223,17 @@ class LocalInferenceResult:
     latency_ms: float | None = None
     cached: bool = False
     execution_receipt_digest: str | None = None
+    usage_source: str = "local_model"
 
     def __post_init__(self) -> None:
         if not self.model_id.strip():
             raise ValueError("model_id must be non-empty")
+        if self.usage_source not in {"local_model", "local_model_estimate"}:
+            raise ValueError("invalid local inference usage_source")
+        if self.text is not None and (
+            not isinstance(self.text, str) or len(self.text.encode("utf-8")) > 4 * 1024 * 1024
+        ):
+            raise ValueError("local inference text must fit the 4 MiB output bound")
         if self.execution_receipt_digest is not None and (
             not isinstance(self.execution_receipt_digest, str)
             or len(self.execution_receipt_digest) != 64
@@ -217,6 +261,8 @@ class LocalInferenceResult:
         }:
             raise ValueError("invalid local finish_reason")
         supplied_calls = tuple(self.tool_calls)
+        if len(supplied_calls) > 256:
+            raise ValueError("local inference result exceeds tool-call protocol bound")
         if any(not isinstance(call, LocalToolCall) for call in supplied_calls):
             raise TypeError("tool_calls must contain LocalToolCall values")
         calls = tuple(replace(call) for call in supplied_calls)
@@ -231,9 +277,10 @@ class LocalInferenceResult:
             raise ValueError("local inference result must contain output")
         object.__setattr__(self, "tool_calls", calls)
         if self.structured_output is not None:
-            object.__setattr__(
-                self, "structured_output", json.loads(_stable_json(dict(self.structured_output)))
-            )
+            encoded = _stable_json(dict(self.structured_output))
+            if len(encoded.encode("utf-8")) > 4 * 1024 * 1024:
+                raise ValueError("local structured output exceeds 4 MiB output bound")
+            object.__setattr__(self, "structured_output", json.loads(encoded))
         if self.latency_ms is not None:
             latency = float(self.latency_ms)
             if not math.isfinite(latency) or latency < 0:
@@ -256,6 +303,18 @@ class LocalModelBackend(Protocol):
 
 class ReferenceNGramModel:
     """A tiny learned language model used as a portable local execution witness."""
+
+    model_family = "reference_ngram"
+    protocol_capabilities = ("text-generation",)
+    tokenizer_kind = "reference_tokens"
+
+    @staticmethod
+    def count_input_tokens(request: LocalInferenceRequest) -> int:
+        return len(_tokenize(request.rendered_input))
+
+    def assert_identity(self) -> None:
+        if _digest(self.to_dict(include_digest=False)) != self.model_digest:
+            raise ValueError("reference model content changed behind its digest")
 
     def __init__(
         self,
@@ -505,6 +564,7 @@ class CallableLocalModel:
         model_id: str,
         model_digest: str,
         runner: Callable[[LocalInferenceRequest, threading.Event], LocalInferenceResult],
+        protocol_capabilities: Sequence[str] = ("text-generation",),
     ) -> None:
         if not model_id.strip():
             raise ValueError("model_id must be non-empty")
@@ -513,6 +573,11 @@ class CallableLocalModel:
         self.model_id = model_id.strip()
         self._model_digest = model_digest
         self._runner = runner
+        capabilities = tuple(dict.fromkeys(protocol_capabilities))
+        if not capabilities or set(capabilities) - {"text-generation", "tool-calls", "structured-output"}:
+            raise ValueError("callable local model protocol capabilities are invalid")
+        self.protocol_capabilities = capabilities
+        self.model_family = "operator_callable"
 
     @property
     def model_digest(self) -> str:
@@ -539,11 +604,18 @@ class LocalInferenceEngine:
         cache_size: int = 128,
         max_concurrency: int = 1,
         max_batch_size: int = 256,
+        max_queue_size: int = 256,
     ) -> None:
         if not hasattr(model, "infer") or not hasattr(model, "model_digest"):
             raise TypeError("model must implement LocalModelBackend")
         if isinstance(cache_size, bool) or not isinstance(cache_size, int) or cache_size < 0:
             raise ValueError("cache_size must be a non-negative integer")
+        if (
+            isinstance(max_queue_size, bool)
+            or not isinstance(max_queue_size, int)
+            or not 0 <= max_queue_size <= 65536
+        ):
+            raise ValueError("max_queue_size must be an integer in [0, 65536]")
         for name, value, upper in (
             ("max_concurrency", max_concurrency, 32),
             ("max_batch_size", max_batch_size, 4096),
@@ -554,29 +626,87 @@ class LocalInferenceEngine:
         self.cache_size = cache_size
         self.max_concurrency = max_concurrency
         self.max_batch_size = max_batch_size
+        self.max_queue_size = max_queue_size
         self._execution_slots = threading.BoundedSemaphore(max_concurrency)
         self._cache: OrderedDict[str, LocalInferenceResult] = OrderedDict()
-        self._cache_lock = asyncio.Lock()
+        # Every critical section is synchronous. A thread lock, unlike an
+        # asyncio lock, has one authority across desktop/event-loop lifetimes.
+        self._cache_lock = threading.Lock()
+        self._capacity_lock = threading.Lock()
+        self._active = 0
+        self._queued = 0
+        self._completed = 0
+        self._failed = 0
+        self._cancelled = 0
+        self._overloaded = 0
+        self._cache_hits = 0
+
+    def snapshot(self) -> dict[str, int]:
+        """Return bounded operational counts without prompts or model output."""
+        with self._capacity_lock:
+            snapshot = {
+                "active": self._active,
+                "queued": self._queued,
+                "completed": self._completed,
+                "failed": self._failed,
+                "cancelled": self._cancelled,
+                "overloaded": self._overloaded,
+                "cache_hits": self._cache_hits,
+            }
+        with self._cache_lock:
+            snapshot["cache_entries"] = len(self._cache)
+        return snapshot
+
+    def _reserve(self) -> None:
+        with self._capacity_lock:
+            if self._active + self._queued >= self.max_concurrency + self.max_queue_size:
+                self._overloaded += 1
+                raise LocalInferenceOverloaded("local inference waiting capacity is full")
+            self._queued += 1
 
     def _infer_admitted(
         self,
         request: LocalInferenceRequest,
         cancel: threading.Event,
+        started: threading.Event,
     ) -> LocalInferenceResult:
-        # A thread semaphore is shared across event loops. Desktop callers
-        # can create a new asyncio loop per turn without weakening capacity.
-        while not self._execution_slots.acquire(timeout=0.05):
-            if cancel.is_set():
-                raise LocalInferenceCancelled("local inference cancelled while queued")
+        started.set()
         try:
             if cancel.is_set():
                 raise LocalInferenceCancelled("local inference cancelled before execution")
             result = self.model.infer(request, cancel)
             if not isinstance(result, LocalInferenceResult):
                 raise TypeError("local backend must return LocalInferenceResult")
+            with self._capacity_lock:
+                self._completed += 1
             return result
+        except LocalInferenceCancelled:
+            with self._capacity_lock:
+                self._cancelled += 1
+            raise
+        except BaseException:
+            with self._capacity_lock:
+                self._failed += 1
+            raise
         finally:
+            with self._capacity_lock:
+                self._active -= 1
             self._execution_slots.release()
+
+    async def _acquire_execution_slot(self) -> None:
+        # Keep waiting requests off the process-wide default executor. The
+        # same thread semaphore still fences capacity across event loops.
+        try:
+            while not self._execution_slots.acquire(blocking=False):
+                await asyncio.sleep(0.01)
+        except asyncio.CancelledError:
+            with self._capacity_lock:
+                self._queued -= 1
+                self._cancelled += 1
+            raise
+        with self._capacity_lock:
+            self._queued -= 1
+            self._active += 1
 
     @staticmethod
     async def _await_worker(worker: asyncio.Task[Any], cancel: threading.Event) -> Any:
@@ -629,7 +759,7 @@ class LocalInferenceEngine:
             raise TypeError("request must be LocalInferenceRequest")
         key = self._key(request)
         if self.cache_size:
-            async with self._cache_lock:
+            with self._cache_lock:
                 cached = self._cache.get(key)
             if cached is not None:
                 admit_cached = getattr(self.model, "assert_identity", None)
@@ -638,19 +768,36 @@ class LocalInferenceEngine:
                     await self._await_worker(admission, threading.Event())
                 if self._key(request) != key:
                     raise ValueError("local runtime identity changed before cache hit")
-                async with self._cache_lock:
+                with self._cache_lock:
                     if key in self._cache:
                         self._cache.move_to_end(key)
+                with self._capacity_lock:
+                    self._cache_hits += 1
                 return replace(cached, cached=True)
 
         cancel = threading.Event()
-        worker = asyncio.create_task(asyncio.to_thread(self._infer_admitted, request, cancel))
-        result = await self._await_worker(worker, cancel)
+        self._reserve()
+        await self._acquire_execution_slot()
+        started = threading.Event()
+        try:
+            worker = asyncio.create_task(asyncio.to_thread(self._infer_admitted, request, cancel, started))
+            result = await self._await_worker(worker, cancel)
+        except BaseException:
+            # Executor rejection can occur before the worker owns its slot.
+            # Once started, only the OS worker releases its own reservation.
+            if not started.is_set():
+                with self._capacity_lock:
+                    self._active -= 1
+                    self._failed += 1
+                self._execution_slots.release()
+            raise
 
         if result.model_id != self.model.model_id or result.model_digest != self.model.model_digest:
             raise ValueError("local inference result model identity drift")
         if self._key(request) != key:
             raise ValueError("local runtime identity changed during inference")
+        if result.usage_source == "local_model" and result.output_tokens > request.max_output_tokens:
+            raise ValueError("local backend exceeded admitted output-token limit")
 
         declared_tools = {
             str(item.get("tool_id", "")).strip(): item
@@ -676,6 +823,21 @@ class LocalInferenceEngine:
                         f"local tool arguments violate schema for {call.tool_id!r}: {exc}"
                     ) from exc
 
+        if request.tool_choice == "none" and result.tool_calls:
+            raise ValueError("local backend returned tools when tool_choice is none")
+        if request.tool_choice in {"required", "specific"} and not result.tool_calls:
+            raise ValueError("local backend omitted required tool calls")
+        if request.tool_choice == "specific" and any(
+            call.tool_id != request.specific_tool_id for call in result.tool_calls
+        ):
+            raise ValueError("local backend returned a different specific tool")
+        if (
+            request.structured_output_schema is not None
+            and not result.tool_calls
+            and result.structured_output is None
+        ):
+            raise ValueError("local backend omitted required structured output")
+
         if result.structured_output is not None and request.structured_output_schema is not None:
             try:
                 validate_json_value(
@@ -687,7 +849,7 @@ class LocalInferenceEngine:
                 raise ValueError(f"local structured output violates request schema: {exc}") from exc
 
         if self.cache_size and result.finish_reason not in {"cancelled", "deadline"}:
-            async with self._cache_lock:
+            with self._cache_lock:
                 if self._key(request) != key:
                     raise ValueError("local runtime identity changed before caching")
                 # The cached copy owns all nested structured/tool output;
@@ -704,6 +866,8 @@ class LocalInferenceEngine:
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
             return ()
+        if len(requests) > self.max_batch_size:
+            raise ValueError("local inference batch exceeds configured max_batch_size")
         if any(not isinstance(item, LocalInferenceRequest) for item in requests):
             raise TypeError("batch requires LocalInferenceRequest values")
         tasks = [asyncio.create_task(self.generate(item)) for item in requests]
@@ -886,16 +1050,77 @@ class LocalModelAdapter(ProviderAdapter):
     ) -> None:
         self.engine = engine
         self.model = engine.model.model_id
+        self._activated_model_digest = engine.model.model_digest
         self.default_seed = default_seed
         self._artifact_status = None if artifact_status is None else dict(artifact_status)
 
     @property
     def available(self) -> bool:
-        return True
+        try:
+            if self.engine.model.model_digest != self._activated_model_digest:
+                return False
+            self.generation_limits()
+            check = getattr(self.engine.model, "check_readiness", None)
+            if callable(check):
+                check()
+            else:
+                check = getattr(self.engine.model, "assert_identity", None)
+                if callable(check):
+                    check()
+            return True
+        except (OSError, ValueError, RuntimeError):
+            return False
 
     @property
     def supports_cooperative_cancellation(self) -> bool:
         return True
+
+    @property
+    def protocol_capabilities(self) -> tuple[str, ...]:
+        supplied = getattr(self.engine.model, "protocol_capabilities", ("text-generation",))
+        if (
+            not isinstance(supplied, (tuple, list))
+            or not supplied
+            or set(supplied) - {"text-generation", "tool-calls", "structured-output"}
+        ):
+            raise ProviderPolicyError("local model protocol capabilities are invalid")
+        return tuple(supplied)
+
+    def generation_limits(self) -> dict[str, Any]:
+        """Resolve limits from the activated backend, rather than a catalog guess."""
+        model = self.engine.model
+        runtime = getattr(model, "runtime", None)
+        native_limits = getattr(runtime, "limits", None)
+        config = getattr(model, "config", None)
+        context = getattr(native_limits, "max_context", None)
+        if context is None:
+            context = getattr(config, "context_size", None)
+        declared_context = context is not None
+        if not declared_context and getattr(model, "model_family", None) == "gguf_open_weight":
+            raise ProviderPolicyError("activated GGUF serving requires an explicit context_size")
+        if context is None:
+            context = 16_384
+        if type(context) is not int or context < 1:
+            raise ProviderPolicyError("activated local context limit is invalid")
+        output = getattr(native_limits, "max_new_tokens", 8_192)
+        total = getattr(native_limits, "max_total_tokens", None)
+        if (
+            type(output) is not int
+            or output < 1
+            or (total is not None and (type(total) is not int or total < 1))
+        ):
+            raise ProviderPolicyError("activated local generation limits are invalid")
+        # GGUF CLI admission conservatively reserves completion in its context;
+        # native runtimes retain their explicit sliding-context/total limits.
+        shared_context = native_limits is None and getattr(config, "context_size", None) is not None
+        return {
+            "context_window": context,
+            "max_output_tokens": min(8_192, output, max(1, context // 2)),
+            "max_total_tokens": context if shared_context else total,
+            "shared_context": shared_context,
+            "tokenizer": getattr(model, "tokenizer_kind", "utf8_bytes_upper_bound"),
+            "limits_source": "activated_local_backend" if declared_context else "engine_chat_policy",
+        }
 
     def status(self) -> dict[str, Any]:
         status = super().status()
@@ -914,6 +1139,11 @@ class LocalModelAdapter(ProviderAdapter):
             "cache_entries": self.engine.cache_size,
         }
         status["artifact"] = None if self._artifact_status is None else dict(self._artifact_status)
+        status["model_family"] = getattr(self.engine.model, "model_family", "operator_callable")
+        status["protocol_capabilities"] = list(self.protocol_capabilities)
+        status["generation_limits"] = self.generation_limits()
+        status["capacity"]["max_queue_size"] = self.engine.max_queue_size
+        status["runtime"] = self.engine.snapshot()
         return status
 
     @property
@@ -930,18 +1160,41 @@ class LocalModelAdapter(ProviderAdapter):
         return value
 
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        started = time.monotonic()
         if not isinstance(request, ProviderRequest):
             raise TypeError("request must be ProviderRequest")
+        if not self.available:
+            raise ProviderUnavailableError("activated local model is unavailable")
+        model_id = _validate_request(request, default_model=self.model)
+        if model_id != self.model:
+            raise ProviderPolicyError("local model override differs from activated model")
         if getattr(request, "temperature", None) is not None:
             raise ProviderPolicyError("local model does not support request temperature")
         budget = request.resource_budget
+        limits = self.generation_limits()
         max_tokens = (
-            min(256, budget.max_output_tokens)
+            min(256, budget.max_output_tokens, limits["max_output_tokens"])
             if request.max_output_tokens is None
             else request.max_output_tokens
         )
         if type(max_tokens) is not int or max_tokens < 1 or max_tokens > budget.max_output_tokens:
             raise ProviderPolicyError("local output token budget exceeded")
+        if max_tokens > limits["max_output_tokens"]:
+            raise ProviderPolicyError("local output exceeds activated model limit")
+        tools = _provider_tool_definitions(request)
+        _provider_tool_choice_payload(request, tools)
+        choice = str(request.tool_choice or "auto").strip().lower()
+        if choice == "none":
+            tools = ()
+        elif choice == "specific":
+            tools = tuple(tool for tool in tools if tool.tool_id == str(request.specific_tool_id).strip())
+        if tools and "tool-calls" not in self.protocol_capabilities:
+            raise ProviderPolicyError("activated local model does not support tool-call protocol")
+        if (
+            request.structured_output_schema is not None
+            and "structured-output" not in self.protocol_capabilities
+        ):
+            raise ProviderPolicyError("activated local model does not support structured-output protocol")
         seed_material = "|".join(
             item or ""
             for item in (
@@ -958,21 +1211,30 @@ class LocalModelAdapter(ProviderAdapter):
             history=tuple((item.role, item.content) for item in request.history),
             max_output_tokens=max_tokens,
             seed=self.default_seed ^ derived_seed,
-            tools=tuple(item.as_dict() for item in request.tools),
+            tools=tuple(item.as_dict() for item in tools),
             structured_output_schema=(
                 None if request.structured_output_schema is None else dict(request.structured_output_schema)
             ),
             context_digest=request.context_digest,
+            tool_choice=choice,
+            specific_tool_id=(str(request.specific_tool_id).strip() if choice == "specific" else None),
         )
-        if isinstance(self.engine.model, ReferenceNGramModel):
-            input_tokens = len(_tokenize(local_request.rendered_input))
+        count_tokens = getattr(self.engine.model, "count_input_tokens", None)
+        if callable(count_tokens):
+            input_tokens = count_tokens(local_request)
         else:
             render = getattr(self.engine.model, "_render_prompt", None)
             full_prompt = render(local_request) if callable(render) else local_request.rendered_input
             input_tokens = len(full_prompt.encode("utf-8")) + 1
+        if type(input_tokens) is not int or input_tokens < 0:
+            raise ProviderPolicyError("local tokenizer returned an invalid token count")
         if input_tokens > budget.max_input_tokens:
             raise ProviderPolicyError("local input token budget exceeded")
-        remaining = float(budget.max_wall_seconds)
+        if input_tokens > limits["context_window"]:
+            raise ProviderPolicyError("local input exceeds activated context window")
+        if limits["max_total_tokens"] is not None and input_tokens + max_tokens > limits["max_total_tokens"]:
+            raise ProviderPolicyError("local request exceeds activated total-token limit")
+        remaining = float(budget.max_wall_seconds) - (time.monotonic() - started)
         if request.deadline is not None:
             if (
                 not isinstance(request.deadline, datetime)
@@ -990,6 +1252,16 @@ class LocalModelAdapter(ProviderAdapter):
             result = await asyncio.wait_for(self.engine.generate(local_request), timeout=remaining)
         except TimeoutError as exc:
             raise LocalInferenceCancelled("local inference deadline exceeded") from exc
+        if time.monotonic() - started > budget.max_wall_seconds or (
+            request.deadline is not None and datetime.now(UTC) >= request.deadline.astimezone(UTC)
+        ):
+            raise LocalInferenceCancelled("local inference completed after its admitted deadline")
+        if result.input_tokens > budget.max_input_tokens:
+            raise ProviderPolicyError("local result exceeded admitted input-token budget")
+        if result.usage_source == "local_model" and result.output_tokens > max_tokens:
+            raise ProviderProtocolViolationError("local result exceeded admitted output-token budget")
+        if len(result.tool_calls) > budget.max_tool_calls:
+            raise ProviderPolicyError("local result exceeded admitted tool-call budget")
         tool_calls = tuple(
             ProviderToolCall(
                 call_id=item.call_id,
@@ -1018,7 +1290,7 @@ class LocalModelAdapter(ProviderAdapter):
                 estimated_cost="0",
                 billed_cost="0",
                 currency="USD",
-                usage_source="local_model",
+                usage_source=result.usage_source,
             ),
             latency_ms=result.latency_ms,
             data_class=request.data_class,

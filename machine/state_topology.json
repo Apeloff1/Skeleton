@@ -1317,7 +1317,8 @@
     "stream delivery failure leaves a durable unpublished outbox row; startup and later dispatch reconcile it using retry-stable event identity",
     "production operation-state and stream SQLite files are mounted on skeleton_data rather than container-ephemeral storage",
     "derived Chroma/vector/cache/index rebuild is forbidden until authoritative restore verification passes",
-    "governance lifecycle metadata, deletion plans, acknowledgements and receipts are restart-safe authoritative state and cannot rely solely on process memory"
+    "governance lifecycle metadata, deletion plans, acknowledgements and receipts are restart-safe authoritative state and cannot rely solely on process memory",
+    "cooperative response phase cursors, observable artifact hashes and monotonic provider reservations are part of the canonical execution checkpoint; they are not a new transcript or learning authority"
   ],
   "backup_policy": {
     "contract": "machine/state_backup_policy.json",

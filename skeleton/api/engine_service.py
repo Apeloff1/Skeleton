@@ -38,6 +38,13 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntime,
     AdmissionRuntimeError,
 )
+from skeleton.intelligence.cooperation import (
+    CooperationPolicyError,
+    cooperation_stages,
+    cooperation_summary,
+    normalize_cooperation_policy,
+    validate_cooperation_state,
+)
 from skeleton.intelligence.quota import QuotaError
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
@@ -628,6 +635,30 @@ class EngineExecutionCommand:
             )
         context_policy = dict(self.execution_request.context_policy)
         try:
+            cooperation = normalize_cooperation_policy(context_policy.get("cooperation"))
+        except CooperationPolicyError as exc:
+            raise EngineServiceError("execution cooperation policy is malformed") from exc
+        if cooperation is not None:
+            if context_policy.get("cooperation") != cooperation:
+                raise EngineServiceError("execution cooperation policy must be canonical")
+            brief_digest = hashlib.sha256(handoff.prompt.strip().encode()).hexdigest()
+            history_digest = hashlib.sha256(json.dumps(
+                [{"role": role, "content": content} for role, content in handoff.history],
+                sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
+            ).encode()).hexdigest()
+            if context_policy.get("cooperation_brief_digest") != brief_digest or context_policy.get("cooperation_history_digest") != history_digest:
+                raise EngineServiceError("cooperation brief/history are not bound to compiled context")
+            stage_count = len(cooperation_stages(cooperation))
+            for key, minimum in (("max_model_turns", stage_count), ("max_provider_attempts", stage_count), ("max_output_tokens", 64 * stage_count)):
+                value = self.execution_request.resource_budget.get(key)
+                if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                    raise EngineServiceError("cooperation stages do not fit the admitted operation budget")
+            provider_input_limit = context_policy.get("provider_input_limit")
+            if isinstance(provider_input_limit, bool) or not isinstance(provider_input_limit, int) or provider_input_limit <= 0:
+                raise EngineServiceError("cooperation requires an explicit per-provider input limit")
+            if self.execution_request.tool_policy.get("allowed_tool_ids", []):
+                raise EngineServiceError("cooperative response pipeline must be tool-free")
+        try:
             provider_context_selection(context_policy)
             provider_context_temperature(context_policy)
         except ProviderUnavailableError as exc:
@@ -930,6 +961,8 @@ class EngineExecutionStatus:
     updated_at: datetime
     cancellation_requested: bool = False
     schema_version: int = 1
+    cooperation: Mapping[str, Any] | None = None
+    provider_receipts: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -943,6 +976,8 @@ class EngineExecutionStatus:
             "failure_code": self.failure_code,
             "updated_at": self.updated_at.isoformat(),
             "cancellation_requested": self.cancellation_requested,
+            "cooperation": None if self.cooperation is None else dict(self.cooperation),
+            "provider_receipts": list(self.provider_receipts),
         }
 
 
@@ -2882,6 +2917,28 @@ class EngineExecutionService:
         execution = self.repository.get(execution_id)
         result = self.repository.result(execution_id)
         failure_code = None
+        cooperation = None
+        provider_receipts = ()
+        policy = normalize_cooperation_policy(stored.command.execution_request.context_policy.get("cooperation"))
+        if policy is not None:
+            checkpoint = self.repository.latest_checkpoint(execution_id)
+            if checkpoint is not None:
+                context = stored.command.execution_request.context_policy
+                try:
+                    state = validate_cooperation_state(
+                        checkpoint.payload.get("cooperation"), policy,
+                        context_digest=str(context.get("context_digest")),
+                        source_snapshot=context.get("source_snapshot", []),
+                        expected_brief_digest=context.get("cooperation_brief_digest"),
+                        expected_history_digest=context.get("cooperation_history_digest"),
+                    )
+                except CooperationPolicyError as exc:
+                    raise EngineServiceError("cooperative progress checkpoint is invalid") from exc
+                cooperation = cooperation_summary(state)
+                raw_refs = checkpoint.payload.get("provider_receipts", [])
+                if not isinstance(raw_refs, list) or any(not isinstance(ref, str) for ref in raw_refs):
+                    raise EngineServiceError("cooperative progress provider receipts are invalid")
+                provider_receipts = tuple(raw_refs)
         if result is not None and result.status in {"failed", "cancelled"}:
             raw = result.usage.get("error_code")
             if isinstance(raw, str):
@@ -2900,6 +2957,8 @@ class EngineExecutionService:
             failure_code=failure_code,
             updated_at=execution.updated_at,
             cancellation_requested=execution.cancellation_requested,
+            cooperation=cooperation,
+            provider_receipts=provider_receipts,
         )
 
     def cancel(

@@ -961,7 +961,7 @@
       "evidence": [
         "frontend/app/product.tsx",
         "frontend/src/product",
-        "frontend/utils/apiBase.ts",
+        "frontend/src/utils/apiBase.ts",
         "machine/ai_game_learning.json",
         "machine/ai_first_install_product.json"
       ],
@@ -1766,7 +1766,10 @@
       ],
       "optional_configuration": [
         "AI_LOCAL_MODEL_CACHE_SIZE",
-        "AI_LOCAL_MODEL_SEED"
+        "AI_LOCAL_MODEL_SEED",
+        "AI_LOCAL_MODEL_MAX_CONCURRENCY",
+        "AI_LOCAL_MODEL_MAX_QUEUE_SIZE",
+        "AI_LOCAL_MODEL_MAX_BATCH_SIZE"
       ],
       "capabilities": [
         "text-generation"
@@ -1774,7 +1777,31 @@
       "undeclared_capability_policy": "deny",
       "network_policy": "none; local artifact execution only",
       "execution_owner": "skeleton/provider_runtime.py",
-      "activation_rule": "local artifact identity must validate before activation; hosted fallback is not implicit"
+      "activation_rule": "local artifact identity must validate before activation; hosted fallback is not implicit",
+      "protocol_capability_policy": {
+        "text-generation": "all admitted local models",
+        "structured-output": "only model backends declaring and implementing the structured response protocol",
+        "tool-calling": "only model backends declaring and implementing governed tool proposal protocol; tools never imply execution authority",
+        "unknown_or_text_only_backend": "deny unsupported protocol before inference"
+      },
+      "capacity_policy": {
+        "default_concurrency": 1,
+        "concurrency_bounds": [
+          1,
+          32
+        ],
+        "default_queue_size": 256,
+        "queue_size_bounds": [
+          0,
+          65536
+        ],
+        "default_batch_size": 256,
+        "batch_size_bounds": [
+          1,
+          4096
+        ],
+        "queue_and_batch": "bounded admission, actual active/queued/completed counters; cancellation reaches supported local execution; no implicit GPU throughput claim"
+      }
     }
   ],
   "gap_policy": {
@@ -3924,8 +3951,8 @@
           "skeleton/vault/data_lifecycle.py",
           "skeleton/api/engine_service.py",
           "skeleton/testing/test_engine_execution_service.py",
-          "frontend/features/Jeeves/WorkspaceController.ts",
-          "frontend/features/Jeeves/workspace.ts",
+          "frontend/src/features/Jeeves/WorkspaceController.ts",
+          "frontend/src/features/Jeeves/workspace.ts",
           "frontend/scripts/test-jeeves-workspace.cjs",
           "scripts/verify_jeeves_conversation_cutover.py"
         ]
@@ -4633,7 +4660,8 @@
       "a side effect is never retried without idempotency or an explicit compensation policy",
       "committed operation state is authoritative; transport streams are projections",
       "terminal completion occurs only after final result and required receipts are durably bound",
-      "loop limits are monotonic and cannot be reset by a model response"
+      "loop limits are monotonic and cannot be reset by a model response",
+      "optional cooperative response stages and semantic verification draw from the same original monotonic operation budget and the same durable execution/checkpoint authority"
     ]
   },
   "cognitive_runtime_blueprint": {
@@ -5229,7 +5257,39 @@
       "skeleton/testing/test_engine_execution_coordinator.py restart/recovery engine coordination regressions",
       "scripts/verify_cognitive_execution_closure.py independent source/mirror/dependency verifier",
       ".github/workflows/cognitive-execution-closure.yml exact-head closure gate"
-    ]
+    ],
+    "cooperative_response_policy": {
+      "schema_version": "skeleton.ai.cooperation.v1",
+      "state": "opt-in-bounded",
+      "canonical_owner": "skeleton/intelligence/execution_runtime.py",
+      "policy_owner": "skeleton/intelligence/cooperation.py",
+      "source_of_truth": "existing execution checkpoint and AgentTurn ledger",
+      "modes": [
+        "absent: existing single-candidate/model-tool behavior",
+        "plan -> draft -> (critique -> refine) for 1..3 declared rounds"
+      ],
+      "request_field": "AIExecutionRequest.context_policy.cooperation",
+      "fields": {
+        "review_rounds": "integer1..3",
+        "max_stage_output_tokens": "integer64..4096; actual allocation cannot exceed remaining shared operation budget",
+        "roles": "optional plan/draft/critique/refine exact provider_id+model_id selections, resolved and pinned before execution"
+      },
+      "rules": [
+        "Every stage uses the canonical ProviderRequest and a real durable AgentTurn; role labels are not independent review evidence.",
+        "One original brief, context digest and source snapshot remain pinned; generated stage artifacts stay untrusted task material.",
+        "No tools or external effects in this opt-in response pipeline; final structured schema applies only to final refinement.",
+        "Provider identities for explicit role selections are pinned in initial execution binding; a missing or changed role/model fails closed.",
+        "All stages and semantic verification share original monotonic token, cost, attempt and deadline ceilings. Unknown usage is recorded and charged conservatively, never treated as zero.",
+        "Only the final candidate passes the existing canonical verification/finalization boundary. Intermediate critiques never grant publication, source rights, training consent or model promotion.",
+        "Recovery resumes from committed phase cursor; completed provider turns and observable artifact digests are never regenerated merely on replay."
+      ],
+      "verification": "direct real trained-model canonical executions, source-bound stage/usage receipts, static architecture checks; local automated suites withheld per current operator instruction",
+      "rollback": "omit cooperation for new requests; existing in-flight cooperative checkpoints require the same pinned implementation/route rather than silent downgrade",
+      "input_accounting": "One aggregate input budget covers every dispatch; context_policy.provider_input_limit separately caps each selected provider context. Compiler reserves artifact/control headroom and all stage actual usage shares the parent reservation ledger.",
+      "semantic_verification": "Canonical SemanticVerificationRuntime uses parent-bound request/response/resolver callbacks: inherited tenant, classification, purpose, operation/execution/context/source/compiler identity, monotonic deadline, finite remaining token/cost/attempt/model-turn grant. Charge actual response before verdict parsing, including invalid replies. Missing or overlapping generator/verifier identities fail closed; no critique becomes independent proof.",
+      "semantic_recovery": "Same canonical execution checkpoint stores immutable claim identity and bounded typed semantic responses atomically with resource settlement. Exact claim/request/receipt/source-bound responses are parsed again without provider redispatch or double charging; unresolved dispatched reservations remain uncertain and may not dispatch implicitly on recovery.",
+      "cost_unknown": "Unknown usage retains finite reservations; estimated token counts never replenish grants. Hosted unknown-cost requests require positive allocated cost shares within the original grant; local routes explicitly permit documented zero cost. Conservative accounting is not a vendor billing guarantee."
+    }
   },
   "conversation_runtime_contract": {
     "owner_plane": "application-api",
@@ -9861,6 +9921,34 @@
       ],
       "authority": "Existing CORE_DB workspace/crawler authority and existing Dragon knowledge/practice SQLite owners only. No new runtime root, provider, physical database authority or automatic promotion.",
       "operator_guide": "docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md",
+      "game_studio_goal_continuation": {
+        "status": "implementation_candidate",
+        "contract": "machine/ai_game_studio_continuation.json",
+        "review_contract": "machine/ai_game_studio_review.json",
+        "goal_schema": "skeleton.game.studio_goal.v2",
+        "decision_schema": "skeleton.game.studio_decision.v2",
+        "quality_policy_schema": "skeleton.game.studio_quality_policy.v1",
+        "quality_progress_schema": "skeleton.game.studio_quality_progress.v1",
+        "owner": "backend/core/game_studio_agent.py",
+        "state_authority": "Existing CORE_DB game_learning_revisions scoped studio_agent_goal journal and existing workspace jobs; no new store, provider, runtime root or promotion authority",
+        "bounds": {
+          "steps": 16,
+          "model_calls": 16,
+          "default_model_calls": 4,
+          "jobs": 8,
+          "default_jobs": 2,
+          "authorization_seconds": 3600,
+          "max_refinement_rounds": 4,
+          "quality_follow_up_actions": 0
+        },
+        "measured_quality": "Opt-in original run requires simulation and review, immutable operator-selected numerical criteria, actual pinned pre-edit reference, host-frozen seed/episode/capture/controller protocol, and fresh exact-current-source simulation/review before packaging or export. Model-produced text cannot satisfy a missing owner fact. Ordinary goals and historical frozen intent/keys remain unchanged.",
+        "source_revision_comparison": "Explicit matched original-successor comparison only: stable environment action/observation/reward contract, workload, controller protocol, seed and actual reviewer/runtime implementation. Default same-source/frozen-policy comparison remains strict. Source revisions, bounded returns and frame findings never certify subjective quality or general superiority.",
+        "historical_reference_authority": "Only genuine admitted completed scoped review jobs may supply historical observations or restoration references. Frozen file/input/result identities, live source rights, teacher consent, policy identity and external-origin revision/epoch checks remain required; no arbitrary historical source endpoint or execution authority.",
+        "restoration": "Existing world editor accepts exactly one of changes, typed edits or restore_review_job_id. Quality host chooses its exact pinned incumbent after rejection; immutable world identity/origins must match. Canonical emission and complete path/content-tree checks preserve source bytes, including absence of optional fields, while project/file revisions increase monotonically. Restoration consumes existing finite grants and stops at owner cancellation/expiry boundaries.",
+        "foreground_continuation": "Product may issue serial version-fenced advances only while foreground/visible, within existing grants and current owner continuation hints; actual child terminal state and pending canonical planner identity determine the next join. No automatic authorization renewal, failed-attempt replacement, retry escalation or background scheduler.",
+        "operator_guide": "docs/ai/STUDIO_MEASURED_QUALITY.md",
+        "qualification": "Implementation candidate. Static validation and separately recorded bounded actual operations do not establish enterprise qualification, target-OS execution, universal consoles or model-weight learning. User no-tests instruction remains authoritative."
+      },
       "session_evidence": "machine/ai_studio_enablement_session_evidence_2026-10-15.json",
       "validation": "Static construction/provider/mirror/source checks, actual bounded crawler/review/build/train/application operations and a fresh frontend production export. User no-tests instruction remains authoritative.",
       "automated_tests_authorized": false,

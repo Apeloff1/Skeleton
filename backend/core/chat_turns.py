@@ -265,6 +265,38 @@ def _assert_lease_doc(
     return current
 
 
+def _live_lease_query(lease: TurnLeaseToken) -> dict[str, Any]:
+    """Fence ownership and expiry at Mongo's atomic update boundary.
+
+    An event timestamp is audit data, not a clock or an ownership grant. Mongo's
+    clock closes the gap between a process-side lease check and the eventual
+    compare-and-swap after storage or scheduling delays.
+    """
+
+    return {
+        "lease_epoch": lease.epoch,
+        "lease_holder_id": lease.holder_id,
+        "lease_digest": lease.digest,
+        "$expr": {"$gt": ["$lease_expires_at", "$$NOW"]},
+    }
+
+
+def _unowned_query(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Allow pre-execution/recovery writes only while no live owner exists."""
+
+    return {
+        "lease_epoch": raw.get("lease_epoch"),
+        "lease_holder_id": raw.get("lease_holder_id"),
+        "lease_digest": raw.get("lease_digest"),
+        "$expr": {
+            "$or": [
+                {"$eq": [{"$ifNull": ["$lease_holder_id", None]}, None]},
+                {"$lte": ["$lease_expires_at", "$$NOW"]},
+            ]
+        },
+    }
+
+
 def _event_doc(
     event: TurnEvent,
     lease: TurnLeaseToken | None = None,
@@ -541,6 +573,19 @@ class MongoChatTurnAuthority:
                         "stale prepared AI chat event could not be discarded"
                     ) from exc
                 return current
+        else:
+            owner = _lease_from_doc(raw)
+            if owner is not None and owner.is_live(_utcnow()):
+                # This transition never reached its snapshot commit point.
+                # Discard it like an expired-lease preparation, leaving the
+                # current holder free to issue the next fenced transition.
+                try:
+                    await self.events.delete_one({"_id": prepared["_id"], "_commit_state": "prepared"})
+                except PyMongoError as exc:
+                    raise ChatTurnStorageUnavailable(
+                        "unowned prepared AI chat event could not be discarded"
+                    ) from exc
+                return current
 
         if (
             event.sequence != current.snapshot.next_sequence
@@ -572,13 +617,9 @@ class MongoChatTurnAuthority:
             "last_event_digest": current.snapshot.last_event_digest,
         }
         if prepared_lease is not None:
-            query.update(
-                {
-                    "lease_epoch": prepared_lease.epoch,
-                    "lease_holder_id": prepared_lease.holder_id,
-                    "lease_digest": prepared_lease.digest,
-                }
-            )
+            query.update(_live_lease_query(prepared_lease))
+        else:
+            query.update(_unowned_query(raw))
 
         try:
             advanced = await self.operations.find_one_and_update(
@@ -734,6 +775,21 @@ class MongoChatTurnAuthority:
             "lease_digest": raw.get("lease_digest"),
             "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
         }
+        if now is None:
+            # A takeover must also observe expiry on the database clock. The
+            # explicit clock seam remains available to bounded maintenance
+            # operations; public routes never supply it.
+            query["$expr"] = {
+                "$and": [
+                    {"$gt": [token.expires_at, "$$NOW"]},
+                    {
+                        "$or": [
+                            {"$eq": [{"$ifNull": ["$lease_holder_id", None]}, None]},
+                            {"$lte": ["$lease_expires_at", "$$NOW"]},
+                        ]
+                    },
+                ]
+            }
         update = {
             "$set": {
                 "lease_epoch": token.epoch,
@@ -814,6 +870,8 @@ class MongoChatTurnAuthority:
             "lease_digest": current.digest,
             "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
         }
+        if now is None:
+            query.update(_live_lease_query(current))
         try:
             advanced = await self.operations.find_one_and_update(
                 query,
@@ -875,6 +933,8 @@ class MongoChatTurnAuthority:
             "lease_digest": current.digest,
             "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
         }
+        if now is None:
+            query.update(_live_lease_query(current))
         try:
             advanced = await self.operations.find_one_and_update(
                 query,
@@ -929,6 +989,21 @@ class MongoChatTurnAuthority:
             owner_id=owner_id,
         )
 
+    async def _confirm_event_commit(self, event: TurnEvent, turn: PersistedChatTurn) -> PersistedChatTurn:
+        """Never acknowledge a preparation discarded by fencing/recovery."""
+
+        if turn.snapshot.next_sequence <= event.sequence:
+            raise ChatTurnConflict("AI chat transition did not reach its durable commit point")
+        try:
+            stored = await self.events.find_one({"_id": f"{event.operation_id}:{event.sequence}"})
+        except PyMongoError as exc:
+            raise ChatTurnStorageUnavailable("AI chat turn commit confirmation is unavailable") from exc
+        if stored is None or stored.get("_commit_state") != "committed":
+            raise ChatTurnCorruption("committed AI chat turn event is missing")
+        if _event_from_doc(stored).digest != event.digest:
+            raise ChatTurnConflict("turn event sequence was reused with different content")
+        return turn
+
     async def append_event(
         self,
         event: TurnEvent,
@@ -958,7 +1033,17 @@ class MongoChatTurnAuthority:
             )
         )
         if lease is not None:
-            _assert_lease_doc(raw, lease, now=event.observed_at)
+            _assert_lease_doc(raw, lease, now=_utcnow())
+        else:
+            owner = _lease_from_doc(raw)
+            if owner is not None and owner.is_live(_utcnow()):
+                raise TurnLeaseBusy("a live execution owner fences unleased turn transitions")
+
+        if event.sequence < current.snapshot.next_sequence:
+            # An acknowledged append may lose its HTTP response. Exact event
+            # replay is a read of the committed journal, not another state
+            # transition; validate it before applying next-sequence rules.
+            return await self._confirm_event_commit(event, current)
 
         try:
             next_snapshot = current.snapshot.apply(event)
@@ -978,11 +1063,12 @@ class MongoChatTurnAuthority:
             existing = _event_from_doc(existing_doc)
             if existing.digest != event.digest:
                 raise ChatTurnConflict("turn event sequence was reused with different content")
-            return await self._recover_prepared(
+            recovered = await self._recover_prepared(
                 event.operation_id,
                 tenant_id=tenant_id,
                 owner_id=owner_id,
             )
+            return await self._confirm_event_commit(event, recovered)
         except PyMongoError as exc:
             raise ChatTurnStorageUnavailable("AI chat turn event could not be prepared") from exc
 
@@ -996,13 +1082,9 @@ class MongoChatTurnAuthority:
             "last_event_digest": current.snapshot.last_event_digest,
         }
         if lease is not None:
-            query.update(
-                {
-                    "lease_epoch": lease.epoch,
-                    "lease_holder_id": lease.holder_id,
-                    "lease_digest": lease.digest,
-                }
-            )
+            query.update(_live_lease_query(lease))
+        else:
+            query.update(_unowned_query(raw))
 
         try:
             advanced = await self.operations.find_one_and_update(
@@ -1018,11 +1100,12 @@ class MongoChatTurnAuthority:
         except PyMongoError as exc:
             raise ChatTurnStorageUnavailable("AI chat turn snapshot could not be advanced") from exc
         if advanced is None:
-            return await self._recover_prepared(
+            recovered = await self._recover_prepared(
                 event.operation_id,
                 tenant_id=tenant_id,
                 owner_id=owner_id,
             )
+            return await self._confirm_event_commit(event, recovered)
 
         try:
             await self.events.update_one(

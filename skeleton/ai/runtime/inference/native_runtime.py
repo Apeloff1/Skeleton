@@ -6,13 +6,15 @@ keeps ProviderRegistry, CognitiveExecutionRuntime, caching, governance, and
 engine orchestration unchanged while replacing the legacy local artifact
 backend with the same tokenizer/checkpoint/transformer runtime used by FLGB-02.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import threading
 import time
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from skeleton.ai.model_runtime import (
     GenerationConfig,
@@ -21,7 +23,6 @@ from skeleton.ai.model_runtime import (
 )
 from skeleton.ai.model_runtime.runtime_contracts import RUNTIME_SCHEMA
 from skeleton.ai.model_runtime.tokenization import TokenizerContractError
-
 from skeleton.skills.tool_contract import (
     ToolContractError,
     validate_json_schema,
@@ -44,6 +45,9 @@ class NativeRuntimeLocalModel:
     """Expose NativeLLMRuntime through the LocalModelBackend protocol."""
 
     artifact_schema = RUNTIME_SCHEMA
+    model_family = "native_transformer"
+    protocol_capabilities = ("text-generation", "tool-calls", "structured-output")
+    tokenizer_kind = "native_tokenizer"
 
     def __init__(self, runtime: NativeLLMRuntime) -> None:
         if not isinstance(runtime, NativeLLMRuntime):
@@ -71,13 +75,17 @@ class NativeRuntimeLocalModel:
 
     @property
     def execution_profile_digest(self) -> str:
-        return hashlib.sha256(self._stable_json({
-            "schema": "skeleton.native.execution-profile.v1",
-            "runtime": self._runtime_digest,
-            "device": self.runtime.device.to_dict(),
-            "device_policy": self.runtime.device_policy.to_dict(),
-            "limits": self.runtime.limits.to_dict(),
-        }).encode("utf-8")).hexdigest()
+        return hashlib.sha256(
+            self._stable_json(
+                {
+                    "schema": "skeleton.native.execution-profile.v1",
+                    "runtime": self._runtime_digest,
+                    "device": self.runtime.device.to_dict(),
+                    "device_policy": self.runtime.device_policy.to_dict(),
+                    "limits": self.runtime.limits.to_dict(),
+                }
+            ).encode("utf-8")
+        ).hexdigest()
 
     def assert_identity(self) -> None:
         """Reject mutable weight/tokenizer/runtime drift before cache or inference."""
@@ -85,9 +93,7 @@ class NativeRuntimeLocalModel:
         try:
             self.runtime.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise NativeRuntimeBackendError(
-                "native tokenizer identity drift"
-            ) from exc
+            raise NativeRuntimeBackendError("native tokenizer identity drift") from exc
         if self.runtime.model_digest != self._model_digest:
             raise NativeRuntimeBackendError("native model digest drift")
         if self.runtime.model_identity.identity_digest != self._runtime_digest:
@@ -101,11 +107,15 @@ class NativeRuntimeLocalModel:
             raise NativeRuntimeBackendError("native checkpoint schema drift")
         return dict(checkpoint)
 
+    def count_input_tokens(self, request: LocalInferenceRequest) -> int:
+        self.assert_identity()
+        return len(self.runtime.encode(self._render_prompt(request)).token_ids)
+
     @classmethod
     def from_checkpoint(
         cls,
         checkpoint: Mapping[str, Any],
-    ) -> "NativeRuntimeLocalModel":
+    ) -> NativeRuntimeLocalModel:
         if not isinstance(checkpoint, Mapping):
             raise TypeError("checkpoint must be a mapping")
         runtime = NativeLLMRuntime.restore(checkpoint)
@@ -122,26 +132,20 @@ class NativeRuntimeLocalModel:
                 allow_nan=False,
             )
         except (TypeError, ValueError) as exc:
-            raise NativeRuntimeBackendError(
-                "native local protocol value is not canonical JSON"
-            ) from exc
+            raise NativeRuntimeBackendError("native local protocol value is not canonical JSON") from exc
 
     @staticmethod
     def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for key, value in pairs:
             if key in result:
-                raise NativeRuntimeBackendError(
-                    f"native local protocol duplicate JSON key: {key}"
-                )
+                raise NativeRuntimeBackendError(f"native local protocol duplicate JSON key: {key}")
             result[key] = value
         return result
 
     @staticmethod
     def _reject_constant(value: str) -> None:
-        raise NativeRuntimeBackendError(
-            "native local protocol contains non-finite JSON constant: " + value
-        )
+        raise NativeRuntimeBackendError("native local protocol contains non-finite JSON constant: " + value)
 
     def _load_protocol_json(self, text: str) -> Any:
         try:
@@ -153,9 +157,7 @@ class NativeRuntimeLocalModel:
         except NativeRuntimeBackendError:
             raise
         except (json.JSONDecodeError, RecursionError) as exc:
-            raise NativeRuntimeBackendError(
-                "native local protocol output is not valid JSON"
-            ) from exc
+            raise NativeRuntimeBackendError("native local protocol output is not valid JSON") from exc
 
     def _normalized_structured_output_schema(
         self,
@@ -166,13 +168,9 @@ class NativeRuntimeLocalModel:
         try:
             schema = validate_json_schema(request.structured_output_schema)
         except ToolContractError as exc:
-            raise NativeRuntimeBackendError(
-                f"invalid native structured output schema: {exc}"
-            ) from exc
+            raise NativeRuntimeBackendError(f"invalid native structured output schema: {exc}") from exc
         if schema.get("type") not in {None, "object"}:
-            raise NativeRuntimeBackendError(
-                "native structured output schema must describe an object"
-            )
+            raise NativeRuntimeBackendError("native structured output schema must describe an object")
         return schema
 
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
@@ -183,13 +181,9 @@ class NativeRuntimeLocalModel:
             for item in request.tools:
                 tool_id = str(item.get("tool_id", "")).strip()
                 if not tool_id:
-                    raise NativeRuntimeBackendError(
-                        "native local tool schema missing tool_id"
-                    )
+                    raise NativeRuntimeBackendError("native local tool schema missing tool_id")
                 if tool_id in seen_tool_ids:
-                    raise NativeRuntimeBackendError(
-                        f"duplicate native local tool_id {tool_id!r}"
-                    )
+                    raise NativeRuntimeBackendError(f"duplicate native local tool_id {tool_id!r}")
                 seen_tool_ids.add(tool_id)
                 allowed.append(
                     {
@@ -215,6 +209,10 @@ class NativeRuntimeLocalModel:
                 + "Allowed tools: "
                 + self._stable_json(allowed)
             )
+            if request.tool_choice in {"required", "specific"}:
+                prompt += "\nA tool call is required for this turn; do not return a prose-only answer."
+            if request.tool_choice == "specific":
+                prompt += "\nRequired tool_id: " + str(request.specific_tool_id)
         elif request.structured_output_schema is not None:
             schema = self._normalized_structured_output_schema(request)
             prompt += (
@@ -251,24 +249,14 @@ class NativeRuntimeLocalModel:
                     payload = json.loads(text)
                 except json.JSONDecodeError:
                     payload = None
-            version = (
-                payload.get("skeleton_local_response")
-                if isinstance(payload, dict)
-                else None
-            )
+            version = payload.get("skeleton_local_response") if isinstance(payload, dict) else None
             if (
                 isinstance(payload, dict)
                 and "skeleton_local_response" in payload
                 and not (type(version) is int and version == 1)
             ):
-                raise NativeRuntimeBackendError(
-                    "unsupported native local response protocol version"
-                )
-            if (
-                isinstance(payload, dict)
-                and type(version) is int
-                and version == 1
-            ):
+                raise NativeRuntimeBackendError("unsupported native local response protocol version")
+            if isinstance(payload, dict) and type(version) is int and version == 1:
                 unknown_envelope = set(payload) - {
                     "skeleton_local_response",
                     "text",
@@ -281,36 +269,26 @@ class NativeRuntimeLocalModel:
                     )
                 raw_calls = payload.get("tool_calls", [])
                 if not isinstance(raw_calls, list):
-                    raise NativeRuntimeBackendError(
-                        "native tool_calls envelope must be a list"
-                    )
+                    raise NativeRuntimeBackendError("native tool_calls envelope must be a list")
                 calls: list[LocalToolCall] = []
                 for raw_call in raw_calls:
                     if not isinstance(raw_call, dict):
-                        raise NativeRuntimeBackendError(
-                            "native local tool call must be an object"
-                        )
+                        raise NativeRuntimeBackendError("native local tool call must be an object")
                     if set(raw_call) != {"call_id", "tool_id", "arguments"}:
-                        raise NativeRuntimeBackendError(
-                            "native local tool call has invalid fields"
-                        )
+                        raise NativeRuntimeBackendError("native local tool call has invalid fields")
                     if not isinstance(raw_call["call_id"], str) or not isinstance(raw_call["tool_id"], str):
                         raise NativeRuntimeBackendError("native tool identifiers must be strings")
                     call_id = str(raw_call.get("call_id", "")).strip()
                     tool_id = str(raw_call.get("tool_id", "")).strip()
                     arguments = raw_call.get("arguments", {})
                     if not call_id:
-                        raise NativeRuntimeBackendError(
-                            "native local tool call missing call_id"
-                        )
+                        raise NativeRuntimeBackendError("native local tool call missing call_id")
                     if tool_id not in allowed_tool_ids:
                         raise NativeRuntimeBackendError(
                             f"native model requested undeclared tool_id {tool_id!r}"
                         )
                     if not isinstance(arguments, dict):
-                        raise NativeRuntimeBackendError(
-                            "native local tool arguments must be an object"
-                        )
+                        raise NativeRuntimeBackendError("native local tool arguments must be an object")
                     calls.append(
                         LocalToolCall(
                             call_id=call_id,
@@ -323,22 +301,13 @@ class NativeRuntimeLocalModel:
                     payload_text,
                     str,
                 ):
-                    raise NativeRuntimeBackendError(
-                        "native response text must be text or null"
-                    )
+                    raise NativeRuntimeBackendError("native response text must be text or null")
                 if isinstance(payload_text, str) and not payload_text.strip():
-                    raise NativeRuntimeBackendError(
-                        "native response text must be non-empty when present"
-                    )
+                    raise NativeRuntimeBackendError("native response text must be non-empty when present")
                 structured = payload.get("structured_output")
                 if structured is not None and not isinstance(structured, dict):
-                    raise NativeRuntimeBackendError(
-                        "native structured_output must be an object"
-                    )
-                if (
-                    structured is not None
-                    and request.structured_output_schema is not None
-                ):
+                    raise NativeRuntimeBackendError("native structured_output must be an object")
+                if structured is not None and request.structured_output_schema is not None:
                     try:
                         validate_json_value(
                             self._normalized_structured_output_schema(request),
@@ -350,9 +319,7 @@ class NativeRuntimeLocalModel:
                             f"native structured output validation failed: {exc}"
                         ) from exc
                 if not calls and payload_text is None and structured is None:
-                    raise NativeRuntimeBackendError(
-                        "native local response envelope contains no output"
-                    )
+                    raise NativeRuntimeBackendError("native local response envelope contains no output")
                 return (
                     payload_text,
                     tuple(calls),
@@ -364,13 +331,9 @@ class NativeRuntimeLocalModel:
             try:
                 structured_payload = self._load_protocol_json(text)
             except NativeRuntimeBackendError as exc:
-                raise NativeRuntimeBackendError(
-                    "native structured output is not valid JSON"
-                ) from exc
+                raise NativeRuntimeBackendError("native structured output is not valid JSON") from exc
             if not isinstance(structured_payload, dict):
-                raise NativeRuntimeBackendError(
-                    "native structured output must be a JSON object"
-                )
+                raise NativeRuntimeBackendError("native structured output must be a JSON object")
             try:
                 validate_json_value(
                     self._normalized_structured_output_schema(request),
@@ -378,9 +341,7 @@ class NativeRuntimeLocalModel:
                     path="structured_output",
                 )
             except ToolContractError as exc:
-                raise NativeRuntimeBackendError(
-                    f"native structured output validation failed: {exc}"
-                ) from exc
+                raise NativeRuntimeBackendError(f"native structured output validation failed: {exc}") from exc
             return None, (), structured_payload, "completed"
 
         return text, (), None, "completed"
@@ -434,15 +395,11 @@ class NativeRuntimeLocalModel:
                     interrupt()
             result = stream.result
             if result is None:
-                raise NativeRuntimeBackendError(
-                    "native runtime terminated without a generation result"
-                )
+                raise NativeRuntimeBackendError("native runtime terminated without a generation result")
         except LocalInferenceCancelled:
             raise
         except RuntimeContractError as exc:
-            raise NativeRuntimeBackendError(
-                "native runtime rejected local inference"
-            ) from exc
+            raise NativeRuntimeBackendError("native runtime rejected local inference") from exc
 
         self.assert_identity()
         raw_text, stop_hit = self._truncate_stop(result.text, request.stop)
@@ -452,7 +409,8 @@ class NativeRuntimeLocalModel:
             raw_text = " ".join(result.generated_tokens).strip()
         if not raw_text:
             raise NativeRuntimeBackendError(
-                "native runtime stopped before visible output" if stop_hit
+                "native runtime stopped before visible output"
+                if stop_hit
                 else "native runtime generated no output"
             )
 
@@ -475,9 +433,17 @@ class NativeRuntimeLocalModel:
         visible_digest = hashlib.sha256((text or "").encode("utf-8")).hexdigest()
         execution_receipt_digest = hashlib.sha256(
             (
-                result.replay_receipt.digest + ":" + request.digest + ":"
-                + self.runtime_digest + ":" + published_digest + ":"
-                + visible_digest + ":" + finish_reason
+                result.replay_receipt.digest
+                + ":"
+                + request.digest
+                + ":"
+                + self.runtime_digest
+                + ":"
+                + published_digest
+                + ":"
+                + visible_digest
+                + ":"
+                + finish_reason
             ).encode("ascii")
         ).hexdigest()
         return LocalInferenceResult(
