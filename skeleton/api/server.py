@@ -980,19 +980,6 @@ def _public_dev_surfaces_enabled() -> bool:
     }
 
 
-def _omnifabric_api_enabled() -> bool:
-    """OmniFabric HTTP surface toggle (default on).
-
-    ``SKELETON_OMNIFABRIC_API`` set to ``0``/``false``/``no``/``off`` keeps the
-    router unmounted. When mounted it sits behind the HMAC gate like every
-    other ``/api/v1`` route; it is never added to the open prefixes.
-    """
-
-    return os.environ.get("SKELETON_OMNIFABRIC_API", "1").strip().lower() not in {
-        "0", "false", "no", "off",
-    }
-
-
 def _canonical_memory_mongo_configured() -> bool:
     """Return whether the production canonical Mongo memory binding is configured."""
 
@@ -1114,22 +1101,15 @@ def create_app() -> Any:
     app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
     app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
     app.include_router(engine_router, prefix="/api/v1")
-    # skeleton.projects.v1 (Internal Systems, #4097): seal via install_gate + session.
-    from skeleton.api.projects_routes import router as projects_router
-    app.include_router(projects_router, prefix="/api/v1")
     app.include_router(cockpit_router)
-    if _omnifabric_api_enabled():
-        # Lazy import keeps the kernel OmniFabric service off the import path
-        # when the surface is disabled. Mounted before install_gate so the
-        # gate covers /api/v1/omnifabric/*. Cortex stays unmounted here.
-        from skeleton.api.omnifabric_routes import router as omnifabric_router
-        app.include_router(omnifabric_router, prefix="/api/v1")
 
     # Realtime transport (ADR-realtime-transport, #4101): canonical SSE stream
     # GET /api/v1/events + POST /api/v1/presence, hub lifecycle owned here.
     from skeleton.api.realtime_routes import router as realtime_router
-    from skeleton.realtime import RealtimeHub
-    realtime_hub = RealtimeHub()
+    from skeleton.realtime import RealtimeHub, sealed_principal_authorizer
+    # Hub default is deny-all; the gate-verified principal opens channels and
+    # per-event owner / job-grant checks decide delivery (Jenkins S1-1).
+    realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer)
     app.state.realtime_hub = realtime_hub
     app.state.realtime_unsubscribe = None
     app.include_router(realtime_router, prefix="/api/v1")
@@ -1140,10 +1120,6 @@ def create_app() -> Any:
         body_limits=_gate_body_limits(),
     )
     install_gate(app, policy=gate_policy)
-    # #3622 follow-up (TD: create_app is the only HTTP entry): fold a registered
-    # agent_edge gateway in behind the same install_gate stack.
-    from skeleton.api.agent_edge_mount import install_registered_agent_edge
-    install_registered_agent_edge(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS
     # admits a browser origin; protected commands still need engine authority.
     app.add_middleware(
