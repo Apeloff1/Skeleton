@@ -43,13 +43,40 @@ def test_game_world_graphic_styles_react_to_original_128_parameter_changes():
         owner=editor())
     modified=route.native_world_codex_edit(
         route.NativeCodexWorldEditRequest(index="0",changes={
-            "flora_succession":255,"verticality":188,
+            "flora_succession":255,"sky_islands":188,
         }),owner=editor())["new_decimal_index"]
     after=route.native_world_codex_tiles(
         route.NativeCodexTileRequest(index=modified,target="nes"),
         owner=editor())
     assert after["source"]["tile_hex"]!=root["source"]["tile_hex"]
     assert after["source"]["digest"]!=root["source"]["digest"]
+
+
+def test_sky_island_design_generates_real_extra_native_tile_bitplanes():
+    from skeleton.ai.webcrawler.dragon_world_codex import edit,validate
+    from skeleton.ai.webcrawler.dragon_codex_tiles import tile_pack,verify_tile_pack
+    expanded=edit("0",{
+        "sky_islands":220,
+        "cloud_oceans":180,
+        "skybridge_density":160,
+        "floating_settlements":110,
+        "thermal_updrafts":96,
+        "wind_shear":75,
+    })
+    _,controls=validate(expanded)
+    assert controls.level("sky_islands")==220
+    assert expanded.decimal_index!="0"
+    assert len(expanded.extension_values)==64
+    for target,fmt in (("nes","nes_planar_2bpp"),("snes","snes_planar_4bpp")):
+        pack=tile_pack(expanded,target)
+        assert len(pack.named_tiles)==16
+        assert {"sky_island","cloud_sea","sky_port","aerial_bridge"}.issubset(
+            pack.named_tiles)
+        assert pack.native_layout==fmt
+        assert pack.all_tile_roundtrips_verified
+        assert verify_tile_pack(expanded,pack)["verified"]
+        assert not pack.emitted_into_final_rom
+        assert not pack.hardware_verified
 
 
 def test_world_tile_API_requires_authenticated_editor_role():
