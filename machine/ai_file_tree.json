@@ -1578,7 +1578,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "9aee132cad7df53db8f001c2f2d94106fd81fdd2",
+      "source_git_object_sha": "76a3e625fb642fc9107b1dab73c360ac50248a57",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -1837,7 +1837,7 @@
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "8bcdd8337a2a885144b7fcfdbdaa4ef420205b5a",
+      "source_git_object_sha": "8c17812d3b317287de101b7710d3ad4b29e20ab2",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",
