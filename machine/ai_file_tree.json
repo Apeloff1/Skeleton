@@ -6582,7 +6582,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_178_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "180_mapping_plus_178_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7317,6 +7317,11 @@
       "path": "skeleton/realtime",
       "owner": "Existing canonical application SSE and presence transport",
       "reason": "Accepted docs/architecture/ADR-realtime-transport.md retains the shared event envelope, bounded hub, authorization/presence, SLO and secret-guard implementation here; transport adds no competing model/runtime or durable state authority."
+    },
+    {
+      "path": "skeleton/compat",
+      "owner": "package-level compatibility utilities",
+      "reason": "Compatibility-only datetime helpers for Python runtime transitions. These wrappers do not own AI execution or provider state."
     }
   ],
   "classification_coverage": {
@@ -7550,7 +7555,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 180,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 126,
+    "retained_outside_ai_tree_count": 127,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
@@ -7563,7 +7568,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 60
+    "native_ai_owner_count": 178
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
