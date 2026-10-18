@@ -1607,6 +1607,27 @@ async def ai_chat(
         else:
             parent_message_id = existing_transcript[-1].message_id if existing_transcript else None
         if existing_turn_user is None:
+            # No canonical user append or repository mutation should be attempted
+            # when the required engine is absent. A new turn is not replayable
+            # without a durable engine execution command.
+            try:
+                preflight_client = EngineClient.from_env()
+            except EngineClientError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "engine_configuration_invalid",
+                        "message": "The AI engine configuration is unavailable.",
+                    },
+                ) from exc
+            if preflight_client is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "engine_unavailable",
+                        "message": "Connect the AI engine before sending a message.",
+                    },
+                )
             initial_thread = await conversation_authority.get_thread(
                 request.thread_id, tenant_id=tenant_id, owner_id=owner_id
             )
