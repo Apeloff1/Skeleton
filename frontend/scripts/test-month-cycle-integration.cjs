@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -11,7 +12,7 @@ function load(file, mocks = {}) {
       esModuleInterop: true }, reportDiagnostics: true });
   assert.equal(output.diagnostics.length, 0, file);
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', output.outputText)(id => {
+  compileFunction(output.outputText, ['require', 'module', 'exports'])(id => {
     assert.ok(Object.hasOwn(mocks, id), file + ': unexpected import ' + id);
     return mocks[id];
   }, mod, mod.exports);
