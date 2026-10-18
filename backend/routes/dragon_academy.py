@@ -214,9 +214,14 @@ def native_production_art_preview(
 
     if body.target not in TARGETS:
         raise HTTPException(status_code=422, detail="Original sprite tile preview adapter unavailable")
-    # Cartridge video asset palette classes are intentionally bounded: other
-    # UI themes map into a compatible handheld 2bpp tone class.
-    actual_palette = body.palette if body.palette in ("dmg_green", "handheld", "vga_dusk") else "handheld"
+    # Accept every explicitly supported original palette, but never silently
+    # reinterpret an unknown video palette as a supported cartridge asset.
+    # That would make a rejected request appear valid and misreport provenance.
+    from skeleton.ai.webcrawler.dragon_game_design import PALETTES
+
+    if body.palette not in PALETTES:
+        raise HTTPException(status_code=422, detail="Unsupported original sprite palette")
+    actual_palette = body.palette
     try:
         art, tiles = make_art(
             hero=body.hero,
