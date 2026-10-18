@@ -1732,9 +1732,11 @@ def hyper_scrutiny_and_review(
         if mix is None:
             mix = (3, 1, 0)
 
-    prof = get_console_rom_profile(console_target)
+    from skeleton.forge.hardware import CONSOLE_ROM_PROFILES, get_console_rom_profile, validate_rom_asset_budget
+    resolved_console = console_target if console_target in CONSOLE_ROM_PROFILES else "gb_dmg_rom"
+    prof = get_console_rom_profile(resolved_console)
     budget_check = validate_rom_asset_budget(
-        console_target,
+        resolved_console,
         {
             "tile_bytes": int(prof["vram_tile_budget_bytes"]) // 4,
             "sprites_per_frame": min(16, int(prof["max_sprites_total"])),
