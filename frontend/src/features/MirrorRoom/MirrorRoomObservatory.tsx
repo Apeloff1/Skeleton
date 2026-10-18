@@ -555,7 +555,7 @@ export default function MirrorRoomObservatory() {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Quality anatomy</Text>
                 <Text style={styles.sectionCopy}>
-                  Each bar compares the selected attempt's baseline against its
+                  Each bar compares the selected attempt&apos;s baseline against its
                   challenger. The candidate only ratchets upward when the full
                   gate accepts it.
                 </Text>

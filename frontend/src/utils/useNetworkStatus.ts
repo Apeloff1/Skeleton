@@ -24,6 +24,8 @@ export interface NetworkStatus {
 let nativeNetInfo: null | { addEventListener?: (cb: (state: any) => void) => (() => void) } = null;
 try {
   // Optional native dependency; fallback remains functional on web.
+  // Optional native module; web fallback must initialize synchronously.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   nativeNetInfo = require('@react-native-community/netinfo').default;
 } catch { /* optional */ }
 

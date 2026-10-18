@@ -108,7 +108,8 @@ export function recordEvent(
   // Honour the modal_telemetry_batch feature flag — disabling kills the
   // batched POSTs entirely (errors/fatals still get a console signal).
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // Delayed load avoids a feature-flag/logger circular bootstrap.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getFeatureFlag } = require('./featureFlags');
     if (getFeatureFlag('modal_telemetry_batch') === false) {
       if (severity === 'fatal' || severity === 'error') {

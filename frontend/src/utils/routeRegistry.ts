@@ -11,7 +11,7 @@ export interface RouteEntry {
   heavy?: boolean;
 }
 
-export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
+export const ROUTE_REGISTRY: readonly RouteEntry[] = [
   { path: '/', title: 'Entry (redirect)', category: 'core' },
   { path: '/welcome', title: 'Welcome / Starfall', category: 'core' },
   { path: '/hub', title: 'Ultimate Hub', category: 'core', heavy: true },

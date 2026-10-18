@@ -539,7 +539,7 @@ export function purgeThermalCachesIfPresent(): void {
 
 /** Stagger an array of async functions with delays between each */
 export async function staggeredExecute<T>(
-  tasks: Array<{ id: string; fn: () => Promise<T>; priority?: number }>,
+  tasks: ({ id: string; fn: () => Promise<T>; priority?: number })[],
   delayBetweenMs = 200
 ): Promise<T[]> {
   const guard = getThermalGuard();

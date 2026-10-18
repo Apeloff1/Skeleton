@@ -40,7 +40,7 @@ interface GenerationResult {
   model?: string;
 }
 
-const CATEGORIES: Array<{ key: CategoryType; label: string; icon: string; desc: string }> = [
+const CATEGORIES: { key: CategoryType; label: string; icon: string; desc: string }[] = [
   { key: 'npc', label: '👤 NPCs', icon: 'person', desc: 'Characters & AI Behavior' },
   { key: 'world', label: '🌍 Worlds', icon: 'globe', desc: 'Regions & Levels' },
   { key: 'combat', label: '⚔️ Combat', icon: 'flash', desc: 'Systems & Mechanics' },

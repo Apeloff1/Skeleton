@@ -6,7 +6,7 @@ import type {DragonKnowledgeView} from './dragonKnowledgePyramid';
 export default function DragonKnowledgePyramid({view}:{view:DragonKnowledgeView|null|undefined}){
  if(!view)return null;
  return <View style={s.root} accessibilityLabel="Dragon knowledge pyramid">
-  <Text style={s.heading}>Dragon's knowledge pyramid</Text>
+  <Text style={s.heading}>Dragon&apos;s knowledge pyramid</Text>
   <View style={s.stages}>
    <Text style={s.stage}>Almanac · researched</Text>
    <Text style={s.arrow}>→</Text>

@@ -31,7 +31,7 @@ export const skeletonAPI = {
   health: () => request<{ alive: boolean }>('/api/v1/health/live'),
 
   capabilities: () =>
-    request<Array<{ name: string; kind: string; version: string }>>('/api/v1/capabilities'),
+    request<{ name: string; kind: string; version: string }[]>('/api/v1/capabilities'),
 
   openSession: (userId: string, mode: 'tutoring' | 'co_coding' = 'tutoring') =>
     request<{ session_id: string; mode: string; status: string }>('/api/v1/jeeves/session', {
@@ -46,7 +46,7 @@ export const skeletonAPI = {
     }),
 
   reviewCode: (sessionId: string, code: string) =>
-    request<{ findings: Array<{ line: number; severity: string; message: string }>; summary: string }>(
+    request<{ findings: { line: number; severity: string; message: string }[]; summary: string }>(
       '/api/v1/jeeves/review',
       { method: 'POST', body: JSON.stringify({ session_id: sessionId, code }) },
     ),
@@ -74,7 +74,7 @@ export const skeletonAPI = {
       body: JSON.stringify({ description, actions }),
     }),
 
-  materialise: (name: string, components: Array<{ kind: string; instance_id: string }>, wires: Array<{ from: [string, string]; to: [string, string] }>) =>
+  materialise: (name: string, components: { kind: string; instance_id: string }[], wires: { from: [string, string]; to: [string, string] }[]) =>
     request<{ artefact: Record<string, unknown>; status: string }>('/api/v1/forge/materialise', {
       method: 'POST',
       body: JSON.stringify({ name, components, wires }),

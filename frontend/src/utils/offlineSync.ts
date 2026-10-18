@@ -207,7 +207,7 @@ export async function getOfflineFootprint(): Promise<{ files: number; bytes: num
  */
 export async function syncAllOffline(
   onProgress: (state: SyncState) => void,
-  opts: { chaptersPerItem?: number; itemTypes?: Array<'book' | 'bible' | 'track' | 'subject'> } = {},
+  opts: { chaptersPerItem?: number; itemTypes?: 'book' | 'bible' | 'track' | 'subject'[] } = {},
 ): Promise<SyncState> {
   abort = false;
   const chaptersPerItem = opts.chaptersPerItem ?? 5;
@@ -221,12 +221,12 @@ export async function syncAllOffline(
   });
   onProgress(state);
 
-  const work: Array<{
+  const work: {
     type: 'book' | 'bible' | 'track' | 'subject';
     id: string;
     itemKey: string;
     chapters: number;
-  }> = [];
+  }[] = [];
 
   try {
     // ── Book pages — uses `total`/row-count fallback (no `pages` field) ──
@@ -351,7 +351,7 @@ export async function syncAllOffline(
     }
 
     // Flatten (item × chapter) tasks for a 6-way concurrent worker pool
-    const tasks: Array<{ w: typeof work[number]; idx: number }> = [];
+    const tasks: { w: typeof work[number]; idx: number }[] = [];
     for (const w of work) {
       for (let idx = 0; idx < w.chapters; idx++) tasks.push({ w, idx });
     }
