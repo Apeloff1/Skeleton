@@ -170,7 +170,7 @@ def apply_gaming_priors(neo, *, rounds: int = 2) -> Dict[str, Any]:
             epochs=rounds,
             lr=0.04,
             weight_decay=1e-4,
-            keep_best=True,
+            holdout=core_texts,
         )
     elif xf is not None and hasattr(xf, "fit"):
         for _ in range(rounds):
@@ -182,7 +182,7 @@ def apply_gaming_priors(neo, *, rounds: int = 2) -> Dict[str, Any]:
             epochs=max(1, rounds // 2),
             lr=0.035,
             weight_decay=1e-4,
-            keep_best=True,
+            holdout=core_texts,
         )
     elif rms is not None and hasattr(rms, "fit"):
         rms.fit(focus_texts, lr=0.035, schedule="cosine")
@@ -196,18 +196,31 @@ def apply_gaming_priors(neo, *, rounds: int = 2) -> Dict[str, Any]:
     moe_updates = 0
     if moe is not None and hasattr(neo, "_stream"):
         gaming_mix_priors = [
+            (
+                "HP = DPS x TTK ; observed mix trash=6 elite=2 boss=0 slack=0.70 soulslike",
+                (6.0, 2.0, 0.0),
+                "heat",
+            ),
+            (
+                "HP = DPS x TTK ; observed mix trash=4 elite=1 boss=0 slack=0.80 extraction now",
+                (4.0, 1.0, 0.0),
+                "loot",
+            ),
+            (
+                "HP = DPS x TTK ; observed mix trash=2 elite=0 boss=0 slack=0.88 arcade golden age",
+                (2.0, 0.0, 0.0),
+                "combat",
+            ),
             ("soulslike extraction ttk elite dread", (6.0, 2.0, 0.0), "heat"),
-            ("extraction now ttk elite loot", (4.0, 1.0, 0.0), "loot"),
-            ("arcade golden age score ttk trash", (2.0, 0.0, 0.0), "combat"),
             ("cozy wholesome intimacy grind farm", (1.0, 0.0, 0.0), "balanced"),
             ("boomer shooter movement gun poetry ttk", (6.0, 1.0, 0.0), "combat"),
             ("horror survival dread heat scarcity", (3.0, 2.0, 0.0), "heat"),
         ]
-        for _ in range(rounds):
+        for _ in range(max(4, rounds * 4)):
             for stim, mix_target, bias_target in gaming_mix_priors:
                 h = neo._stream(stim)
                 if "left" in moe.experts:
-                    moe.experts["left"].head.step(h, mix_target, lr=0.10)
+                    moe.experts["left"].head.step(h, mix_target, lr=0.14)
                 if "right" in moe.experts:
                     moe.experts["right"].head.step(h, bias_target, lr=0.10)
                 if "midbrain" in moe.experts:

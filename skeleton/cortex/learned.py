@@ -57,7 +57,7 @@ class LearnedWeights:
         xf_info = None
         if self.transformer is not None and hasattr(self.transformer, "specialized_calibrate"):
             xf_info = self.transformer.specialized_calibrate(
-                seq, epochs=epochs, lr=lr, weight_decay=1e-4, keep_best=True
+                seq, epochs=epochs, lr=lr, weight_decay=1e-4
             )
         return {
             "ngram_fitted": ngram_n,

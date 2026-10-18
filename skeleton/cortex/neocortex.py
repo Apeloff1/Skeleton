@@ -636,7 +636,8 @@ class JeevesCortex:
         from skeleton.cortex.gossip import adaptive_gossip
 
         rounds = max(1, min(16, int(rounds)))
-        texts = list(stimuli) if stimuli else ([a for a, _ in CORE_PAIRS[:6]] + [a for a, _ in WALK_PAIRS])
+        eval_texts = [a for a, _ in list(CORE_PAIRS)] + [a for a, _ in list(WALK_PAIRS)]
+        texts = list(stimuli) if stimuli else eval_texts
         ratchet = self.genos_engine.ratchet
 
         def _inner_step(lr_scale: float) -> Dict[str, Any]:
@@ -651,20 +652,20 @@ class JeevesCortex:
                 elif port is not None and hasattr(port, "fit"):
                     for text in texts[:4]:
                         port.fit(text)
-            if apply_gaming:
-                self.apply_gaming_weights(rounds=max(1, rounds // 2))
-            xf = self.transformer
-            if xf is not None and hasattr(xf, "specialized_calibrate"):
-                xf.specialized_calibrate(texts, epochs=rounds, lr=base_lr, weight_decay=1e-4, keep_best=True)
-            rms = getattr(self, "neo_rms", None)
-            if rms is not None and hasattr(rms, "specialized_calibrate"):
-                rms.specialized_calibrate(texts, epochs=max(1, rounds // 2), lr=base_lr, weight_decay=1e-4, keep_best=True)
-            if xf is not None and rms is not None:
-                adaptive_gossip(xf, rms, texts[:4], base_alpha=0.20)
             for slot in SLOTS:
                 self.acquire(slot)
             sleep_info = self.sleep_cycle(n=6)
             pulse = self.genos(texts[0] if texts else "plan tensor ttk")
+            xf = self.transformer
+            if xf is not None and hasattr(xf, "specialized_calibrate"):
+                xf.specialized_calibrate(texts, epochs=rounds, lr=base_lr, weight_decay=1e-4, holdout=eval_texts)
+            rms = getattr(self, "neo_rms", None)
+            if rms is not None and hasattr(rms, "specialized_calibrate"):
+                rms.specialized_calibrate(texts, epochs=max(1, rounds // 2), lr=base_lr, weight_decay=1e-4, holdout=eval_texts)
+            if xf is not None and rms is not None:
+                adaptive_gossip(xf, rms, eval_texts, max_alpha=0.20)
+            if apply_gaming:
+                self.apply_gaming_weights(rounds=max(1, rounds // 2))
             return {"sleep": sleep_info, "pulse": pulse, "lr_used": round(base_lr, 4)}
 
         verdict = ratchet.step(self, _inner_step)

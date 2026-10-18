@@ -1189,15 +1189,16 @@ class TinyTransformer:
         add_n = max(1, int(extra_layers))
         self._sync_accelerator()
         before = self.n_layers
+        s = 0.08
         for idx in range(add_n):
+            rng = random.Random((1337 + 31 * (before + idx)) & 0xFFFFFFFF)
             blk = TransformerBlock(
                 self.dim,
-                d_ff=self.d_ff,
-                seed=1337 + 31 * (before + idx),
+                self.d_ff,
+                rng,
+                s,
                 norm=self.norm,
                 ffn_kind=self.ffn_kind,
-                rope_cos=self.rope_cos,
-                rope_sin=self.rope_sin,
             )
             blk.Wo = [[0.0] * self.dim for _ in range(self.dim)]
             if blk.W2:
