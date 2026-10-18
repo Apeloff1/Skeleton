@@ -143,6 +143,23 @@ def test_sink_binds_owner_from_envelope_not_payload():
     assert _events(mallory) == []
 
 
+def test_presence_subscribers_and_snapshots_are_principal_private():
+    hub = _hub()
+    alice = hub.subscribe(["presence"], principal="alice")
+    bob = hub.subscribe(["presence"], principal="bob")
+    hub.presence("join", client_id="tab-a", principal="alice", meta={"private": "alice"})
+    hub.presence("join", client_id="tab-b", principal="bob", meta={"private": "bob"})
+    assert [e.payload["client_id"] for e in _events(alice)] == ["tab-a"]
+    assert [e.payload["client_id"] for e in _events(bob)] == ["tab-b"]
+    later = hub.subscribe(["presence"], principal="alice")
+    snapshot = [e for e in later.drain() if e.type == "presence.snapshot"]
+    assert len(snapshot) == 1
+    assert [m["client_id"] for m in snapshot[0].payload["members"]] == ["tab-a"]
+    assert [m["client_id"] for m in hub.presence_snapshot(principal="bob")["members"]] == ["tab-b"]
+    hub.presence("leave", client_id="tab-b", principal="bob")
+    assert _events(alice) == []
+
+
 # -- HTTP layer --------------------------------------------------------------
 
 fastapi = pytest.importorskip("fastapi")

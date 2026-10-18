@@ -173,10 +173,10 @@ async def presence_snapshot(
     scope: str = Query(default="app", min_length=1, max_length=128),
     attester: Optional[str] = Header(default=None, alias="x-zaibatsu-attester"),
 ) -> Dict[str, Any]:
-    _principal(attester)
+    principal = _principal(attester)
     hub = get_hub(request.app)
     try:
-        return hub.presence_snapshot(scope)
+        return hub.presence_snapshot(scope, principal=principal)
     except EnvelopeError:
         raise HTTPException(status_code=422, detail={"error": "invalid_scope"}) from None
 

@@ -154,7 +154,7 @@ def test_authorizer_hook_denies_channels():
 def test_presence_join_heartbeat_leave_snapshot_and_timeout():
     clock = {"ms": 1_792_252_800_000.0}
     hub = _hub(clock_ms=lambda: clock["ms"], presence_ttl_s=45)
-    watcher = hub.subscribe(["presence"], principal="p")
+    watcher = hub.subscribe(["presence"], principal="alice")
     first = watcher.drain()
     assert first[0].type == "presence.snapshot" and first[0].payload["count"] == 0
     hub.presence("join", client_id="tab-1", principal="alice", meta={"name": "Alice"})
@@ -167,6 +167,8 @@ def test_presence_join_heartbeat_leave_snapshot_and_timeout():
         hub.presence("join", client_id="tab-1", principal="mallory")
     hub.presence("leave", client_id="tab-1", principal="mallory")  # not the owner: no-op
     assert hub.presence_snapshot()["count"] == 2
+    assert [m["client_id"] for m in hub.presence_snapshot(principal="alice")["members"]] == ["tab-1"]
+    assert [m["client_id"] for m in hub.presence_snapshot(principal="bob")["members"]] == ["tab-2"]
     clock["ms"] += 20_000
     expired = hub.sweep_presence()
     assert [m.client_id for m in expired] == ["tab-2"]
@@ -174,8 +176,6 @@ def test_presence_join_heartbeat_leave_snapshot_and_timeout():
     types = [(e.type, e.payload.get("client_id"), e.payload.get("reason")) for e in watcher.drain()]
     assert types == [
         ("presence.joined", "tab-1", None),
-        ("presence.joined", "tab-2", None),
-        ("presence.left", "tab-2", "heartbeat_timeout"),
         ("presence.left", "tab-1", "left"),
     ]
     assert hub.presence_snapshot()["count"] == 0
