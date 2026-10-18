@@ -1,5 +1,5 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import { API_BASE } from '../../utils/apiBase';
+import { API_BASE } from '../utils/apiBase';
 import { authHeaders } from '../auth/gameforgeAuth';
 import api from '../utils/apiClient';
 import {

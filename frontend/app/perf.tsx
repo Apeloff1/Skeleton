@@ -13,8 +13,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getPerfLog, clearPerfLog, subscribePerf, PerfSample } from '../utils/perf';
-import { withScreenGuard } from '../components/withScreenGuard';
+import { getPerfLog, clearPerfLog, subscribePerf, PerfSample } from '../src/utils/perf';
+import { withScreenGuard } from '../src/components/withScreenGuard';
 
 interface AggRow {
   name:    string;

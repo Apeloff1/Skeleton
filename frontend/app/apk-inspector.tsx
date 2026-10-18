@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /apk-inspector — Deep introspection of the most recent APKs.
  *
@@ -22,10 +22,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../theme/tokens';
-import { useModalLogger } from '../utils/modalLogger';
-import { toast } from '../components/Toast';
-import { useFeatureFlag } from '../utils/featureFlags';
+import theme from '../src/theme/tokens';
+import { useModalLogger } from '../src/utils/modalLogger';
+import { toast } from '../src/components/AppToast';
+import { useFeatureFlag } from '../src/utils/featureFlags';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const { breathing, palette, radii } = theme;

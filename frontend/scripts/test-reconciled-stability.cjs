@@ -118,7 +118,7 @@ test('observer snapshots are independent of the authoritative runner', () => {
 });
 
 test('retry never fabricates a clean boot or leaves earlier callbacks authoritative', () => {
-  const launcher = read('components/BootLauncher.tsx');
+  const launcher = read('src/components/BootLauncher.tsx');
   assert.doesNotMatch(launcher, /safeSetItem\('@boot\/crash_count',\s*'0'\)/);
   assert.match(launcher, /attemptEpochRef\.current \+= 1/);
   assert.match(launcher, /epoch !== attemptEpochRef\.current/);
@@ -152,7 +152,7 @@ test('native network listeners are never registered after unmount', () => {
 });
 
 test('changed release code is TypeScript syntax-valid', () => {
-  for (const filename of ['components/BootLauncher.tsx', 'src/boot/runner.ts',
+  for (const filename of ['src/components/BootLauncher.tsx', 'src/boot/runner.ts',
     'src/boot/stages.ts', 'app/safe-mode.tsx', 'src/hooks/useNetworkStatus.ts']) {
     const result = ts.transpileModule(read(filename), {
       fileName: filename,

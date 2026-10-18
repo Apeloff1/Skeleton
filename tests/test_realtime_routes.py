@@ -58,7 +58,7 @@ def _request(app, accept):
 
 def test_engine_events_route_keeps_json_unless_sse_requested():
     app = fastapi.FastAPI()
-    app.state.realtime_hub = RealtimeHub(id_seed=1)
+    app.state.realtime_hub = RealtimeHub(id_seed=1, authorizer=lambda p, c: bool(p))
     assert execution_stream_or_none(_request(app, "application/json"), "exec-1", principal="svc") is None
     bare = fastapi.FastAPI()
     assert execution_stream_or_none(_request(bare, "text/event-stream"), "exec-1", principal="svc") is None
@@ -66,3 +66,4 @@ def test_engine_events_route_keeps_json_unless_sse_requested():
     assert stream is not None and stream.media_type == "text/event-stream"
     (sub,) = app.state.realtime_hub._subs.values()
     assert sub.job_id == "exec-1" and sub.channels == ("build", "agent")
+    assert sub.job_grant == "exec-1"

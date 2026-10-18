@@ -1,14 +1,14 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import { API_BASE } from '../../utils/apiBase';
+import { API_BASE } from '../utils/apiBase';
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken, resolveStorageTenantIdentity } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';
 import type { ConversationMessage, ConversationThread } from './conversationClient';
 import { validateConversationProjection } from './conversationProjection';
-import { createConversation, projectCanonicalHistory, MAX_CONVERSATIONS, type ChatBody, type ChatHistoryProjection, type Conversation } from '../../features/Jeeves/workspace';
-import type { ChatProgress, ChatResponse, WorkspaceStorage } from '../../features/Jeeves/WorkspaceController';
+import { createConversation, projectCanonicalHistory, MAX_CONVERSATIONS, type ChatBody, type ChatHistoryProjection, type Conversation } from '../features/Jeeves/workspace';
+import type { ChatProgress, ChatResponse, WorkspaceStorage } from '../features/Jeeves/WorkspaceController';
 
 export type ChatModel = { id: string; provider_id: string; model_id: string; label: string; available: boolean; selectable: boolean; active: boolean; credential_free: boolean; context_window: number; max_output_tokens: number; default_output_tokens: number; capabilities: string[]; readiness: { code: string; message: string; action?: string | null } };
 export type ChatReadiness = {

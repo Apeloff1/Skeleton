@@ -14,15 +14,15 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearMirror, safeRemoveItem, pauseSafeStorageForWipe, resumeSafeStorageAfterWipe } from '../utils/safeStorage';
+import { clearMirror, safeRemoveItem, pauseSafeStorageForWipe, resumeSafeStorageAfterWipe } from '../src/utils/safeStorage';
 import {
   getLastTrace, getCrashCount, getLastCleanBoot,
   resetBootState, TraceStep,
-} from '../utils/bootTracer';
+} from '../src/utils/bootTracer';
 import {
   FEATURE_FLAGS, getFeatureFlag, loadFeatureFlags,
   resetAllFlags, getModifiedFlagKeys,
-} from '../utils/featureFlags';
+} from '../src/utils/featureFlags';
 
 export default function SafeModeRoute() {
   const router = useRouter();

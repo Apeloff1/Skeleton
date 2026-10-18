@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/LanguageTrack/LanguageTrackModal'), 'LanguageTrackRoute', 'LanguageTrackModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/LanguageTrack/LanguageTrackModal'), 'LanguageTrackRoute', 'LanguageTrackModal');

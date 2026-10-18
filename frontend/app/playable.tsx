@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /playable — Real Playable Export (Phase V.1).
  *
@@ -17,9 +17,9 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
-import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
 import { awardXp, getVisitorId } from '../src/utils/liveops';
-import theme from '../theme/tokens';
+import theme from '../src/theme/tokens';
 
 const BACKEND = CANONICAL_API_BASE || '';
 

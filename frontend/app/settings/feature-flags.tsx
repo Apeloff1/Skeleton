@@ -23,11 +23,11 @@ import {
   FEATURE_FLAGS, FlagSpec, FlagCategory,
   getFeatureFlag, setFeatureFlag, loadFeatureFlags,
   getModifiedFlagKeys, resetAllFlags, resetFeatureFlag,
-} from '../../utils/featureFlags';
-import { withScreenGuard } from '../../components/withScreenGuard';
-import { toast } from '../../components/Toast';
-import { actionSheet } from '../../components/ActionSheet';
-import * as haptics from '../../utils/haptics';
+} from '../../src/utils/featureFlags';
+import { withScreenGuard } from '../../src/components/withScreenGuard';
+import { toast } from '../../src/components/AppToast';
+import { actionSheet } from '../../src/components/ActionSheet';
+import * as haptics from '../../src/utils/haptics';
 
 // LayoutAnimation needs an opt-in on Android.
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /collections — Creator Marketplace Collections / Playlists.
  *
@@ -16,7 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
-import theme from '../theme/tokens';
+import theme from '../src/theme/tokens';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const { colors: C, spacing: S, radii: R } = { colors: theme.colors, spacing: theme.spacing, radii: theme.radii };

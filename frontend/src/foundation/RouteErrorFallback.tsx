@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { ErrorState, Screen } from '../../components/primitives';
+import { ErrorState, Screen } from '../components/primitives';
 import { t } from './strings';
 
 /**

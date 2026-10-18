@@ -7,13 +7,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useUser, setProfile, setGoals, setTheme, resetUser, getState, AVATAR_COLORS, ACHIEVEMENT_CATALOG } from '../utils/userStore';
-import { openModalFromRoute } from '../utils/openModalFromRoute';
+import { useUser, setProfile, setGoals, setTheme, resetUser, getState, AVATAR_COLORS, ACHIEVEMENT_CATALOG } from '../src/utils/userStore';
+import { openModalFromRoute } from '../src/utils/openModalFromRoute';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/UI';
-import { toast } from '../components/Toast';
-import { actionSheet, promptSheet } from '../components/ActionSheet';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader } from '../src/components/UI';
+import { toast } from '../src/components/AppToast';
+import { actionSheet, promptSheet } from '../src/components/ActionSheet';
 
 export default function ProfileScreen() {
   const router = useRouter();

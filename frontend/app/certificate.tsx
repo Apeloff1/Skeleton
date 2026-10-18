@@ -8,11 +8,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Platform }
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useUser } from '../utils/userStore';
-import { openModalFromRoute } from '../utils/openModalFromRoute';
-import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/UI';
-import { toast } from '../components/Toast';
+import { useUser } from '../src/utils/userStore';
+import { openModalFromRoute } from '../src/utils/openModalFromRoute';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader } from '../src/components/UI';
+import { toast } from '../src/components/AppToast';
 
 function CertificateScreen() {
   const router = useRouter();

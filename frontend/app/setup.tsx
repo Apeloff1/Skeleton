@@ -1,1 +1,1 @@
-export { default } from '../features/Setup/AppSetupWorkspace';
+export { default } from '../src/features/Setup/AppSetupWorkspace';

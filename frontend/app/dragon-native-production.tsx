@@ -12,9 +12,9 @@ import { useRouter } from 'expo-router';
 
 import StudioLoginGate, { useStudioAuth } from '../src/auth/StudioLoginGate';
 import { authHeaders, getAuthToken } from '../src/auth/gameforgeAuth';
-import { API_BASE } from '../utils/apiBase';
+import { API_BASE } from '../src/utils/apiBase';
 import DragonOriginalPuzzleEditor from '../src/components/DragonOriginalPuzzleEditor';
-import {saveNativeSourceZip} from '../features/Jeeves/companion/saveNativeSourceZip';
+import {saveNativeSourceZip} from '../src/features/Jeeves/companion/saveNativeSourceZip';
 
 type PlatformCapability = {
   id: string;

@@ -17,7 +17,15 @@ from .envelope import (
     parse_cursor,
 )
 from .guard import PayloadSecretGuard, RealtimeSecretError
-from .hub import PresenceMember, RealtimeAuthError, RealtimeHub, Subscription
+from .hub import (
+    EventAccess,
+    PresenceMember,
+    RealtimeAuthError,
+    RealtimeHub,
+    Subscription,
+    deny_all_authorizer,
+    sealed_principal_authorizer,
+)
 from .sinks import HubJobEventSink, JobEventPublisher, NullJobEventPublisher, attach_hub
 from .slo import SLO_TARGETS, RealtimeSLO
 
@@ -26,6 +34,7 @@ __all__ = [
     "CONTROL_TYPES",
     "ControlEvent",
     "EnvelopeError",
+    "EventAccess",
     "HubJobEventSink",
     "JobEventPublisher",
     "KNOWN_EVENT_TYPES",
@@ -41,5 +50,7 @@ __all__ = [
     "SLO_TARGETS",
     "Subscription",
     "attach_hub",
+    "deny_all_authorizer",
     "parse_cursor",
+    "sealed_principal_authorizer",
 ]

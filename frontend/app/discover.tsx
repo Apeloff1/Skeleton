@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /discover — Unified Discovery feed for Galaxy Studio.
  *
@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
-import theme from '../theme/tokens';
+import theme from '../src/theme/tokens';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const C = theme.colors, S = theme.spacing, R = theme.radii;

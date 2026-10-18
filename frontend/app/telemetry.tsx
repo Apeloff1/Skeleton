@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /telemetry — Live dashboard for the security + modal-log system.
  *
@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../theme/tokens';
-import { useModalLogger } from '../utils/modalLogger';
-import { useBackendHealth } from '../utils/selfHeal';
+import theme from '../src/theme/tokens';
+import { useModalLogger } from '../src/utils/modalLogger';
+import { useBackendHealth } from '../src/utils/selfHeal';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const { breathing, palette, radii } = theme;

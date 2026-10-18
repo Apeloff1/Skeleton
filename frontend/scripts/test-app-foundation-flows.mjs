@@ -90,7 +90,7 @@ test('F3-01 create: brief screen hands off the generated artifact to game-factor
   assert.match(g, /queueGameBuilderArtifact\(data, type\)/);
   assert.match(g, /router\.replace\('\/game-factory'\)/);
   assert.ok(route('/game-factory'));
-  assert.ok(existsSync(new URL('../features/GameFactory/gameBuilderHandoff.ts', import.meta.url)));
+  assert.ok(existsSync(new URL('../src/features/GameFactory/gameBuilderHandoff.ts', import.meta.url)));
 });
 test('F3-02 create: build-scoped steps carry only safe project ids (128 ok, 129 rejected)', () => {
   const steps = journeyById('idea-to-game').steps;

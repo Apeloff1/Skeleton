@@ -22,7 +22,7 @@ import { styles } from '../src/styles/home.styles';
 import { StarlightBackground } from '../src/components/StarlightBackground';
 // 2026-06 — Galaxy Studio agent-health probe for the home-tile degradation chip.
 import apiClient from '../src/utils/apiClient';
-import { traceStepSync } from '../utils/bootTracer';
+import { traceStepSync } from '../src/utils/bootTracer';
 
 // ── Lazy modal loader (2026-06, Samsung-S20 OOM fix) ────────────────────
 // Defers each heavy modal's MODULE EVALUATION until it is first opened,
@@ -44,36 +44,36 @@ const lazyNamed = <TModule, TKey extends keyof TModule>(
   });
 
 // Custom Hooks
-import { useTheme } from '../hooks/useTheme';
-import { useStorage } from '../hooks/useStorage';
-import { useAPI } from '../hooks/useAPI';
-import { usePowerAwareness } from '../hooks/usePowerAwareness';
-import { useStability } from '../hooks/useStability';
-import { useMobileOptimization } from '../hooks/useMobileOptimization';
+import { useTheme } from '../src/hooks/useTheme';
+import { useStorage } from '../src/hooks/useStorage';
+import { useAPI } from '../src/hooks/useAPI';
+import { usePowerAwareness } from '../src/hooks/usePowerAwareness';
+import { useStability } from '../src/hooks/useStability';
+import { useMobileOptimization } from '../src/hooks/useMobileOptimization';
 
 // Boot the global ngrok tunnel heartbeat + resilient network layer
 // 2026-02 — Moved out of module scope into a deferred microtask so a
 // failure here can never block hub.tsx from even being imported. Any
 // throw becomes a console warning instead of a bundle-time crash.
-import { startHeartbeat as _startTunnelHeartbeat } from '../utils/resilientNet';
+import { startHeartbeat as _startTunnelHeartbeat } from '../src/utils/resilientNet';
 
 
 // Mobile UI Components
-import { ErrorBoundary } from '../components/ErrorBoundary';
-import { QuickActionBar } from '../components/MobileUI/QuickActionBar';
-import { MinimalToolbar } from '../components/MobileUI/MinimalToolbar';
-import { StatusIndicator } from '../components/MobileUI/StatusIndicator';
-import { RecentArtifactsStrip } from '../components/RecentArtifactsStrip';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { QuickActionBar } from '../src/components/MobileUI/QuickActionBar';
+import { MinimalToolbar } from '../src/components/MobileUI/MinimalToolbar';
+import { StatusIndicator } from '../src/components/MobileUI/StatusIndicator';
+import { RecentArtifactsStrip } from '../src/components/RecentArtifactsStrip';
 
 // Features (lazy — evaluated on first open)
-const BibleModal = lazyNamed(() => import('../features/Bible/BibleModal'), 'BibleModal');
-const CompilerModal = lazyNamed(() => import('../features/Compiler/CompilerModal'), 'CompilerModal');
-const PipelineVisualizer = lazyNamed(() => import('../features/Pipeline/PipelineVisualizer'), 'PipelineVisualizer');
-const LearningDashboard = lazyNamed(() => import('../features/Learning/LearningDashboard'), 'LearningDashboard');
-const CollaborationModal = lazyNamed(() => import('../features/Collaboration/CollaborationModal'), 'CollaborationModal');
-const HubModal = lazyNamed(() => import('../features/Hub/HubModal'), 'HubModal');
-const AISuggestionsModal = lazyNamed(() => import('../features/AI/AISuggestionsModal'), 'AISuggestionsModal');
-import { useVoiceCommands, speak } from '../features/Voice/useVoiceCommands';
+const BibleModal = lazyNamed(() => import('../src/features/Bible/BibleModal'), 'BibleModal');
+const CompilerModal = lazyNamed(() => import('../src/features/Compiler/CompilerModal'), 'CompilerModal');
+const PipelineVisualizer = lazyNamed(() => import('../src/features/Pipeline/PipelineVisualizer'), 'PipelineVisualizer');
+const LearningDashboard = lazyNamed(() => import('../src/features/Learning/LearningDashboard'), 'LearningDashboard');
+const CollaborationModal = lazyNamed(() => import('../src/features/Collaboration/CollaborationModal'), 'CollaborationModal');
+const HubModal = lazyNamed(() => import('../src/features/Hub/HubModal'), 'HubModal');
+const AISuggestionsModal = lazyNamed(() => import('../src/features/AI/AISuggestionsModal'), 'AISuggestionsModal');
+import { useVoiceCommands, speak } from '../src/features/Voice/useVoiceCommands';
 // 2026-02 — Removed dead imports `starlog` (VersionControl/Starlog) and
 // `wasmCompiler` (WasmCompiler/WasmCompiler). They were imported but
 // never referenced anywhere in this file, adding pointless module-load
@@ -82,122 +82,122 @@ import { useVoiceCommands, speak } from '../features/Voice/useVoiceCommands';
 // used so the cost is paid only when the feature actually runs.
 
 // v11.0 Features (lazy)
-const AIPipelineModal = lazyNamed(() => import('../features/AIPipeline/AIPipelineModal'), 'AIPipelineModal');
-const CurriculumBrowser = lazyNamed(() => import('../features/Curriculum/CurriculumBrowser'), 'CurriculumBrowser');
-const VaultModal = lazyNamed(() => import('../features/Vault/VaultModal'), 'VaultModal');
-const AdvancedFeaturesModal = lazyNamed(() => import('../features/Advanced/AdvancedFeaturesModal'), 'AdvancedFeaturesModal');
-const CodeToAppModal = lazyNamed(() => import('../features/CodeToApp/CodeToAppModal'), 'CodeToAppModal');
-const ImagineModal = lazyNamed(() => import('../features/Imagine/ImagineModal'), 'ImagineModal');
+const AIPipelineModal = lazyNamed(() => import('../src/features/AIPipeline/AIPipelineModal'), 'AIPipelineModal');
+const CurriculumBrowser = lazyNamed(() => import('../src/features/Curriculum/CurriculumBrowser'), 'CurriculumBrowser');
+const VaultModal = lazyNamed(() => import('../src/features/Vault/VaultModal'), 'VaultModal');
+const AdvancedFeaturesModal = lazyNamed(() => import('../src/features/Advanced/AdvancedFeaturesModal'), 'AdvancedFeaturesModal');
+const CodeToAppModal = lazyNamed(() => import('../src/features/CodeToApp/CodeToAppModal'), 'CodeToAppModal');
+const ImagineModal = lazyNamed(() => import('../src/features/Imagine/ImagineModal'), 'ImagineModal');
 
 // v11.1 SOTA 2026 Features (lazy)
-const DebuggerModal = lazyNamed(() => import('../features/Debugger/DebuggerModal'), 'DebuggerModal');
-const MusicPipelineModal = lazyNamed(() => import('../features/Music/MusicPipelineModal'), 'MusicPipelineModal');
-const EducationModal = lazyNamed(() => import('../features/Education/EducationModal'), 'EducationModal');
-const MegaAcademyModal = lazyNamed(() => import('../features/MegaAcademy/MegaAcademyModal'), 'MegaAcademyModal');
-const JeevesModal = lazyNamed(() => import('../features/Jeeves/JeevesModal'), 'JeevesModal');
+const DebuggerModal = lazyNamed(() => import('../src/features/Debugger/DebuggerModal'), 'DebuggerModal');
+const MusicPipelineModal = lazyNamed(() => import('../src/features/Music/MusicPipelineModal'), 'MusicPipelineModal');
+const EducationModal = lazyNamed(() => import('../src/features/Education/EducationModal'), 'EducationModal');
+const MegaAcademyModal = lazyNamed(() => import('../src/features/MegaAcademy/MegaAcademyModal'), 'MegaAcademyModal');
+const JeevesModal = lazyNamed(() => import('../src/features/Jeeves/JeevesModal'), 'JeevesModal');
 
 // v11.2 Masterclass, Assets & Game Systems (lazy)
-const MasterclassModal = lazyNamed(() => import('../features/Masterclass/MasterclassModal'), 'MasterclassModal');
-const AssetPipelineModal = lazyNamed(() => import('../features/AssetPipeline/AssetPipelineModal'), 'AssetPipelineModal');
+const MasterclassModal = lazyNamed(() => import('../src/features/Masterclass/MasterclassModal'), 'MasterclassModal');
+const AssetPipelineModal = lazyNamed(() => import('../src/features/AssetPipeline/AssetPipelineModal'), 'AssetPipelineModal');
 
 // v11.3 Command Palette for Clean UI (lazy — heavy declarative menu, evaluated
 // on first open inside a LazyModal Suspense boundary; keeps it off the cold boot).
-const CommandPalette = lazyNamed(() => import('../components/CommandPalette'), 'CommandPalette');
+const CommandPalette = lazyNamed(() => import('../src/components/CommandPalette'), 'CommandPalette');
 
 // v11.3 SOTA Feature Modals (lazy)
-const MultiAgentModal = lazyNamed(() => import('../features/MultiAgent/MultiAgentModal'), 'MultiAgentModal');
-const SOTAModal = lazyNamed(() => import('../features/SOTA/SOTAModal'), 'SOTAModal');
-const CodeIntelligenceModal = lazyNamed(() => import('../features/CodeIntelligence/CodeIntelligenceModal'), 'CodeIntelligenceModal');
-const LiveCollabModal = lazyNamed(() => import('../features/LiveCollab/LiveCollabModal'), 'LiveCollabModal');
+const MultiAgentModal = lazyNamed(() => import('../src/features/MultiAgent/MultiAgentModal'), 'MultiAgentModal');
+const SOTAModal = lazyNamed(() => import('../src/features/SOTA/SOTAModal'), 'SOTAModal');
+const CodeIntelligenceModal = lazyNamed(() => import('../src/features/CodeIntelligence/CodeIntelligenceModal'), 'CodeIntelligenceModal');
+const LiveCollabModal = lazyNamed(() => import('../src/features/LiveCollab/LiveCollabModal'), 'LiveCollabModal');
 
 // v11.5 AI-to-Game Pipelines
 // WorldEngine, Narrative, LogicEngine → Galaxy Studio Factory
 
 // v11.6 Educational Academy & SOTA Extended (lazy)
-const HybridPipelineModal = lazyNamed(() => import('../features/HybridPipeline/HybridPipelineModal'), 'HybridPipelineModal');
-const SOTAExtendedModal = lazyNamed(() => import('../features/SOTAExtended/SOTAExtendedModal'), 'SOTAExtendedModal');
-const ImmersiveLearningModal = lazyNamed(() => import('../features/ImmersiveLearning/ImmersiveLearningModal'), 'ImmersiveLearningModal');
+const HybridPipelineModal = lazyNamed(() => import('../src/features/HybridPipeline/HybridPipelineModal'), 'HybridPipelineModal');
+const SOTAExtendedModal = lazyNamed(() => import('../src/features/SOTAExtended/SOTAExtendedModal'), 'SOTAExtendedModal');
+const ImmersiveLearningModal = lazyNamed(() => import('../src/features/ImmersiveLearning/ImmersiveLearningModal'), 'ImmersiveLearningModal');
 
 // v11.8 Reading Corner, Jeeves EQ & Export (lazy)
-const ReadingCornerModal = lazyNamed(() => import('../features/ReadingCorner/ReadingCornerModal'), 'ReadingCornerModal');
-const JeevesEQModal = lazyNamed(() => import('../features/JeevesEQ/JeevesEQModal'), 'JeevesEQModal');
+const ReadingCornerModal = lazyNamed(() => import('../src/features/ReadingCorner/ReadingCornerModal'), 'ReadingCornerModal');
+const JeevesEQModal = lazyNamed(() => import('../src/features/JeevesEQ/JeevesEQModal'), 'JeevesEQModal');
 
 // v12.0 AI Interactions Log (lazy)
-const AIInteractionsLogModal = lazyNamed(() => import('../features/AIInteractionsLog/AIInteractionsLogModal'), 'AIInteractionsLogModal');
+const AIInteractionsLogModal = lazyNamed(() => import('../src/features/AIInteractionsLog/AIInteractionsLogModal'), 'AIInteractionsLogModal');
 
 // v12.0 Dashboard & Session Tracking
-const DashboardModal = lazyNamed(() => import('../features/Dashboard/DashboardModal'), 'DashboardModal');
-import { AchievementQueue } from '../components/AchievementNotification';
-import { useSessionTracker } from '../hooks/useSessionTracker';
+const DashboardModal = lazyNamed(() => import('../src/features/Dashboard/DashboardModal'), 'DashboardModal');
+import { AchievementQueue } from '../src/components/AchievementNotification';
+import { useSessionTracker } from '../src/hooks/useSessionTracker';
 
 // v12.5 Learning Hub - Multi-Layer Learning System (lazy)
-const LearningHubModal = lazyNamed(() => import('../features/LearningHub/LearningHubModal'), 'LearningHubModal');
+const LearningHubModal = lazyNamed(() => import('../src/features/LearningHub/LearningHubModal'), 'LearningHubModal');
 
 // v14.5 Immersive Tutor - Jeeves Synergy Learning System (lazy)
-const ImmersiveTutorModal = lazyNamed(() => import('../features/ImmersiveTutor/ImmersiveTutorModal'), 'ImmersiveTutorModal');
+const ImmersiveTutorModal = lazyNamed(() => import('../src/features/ImmersiveTutor/ImmersiveTutorModal'), 'ImmersiveTutorModal');
 
 // v17.0 Knowledge Databases & Interactive Quizzes (lazy)
-const KnowledgeDatabasesModal = lazyNamed(() => import('../features/KnowledgeDatabases/KnowledgeDatabasesModal'), 'KnowledgeDatabasesModal');
-const InteractiveQuizzesModal = lazyNamed(() => import('../features/InteractiveQuizzes/InteractiveQuizzesModal'), 'InteractiveQuizzesModal');
-const ReadingLibraryModal = lazyNamed(() => import('../features/ReadingLibrary/ReadingLibraryModal'), 'ReadingLibraryModal');
-const StudyPathsModal = lazyNamed(() => import('../features/StudyPaths/StudyPathsModal'), 'StudyPathsModal');
-const DailyChallengesModal = lazyNamed(() => import('../features/DailyChallenges/DailyChallengesModal'), 'DailyChallengesModal');
-const BugfixLibraryModal = lazyNamed(() => import('../features/BugfixLibrary/BugfixLibraryModal'), 'BugfixLibraryModal');
-const CodePlaygroundModal = lazyNamed(() => import('../features/CodePlayground/CodePlaygroundModal'), 'CodePlaygroundModal');
-const ReferenceHubModal = lazyNamed(() => import('../features/ReferenceHub/ReferenceHubModal'), 'ReferenceHubModal');
+const KnowledgeDatabasesModal = lazyNamed(() => import('../src/features/KnowledgeDatabases/KnowledgeDatabasesModal'), 'KnowledgeDatabasesModal');
+const InteractiveQuizzesModal = lazyNamed(() => import('../src/features/InteractiveQuizzes/InteractiveQuizzesModal'), 'InteractiveQuizzesModal');
+const ReadingLibraryModal = lazyNamed(() => import('../src/features/ReadingLibrary/ReadingLibraryModal'), 'ReadingLibraryModal');
+const StudyPathsModal = lazyNamed(() => import('../src/features/StudyPaths/StudyPathsModal'), 'StudyPathsModal');
+const DailyChallengesModal = lazyNamed(() => import('../src/features/DailyChallenges/DailyChallengesModal'), 'DailyChallengesModal');
+const BugfixLibraryModal = lazyNamed(() => import('../src/features/BugfixLibrary/BugfixLibraryModal'), 'BugfixLibraryModal');
+const CodePlaygroundModal = lazyNamed(() => import('../src/features/CodePlayground/CodePlaygroundModal'), 'CodePlaygroundModal');
+const ReferenceHubModal = lazyNamed(() => import('../src/features/ReferenceHub/ReferenceHubModal'), 'ReferenceHubModal');
 
 // v20.0 Gamification, Language Academy, Offline Sync (lazy)
-const GamificationModal = lazyNamed(() => import('../features/Gamification/GamificationModal'), 'GamificationModal');
-const LanguageAcademyModal = lazyNamed(() => import('../features/LanguageAcademy/LanguageAcademyModal'), 'LanguageAcademyModal');
-const OfflineSyncModal = lazyNamed(() => import('../features/OfflineSync/OfflineSyncModal'), 'OfflineSyncModal');
+const GamificationModal = lazyNamed(() => import('../src/features/Gamification/GamificationModal'), 'GamificationModal');
+const LanguageAcademyModal = lazyNamed(() => import('../src/features/LanguageAcademy/LanguageAcademyModal'), 'LanguageAcademyModal');
+const OfflineSyncModal = lazyNamed(() => import('../src/features/OfflineSync/OfflineSyncModal'), 'OfflineSyncModal');
 
 // v25.0 Rosetta Playground (lazy)
-const RosettaPlaygroundModal = lazyNamed(() => import('../features/RosettaPlayground/RosettaPlaygroundModal'), 'RosettaPlaygroundModal');
+const RosettaPlaygroundModal = lazyNamed(() => import('../src/features/RosettaPlayground/RosettaPlaygroundModal'), 'RosettaPlaygroundModal');
 
 // v28.0 Challenge Arena (lazy)
-const ChallengeArenaModal = lazyNamed(() => import('../features/ChallengeArena/ChallengeArenaModal'), 'ChallengeArenaModal');
+const ChallengeArenaModal = lazyNamed(() => import('../src/features/ChallengeArena/ChallengeArenaModal'), 'ChallengeArenaModal');
 
-import { resolveAction } from '../utils/actionMap';
-import { toast } from '../components/Toast';
+import { resolveAction } from '../src/utils/actionMap';
+import { toast } from '../src/components/AppToast';
 import { useFeatureFlag, FLAG } from '../src/feature-flags';
 
 // v15.5 AI Game Generator - Unified Game Development Interface (lazy)
-const AIGameGeneratorModal = lazyNamed(() => import('../features/AIGameGenerator/AIGameGeneratorModal'), 'AIGameGeneratorModal');
+const AIGameGeneratorModal = lazyNamed(() => import('../src/features/AIGameGenerator/AIGameGeneratorModal'), 'AIGameGeneratorModal');
 
 // v16.0 Language Academy, Achievements & Progress (lazy)
-const LanguageTrackModal = lazyNamed(() => import('../features/LanguageTrack/LanguageTrackModal'), 'LanguageTrackModal');
-const AchievementsModal = lazyNamed(() => import('../features/Achievements/AchievementsModal'), 'AchievementsModal');
-const ProgressModal = lazyNamed(() => import('../features/Progress/ProgressModal'), 'ProgressModal');
-const LeaderboardModal = lazyNamed(() => import('../features/Leaderboard/LeaderboardModal'), 'LeaderboardModal');
-const LanguageRecommendModal = lazyNamed(() => import('../features/LanguageRecommend/LanguageRecommendModal'), 'LanguageRecommendModal');
+const LanguageTrackModal = lazyNamed(() => import('../src/features/LanguageTrack/LanguageTrackModal'), 'LanguageTrackModal');
+const AchievementsModal = lazyNamed(() => import('../src/features/Achievements/AchievementsModal'), 'AchievementsModal');
+const ProgressModal = lazyNamed(() => import('../src/features/Progress/ProgressModal'), 'ProgressModal');
+const LeaderboardModal = lazyNamed(() => import('../src/features/Leaderboard/LeaderboardModal'), 'LeaderboardModal');
+const LanguageRecommendModal = lazyNamed(() => import('../src/features/LanguageRecommend/LanguageRecommendModal'), 'LanguageRecommendModal');
 
 // v16.5 - Group Chat, Math Academy Full, Pipeline Agents (lazy)
-const GroupChatModal = lazyNamed(() => import('../features/GroupChat/GroupChatModal'), 'GroupChatModal');
-const ThermalMonitorModal = lazyNamed(() => import('../features/ThermalMonitor/ThermalMonitorModal'), 'ThermalMonitorModal');
+const GroupChatModal = lazyNamed(() => import('../src/features/GroupChat/GroupChatModal'), 'GroupChatModal');
+const ThermalMonitorModal = lazyNamed(() => import('../src/features/ThermalMonitor/ThermalMonitorModal'), 'ThermalMonitorModal');
 // Heaviest module (~3.5k lines) — default export, lazy-loaded.
-const GalaxyStudioFactoryModal = React.lazy(() => import('../features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
-import { LazyModal } from '../components/LazyModal';
-import { useThermalGuard } from '../hooks/useThermalGuard';
-const JeevesLevelModal = lazyNamed(() => import('../features/JeevesLevel/JeevesLevelModal'), 'JeevesLevelModal');
-const MathAcademyFullModal = lazyNamed(() => import('../features/MathAcademy/MathAcademyFullModal'), 'MathAcademyModal');
+const GalaxyStudioFactoryModal = React.lazy(() => import('../src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
+import { LazyModal } from '../src/components/LazyModal';
+import { useThermalGuard } from '../src/hooks/useThermalGuard';
+const JeevesLevelModal = lazyNamed(() => import('../src/features/JeevesLevel/JeevesLevelModal'), 'JeevesLevelModal');
+const MathAcademyFullModal = lazyNamed(() => import('../src/features/MathAcademy/MathAcademyFullModal'), 'MathAcademyModal');
 
 // i18n Provider
-import { I18nProvider } from '../i18n';
-import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { I18nProvider } from '../src/i18n/legacy';
+import { LanguageSwitcher } from '../src/components/LanguageSwitcher';
 
 // Zustand Stores
-import { useModalStore, ModalType } from '../store/modalStore';
+import { useModalStore, ModalType } from '../src/store/modalStore';
 
 // Types
-import { Language, Template, AIMode } from '../types';
+import { Language, Template, AIMode } from '../src/types';
 
 // Constants
-import { VERSION, CODENAME } from '../constants/config';
+import { VERSION, CODENAME } from '../src/constants/config';
 
 // ============================================================================
 // APP WRAPPER WITH PROVIDERS
 // ============================================================================
-import { withScreenGuard } from '../components/withScreenGuard';
+import { withScreenGuard } from '../src/components/withScreenGuard';
 // 2026-02 — WebView lazy-required.
 // Importing react-native-webview at module scope on Android (Samsung S20,
 // Fabric / New Architecture) can throw during module init if the native
@@ -272,7 +272,7 @@ function CodeDockAppContent() {
         AsyncStorage.setItem('@codedock:welcome_seen:v1', '1').catch(() => {});
       } catch {}
       try {
-        const { markBootClean, traceStep } = await import('../utils/bootTracer');
+        const { markBootClean, traceStep } = await import('../src/utils/bootTracer');
         if (cancelled) return;
         await traceStep('hub_mounted');
         // Fire markBootClean on the next tick — fast enough to clear the

@@ -1,4 +1,4 @@
-import { API_BASE, SKELETON_API_BASE } from '../../utils/apiBase';
+import { API_BASE, SKELETON_API_BASE } from '../utils/apiBase';
 import { bootstrapService, getAppBootstrap, getAppRuntimeStatus } from './appBootstrapClient';
 import type { AppBootstrap, AppRuntimeProduct } from './appBootstrapClient';
 
