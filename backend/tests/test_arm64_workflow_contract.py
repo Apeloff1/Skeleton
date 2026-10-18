@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-from scripts.check_ci_workflow_tiers import events
+from runpy import run_path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+# Backend CI executes from backend/, where backend/scripts shadows the root
+# scripts package. Load the canonical tier parser by its checked-out path so
+# this contract does not depend on the test runner's working directory.
+events = run_path(str(ROOT / "scripts" / "check_ci_workflow_tiers.py"))["events"]
 ACTIVE_WORKFLOW = ROOT / ".github" / "workflows" / "arm64.yml"
 ARCHIVED_WORKFLOW = ROOT / ".github" / "workflows-archive" / "arm64.yml"
 WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
