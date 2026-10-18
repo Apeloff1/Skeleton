@@ -385,6 +385,7 @@ def train_budget(
     chunk_docs: int = 192,
     min_scale: float = 0.25,
     slack: float = 1e-4,
+    slack_cap: float | None = None,
     margin_cap: float = 5e-4,
     stream_weights: Mapping[str, float] | None = None,
     continuation: bool | None = None,
@@ -410,6 +411,10 @@ def train_budget(
         raise ValueError("min_scale must be in (0, 1]")
     if isinstance(slack, bool) or not isinstance(slack, (int, float)) or not 0.0 < float(slack) <= 1e-2:
         raise ValueError("slack must be in (0, 1e-2]")
+    if slack_cap is None:
+        slack_cap = max(float(slack), 5e-4)
+    if isinstance(slack_cap, bool) or not isinstance(slack_cap, (int, float)) or float(slack_cap) < float(slack):
+        raise ValueError("slack_cap must be >= slack")
     if isinstance(margin_cap, bool) or not isinstance(margin_cap, (int, float)) or not 0.0 < float(margin_cap) <= 1e-2:
         raise ValueError("margin_cap must be in (0, 1e-2]")
     min_scale = float(min_scale)
@@ -445,7 +450,7 @@ def train_budget(
     parameters = [p for p in model.parameters() if p.requires_grad]
     peak_lr = float(peak_lr)
     opt = _fresh_optimizer(parameters, peak_lr)
-    ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=max(slack, 5e-4), margin_cap=margin_cap)
+    ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=float(slack_cap), margin_cap=margin_cap)
     mastery = SamMatrix()
     stream = CorpusStream(weights=stream_weights)
     base_weights = dict(stream.weights)
@@ -474,7 +479,7 @@ def train_budget(
             cycle_start = int(saved.get("cycle_start", bytes_done))
         else:
             opt = _fresh_optimizer(parameters, peak_lr)
-            ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=max(slack, 5e-4), margin_cap=margin_cap)
+            ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=float(slack_cap), margin_cap=margin_cap)
             cycle_start = bytes_done
     else:
         goal = additional_bytes if additional_bytes is not None else budget_bytes

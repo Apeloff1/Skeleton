@@ -121,6 +121,18 @@ def test_training_serials_practice_long_ids_and_skip_holdouts():
         assert "Pass " in text
 
 
+def test_half_weights_keep_legal_and_coding_first():
+    from skeleton.ai.runtime.inference.game_focus_finetune import half_weights
+
+    weights = half_weights()
+    assert weights["legal"] == 3.0
+    assert weights["coding"] == 3.0
+    assert weights["legal"] > weights["sprites"]
+    assert weights["sprites"] >= 2.0
+    assert weights["story"] >= 2.0
+    assert weights["proofreading"] == 2.5
+
+
 def test_focus_weights_put_legal_coding_and_review_first():
     weights = focus_weights()
     assert set(weights) == set(TEMPLATES)
@@ -152,6 +164,15 @@ def test_ratchet_stall_resets_when_a_step_is_kept():
     assert ratchet.stall == 3
     assert ratchet.observe(before, {name: 1.5 for name in before}) is True
     assert ratchet.stall == 0
+
+
+def test_slack_stays_at_the_cap_when_rejects_pile_up():
+    ratchet = AdaptiveRatchet(slack=2e-4, slack_cap=2e-4, margin_cap=1e-5)
+    before = {"visual": 1.0, "narrative": 1.0}
+    worse = {name: 1.1 for name in before}
+    for _ in range(8):
+        assert ratchet.observe(before, worse) is False
+    assert ratchet.slack == 2e-4
 
 
 def test_ratchet_shrinks_steps_and_tightens_across_the_cycle():

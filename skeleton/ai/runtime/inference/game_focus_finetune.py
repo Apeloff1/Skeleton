@@ -33,6 +33,15 @@ from skeleton.ai.runtime.inference.game_corpus_stream import (
     track_holdouts,
 )
 
+
+def half_weights() -> dict[str, float]:
+    """Sample every measured track often enough to move it. Legal and coding stay first."""
+    weights = focus_weights()
+    for track in ("visual", "narrative", "systems", "practice"):
+        for name in TRACKS[track]:
+            weights[name] = max(weights[name], 2.0)
+    return weights
+
 SCHEMA = "skeleton.game_focus_finetune.v1"
 ENTERPRISE_SCHEMA = "skeleton.game_finetune_enterprise.v1"
 FOCUS_BYTES = 8 * 1024 * 1024
@@ -265,8 +274,9 @@ def finetune_toward_half(
         "chunk_docs": 24,
         "min_scale": 1.0,
         "slack": 2e-4,
+        "slack_cap": 2e-4,
         "margin_cap": 1e-5,
-        "stream_weights": focus_weights(),
+        "stream_weights": half_weights(),
         "continuation": True,
         "plateau_rejects": 256,
         "log_bytes": 1024 * 1024,
