@@ -4,7 +4,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "idle-ci-watchdog.yml"
+ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "idle-ci-watchdog.yml"
+ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "idle-ci-watchdog.yml"
+# The retired watchdog remains subject to adversarial contract tests.
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 
 
 def test_watchdog_ledger_creation_uses_supported_gh_api_contract() -> None:

@@ -296,12 +296,11 @@ def test_current_repository_concurrency_groups_pass() -> None:
 
 
 def test_legacy_merge_readiness_drain_has_unique_top_level_concurrency() -> None:
-    workflow = (
-        Path(__file__).resolve().parents[2]
-        / ".github"
-        / "workflows"
-        / "merge-readiness-concurrency-drain.yml"
-    ).read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[2] / ".github"
+    active = root / "workflows" / "merge-readiness-concurrency-drain.yml"
+    archived = root / "workflows-archive" / "merge-readiness-concurrency-drain.yml"
+    # Retiring a recovery controller does not retire its concurrency safeguards.
+    workflow = (active if active.is_file() else archived).read_text(encoding="utf-8")
 
     record, findings = concurrency.violations_from_text(
         "merge-readiness-concurrency-drain.yml",
@@ -400,7 +399,10 @@ def test_native_platform_pr_runs_preempt_only_obsolete_heads() -> None:
         "game-builder-native-coleco-cpu.yml",
     )
     for name in preemptible:
-        text = (workflows / name).read_text(encoding="utf-8")
+        active = workflows / name
+        archived = workflows.parent / "workflows-archive" / name
+        # Manual native-ROM contracts still require safe concurrency behavior.
+        text = (active if active.is_file() else archived).read_text(encoding="utf-8")
         # Native console compilation is deliberately manual-only on some
         # targets. Preserve the no-automatic-run policy when throttled.
         assert "  workflow_dispatch:" in text, name
@@ -414,5 +416,8 @@ def test_native_platform_pr_runs_preempt_only_obsolete_heads() -> None:
     # Expensive cross-target and Spectrum qualification deliberately preserve
     # the currently running source evidence and coalesce only pending requests.
     for name in ("game-builder-native-spectrum.yml", "game-builder-native-portfolio.yml"):
-        text = (workflows / name).read_text(encoding="utf-8")
+        active = workflows / name
+        archived = workflows.parent / "workflows-archive" / name
+        # Manual native-ROM contracts still require safe concurrency behavior.
+        text = (active if active.is_file() else archived).read_text(encoding="utf-8")
         assert "  cancel-in-progress: false" in text, name
