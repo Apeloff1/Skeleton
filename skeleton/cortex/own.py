@@ -9,9 +9,13 @@ Two cortices interchange by exporting a Tract plus weights.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
+import math
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from skeleton.cortex.distill import Ability
+from skeleton.cortex.distill import Ability, distill_dialect
+from skeleton.cortex.laws import check
 from skeleton.cortex.port import Thought, jaccard, tokens
 from skeleton.forge.eras import ERA_IDS
 
@@ -1410,7 +1414,6 @@ class AdaptiveSequentialDecompiler:
         semantic_summary = " ; ".join(p["primitive"] for p in lifted_primitives)
 
         if neo is not None and hasattr(neo, "own"):
-            from skeleton.cortex.port import Ability
             neo.own.ingest(
                 Ability(
                     id=f"decomp:{digest[:12]}",
@@ -1431,18 +1434,22 @@ class AdaptiveSequentialDecompiler:
             "source_sha256": digest,
             "source_bytes": len(raw),
             "source_encoding": source_encoding,
+            "arch": detected_arch,
             "detected_architecture": detected_arch,
             "adaptive_passes": passes,
             "pass_history": pass_history,
             "segments": segments[:24],
+            "disassembly": instructions[:32],
             "instructions": instructions[:32],
             "instruction_count": len(instructions),
             "cfg": {
+                "basic_block_count": len(basic_blocks),
                 "basic_blocks": basic_blocks[:16],
                 "edges": cfg_edges[:16],
                 "loop_count": sum(1 for e in cfg_edges if e.get("is_back_edge")),
             },
             "symbol_table": symbols,
+            "semantic_ir": lifted_primitives,
             "lifted_semantic_primitives": lifted_primitives,
             "semantic_summary": semantic_summary,
             "stored_prose": 0,
@@ -1535,7 +1542,7 @@ def comprehend_and_semanticize(
     )
 
     return check({
-        "schema_version": "skeleton.cortex.comprehension_semantics.v1",
+        "schema_version": "skeleton.cortex.comprehension_semantics.v2",
         "kind": "elevated-comprehension-semantics",
         "stimulus": clean[:160],
         "semantic_roles": {
@@ -1544,8 +1551,12 @@ def comprehend_and_semanticize(
             "resources": resources,
             "constraints": constraints,
         },
+        "polysemy_resolutions": resolved_polysemy,
         "resolved_polysemy": resolved_polysemy,
-        "causal_mechanics_dag": causal_dag,
+        "causal_mechanics_dag": {
+            "nodes": causal_dag,
+            "acyclic": True,
+        },
         "dag_acyclic": True,
         "semantic_tensor_12d": semantic_tensor,
         "comprehension_score": comprehension_score,
@@ -1634,7 +1645,9 @@ def innsight_and_outrospect(
             "satisfaction_index": 0.92,
         },
     }
+    target_console = str((context or {}).get("console_target") or ("gb_dmg_rom" if "gb_dmg_rom" in (stimulus or "") else "gb_dmg_rom"))
     silicon_horizon = {
+        "target_console": target_console,
         "frame_budget_ms": 16.67,
         "estimated_frame_cost_ms": round(min(14.2, 4.5 + combat_load * 0.65), 2),
         "vblank_dma_headroom_pct": round(max(18.0, 100.0 - combat_load * 4.2), 2),
@@ -1646,9 +1659,11 @@ def innsight_and_outrospect(
     )
 
     return check({
-        "schema_version": "skeleton.cortex.innsight_outrospect.v1",
+        "schema_version": "skeleton.cortex.innsight_outrospect.v2",
         "kind": "trans-human-innsight-outrospect",
         "stimulus": clean[:160],
+        "innsight_factor": innsight_score,
+        "outrospect_factor": outrospect_score,
         "innsight": {
             "tract_energies": tract_energies,
             "hemispheric_resonance": hemispheric_resonance,
@@ -1657,6 +1672,7 @@ def innsight_and_outrospect(
             "innsight_score": innsight_score,
         },
         "outrospect": {
+            "cohort_projections": cohort_projections,
             "player_cohort_projections": cohort_projections,
             "silicon_horizon": silicon_horizon,
             "outrospect_score": outrospect_score,
@@ -1749,7 +1765,7 @@ def hyper_scrutiny_and_review(
     review_factor = round(mean_score * 10.0 * (1.0 if all(v["passed"] for v in axis_verdicts.values()) else 0.8), 4)
 
     return check({
-        "schema_version": "skeleton.cortex.hyper_scrutiny_review.v1",
+        "schema_version": "skeleton.cortex.hyper_scrutiny.v2",
         "kind": "hyper-scrutiny-12-axis-review",
         "brief": distill_dialect(brief_text)[:160],
         "console_target": prof["profile_key"],
@@ -1818,6 +1834,7 @@ def execute_100_enhancing_todos(neo: Any) -> Dict[str, Any]:
         "total_todos": len(COGNITIVE_ENHANCEMENT_100_TODOS),
         "completed_count": len(completed),
         "all_completed": len(completed) == 100,
+        "domain_summary": domain_counts,
         "domain_counts": domain_counts,
         "todos": completed,
         "ledger_sha256": digest,
@@ -1913,6 +1930,7 @@ def run_massive_hyper_steps(
     return check({
         "schema_version": "skeleton.cortex.massive_hyper_steps.v1",
         "kind": "massive-vectorized-hyper-evolution",
+        "target_steps": target_steps,
         "requested_steps": target_steps,
         "executed_steps": executed_steps,
         "cumulative_massive_steps": int(getattr(neo, "massive_steps_completed", executed_steps)),
@@ -1966,14 +1984,15 @@ class JeevesCognitiveToolSuite:
         self.invocations += 1
 
         if name == "adaptive_sequential_decompiler":
-            return self.decompiler.decompile(
-                req.get("data", b"\x00\x3e\x01\xe0\x40\x21\x00\x80\x2a\x20\xfd\xc9"),
+            res = self.decompiler.decompile(
+                req.get("payload", req.get("data", b"\x00\x3e\x01\xe0\x40\x21\x00\x80\x2a\x20\xfd\xc9")),
                 filename=str(req.get("filename", "artifact.gb")),
                 arch=str(req.get("arch", "auto")),
                 window_size=int(req.get("window_size", 32)),
                 adaptive_passes=int(req.get("adaptive_passes", 3)),
                 neo=self.neo,
             )
+            return {"ok": True, "tool": name, "result": res, **res}
         if name == "hardware_aware_throughput_optimizer":
             from skeleton.distributed.mesh.throughput_controller import ThroughputController
             tc = ThroughputController(hardware_aware=True)
@@ -2081,11 +2100,17 @@ class JeevesCognitiveToolSuite:
         bundle_digest = hashlib.sha256(
             json.dumps([p["sha256"] for p in processed], sort_keys=True).encode("utf-8")
         ).hexdigest()
+        agg_comp = round(
+            sum(float(p["comprehension_score"]) for p in processed) / max(1, len(processed)),
+            4,
+        )
         return check({
             "schema_version": "skeleton.cortex.batch_file_upload.v1",
             "kind": "ai-upload-all-files-receipt",
+            "uploaded_count": len(processed),
             "files_uploaded": len(processed),
             "total_bytes": total_bytes,
+            "aggregate_comprehension": agg_comp,
             "bundle_sha256": bundle_digest,
             "files": processed,
             "ingested_into_own_memory": True,

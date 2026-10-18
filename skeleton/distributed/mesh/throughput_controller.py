@@ -95,7 +95,14 @@ class Lane:
 class ThroughputController:
     """AIMD + Vegas gradient concurrency limiter per subsystem lane with hardware awareness."""
 
-    def __init__(self, *, hardware_aware: bool = False):
+    def __init__(
+        self,
+        *,
+        initial_limit: float = 10.0,
+        default_limit: Optional[float] = None,
+        hardware_aware: bool = False,
+    ):
+        self._default_limit: float = float(default_limit if default_limit is not None else initial_limit)
         self._lanes: Dict[str, Lane] = {}
         self._rejected = 0
         self._hardware_aware: bool = bool(hardware_aware)
@@ -105,7 +112,7 @@ class ThroughputController:
         if self._hardware_aware:
             self.probe_hardware()
 
-    def probe_hardware(self) -> HardwareTelemetry:
+    def probe_hardware(self) -> Dict[str, Any]:
         """Probe live host CPU cores, OS load average, and /proc/meminfo memory pressure."""
         self._hardware_aware = True
         cores = max(1, int(os.cpu_count() or 4))
@@ -131,7 +138,9 @@ class ThroughputController:
                 self.hardware.memory_pressure = max(0.0, min(1.0, used_ratio))
         except OSError:
             pass
-        return self.hardware
+        info = self.hardware.to_dict()
+        info["scale_factor"] = self.hardware.hardware_scale_factor()
+        return info
 
     def update_hardware_telemetry(
         self,
