@@ -979,6 +979,30 @@ class TinyTransformer:
         mean = sum(self.logprob(t) for t in seq) / len(seq)
         return math.exp(-mean)
 
+    def adamw_sequence(
+        self,
+        ids: Sequence[int],
+        lr: float,
+        *,
+        weight_decay: float = 0.0,
+        beta1: float = 0.9,
+        beta2: float = 0.95,
+        eps: float = 1e-8,
+        z_loss: float = 0.0,
+    ) -> float:
+        """AdamW on the pinned accelerator. Unpinned mouths fail closed."""
+        if self._accel is None:
+            raise RuntimeError("AdamW sequence training requires a pinned accelerator")
+        return float(self._accel.adamw_sequence(
+            ids,
+            lr,
+            weight_decay=weight_decay,
+            beta1=beta1,
+            beta2=beta2,
+            eps=eps,
+            z_loss=z_loss,
+        ))
+
     def decode(self, prefix: str, *, n: int = 14, seed: int = 0) -> str:
         """Next-token decode on the bound device (CPU default, CUDA if harnessed)."""
         # Use the same sampling and fallback policy on every device. The
