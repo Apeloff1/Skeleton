@@ -1852,4 +1852,3 @@ class AdaptiveRatchetController:
             "required_weighted_gain": round(w_req, 6),
             "required_strict_metric_gain": round(s_req, 6),
         }
-

@@ -462,5 +462,3 @@ def test_mesh_discovery_hedging_throughput_and_pool_upgrades():
     assert warmed == 3
     chk = pool.checkout("db:5432")
     assert chk["acquired"] is True
-
-

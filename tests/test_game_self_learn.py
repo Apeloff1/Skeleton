@@ -72,4 +72,3 @@ def test_focused_review_and_self_learn_pass_improve_weak_concepts():
     assert report["final_eval_loss"] <= report["initial_eval_loss"]
     measured = concept_losses(model)
     assert set(measured.keys()) == set(grouped.keys())
-
