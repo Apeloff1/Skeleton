@@ -6,11 +6,14 @@ from pathlib import Path
 
 from skeleton.ai.runtime.inference.game_coherent_english import (
     FOCUS,
+    TRILLION_WORDS,
     assess,
+    budget_forecast,
     coherent_holdouts,
     iter_training_passages,
     render_passage,
     train_coherent_words,
+    training_stop,
     validate_passages,
 )
 from skeleton.ai.runtime.inference.game_corpus_stream import (
@@ -91,3 +94,16 @@ def test_a_short_pass_trains_without_promoting():
     assert set(receipt["official_tracks"]) == set(receipt["torch_best_tracks"])
     assert "gap" in receipt["coherence_before"]
     assert receipt["coherence_after"]["ordered_nll"] > 0
+    assert receipt["budget_met"] is True
+    assert receipt["stop_reason"] == "budget"
+
+
+def test_a_trillion_word_budget_stops_on_a_plateau_instead_of_claiming_the_total():
+    assert TRILLION_WORDS == 1_000_000_000_000
+    assert training_stop(100, TRILLION_WORDS, stall=8, plateau_rejects=8) == "plateau"
+    assert training_stop(TRILLION_WORDS, TRILLION_WORDS, stall=0, plateau_rejects=8) == "budget"
+    assert training_stop(100, TRILLION_WORDS, stall=3, plateau_rejects=8) is None
+    forecast = budget_forecast(2_000, 1.0, TRILLION_WORDS)
+    assert forecast["budget_met"] is False
+    assert forecast["words_per_second"] == 2_000
+    assert forecast["projected_seconds"] == TRILLION_WORDS / 2_000

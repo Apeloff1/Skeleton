@@ -453,6 +453,10 @@ def _append_ledger(path: Path, receipt: Mapping[str, Any]) -> None:
         "coherence_before",
         "coherence_after",
         "source_digest",
+        "stop_reason",
+        "budget_met",
+        "words_per_second",
+        "projected_seconds",
     ):
         if key in receipt and receipt[key] is not None:
             row[key] = receipt[key]
