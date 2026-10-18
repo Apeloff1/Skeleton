@@ -65,6 +65,6 @@ assert.ok(life.includes('useNativeDriver:true'),'no JS frame loop');
 assert.ok(life.includes('loops.forEach(a=>a.stop())'),'cleanup required');
 assert.ok(life.includes('reducedMotion'),'respect OS preferences');
 assert.ok(component.includes('DragonAtmosphere')&&component.includes('life.pet'),'scene and touch reaction must render');
-assert.ok(panel.includes('motion={motion}')&&panel.includes('skeleton.dragon.motion.v1'),'gentle/off prefs must reach animator and persist');
+assert.ok(panel.includes('motion={shownMotion}')&&panel.includes('skeleton.dragon.motion.v1')&&panel.includes('effectiveMotion'),'comfort settings must reach the animator and the motion preference must persist');
 assert.ok(panel.includes('never start research or change memory'),'pet interactions must remain cosmetic');
 console.log('Dragon life: 120 real phase beats, 30 physical gestures, 10 phases, bounded motion, reduced-motion and syntax checks passed.');
