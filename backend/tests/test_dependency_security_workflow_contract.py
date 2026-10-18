@@ -5,7 +5,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / ".github" / "workflows" / "dependency-security.yml"
+ACTIVE_WORKFLOW = ROOT / ".github" / "workflows" / "dependency-security.yml"
+ARCHIVED_WORKFLOW = ROOT / ".github" / "workflows-archive" / "dependency-security.yml"
+# Retain container/SBOM security regression assertions when the workflow is archived.
+# This validates the definition, not its currently active execution schedule.
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 
 
 def _text() -> str:

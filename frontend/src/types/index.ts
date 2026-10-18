@@ -65,7 +65,7 @@ export interface AIMode {
 export interface AIResponse {
   mode: string;
   suggestion: string;
-  code_blocks: Array<{ language: string; code: string }>;
+  code_blocks: { language: string; code: string }[];
   confidence: number;
   model: string;
 }
@@ -117,7 +117,7 @@ export interface BibleExercise {
   language: string;
   hints: string[];
   solution?: string;
-  testCases?: Array<{ input: string; expected: string }>;
+  testCases?: { input: string; expected: string }[];
 }
 
 export interface BibleChapter {

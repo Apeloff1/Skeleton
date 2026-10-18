@@ -109,13 +109,13 @@ class LocalInferenceRequest:
     tools: tuple[Mapping[str, Any], ...] = ()
     structured_output_schema: Mapping[str, Any] | None = None
     context_digest: str | None = None
+    tool_choice: str = "auto"
+    specific_tool_id: str | None = None
     temperature: float = 1.0
     top_k: int = 0
     top_p: float = 1.0
     min_p: float = 0.0
     repetition_penalty: float = 1.0
-    tool_choice: str = "auto"
-    specific_tool_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.prompt, str) or not self.prompt.strip():

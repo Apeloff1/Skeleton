@@ -8,7 +8,7 @@ export default function DragonWisdomSquares({ review }: { review: DragonWisdomRe
   // display validation only; it is not signature/receipt authentication.
   if (!normalizeDragonWisdomReview(review)) return <Text accessibilityRole="alert" style={s.note}>Dragon review unavailable: completed, validated review required.</Text>;
   return <View style={s.root}>
-    <Text style={s.title}>Dragon's final review</Text>
+    <Text style={s.title}>Dragon&apos;s final review</Text>
     <Text style={s.note}>{review.completed_rounds} improvement cycles completed</Text>
     <View style={s.grid}>
       {review.squares.map(square => <View key={square.id} style={[s.square, square.status === 'blocked' && s.blocked]}>

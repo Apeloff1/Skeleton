@@ -66,7 +66,7 @@ export async function withRetry<T>(op: () => Promise<T>, opts: RetryOpts<T> = {}
 }
 
 /** Promise.all but per-promise error isolation. Always resolves. */
-export async function resolveAllSafe<T>(promises: Promise<T>[]): Promise<Array<{ ok: boolean; value?: T; error?: any }>> {
+export async function resolveAllSafe<T>(promises: Promise<T>[]): Promise<{ ok: boolean; value?: T; error?: any }[]> {
   return Promise.all(promises.map(p =>
     p.then(value => ({ ok: true, value }))
      .catch(error => ({ ok: false, error }))

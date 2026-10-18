@@ -42,7 +42,7 @@ export default function PlanViewer({
   const view = React.useMemo(() => planView(payload, eras, pinnedEra), [payload, eras, pinnedEra]);
   const status = React.useMemo(() => planStatus(payload, running, view), [payload, running, view]);
   const [mixActive, setMixActive] = useRovingIndex(view.mix.length);
-  const mixRefs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const mixRefs = React.useRef<({ focus?: () => void } | null)[]>([]);
   const mixViaKey = React.useRef(false);
   React.useEffect(() => {
     if (!mixViaKey.current) return;

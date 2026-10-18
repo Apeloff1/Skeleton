@@ -654,7 +654,7 @@ async def regenerate_assistant_message(
     )
 
     tenant_id, owner_id = _identity(user)
-    engine = _chat_engine()
+    engine = None
     try:
         record = await conversation_authority.regeneration_request(
             thread_id, message_id, body.idempotency_key, tenant_id=tenant_id, owner_id=owner_id
@@ -700,6 +700,7 @@ async def regenerate_assistant_message(
             execution_id = str(
                 uuid.uuid5(uuid.NAMESPACE_URL, "skeleton-conversation-regenerate-execution:" + operation_id)
             )
+            engine = _chat_engine()
             catalog = await model_catalog(engine, actor_id=owner_id, tenant_id=tenant_id)
             selection = resolve_selection(catalog, provider_id=body.provider_id, model_id=body.model_id)
             budget = context_budget_for_selection(selection, output_tokens=body.max_output_tokens)
@@ -827,6 +828,8 @@ async def regenerate_assistant_message(
                 expected_thread_version=body.expected_thread_version,
                 record=record,
             )
+        if engine is None:
+            engine = _chat_engine()
         command = _regeneration_command(record, tenant_id, owner_id)
         projected = await _project_regeneration(
             record, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user

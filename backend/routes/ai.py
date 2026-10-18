@@ -1476,6 +1476,35 @@ async def _prepare_new_chat_execution(
     return message, metadata
 
 
+async def _user_request_refs_for_replay(
+    authority: Any,
+    user_message: Any,
+    *,
+    thread_id: str,
+    tenant_id: str,
+    owner_id: str,
+) -> tuple[str, ...]:
+    """Read server-persisted replay identity without fabricating missing evidence.
+
+    Mongo conversation authority stores request refs separately to bind immutable
+    execution metadata, whereas the SQLite reference repository and some
+    compatible authority implementations persist them on the user message.
+    Prefer the authoritative lookup whenever it is available. Never fall back
+    after that lookup raises, because a storage error must fail closed.
+    """
+    lookup = getattr(authority, "user_request_refs", None)
+    if lookup is not None:
+        return tuple(
+            await lookup(
+                thread_id,
+                user_message.message_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+        )
+    return tuple(getattr(user_message, "attachment_refs", ()) or ())
+
+
 @router.post("/chat", dependencies=[Depends(dragon_foreground)])
 async def ai_chat(
     request: AIChatRequest,
@@ -1512,8 +1541,12 @@ async def ai_chat(
         existing_refs = ()
         edited_unbound = False
         if existing_turn_user is not None:
-            existing_refs = await conversation_authority.user_request_refs(
-                request.thread_id, existing_turn_user.message_id, tenant_id=tenant_id, owner_id=owner_id
+            existing_refs = await _user_request_refs_for_replay(
+                conversation_authority,
+                existing_turn_user,
+                thread_id=request.thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
             )
             identities = [
                 ref.removeprefix("chat-request-sha256:")
