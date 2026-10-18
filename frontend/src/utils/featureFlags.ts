@@ -27,7 +27,7 @@ export interface FlagSpec {
   requiresReload?: boolean;
 }
 
-export const FEATURE_FLAGS: ReadonlyArray<FlagSpec> = [
+export const FEATURE_FLAGS: readonly FlagSpec[] = [
   { key: 'experimental_voice', default: false, label: 'Voice (experimental)', desc: 'Jeeves voice mode — preview', visible: true, category: 'Experimental' },
   { key: 'experimental_collab', default: true, label: 'Live collaboration', desc: 'Realtime multi-user coding (Collab + Hub)', visible: true, category: 'Experimental' },
   { key: 'jeeves_audio_test', default: false, label: 'Jeeves audio test', desc: 'Show Jeeves audio diagnostics tile', visible: true, category: 'Experimental' },

@@ -86,6 +86,8 @@ export function useThermalGuard(): ThermalGuardHook {
 
     const init = async () => {
       try {
+        // Optional native dependency; keep synchronous availability detection.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const BatteryModule = require('expo-battery');
         const [level, state] = await Promise.all([
           BatteryModule.getBatteryLevelAsync(),

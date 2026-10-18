@@ -66,7 +66,7 @@ export interface AIState {
   isGenerating: boolean;
   lastPrompt: string;
   lastResponse: string;
-  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  conversationHistory: { role: 'user' | 'assistant'; content: string }[];
   activeMode: string;
 }
 

@@ -184,13 +184,14 @@ export function useMobileOptimization() {
   // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
+    const pendingTasks = pendingIdleRef.current;
     return () => {
       mountedRef.current = false;
-      for (const task of pendingIdleRef.current) {
+      for (const task of pendingTasks) {
         task.cancel();
         task.reject(new Error('Component unmounted'));
       }
-      pendingIdleRef.current.clear();
+      pendingTasks.clear();
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = null;
     };

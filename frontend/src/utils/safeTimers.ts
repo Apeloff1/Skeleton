@@ -172,10 +172,11 @@ export function useSafeTimers() {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
+    const ownedTimers = owned.current;
     return () => {
       mounted.current = false;
-      for (const cancel of [...owned.current]) cancel();
-      owned.current.clear();
+      for (const cancel of [...ownedTimers]) cancel();
+      ownedTimers.clear();
     };
   }, []);
   function schedule(fn: Task, ms: number, kind: Kind): () => void {

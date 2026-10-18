@@ -108,7 +108,9 @@ export function usePersistentState<T>(
       }
     });
     return () => {
-      ++epochRef.current;
+      // The setup epoch is the authority being invalidated. Assign it
+      // directly so cleanup never reads a potentially changed ref value.
+      epochRef.current = epoch + 1;
       if (state.timer) clearTimeout(state.timer);
       state.timer = null;
       persist(state); // no state update, best effort but ordered native write

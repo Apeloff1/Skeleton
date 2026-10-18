@@ -12,13 +12,13 @@
 import type { DnaTuple, DnaGroup } from './narrativeDnaData';
 
 /** Public list of build categories — keep in sync with CodeToAppModal.appTypes. */
-export const BUILDER_CATEGORIES: ReadonlyArray<{
+export const BUILDER_CATEGORIES: readonly {
   key: string;
   label: string;
   emoji: string;
   color: string;
   flavour: string;
-}> = [
+}[] = [
   { key: 'cli',       label: 'CLI',       emoji: '💻', color: '#a78bfa', flavour: 'command-line tools' },
   { key: 'web',       label: 'Web',       emoji: '🌐', color: '#06b6d4', flavour: 'web applications' },
   { key: 'api',       label: 'API',       emoji: '⚙️', color: '#fbbf24', flavour: 'REST/RPC services' },

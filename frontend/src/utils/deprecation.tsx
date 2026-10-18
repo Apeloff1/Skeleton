@@ -36,7 +36,7 @@ export interface DeprecationInfo {
 }
 
 const _seen = new Set<string>();
-const _log: Array<{ name: string; info: DeprecationInfo; ts: number }> = [];
+const _log: { name: string; info: DeprecationInfo; ts: number }[] = [];
 
 function _emit(name: string, info: DeprecationInfo): void {
   const key = name + (info.since || '');

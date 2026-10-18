@@ -18,7 +18,7 @@ export default function DragonDemoPlayer({
   <SafeAreaView style={s.root}>
    <View style={s.header}>
     <View style={s.title}>
-     <Text style={s.heading}>Dragon's little game lab</Text>
+     <Text style={s.heading}>Dragon&apos;s little game lab</Text>
      <Text style={s.caption}>Offline experiment · not a verified playtest</Text>
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Close game demo"

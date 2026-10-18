@@ -478,10 +478,13 @@ def main() -> int:
     )
 
     backend_quality = read(".github/workflows/backend-quality.yml")
+    # CI/CD is the sole Ruff owner for backend changes. Backend Quality retains
+    # all separate SAST, security, regression, and fail-closed scanners.
     require(
         f'python-version: "{PYTHON_VERSION}"' in backend_quality
-        and f'"ruff=={RUFF_CI_VERSION}"' in backend_quality,
-        f"Backend Quality must use Python {PYTHON_VERSION} and Ruff {RUFF_CI_VERSION}",
+        and ci.count(ruff_command) == 1
+        and "ruff check . --output-format=github" not in backend_quality,
+        f"Backend Quality must pin Python {PYTHON_VERSION} and delegate Ruff {RUFF_CI_VERSION} to exactly one CI/CD Backend Lint lane",
         failures,
     )
     require(

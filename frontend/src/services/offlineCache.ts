@@ -91,9 +91,6 @@ function validCommit(raw: string | null): CacheCommit | null {
     return c;
   } catch { return null; }
 }
-async function committed(): Promise<CacheCommit | null> {
-  return validCommit(await AsyncStorage.getItem(COMMIT_KEY));
-}
 function baseKey(collection: string, generation: string | null): string {
   return generation ? `${CACHE_PREFIX}g-${generation}/${collection}` : `${CACHE_PREFIX}${collection}`;
 }
