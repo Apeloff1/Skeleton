@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ts = require('typescript');
@@ -30,7 +31,7 @@ function hookFixture() {
   global.setTimeout = (fn, ms) => { const id = ++next; timers.set(id, { fn, ms }); return id; };
   global.clearTimeout = id => { timers.delete(id); };
   const mod = { exports: {} };
-  new Function('require','module','exports',compiled.outputText)(id => {
+  compileFunction(compiled.outputText, ['require', 'module', 'exports'])(id => {
     if (id === 'react') return react;
     if (id === 'react-native') return native;
     if (id === './apiBase') return { API_BASE: 'https://backend.test' };
