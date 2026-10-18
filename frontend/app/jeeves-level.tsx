@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/JeevesLevel/JeevesLevelModal'), 'JeevesLevelRoute', 'JeevesLevelModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/JeevesLevel/JeevesLevelModal'), 'JeevesLevelRoute', 'JeevesLevelModal');

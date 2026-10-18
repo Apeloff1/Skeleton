@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/SOTAExtended/SOTAExtendedModal'), 'SOTAExtendedRoute', 'SOTAExtendedModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/SOTAExtended/SOTAExtendedModal'), 'SOTAExtendedRoute', 'SOTAExtendedModal');

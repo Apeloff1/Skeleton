@@ -1,7 +1,7 @@
 /** Forge cockpit compatibility colors from the canonical design-token module. */
 import type { ViewStyle } from 'react-native';
 import type { Tone } from '../run';
-import design, { status } from '../../../theme/tokens';
+import design, { status } from '../../theme/tokens';
 
 const { breathing, radii } = design;
 

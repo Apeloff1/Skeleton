@@ -1,7 +1,7 @@
 const fs=require('node:fs');const path=require('node:path');
-const model=fs.readFileSync(path.join(__dirname,'../features/Jeeves/companion/dragonCompanionState.ts'),'utf8');
-const view=fs.readFileSync(path.join(__dirname,'../features/Jeeves/companion/DragonCompanion.tsx'),'utf8');
-const chat=fs.readFileSync(path.join(__dirname,'../features/Jeeves/ChatWorkspace.tsx'),'utf8');
+const model=fs.readFileSync(path.join(__dirname,'../src/features/Jeeves/companion/dragonCompanionState.ts'),'utf8');
+const view=fs.readFileSync(path.join(__dirname,'../src/features/Jeeves/companion/DragonCompanion.tsx'),'utf8');
+const chat=fs.readFileSync(path.join(__dirname,'../src/features/Jeeves/ChatWorkspace.tsx'),'utf8');
 function ok(v,m){if(!v)throw new Error(m)}
 ok(model.includes("case'burn_complete':return state('distilling'"),'burn completion must enter distillation');
 ok(model.includes('glasses:true,bandage:true'),'distillation must wear glasses and bridge bandage');

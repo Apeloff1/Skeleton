@@ -17,10 +17,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import api from '../utils/apiClient';
+import { useQuery } from '../foundation/useQuery';
+import { getJson, parseVault, vaultKey } from '../foundation/queries';
 import {
   downloadToDevice, fetchBoardroomContent, fetchBoardroomVersions,
   rollbackVault, fetchToSystem, fetchMonograph,
 } from '../utils/vaultActions';
+
+const fetchVault = async () => parseVault(await getJson<unknown>(api, '/api/gameforge/studio/vault/unified?limit=80', 20_000));
 
 const GREEN = '#22c55e';
 const BLUE = '#3b82f6';
@@ -44,9 +48,11 @@ type Item = {
 
 export default function UnifiedVault({ embedded = false, onContinueInBuild }: { embedded?: boolean; onContinueInBuild?: () => void }) {
   const router = useRouter();
-  const [items, setItems] = React.useState<Item[]>([]);
-  const [counts, setCounts] = React.useState<Record<string, number>>({});
-  const [loading, setLoading] = React.useState(true);
+  // Shared, cached vault list (same query as the Projects tab).
+  const vault = useQuery(vaultKey(80), fetchVault, { staleTimeMs: 15_000 });
+  const items: Item[] = vault.data?.items ?? [];
+  const counts: Record<string, number> = vault.data?.counts ?? {};
+  const loading = vault.status === 'loading' || vault.status === 'idle';
   const [refreshing, setRefreshing] = React.useState(false);
   const [filter, setFilter] = React.useState<'all' | 'boardroom' | 'agents' | 'worldforge'>('all');
 
@@ -58,17 +64,10 @@ export default function UnifiedVault({ embedded = false, onContinueInBuild }: { 
   const [actionMsg, setActionMsg] = React.useState('');
   const [fetchedGamefiles, setFetchedGamefiles] = React.useState(false);
 
+  const { refetch } = vault;
   const load = React.useCallback(async () => {
-    const r = await api.get<any>('/api/gameforge/studio/vault/unified?limit=80', { timeoutMs: 20000 });
-    if (r.ok && r.data?.ok) {
-      setItems(r.data.items || []);
-      setCounts(r.data.counts || {});
-    }
-    setLoading(false);
-    setRefreshing(false);
-  }, []);
-
-  React.useEffect(() => { load(); }, [load]);
+    try { await refetch(); } finally { setRefreshing(false); }
+  }, [refetch]);
 
   const openItem = async (it: Item) => {
     setSel(it); setContent(''); setVersions([]); setActionMsg(''); setDetailBusy(true);
@@ -150,6 +149,10 @@ export default function UnifiedVault({ embedded = false, onContinueInBuild }: { 
 
       {loading ? (
         <View style={st.center}><ActivityIndicator color={GREEN} /></View>
+      ) : vault.status === 'error' && items.length === 0 ? (
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Vault failed to load. Tap to retry" onPress={() => { void load(); }}>
+          <Text style={st.empty}>Couldn’t load the vault ({vault.error?.message || 'network error'}). Tap to retry.</Text>
+        </TouchableOpacity>
       ) : shown.length === 0 ? (
         <Text style={st.empty}>No vault entries in this view yet.</Text>
       ) : (

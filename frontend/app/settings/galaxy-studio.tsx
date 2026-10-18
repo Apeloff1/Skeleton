@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../../src/utils/apiBase';
 import { useMemo, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity,
@@ -10,10 +10,10 @@ import {
   useSettings, BATCH_LABELS, NARRATIVE_DNA_GROUPS, NARRATIVE_DNA_TOTAL,
   getPhaseWeightsPayload, getNarrativeDnaPayload, getNarrativeDnaDriftCount,
   DnaGroup,
-} from '../../state/settingsStore';
-import { Section, SliderRow, SwitchRow, ActionButton } from '../../features/Settings/components';
-import { actionSheet } from '../../components/ActionSheet';
-import { toast } from '../../components/Toast';
+} from '../../src/state/settingsStore';
+import { Section, SliderRow, SwitchRow, ActionButton } from '../../src/features/Settings/components';
+import { actionSheet } from '../../src/components/ActionSheet';
+import { toast } from '../../src/components/AppToast';
 
 // Smooth height transitions for open/close (Android needs explicit enable).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

@@ -161,7 +161,7 @@ test('progress status helper validates bounds', () => {
 });
 
 test('ActionSheet exposes modal semantics, accessible buttons and reduced motion', () => {
-  const content = source('components/ActionSheet.tsx');
+  const content = source('src/components/ActionSheet.tsx');
   assert.match(content, /accessibilityViewIsModal/);
   assert.match(content, /accessibleButtonProps/);
   assert.match(content, /useReduceMotion/);
@@ -169,7 +169,7 @@ test('ActionSheet exposes modal semantics, accessible buttons and reduced motion
 });
 
 test('Toast exposes live status without swallowing child controls', () => {
-  const content = source('components/Toast.tsx');
+  const content = source('src/components/AppToast.tsx');
   assert.match(content, /accessibleStatusProps/);
   assert.match(content, /accessibleButtonProps\(t\('notification.dismiss'\)\)/);
   assert.match(content, /minWidth: 44/);
@@ -191,7 +191,7 @@ test('StabilityBanner exposes textual assertive connectivity semantics', () => {
 });
 
 test('BootLauncher exposes progress, failure, recovery and single reduce-motion source', () => {
-  const content = source('components/BootLauncher.tsx');
+  const content = source('src/components/BootLauncher.tsx');
   assert.match(content, /useReduceMotion/);
   assert.match(content, /accessibleStatusProps/);
   assert.match(content, /t\('status.startup_progress', \{ percent: boundedPct \}\)/);
@@ -202,7 +202,7 @@ test('BootLauncher exposes progress, failure, recovery and single reduce-motion 
 });
 
 test('LaunchCascade exposes named fallback controls and startup status', () => {
-  const content = source('components/LaunchCascade.tsx');
+  const content = source('src/components/LaunchCascade.tsx');
   assert.match(content, /accessibleButtonProps\(t\('launcher.open'\)\)/);
   assert.match(content, /accessibleButtonProps\(t\('recovery.safe_mode'\)\)/);
   assert.match(content, /accessibleStatusProps\(t\('status.starting'\)\)/);
