@@ -1505,6 +1505,30 @@ async def _user_request_refs_for_replay(
     return tuple(getattr(user_message, "attachment_refs", ()) or ())
 
 
+def _chat_context_attachment_refs(
+    request: AIChatRequest,
+    request_digest: str,
+    *,
+    include_prepared: bool,
+) -> tuple[str, ...]:
+    """Build immutable source evidence before any durable chat admission.
+
+    The request identity is always bound, ephemeral context gets a separate
+    digest, and preparation provenance is explicit. Existing turns still load
+    their original server-owned references instead of rebuilding them.
+    """
+    refs: list[str] = []
+    if request.context:
+        refs.append(
+            "ephemeral-context-sha256:" + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
+        )
+    refs.append("chat-request-sha256:" + request_digest)
+    if include_prepared:
+        refs.append("chat-prepared-execution:v1")
+    refs.extend(request.attachment_refs)
+    return tuple(refs)
+
+
 @router.post("/chat", dependencies=[Depends(dragon_foreground)])
 async def ai_chat(
     request: AIChatRequest,
@@ -1561,15 +1585,15 @@ async def ai_chat(
                         "the original chat key is bound to different request semantics"
                     )
                 request_digest = matches.pop()
-        context_refs: list[str] = []
-        if request.context:
-            context_refs.append(
-                "ephemeral-context-sha256:" + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
-            )
-        context_refs.append("chat-request-sha256:" + request_digest)
-        if existing_turn_user is None or edited_unbound or "chat-prepared-execution:v1" in existing_refs:
-            context_refs.append("chat-prepared-execution:v1")
-        context_attachment_refs = tuple((*context_refs, *request.attachment_refs))
+        context_attachment_refs = _chat_context_attachment_refs(
+            request,
+            request_digest,
+            include_prepared=(
+                existing_turn_user is None
+                or edited_unbound
+                or "chat-prepared-execution:v1" in existing_refs
+            ),
+        )
         if existing_turn_user is not None and not edited_unbound:
             context_attachment_refs = existing_refs
 
