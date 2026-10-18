@@ -13,7 +13,7 @@ from skeleton.api.engine_service import (
     SQLiteEngineSubmissionStore,
 )
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
-from skeleton.testing.test_engine_routes import (
+from skeleton.testing.engine_route_test_support import (
     _client,
     _inventory_headers,
     _service_and_command,
