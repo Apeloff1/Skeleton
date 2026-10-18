@@ -190,6 +190,8 @@ class SSETransport:
         headers: Optional[HeaderProvider] = None,
         path: str = "/api/v1/events",
         timeout_s: float = 10.0,
+        actor_id: Optional[str] = None,
+        tenant_id: Optional[str] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.path = path
@@ -197,6 +199,16 @@ class SSETransport:
         self._owns_client = client is None
         self._headers = headers or (lambda: {})
         self._timeout_s = timeout_s
+        # Job-scoped subscriptions need engine actor+tenant authorization.
+        # Query parameters are composed by httpx (not embedded in ``path``:
+        # passing ``params=`` would discard a pre-existing path query string).
+        if (actor_id is None) != (tenant_id is None):
+            raise ValueError("actor_id and tenant_id must be supplied together")
+        for value in (actor_id, tenant_id):
+            if value is not None and (not isinstance(value, str) or not 1 <= len(value) <= 512):
+                raise ValueError("invalid actor/tenant scope")
+        self._actor_id = actor_id
+        self._tenant_id = tenant_id
 
     def _http(self) -> Any:
         if self._client is None:
@@ -209,6 +221,9 @@ class SSETransport:
         params: Dict[str, str] = {"channels": ",".join(channels)}
         if job_id:
             params["job_id"] = job_id
+            if self._actor_id is not None and self._tenant_id is not None:
+                params["actor_id"] = self._actor_id
+                params["tenant_id"] = self._tenant_id
         if cursor:
             params["cursor"] = cursor
         headers = {"accept": SSE_MEDIA_TYPE, "cache-control": "no-cache"}
