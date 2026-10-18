@@ -70,7 +70,7 @@ test('nb dictionary covers every en key with matching placeholders', () => {
 });
 
 test('canonical theme (dark + light) meets WCAG contrast for primary text roles', () => {
-  for (const [mode, c] of Object.entries(theme.colors)) {
+  for (const [mode, c] of Object.entries(theme.default.colorModes)) {
     if (!c.text) continue;
     assert.ok(A.contrastRatio(c.text, c.bg) >= 7, `${mode} text on bg`);
     assert.ok(A.contrastRatio(c.textMuted, c.bg) >= 4.5, `${mode} textMuted on bg`);
