@@ -1904,11 +1904,11 @@ def run_massive_hyper_steps(
         # 1. Advance transformer and n-gram/neural substrates with analytical stride scaling
         if xf is not None:
             if chunk_idx < 6 and hasattr(xf, "fit"):
-                xf.fit(stim, epochs=1, lr=eff_lr)
+                xf.fit(stim, lr=eff_lr)
             xf.steps = int(getattr(xf, "steps", 0) or 0) + chunk_steps
         if rms is not None:
             if chunk_idx < 4 and hasattr(rms, "fit"):
-                rms.fit(stim, epochs=1, lr=eff_lr)
+                rms.fit(stim, lr=eff_lr)
             rms.steps = int(getattr(rms, "steps", 0) or 0) + chunk_steps
         if backup is not None:
             backup.steps = int(getattr(backup, "steps", 0) or 0) + chunk_steps
