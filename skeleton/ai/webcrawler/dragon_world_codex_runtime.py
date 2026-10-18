@@ -142,6 +142,7 @@ def _gate(address:CodexAddress,state:CodexState,index:int)->dict:
     domain_score=state.domain_reputation[index]
     danger=max(0,secondary//48-domain_score//12)
     resource_cost=1+secondary//80
+    extra_requirements=[]
     if domain=="aerial_realms":
         # Active sky islands and jet shear make elevated routes harder,
         # while real skybridges and glider training mitigate that exposure.
@@ -149,15 +150,22 @@ def _gate(address:CodexAddress,state:CodexState,index:int)->dict:
         resource_cost+=codex.level("aerial_isolation")//64
         protected=(codex.level("skybridge_density")>=128 or
                    state.axis_mastery[128+EXTENSION_AXIS_INDEX["glider_lift"]]>=2)
+        if intensity>=96 and codex.level("skybridge_density")<128:
+            extra_requirements=[{
+                "axis":"glider_lift",
+                "required":2,
+                "current":state.axis_mastery[128+EXTENSION_AXIS_INDEX["glider_lift"]],
+            }]
         earned=earned and (intensity<96 or protected)
     currently=earned and turn>=earliest and turn%period==0
     mode=ALL_GATE_MODES[index]
     return {
         "name":mode,"domain":domain,"axis_required":[
-            AXIS_NAMES[axis0],AXIS_NAMES[axis1]],
+            ALL_AXIS_NAMES[axis0],ALL_AXIS_NAMES[axis1]],
         "mastery_required":[needed0,needed1],
         "mastery_current":[state.axis_mastery[axis0],
                            state.axis_mastery[axis1]],
+        "additional_prerequisites":extra_requirements,
         "earned":earned,"available":currently,
         "earliest_turn":earliest,
         "cycle_period":period,
@@ -423,6 +431,13 @@ def witness_to_gate(address:CodexAddress,domain:str,
     ):
         for _ in range(max(0,required-actual)):
             command="study_"+axis
+            current=step(address,current,command)
+            plan.append(command)
+    # Advanced routes explicitly earn alternate lift prerequisites when
+    # no configured skybridge can make a high-density sky island reachable.
+    for requirement in gate["additional_prerequisites"]:
+        command="study_"+requirement["axis"]
+        for _ in range(max(0,requirement["required"]-requirement["current"])):
             current=step(address,current,command)
             plan.append(command)
     # Time access is procedural and finite, not a teleport around locks.
