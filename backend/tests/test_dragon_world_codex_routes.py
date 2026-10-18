@@ -213,6 +213,12 @@ def test_versioned_sky_islands_stimulate_real_traversal_and_altitude():
     assert len(info["available_actions"])==218
     assert info["axes_level_map"]["sky_islands"]==188
     assert "aerial_topology" in info["terrain"]
+    interactions=info["terrain"]["world_interactions"]
+    assert len(interactions)==8
+    assert all(type(value) is int and 0<=value<=255
+               for value in interactions.values())
+    assert interactions["aerial_trade_access"]>=0
+    assert interactions["cinematic_scene_depth"]==0
     aerial=next(x for x in info["gates"] if x["name"]=="cross_sky_islands")
     assert aerial["additional_prerequisites"]==[
         {"axis":"glider_lift","required":2,"current":0}]
@@ -242,6 +248,7 @@ def test_extended_codex_impact_endpoint_checks_both_art_and_world_paths():
     assert result["terrain"]["changed"]
     assert result["terrain"]["aerial_before"] is None
     assert result["terrain"]["aerial_after"] is not None
+    assert result["terrain"]["after"]["aerial_realms"]["energy"]>=0
     assert "cross_sky_islands" in result["traversal"]["additional_route_names"]
     assert result["tiles"]["before_count"]==12
     assert result["tiles"]["after_count"]==16
