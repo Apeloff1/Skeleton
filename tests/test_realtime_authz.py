@@ -43,8 +43,36 @@ def test_cross_tenant_live_events_are_not_delivered():
     bob = hub.subscribe(["build", "agent"], principal="bob")
     hub.publish("build", "build.progress", {"n": 1}, job_id="job-a", owner="alice", tenant="t1")
     hub.publish("agent", "agent.step", {"n": 2}, job_id="job-b", owner="bob", tenant="t2")
-    assert [e.payload["n"] for e in _events(alice)] == [1]
-    assert [e.payload["n"] for e in _events(bob)] == [2]
+    # Raw actor identity does not establish the tenant. Tenant-scoped events
+    # require a separately authorized execution/job grant.
+    assert _events(alice) == []
+    assert _events(bob) == []
+
+
+def test_same_actor_in_multiple_tenants_requires_execution_grant_live_and_replay():
+    hub = _hub()
+    shared = hub.subscribe(["build"], principal="shared-actor")
+    hub.publish("build", "build.progress", {"n": 1}, job_id="job-t1", owner="shared-actor", tenant="tenant-1")
+    hub.publish("build", "build.progress", {"n": 2}, job_id="job-t2", owner="shared-actor", tenant="tenant-2")
+    # Neither event is safe merely because the actor name matches.
+    assert _events(shared) == []
+    resumed = hub.subscribe(["build"], principal="shared-actor", cursor=1000)
+    assert _events(resumed) == []
+    # Only the separately authorized execution ID gives its scoped data back.
+    granted = hub.subscribe(["build"], principal="service", job_id="job-t1", job_grant="job-t1", cursor=1000)
+    assert [e.payload["n"] for e in _events(granted)] == [1]
+    hub.publish("build", "build.progress", {"n": 3}, job_id="job-t1", owner="shared-actor", tenant="tenant-1")
+    hub.publish("build", "build.progress", {"n": 4}, job_id="job-t2", owner="shared-actor", tenant="tenant-2")
+    assert [e.payload["n"] for e in _events(granted)] == [3]
+    assert _events(resumed) == []
+
+
+def test_unscoped_owner_events_still_reach_matching_principal():
+    hub = _hub()
+    subscriber = hub.subscribe(["agent"], principal="alice", cursor=1000)
+    hub.publish("agent", "agent.step", {"n": 1}, owner="alice")
+    hub.publish("agent", "agent.step", {"n": 2}, owner="bob")
+    assert [e.payload["n"] for e in _events(subscriber)] == [1]
 
 
 def test_unowned_events_are_delivered_to_nobody_without_a_grant():
@@ -110,7 +138,8 @@ def test_sink_binds_owner_from_envelope_not_payload():
     sink = HubJobEventSink(hub)
     sink.publish({"type": "build.progress", "actor_id": "alice", "tenant_id": "t1", "payload": {"actor_id": "mallory"}})
     sink.publish({"type": "build.progress", "payload": {"owner": "mallory"}})
-    assert len(_events(alice)) == 1
+    # The scoped producer envelope cannot grant unfiltered tenant access.
+    assert _events(alice) == []
     assert _events(mallory) == []
 
 

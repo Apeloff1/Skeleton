@@ -141,7 +141,16 @@ class Subscription:
         if self.job_grant is not None and event.job_id == self.job_grant:
             return True
         access = self.hub._access.get(event.seq)
-        return access is not None and access.owner is not None and access.owner == self.principal
+        # An actor identifier alone is not a tenant authorization claim.
+        # A principal reused in multiple tenants must not see tenant-scoped
+        # events through an unfiltered channel. Those events require a
+        # per-execution grant obtained from the engine ownership gate above.
+        return (
+            access is not None
+            and access.owner is not None
+            and access.owner == self.principal
+            and access.tenant is None
+        )
 
     # -- producer side (hub lock held) ------------------------------------
     def _offer(self, event: RealtimeEvent) -> int:
