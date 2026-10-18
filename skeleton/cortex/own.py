@@ -1033,7 +1033,14 @@ class ZeroShotBlueprintCompiler:
         if getattr(neo, "moe", None) is not None and "left" in neo.moe.experts:
             aux = getattr(neo.moe.experts["left"], "aux", None)
             if aux is not None and hasattr(aux, "predict"):
-                pacing = tuple(round(float(x), 4) for x in aux.predict(h))
+                raw_pacing = aux.predict(h)
+                if isinstance(raw_pacing, dict):
+                    vals = [float(v) for v in raw_pacing.values()]
+                else:
+                    vals = [float(v) for v in raw_pacing]
+                while len(vals) < 4:
+                    vals.append(0.75)
+                pacing = tuple(round(v, 4) for v in vals[:4])
 
         # Synthesize hardware-exact ROM tile bank, palette, OAM table, and PSG audio patch
         rom_envelope = compile_console_rom_envelope(console_target)

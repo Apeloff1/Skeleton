@@ -1147,6 +1147,8 @@ def run_curiosity_self_play_loop(
     top_k_concepts: int = 4,
     learning_rate: float = 0.02,
     optimizer: str = "adamw",
+    weight_decay: float = 0.01,
+    gradient_clip: float = 1.0,
     eval_documents: Sequence[str] | None = None,
 ) -> dict[str, object]:
     """Closed-loop curiosity-driven self-play training with non-regression ratchet."""
@@ -1167,6 +1169,8 @@ def run_curiosity_self_play_loop(
             epochs=1,
             lr=float(learning_rate) * (0.92 ** r_idx),
             optimizer=optimizer,
+            weight_decay=weight_decay,
+            gradient_clip=gradient_clip,
             holdout=eval_set,
         )
         after_loss = _eval_loss(model, eval_set)

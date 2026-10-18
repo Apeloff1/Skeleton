@@ -962,9 +962,9 @@ def test_hyperlora_ties_slerp_model_soup_constrained_jacobi_dream_dpo_and_zero_s
 
     # 6. Predictive Brownout Forecasting, Batch Coalescing, and Speculative Prefetch
     splitter = TrafficSplitter()
-    splitter.set_backend("steady", weight=100)
-    splitter.set_backend("spiking", weight=100)
-    for lat in (20.0, 45.0, 80.0, 120.0):
+    splitter.add_backend("steady", weight=100)
+    splitter.add_backend("spiking", weight=100)
+    for lat in (40.0, 75.0, 110.0, 145.0):
         splitter.record("spiking", latency_ms=lat)
         splitter.record("steady", latency_ms=18.0)
     forecast = splitter.forecast_brownout(latency_budget_ms=100.0, horizon_steps=3)
