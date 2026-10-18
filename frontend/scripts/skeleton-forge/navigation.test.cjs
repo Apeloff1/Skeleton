@@ -27,3 +27,17 @@ test('menu exposes a Skeleton Forge card pointing at the route', () => {
   assert.ok(card, 'menu card missing');
   assert.match(card, /route: '\/skeleton-forge'/);
 });
+
+test('studio route, registry and menu agree', () => {
+  const route = read('app/skeleton-studio.tsx');
+  assert.match(route, /FoundationScreen/);
+  assert.match(route, /\/skeleton-forge/);
+  assert.match(route, /\/setup/);
+  const reg = read('src/utils/routeRegistry.ts');
+  const hits = reg.match(/path: '\/skeleton-studio'/g) || [];
+  assert.equal(hits.length, 1);
+  const menu = read('app/menu.tsx');
+  const card = menu.split('\n').find((l) => l.includes("id: 'skeletonStudio'"));
+  assert.ok(card, 'studio menu card missing');
+  assert.match(card, /route: '\/skeleton-studio'/);
+});
