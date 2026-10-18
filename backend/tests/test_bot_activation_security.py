@@ -71,8 +71,10 @@ def test_expensive_secret_scan_has_bounded_extended_timeout(monkeypatch) -> None
     monkeypatch.setattr(security.subprocess, "run", fake_run)
     security.run_bot_activation_security_baseline()
 
-    assert calls["check_secret_hygiene.py"] == 180
-    assert all(timeout <= 180 for timeout in calls.values())
+    # Larger repositories give the full secret scan a finite 300-second
+    # allowance; other scanners retain their shorter fixed 90-second budget.
+    assert calls["check_secret_hygiene.py"] == 300
+    assert all(0 < timeout <= 300 for timeout in calls.values())
     assert {
         timeout for name, timeout in calls.items()
         if name != "check_secret_hygiene.py"
@@ -161,7 +163,10 @@ def test_model_entrypoints_import_dependency_free_gate() -> None:
 
 
 def test_repair_intake_issue_body_stays_inside_yaml_shell_block() -> None:
-    workflow = (REPO_ROOT / ".github/workflows/repair-intake.yml").read_text(
+    # Archived privileged workflow definitions remain subject to injection
+    # contract tests but cannot be mistaken for a live CI qualification.
+    assert not (REPO_ROOT / ".github/workflows/repair-intake.yml").exists()
+    workflow = (REPO_ROOT / ".github/workflows-archive/repair-intake.yml").read_text(
         encoding="utf-8"
     )
 

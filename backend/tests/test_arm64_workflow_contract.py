@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scripts.check_ci_workflow_tiers import events
+
 
 ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_WORKFLOW = ROOT / ".github" / "workflows" / "arm64.yml"
@@ -13,10 +15,10 @@ def test_arm64_is_manual_only_when_specialized() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
     # This expensive specialized lane is explicitly dispatched, not a PR fanout.
-    assert "  workflow_dispatch:" in text
-    assert "  pull_request:" not in text
-    assert "  push:" not in text
-    assert "  schedule:" not in text
+    # Only the top-level on: block declares workflow triggers. A Docker
+    # build-push-action with push: false is not an Actions push event.
+    assert events(text) == {"workflow_dispatch"}
+    assert not ACTIVE_WORKFLOW.exists()  # archived manual evidence is not a passing live gate
     assert 'group: arm64-${{ github.event.pull_request.number || github.ref }}' in text
     assert "cancel-in-progress: true" in text
     assert "github.event_name != 'pull_request' ||" in text
