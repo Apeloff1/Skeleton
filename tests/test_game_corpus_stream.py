@@ -1,6 +1,7 @@
 """The game corpus covers the required domains and stays off the holdouts."""
 from __future__ import annotations
 
+import math
 import tempfile
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from skeleton.ai.runtime.inference.game_corpus_stream import (
     iter_documents,
     leaks,
     render,
+    focus_weights,
     track_holdouts,
     training_serial,
     validate_templates,
@@ -80,7 +82,7 @@ def test_track_holdouts_are_outside_the_training_serials():
     held = holdout_documents()
     assert len(held) == len(set(held))
     tracks = track_holdouts()
-    assert set(tracks) == {"visual", "narrative", "systems"}
+    assert set(tracks) == {"visual", "narrative", "systems", "review", "practice"}
     flat = [text for rows in tracks.values() for text in rows]
     assert set(flat) <= set(held)
     assert len(flat) == len(set(flat))
@@ -109,6 +111,17 @@ def test_training_serials_practice_long_ids_and_skip_holdouts():
         _domain, text = stream.next_document()
         assert text not in held
         assert "Pass " in text
+
+
+def test_focus_weights_put_legal_coding_and_review_first():
+    weights = focus_weights()
+    assert set(weights) == set(TEMPLATES)
+    assert weights["legal"] == weights["coding"] == 3.0
+    for name in ("proofreading", "syntax", "errors", "crash", "lint"):
+        assert weights[name] == 2.5
+    assert weights["sprites"] == 1.0
+    assert len(TEMPLATES["legal"]) >= 4
+    assert len(TEMPLATES["coding"]) >= 4
 
 
 def test_ratchet_keeps_a_mean_gain_and_blocks_a_track_collapse():
@@ -180,4 +193,17 @@ def test_a_short_budget_trains_without_promoting():
     assert receipt["byte_loss_is_gameplay_quality"] is False
     assert receipt["adamw"]["betas"] == [0.9, 0.999]
     assert receipt["adamw"]["weight_decay"] == 0.01
-    assert set(receipt["official_tracks"]) == {"visual", "narrative", "systems"}
+    assert set(receipt["official_tracks"]) == {"visual", "narrative", "systems", "review", "practice"}
+
+
+def test_transformer_finetune_stays_off_the_serving_checkpoint():
+    from skeleton.ai.runtime.inference.game_focus_finetune import finetune_transformer
+
+    root = Path(tempfile.mkdtemp())
+    receipt = finetune_transformer(max_documents=4, checkpoint_dir=root)
+    assert receipt["promotion"] is False
+    assert receipt["service_checkpoint_touched"] is False
+    assert receipt["documents"] == 4
+    assert math.isfinite(receipt["holdout_logprob_before"])
+    assert math.isfinite(receipt["holdout_logprob_after"])
+    assert set(receipt["review_domains"]) == {"proofreading", "syntax", "errors", "crash", "lint"}

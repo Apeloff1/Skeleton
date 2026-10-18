@@ -94,6 +94,10 @@ SLOTS: dict[str, tuple[str, ...]] = {
     "region": ("hand", "torso", "head", "back"),
     "pattern": ("plain", "stripe", "check", "hem", "speck"),
     "note": ("pickup", "footstep", "hit", "failure sting", "discovery"),
+    "fault": ("off-by-one index", "unset field", "stale tick", "wrong owner", "mixed units"),
+    "check": ("type", "name", "unused import", "unreachable branch", "format"),
+    "symptom": ("hard stop", "soft lock", "desync", "black frame", "stuck pose"),
+    "copy": ("button label", "quest line", "legal notice", "error line", "subtitle"),
 }
 
 # Tracks the adaptive ratchet watches. Every name is also a corpus domain.
@@ -110,6 +114,16 @@ TRACKS: dict[str, tuple[str, ...]] = {
         "voice",
     ),
     "systems": ("legal", "coding", "world", "combat", "economy", "physics", "save_state", "input", "build"),
+    "review": ("proofreading", "syntax", "errors", "crash", "lint"),
+    "practice": (
+        "tutorial",
+        "achievement",
+        "navigation",
+        "moderation",
+        "analytics",
+        "subtitles",
+        "photo_mode",
+    ),
 }
 
 TEMPLATES: dict[str, tuple[str, ...]] = {
@@ -117,11 +131,15 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
         "Pass {n}. The {role} files a {grant} for the {asset}. The record names the author and the revision, and a missing grant keeps that file out of the shipping build.",
         "Pass {n}. A collaborator may replace the {asset} for the {place} only after the change is written down. The previous revision stays addressable so the cut can be restored.",
         "Pass {n}. Age-rating notes for the {place} list the {verb} and the {failure}. They describe the authored scene. They do not copy a commercial rating form.",
+        "Pass {n}. A license note for the {asset} names the grant and the author. Shipping without that note keeps the file out of the build.",
+        "Pass {n}. The {role} records who may use the {item} likeness. A missing consent line blocks the {place} scene that shows it.",
     ),
     "coding": (
         "Pass {n}. The {role} steps {field} on a fixed interval. Render may interpolate. A long frame runs several ticks or slows, and it does not take one giant step.",
         "Pass {n}. One owner writes {field}. The {verb} emits an event that owner applies. A second writer of {field} is a defect, logged with the rule id.",
         "Pass {n}. Input for {verb} is sampled once at the start of tick {n}. Menus and play share the action table, so a rebound does not fork the rule.",
+        "Pass {n}. The lint and the syntax pass both run before the {verb} change can merge. A red check names the line and the owner.",
+        "Pass {n}. An error path for {failure} returns one result type. The caller does not parse a crash string to decide the rule.",
     ),
     "sprites": (
         "Pass {n}. The {asset} for the {item} names its palette, its pixel size, and its author. Nearest growth repeats pixels. A box step may mix a channel and stays an authoring choice.",
@@ -146,7 +164,7 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
     "story": (
         "Pass {n}. The ledger for the {place} records who knows the {item}, which promise stands, and which fact is shared by every branch.",
         "Pass {n}. A branch may add a fact about the {item}. It may not silently rewrite a shared fact. Repair the smallest set of later lines. Pass {n}.",
-        "Pass {n}. The {role} does not give a speaker a secret they never witnessed. Knowledge is data on the ledger, pass {n}.",
+        "Pass {n}. The {role} withholds a fact the speaker did not see at the {place}. The ledger stores that boundary. Tone is not the record.",
     ),
     "cinematics": (
         "Pass {n}. Shot {n} is a {shot} on the {place}. The camera {move} during the {beat}. Gameplay state does not advance inside the shot.",
@@ -328,11 +346,76 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
         "Pass {n}. A crowd member at the {place} copies the sheet and changes hair {hair} or cloth {cloth}, one field only.",
         "Pass {n}. The crowd uses the same {verb} set as the lead. A cheaper lod drops particles, not the collision layer. Pass {n}.",
     ),
+    "proofreading": (
+        "Pass {n}. The {role} reads the {copy} for the {screen} screen aloud. A doubled word or a swapped {item} name is a defect, logged with the line id.",
+        "Pass {n}. Proofreading the {place} text checks tense and the {verb} name. It does not rewrite the rule. The ledger keeps the previous line.",
+        "Pass {n}. The legal notice and the {copy} must name the same {item}. A mismatch is a proofreading fail, not a new grant. Pass {n}.",
+    ),
+    "syntax": (
+        "Pass {n}. The script for {verb} must parse before play. A missing closer stops the build and names the line. The {role} does not ship the broken file.",
+        "Pass {n}. A syntax pass on the {field} writer rejects an unknown token and leaves the last good revision in place. Pass {n}.",
+        "Pass {n}. The {fault} in the {verb} script is a syntax block. Format may differ. The token that failed must be the one the message names.",
+    ),
+    "errors": (
+        "Pass {n}. When {verb} fails for {failure}, the {screen} screen states the cause and the next legal action. A bare code number is not the message.",
+        "Pass {n}. The {role} maps the {fault} to one error line. Two writers of that line are a defect. The player can retry without a restart.",
+        "Pass {n}. The error line for the {item} uses the ledger name. It does not invent a cause the {failure} record does not hold. Pass {n}.",
+    ),
+    "crash": (
+        "Pass {n}. A crash at the {place} stores the tick, the {verb}, and the {field} value. The report does not include a personal name. The last save stays readable.",
+        "Pass {n}. The {symptom} after {failure} writes a receipt and returns to the {screen} screen. It does not roll the whole build back. Pass {n}.",
+        "Pass {n}. The {role} can replay the crash from the stored tick and the {verb} input. A report that cannot be replayed is not closed.",
+    ),
+    "lint": (
+        "Pass {n}. The lint for {check} runs on the {verb} script before review. A warning names the line. It does not change {field} by itself.",
+        "Pass {n}. The {role} treats a lint hit on the {asset} path as a block for release. Suppressing the check requires a written reason. Pass {n}.",
+        "Pass {n}. Lint for {check} and the syntax pass agree on the line number. If they disagree, the file is not ready to merge.",
+    ),
+    "tutorial": (
+        "Pass {n}. The first {verb} at the {place} is shown once, then the prompt leaves. The {screen} screen does not repeat the lesson after a success.",
+        "Pass {n}. A tutorial must be skippable from a fresh start and must not change {field}. The {role} checks both paths. Pass {n}.",
+    ),
+    "achievement": (
+        "Pass {n}. The {verb} achievement unlocks from the ledger, not from a picture. Reloading the save does not grant it twice.",
+        "Pass {n}. An achievement for the {place} names the rule that fired. It does not reveal a secret the player has not seen. Pass {n}.",
+    ),
+    "navigation": (
+        "Pass {n}. The route through the {place} uses the door flag, not the art. A blocked {verb} path says why and offers the open route.",
+        "Pass {n}. Navigation marks for the {item} stay on the {screen} map until the player arrives. They do not move {field}. Pass {n}.",
+    ),
+    "moderation": (
+        "Pass {n}. Player text on the {screen} screen is checked before it is shown. A rejected line tells the sender and does not punish the room.",
+        "Pass {n}. The {role} keeps a moderation note on the report id. The note is not a copy of a private message. Pass {n}.",
+    ),
+    "analytics": (
+        "Pass {n}. A play of {verb} at the {place} records the tick and the outcome. It does not record a personal name. The {role} can delete the row.",
+        "Pass {n}. Analytics for the {failure} count the event once per attempt. A replay of the same tick does not double the total. Pass {n}.",
+    ),
+    "subtitles": (
+        "Pass {n}. The subtitle for the {place} line names the speaker id and stays readable over the {shot}. It does not replace the spoken ledger.",
+        "Pass {n}. Subtitles for {verb} keep a stable id so a translation can grow. The logic reads the id, not the line width. Pass {n}.",
+    ),
+    "photo_mode": (
+        "Pass {n}. Photo mode at the {place} may move the camera. It does not advance the tick or change {field}. The {role} checks the exit state.",
+        "Pass {n}. A photo hides interface chrome and keeps the character sheet: eyes {eye}, hair {hair}. It is not a new canon portrait. Pass {n}.",
+    ),
 }
 
 
 def domains() -> tuple[str, ...]:
     return tuple(TEMPLATES)
+
+
+def focus_weights() -> dict[str, float]:
+    """Legal, coding, and the review domains are sampled ahead of the rest."""
+    weights = {domain: 1.0 for domain in TEMPLATES}
+    for name in ("legal", "coding"):
+        weights[name] = 3.0
+    for name in TRACKS["review"]:
+        weights[name] = 2.5
+    for name in TRACKS["practice"]:
+        weights[name] = 1.5
+    return weights
 
 
 def _formatter_fields(template: str) -> tuple[str, ...]:
@@ -350,6 +433,11 @@ def validate_templates() -> dict[str, int]:
     required = {
         "legal",
         "coding",
+        "proofreading",
+        "syntax",
+        "errors",
+        "crash",
+        "lint",
         "sprites",
         "assets",
         "character",

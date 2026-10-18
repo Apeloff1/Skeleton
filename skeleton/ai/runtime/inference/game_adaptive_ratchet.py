@@ -335,6 +335,8 @@ def train_budget(
     hidden: int = HIDDEN,
     chunk_docs: int = 192,
     min_scale: float = 0.25,
+    slack: float = 1e-4,
+    stream_weights: Mapping[str, float] | None = None,
     ledger_path: Path | str | None = None,
     log: Any = None,
 ) -> dict[str, Any]:
@@ -351,7 +353,10 @@ def train_budget(
         raise ValueError("peak_lr must be in (0, 1]")
     if isinstance(min_scale, bool) or not isinstance(min_scale, (int, float)) or not 0.0 < float(min_scale) <= 1.0:
         raise ValueError("min_scale must be in (0, 1]")
+    if isinstance(slack, bool) or not isinstance(slack, (int, float)) or not 0.0 < float(slack) <= 1e-2:
+        raise ValueError("slack must be in (0, 1e-2]")
     min_scale = float(min_scale)
+    slack = float(slack)
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     pause = root / "PAUSE"
@@ -363,9 +368,10 @@ def train_budget(
     parameters = [p for p in model.parameters() if p.requires_grad]
     peak_lr = float(peak_lr)
     opt = _fresh_optimizer(parameters, peak_lr)
-    ratchet = AdaptiveRatchet(min_scale=min_scale)
+    ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=max(slack, 5e-4))
     mastery = SamMatrix()
-    stream = CorpusStream()
+    stream = CorpusStream(weights=stream_weights)
+    base_weights = dict(stream.weights)
     replay: deque[tuple[str, str]] = deque(maxlen=256)
     domain_ema: dict[str, float] = {}
     bytes_done = 0
@@ -391,7 +397,7 @@ def train_budget(
             cycle_start = int(saved.get("cycle_start", bytes_done))
         else:
             opt = _fresh_optimizer(parameters, peak_lr)
-            ratchet = AdaptiveRatchet(min_scale=min_scale)
+            ratchet = AdaptiveRatchet(min_scale=min_scale, slack=slack, slack_cap=max(slack, 5e-4))
             cycle_start = bytes_done
     else:
         goal = additional_bytes if additional_bytes is not None else budget_bytes
@@ -436,10 +442,11 @@ def train_budget(
             level = sorted(domain_ema.values())[len(domain_ema) // 2]
             level = level if level > 0 else 1.0
             for name, ema in domain_ema.items():
-                stream.weights[name] = min(3.0, max(0.5, ema / level))
+                base = base_weights.get(name, 1.0)
+                stream.weights[name] = min(4.0, max(0.5, base * (ema / level)))
         for name in review:
             if name in stream.weights:
-                stream.weights[name] = min(3.0, max(stream.weights[name], 1.5))
+                stream.weights[name] = min(4.0, max(stream.weights[name], base_weights.get(name, 1.5)))
         batch: list[tuple[str, str]] = []
         batch_bytes = 0
         while len(batch) < chunk_docs and bytes_done + batch_bytes < goal:
