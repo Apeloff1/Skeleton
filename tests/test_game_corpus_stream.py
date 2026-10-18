@@ -20,6 +20,7 @@ from skeleton.ai.runtime.inference.game_corpus_stream import (
     HOLDOUT_SERIAL,
     SERIAL_WIDTHS,
     TEMPLATES,
+    TRACKS,
     CorpusStream,
     banned_windows,
     byte_kinds,
@@ -50,6 +51,10 @@ REQUIRED = {
     "clothing",
     "hair",
     "eyes",
+    "copyright",
+    "license",
+    "music_rights",
+    "asset_rights",
 }
 
 
@@ -90,7 +95,12 @@ def test_track_holdouts_are_outside_the_training_serials():
     held = holdout_documents()
     assert len(held) == len(set(held))
     tracks = track_holdouts()
-    assert set(tracks) == {"visual", "narrative", "systems", "review", "practice"}
+    assert set(tracks) == set(TRACKS)
+    assert {"visual", "narrative", "systems", "review", "practice", "rights"} <= set(tracks)
+    assert "copyright" in TRACKS["rights"]
+    assert "legal" in TRACKS["systems"]
+    assert "assets" in TRACKS["visual"]
+    assert "world" in TRACKS["systems"]
     flat = [text for rows in tracks.values() for text in rows]
     assert set(flat) <= set(held)
     assert len(flat) == len(set(flat))
@@ -136,7 +146,8 @@ def test_half_weights_keep_legal_and_coding_first():
 def test_focus_weights_put_legal_coding_and_review_first():
     weights = focus_weights()
     assert set(weights) == set(TEMPLATES)
-    assert weights["legal"] == weights["coding"] == 3.0
+    assert weights["legal"] == weights["coding"] == weights["copyright"] == 3.0
+    assert weights["music_rights"] == weights["asset_rights"] == 3.0
     for name in ("proofreading", "syntax", "errors", "crash", "lint"):
         assert weights[name] == 2.5
     assert weights["sprites"] == 1.0
@@ -223,7 +234,7 @@ def test_a_short_budget_trains_without_promoting():
     assert receipt["adamw"]["betas"] == [0.9, 0.999]
     assert receipt["adamw"]["weight_decay"] == 0.01
     assert receipt["loss_focus"] is None
-    assert set(receipt["official_tracks"]) == {"visual", "narrative", "systems", "review", "practice"}
+    assert set(receipt["official_tracks"]) == set(TRACKS)
 
 
 def test_legal_sources_cover_every_domain_once():
@@ -233,9 +244,13 @@ def test_legal_sources_cover_every_domain_once():
     covered = [name for names in groups.values() for name in names]
     assert sorted(covered) == sorted(TEMPLATES)
     assert len(covered) == len(set(covered))
-    assert set(groups) == {"visual", "narrative", "systems", "review", "practice", "adjacent"}
+    assert set(groups) == set(TRACKS) | {"adjacent"}
+    assert "copyright" in groups["rights"]
     assert "legal" in groups["systems"]
     assert "audio" in groups["adjacent"]
+    assert "music" in groups["adjacent"]
+    assert "world" in groups["systems"]
+    assert "assets" in groups["visual"]
 
 
 def test_maximal_prediction_does_not_promote():
@@ -297,7 +312,7 @@ def test_score_ceiling_stops_before_the_budget():
     )
     assert receipt["bytes_trained"] == 0
     assert receipt["promotion"] is False
-    assert set(receipt["official_tracks"]) == {"visual", "narrative", "systems", "review", "practice"}
+    assert set(receipt["official_tracks"]) == set(TRACKS)
 
 
 def test_widening_keeps_the_current_holdouts_and_records_the_half():

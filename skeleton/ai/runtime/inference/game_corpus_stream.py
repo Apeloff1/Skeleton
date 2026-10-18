@@ -124,6 +124,16 @@ TRACKS: dict[str, tuple[str, ...]] = {
         "subtitles",
         "photo_mode",
     ),
+    "rights": (
+        "copyright",
+        "license",
+        "trademark",
+        "attribution",
+        "age_rating",
+        "likeness",
+        "music_rights",
+        "asset_rights",
+    ),
 }
 
 TEMPLATES: dict[str, tuple[str, ...]] = {
@@ -399,6 +409,38 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
         "Pass {n}. Photo mode at the {place} may move the camera. It does not advance the tick or change {field}. The {role} checks the exit state.",
         "Pass {n}. A photo hides interface chrome and keeps the character sheet: eyes {eye}, hair {hair}. It is not a new canon portrait. Pass {n}.",
     ),
+    "copyright": (
+        "Pass {n}. The {role} records who owns the expression in the {asset} and the year it was made. A filename is not ownership, and the shipping build keeps the notice with the file.",
+        "Pass {n}. A new cut of the {asset} for the {place} stays inside the granted scope. The {role} stores the source beside the notice.",
+    ),
+    "license": (
+        "Pass {n}. The {grant} for the {asset} names what the {role} may ship, change, and pass on. An extra use that the grant does not name stays out of the build.",
+        "Pass {n}. The {place} scene may show the {item} only while its {grant} is in force. When that grant ends, the file leaves the build.",
+    ),
+    "trademark": (
+        "Pass {n}. The {role} checks the game title and the {item} name against the mark list before the {place} build. A plain descriptive word is not assumed to be a mark.",
+        "Pass {n}. Writing in the {place} does not paint a third-party mark onto the {asset}. The {role} substitutes an original name and records the swap.",
+    ),
+    "attribution": (
+        "Pass {n}. Credits for the {asset} name the {role} and the {grant}. Shipping the file without that credit line breaks the record.",
+        "Pass {n}. The {place} trailer names the composer and the author of the {asset}. A shorter cut keeps those names in the ledger.",
+    ),
+    "age_rating": (
+        "Pass {n}. The {role} writes an age note for the {verb} scene at the {place}. The note describes that authored {failure} and does not paste an outside form.",
+        "Pass {n}. Intensity for the {verb} at the {place} is a content flag on the scene. The store page reads the flag and does not invent a rating badge.",
+    ),
+    "likeness": (
+        "Pass {n}. A performer's face on the {asset} needs written consent that names the {place} scene. The {role} stores that consent beside the take.",
+        "Pass {n}. The {item} likeness at the {place} is allowed only when the consent names that use. Silence from the subject is not a grant.",
+    ),
+    "music_rights": (
+        "Pass {n}. The {note} cue separates the composition from the recorded take. The {role} ships only the take named by the {grant}.",
+        "Pass {n}. A {place} scene that plays {note} keeps the music grant with the cue id. A new mix does not replace that grant.",
+    ),
+    "asset_rights": (
+        "Pass {n}. The {asset} enters the {place} build only with a {grant} that covers the shipped revision. A preview file is not that grant.",
+        "Pass {n}. The {role} traces the {item_color} {item} back to its author and its {grant}. A recolor does not create a new owner.",
+    ),
 }
 
 
@@ -426,7 +468,7 @@ def legal_source_groups() -> dict[str, tuple[str, ...]]:
 def focus_weights() -> dict[str, float]:
     """Legal, coding, and the review domains are sampled ahead of the rest."""
     weights = {domain: 1.0 for domain in TEMPLATES}
-    for name in ("legal", "coding"):
+    for name in ("legal", "coding", *TRACKS["rights"]):
         weights[name] = 3.0
     for name in TRACKS["review"]:
         weights[name] = 2.5
@@ -450,6 +492,14 @@ def validate_templates() -> dict[str, int]:
     required = {
         "legal",
         "coding",
+        "copyright",
+        "license",
+        "trademark",
+        "attribution",
+        "age_rating",
+        "likeness",
+        "music_rights",
+        "asset_rights",
         "proofreading",
         "syntax",
         "errors",
