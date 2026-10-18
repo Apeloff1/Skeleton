@@ -52,6 +52,7 @@ class AdaptiveRatchet:
         self.min_scale = float(min_scale)
         self.accepts = 0
         self.rejects = 0
+        self.reject_streak = 0
 
     def observe(self, before: Mapping[str, float], after: Mapping[str, float]) -> bool:
         if set(before) != set(after) or not before:
@@ -60,11 +61,18 @@ class AdaptiveRatchet:
         accepted = all(gain > self.margin for gain in gains.values())
         if accepted:
             self.accepts += 1
+            self.reject_streak = 0
             smallest = min(gains.values())
-            # The bar only rises, and it is capped so later real gains can still pass.
+            # The bar rises toward a fraction of the gain and stays capped.
             self.margin = min(self.margin_cap, max(self.margin, smallest * 0.25))
         else:
             self.rejects += 1
+            self.reject_streak += 1
+            # After a run of rejects, ease the bar so a smaller real gain can pass.
+            # The step scale still tightens with the byte budget.
+            if self.reject_streak >= 8 and self.margin > 0:
+                self.margin *= 0.5
+                self.reject_streak = 0
         return accepted
 
     def tighten(self, bytes_done: int, budget_bytes: int) -> float:

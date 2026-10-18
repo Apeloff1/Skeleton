@@ -94,6 +94,9 @@ def test_ratchet_tightens_and_does_not_loosen():
     tiny = {name: before[name] - tightened_margin / 2 for name in before}
     assert ratchet.observe(before, tiny) is False
     assert ratchet.margin == tightened_margin
+    for _ in range(7):
+        assert ratchet.observe(before, tiny) is False
+    assert ratchet.margin == tightened_margin / 2
     assert ratchet.tighten(0, 100) > ratchet.tighten(50, 100) > ratchet.tighten(100, 100)
     assert ratchet.tighten(0, 100) == ratchet.scale
     assert ratchet.scale == ratchet.min_scale
