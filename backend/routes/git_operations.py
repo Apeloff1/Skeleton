@@ -14,14 +14,34 @@ from pathlib import Path
 import asyncio
 import os
 import re
+import tempfile
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 router = APIRouter(prefix="/api/git", tags=["git"])
 
-# Persistent-ish workspace root for per-project repos.
-GIT_WORKSPACE_BASE = Path(os.environ.get(
-    "GIT_WORKSPACE_BASE", "/app/backend/.git_workspaces"))
-GIT_WORKSPACE_BASE.mkdir(parents=True, exist_ok=True)
+# Resolved on first use. Import must not create /app or any other directory.
+_workspace_base: Path | None = None
+
+
+def workspace_base() -> Path:
+    """Return the configured git sandbox, creating it only when a call needs it."""
+    global _workspace_base
+    if _workspace_base is not None:
+        return _workspace_base
+    configured = os.environ.get("GIT_WORKSPACE_BASE", "").strip()
+    preferred = Path(configured) if configured else Path("/app/backend/.git_workspaces")
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        probe = preferred / ".writable"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError:
+        if configured:
+            raise
+        preferred = Path(tempfile.gettempdir()) / "skeleton-git-workspaces"
+        preferred.mkdir(parents=True, exist_ok=True)
+    _workspace_base = preferred.resolve()
+    return _workspace_base
 
 # The "active" project repo (set by /init, defaults to a sandbox project).
 _active = {"project": "default"}
@@ -58,10 +78,13 @@ def _repo_dir(project: Optional[str] = None) -> Path:
     # _safe_segment → _resolve_under (CodeQL: never joinpath raw/regex-only).
     name = _SAFE.sub("_", (project or _active["project"]) or "default") or "default"
     try:
+        root = workspace_base()
         safe = _safe_segment(name, what="project")
-        return _resolve_under(GIT_WORKSPACE_BASE, safe)
+        return _resolve_under(root, safe)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="invalid project path") from e
+    except OSError as e:
+        raise HTTPException(status_code=503, detail="git workspace unavailable") from e
 
 
 async def _git(args: List[str], project: Optional[str] = None, cwd: Optional[Path] = None) -> dict:

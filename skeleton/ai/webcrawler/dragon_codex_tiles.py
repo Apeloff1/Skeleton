@@ -22,6 +22,9 @@ TILES=(
  "ground","rock","water","highland","city","forest",
  "historic_ruin","portal","secret_gate","storm","skybridge","hero",
 )
+EXTENDED_TILES=TILES+(
+ "sky_island","cloud_sea","sky_port","aerial_bridge",
+)
 SUPPORTED_NATIVE_LAYOUTS={
  "game_boy":"gb_interleaved_2bpp",
  "game_boy_color":"gb_interleaved_2bpp",
@@ -40,7 +43,8 @@ PALETTE_16=(
 
 def _bitmap(address:CodexAddress,name:str,colors:int)->tuple[tuple[int,...],...]:
     _,genes=validate(address)
-    if name not in TILES or colors not in (4,16):
+    allowed=EXTENDED_TILES if any(address.extension_values) else TILES
+    if name not in allowed or colors not in (4,16):
         raise ValueError("original game art requires a supported tile archetype")
     c=genes.level
     influence={
@@ -56,6 +60,10 @@ def _bitmap(address:CodexAddress,name:str,colors:int)->tuple[tuple[int,...],...]
         "storm":("storm_fronts","rain_seasons"),
         "skybridge":("aerial_visibility","shortcut_stability"),
         "hero":("story_branching","companion_loyalty"),
+        "sky_island":("sky_islands","thermal_updrafts"),
+        "cloud_sea":("cloud_oceans","atmospheric_layers"),
+        "sky_port":("floating_settlements","airship_lanes"),
+        "aerial_bridge":("skybridge_density","wind_shear"),
     }[name]
     a,b=map(c,influence)
     source=int(_sha([SCHEMA,address.codex_digest,name])[:12],16)
@@ -65,7 +73,30 @@ def _bitmap(address:CodexAddress,name:str,colors:int)->tuple[tuple[int,...],...]
         for x in range(8):
             seed=(source>>(x%6*6))+x*17+y*23+(a*7)+(b*11)
             base=(seed//(1+(a%5)))%colors
-            if name in ("water","storm"):
+            if name=="sky_island":
+                # Floating land mass: underside tapers, top reflects authored
+                # island density and updraft intensity.
+                center=abs(2*x-7)
+                rim=(a//32)+2
+                solid=(y in (2,3,4) and center<=rim*2 and
+                       ((source+x*13+y*17)%256)<(a+24))
+                underside=(y in (5,6) and center<max(1,rim*2-(y-4)*2))
+                value=((2+(b//64)) if solid else
+                       (1+(a//128)) if underside else 0)%colors
+            elif name=="cloud_sea":
+                turbulence=(x*11+y*19+b//8+a//16)%7
+                value=((a//32+1) if (y>=3 and turbulence<5) else
+                       (b//64 if y>=5 else 0))%colors
+            elif name=="sky_port":
+                pier=(y in (4,5) and 1<=x<=6)
+                tower=(x in (2,5) and 1<=y<=4)
+                value=((2+b//128) if pier else
+                       (1+a//128) if tower else base//8)%colors
+            elif name=="aerial_bridge":
+                deck=(y==4 and 1<=x<=6 and (a>=32 or x%2==0))
+                cable=(y<4 and (x in (1,6) or ((x+y+b//64)%7==0)))
+                value=(3 if deck else 1 if cable else 0)%colors
+            elif name in ("water","storm"):
                 wave=((x+y//2+(b//16))%4)
                 value=(base+wave) %colors
             elif name=="portal":
@@ -169,7 +200,8 @@ def tile_pack(address:CodexAddress,target_id:str)->TilePack:
     # These palettes are authored original reference colors; game-specific
     # palette register handling remains a separate native integration step.
     palette=PALETTE_4 if colors==4 else PALETTE_16
-    tiles=tuple(_bitmap(address,name,colors) for name in TILES)
+    names=EXTENDED_TILES if any(address.extension_values) else TILES
+    tiles=tuple(_bitmap(address,name,colors) for name in names)
     byteset=tuple(encode_tile(tile,fmt) for tile in tiles)
     if any(decode_tile(raw,fmt)!=pixels for raw,pixels in zip(byteset,tiles)):
         raise ValueError("original tile source did not survive genuine bitplane encoding")
@@ -177,7 +209,7 @@ def tile_pack(address:CodexAddress,target_id:str)->TilePack:
         "schema":SCHEMA,"target_id":target_id,
         "native_layout":fmt,
         "original_world_digest":address.codex_digest,
-        "named_tiles":TILES,"indexed_colors":colors,
+        "named_tiles":names,"indexed_colors":colors,
         "palette":palette,
         "tile_hex":tuple(data.hex() for data in byteset),
         "artwork_hashes":tuple(sha256(data).hexdigest() for data in byteset),

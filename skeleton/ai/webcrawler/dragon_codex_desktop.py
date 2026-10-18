@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 
 from .dragon_world_codex import CodexAddress,validate
-from .dragon_world_codex_runtime import GATE_MODES,GATE_VECTORS
+from .dragon_world_codex_runtime import GATE_MODES,GATE_VECTORS,ALL_GATE_MODES,ALL_GATE_VECTORS
 from .dragon_living_world import _sha
 
 SCHEMA="skeleton.ai.dragon.codex_native_c99.v1"
@@ -40,8 +40,8 @@ C99=r'''/* ORIGINAL DRAGON LIVING-WORLD GAME — generated C99, no copied game I
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#define AXES 128
-#define DOMAINS 16
+#define AXES @AXES@
+#define DOMAINS @DOMAINS@
 #define MAX_TURNS 10000000
 static const unsigned char world_levels[AXES] = {@LEVELS@};
 static const int gx[DOMAINS] = {@GATE_X@};
@@ -50,6 +50,7 @@ static const char* gate_names[DOMAINS] = {@GATE_NAMES@};
 static const char* original_world_id = "@WORLD_DIGEST@";
 static int skills[AXES],turns=0,x=0,y=0,era=0,opened[DOMAINS],visits=0;
 static int world_risk=0;
+@SKY_STATE@
 static int gate_needs(int idx) {
  return 1+world_levels[idx]/64;
 }
@@ -62,6 +63,7 @@ static int gate_period(int domain) {
 static int gate_open(int domain) {
  if (domain<0||domain>=DOMAINS)return 0;
  int first=domain*8;
+@SKY_GATE_CONDITION@
  return skills[first]>=gate_needs(first) &&
         skills[first+1]>=gate_needs(first+1) &&
         turns>=gate_earliest(domain) &&
@@ -71,6 +73,7 @@ static void reset_world(void) {
  memset(skills,0,sizeof skills);
  memset(opened,0,sizeof opened);
  turns=0;x=0;y=0;era=0;visits=0;world_risk=0;
+@SKY_RESET@
 }
 static int study_skill(int index) {
  if (index<0||index>=AXES||turns>=MAX_TURNS)return 0;
@@ -89,6 +92,7 @@ static int use_gate(int domain) {
  x+=gx[domain];y+=gy[domain];
  turns++;visits++;
  opened[domain]=1;
+@SKY_TRAVEL@
  world_risk+=world_levels[domain*8+1]/48;
  if(domain==9||domain==11||domain==15)era++;
  return 1;
@@ -105,6 +109,7 @@ static void status(void) {
  printf("Turn %d  Era %d  Position (%d,%d)  Journeys %d  Risk %d\n",
          turns,era,x,y,visits,world_risk);
  printf("No mandatory ending; explore, learn, wait, revisit, or quit.\n");
+@SKY_STATUS@
  for(int d=0;d<DOMAINS;d++) {
   int a=d*8;
   int period=gate_period(d);
@@ -123,6 +128,7 @@ static int check_all_gates(void) {
   int a=d*8;
   for(int i=0;i<gate_needs(a);i++)if(!study_skill(a))return 11;
   for(int i=0;i<gate_needs(a+1);i++)if(!study_skill(a+1))return 12;
+@SKY_SELFTEST@
   for(int i=0;i<48 && !gate_open(d);i++)if(!wait_world())return 13;
   if(!gate_open(d))return 14;
   if(!use_gate(d))return 15;
@@ -133,15 +139,15 @@ static int check_all_gates(void) {
          d,gate_names[d],turns,x,y,era);
  }
  reset_world();
- printf("DRAGON_CODEX_SELFTEST_PASS 16 actual gate unlocks and real journeys\n");
+ printf("DRAGON_CODEX_SELFTEST_PASS @DOMAINS@ actual gate unlocks and real journeys\n");
  return 0;
 }
 static void help(void) {
- puts("Original World Codex: 128 trained axes and 16 earned travel gates.");
- puts("study <0..127> — train one skill and advance actual world time");
+ puts("Original World Codex: @AXES@ trained axes and @DOMAINS@ earned travel gates.");
+ puts("study <0..@LAST_AXIS@> — train one skill and advance actual world time");
  puts("wait — advance a world turn; all gates have periodic openings");
  puts("rest — recover attention; advance time without erasing progress");
- puts("gate <0..15> — require BOTH relevant trained skills and time window");
+ puts("gate <0..@LAST_GATE@> — require BOTH relevant trained skills and time window");
  puts("explore — wander the original no-final-boss world");
  puts("map — show all gateway statuses; status — report current world");
  puts("quit — leave session; selftest is separate executable --selftest");
@@ -184,33 +190,68 @@ int main(int argc,char**argv) {
 
 def emit_codex_c99(address:CodexAddress)->CodexDesktopProject:
     _,genes=validate(address)
-    levels=",".join(str(value) for value in genes.values)
-    xs=",".join(str(x) for x,_ in GATE_VECTORS)
-    ys=",".join(str(y) for _,y in GATE_VECTORS)
-    names=",".join('"'+name+'"' for name in GATE_MODES)
-    source=(C99.replace("@LEVELS@",levels)
+    extended=any(genes.extension_values)
+    count=192 if extended else 128
+    modes=ALL_GATE_MODES if extended else GATE_MODES
+    vectors=ALL_GATE_VECTORS if extended else GATE_VECTORS
+    levels=",".join(str(value) for value in
+                    genes.values+(genes.extension_values if extended else ()))
+    xs=",".join(str(x) for x,_ in vectors)
+    ys=",".join(str(y) for _,y in vectors)
+    names=",".join('"'+name+'"' for name in modes)
+    # Only include aerial rules in v3 source. Legacy C99 does not access
+    # out-of-bounds controls and preserves its sixteen-domain behavior.
+    aerial={
+        "@SKY_STATE@":"static int sky_altitude=0;",
+        "@SKY_GATE_CONDITION@":(
+            " if(domain==16 && world_levels[128]>=96 && "
+            "world_levels[131]<128 && skills[160]<2)return 0;"
+        ),
+        "@SKY_RESET@":" sky_altitude=0;",
+        "@SKY_TRAVEL@":" if(domain==16)sky_altitude++;",
+        "@SKY_STATUS@":(
+            ' printf("Sky-island density %d  Cloud ocean %d  Altitude %d\\n",'
+            'world_levels[128],world_levels[129],sky_altitude);'
+        ),
+        "@SKY_SELFTEST@":(
+            "  if(d==16 && world_levels[128]>=96 && world_levels[131]<128)"
+            "for(int k=0;k<2;k++)if(!study_skill(160))return 19;"
+        ),
+    } if extended else {token:"" for token in (
+        "@SKY_STATE@","@SKY_GATE_CONDITION@","@SKY_RESET@",
+        "@SKY_TRAVEL@","@SKY_STATUS@","@SKY_SELFTEST@",
+    )}
+    source=(C99.replace("@AXES@",str(count))
+                 .replace("@DOMAINS@",str(len(modes)))
+                 .replace("@LAST_AXIS@",str(count-1))
+                 .replace("@LAST_GATE@",str(len(modes)-1))
+                 .replace("@LEVELS@",levels)
                  .replace("@GATE_X@",xs)
                  .replace("@GATE_Y@",ys)
                  .replace("@GATE_NAMES@",names)
                  .replace("@WORLD_DIGEST@",address.codex_digest))
+    for token,value in aerial.items():
+        source=source.replace(token,value)
     if "@" in source:
         # Source may legitimately have @ in original game comments, but
         # unresolved template slots are always at-token sentinels.
-        for token in ("@LEVELS@","@GATE_X@","@GATE_Y@",
-                      "@GATE_NAMES@","@WORLD_DIGEST@"):
+        for token in ("@AXES@","@DOMAINS@","@LAST_AXIS@","@LAST_GATE@",
+                      "@LEVELS@","@GATE_X@","@GATE_Y@",
+                      "@GATE_NAMES@","@WORLD_DIGEST@",*aerial):
             if token in source:
                 raise ValueError("incomplete original world C99 source")
     return CodexDesktopProject(
         schema=SCHEMA,source_name="dragon_codex_game.c",
         source=source,source_sha256=sha256(source.encode()).hexdigest(),
-        game_rules_sha256=_sha([genes.values,GATE_MODES,GATE_VECTORS]),
+        game_rules_sha256=_sha([genes.values,*([genes.extension_values] if extended else []),modes,vectors]),
         source_license_scope="Original source; source production only. "
                              "Commercial redistribution requires rights review.",
         active_mechanics=(
-            "128_real_trainable_axes","16_time_gated_passages",
+            f"{count}_real_trainable_axes",f"{len(modes)}_time_gated_passages",
             "independent_gateway_selftest","persistent_world_clock",
             "multiple_routes","no_mandatory_ending","exploration",
             "world_era_progression",
+            *(("sky_island_altitude","glider_or_skybridge_access") if extended else ()),
         ),
         actual_native_binary_produced=False,
         independently_compiled=False,

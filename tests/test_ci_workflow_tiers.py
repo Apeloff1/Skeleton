@@ -46,6 +46,33 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             self.assertTrue(any("required reusable workflow not called" in p for p in audit(root)))
             readiness.write_text(readiness_original)
+            evidence = root / ".github/workflows" / "signed-evidence-manual.yml"
+            evidence.write_text(
+                "name: Signed evidence\n"
+                "on:\n"
+                "  workflow_dispatch:\n"
+                "jobs:\n"
+                "  hold:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: echo hold\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(audit(root), [])
+            evidence.unlink()
+            for index in range(10):
+                (
+                    root / ".github/workflows" / f"automatic-extra-{index}.yml"
+                ).write_text(
+                    "name: extra\non:\n  pull_request:\njobs:\n  x:\n"
+                    "    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+                    encoding="utf-8",
+                )
+            self.assertTrue(
+                any("unexpected active workflow count" in item for item in audit(root))
+            )
+            for index in range(10):
+                (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
             name = registry["specialized_manual_only"][0]
             spec = root / ".github/workflows-archive" / name
             original = spec.read_text()

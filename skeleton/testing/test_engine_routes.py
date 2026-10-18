@@ -33,6 +33,13 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 _SERVICE_TOKEN = "test-engine-service-token-" + ("x" * 32)
 
 
+def _inventory_headers() -> dict[str, str]:
+    return {
+        "x-zaibatsu-attester": "backend-service",
+        "authorization": "Bearer " + _SERVICE_TOKEN,
+    }
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 

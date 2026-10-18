@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from dataclasses import replace
+import asyncio
 import logging
 import hashlib
 import json
@@ -32,6 +33,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
 from core.engine_client import EngineClient
+from skeleton.contracts.context import ContextKind, ContextTrust
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
@@ -155,6 +157,19 @@ def _thread_from_doc(doc: dict[str, Any]) -> ConversationThread:
     )
 
 
+def _projection_reference_message(doc: dict[str, Any]) -> ConversationMessage:
+    """Build a checkpoint window without copying transcript text."""
+    payload = dict(doc)
+    if not payload.get("content") and not payload.get("content_ref"):
+        payload["content_ref"] = (
+            "conversation-message://"
+            + str(payload.get("thread_id") or "")
+            + "/"
+            + str(payload.get("message_id") or "")
+        )
+    return _message_from_doc(payload)
+
+
 def _message_from_doc(doc: dict[str, Any]) -> ConversationMessage:
     return ConversationMessage(
         message_id=str(doc["message_id"]),
@@ -215,6 +230,14 @@ class MongoConversationAuthority:
         self.governance_retention_planner = governance_retention_planner
         # Installed only through the trusted application lifespan.
         self.dragon_projection = None
+        self.dragon_projection_outcomes = {"written": 0, "skipped": 0, "degraded": 0}
+
+    def _dragon_outcomes(self) -> dict[str, int]:
+        outcomes = getattr(self, "dragon_projection_outcomes", None)
+        if not isinstance(outcomes, dict):
+            outcomes = {"written": 0, "skipped": 0, "degraded": 0}
+            self.dragon_projection_outcomes = outcomes
+        return outcomes
 
     async def dragon_context_segments(self, thread: ConversationThread, query: str) -> tuple:
         """Return only currently consented, untrusted Dragon context evidence."""
@@ -222,18 +245,71 @@ class MongoConversationAuthority:
         if projection is None:
             return ()
         try:
-            return await projection.context_segments(thread, query)
+            current = await self.get_thread(
+                thread.thread_id,
+                tenant_id=thread.tenant_id,
+                owner_id=thread.owner_id,
+            )
+        except Exception:
+            return ()
+        if (
+            current is None
+            or current.active_branch_id != thread.active_branch_id
+            or current.version != thread.version
+            or current.message_sequence != thread.message_sequence
+        ):
+            return ()
+        try:
+            segments = await projection.context_segments(current, query)
         except Exception:
             # Advisory memory must never bypass or prevent canonical chat.
             logging.getLogger(__name__).exception(
                 "Dragon projection retrieval unavailable thread=%s", thread.thread_id
             )
             return ()
+        admitted = []
+        for segment in segments:
+            if getattr(segment, "tenant_id", None) not in {None, thread.tenant_id}:
+                continue
+            if getattr(segment, "trust_level", None) is not ContextTrust.DERIVED_UNTRUSTED:
+                continue
+            if getattr(segment, "kind", None) is not ContextKind.CONVERSATION_SUMMARY:
+                continue
+            if getattr(segment, "mandatory", False):
+                continue
+            admitted.append(segment)
+        return tuple(admitted)
 
-    async def _delete_dragon_projection(self, *, tenant_id: str, owner_id: str, thread_id: str) -> None:
+    async def _delete_dragon_projection(
+        self,
+        *args,
+        tenant_id: str | None = None,
+        owner_id: str | None = None,
+        thread_id: str | None = None,
+    ) -> None:
         """Erase the optional derived store before canonical deletion advances."""
+        if args:
+            kind, query, positional_tenant = args[:3]
+            if kind != "thread":
+                return
+            thread_id = str((query or {}).get("_id") or "")
+            tenant_id = str(positional_tenant)
+            try:
+                owner_doc = await self.threads.find_one(
+                    {"_id": thread_id, "tenant_id": tenant_id},
+                    {"owner_id": 1},
+                )
+            except PyMongoError as exc:
+                raise ConversationStorageUnavailable(
+                    "Dragon derived conversation deletion could not be confirmed"
+                ) from exc
+            owner_id = str((owner_doc or {}).get("owner_id") or "")
         projection = getattr(self, "dragon_projection", None)
-        if projection is None:
+        if projection is None or not tenant_id or not owner_id or not thread_id:
+            if args and projection is not None:
+                raise ConversationStorageUnavailable(
+                    "Dragon derived conversation deletion could not be confirmed"
+                )
             return
         try:
             await projection.delete_thread(tenant_id, owner_id, thread_id)
@@ -242,31 +318,91 @@ class MongoConversationAuthority:
                 "Dragon derived conversation deletion could not be confirmed"
             ) from exc
 
-    async def _after_dragon_commit(self, thread: ConversationThread) -> None:
-        """Checkpoint only exact ten-step committed windows, when configured."""
-        # Optional derived state is installed by the full application lifespan.
-        # Minimal authority adapters (replay/recovery/migration) can omit it;
-        # canonical Mongo commits must never fail from an absent extension.
+    async def _project_dragon_checkpoint(self, thread: ConversationThread, message: Any) -> None:
+        """Store one derived ten-step window. Canonical commit never depends on it."""
+        outcomes = self._dragon_outcomes()
         projection = getattr(self, "dragon_projection", None)
-        if projection is None or thread.message_sequence < 10 or thread.message_sequence % 10:
+        sequence = getattr(message, "sequence", 0)
+        if (
+            projection is None
+            or isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence < 10
+            or sequence % 10
+        ):
+            outcomes["skipped"] += 1
             return
+        fields = {
+            "message_id": 1,
+            "thread_id": 1,
+            "branch_id": 1,
+            "sequence": 1,
+            "author_type": 1,
+            "created_at": 1,
+            "idempotency_key": 1,
+        }
         try:
-            window = await self.list_messages(
-                thread.thread_id,
-                tenant_id=thread.tenant_id,
-                owner_id=thread.owner_id,
-                after_sequence=thread.message_sequence - 10,
-                limit=10,
+            docs = await (
+                self.messages.find(
+                    {
+                        "thread_id": thread.thread_id,
+                        "branch_id": thread.active_branch_id,
+                        "sequence": {"$gt": sequence - 10, "$lte": sequence},
+                    },
+                    fields,
+                )
+                .sort("sequence", ASCENDING)
+                .limit(10)
+                .to_list(length=10)
             )
-            if len(window) == 10 and all(message.branch_id == thread.active_branch_id for message in window):
-                await projection.after_commit(thread, window)
+            window = tuple(_projection_reference_message(doc) for doc in docs)
+            digest = await asyncio.wait_for(
+                projection.after_commit(thread, window),
+                timeout=0.2,
+            )
         except Exception:
-            # This is derived, optional state. The canonical Mongo commit is final.
-            # Log the failure for a scoped retention/recovery repair, never retry
-            # the user message or change its committed identity.
+            outcomes["degraded"] += 1
             logging.getLogger(__name__).exception(
                 "Dragon derived checkpoint unavailable thread=%s", thread.thread_id
             )
+            return
+        if digest:
+            outcomes["written"] += 1
+        else:
+            outcomes["skipped"] += 1
+
+    async def repair_dragon_checkpoint(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        end_sequence: int,
+    ) -> str:
+        """Rebuild one committed ten-step window from canonical message references."""
+        if isinstance(end_sequence, bool) or not isinstance(end_sequence, int) or end_sequence < 10 or end_sequence % 10:
+            raise ValueError("checkpoint repair requires an exact ten-step boundary")
+        thread = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        if thread is None or end_sequence > thread.message_sequence:
+            raise ValueError("checkpoint window is not committed")
+        before = dict(self._dragon_outcomes())
+        await self._project_dragon_checkpoint(
+            thread,
+            type("_Boundary", (), {"sequence": end_sequence})(),
+        )
+        outcomes = self._dragon_outcomes()
+        if outcomes["degraded"] > before.get("degraded", 0):
+            raise ConversationStorageUnavailable("Dragon derived checkpoint repair failed")
+        if outcomes["written"] > before.get("written", 0):
+            return "written"
+        return "skipped"
+
+    async def _after_dragon_commit(self, thread: ConversationThread) -> None:
+        """Checkpoint the committed sequence when no specific message is in hand."""
+        await self._project_dragon_checkpoint(
+            thread,
+            type("_Boundary", (), {"sequence": thread.message_sequence})(),
+        )
 
     @staticmethod
     def _governed_conversation_location(
@@ -541,12 +677,13 @@ class MongoConversationAuthority:
         # Expire Dragon's tenant-scoped derived summaries even when the
         # canonical governance plan has no parent records due in this sweep.
         projection = getattr(self, "dragon_projection", None)
+        dragon_result = None
         if projection is not None:
             try:
-                await projection.expire_tenant(str(tenant_id))
+                dragon_result = await projection.expire_tenant(str(tenant_id))
             except Exception as exc:
                 raise ConversationStorageUnavailable(
-                    "Dragon derived retention sweep could not be confirmed"
+                    "projection retention unavailable"
                 ) from exc
         planner = self.governance_retention_planner
         if planner is None:
@@ -572,6 +709,7 @@ class MongoConversationAuthority:
                 "record_ids": [],
                 "linked_execution": None,
                 "conversation": None,
+                "dragon_projection": dragon_result,
                 "complete": True,
             }
 
@@ -636,6 +774,7 @@ class MongoConversationAuthority:
             "record_ids": sorted(seen_records),
             "linked_execution": (None if engine_result is None else dict(engine_result)),
             "conversation": (None if conversation_result is None else dict(conversation_result)),
+            "dragon_projection": dragon_result,
             "complete": True,
         }
 
@@ -1254,6 +1393,7 @@ class MongoConversationAuthority:
             if not self._same_identity(existing, message):
                 raise ConversationConflict("idempotency_key was reused with different content")
             if existing.sequence <= thread.message_sequence:
+                await self._project_dragon_checkpoint(thread, existing)
                 return thread, existing
 
         if not thread.writable:
@@ -1370,7 +1510,7 @@ class MongoConversationAuthority:
         )
         if committed.message_sequence < message.sequence:
             raise ConversationConflict("conversation append did not reach commit point")
-        await self._after_dragon_commit(committed)
+        await self._project_dragon_checkpoint(committed, message)
         return committed, message
 
     async def chat_execution(self, thread_id: str, message_id: str, *, tenant_id: str, owner_id: str):
