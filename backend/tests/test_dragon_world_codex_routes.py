@@ -145,6 +145,7 @@ def test_c99_game_source_is_real_game_not_claimed_executable():
 @pytest.mark.parametrize("endpoint",[
     "/api/dragon-academy/native/production/worlds/codex/inspect",
     "/api/dragon-academy/native/production/worlds/codex/edit",
+    "/api/dragon-academy/native/production/worlds/codex/impact",
     "/api/dragon-academy/native/production/worlds/codex/play",
     "/api/dragon-academy/native/production/worlds/codex/unlock-witness",
     "/api/dragon-academy/native/production/worlds/codex/compile-target",
