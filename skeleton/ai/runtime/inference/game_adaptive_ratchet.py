@@ -70,6 +70,7 @@ class AdaptiveRatchet:
         self.accepts = 0
         self.rejects = 0
         self.reject_streak = 0
+        self.steps_since_adapt = 0
         self.recent: deque[int] = deque(maxlen=16)
 
     def observe(self, before: Mapping[str, float], after: Mapping[str, float]) -> bool:
@@ -90,7 +91,7 @@ class AdaptiveRatchet:
             self.rejects += 1
             self.reject_streak += 1
             if self.reject_streak >= 4:
-                self.scale = max(self.min_scale, self.scale * 0.9)
+                self.scale = max(self.min_scale, self.scale * 0.97)
                 self.slack = min(self.slack_cap, self.slack * 1.15)
                 self.margin = max(self.margin_floor, self.margin * 0.5)
                 self.reject_streak = 0
@@ -99,8 +100,12 @@ class AdaptiveRatchet:
         return accepted
 
     def _adapt_scale(self) -> None:
-        if len(self.recent) < 8:
+        # Once per window, not once per chunk. A per-chunk cut pinned the step
+        # at the floor before a real gain could land.
+        self.steps_since_adapt += 1
+        if len(self.recent) < 8 or self.steps_since_adapt < 16:
             return
+        self.steps_since_adapt = 0
         rate = sum(self.recent) / len(self.recent)
         if rate < self.target_accept - 0.15:
             self.scale = max(self.min_scale, self.scale * 0.95)
@@ -555,7 +560,7 @@ def main() -> None:
         json.dumps(
             train_budget(
                 additional_bytes=BUDGET_BYTES,
-                peak_lr=3e-4,
+                peak_lr=ADAMW_LR,
                 chunk_docs=96,
                 ledger_path=Path("skeleton/ai/runtime/inference/game_corpus_cycles.json"),
                 log=sys.stdout,

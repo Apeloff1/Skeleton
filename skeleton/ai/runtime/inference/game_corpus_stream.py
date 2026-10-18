@@ -12,6 +12,9 @@ from collections.abc import Iterator, Mapping
 BUDGET_BYTES = 199 * 1024 * 1024
 WINDOW = 40
 HOLDOUT_SERIAL = 10**12
+# Rotating pass-id widths. Thirteen digits is the holdout width; those two ids stay reserved.
+SERIAL_WIDTHS = (4, 7, 10, 13, 16)
+HOLDOUT_GAP = 10_000
 
 # Measurement sentences from the English and A-to-Z packs. Training text that
 # shares a 40-character window with any of these is discarded.
@@ -390,6 +393,32 @@ def render(domain: str, serial: int) -> str:
     return template.format(**values)
 
 
+def training_serial(counter: int) -> int:
+    """Map a training counter to a pass id of rotating width.
+
+    The reserved holdout ids, and a gap around them, are never returned.
+    Distant long ids teach the digit length the measurement lines use.
+    """
+    if isinstance(counter, bool) or not isinstance(counter, int) or counter < 0:
+        raise ValueError("counter must be a non-negative int")
+    width = SERIAL_WIDTHS[counter % len(SERIAL_WIDTHS)]
+    block = counter // len(SERIAL_WIDTHS)
+    origin = 10 ** (width - 1)
+    limit = origin * 10
+    start = origin + 1
+    # The 13-digit measurement ids stay a million away. Other widths wrap inside themselves.
+    if origin <= HOLDOUT_SERIAL < limit:
+        start = HOLDOUT_SERIAL + 10**6
+    stride = 97
+    room = max(1, (limit - start) // stride)
+    serial = start + (block % room) * stride
+    if serial in (HOLDOUT_SERIAL, HOLDOUT_SERIAL + 1) or not origin <= serial < limit:
+        raise RuntimeError("training serial collided with a holdout")
+    if min(abs(serial - HOLDOUT_SERIAL), abs(serial - (HOLDOUT_SERIAL + 1))) < HOLDOUT_GAP:
+        raise RuntimeError("training serial entered the holdout gap")
+    return serial
+
+
 def banned_windows(texts: tuple[str, ...] | list[str]) -> set[str]:
     found: set[str] = set()
     for text in texts:
@@ -452,10 +481,9 @@ class CorpusStream:
                     name,
                 ),
             )
-            serial = self.serial[domain]
-            if serial >= HOLDOUT_SERIAL:
-                raise RuntimeError("training serial entered the holdout range")
-            self.serial[domain] = serial + 1
+            counter = self.serial[domain]
+            self.serial[domain] = counter + 1
+            serial = training_serial(counter)
             text = render(domain, serial)
             if len(text) < 40 or leaks(text, self.banned):
                 continue

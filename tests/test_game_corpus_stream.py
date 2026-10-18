@@ -8,6 +8,9 @@ from skeleton.ai.runtime.inference.game_adaptive_ratchet import AdaptiveRatchet,
 from skeleton.ai.runtime.inference.game_corpus_stream import (
     BUDGET_BYTES,
     DENYLIST,
+    HOLDOUT_GAP,
+    HOLDOUT_SERIAL,
+    SERIAL_WIDTHS,
     TEMPLATES,
     CorpusStream,
     banned_windows,
@@ -16,6 +19,7 @@ from skeleton.ai.runtime.inference.game_corpus_stream import (
     leaks,
     render,
     track_holdouts,
+    training_serial,
     validate_templates,
 )
 
@@ -83,6 +87,28 @@ def test_track_holdouts_are_outside_the_training_serials():
     # Training serial 0 of each domain is a different line from the reserved holdout.
     for domain in TEMPLATES:
         assert render(domain, 0) not in held
+
+
+def test_training_serials_practice_long_ids_and_skip_holdouts():
+    reserved = {HOLDOUT_SERIAL, HOLDOUT_SERIAL + 1}
+    widths = set()
+    seen = set()
+    for counter in range(5000):
+        serial = training_serial(counter)
+        assert serial not in reserved
+        assert min(abs(serial - HOLDOUT_SERIAL), abs(serial - (HOLDOUT_SERIAL + 1))) >= HOLDOUT_GAP
+        widths.add(len(str(serial)))
+        seen.add(serial)
+    assert widths == set(SERIAL_WIDTHS)
+    long_ids = [serial for serial in seen if len(str(serial)) >= 13]
+    assert len(long_ids) == len(set(long_ids))
+    assert any(len(str(serial)) == 13 for serial in seen)
+    held = set(holdout_documents())
+    stream = CorpusStream()
+    for _ in range(200):
+        _domain, text = stream.next_document()
+        assert text not in held
+        assert "Pass " in text
 
 
 def test_ratchet_keeps_a_mean_gain_and_blocks_a_track_collapse():
