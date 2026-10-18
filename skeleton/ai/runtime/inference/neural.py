@@ -80,6 +80,58 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     return exps / total
 
 
+def _sample_policy(
+    logits: np.ndarray,
+    rng: np.random.Generator,
+    request: LocalInferenceRequest,
+    history: Sequence[int],
+) -> int:
+    """Temperature, repetition, top-k, min-p, and top-p. Defaults stay on the raw path."""
+    adjusted = np.array(logits, dtype=np.float64, copy=True)
+    if not np.all(np.isfinite(adjusted)):
+        raise NeuralLMError("sampling logits must be finite")
+    penalty = float(request.repetition_penalty)
+    if penalty != 1.0:
+        for token_id in set(history[-64:]):
+            if not 0 <= token_id < adjusted.shape[0]:
+                continue
+            value = float(adjusted[token_id])
+            adjusted[token_id] = value / penalty if value >= 0.0 else value * penalty
+    if float(request.temperature) <= 1e-8 or int(request.top_k) == 1:
+        return int(np.argmax(adjusted))
+    temperature = max(1e-6, float(request.temperature))
+    probs = _softmax(adjusted / temperature)
+    if request.top_k:
+        k = min(int(request.top_k), probs.shape[0])
+        keep = np.argpartition(probs, -k)[-k:]
+        masked = np.zeros_like(probs)
+        masked[keep] = probs[keep]
+        probs = masked
+    if request.min_p > 0.0:
+        floor = float(request.min_p) * float(np.max(probs))
+        probs = np.where(probs >= floor, probs, 0.0)
+    if request.top_p < 1.0:
+        order = np.argsort(-probs)
+        acc = 0.0
+        chosen: list[int] = []
+        for index in order:
+            mass = float(probs[index])
+            if mass <= 0.0:
+                break
+            chosen.append(int(index))
+            acc += mass
+            if acc >= float(request.top_p):
+                break
+        masked = np.zeros_like(probs)
+        if chosen:
+            masked[chosen] = probs[chosen]
+        probs = masked
+    total = float(np.sum(probs))
+    if total <= 0.0 or not math.isfinite(total):
+        return int(np.argmax(adjusted))
+    return int(rng.choice(probs.shape[0], p=probs / total))
+
+
 @dataclass(frozen=True, slots=True)
 class NeuralLMConfig:
     hidden_size: int = 48
@@ -194,6 +246,7 @@ class NumpyRecurrentLM:
             self.hidden_bias = loaded["hidden_bias"]
             self.output = loaded["output"]
             self.output_bias = loaded["output_bias"]
+        self._adam_moments: dict[str, tuple[np.ndarray, np.ndarray, int]] = {}
 
     @property
     def model_digest(self) -> str:
@@ -263,6 +316,10 @@ class NumpyRecurrentLM:
         epochs: int = 8,
         learning_rate: float = 0.05,
         gradient_clip: float = 1.0,
+        optimizer: str = "sgd",
+        weight_decay: float = 0.0,
+        beta1: float = 0.9,
+        beta2: float = 0.95,
     ) -> NeuralTrainingReceipt:
         if isinstance(epochs, bool) or not isinstance(epochs, int) or not 1 <= epochs <= 10000:
             raise NeuralLMError("epochs must be in [1, 10000]")
@@ -281,11 +338,22 @@ class NumpyRecurrentLM:
         initial_loss = self.loss(documents)
         lr = float(learning_rate)
         clip = float(gradient_clip)
+        decay = float(weight_decay)
+        b1 = float(beta1)
+        b2 = float(beta2)
         total_tokens = sum(len(self._sequence(document)) - 1 for document in documents)
 
         for _ in range(epochs):
             for document in documents:
-                self.train_document(document, learning_rate=lr, gradient_clip=clip)
+                self.train_document(
+                    document,
+                    learning_rate=lr,
+                    gradient_clip=clip,
+                    optimizer=optimizer,
+                    weight_decay=decay,
+                    beta1=b1,
+                    beta2=b2,
+                )
         final_loss = self.loss(documents)
         return NeuralTrainingReceipt(
             model_id=self.model_id,
@@ -307,8 +375,17 @@ class NumpyRecurrentLM:
         *,
         learning_rate: float = 0.05,
         gradient_clip: float = 1.0,
+        optimizer: str = "sgd",
+        weight_decay: float = 0.0,
+        beta1: float = 0.9,
+        beta2: float = 0.95,
     ) -> int:
-        """Perform one deterministic SGD update and return observed byte/EOS targets."""
+        """Perform one deterministic update and return observed byte/EOS targets.
+
+        ``sgd`` is the historical baseline. ``adamw`` keeps first and second
+        moments on the live model only; they are not part of the artifact or
+        the model digest. Decoupled decay applies to matrices, not biases.
+        """
         self._corpus_digest((document,))
         if not isinstance(learning_rate, (int, float)) or isinstance(learning_rate, bool):
             raise NeuralLMError("learning_rate must be numeric")
@@ -321,6 +398,17 @@ class NumpyRecurrentLM:
 
         lr = float(learning_rate)
         clip = float(gradient_clip)
+        if optimizer not in {"sgd", "adamw"}:
+            raise NeuralLMError("optimizer must be sgd or adamw")
+        if not isinstance(weight_decay, (int, float)) or isinstance(weight_decay, bool):
+            raise NeuralLMError("weight_decay must be numeric")
+        if not 0.0 <= float(weight_decay) <= 1.0:
+            raise NeuralLMError("weight_decay must be in [0, 1]")
+        for name, value, upper in (("beta1", beta1, 1.0), ("beta2", beta2, 1.0)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise NeuralLMError(f"{name} must be finite")
+            if not 0.0 < float(value) < upper:
+                raise NeuralLMError(f"{name} must be in (0, 1)")
         seq = self._sequence(document)
         inputs = seq[:-1]
         targets = seq[1:]
@@ -361,12 +449,27 @@ class NumpyRecurrentLM:
             norm_sq += float(np.sum(grad * grad))
         norm = math.sqrt(norm_sq)
         scale = 1.0 if norm <= clip else clip / max(norm, 1e-300)
-
-        self.embedding -= lr * scale * grad_embedding
-        self.recurrent -= lr * scale * grad_recurrent
-        self.hidden_bias -= lr * scale * grad_hidden_bias
-        self.output -= lr * scale * grad_output
-        self.output_bias -= lr * scale * grad_output_bias
+        clipped = {
+            "embedding": scale * grad_embedding,
+            "recurrent": scale * grad_recurrent,
+            "hidden_bias": scale * grad_hidden_bias,
+            "output": scale * grad_output,
+            "output_bias": scale * grad_output_bias,
+        }
+        if optimizer == "sgd":
+            self.embedding -= lr * clipped["embedding"]
+            self.recurrent -= lr * clipped["recurrent"]
+            self.hidden_bias -= lr * clipped["hidden_bias"]
+            self.output -= lr * clipped["output"]
+            self.output_bias -= lr * clipped["output_bias"]
+        else:
+            self._adamw_apply(
+                clipped,
+                lr=lr,
+                weight_decay=float(weight_decay),
+                beta1=float(beta1),
+                beta2=float(beta2),
+            )
 
         for value in (
             self.embedding,
@@ -379,6 +482,40 @@ class NumpyRecurrentLM:
                 raise NeuralLMError("training produced non-finite parameters")
 
         return len(targets)
+
+    def _adamw_apply(
+        self,
+        grads: Mapping[str, np.ndarray],
+        *,
+        lr: float,
+        weight_decay: float,
+        beta1: float,
+        beta2: float,
+        eps: float = 1e-8,
+    ) -> None:
+        decay_names = {"embedding", "recurrent", "output"}
+        for name, grad in grads.items():
+            parameter = getattr(self, name)
+            moment = self._adam_moments.get(name)
+            if moment is None or moment[0].shape != parameter.shape:
+                moment = (
+                    np.zeros_like(parameter),
+                    np.zeros_like(parameter),
+                    0,
+                )
+            first, second, step = moment
+            step += 1
+            first = beta1 * first + (1.0 - beta1) * grad
+            second = beta2 * second + (1.0 - beta2) * grad * grad
+            self._adam_moments[name] = (first, second, step)
+            corrected_m = first / (1.0 - beta1 ** step)
+            corrected_v = second / (1.0 - beta2 ** step)
+            step_update = lr * corrected_m / (np.sqrt(corrected_v) + eps)
+            if name in decay_names and weight_decay:
+                updated = parameter * (1.0 - lr * weight_decay) - step_update
+            else:
+                updated = parameter - step_update
+            getattr(self, name)[...] = updated
 
     def _prime(self, tokens: Sequence[int], *, cancel: threading.Event | None = None) -> np.ndarray:
         h = np.zeros((self.config.hidden_size,), dtype=np.float64)
@@ -411,6 +548,14 @@ class NumpyRecurrentLM:
             raise NeuralLMError("native neural context exceeds byte intake bound")
         prompt_tokens = (BOS,) + _encode(rendered_input)
         hidden = self._prime(prompt_tokens, cancel=cancel)
+        default_policy = (
+            request.temperature == 1.0
+            and request.top_k == 0
+            and request.top_p == 1.0
+            and request.min_p == 0.0
+            and request.repetition_penalty == 1.0
+        )
+        seen = list(prompt_tokens)
         rng = np.random.default_rng((request.seed ^ int(self.model_digest[:16], 16)) & ((1 << 63) - 1))
         output_tokens: list[int] = []
         finish = "length"
@@ -419,8 +564,12 @@ class NumpyRecurrentLM:
         for _ in range(request.max_output_tokens):
             if cancel.is_set():
                 raise LocalInferenceCancelled("native neural generation cancelled")
-            probs = _softmax(hidden @ self.output + self.output_bias)
-            token = int(rng.choice(VOCAB_SIZE, p=probs))
+            logits = hidden @ self.output + self.output_bias
+            if default_policy:
+                token = int(rng.choice(VOCAB_SIZE, p=_softmax(logits)))
+            else:
+                token = _sample_policy(logits, rng, request, seen)
+            seen.append(token)
             if token == EOS:
                 finish = "completed"
                 break
