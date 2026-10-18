@@ -1,4 +1,4 @@
-import { API_BASE } from '../../utils/apiBase';
+import { API_BASE } from '../utils/apiBase';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken } from '../auth/gameforgeAuth';

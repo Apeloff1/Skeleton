@@ -1,9 +1,9 @@
 /**
  * Semantic foundation tokens derived from the canonical palette in
- * theme/tokens.ts. Never introduce raw hex values here; alias the palette.
+ * src/theme/tokens.ts. Never introduce raw hex values here; alias the palette.
  */
 import type { TextStyle } from 'react-native';
-import theme from '../../theme/tokens';
+import theme from '../theme/tokens';
 
 // Canonical tokens expose theme-bound roles on the default object.
 // Do not import these as named exports: the theme API intentionally removed them.

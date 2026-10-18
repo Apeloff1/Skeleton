@@ -44,7 +44,7 @@ function fixture({ load, save } = {}) {
   const h = hooks();
   const saved = new Map();
   const writes = [];
-  const persist = loadTS('utils/usePersistentState.ts', {
+  const persist = loadTS('src/utils/usePersistentState.ts', {
     react: h.react,
     './safeStorage': {
       safeGetItem: load || (async key => saved.get(key) ?? null),

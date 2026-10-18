@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
-import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
 
 async function getVisitorId(): Promise<string> {
   let id = await safeGetItem('mkt_visitor_id');

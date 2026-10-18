@@ -22,12 +22,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   scheduleEventReminder,
   cancelEventReminder,
-} from '../utils/notifications';
+} from '../src/utils/notifications';
 import { LinearGradient } from 'expo-linear-gradient';
-import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/UI';
-import { openModalFromRoute } from '../utils/openModalFromRoute';
-import { toast } from '../components/Toast';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader } from '../src/components/UI';
+import { openModalFromRoute } from '../src/utils/openModalFromRoute';
+import { toast } from '../src/components/AppToast';
 
 interface Event {
   id: string;
@@ -255,7 +255,7 @@ function SchedulerScreen() {
             <TouchableOpacity
               onPress={() => {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-    try { require('../utils/haptics').default.tap(); } catch {}
+    try { require('../src/utils/haptics').default.tap(); } catch {}
                 setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1));
               }}
               hitSlop={theme.hitSlop.md}
@@ -267,7 +267,7 @@ function SchedulerScreen() {
             <TouchableOpacity
               onPress={() => {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-    try { require('../utils/haptics').default.tap(); } catch {}
+    try { require('../src/utils/haptics').default.tap(); } catch {}
                 const now = new Date();
                 setViewMonth(new Date(now.getFullYear(), now.getMonth(), 1));
                 setSelectedDate(`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`);
@@ -282,7 +282,7 @@ function SchedulerScreen() {
             <TouchableOpacity
               onPress={() => {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-    try { require('../utils/haptics').default.tap(); } catch {}
+    try { require('../src/utils/haptics').default.tap(); } catch {}
                 setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1));
               }}
               hitSlop={theme.hitSlop.md}

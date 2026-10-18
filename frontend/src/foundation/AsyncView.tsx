@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { EmptyState, ErrorState } from '../../components/primitives';
+import { EmptyState, ErrorState } from '../components/primitives';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { color } from './tokens';

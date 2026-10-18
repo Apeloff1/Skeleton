@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /marketplace — Creator Marketplace (one-time game purchases via Stripe).
  *
@@ -15,7 +15,7 @@ import * as WebBrowser from 'expo-web-browser';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
 import { awardXp } from '../src/utils/liveops';
-import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
 
 const BACKEND = CANONICAL_API_BASE || '';
 

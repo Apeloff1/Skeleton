@@ -17,6 +17,16 @@ Implements ADR ``docs/architecture/ADR-realtime-transport.md`` (PR #4101):
 * ``publish`` is thread-safe: job workers may publish from other threads
   while the event loop streams to clients.
 * **Secret guard** on every publish (#3637).
+* **Deny-by-default authorization** (Jenkins S1-1, #4128 review): the default
+  channel authorizer denies everyone; deployments install an explicit one.
+  Every build/agent event is bound at publish time to hub-side
+  :class:`EventAccess` metadata (owner principal, tenant) that never travels
+  in the payload, so producers' payload fields cannot spoof it. A
+  subscription receives a build/agent event only if its principal owns the
+  event, or it holds a job grant for that event's ``job_id`` issued after
+  the engine actor/service checks. The same check runs on live fan-out AND on
+  ring replay. Unowned build/agent events are delivered to nobody but
+  job-grant holders.
 """
 
 from __future__ import annotations
@@ -55,10 +65,29 @@ class RealtimeAuthError(PermissionError):
     """Principal may not subscribe to / act on the requested channel."""
 
 
-def _default_authorizer(principal: str, channel: str) -> bool:
-    # The API gate has already verified the HMAC seal; any verified principal
-    # may read the app-wide live channels. Deployments can narrow this hook.
+def deny_all_authorizer(principal: str, channel: str) -> bool:
+    """Default channel authorizer: deny everything (fail closed)."""
+    return False
+
+
+def sealed_principal_authorizer(principal: str, channel: str) -> bool:
+    """Channel-level allow for any gate-verified principal.
+
+    Only opens the *channel*; per-event owner/job-grant checks in
+    :meth:`Subscription.wants` still decide what is delivered.
+    """
     return bool(principal)
+
+
+_default_authorizer = deny_all_authorizer
+
+
+@dataclass(frozen=True)
+class EventAccess:
+    """Hub-side access metadata bound to an event at publish time."""
+
+    owner: Optional[str] = None
+    tenant: Optional[str] = None
 
 
 def _wall_ms() -> float:
@@ -75,12 +104,16 @@ class Subscription:
         principal: str,
         max_queue: int,
         job_id: Optional[str] = None,
+        job_grant: Optional[str] = None,
     ) -> None:
         self.id = uuid.uuid4().hex
         self.hub = hub
         self.channels = channels
         self.principal = principal
         self.job_id = job_id
+        # Execution id this subscription was authorized for by the engine
+        # actor/service checks (see ``skeleton.api.engine_routes``).
+        self.job_grant = job_grant
         self.max_queue = max_queue
         self.head_at_connect = 0
         self.replayed = 0
@@ -101,9 +134,25 @@ class Subscription:
     def wants(self, event: RealtimeEvent) -> bool:
         if event.channel not in self.channels:
             return False
-        if self.job_id is not None and event.channel != CHANNEL_PRESENCE:
-            return event.job_id == self.job_id
-        return True
+        if event.channel == CHANNEL_PRESENCE:
+            # Presence is scoped to its verified producer, not public scope metadata.
+            access = self.hub._access.get(event.seq)
+            return access is not None and access.owner == self.principal and access.tenant is None
+        if self.job_id is not None and event.job_id != self.job_id:
+            return False
+        if self.job_grant is not None and event.job_id == self.job_grant:
+            return True
+        access = self.hub._access.get(event.seq)
+        # An actor identifier alone is not a tenant authorization claim.
+        # A principal reused in multiple tenants must not see tenant-scoped
+        # events through an unfiltered channel. Those events require a
+        # per-execution grant obtained from the engine ownership gate above.
+        return (
+            access is not None
+            and access.owner is not None
+            and access.owner == self.principal
+            and access.tenant is None
+        )
 
     # -- producer side (hub lock held) ------------------------------------
     def _offer(self, event: RealtimeEvent) -> int:
@@ -253,6 +302,7 @@ class RealtimeHub:
         self._ring: Deque[RealtimeEvent] = deque(maxlen=self.replay_capacity)
         self._seq = int(id_seed) if id_seed is not None else int(time.time() * 1_000_000)
         self._seed = self._seq
+        self._access: Dict[int, EventAccess] = {}
         self._subs: Dict[str, Subscription] = {}
         self._presence: Dict[Tuple[str, str], PresenceMember] = {}
         self._closed = False
@@ -279,8 +329,14 @@ class RealtimeHub:
         *,
         job_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
+        owner: Optional[str] = None,
+        tenant: Optional[str] = None,
     ) -> RealtimeEvent:
-        """Validate, secret-scrub, store and fan out one event. Thread-safe."""
+        """Validate, secret-scrub, store and fan out one event. Thread-safe.
+
+        ``owner`` / ``tenant`` are trusted, hub-side access metadata supplied
+        by the server-side producer seam (never read from ``payload``).
+        """
         try:
             validate_channel(channel)
             clean, hits = self.guard.scrub(payload or {})
@@ -309,7 +365,11 @@ class RealtimeHub:
                 self.slo.record_publish_rejected("invalid")
                 raise
             self._seq += 1
+            if len(self._ring) == self._ring.maxlen:
+                self._access.pop(self._ring[0].seq, None)
             self._ring.append(event)
+            if owner or tenant:
+                self._access[event.seq] = EventAccess(owner or None, tenant or None)
             for sub in self._subs.values():
                 if sub.wants(event):
                     dropped = sub._offer(event)
@@ -328,12 +388,23 @@ class RealtimeHub:
         principal: str,
         cursor: Optional[int] = None,
         job_id: Optional[str] = None,
+        job_grant: Optional[str] = None,
     ) -> Subscription:
-        """Register a consumer; replays from ``cursor`` (exclusive) when retained."""
+        """Register a consumer; replays from ``cursor`` (exclusive) when retained.
+
+        ``job_grant`` must only be passed by callers that already ran the
+        engine actor/service authorization for that execution id.
+        """
         wanted = tuple(dict.fromkeys(validate_channel(c) for c in channels))
         if not wanted:
             raise EnvelopeError(f"subscribe needs at least one channel from {CHANNELS}")
         validate_identifier(job_id, "job_id")
+        validate_identifier(job_grant, "job_grant")
+        if job_grant is not None and job_id not in (None, job_grant):
+            raise RealtimeAuthError("job_grant does not cover the requested job_id")
+        if not principal:
+            self.slo.record_connect(False)
+            raise RealtimeAuthError("principal required")
         denied = [c for c in wanted if not self.authorizer(principal, c)]
         if denied:
             self.slo.record_connect(False)
@@ -343,7 +414,7 @@ class RealtimeHub:
             if self._closed or len(self._subs) >= self.max_subscribers:
                 self.slo.record_connect(False)
                 raise RuntimeError("realtime hub closed or at subscriber capacity")
-            sub = Subscription(self, wanted, principal, self.subscriber_queue, job_id)
+            sub = Subscription(self, wanted, principal, self.subscriber_queue, job_id, job_grant)
             sub.head_at_connect = self._seq
             if cursor is not None:
                 oldest = self._ring[0].seq if self._ring else self._seq + 1
@@ -374,7 +445,7 @@ class RealtimeHub:
                         )
                     )
             if CHANNEL_PRESENCE in wanted:
-                sub._queue.append(self._snapshot_event_locked())
+                sub._queue.append(self._snapshot_event_locked(principal=principal))
                 sub._events_queued += 1
             self._subs[sub.id] = sub
             active = len(self._subs)
@@ -395,10 +466,12 @@ class RealtimeHub:
         self.slo.set_active_connections(active)
 
     # -- presence ----------------------------------------------------------
-    def _snapshot_event_locked(self, scope: Optional[str] = None) -> RealtimeEvent:
+    def _snapshot_event_locked(self, scope: Optional[str] = None, *, principal: Optional[str] = None) -> RealtimeEvent:
         """Per-subscriber presence.snapshot. Not stored; carries the head id."""
         members = sorted(
-            (m.to_dict() for m in self._presence.values() if scope is None or m.scope == scope),
+            (m.to_dict() for m in self._presence.values()
+             if (scope is None or m.scope == scope)
+             and (principal is None or m.principal == principal)),
             key=lambda m: (m["scope"], m["client_id"]),
         )
         return RealtimeEvent(
@@ -432,7 +505,7 @@ class RealtimeHub:
             self._leave(client_id, principal, scope, reason="left")
         else:
             self._touch(client_id, principal, scope, meta, announce=True)
-        return self.presence_snapshot(scope)
+        return self.presence_snapshot(scope, principal=principal)
 
     def _touch(self, client_id: str, principal: str, scope: str, meta: Optional[Mapping[str, Any]], *, announce: bool) -> PresenceMember:
         clean_meta, hits = self.guard.scrub(meta or {})
@@ -451,7 +524,7 @@ class RealtimeHub:
             member = PresenceMember(client_id, principal, scope, ts_from_ms(now), now, clean_meta)
             self._presence[key] = member
         if announce:
-            self.publish(CHANNEL_PRESENCE, "presence.joined", member.to_dict())
+            self.publish(CHANNEL_PRESENCE, "presence.joined", member.to_dict(), owner=principal)
         return member
 
     def _leave(self, client_id: str, principal: str, scope: str, *, reason: str) -> bool:
@@ -462,7 +535,7 @@ class RealtimeHub:
             del self._presence[(scope, client_id)]
         payload = member.to_dict()
         payload["reason"] = reason
-        self.publish(CHANNEL_PRESENCE, "presence.left", payload)
+        self.publish(CHANNEL_PRESENCE, "presence.left", payload, owner=principal)
         return True
 
     def sweep_presence(self, now_ms: Optional[float] = None) -> List[PresenceMember]:
@@ -477,13 +550,15 @@ class RealtimeHub:
             payload = m.to_dict()
             payload["reason"] = "heartbeat_timeout"
             self.slo.record_presence_timeout()
-            self.publish(CHANNEL_PRESENCE, "presence.left", payload)
+            self.publish(CHANNEL_PRESENCE, "presence.left", payload, owner=m.principal)
         return expired
 
-    def presence_snapshot(self, scope: str = DEFAULT_SCOPE) -> Dict[str, Any]:
+    def presence_snapshot(self, scope: str = DEFAULT_SCOPE, *, principal: Optional[str] = None) -> Dict[str, Any]:
         validate_identifier(scope, "scope")
         with self._lock:
-            members = sorted((m.to_dict() for m in self._presence.values() if m.scope == scope), key=lambda m: m["client_id"])
+            members = sorted((m.to_dict() for m in self._presence.values()
+                              if m.scope == scope and (principal is None or m.principal == principal)),
+                             key=lambda m: m["client_id"])
             head = str(self._seq)
         return {"scope": scope, "members": members, "count": len(members), "head_id": head}
 
@@ -538,6 +613,9 @@ class RealtimeHub:
 
 __all__ = [
     "DEFAULT_SCOPE",
+    "EventAccess",
+    "deny_all_authorizer",
+    "sealed_principal_authorizer",
     "Frame",
     "PRESENCE_ACTIONS",
     "PresenceMember",

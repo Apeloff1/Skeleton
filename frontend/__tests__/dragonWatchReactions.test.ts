@@ -1,5 +1,5 @@
-import {advanceWatchReactions,EMPTY_REACTION_CURSOR} from '../features/Jeeves/companion/dragonWatchReactions';
-import type {WatchCue} from '../features/Jeeves/companion/dragonWatchCues';
+import {advanceWatchReactions,EMPTY_REACTION_CURSOR} from '../src/features/Jeeves/companion/dragonWatchReactions';
+import type {WatchCue} from '../src/features/Jeeves/companion/dragonWatchCues';
 describe('video companion reaction timing',()=>{
  const cue:WatchCue={id:'e1',positionMs:2000,kind:'frame',title:'Visual observation',description:'A scene',observationIds:['e1'],confidence:.9,requiresReview:true};
  const player=(positionMs:number,playing=true)=>({positionMs,durationMs:10000,playing,buffering:false,ended:false});

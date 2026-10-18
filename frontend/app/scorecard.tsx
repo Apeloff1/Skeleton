@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /scorecard — 🩺 10-Level Quality Scorecard + hard 95 delivery gate.
  * Shows every audit level, the gate verdict (ship-ready badge), fix-it deep-links,

@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /rosetta — Full Rosetta Challenge Runner.
  *
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';
