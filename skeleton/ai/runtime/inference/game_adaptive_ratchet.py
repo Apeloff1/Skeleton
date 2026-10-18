@@ -3,7 +3,8 @@
 AdamW uses the standard betas, epsilon, and decoupled weight decay. A chunk
 is kept when the mean holdout improves and no track regresses past an
 adaptive slack. The step scale hunts a stable acceptance rate under a cosine
-ceiling that tightens across the cycle. Holdout text is never a training
+ceiling that tightens across the cycle. Accepted text is recorded for review,
+and the update stays on fresh lines. Holdout text is never a training
 target, and nothing here promotes a checkpoint.
 """
 from __future__ import annotations
@@ -274,7 +275,7 @@ def _warmup(cycle_bytes: int, *, continuation: bool) -> float:
     # A continuation already has a fitted network, so the step starts small
     # rather than at zero and can still climb while the accept rate allows it.
     if continuation:
-        return 0.7 + 0.3 * ramp
+        return 1.0
     return ramp
 
 
@@ -432,17 +433,10 @@ def train_budget(
         for name in review:
             if name in stream.weights:
                 stream.weights[name] = min(3.0, max(stream.weights[name], 1.5))
-        fresh_docs = chunk_docs if len(replay) < 32 else max(1, int(chunk_docs * 0.85))
         batch: list[tuple[str, str]] = []
         batch_bytes = 0
-        while len(batch) < fresh_docs and bytes_done + batch_bytes < goal:
+        while len(batch) < chunk_docs and bytes_done + batch_bytes < goal:
             domain, text = stream.next_document()
-            batch.append((domain, text))
-            batch_bytes += len(text.encode("utf-8"))
-        replay_index = 0
-        while len(batch) < chunk_docs and replay and bytes_done + batch_bytes < goal:
-            domain, text = replay[replay_index % len(replay)]
-            replay_index += 1
             batch.append((domain, text))
             batch_bytes += len(text.encode("utf-8"))
         if not batch:
