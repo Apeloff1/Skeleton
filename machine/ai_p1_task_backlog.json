@@ -744,7 +744,7 @@
     {
       "task_id": "P1-INTEL-04",
       "lane_id": "P1-L1",
-      "status": "blocked",
+      "status": "ready",
       "title": "Answer and artifact quality pipeline",
       "volume_refs": [
         "VOL-254",
@@ -812,12 +812,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896328Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-INTEL-05",
       "lane_id": "P1-L1",
-      "status": "blocked",
+      "status": "ready",
       "title": "Plan verifier and static analysis",
       "volume_refs": [
         "VOL-014",
@@ -890,12 +892,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896338Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-INTEL-06",
       "lane_id": "P1-L1",
-      "status": "blocked",
+      "status": "ready",
       "title": "Core intelligence qualification bundle",
       "volume_refs": [
         "VOL-362",
@@ -971,7 +975,9 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896340Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-AUTO-01",
@@ -1051,7 +1057,7 @@
     {
       "task_id": "P1-AUTO-02",
       "lane_id": "P1-L2",
-      "status": "blocked",
+      "status": "ready",
       "title": "Agent identity, handoff and delegation budgets",
       "volume_refs": [
         "VOL-016",
@@ -1117,12 +1123,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896341Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-AUTO-03",
       "lane_id": "P1-L2",
-      "status": "blocked",
+      "status": "ready",
       "title": "Autonomy levels and de-escalation state machine",
       "volume_refs": [
         "VOL-018",
@@ -1186,12 +1194,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896342Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-AUTO-04",
       "lane_id": "P1-L2",
-      "status": "blocked",
+      "status": "ready",
       "title": "Human override, interrupt and approval receipts",
       "volume_refs": [
         "VOL-084",
@@ -1257,12 +1267,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896343Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-AUTO-05",
       "lane_id": "P1-L2",
-      "status": "blocked",
+      "status": "ready",
       "title": "Blast radius, reversibility and adversarial alignment",
       "volume_refs": [
         "VOL-025",
@@ -1338,12 +1350,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896344Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-AUTO-06",
       "lane_id": "P1-L2",
-      "status": "blocked",
+      "status": "ready",
       "title": "Safe autonomy qualification bundle",
       "volume_refs": [
         "VOL-028",
@@ -1414,7 +1428,9 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896346Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-PROD-01",
@@ -1621,7 +1637,7 @@
     {
       "task_id": "P1-PROD-04",
       "lane_id": "P1-L3",
-      "status": "blocked",
+      "status": "ready",
       "title": "Operator controls projection",
       "volume_refs": [
         "VOL-045"
@@ -1685,12 +1701,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896347Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-PROD-05",
       "lane_id": "P1-L3",
-      "status": "blocked",
+      "status": "ready",
       "title": "Web/desktop tenant and storage boundary",
       "volume_refs": [
         "VOL-043",
@@ -1752,7 +1770,9 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896348Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-LEARN-01",
@@ -1822,7 +1842,7 @@
     {
       "task_id": "P1-LEARN-02",
       "lane_id": "P1-L4",
-      "status": "blocked",
+      "status": "ready",
       "title": "Benchmark registry and contamination controls",
       "volume_refs": [
         "VOL-082",
@@ -1883,12 +1903,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896350Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-LEARN-03",
       "lane_id": "P1-L4",
-      "status": "blocked",
+      "status": "ready",
       "title": "Candidate and champion/challenger registry",
       "volume_refs": [
         "VOL-023",
@@ -1948,12 +1970,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896351Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-LEARN-04",
       "lane_id": "P1-L4",
-      "status": "blocked",
+      "status": "ready",
       "title": "Shadow traffic isolation",
       "volume_refs": [
         "VOL-414"
@@ -2010,12 +2034,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896352Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-LEARN-05",
       "lane_id": "P1-L4",
-      "status": "blocked",
+      "status": "ready",
       "title": "Specification and reasoning regression corpus",
       "volume_refs": [
         "VOL-324",
@@ -2076,12 +2102,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896353Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-LEARN-06",
       "lane_id": "P1-L4",
-      "status": "blocked",
+      "status": "ready",
       "title": "Failure knowledge pipeline",
       "volume_refs": [
         "VOL-419",
@@ -2140,12 +2168,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896354Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-REL-01",
       "lane_id": "P1-L5",
-      "status": "blocked",
+      "status": "ready",
       "title": "Release evidence bundle",
       "volume_refs": [
         "VOL-060",
@@ -2203,12 +2233,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896355Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-REL-02",
       "lane_id": "P1-L5",
-      "status": "blocked",
+      "status": "ready",
       "title": "Installer/update/repair lifecycle",
       "volume_refs": [
         "VOL-047",
@@ -2264,12 +2296,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896356Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-REL-03",
       "lane_id": "P1-L5",
-      "status": "blocked",
+      "status": "ready",
       "title": "Migration and rollback compatibility",
       "volume_refs": [
         "VOL-048",
@@ -2328,12 +2362,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896358Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-REL-04",
       "lane_id": "P1-L5",
-      "status": "blocked",
+      "status": "ready",
       "title": "Backup and restore qualification",
       "volume_refs": [
         "VOL-064",
@@ -2388,12 +2424,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896359Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-REL-05",
       "lane_id": "P1-L5",
-      "status": "blocked",
+      "status": "ready",
       "title": "Disaster recovery and incident feedback",
       "volume_refs": [
         "VOL-065",
@@ -2448,12 +2486,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896360Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-REL-06",
       "lane_id": "P1-L5",
-      "status": "blocked",
+      "status": "ready",
       "title": "Attribution and release notices",
       "volume_refs": [
         "VOL-409"
@@ -2509,12 +2549,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896361Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-DIST-01",
       "lane_id": "P1-L6",
-      "status": "blocked",
+      "status": "ready",
       "title": "Remote execution and worker trust",
       "volume_refs": [
         "VOL-030",
@@ -2572,12 +2614,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896362Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-DIST-02",
       "lane_id": "P1-L6",
-      "status": "blocked",
+      "status": "ready",
       "title": "Topology-aware model placement and warming",
       "volume_refs": [
         "VOL-031",
@@ -2636,12 +2680,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896363Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-DIST-03",
       "lane_id": "P1-L6",
-      "status": "blocked",
+      "status": "ready",
       "title": "Batching and autoscaling controller",
       "volume_refs": [
         "VOL-386",
@@ -2697,12 +2743,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896364Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-DIST-04",
       "lane_id": "P1-L6",
-      "status": "blocked",
+      "status": "ready",
       "title": "Load and capacity qualification",
       "volume_refs": [
         "VOL-067",
@@ -2759,12 +2807,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896365Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-DIST-05",
       "lane_id": "P1-L6",
-      "status": "blocked",
+      "status": "ready",
       "title": "Quota and budget accounting ledger",
       "volume_refs": [
         "VOL-069",
@@ -2821,12 +2871,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896366Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-DIST-06",
       "lane_id": "P1-L6",
-      "status": "blocked",
+      "status": "ready",
       "title": "Forecasting and cost anomaly loop",
       "volume_refs": [
         "VOL-405",
@@ -2883,12 +2935,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896367Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-PROM-01",
       "lane_id": "P1-L7",
-      "status": "blocked",
+      "status": "ready",
       "title": "Aggregate exact-head P1 evidence",
       "volume_refs": [],
       "depends_on": [
@@ -2953,12 +3007,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896369Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-PROM-02",
       "lane_id": "P1-L7",
-      "status": "blocked",
+      "status": "ready",
       "title": "Terminal failure-journey qualification",
       "volume_refs": [],
       "depends_on": [
@@ -3015,12 +3071,14 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896370Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     },
     {
       "task_id": "P1-PROM-03",
       "lane_id": "P1-L7",
-      "status": "blocked",
+      "status": "ready",
       "title": "Independent signed P1 promotion decision",
       "volume_refs": [],
       "depends_on": [
@@ -3078,7 +3136,9 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
-      "verification_signed": true
+      "verification_signed": true,
+      "unblocked_at": "2026-10-18T05:29:10.896371Z",
+      "unblock_note": "All dependencies done or ready; advanced in current-task pass."
     }
   ],
   "summary": {
