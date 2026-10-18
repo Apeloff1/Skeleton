@@ -986,3 +986,146 @@ def test_hyperlora_ties_slerp_model_soup_constrained_jacobi_dream_dpo_and_zero_s
     replay = dedup.execute("stage:3", {"brief": "rpg"}, lambda: {"ok": 999})
     assert replay["replay"] is True
     assert replay["response"] == {"ok": 3}
+
+
+def test_hardware_aware_throughput_adaptive_decompiler_elevated_cognition_100_todos_900k_steps_and_upload_all():
+    from skeleton.cortex.neocortex import JeevesCortex
+    from skeleton.cortex.own import COGNITIVE_ENHANCEMENT_100_TODOS, SCRUTINY_12_AXES
+    from skeleton.distributed.mesh.throughput_controller import ThroughputController
+
+    # 1. Hardware-Aware ThroughputController
+    tc = ThroughputController(default_limit=32, hardware_aware=True)
+    hw_probe = tc.probe_hardware()
+    assert hw_probe["cpu_cores"] >= 1
+    assert 0.20 <= hw_probe["scale_factor"] <= 2.50
+
+    tc.bind_console_target("gb_dmg_rom")
+    assert tc.hardware.target_console_profile == "gb_dmg_rom"
+    assert abs(tc.hardware.console_cpu_mhz - 4.194304) < 1e-4
+
+    # Under low load / cool thermals, effective limit scales up or stays healthy
+    tc.update_hardware_telemetry(
+        cpu_cores=8,
+        cpu_load_ratio=0.15,
+        memory_pressure=0.20,
+        vram_pressure=0.10,
+        thermal_c=48.0,
+        simd_width_bits=256,
+        l2_cache_kb=1024,
+    )
+    eff_cool = tc.effective_limit("rom_synth")
+    batch_cool = tc.optimal_batch_size("rom_synth", base_batch_size=8, item_bytes=2048)
+
+    # Under severe thermal / memory pressure, effective limit and batch size throttle down
+    tc.update_hardware_telemetry(
+        cpu_load_ratio=0.95,
+        memory_pressure=0.92,
+        vram_pressure=0.90,
+        thermal_c=89.0,
+    )
+    assert tc.hardware.under_severe_pressure() is True
+    eff_hot = tc.effective_limit("rom_synth")
+    batch_hot = tc.optimal_batch_size("rom_synth", base_batch_size=8, item_bytes=2048)
+    assert eff_hot < eff_cool
+    assert batch_hot <= batch_cool
+
+    coal_hw = tc.execute_coalesced_batch(
+        "rom_synth",
+        list(range(10)),
+        lambda chunk: [x + 1 for x in chunk],
+        max_batch_size=8,
+        auto_hardware_batch=True,
+    )
+    assert coal_hw["executed"] is True
+    assert coal_hw["results"] == list(range(1, 11))
+    assert "hardware" in tc.card()
+
+    # 2. Adaptive Sequential Decompiler (SM83 binary ROM, 6502 ROM, and GDScript)
+    neo = JeevesCortex()
+    sm83_rom = bytes([0x00, 0x3E, 0x01, 0xE0, 0x40, 0xCD, 0x50, 0x01, 0xC3, 0x00, 0x01, 0xC9]) + bytes(range(32))
+    dec_gb = neo.decompile_sequential(sm83_rom, filename="hero_dmg.gb", arch="auto", window_size=16, adaptive_passes=3)
+    assert dec_gb["schema_version"] == "skeleton.cortex.adaptive_sequential_decompiler.v1"
+    assert dec_gb["arch"] == "sm83_gb"
+    assert dec_gb["cfg"]["basic_block_count"] >= 1
+    assert dec_gb["cfg"]["loop_count"] >= 1
+    assert len(dec_gb["disassembly"]) >= 4
+    assert any(p["primitive"] == "vblank_dma_register_sync" for p in dec_gb["semantic_ir"])
+
+    gd_source = """
+    func _physics_process(delta):
+        var velocity = Vector2(120, 0)
+        if hp <= 0:
+            return
+        move_and_slide()
+    """
+    dec_gd = neo.decompile_sequential(gd_source, filename="player.gd", arch="auto")
+    assert dec_gd["arch"] == "script_ast"
+    assert any(p["primitive"] == "fixed_tick_state_machine_loop" for p in dec_gd["semantic_ir"])
+
+    # 3. Elevated Comprehension & Semantics, Innsight & Outrospection, and 12-Axis Hyper-Scrutiny
+    comp = neo.comprehend("player parries boss attack in gb_dmg_rom bank0 within 16.6ms frame budget and 2bpp palette")
+    assert comp["schema_version"] == "skeleton.cortex.comprehension_semantics.v2"
+    assert comp["comprehension_score"] > 0.70
+    assert len(comp["semantic_tensor_12d"]) == 12
+    assert len(comp["polysemy_resolutions"]) >= 2
+    assert comp["causal_mechanics_dag"]["acyclic"] is True
+
+    inns = neo.innsight_outrospect("soulslike boss parry ttk=3.8s in gb_dmg_rom with 40 sprites")
+    assert inns["schema_version"] == "skeleton.cortex.innsight_outrospect.v2"
+    assert inns["innsight_factor"] > 0.5
+    assert inns["outrospect_factor"] > 0.5
+    assert len(inns["outrospect"]["cohort_projections"]) == 5
+    assert "gb_dmg_rom" in inns["outrospect"]["silicon_horizon"]["target_console"]
+
+    assert len(SCRUTINY_12_AXES) == 12
+    scrut = neo.hyper_scrutinize(
+        {"brief": "gb_dmg_rom soulslike 60hz fixed_tick 2bpp bank0 ttk=1.1s"},
+        console_target="gb_dmg_rom",
+    )
+    assert scrut["schema_version"] == "skeleton.cortex.hyper_scrutiny.v2"
+    assert scrut["axes_evaluated"] == 12
+    assert len(scrut["axis_verdicts"]) == 12
+    assert scrut["scrutiny_factor"] > 0.75
+
+    # 4. 100 Enhancing To-Dos Ledger & Executor
+    assert len(COGNITIVE_ENHANCEMENT_100_TODOS) == 100
+    todos_out = neo.run_100_enhancing_todos()
+    assert todos_out["total_todos"] == 100
+    assert todos_out["completed_count"] == 100
+    assert todos_out["all_completed"] is True
+    assert len(todos_out["domain_summary"]) == 10
+
+    # 5. Massive 900,000-Step Vectorized Hyper-Evolution Engine
+    steps_out = neo.run_massive_steps(total_steps=900_000, lr=0.025, console_target="gb_dmg_rom")
+    assert steps_out["executed_steps"] == 900_000
+    assert steps_out["target_steps"] == 900_000
+    assert neo.massive_steps_completed >= 900_000
+    assert neo.transformer.steps >= 900_000
+    assert neo.status()["massive_steps_completed"] >= 900_000
+
+    # 6. 16-Tool AI Cognitive Tool Suite + Upload All Files Batch Ingestion
+    tools = neo.list_ai_tools()
+    assert len(tools) >= 16
+    tool_names = {t["name"] for t in tools}
+    assert "adaptive_sequential_decompiler" in tool_names
+    assert "batch_file_ingest_and_analyze" in tool_names
+
+    inv_dec = neo.invoke_ai_tool(
+        "adaptive_sequential_decompiler",
+        {"payload": "00 3e 01 e0 40 c9", "filename": "boot.gb"},
+    )
+    assert inv_dec["ok"] is True
+    assert inv_dec["result"]["arch"] == "sm83_gb"
+
+    batch_upload = neo.upload_all_files(
+        [
+            {"filename": "rom_bank0.gb", "content": sm83_rom, "mime_type": "application/octet-stream"},
+            {"filename": "combat_loop.gd", "content": gd_source, "mime_type": "text/plain"},
+            {"filename": "balance.json", "content": '{"trash_ttk": 1.1, "elite_ttk": 4.5, "boss_ttk": 60.0}', "mime_type": "application/json"},
+        ]
+    )
+    assert batch_upload["schema_version"] == "skeleton.cortex.batch_file_upload.v1"
+    assert batch_upload["uploaded_count"] == 3
+    assert len(batch_upload["files"]) == 3
+    assert batch_upload["aggregate_comprehension"] > 0.70
+

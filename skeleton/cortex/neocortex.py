@@ -165,12 +165,20 @@ class JeevesCortex:
         self._seal: Dict[str, Any] = {}
         from skeleton.cortex.contact import ContactEngine
         from skeleton.cortex.genos import Genos
-        from skeleton.cortex.own import RepetitionTrainingAutomation, ZeroShotBlueprintCompiler
+        from skeleton.cortex.own import (
+            AdaptiveSequentialDecompiler,
+            JeevesCognitiveToolSuite,
+            RepetitionTrainingAutomation,
+            ZeroShotBlueprintCompiler,
+        )
         from skeleton.cortex.rl import DPOPreferenceOptimizer
         self.contact_engine = ContactEngine()
         self.genos_engine = Genos()
         self.repetition_automation = RepetitionTrainingAutomation()
         self.blueprint_compiler = ZeroShotBlueprintCompiler()
+        self.decompiler = AdaptiveSequentialDecompiler()
+        self.tool_suite = JeevesCognitiveToolSuite(self)
+        self.massive_steps_completed: int = 0
         self.dpo_optimizer = DPOPreferenceOptimizer()
 
     def backends(self) -> Dict[str, str]:
@@ -928,6 +936,8 @@ class JeevesCortex:
         genre = str(spec.get("genre") or "action")
         stim = f"qa review {era} {genre} files={len(files)} ok={bool(build.get('ok'))}"
         trace = self.think(stim, {"era": era, "genre": genre})
+        scrutiny = self.hyper_scrutinize(build, console_target=era)
+        innsight_out = self.innsight_outrospect(stim, {"era": era, "genre": genre})
 
         passed = bool(build.get("ok", False)) and len(issues) == 0
         return {
@@ -941,7 +951,12 @@ class JeevesCortex:
                 "era": era,
                 "genre": genre,
                 "file_count": len(files),
+                "scrutiny_factor": scrutiny.get("scrutiny_factor"),
+                "review_factor": scrutiny.get("review_factor"),
+                "hemispheric_resonance": innsight_out.get("innsight", {}).get("hemispheric_resonance"),
             },
+            "hyper_scrutiny": scrutiny,
+            "innsight_outrospect": innsight_out,
         }
 
     def learn_from_game_build(self, build_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -1231,6 +1246,8 @@ class JeevesCortex:
             "lora": (self.transformer.lora.to_dict()
                      if getattr(self.transformer, "lora", None) is not None else None),
             "genos": self.genos_engine.snapshot() if getattr(self, "genos_engine", None) else None,
+            "massive_steps_completed": int(getattr(self, "massive_steps_completed", 0) or 0),
+            "ai_tools_count": len(self.list_ai_tools()),
             "law": "ok",
         }
 
@@ -1573,6 +1590,73 @@ class JeevesCortex:
             seed=seed,
             use_cache=use_cache,
         )
+
+    def decompile_sequential(
+        self,
+        payload: Any,
+        *,
+        filename: str = "artifact.gb",
+        arch: str = "auto",
+        window_size: int = 32,
+        adaptive_passes: int = 3,
+    ) -> Dict[str, Any]:
+        """Decompile a binary ROM, hex dump, or script sequentially into CFG, symbol table, and semantic IR."""
+        return self.decompiler.decompile(
+            payload,
+            filename=filename,
+            arch=arch,
+            window_size=window_size,
+            adaptive_passes=adaptive_passes,
+            neo=self,
+        )
+
+    def comprehend(self, stimulus: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Execute deep multi-order comprehension and semantic role-frame + causal DAG extraction."""
+        from skeleton.cortex.own import comprehend_and_semanticize
+        return comprehend_and_semanticize(self, stimulus, context)
+
+    def innsight_outrospect(self, stimulus: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Execute deep introspective ('innsight') and external player/hardware ('outrospect') synthesis."""
+        from skeleton.cortex.own import innsight_and_outrospect
+        return innsight_and_outrospect(self, stimulus, context)
+
+    def hyper_scrutinize(self, target: Any, *, console_target: str = "gb_dmg_rom") -> Dict[str, Any]:
+        """Run 12-axis trans-human scrutiny and review across a prompt, blueprint, or game build."""
+        from skeleton.cortex.own import hyper_scrutiny_and_review
+        return hyper_scrutiny_and_review(self, target, console_target=console_target)
+
+    def run_100_enhancing_todos(self) -> Dict[str, Any]:
+        """Execute and verify all 100 cognitive enhancement to-dos across the cortex."""
+        from skeleton.cortex.own import execute_100_enhancing_todos
+        return execute_100_enhancing_todos(self)
+
+    def run_massive_steps(
+        self,
+        *,
+        total_steps: int = 900_000,
+        lr: float = 0.025,
+        console_target: str = "gb_dmg_rom",
+    ) -> Dict[str, Any]:
+        """Execute a massive vectorized hyper-training run (default 900,000 steps) across the cortex."""
+        from skeleton.cortex.own import run_massive_hyper_steps
+        return run_massive_hyper_steps(
+            self,
+            total_steps=total_steps,
+            lr=lr,
+            console_target=console_target,
+        )
+
+    def list_ai_tools(self) -> List[Dict[str, Any]]:
+        """List all 16 callable tools in the Jeeves Cognitive Tool Suite."""
+        return self.tool_suite.list_tools()
+
+    def invoke_ai_tool(self, tool_name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Invoke a named tool from the Jeeves Cognitive Tool Suite."""
+        return self.tool_suite.invoke(tool_name, payload)
+
+    def upload_all_files(self, files: Sequence[Any]) -> Dict[str, Any]:
+        """Batch-upload, decompile, comprehend, and scrutinize all provided files into the AI memory."""
+        return self.tool_suite.upload_all_files(files)
 
 
     def speaking_name(self) -> str:

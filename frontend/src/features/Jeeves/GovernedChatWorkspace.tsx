@@ -10,7 +10,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useChatController } from '../../product/useChatController';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import type { ConversationMessage, ConversationThread } from '../../product/governedConversationClient';
-import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadChatAttachment } from './chatFiles';
+import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadAllChatAttachments, uploadChatAttachment } from './chatFiles';
 import MessageContent from './MessageContent';
 import JeevesRuntimeStatus from './JeevesRuntimeStatus';
 import { MAX_CONTEXT } from './workspace';
@@ -336,18 +336,25 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     } finally { sending.current = false; }
   };
 
-  const pickAttachment = async () => {
+  const pickAttachment = async (multiple = false) => {
     if (uploading || busy || creatingRef.current || !attachmentTypes.length) return;
     setUploading(true); setUploadError(null);
     const origin = threadIdRef.current;
     const uploadingAccount = getAuthToken();
     const abort = new AbortController(); uploadController.current = abort;
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: attachmentTypes, copyToCacheDirectory: true, multiple: false });
+      const result = await DocumentPicker.getDocumentAsync({ type: attachmentTypes, copyToCacheDirectory: true, multiple });
       if (result.canceled) return;
-      const file = result.assets[0];
-      const base64 = await readPickedAttachment(file);
-      if (abort.signal.aborted) return;
+      const existingCount = (files[origin] || []).length;
+      const remainingSlots = Math.max(0, 4 - existingCount);
+      if (remainingSlots <= 0) throw new Error('You can attach up to four files per message.');
+      const selectedAssets = result.assets.slice(0, remainingSlots);
+      const encodedAssets: { name: string; mimeType: string; base64: string }[] = [];
+      for (const file of selectedAssets) {
+        const base64 = await readPickedAttachment(file);
+        if (abort.signal.aborted) return;
+        encodedAssets.push({ name: file.name, mimeType: inferredMime(file.name, file.mimeType), base64 });
+      }
       if (uploadingAccount !== getAuthToken()) throw new Error('Your account changed. Choose the file again in the intended conversation.');
       let thread = controller.getSnapshot().activeThread;
       if (origin === '__new') {
@@ -361,11 +368,18 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
       const uploadThreadId = thread.thread_id;
       if (uploadingAccount !== getAuthToken()) throw new Error('Your account changed. Choose the file again in the intended conversation.');
       if (origin === '__new') setDrafts(current => ({ ...current, [uploadThreadId]: current.__new || '', __new: '' }));
-      if ((files[thread.thread_id] || []).length >= 4) throw new Error('You can attach up to four files per message.');
-      const uploaded = await uploadChatAttachment({ threadId: thread.thread_id, filename: file.name,
-        mimeType: inferredMime(file.name, file.mimeType), base64, rightsAcknowledged: true, signal: abort.signal });
+      if ((files[thread.thread_id] || []).length + encodedAssets.length > 4) throw new Error('You can attach up to four files per message.');
+      const uploadedBatch = multiple
+        ? await uploadAllChatAttachments(encodedAssets.map(item => ({
+            threadId: uploadThreadId, filename: item.name, mimeType: item.mimeType,
+            base64: item.base64, rightsAcknowledged: true as const, signal: abort.signal,
+          })))
+        : [await uploadChatAttachment({
+            threadId: uploadThreadId, filename: encodedAssets[0].name, mimeType: encodedAssets[0].mimeType,
+            base64: encodedAssets[0].base64, rightsAcknowledged: true, signal: abort.signal,
+          })];
       if (!mounted.current || abort.signal.aborted || uploadingAccount !== getAuthToken()) return;
-      setFiles(current => ({ ...current, [uploadThreadId]: [...(current[uploadThreadId] || []), uploaded] }));
+      setFiles(current => ({ ...current, [uploadThreadId]: [...(current[uploadThreadId] || []), ...uploadedBatch] }));
       input.current?.focus();
     } catch (caught) {
       if (mounted.current && !abort.signal.aborted) setUploadError(caught instanceof Error ? caught.message : 'This file could not be attached.');
@@ -544,6 +558,8 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
               <View style={s.between}><View style={s.row}>
                 <IconButton icon="attach-outline" label="Attach a file" disabled={busy || loading || creating || uploading || attached.length >= 4 || !state.ready}
                   onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
+                <MiniButton icon="cloud-upload-outline" label="Upload all files" disabled={busy || loading || creating || uploading || attached.length >= 4 || !state.ready}
+                  onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
                 {uploading ? <View style={s.row}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>Attaching…</Text>
                   <MiniButton icon="close-outline" label="Cancel" onPress={() => uploadController.current?.abort()} /></View> :
                   <Text style={s.muted}>{draft.length > 30000 ? `${draft.length.toLocaleString()} / ${MAX_MESSAGE_LENGTH.toLocaleString()}` : attached.length ? `${attached.length} / 4 files` : 'Ask anything'}</Text>}
@@ -622,8 +638,10 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         <Text style={s.checkboxText}>I have permission to use this file in this conversation.</Text>
       </TouchableOpacity>
       <View style={s.dialogActions}><Button label="Cancel" onPress={() => setAttachmentConsent(false)} />
-        <Button icon="document-outline" label="Choose file" primary disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
-          onPress={() => { setAttachmentConsent(false); void pickAttachment(); }} /></View>
+        <Button icon="document-outline" label="Choose file" disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
+          onPress={() => { setAttachmentConsent(false); void pickAttachment(false); }} />
+        <Button icon="cloud-upload-outline" label="Upload all files" primary disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
+          onPress={() => { setAttachmentConsent(false); void pickAttachment(true); }} /></View>
     </Dialog>}
     {!!toast && <View pointerEvents="none" style={s.toast} accessibilityLiveRegion="polite"><Text style={s.toastText}>{toast}</Text></View>}
   </SafeAreaView>;
