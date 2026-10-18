@@ -23,10 +23,10 @@
     "test:known-advisories": "node --test ./scripts/test-known-yarn-advisories.cjs",
     "test:operation-stream": "node --test scripts/test-operation-stream-reducer.mjs scripts/test-operation-stream-session.mjs",
     "test:conversation": "node --test scripts/test-conversation-projection.mjs scripts/test-chat-error-boundary.mjs",
-    "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs",
+    "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs && node scripts/test-dragon-journal-chain.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
-    "test:app-foundation": "node --test scripts/app-foundation/*.test.cjs",
+    "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs",
     "test:app-foundation:render": "node --test scripts/app-foundation/render/*.test.cjs",
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
@@ -34,14 +34,17 @@
     "test:localization": "node --test scripts/test-localization-contract.mjs",
     "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
     "test:dragon-native-editor": "node --test scripts/test-dragon-native-puzzle-preview.mjs scripts/test-dragon-native-puzzle-history.mjs",
-    "test:product-journeys": "node --test scripts/test-product-journeys.mjs scripts/test-jeeves-model-inventory.mjs",
+    "test:product-journeys": "node --test scripts/test-product-journeys.mjs scripts/test-jeeves-model-inventory.mjs scripts/test-app-foundation-flows.mjs",
     "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
     "test:stability": "node --experimental-strip-types --test scripts/test-startup-stability.mjs scripts/test-request-recovery.mjs scripts/test-trace-write-queue.mjs scripts/test-storage-retention.mjs scripts/test-crash-commit-order.mjs scripts/test-native-mutation-fence.mjs scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs scripts/test-offline-cache-integrity.cjs scripts/test-memory-pressure-runtime.cjs scripts/test-operation-stream-endurance.cjs scripts/test-persistent-preferences-endurance.cjs scripts/test-build-observer-endurance.cjs scripts/test-timer-resume-endurance.cjs scripts/test-connectivity-probe.cjs scripts/test-native-mirror-memory.cjs scripts/test-month-cycle-ledger.cjs scripts/test-month-cycle-recovery.cjs scripts/test-month-cycle-integration.cjs scripts/test-month-cycle-foreground.cjs",
     "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
     "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
     "test:story-continuity": "node --test scripts/test-story-continuity.mjs",
     "test:design-review": "node --test scripts/test-design-review.mjs",
-    "test:stability:reconciliation": "node --test scripts/test-reconciled-stability.cjs"
+    "test:stability:reconciliation": "node --test scripts/test-reconciled-stability.cjs",
+    "test:env": "node --test scripts/validate-public-env.test.cjs",
+    "validate:env": "node scripts/validate-public-env.cjs",
+    "test:foundation-tokens": "node --test scripts/test-foundation-tokens.cjs"
   },
   "engines": {
     "node": ">=24"
