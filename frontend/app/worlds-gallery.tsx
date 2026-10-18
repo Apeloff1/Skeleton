@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /worlds-gallery — a showcase of every world forged from a game and saved (WG).
  * Each card shows a rendered thumbnail (globe / cartographic / cosmic), its name,

@@ -1,6 +1,6 @@
 import type React from 'react';
-import { ErrorBoundary } from '../../components/ErrorBoundary';
-import type { ThemeColors } from '../../constants/themes';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import type { ThemeColors } from '../constants/themes';
 
 // Compile-time sentinels for shared contracts that are consumed by hub.tsx.
 // These values are never executed; `tsc --noEmit` is the regression gate.

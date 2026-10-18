@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /jeeves-audio-test — P2 Jeeves TTS audio diagnostics route.
  *
@@ -20,11 +20,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   jeevesSpeak, jeevesCatchphrase, jeevesStop, type JeevesContext,
-} from '../features/Academy/jeevesTts';
+} from '../src/features/Academy/jeevesTts';
 import {
   ttsSpeak, ttsAvailableVoices, pickPreferredVoice, ttsIsSpeaking,
-} from '../features/Academy/tts';
-import { useSettings } from '../state/settingsStore';
+} from '../src/features/Academy/tts';
+import { useSettings } from '../src/state/settingsStore';
 
 const BACKEND = CANONICAL_API_BASE || '';
 

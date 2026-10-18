@@ -2,9 +2,9 @@
   "extends": "./tsconfig.json",
   "include": [
     "app/game-learning.tsx",
-    "features/Jeeves/GameLearningWorkspace.tsx",
-    "features/Jeeves/GameLearningWorkspace.styles.ts",
-    "features/Jeeves/gameLearningFiles.ts",
+    "src/features/Jeeves/GameLearningWorkspace.tsx",
+    "src/features/Jeeves/GameLearningWorkspace.styles.ts",
+    "src/features/Jeeves/gameLearningFiles.ts",
     "src/product/gameLearningClient.ts",
     "expo-env.d.ts"
   ]

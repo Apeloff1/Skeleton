@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isPrunableStorageKey } from '../utils/storageRetentionPolicy.ts';
+import { isPrunableStorageKey } from '../src/utils/storageRetentionPolicy.ts';
 
 test('advisory warm-boot and namespaced telemetry caches can expire', () => {
   assert.equal(isPrunableStorageKey('@boot/last_ok:v1'), true);

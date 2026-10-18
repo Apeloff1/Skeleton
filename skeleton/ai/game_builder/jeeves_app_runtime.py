@@ -158,6 +158,7 @@ ACTION_DEFS = (
     ("game.console.source.stage", "Generate authentic console assembly/C and stage one exact source for human approval", "propose", True),
     ("game.console.source.stage.artwork", "Compile six exact original 8x8 sprite tile arrays into reviewed native console source", "propose", True),
     ("game.mirror.review", "Run original game browser/native replay plus the independent adversarial mirror", "simulate", True),
+    ("system.triad", "Connect every game-builder part through Jeeves, Dragon, and its adversarial counterpart", "simulate", True),
     ("tool.fabric", "Inspect actual game tool contracts versus executable handlers", "read", False),
     ("tool.plan", "Validate a finite typed Jeeves tool plan without executing it", "plan", True),
     ("companion.simulate", "Rehearse consent-bound Dragon growth and idle state transitions", "simulate", False),
@@ -896,6 +897,12 @@ def dispatch_app_action(workspace,project,action,args,*,authorized=False):
         result=_stage_console_art_source(workspace,project,args,with_artist=True)
     elif action=="game.mirror.review":
         result=_compile_original_game(project,args,"mirror")
+    elif action=="system.triad":
+        _exact(args,("seed","mirror_attempts"),"role triad")
+        from .studio_role_triad import connect_system_triad
+        result=connect_system_triad(
+            seed=args["seed"], mirror_attempts=args["mirror_attempts"],
+            authorized=authorized)
     elif action=="forge.graph":
         result=_review_forge_graph(args)
     elif action=="tool.fabric":

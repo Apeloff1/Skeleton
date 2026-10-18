@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { Redirect, usePathname } from 'expo-router';
-import { ErrorState } from '../../components/primitives';
+import { ErrorState } from '../components/primitives';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { color } from './tokens';

@@ -9,15 +9,18 @@ Usage::
 
 Behaviour (ADR-realtime-transport §4):
 
-* resumes from the last delivered ``id`` via ``Last-Event-ID`` on every
-  reconnect, de-duplicating anything at or below it;
+* resumes from the last delivered ``id`` via ``Last-Event-ID`` (and
+  ``?cursor=``) on every reconnect, de-duplicating anything at or below it;
 * ``stream.lagged`` -> immediate reconnect from the last id (the server ring
   fills the gap); ``stream.reset`` -> ``on_reset`` callback, cursor moves to
   the server head, caller refetches state over REST;
 * 45 s with no bytes -> stream is dead, reconnect;
 * failures back off with full jitter via ``RetryPolicy`` (0.5 s .. 30 s),
   honouring ``retry:`` as a floor and resetting after 60 s healthy;
-* 401/403 are never retried.
+* 401/403 (:class:`RealtimeAuthError`), 503 ``seal_unavailable``
+  (:class:`RealtimeSealUnavailable`) and any connect error with
+  ``retryable=False`` (e.g. 422) are raised immediately, never retried;
+* abandoning the generator (``aclose()`` / ``break``) closes the open stream.
 """
 
 from __future__ import annotations
@@ -29,7 +32,13 @@ from typing import Any, AsyncIterator, Callable, Dict, Optional, Sequence, Union
 from skeleton.realtime.envelope import CHANNELS, STREAM_LAGGED, STREAM_RESET, ControlEvent, RealtimeEvent
 
 from .backoff import ReconnectBackoff
-from .errors import RealtimeAuthError, RealtimeConnectError, RealtimeGaveUp, RealtimeProtocolError
+from .errors import (
+    RealtimeAuthError,
+    RealtimeConnectError,
+    RealtimeGaveUp,
+    RealtimeProtocolError,
+    RealtimeSealUnavailable,
+)
 from .transport import HEARTBEAT, RealtimeTransport
 
 DEAD_STREAM_SECONDS = 45.0
@@ -91,9 +100,16 @@ class RealtimeClient:
             self.stats["connect_attempts"] += 1
             try:
                 stream = await self.transport.open(channels=self.channels, job_id=self.job_id, cursor=self.last_event_id)
-            except RealtimeAuthError:
+            except (RealtimeAuthError, RealtimeSealUnavailable):
+                self.stats["connect_failures"] += 1
                 raise
-            except (RealtimeConnectError, OSError):
+            except RealtimeConnectError as exc:
+                self.stats["connect_failures"] += 1
+                if not exc.retryable:
+                    raise
+                await self._backoff_or_give_up()
+                continue
+            except OSError:
                 self.stats["connect_failures"] += 1
                 await self._backoff_or_give_up()
                 continue
@@ -147,6 +163,16 @@ class RealtimeClient:
             except (RealtimeProtocolError, RealtimeConnectError, OSError):
                 pass
             finally:
+                # Runs on normal exit and when the consumer abandons the
+                # generator (GeneratorExit at a ``yield``): close the frame
+                # iterator first so its body iterator is awaited, then the
+                # stream itself.
+                closer = getattr(iterator, "aclose", None)
+                if closer is not None:
+                    try:
+                        await closer()
+                    except Exception:
+                        pass
                 await stream.aclose()
             if self._closed:
                 return

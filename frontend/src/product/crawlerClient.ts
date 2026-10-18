@@ -1,5 +1,5 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import { API_BASE } from '../../utils/apiBase';
+import { API_BASE } from '../utils/apiBase';
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';

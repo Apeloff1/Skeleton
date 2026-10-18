@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /tools-arena — Power-user surface for the 8 complex backend tools.
  *
@@ -24,9 +24,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../theme/tokens';
-import { useModalLogger } from '../utils/modalLogger';
-import RetryBanner from '../components/UI/RetryBanner';
+import theme from '../src/theme/tokens';
+import { useModalLogger } from '../src/utils/modalLogger';
+import RetryBanner from '../src/components/UI/RetryBanner';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const { breathing, palette, radii } = theme;
