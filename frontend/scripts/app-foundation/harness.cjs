@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 /* global __dirname */
 // Transpile a dependency-light foundation module with TypeScript only (no Babel,
 // no node_modules beyond `typescript`) so CI can run it via NODE_PATH.
@@ -16,7 +17,7 @@ function load(rel, mocks = {}) {
   });
   if ((out.diagnostics || []).length) throw new Error(rel + ': transpile diagnostics');
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', out.outputText)((name) => {
+  compileFunction(out.outputText, ['require', 'module', 'exports'])((name) => {
     if (Object.prototype.hasOwnProperty.call(mocks, name)) return mocks[name];
     throw new Error(`${rel}: unexpected import ${name}`);
   }, mod, mod.exports);

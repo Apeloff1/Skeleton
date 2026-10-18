@@ -4,7 +4,8 @@ Reuses the forge game-logic, animation, and dialogue pipelines, the
 deterministic combat and economy simulators, the room graph already emitted
 by Godot materialisation, the render particle contract, and the kinematic
 physics body. Numbers the playable loop executes are the encounter, economy,
-platform, and narrative tables returned here.
+platform, and narrative tables returned here. ``longform`` is a five-act
+campaign walked to a completed ending.
 """
 from __future__ import annotations
 
@@ -21,6 +22,15 @@ CONTENT_SCHEMA = "skeleton.game_content_bundle.v1"
 _SCOPE_ENCOUNTERS = {"small": 3, "medium": 5, "large": 8}
 _SCOPE_PLATFORMS = {"small": (2, 3, 2), "medium": (2, 3, 2, 3, 2), "large": (2, 2, 3, 2, 3, 2, 2, 3)}
 _SCOPE_LEVELS = {"small": 4, "medium": 6, "large": 8}
+_SCOPE_CHAPTERS = {"small": 8, "medium": 32, "large": 120}
+_ACTS = (
+    ("arrival", "The road opens."),
+    ("trials", "The rooms answer back."),
+    ("fracture", "The hook splits."),
+    ("reckoning", "What was owed comes due."),
+    ("return", "The way home is the last room."),
+)
+LONGFORM_SCHEMA = "skeleton.game_longform.v1"
 
 
 def _seed(spec_id: str) -> int:
@@ -112,36 +122,101 @@ def _economy(seed: int, encounters: list[Mapping[str, Any]], *, currency: str) -
     }
 
 
-def _narrative(spec: Mapping[str, Any]) -> list[dict[str, str]]:
+def _act_index(chapter: int, total: int) -> int:
+    return min(len(_ACTS) - 1, chapter * len(_ACTS) // total)
+
+
+def _beat_line(fantasy: str, act_id: str, chapter: int, beat: str) -> str:
+    return " ".join(f"{beat} {chapter + 1} in {act_id}: {fantasy}".split())[:180]
+
+
+def _longform(spec: Mapping[str, Any], scope: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Walk a five-act campaign to a terminal ending.
+
+    Small is a complete arc. Large is the massive campaign. Every chapter is
+    a dialogue tree that must finish; the bundle is not returned unfinished.
+    """
     fantasy = str(spec.get("fantasy") or "the delve")
-    tree = DialogueTree(
-        tree_id="core-hook",
-        entry="arrive",
-        nodes={
-            "arrive": DialogueNode(
-                "arrive",
-                "guide",
-                f"The way through {fantasy} is still open.",
-                edges=[DialogueEdge("follow the hook", "payoff", effects={"hook": "hook-0"})],
-            ),
-            "payoff": DialogueNode(
-                "payoff",
-                "guide",
-                "The hook is yours if the rooms are cleared.",
-                terminal=True,
-            ),
-        },
-    )
-    walker = DialogueWalker(tree)
-    walker.choose(0)
-    if not walker.finished:
-        raise RuntimeError("narrative hook did not reach a terminal line")
-    return [{
-        "id": "hook-0",
-        "speaker": walker.node.speaker,
-        "line": walker.node.line,
-        "tree_id": tree.tree_id,
-    }]
+    total = _SCOPE_CHAPTERS[scope]
+    chapters: list[dict[str, Any]] = []
+    beats: list[dict[str, Any]] = []
+    per_act = {act_id: 0 for act_id, _title in _ACTS}
+    for index in range(total):
+        act_id, _title = _ACTS[_act_index(index, total)]
+        per_act[act_id] += 1
+        arrive_id = "hook-0" if index == 0 else f"c{index}-open"
+        turn_id = f"c{index}-turn"
+        end_id = f"c{index}-end"
+        close = "completed" if index == total - 1 else "close"
+        tree = DialogueTree(
+            tree_id=f"chapter-{index}",
+            entry=arrive_id,
+            nodes={
+                arrive_id: DialogueNode(
+                    arrive_id,
+                    "guide",
+                    _beat_line(fantasy, act_id, index, "open"),
+                    edges=[DialogueEdge("continue", turn_id, effects={"chapter": index})],
+                ),
+                turn_id: DialogueNode(
+                    turn_id,
+                    "guide",
+                    _beat_line(fantasy, act_id, index, "turn"),
+                    edges=[DialogueEdge("finish the chapter", end_id)],
+                ),
+                end_id: DialogueNode(
+                    end_id,
+                    "guide",
+                    _beat_line(fantasy, act_id, index, close),
+                    terminal=True,
+                ),
+            },
+        )
+        for node_id in (arrive_id, turn_id, end_id):
+            node = tree.nodes[node_id]
+            beats.append({
+                "chapter": index,
+                "act": act_id,
+                "node": node_id,
+                "line": node.line,
+            })
+        walker = DialogueWalker(tree)
+        walker.choose(0)
+        walker.choose(0)
+        if not walker.finished or walker.node.node_id != end_id:
+            raise RuntimeError(f"longform chapter {index} did not complete")
+        chapters.append({
+            "id": "hook-0" if index == 0 else f"chapter-{index}",
+            "speaker": walker.node.speaker,
+            "line": walker.node.line,
+            "tree_id": tree.tree_id,
+            "act": act_id,
+            "chapter": index,
+        })
+    if chapters[-1]["act"] != "return":
+        raise RuntimeError("longform campaign did not end on the return act")
+    transcript = [
+        {"id": row["id"], "act": row["act"], "line": row["line"]}
+        for row in chapters
+    ]
+    digest = hashlib.sha256(
+        json.dumps(transcript, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    story = {
+        "schema_version": LONGFORM_SCHEMA,
+        "acts": [
+            {"id": act_id, "title": title, "chapters": per_act[act_id]}
+            for act_id, title in _ACTS
+        ],
+        "chapters": total,
+        "beats": beats,
+        "beat_count": len(beats),
+        "completed": True,
+        "opening_id": "hook-0",
+        "ending_id": "return",
+        "digest": digest,
+    }
+    return chapters, story
 
 
 def _animation(description: str, genre: str) -> dict[str, Any]:
@@ -232,6 +307,7 @@ def generate_content(spec: Mapping[str, Any], files: Mapping[str, str] | None = 
     encounters = _encounters(_SCOPE_ENCOUNTERS[scope])
     platforms, goal_x, jump_reach = _platforms(_SCOPE_PLATFORMS[scope])
     economy = _economy(seed, encounters, currency="salvage" if genre == "top_down_shooter" else "gold")
+    narrative, longform = _longform(spec, scope)
     bundle = {
         "schema_version": CONTENT_SCHEMA,
         "spec_id": spec_id,
@@ -245,7 +321,8 @@ def generate_content(spec: Mapping[str, Any], files: Mapping[str, str] | None = 
         "encounters": encounters,
         "economy": economy,
         "combat_design": _combat_design(seed, description, root=root),
-        "narrative": _narrative(spec),
+        "narrative": narrative,
+        "longform": longform,
         "animation": _animation(description, genre),
         "vfx": _vfx(spec_id),
         "physics": _vehicle(6.0 if genre != "platformer" else 4.5),

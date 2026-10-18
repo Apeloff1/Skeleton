@@ -71,6 +71,48 @@ def _patch_engine(monkeypatch):
     )
 
 
+def test_longform_campaign_completes_and_scales(tmp_path):
+    from skeleton.forge.game_content import generate_content
+    from skeleton.forge.genre_project import execute_core_loop
+
+    small_spec = compile_brief("A small platformer. Fantasy: ledges. Core loop: jump. Scope: small.")
+    small = generate_content(small_spec, {}, root=tmp_path)
+    story = small["longform"]
+    assert story["schema_version"] == "skeleton.game_longform.v1"
+    assert story["completed"] is True
+    assert story["ending_id"] == "return"
+    assert story["opening_id"] == "hook-0"
+    assert [act["id"] for act in story["acts"]] == [
+        "arrival", "trials", "fracture", "reckoning", "return",
+    ]
+    assert all(act["chapters"] > 0 for act in story["acts"])
+    assert story["chapters"] == 8
+    assert story["beat_count"] == 24
+    assert len(story["beats"]) == 24
+    assert small["narrative"][0]["id"] == "hook-0"
+    assert small["narrative"][-1]["act"] == "return"
+    assert execute_core_loop(small, "platformer").startswith("goal:")
+    again = generate_content(small_spec, {}, root=tmp_path)
+    assert again["longform"]["digest"] == story["digest"]
+
+    large_spec = compile_brief("A large campaign roguelike. Fantasy: the drowned archive.")
+    large = generate_content(large_spec, {}, root=tmp_path)
+    assert large["genre"] == "rpg_roguelike"
+    assert large["scope"] == "large"
+    assert large["longform"]["chapters"] == 120
+    assert large["longform"]["beat_count"] == 360
+    assert large["longform"]["completed"] is True
+    assert large["longform"]["acts"][-1]["id"] == "return"
+    assert execute_core_loop(large, "rpg_roguelike").startswith("rooms:")
+
+    unfinished = dict(small)
+    unfinished["longform"] = dict(story, completed=False)
+    assert execute_core_loop(unfinished, "platformer") == "unfinished"
+    missing_ending = dict(small)
+    missing_ending["longform"] = dict(story, ending_id="")
+    assert execute_core_loop(missing_ending, "platformer") == "unfinished"
+
+
 def test_string_and_structured_briefs_are_both_valid():
     structured, text = coerce_brief({
         "schema_version": PROJECTS_SCHEMA,
