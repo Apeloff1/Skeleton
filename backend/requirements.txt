@@ -59,6 +59,11 @@ APScheduler==3.11.3
 stripe==15.6.1
 
 # --- Documents / media ---
+# Studio video and LAFS probability paths import these lazily; install them
+# explicitly so a healthy boot does not hide missing production capabilities.
+imageio==2.37.2
+imageio-ffmpeg==0.6.0
+scipy==1.16.3
 reportlab==5.0.1
 pillow==12.3.0
 numpy==2.4.6
