@@ -61,6 +61,5 @@ class SkeletonCancelledError(SkeletonClientError):
 class SkeletonSealConfigError(SkeletonClientError):
     """Request seal cannot be minted locally or the server has no seal secret."""
 
-
 class SkeletonSessionConfigError(SkeletonClientError):
     """No app session token configured (``session_token=`` / SKELETON_SESSION_TOKEN)."""
