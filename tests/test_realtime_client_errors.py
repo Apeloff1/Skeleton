@@ -327,6 +327,43 @@ def test_http_abandoned_stream_has_no_never_awaited_warning(live_server):
 # --------------------------------------------------------------------------
 
 
+def test_engine_job_scope_is_encoded_as_query_params_without_overwriting_filters():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, headers={"content-type": SSE_MEDIA_TYPE}, text=": hb\n\n")
+
+    async def scenario():
+        http, transport = _mock_transport(
+            handler, actor_id="actor&name", tenant_id="tenant / 2"
+        )
+        stream = await transport.open(
+            channels=("build", "agent"), job_id="job-1", cursor="41"
+        )
+        await stream.aclose()
+        await http.aclose()
+
+    asyncio.run(scenario())
+    assert len(seen) == 1
+    params = seen[0].url.params
+    assert params["channels"] == "build,agent"
+    assert params["job_id"] == "job-1"
+    assert params["actor_id"] == "actor&name"
+    assert params["tenant_id"] == "tenant / 2"
+    assert params["cursor"] == "41"
+    assert seen[0].headers["last-event-id"] == "41"
+
+
+def test_engine_scope_must_be_complete_and_bounded():
+    with pytest.raises(ValueError, match="supplied together"):
+        SSETransport("http://rt.test", actor_id="alice")
+    with pytest.raises(ValueError, match="invalid actor/tenant"):
+        SSETransport("http://rt.test", actor_id="", tenant_id="t1")
+    with pytest.raises(ValueError, match="invalid actor/tenant"):
+        SSETransport("http://rt.test", actor_id="alice", tenant_id="t" * 513)
+
+
 def test_reconnect_sends_cursor_param_and_last_event_id():
     seen = []
     events = [
