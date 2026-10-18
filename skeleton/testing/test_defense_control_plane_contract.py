@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from scripts.check_defense_control_plane_contract import (
+    ARCHIVE_FALLBACKS,
     REQUIRED_FILES,
     REQUIRED_TESTS,
     audit,
@@ -18,6 +19,9 @@ ROOT = Path(__file__).resolve().parents[2]
 def _copy_contract_tree(destination: Path) -> None:
     for relative in (*REQUIRED_FILES, *REQUIRED_TESTS):
         source = ROOT / relative
+        if not source.exists() and relative in ARCHIVE_FALLBACKS:
+            # Slim CI policy: the runner workflow lives in workflows-archive.
+            source = ROOT / ARCHIVE_FALLBACKS[relative]
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
@@ -29,6 +33,26 @@ def _codes(destination: Path) -> set[str]:
 
 def test_repository_satisfies_defense_control_plane_contract() -> None:
     assert audit(ROOT) == []
+
+
+def test_archived_runner_workflow_is_still_contract_checked(tmp_path: Path) -> None:
+    _copy_contract_tree(tmp_path)
+    active = tmp_path / ".github/workflows/pr-automation-index.yml"
+    archived = tmp_path / ".github/workflows-archive/pr-automation-index.yml"
+    archived.parent.mkdir(parents=True, exist_ok=True)
+    active.replace(archived)
+    assert audit(tmp_path) == []
+
+    archived.write_text(
+        archived.read_text(encoding="utf-8").replace(
+            "github.event.workflow_run.conclusion != 'cancelled'", "true"
+        ),
+        encoding="utf-8",
+    )
+    assert "cancelled-tombstone" in _codes(tmp_path)
+
+    archived.unlink()
+    assert "missing" in _codes(tmp_path)
 
 
 def test_missing_required_control_fails_closed(tmp_path: Path) -> None:

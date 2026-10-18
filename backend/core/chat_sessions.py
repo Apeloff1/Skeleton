@@ -14,6 +14,7 @@ import json
 from typing import Any, Mapping
 import uuid
 from urllib.parse import urlsplit
+from weakref import WeakKeyDictionary
 
 from core.conversations import ConversationConflict, conversation_authority
 from core.engine_client import EngineExecutionCommand, EngineProtocolError
@@ -24,7 +25,16 @@ MAX_PREPARED_BYTES = 2 * 1024 * 1024
 
 
 _indexes_ready = False
-_index_lock = asyncio.Lock()
+_index_locks_by_loop: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def _get_index_lock() -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    lock = _index_locks_by_loop.get(loop)
+    if lock is None:
+        lock = asyncio.Lock()
+        _index_locks_by_loop[loop] = lock
+    return lock
 
 
 async def initialize_chat_runtime():
@@ -32,7 +42,7 @@ async def initialize_chat_runtime():
     global _indexes_ready
     if _indexes_ready:
         return
-    async with _index_lock:
+    async with _get_index_lock():
         if not _indexes_ready:
             from core.chat_turns import chat_turn_authority
 

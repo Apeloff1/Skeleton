@@ -4,8 +4,17 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-IDLE = REPO_ROOT / ".github" / "workflows" / "idle-studio.yml"
-NIGHT = REPO_ROOT / ".github" / "workflows" / "autonomous-studio.yml"
+
+
+def _workflow_source(name: str) -> Path:
+    active = REPO_ROOT / ".github" / "workflows" / name
+    archived = REPO_ROOT / ".github" / "workflows-archive" / name
+    # Inspect the original contract even when its workflow was retired.
+    return active if active.is_file() else archived
+
+
+IDLE = _workflow_source("idle-studio.yml")
+NIGHT = _workflow_source("autonomous-studio.yml")
 
 
 def _text(path: Path) -> str:

@@ -21,6 +21,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, NAMESPACE_URL, uuid4, uuid5
+from weakref import WeakKeyDictionary
 
 from pymongo import ReturnDocument
 
@@ -41,9 +42,27 @@ ATTACHMENT_PREFIX = "chat-attachment://"
 _TEXT_MIMES = frozenset({"text/plain", "text/markdown", "text/csv", "application/json"})
 _IMAGE_MIMES = frozenset({"image/png", "image/jpeg", "image/webp"})
 _ALL_MIMES = _TEXT_MIMES | _IMAGE_MIMES | {"application/pdf", "audio/wav"}
-_UPLOAD_SLOTS = asyncio.Semaphore(2)
-_INDEX_LOCK = asyncio.Lock()
 _INDEX_READY = False
+_upload_slots_by_loop: WeakKeyDictionary = WeakKeyDictionary()
+_index_locks_by_loop: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def _get_upload_slots() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    slots = _upload_slots_by_loop.get(loop)
+    if slots is None:
+        slots = asyncio.Semaphore(2)
+        _upload_slots_by_loop[loop] = slots
+    return slots
+
+
+def _get_index_lock() -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    lock = _index_locks_by_loop.get(loop)
+    if lock is None:
+        lock = asyncio.Lock()
+        _index_locks_by_loop[loop] = lock
+    return lock
 
 
 class ChatAttachmentError(RuntimeError):
@@ -304,7 +323,7 @@ async def ensure_attachment_indexes() -> None:
     global _INDEX_READY
     if _INDEX_READY:
         return
-    async with _INDEX_LOCK:
+    async with _get_index_lock():
         if _INDEX_READY:
             return
         collection = _collection()
@@ -611,10 +630,12 @@ async def upload_attachment(
         _validate_row(existing)
         return _public(existing)
     await _cleanup_owner(tenant_id, owner_id)
+    slots = _get_upload_slots()
     try:
-        await asyncio.wait_for(_UPLOAD_SLOTS.acquire(), timeout=1)
+        await asyncio.wait_for(slots.acquire(), timeout=1)
     except TimeoutError as exc:
         raise ChatAttachmentError("The file extractor is busy; retry shortly", 429) from exc
+    work: asyncio.Task | None = None
     try:
         work = asyncio.create_task(asyncio.to_thread(_isolated_extract, payload, mime))
         try:
@@ -627,10 +648,11 @@ async def upload_attachment(
                 pass
             raise
     finally:
-        if work.done():
-            _UPLOAD_SLOTS.release()
+        if work is None or work.done():
+            slots.release()
         else:
-            work.add_done_callback(lambda _completed: _UPLOAD_SLOTS.release())
+            # Keep the exact acquired limiter until the extraction task quiesces.
+            work.add_done_callback(lambda _completed: slots.release())
     created = _now()
     expires = created + timedelta(seconds=RETENTION_SECONDS)
     context_text = f"Uploaded file: {name}\nMedia type: {mime}\n" + (

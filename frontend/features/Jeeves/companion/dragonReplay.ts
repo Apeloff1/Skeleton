@@ -6,9 +6,11 @@ export interface DragonFeedPage {events:WireDragonEvent[];history_truncated?:boo
 export function acceptDragonFeed(journal:CompanionJournal,page:DragonFeedPage):CompanionJournal{
  if(!page||!Array.isArray(page.events))return journal;
  const first=page.events[0];
- const truncated=journal.lastSequence===0&&page.history_truncated===true&&!!first
-  &&Number.isSafeInteger(first.sequence)&&first.sequence>1&&typeof first.previous_digest==='string';
- let cursor:CompanionJournal=truncated?{...journal,lastSequence:first.sequence-1,chainHead:first.previous_digest,provenance:false}:journal;
+ let cursor:CompanionJournal=journal;
+ if(journal.lastSequence===0&&page.history_truncated===true&&first
+   &&Number.isSafeInteger(first.sequence)&&first.sequence>1&&typeof first.previous_digest==='string'){
+  cursor={...journal,lastSequence:first.sequence-1,chainHead:first.previous_digest,provenance:false};
+ }
  let applied=journal;
  let started=false;
  for(const event of page.events){

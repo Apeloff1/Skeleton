@@ -5,7 +5,10 @@ from pathlib import Path
 from scripts.check_branch_flow_contract import violations_for_text
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "branch-flow.yml"
+ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "branch-flow.yml"
+ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "branch-flow.yml"
+# Keep adversarial safety checks for the archived definition until it is restored.
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 
 
 def _source() -> str:

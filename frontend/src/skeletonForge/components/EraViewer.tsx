@@ -70,10 +70,10 @@ export default function EraViewer({ eras, loading, error, onReload, resultEra, p
   const cols = columnsFor(width);
   const detail = selected ? all.find((v) => v.id === selected) ?? null : null;
   const [active, setActive] = useRovingIndex(shown.length);
-  const cardRefs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const cardRefs = React.useRef<({ focus?: () => void } | null)[]>([]);
   const viaKey = React.useRef(false);
   const sortIndex = Math.max(0, ERA_SORTS.findIndex((o) => o.id === sort));
-  const sortRefs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const sortRefs = React.useRef<({ focus?: () => void } | null)[]>([]);
   const sortViaKey = React.useRef(false);
   React.useEffect(() => {
     if (!viaKey.current) return;

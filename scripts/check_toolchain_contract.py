@@ -76,6 +76,14 @@ DEPENDENCY_SECURITY_MARKERS = (
     "Enforce JavaScript vulnerability policy",
 )
 
+DEPENDENCY_REVIEW_MARKERS = (
+    "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294",
+    "fail-on-severity: high",
+    "persist-credentials: false",
+    "'**/requirements*.txt'",
+    "'**/yarn.lock'",
+)
+
 
 def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
@@ -512,34 +520,56 @@ def main() -> int:
         failures,
     )
 
-    dependency_security = read(".github/workflows/dependency-security.yml")
-    require_all(
-        dependency_security,
-        DEPENDENCY_SECURITY_MARKERS,
-        "dependency audit/SBOM contract drifted",
-        failures,
-    )
-    require(
-        cancel_true(dependency_security),
-        "Dependency Security must cancel superseded same-ref dependency audits",
-        failures,
-    )
-    require(
-        "pip-audit" in dependency_security and "yarn audit" in dependency_security,
-        "Dependency Security must audit both ecosystems",
-        failures,
-    )
-    require(
-        dependency_security.count("persist-credentials: false") >= 2,
-        "Dependency Security checkouts must not persist credentials",
-        failures,
-    )
-    require(
-        "if: steps.python-audit.outputs.status != '0'" in dependency_security
-        and "if: steps.yarn-audit.outputs.status != '0'" in dependency_security,
-        "Dependency Security audits must fail closed after artifact capture",
-        failures,
-    )
+    # Slim CI policy (.github/CI_SLIM_POLICY.md): Dependency Security was
+    # archived by ace886be; PR dependency coverage moved to the active
+    # Dependency Review workflow. Check whichever is active, never crash.
+    if (ROOT / ".github/workflows/dependency-security.yml").is_file():
+        dependency_security = read(".github/workflows/dependency-security.yml")
+        require_all(
+            dependency_security,
+            DEPENDENCY_SECURITY_MARKERS,
+            "dependency audit/SBOM contract drifted",
+            failures,
+        )
+        require(
+            cancel_true(dependency_security),
+            "Dependency Security must cancel superseded same-ref dependency audits",
+            failures,
+        )
+        require(
+            "pip-audit" in dependency_security and "yarn audit" in dependency_security,
+            "Dependency Security must audit both ecosystems",
+            failures,
+        )
+        require(
+            dependency_security.count("persist-credentials: false") >= 2,
+            "Dependency Security checkouts must not persist credentials",
+            failures,
+        )
+        require(
+            "if: steps.python-audit.outputs.status != '0'" in dependency_security
+            and "if: steps.yarn-audit.outputs.status != '0'" in dependency_security,
+            "Dependency Security audits must fail closed after artifact capture",
+            failures,
+        )
+    else:
+        dependency_review = read(".github/workflows/dependency-review.yml")
+        require_all(
+            dependency_review,
+            DEPENDENCY_REVIEW_MARKERS,
+            "Dependency Review (active replacement for archived Dependency Security) drifted",
+            failures,
+        )
+        require(
+            cancel_true(dependency_review),
+            "Dependency Review must cancel superseded same-ref reviews",
+            failures,
+        )
+        require(
+            (ROOT / ".github/workflows-archive/dependency-security.yml").is_file(),
+            "archived Dependency Security definition must remain available for release audits",
+            failures,
+        )
 
     quality = read("scripts/quality-gates.sh")
     require_all(

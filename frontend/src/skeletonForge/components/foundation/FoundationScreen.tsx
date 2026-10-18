@@ -13,7 +13,7 @@ import { loadFoundation, saveFoundation } from '../../foundation/storage';
 import { composeSummaryOf, consoleFailures } from '../../cockpitScreen';
 import { useCockpitConsole } from '../../consoleHooks';
 import { useForgeCatalog, useForgeRun, useLiveCompose, useNow } from '../../hooks';
-import useReduceMotion from '../../../hooks/useReduceMotion';
+import { useReduceMotion } from '../../../hooks/useReduceMotion';
 import FoundationShell from './FoundationShell';
 
 function usePlatformA11y(): A11yPlatformSnapshot {

@@ -4,13 +4,19 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / ".github" / "workflows" / "arm64.yml"
+ACTIVE_WORKFLOW = ROOT / ".github" / "workflows" / "arm64.yml"
+ARCHIVED_WORKFLOW = ROOT / ".github" / "workflows-archive" / "arm64.yml"
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 
 
-def test_arm64_pr_close_is_zero_work_cancellation_tombstone() -> None:
+def test_arm64_is_manual_only_when_specialized() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]" in text
+    # This expensive specialized lane is explicitly dispatched, not a PR fanout.
+    assert "  workflow_dispatch:" in text
+    assert "  pull_request:" not in text
+    assert "  push:" not in text
+    assert "  schedule:" not in text
     assert 'group: arm64-${{ github.event.pull_request.number || github.ref }}' in text
     assert "cancel-in-progress: true" in text
     assert "github.event_name != 'pull_request' ||" in text
