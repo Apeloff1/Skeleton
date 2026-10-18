@@ -137,6 +137,42 @@ def get_sync_db(db_name: str | None = None):
         name = SWARM_DB_NAME
     return get_sync_client()[name]
 
+
+class _LazySyncCollection:
+    """Collection proxy that opens Mongo and creates indexes on first use."""
+
+    def __init__(self, name: str, indexes: tuple[tuple[object, dict], ...], db_name: str | None = None):
+        self._name = name
+        self._indexes = indexes
+        self._db_name = db_name
+        self._coll = None
+        self._ready = _threading.Lock()
+
+    def _materialize(self):
+        if self._coll is not None:
+            return self._coll
+        with self._ready:
+            if self._coll is None:
+                coll = get_sync_db(self._db_name)[self._name]
+                for keys, options in self._indexes:
+                    coll.create_index(keys, **options)
+                self._coll = coll
+        return self._coll
+
+    def __getattr__(self, item: str):
+        if item.startswith("_"):
+            raise AttributeError(item)
+        return getattr(self._materialize(), item)
+
+
+def lazy_sync_collection(name: str, *indexes: tuple[object, dict], db_name: str | None = None):
+    """Return a sync collection that does no I/O until a method is called.
+
+    Each index is ``(keys, options)``. Options may be an empty dict.
+    """
+    return _LazySyncCollection(name, indexes, db_name)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # COLLECTION ROUTING
 # ─────────────────────────────────────────────────────────────────────────────

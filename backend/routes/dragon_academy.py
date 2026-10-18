@@ -19,6 +19,7 @@ import time
 from typing import Annotated, Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StringConstraints, model_validator
 
 from routes.gameforge_auth import get_current_user
@@ -797,7 +798,7 @@ def native_living_world_checkpoint_advance(
     owner: str = Depends(_native_source_editor),
 ) -> dict:
     from skeleton.ai.webcrawler.dragon_living_world_checkpoint import continue_world
-    from skeleton.ai.webcrawler.dragon_living_world import describe, terrain_for_state_for_state
+    from skeleton.ai.webcrawler.dragon_living_world import describe, terrain_for_state
 
     try:
         world = _dragon_living_world(body)
@@ -1049,14 +1050,14 @@ def native_living_world_temporal_maze(
 
 
 class NativeCodexWorldRequest(BaseModel):
-    """Exact 1024-bit+ world identity; Python decimal, never a JS float."""
+    """Exact versioned world identity; decimal strings, never a JS float."""
 
     model_config = ConfigDict(extra="forbid")
-    index: str = Field(default="0", strict=True, min_length=1, max_length=400, pattern=r"^(0|[1-9][0-9]*)$")
+    index: str = Field(default="0", strict=True, min_length=1, max_length=600, pattern=r"^(0|[1-9][0-9]*)$")
 
 
 class NativeCodexWorldEditRequest(NativeCodexWorldRequest):
-    changes: dict[str, StrictInt] = Field(default_factory=dict, max_length=128)
+    changes: dict[str, StrictInt] = Field(default_factory=dict, max_length=192)
 
 
 class NativeCodexWorldPlayRequest(NativeCodexWorldRequest):
@@ -1122,6 +1123,84 @@ def native_world_codex_edit(
         }
     except ValueError:
         raise HTTPException(status_code=422, detail="Original Codex axis or level unsupported") from None
+
+
+@router.post("/native/production/worlds/codex/impact")
+def native_world_codex_impact(
+    body: NativeCodexWorldEditRequest,
+    owner: str = Depends(_native_source_editor),
+) -> dict:
+    """Show observed design consequences before accepting an edited world ID.
+
+    Only compares deterministic source-generated gameplay and native tile bytes;
+    it does not pretend to have rendered a commercial 3D level or ROM binary.
+    """
+    from skeleton.ai.webcrawler.dragon_world_codex import (
+        unrank, edit, DOMAIN_AXIS, EXTENSION_DOMAIN_AXIS,
+    )
+    from skeleton.ai.webcrawler.dragon_world_codex_runtime import (
+        start, codex_cell, gate_catalog,
+    )
+    from skeleton.ai.webcrawler.dragon_codex_tiles import tile_pack
+
+    try:
+        old=unrank(body.index)
+        new=edit(body.index, body.changes)
+        old_state=start(old)
+        new_state=start(new)
+        before=codex_cell(old, old_state)
+        after=codex_cell(new, new_state)
+        old_gates=gate_catalog(old, old_state)
+        new_gates=gate_catalog(new, new_state)
+        original_tiles=tile_pack(old, "nes")
+        edited_tiles=tile_pack(new, "nes")
+        domains={**DOMAIN_AXIS,**EXTENSION_DOMAIN_AXIS}
+        return {
+            "ok": True,
+            "source_index":old.decimal_index,
+            "edited_index":new.decimal_index,
+            "version":new.schema,
+            "changed_axes":sorted(
+                axis for axis,level in body.changes.items()
+                if (old.values+old.extension_values)[
+                    tuple(axis for names in domains.values() for axis in names).index(axis)
+                ]!=level
+            ),
+            "affected_domains":[name for name,axes in domains.items()
+                                if any(axis in body.changes for axis in axes)],
+            "terrain": {
+                "before":before["codex_terrain"],
+                "after":after["codex_terrain"],
+                "aerial_before":before.get("aerial_topology"),
+                "aerial_after":after.get("aerial_topology"),
+                "changed":before["codex_cell_digest"]!=after["codex_cell_digest"],
+            },
+            "traversal":{
+                "before":old_gates,"after":new_gates,
+                "additional_route_names":[
+                    row["name"] for row in new_gates
+                    if row["name"] not in {gate["name"] for gate in old_gates}
+                ],
+            },
+            "tiles":{
+                "target":"nes",
+                "before_count":len(original_tiles.named_tiles),
+                "after_count":len(edited_tiles.named_tiles),
+                "changed":[name for name,h in zip(
+                    edited_tiles.named_tiles,edited_tiles.artwork_hashes)
+                    if name not in original_tiles.named_tiles or
+                    original_tiles.artwork_hashes[
+                        original_tiles.named_tiles.index(name)
+                    ]!=h],
+                "verified_roundtrip":edited_tiles.all_tile_roundtrips_verified,
+                "hardware_binary_compiled":False,
+            },
+        }
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="World axis change or indexed gameplay design is unsupported",
+        ) from None
 
 
 @router.post("/native/production/worlds/codex/play")
@@ -1217,7 +1296,7 @@ def native_world_codex_story(
         return {
             "ok": True,
             "actual_decisions": list(body.decisions),
-            "original_story_world": story_report(source, narrative),
+            "original_story_world": jsonable_encoder(story_report(source, narrative)),
         }
     except ValueError:
         raise HTTPException(
@@ -1729,7 +1808,7 @@ def native_original_mechanics_preview(
         return {
             "ok": True,
             "program": asdict(program),
-            "initial_game_state": asdict(state),
+            "initial_game_state": jsonable_encoder(asdict(state)),
             "playable_actions": choices(program, state),
             "causal_gameplay_proofs": demonstrate_mechanics(program),
             "fixed_win_required": False,
@@ -1760,7 +1839,7 @@ def native_original_mechanics_play(
             "program_index": program.decimal_index,
             "source_digest": program.source_digest,
             "played_actions": list(body.moves),
-            "current_game_state": asdict(state),
+            "current_game_state": jsonable_encoder(asdict(state)),
             "available_actions": choices(program, state),
             "playable_after_endings": True,
             "claim": "real original game-state choices, no mandatory world victory",
@@ -1983,7 +2062,7 @@ def native_living_world_indexed_design(
         raise HTTPException(
             status_code=422, detail="Requested original game address has no valid replayable route"
         ) from None
-    return {"ok": True, **report}
+    return {"ok": True, **jsonable_encoder(report)}
 
 
 class NativeAtlasWorldRequest(BaseModel):
@@ -2162,7 +2241,7 @@ def native_production_analyze_campaign(
         "ok": True,
         "schema": "skeleton.ai.dragon.native_campaign_design_preview.v1",
         "original_campaign_digest": campaign.digest,
-        "chapter_paths": graph_report(chapters),
+        "chapter_paths": jsonable_encoder(graph_report(chapters)),
         "challenge": challenge_report(director),
         "stages": [{"stage": index + 1, "routes": document} for index, document in enumerate(reports)],
         "claim": "solver-derived challenge and branching; no human player enjoyment certified",

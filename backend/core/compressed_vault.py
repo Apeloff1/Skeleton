@@ -26,7 +26,31 @@ import re
 from pathlib import Path
 from typing import Iterable, Iterator, Any
 
-import zstandard as zstd
+_COMPRESSOR_OBJ = None
+_DECOMPRESSOR_OBJ = None
+
+
+def _ensure_zstd():
+    """Import zstandard on first shard read/write, not at module import."""
+    global _COMPRESSOR_OBJ, _DECOMPRESSOR_OBJ
+    if _COMPRESSOR_OBJ is not None and _DECOMPRESSOR_OBJ is not None:
+        return
+    import zstandard as zstd
+
+    _COMPRESSOR_OBJ = zstd.ZstdCompressor(
+        level=_COMPRESSION_LEVEL, threads=-1, write_content_size=True
+    )
+    _DECOMPRESSOR_OBJ = zstd.ZstdDecompressor()
+
+
+class _CodecProxy:
+    def __init__(self, kind: str):
+        self._kind = kind
+
+    def __getattr__(self, name: str):
+        _ensure_zstd()
+        target = _COMPRESSOR_OBJ if self._kind == "c" else _DECOMPRESSOR_OBJ
+        return getattr(target, name)
 
 
 def _json_default(obj: Any):
@@ -73,8 +97,8 @@ SCRATCH_ROOT = _resolve_writable_dir(
 )
 
 _COMPRESSION_LEVEL = int(os.environ.get("HYPERSCALE_ZSTD_LEVEL", "21"))
-_COMPRESSOR = zstd.ZstdCompressor(level=_COMPRESSION_LEVEL, threads=-1, write_content_size=True)
-_DECOMPRESSOR = zstd.ZstdDecompressor()
+_COMPRESSOR = _CodecProxy("c")
+_DECOMPRESSOR = _CodecProxy("d")
 
 _CACHE: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_LOCK = threading.Lock()

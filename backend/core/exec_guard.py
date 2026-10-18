@@ -29,7 +29,12 @@ _PRODUCTION_MARKERS = (
     "DYNO",  # Heroku
 )
 _CORS_DISABLED_ORIGIN = "https://cors-disabled.invalid"
-_LOCAL_CORS_ORIGINS = ("http://localhost", "http://127.0.0.1")
+# Browsers send an Origin that includes a non-default port. The studio
+# publishes the web app on FRONTEND_PORT (3000), so the development
+# fallback must name that origin. Portless loopback remains for clients
+# that omit the default HTTP port.
+_LOCAL_CORS_HOSTS = ("localhost", "127.0.0.1")
+_DEFAULT_FRONTEND_PORT = "3000"
 _DEFAULT_DOTENV = Path(__file__).resolve().parents[1] / ".env"
 
 
@@ -78,6 +83,22 @@ def _valid_cors_origin(value: str) -> bool:
     )
 
 
+def local_development_origins() -> tuple[str, ...]:
+    """Loopback origins for an unconfigured development process.
+
+    ``FRONTEND_PORT`` selects the published studio port. An invalid port
+    falls back to the assembly default rather than opening every port.
+    """
+    raw_port = os.environ.get("FRONTEND_PORT", _DEFAULT_FRONTEND_PORT).strip()
+    port = raw_port if raw_port.isdigit() and 1 <= int(raw_port) <= 65535 else _DEFAULT_FRONTEND_PORT
+    origins = [f"http://{host}" for host in _LOCAL_CORS_HOSTS]
+    for host in _LOCAL_CORS_HOSTS:
+        origin = f"http://{host}:{port}"
+        if origin not in origins:
+            origins.append(origin)
+    return tuple(origins)
+
+
 def normalize_cors_origins(
     raw: str | None,
     *,
@@ -86,7 +107,7 @@ def normalize_cors_origins(
 ) -> tuple[str, ...]:
     """Normalize a CORS allowlist and fail closed on partial/unsafe input."""
     values = tuple(part.strip().rstrip("/") for part in (raw or "").split(",") if part.strip())
-    fallback = (_CORS_DISABLED_ORIGIN,) if production else _LOCAL_CORS_ORIGINS
+    fallback = (_CORS_DISABLED_ORIGIN,) if production else local_development_origins()
     if not values:
         return fallback
 

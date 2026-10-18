@@ -18,7 +18,11 @@ import hashlib
 import math
 from typing import Dict, List, Optional, Tuple
 
-from PIL import Image, ImageDraw, ImageFont
+def _pil():
+    """Pillow is a declared media dependency. Import it when a frame is drawn."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    return Image, ImageDraw, ImageFont
 
 # GameForge palette — NO cyan/teal (banned).
 _SKY = [((124, 58, 237), (17, 24, 39)),   # purple dusk
@@ -33,10 +37,11 @@ def _seed(s: str) -> int:
 
 
 def _font(size: int):
+    _image, _draw, image_font = _pil()
     try:
-        return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size)
+        return image_font.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size)
     except Exception:  # noqa: BLE001
-        return ImageFont.load_default()
+        return image_font.load_default()
 
 
 def _rgba(hex_color: str, alpha: int) -> Tuple[int, int, int, int]:
@@ -67,8 +72,9 @@ class GameWorld:
         key = (W, H)
         if key in self._bg_cache:
             return self._bg_cache[key].copy()
-        bg = Image.new("RGB", (W, H))
-        dd = ImageDraw.Draw(bg)
+        image, image_draw, _font_mod = _pil()
+        bg = image.new("RGB", (W, H))
+        dd = image_draw.Draw(bg)
         (r1, g1, b1), (r2, g2, b2) = self.sky
         for y in range(H):
             f = y / H
@@ -95,8 +101,9 @@ class GameWorld:
                      camera_x: Optional[float] = None, hud: bool = True,
                      label: Optional[str] = None, portrait: Optional[int] = None,
                      cinematic: bool = True) -> Image.Image:
+        _image, image_draw, _font_mod = _pil()
         img = self._sky_bg(W, H)
-        d = ImageDraw.Draw(img, "RGBA")
+        d = image_draw.Draw(img, "RGBA")
         px, py = self.player_pos(t)
         cam = camera_x if camera_x is not None else px - W * 0.35
 
@@ -186,7 +193,7 @@ class GameWorld:
         if cinematic:
             from gameforge.media.cinematic import grade
             img = grade(img, mood=self.mood, bloom=True, grain=0.03, letterbox=True)
-            d = ImageDraw.Draw(img, "RGBA")
+            d = image_draw.Draw(img, "RGBA")
 
         # ── text overlays (after grade so they stay crisp) ──
         if portrait is not None:

@@ -57,8 +57,23 @@ def audit(root: Path = ROOT) -> list[str]:
         failures.append("release rules must preserve explicit qualification")
     active = sorted((root / WORKFLOWS).glob("*.yml"))
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
-    if not active or len(active) > 20:
-        failures.append(f"unexpected active workflow count: {len(active)}")
+    if not active:
+        failures.append("unexpected active workflow count: 0")
+    # Signed evidence workflows may sit beside the compact PR set when they
+    # cannot run automatically. Only non-manual triggers consume the cap.
+    automatic = 0
+    for path in active:
+        try:
+            found = events(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(
+                f"{path.name}: cannot inspect active workflow ({exc})"
+            )
+            continue
+        if found != {"workflow_dispatch"}:
+            automatic += 1
+    if automatic > 20:
+        failures.append(f"unexpected active workflow count: {automatic}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():
@@ -90,6 +105,9 @@ def audit(root: Path = ROOT) -> list[str]:
         failures.append(f"Merge Readiness missing ({exc})")
     try:
         backend = (root / WORKFLOWS / "backend-quality.yml").read_text(encoding="utf-8")
+        # Backend Quality declares defaults.run.working-directory: backend.
+        # Scanner commands are correctly relative to that working directory;
+        # require the actual invocations rather than impossible backend/backend paths.
         for required in (
             "python scripts/check_ci_workflow_tiers.py",
             "python scripts/check_workflow_permissions.py",
