@@ -160,5 +160,3 @@ def _client(service: EngineExecutionService) -> TestClient:
     app.dependency_overrides[_engine_service_token] = lambda: _SERVICE_TOKEN
     app.dependency_overrides[_engine_coordinator] = lambda: None
     return TestClient(app)
-
-
