@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from routes import dragon_academy as route
 from skeleton.ai.webcrawler.dragon_world_codex import (
-    CODEX_WORLD_ADDRESSES,DOMAINS,
+    CODEX_WORLD_ADDRESSES,EXTENDED_CODEX_WORLD_ADDRESSES,DOMAINS,
 )
 
 
@@ -20,11 +20,11 @@ def owner():
 def test_exact_huge_world_capacity_never_counts_unbuilt_games():
     data=route.native_world_codex_capabilities(owner=owner())
     assert data["ok"]
-    assert data["codex"]["axes"]==128
-    assert data["codex"]["domains"]==16
+    assert data["codex"]["axes"]==192
+    assert data["codex"]["domains"]==24
     assert data["codex"]["levels_per_axis"]==256
     assert data["codex"]["total_exact_reversible_original_world_addresses"]==(
-        str(CODEX_WORLD_ADDRESSES))
+        str(EXTENDED_CODEX_WORLD_ADDRESSES))
     assert data["codex"]["enumerated_games"]==0
     assert data["codex"]["independently_reviewed_unique_games"]==0
 
@@ -166,12 +166,107 @@ def test_codex_world_creation_legal_profile_and_source_are_editor_only(endpoint)
 
 @pytest.mark.parametrize("bad",[
     {"index":"0001"},{"index":"+5"},{"index":"1e350"},
-    {"index":123},{"index":True},{"index":"9"*410},
+    {"index":123},{"index":True},{"index":"9"*610},
     {"untrusted_copyright_source":"not permitted"},
 ])
 def test_huge_world_addresses_reject_unsafe_or_inexact_web_json(bad):
     with pytest.raises(ValidationError):
         route.NativeCodexWorldRequest(**bad)
+
+
+def test_legacy_world_address_is_not_reinterpreted_after_extension():
+    from skeleton.ai.webcrawler.dragon_world_codex import (
+        unrank,rank,edit,WorldCodex,SCHEMA,EXTENDED_SCHEMA,validate,
+    )
+    baseline=unrank("0")
+    assert baseline.schema==SCHEMA
+    assert baseline.decimal_index=="0"
+    assert len(baseline.values)==128
+    assert all(level==0 for level in baseline.extension_values)
+    assert rank(baseline.parent_decimal_index,WorldCodex(baseline.values))=="0"
+    assert edit("0",{"sky_islands":0})==baseline
+    enhanced=edit("0",{"sky_islands":188,"cloud_oceans":131})
+    assert enhanced.schema==EXTENDED_SCHEMA
+    assert int(enhanced.decimal_index)>=CODEX_WORLD_ADDRESSES
+    assert enhanced.codex_digest!=baseline.codex_digest
+    _,levels=validate(enhanced)
+    assert levels.level("sky_islands")==188
+    assert levels.level("cloud_oceans")==131
+    assert edit(enhanced.decimal_index,{"sky_islands":0,"cloud_oceans":0})==baseline
+
+
+def test_versioned_sky_islands_stimulate_real_traversal_and_altitude():
+    from skeleton.ai.webcrawler.dragon_world_codex import edit
+    from skeleton.ai.webcrawler.dragon_world_codex_runtime import (
+        start,report,step,gate_catalog,witness_to_gate,replay,
+    )
+    expanded=edit("0",{
+        "sky_islands":188,"cloud_oceans":80,
+        "wind_shear":120,"skybridge_density":0,
+        "glider_lift":150,"floating_settlements":40,
+    })
+    opening=start(expanded)
+    info=report(expanded,opening,detail=True)
+    assert len(info["axes_level_map"])==192
+    assert len(info["domain_progress"])==24
+    assert len(info["available_actions"])==218
+    assert info["axes_level_map"]["sky_islands"]==188
+    assert "aerial_topology" in info["terrain"]
+    aerial=next(x for x in info["gates"] if x["name"]=="cross_sky_islands")
+    assert aerial["additional_prerequisites"]==[
+        {"axis":"glider_lift","required":2,"current":0}]
+    assert not aerial["available"]
+    route=witness_to_gate(expanded,"aerial_realms")
+    assert route.count("study_glider_lift")==2
+    arrived=replay(expanded,route)
+    assert arrived.altitude==1
+    assert "cross_sky_islands" in arrived.opened_gates
+    assert report(expanded,arrived)["terrain"]["aerial_topology"]["altitude_layer"]==1
+    assert replay(expanded,route).history_digest==arrived.history_digest
+
+
+def test_extended_codex_impact_endpoint_checks_both_art_and_world_paths():
+    payload=route.NativeCodexWorldEditRequest(
+        index="0",changes={
+            "sky_islands":220,"thermal_updrafts":80,
+            "cloud_oceans":110,"wind_shear":95,
+            "skybridge_density":160,
+        })
+    result=route.native_world_codex_impact(payload,owner=owner())
+    assert result["ok"]
+    assert result["edited_index"]!="0"
+    assert result["version"].endswith("v3")
+    assert "aerial_realms" in result["affected_domains"]
+    assert "atmosphere" in result["affected_domains"]
+    assert result["terrain"]["changed"]
+    assert result["terrain"]["aerial_before"] is None
+    assert result["terrain"]["aerial_after"] is not None
+    assert "cross_sky_islands" in result["traversal"]["additional_route_names"]
+    assert result["tiles"]["before_count"]==12
+    assert result["tiles"]["after_count"]==16
+    assert "sky_island" in result["tiles"]["changed"]
+    assert result["tiles"]["verified_roundtrip"]
+    assert not result["tiles"]["hardware_binary_compiled"]
+
+
+def test_extended_axes_refuse_non_canonical_and_forged_identities():
+    from dataclasses import replace
+    from skeleton.ai.webcrawler.dragon_world_codex import (
+        edit,unrank,validate,read_index,EXTENDED_CODEX_WORLD_ADDRESSES,
+    )
+    enhanced=edit("0",{"sky_islands":200})
+    with pytest.raises(ValueError):
+        validate(replace(enhanced,extension_values=(0,)*64))
+    with pytest.raises(ValueError):
+        read_index(str(EXTENDED_CODEX_WORLD_ADDRESSES))
+    with pytest.raises(ValueError):
+        read_index("0"+enhanced.decimal_index)
+    with pytest.raises(HTTPException) as unsupported:
+        route.native_world_codex_edit(
+            route.NativeCodexWorldEditRequest(changes={"sky_islands":True}),
+            owner=owner(),
+        )
+    assert unsupported.value.status_code==422
 
 
 def test_codecs_refuse_nonexistent_platform_or_axis_in_real_world_content():
