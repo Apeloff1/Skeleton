@@ -12,7 +12,8 @@ from hashlib import sha256
 
 from .dragon_world_codex import (
     CodexAddress,WorldCodex,DOMAIN_AXIS,DOMAINS,AXIS_NAMES,
-    AXIS_INDEX,DOMAIN_INDEX,validate,
+    AXIS_INDEX,DOMAIN_INDEX,EXTENSION_DOMAIN_AXIS,EXTENSION_DOMAINS,
+    EXTENSION_AXIS_INDEX,ALL_AXIS_NAMES,ALL_DOMAINS,validate,
 )
 from .dragon_genomic_world import (
     GenomicState,initial_genomic_state,play as genomic_play,
@@ -40,7 +41,20 @@ GATE_VECTORS=(
  (-1,5),(5,1),(4,4),(-5,2),
 )
 assert len(GATE_MODES)==len(DOMAINS)==len(GATE_VECTORS)
-GATE_TO_DOMAIN=dict(zip(GATE_MODES,DOMAINS))
+EXTENSION_GATE_MODES=(
+ "cross_sky_islands","descend_ancient_caverns",
+ "navigate_abyssal_currents","ride_jet_stream",
+ "connect_vertical_transit","reach_remote_settlement",
+ "direct_cinematic_vista","reconfigure_living_terrain",
+)
+EXTENSION_GATE_VECTORS=(
+ (2,-6),(-2,5),(7,4),(8,-3),(1,-7),
+ (-6,1),(3,6),(-7,-4),
+)
+ALL_GATE_MODES=GATE_MODES+EXTENSION_GATE_MODES
+ALL_GATE_VECTORS=GATE_VECTORS+EXTENSION_GATE_VECTORS
+assert len(ALL_GATE_MODES)==len(ALL_DOMAINS)==len(ALL_GATE_VECTORS)
+GATE_TO_DOMAIN=dict(zip(ALL_GATE_MODES,ALL_DOMAINS))
 
 
 @dataclass(frozen=True)
@@ -54,14 +68,18 @@ class CodexState:
     world_pressure:int=0
     history_digest:str=""
     actions:int=0
+    altitude:int=0
 
 
 def start(address:CodexAddress)->CodexState:
     root,codex=validate(address)
     gen=initial_genomic_state(root)
+    extended=any(codex.extension_values)
+    levels=codex.values+(codex.extension_values if extended else ())
     return CodexState(
         player=gen,
-        domain_reputation=tuple(codex.values[n*8]//16 for n in range(16)),
+        axis_mastery=(0,)*len(levels),
+        domain_reputation=tuple(levels[n*8]//16 for n in range(len(levels)//8)),
         world_pressure=codex.level("hostile_pressure")//16 if (
             "hostile_pressure" in AXIS_INDEX) else codex.level("predator_pressure")//16,
         history_digest=_sha([SCHEMA,address.codex_digest,"initial_gameplay"]),
@@ -72,19 +90,26 @@ def _valid(address:CodexAddress,state:CodexState):
     if not isinstance(state,CodexState):
         raise ValueError("original world codex game state is required")
     root,codex=validate(address)
-    if (type(state.axis_mastery) is not tuple or len(state.axis_mastery)!=128
+    extended=any(codex.extension_values)
+    expected_axes=len(ALL_AXIS_NAMES) if extended else len(AXIS_NAMES)
+    expected_domains=len(ALL_DOMAINS) if extended else len(DOMAINS)
+    if (type(state.axis_mastery) is not tuple or len(state.axis_mastery)!=expected_axes
         or type(state.domain_reputation) is not tuple or
-        len(state.domain_reputation)!=16 or
+        len(state.domain_reputation)!=expected_domains or
         any(type(x) is not int or not 0<=x<=MAX_INTENSITY
             for x in state.axis_mastery+state.domain_reputation)
         or type(state.era) is not int or not 0<=state.era<2**31
         or type(state.world_pressure) is not int or
         not 0<=state.world_pressure<=MAX_INTENSITY
         or type(state.actions) is not int or not 0<=state.actions<2**31
-        or any(type(k) is not str or k not in GATE_MODES
+        or type(state.altitude) is not int or not 0<=state.altitude<=255
+        or (not extended and state.altitude!=0)
+        or any(type(k) is not str or k not in
+               (ALL_GATE_MODES if extended else GATE_MODES)
                for k in state.opened_gates)
         or len(set(state.opened_gates))!=len(state.opened_gates)
-        or any(type(k) is not str or k not in GATE_MODES for k in state.journeys)
+        or any(type(k) is not str or k not in
+               (ALL_GATE_MODES if extended else GATE_MODES) for k in state.journeys)
         or len(state.journeys)>64
         or type(state.history_digest) is not str or
         len(state.history_digest)!=64):
@@ -94,11 +119,15 @@ def _valid(address:CodexAddress,state:CodexState):
 
 def _gate(address:CodexAddress,state:CodexState,index:int)->dict:
     root,codex=_valid(address,state)
-    domain=DOMAINS[index]
+    domains=ALL_DOMAINS if any(codex.extension_values) else DOMAINS
+    if type(index) is not int or not 0<=index<len(domains):
+        raise ValueError("unknown world design traversal domain")
+    domain=domains[index]
     axis0=index*8
     axis1=axis0+1
-    intensity=codex.values[axis0]
-    secondary=codex.values[axis1]
+    levels=codex.values+codex.extension_values
+    intensity=levels[axis0]
+    secondary=levels[axis1]
     # A delayed destination has *two actual authored prerequisites* and
     # its own time-window clock. Players may choose to wait for the window.
     needed0=1+intensity//64
@@ -113,8 +142,16 @@ def _gate(address:CodexAddress,state:CodexState,index:int)->dict:
     domain_score=state.domain_reputation[index]
     danger=max(0,secondary//48-domain_score//12)
     resource_cost=1+secondary//80
+    if domain=="aerial_realms":
+        # Active sky islands and jet shear make elevated routes harder,
+        # while real skybridges and glider training mitigate that exposure.
+        danger+=codex.level("wind_shear")//48
+        resource_cost+=codex.level("aerial_isolation")//64
+        protected=(codex.level("skybridge_density")>=128 or
+                   state.axis_mastery[128+EXTENSION_AXIS_INDEX["glider_lift"]]>=2)
+        earned=earned and (intensity<96 or protected)
     currently=earned and turn>=earliest and turn%period==0
-    mode=GATE_MODES[index]
+    mode=ALL_GATE_MODES[index]
     return {
         "name":mode,"domain":domain,"axis_required":[
             AXIS_NAMES[axis0],AXIS_NAMES[axis1]],
@@ -130,14 +167,15 @@ def _gate(address:CodexAddress,state:CodexState,index:int)->dict:
                   "future_epoch_locked" if turn<earliest else
                   "wait_for_window"),
         "danger":danger,"travel_cost":resource_cost,
-        "moves_to":list(GATE_VECTORS[index]),
+        "moves_to":list(ALL_GATE_VECTORS[index]),
         "already_discovered":mode in state.opened_gates,
         "requirements_are_playable":True,
     }
 
 
 def gate_catalog(address:CodexAddress,state:CodexState)->list[dict]:
-    return [_gate(address,state,i) for i in range(16)]
+    count=len(ALL_DOMAINS) if any(address.extension_values) else len(DOMAINS)
+    return [_gate(address,state,i) for i in range(count)]
 
 
 def available_actions(address:CodexAddress,state:CodexState)->list[dict]:
@@ -158,9 +196,12 @@ def available_actions(address:CodexAddress,state:CodexState)->list[dict]:
         "name":"rest_world","available":True,
         "reason":"open","kind":"recover_player",
     }]
-    for i,axis in enumerate(AXIS_NAMES):
-        domain=DOMAINS[i//8]
-        level=codex.values[i]
+    extended=any(codex.extension_values)
+    names=ALL_AXIS_NAMES if extended else AXIS_NAMES
+    levels=codex.values+(codex.extension_values if extended else ())
+    for i,axis in enumerate(names):
+        domain=(ALL_DOMAINS if extended else DOMAINS)[i//8]
+        level=levels[i]
         result.append({
             "name":"study_"+axis,"available":True,
             "domain":domain,"axis":axis,"level":level,
@@ -188,7 +229,8 @@ def codex_cell(address:CodexAddress,state:CodexState,
     base=genomic_cell(root,state.player,hero.realm,col,row)
     tick=hero.turn
     domains={}
-    for i,name in enumerate(DOMAINS):
+    extended=any(codex.extension_values)
+    for i,name in enumerate(ALL_DOMAINS if extended else DOMAINS):
         levels=codex.domain(name)
         # All eight domain axes affect the cell's actual simulated field.
         # Time and coordinate alter the resulting field deterministically.
@@ -205,6 +247,29 @@ def codex_cell(address:CodexAddress,state:CodexState,
             "discovered_mastery":sum(state.axis_mastery[i*8:i*8+8]),
             "terrain_signature":signal[:16],
         }
+    if extended:
+        sky=codex.level("sky_islands")
+        clouds=codex.level("cloud_oceans")
+        bridges=codex.level("skybridge_density")
+        shear=codex.level("wind_shear")
+        lift=codex.level("glider_lift")
+        local=int(_sha([address.codex_digest,"sky_archipelago",col//3,row//3])[:8],16)%256
+        island=local<sky
+        # Aerial navigability and encounter cost respond to actual controls,
+        # player route achievements and cell position, not a cosmetic label.
+        reachable=(island and (bridges>=128 or lift>=96 or
+                   "cross_sky_islands" in state.opened_gates))
+        base["aerial_topology"]={
+            "sky_island_present":island,
+            "sky_island_elevation":(8+sky//12+state.altitude*4 if island else 0),
+            "altitude_layer":state.altitude,
+            "cloud_ocean_depth":clouds//16,
+            "skybridge_connected":island and bridges>=128,
+            "accessible":reachable,
+            "glide_risk":(max(0,(shear+clouds)//12-lift//16)
+                          if island else 0),
+            "wind_current":(shear+int(_sha([col,row,tick])[:4],16))%32,
+        }
     base.update({
         "codex_terrain":domains,
         "codex_source_digest":address.codex_digest,
@@ -213,8 +278,12 @@ def codex_cell(address:CodexAddress,state:CodexState,
         ]),
         "era":state.era,
         "original_world_only":True,
-        "gameplay_claim":"128 original configuration axes are used in "
-                         "terrain projection and playable progression",
+        "gameplay_claim":(
+            "192 original configuration axes include active sky terrain, "
+            "earned traversal and game-state progression" if extended else
+            "128 original configuration axes are used in terrain projection "
+            "and playable progression"
+        ),
     })
     return base
 
@@ -253,33 +322,39 @@ def step(address:CodexAddress,state:CodexState,action:str)->CodexState:
         player=genomic_play(root,player,"rest")
     elif action.startswith("study_"):
         axis=action.removeprefix("study_")
-        if axis not in AXIS_INDEX:
-            raise ValueError("original study action has no implemented physical axis")
-        i=AXIS_INDEX[axis]
+        extended=any(codex.extension_values)
+        if axis in AXIS_INDEX:i=AXIS_INDEX[axis]
+        elif extended and axis in EXTENSION_AXIS_INDEX:
+            i=128+EXTENSION_AXIS_INDEX[axis]
+        else:raise ValueError("original study action has no implemented physical axis")
         # All study actions are available to any *playable* original world
         # regardless of mandatory story completion. The underlying world
         # retains normal end-state restrictions.
         verbs=CHOICE_VERBS
         player=genomic_play(root,player,verbs[i%len(verbs)])
-        level=codex.values[i]
+        level=(codex.values+codex.extension_values)[i]
         earned=1+level//16
         new_mastery[i]=min(MAX_INTENSITY,new_mastery[i]+1)
         new_rep[i//8]=min(MAX_INTENSITY,new_rep[i//8]+earned)
         pressure=min(MAX_INTENSITY,pressure+level//80)
         # Narrative and historical domains literally alter epoch progression
         # without fabricating a mandatory ending.
-        if DOMAINS[i//8] in ("chronology","postgame") and (
+        if ALL_DOMAINS[i//8] in ("chronology","postgame","simulation") and (
                 new_mastery[i]%4==0):
             era+=1
     elif action in GATE_TO_DOMAIN:
-        index=DOMAIN_INDEX[GATE_TO_DOMAIN[action]]
+        extended=any(codex.extension_values)
+        domain=GATE_TO_DOMAIN[action]
+        if domain not in (ALL_DOMAINS if extended else DOMAINS):
+            raise ValueError("world design route unavailable for legacy world")
+        index=ALL_DOMAINS.index(domain)
         gate=_gate(address,state,index)
         if not gate["available"]:
             raise ValueError("real world passage is locked by progress or time")
         # The room/realm transition executes only after all prerequisites.
         # A reader can choose to unlock, skip, revisit, doubleback, or wait.
         player=genomic_play(root,player,"observe")
-        delta=GATE_VECTORS[index]
+        delta=ALL_GATE_VECTORS[index]
         old=player.base
         target=(old.x+delta[0],old.y+delta[1])
         if any(abs(n)>MAX_ABS_COORD for n in target):
@@ -304,8 +379,13 @@ def step(address:CodexAddress,state:CodexState,action:str)->CodexState:
             era+=1
     else:
         raise ValueError("original world action not available")
+    altitude=state.altitude
+    if action=="cross_sky_islands":
+        altitude=min(255,altitude+1)
+    elif action=="connect_vertical_transit" and altitude:
+        altitude-=1
     evolved=replace(
-        state,player=player,axis_mastery=tuple(new_mastery),
+        state,player=player,altitude=altitude,axis_mastery=tuple(new_mastery),
         domain_reputation=tuple(new_rep),
         opened_gates=tuple(opened),journeys=tuple(journeys),
         world_pressure=pressure,era=era,actions=state.actions+1,
@@ -313,6 +393,7 @@ def step(address:CodexAddress,state:CodexState,action:str)->CodexState:
             SCHEMA,address.codex_digest,state.history_digest,
             action,player.history_digest,
             new_mastery,new_rep,opened,journeys,pressure,era,
+            *([altitude] if any(codex.extension_values) else []),
         ]),
     )
     _valid(address,evolved)
@@ -330,10 +411,10 @@ def replay(address:CodexAddress,actions:tuple[str,...]=())->CodexState:
 
 def witness_to_gate(address:CodexAddress,domain:str,
                     *,starting_state:CodexState|None=None)->tuple[str,...]:
-    if domain not in DOMAIN_INDEX:
+    if domain not in (ALL_DOMAINS if any(address.extension_values) else DOMAINS):
         raise ValueError("only actual original world domains can be unlocked")
     current=start(address) if starting_state is None else starting_state
-    pos=DOMAIN_INDEX[domain]
+    pos=ALL_DOMAINS.index(domain)
     plan=[]
     gate=_gate(address,current,pos)
     for axis,required,actual in zip(
@@ -362,7 +443,7 @@ def witness_to_gate(address:CodexAddress,domain:str,
 def proof_of_access(address:CodexAddress,domain:str)->dict:
     itinerary=witness_to_gate(address,domain)
     again=replay(address,itinerary)
-    gate=GATE_MODES[DOMAIN_INDEX[domain]]
+    gate=ALL_GATE_MODES[ALL_DOMAINS.index(domain)]
     if gate not in again.opened_gates:
         raise ValueError("original corridor evidence failed to reach destination")
     return {
@@ -383,6 +464,10 @@ def report(address:CodexAddress,state:CodexState, *,
            detail:bool=False)->dict:
     root,codex=_valid(address,state)
     hero=state.player.base
+    extended=any(codex.extension_values)
+    domains=ALL_DOMAINS if extended else DOMAINS
+    names=ALL_AXIS_NAMES if extended else AXIS_NAMES
+    levels=codex.values+(codex.extension_values if extended else ())
     return {
         "schema":SCHEMA,
         "source_address":address.decimal_index,
@@ -398,7 +483,7 @@ def report(address:CodexAddress,state:CodexState, *,
             name:{"reputation":state.domain_reputation[n],
                   "axes":{axis:state.axis_mastery[n*8+i]
                           for i,axis in enumerate(DOMAIN_AXIS[name])}}
-            for n,name in enumerate(DOMAINS)
+            for n,name in enumerate(domains)
         },
         "available_actions":available_actions(address,state),
         "gates":gate_catalog(address,state),
@@ -409,8 +494,14 @@ def report(address:CodexAddress,state:CodexState, *,
             "materials":state.player.material,"danger":state.player.danger,
         },
         "journeys":list(state.journeys),
-        "axes_level_map":{axis:codex.values[i] for i,axis in
-                          enumerate(AXIS_NAMES)} if detail else None,
-        "claim":"game-state transitions for 128 axes and sixteen earned "
-                "time-window passages; not rendered vehicle physics or AAA AI",
+        "altitude_layer":state.altitude if extended else 0,
+        "axes_level_map":{axis:levels[i] for i,axis in
+                          enumerate(names)} if detail else None,
+        "claim":(
+            "game-state transitions for 192 axes, 24 earned time-window passages, "
+            "and indexed sky-island terrain; not rendered vehicle physics or AAA AI"
+            if extended else
+            "game-state transitions for 128 axes and sixteen earned "
+            "time-window passages; not rendered vehicle physics or AAA AI"
+        ),
     }
