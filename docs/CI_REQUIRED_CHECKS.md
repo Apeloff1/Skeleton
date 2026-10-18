@@ -20,9 +20,9 @@ for the same head SHA:
 | Lane (check name) | Job id | Covers |
 | --- | --- | --- |
 | Quarantine Policy | `quarantine_policy` | merge-readiness contract, required-check policy, flaky-test quarantine registry |
-| Unit | `unit` | canonical unit runner and the complete canonical domain suite |
+| Unit | `unit` | canonical compile, and — when CI/CD change scope includes Python — `tests/run_unit.py` plus the complete `skeleton/testing` suite |
 | Integration Smoke | `integration_smoke` | backend import against live MongoDB and the cross-subsystem integration matrix |
-| Lint Type Security | `quality_security` | backend Ruff, canonical lint/type/high-confidence security gates, full-history Gitleaks secret scan |
+| Lint Type Security | `quality_security` | high-confidence security gates and full-history Gitleaks. Backend Ruff and frontend lint/typecheck stay with CI/CD when that lane runs them |
 | PR Automation Tests | `pr_automation` | auto-merge and runner-v2 privileged contracts, repository machine contracts, filesystem/tool transaction boundaries |
 | CI/CD | `ci` | reusable `.github/workflows/ci.yml` (restored in #4104): Frontend lint/typecheck/`test:*`/stability suites/`export:web`, Backend Lint, Backend Test, Backend Import Smoke, Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke, Docker Build (build-only). Per-lane checks appear as `CI/CD / <job>`; lanes whose inputs a PR does not touch are skipped (skip counts as success). |
 

@@ -37,6 +37,7 @@ jobs:
       frontend: ${{ steps.scope.outputs.frontend }}
       backend: ${{ steps.scope.outputs.backend }}
       python: ${{ steps.scope.outputs.python }}
+      docker: ${{ steps.scope.outputs.docker }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false, fetch-depth: 2}
@@ -44,24 +45,7 @@ jobs:
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          all() { for k in frontend backend python; do echo "$k=true" >> "$GITHUB_OUTPUT"; done; }
-          # Only PR merge commits (HEAD^2 present) are scoped; main pushes and
-          # dispatches always run the complete gate set.
-          if [ "$EVENT_NAME" != "pull_request" ] || ! git rev-parse --verify -q HEAD^2 >/dev/null; then
-            all; exit 0
-          fi
-          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
-          if grep -Eq '^(\.github/workflows/(ci|merge-readiness)\.yml|\.github/ci/|pyproject\.toml|requirements[^/]*\.txt)' "$RUNNER_TEMP/changed.txt"; then
-            all; exit 0
-          fi
-          has() { if grep -Eq "$1" "$RUNNER_TEMP/changed.txt"; then echo true; else echo false; fi; }
-          {
-            echo "frontend=$(has '^frontend/')"
-            echo "backend=$(has '^backend/')"
-            echo "python=$(has '^(skeleton/|tests/|scripts/|java-accelerators/)')"
-          } >> "$GITHUB_OUTPUT"
+        run: bash scripts/ci_change_scope.sh
 
   backend-lint:
     if: needs.changes.outputs.backend == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))

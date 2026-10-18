@@ -39,11 +39,15 @@ The repository-level deterministic merge gate is implemented by
 and it fails unless all of these constituent gates succeed for the same head:
 
 - **Quarantine Policy** — validates the machine-readable flaky-test registry;
-- **Unit** — compiles the canonical package and runs `tests/run_unit.py`;
+- **Unit** — compiles the canonical package and, when the shared CI/CD change
+  scope says Python inputs changed (or the run is not a scoped pull request),
+  runs `tests/run_unit.py` and the complete `skeleton/testing` suite. Frontend-only
+  pull requests do not spend the 45-minute domain suite.
 - **Integration Smoke** — installs the backend runtime and imports the live app
   against the workflow MongoDB service;
-- **Lint Type Security** — runs backend Ruff, the canonical frontend lint/type
-  and high-confidence security gates, plus the pinned full-history Gitleaks scan.
+- **Lint Type Security** — runs the high-confidence security gates and the pinned
+  full-history Gitleaks scan. Backend Ruff and frontend `yarn lint:ci` / typecheck
+  run here only when CI/CD will skip those lanes; otherwise **CI/CD** owns them.
 - **PR Automation Tests** — compiles the automation packages and runs the
   auto-merge, runner-v2, repository-machine, and filesystem/tool transaction
   contracts.
