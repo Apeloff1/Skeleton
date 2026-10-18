@@ -350,3 +350,117 @@ def test_traffic_splitter_qos_routing_and_recovery():
     splitter.release_route(b1, latency_ms=12.0, error=False)
     splitter.release_route(b2, latency_ms=14.0, error=False)
 
+
+def test_adaptive_ratchet_and_quality_debt_ratchet():
+    from skeleton.ai.game_builder.quality_debt import DebtItem, DebtSeverity, QualityDebtLedger
+    from skeleton.learning.mirror_room.adversarial import (
+        AdaptiveRatchetController,
+        AdversarialRatchetPolicy,
+    )
+
+    policy = AdversarialRatchetPolicy()
+    ctrl = AdaptiveRatchetController(policy)
+    base_w, base_s = policy.weighted_gain_threshold(10), policy.strict_metric_gain_threshold(10)
+    for idx in range(1, 10):
+        ctrl.record_outcome(attempt=idx, accepted=True, observed_weighted_gain=0.002)
+    adapt_w, adapt_s = ctrl.thresholds_for_attempt(10)
+    assert adapt_w > base_w
+    assert adapt_s > base_s
+
+    for idx in range(10, 15):
+        ctrl.record_outcome(attempt=idx, accepted=False, observed_weighted_gain=0.0)
+    relaxed_w, _ = ctrl.thresholds_for_attempt(15)
+    assert relaxed_w >= policy.weighted_gain_threshold(15)
+
+    ledger = QualityDebtLedger(ceiling=12, protected_ceiling=4)
+    ledger.add(
+        DebtItem(
+            debt_id="d1",
+            axis="pacing",
+            severity=DebtSeverity.MEDIUM,
+            description="minor pacing gap",
+            evidence_digest="0123456789abcdef0123456789abcdef",
+            opened_round=1,
+            protected=False,
+        )
+    )
+    res = ledger.adaptive_ratchet(round_index=3, clean_streak=4, target_floor=2)
+    assert res["after_ceiling"] < res["before_ceiling"]
+    assert res["after_ceiling"] >= ledger.total_score
+
+
+def test_cortex_self_learn_cycle_gaming_priors_and_capacity_increase():
+    from skeleton.cortex.improve import gaming_and_adjacent_corpus
+    from skeleton.cortex.neocortex import JeevesCortex
+    from skeleton.cortex.port import negotiate_port_protocol
+    from skeleton.cortex.production_profile import ENTERPRISE_PROFILES, plan_capacity_escalation
+
+    assert "enterprise" in ENTERPRISE_PROFILES
+    assert "sovereign" in ENTERPRISE_PROFILES
+    plan = plan_capacity_escalation("legacy", genos_g=6.0, ratchet_streak=8)
+    assert plan["escalated"] is True
+    assert plan["parameter_scale_ratio"] > 1.0
+
+    corpus = gaming_and_adjacent_corpus()
+    assert len(corpus) >= 40
+
+    neo = JeevesCortex()
+    for slot, port in neo.slots.items():
+        proto = negotiate_port_protocol(port)
+        assert proto["compliant"] is True
+        assert proto["self_learn_capable"] is True
+
+    priors = neo.apply_gaming_weights(rounds=1)
+    assert priors["applied"] == 1
+    assert priors["gaming_domains"] >= 15
+    assert priors["adjacent_domains"] >= 7
+
+    cycle = neo.self_learn_cycle(rounds=1, apply_gaming=True, grow_on_streak=True)
+    assert cycle["ratchet"]["passed"] is True
+    assert cycle["ratchet"]["rolled_back"] is False
+    assert cycle["G"] >= 1.0
+    assert cycle["capacity_upgrade"] is not None
+    assert neo.transformer.n_layers >= 3
+    assert neo.transformer.lora.rank >= 4
+
+
+def test_mesh_discovery_hedging_throughput_and_pool_upgrades():
+    from skeleton.distributed.mesh.connection_pool import ConnectionPool
+    from skeleton.distributed.mesh.request_hedging import RequestHedger
+    from skeleton.distributed.mesh.service_discovery import ServiceRegistry
+    from skeleton.distributed.mesh.throughput_controller import ThroughputController
+
+    reg = ServiceRegistry()
+    reg.register("node-a", "cortex", "10.0.0.1:8000", capabilities=["gaming", "self_learn"])
+    reg.register("node-b", "cortex", "10.0.0.2:8000", capabilities=["gaming"])
+    reg.heartbeat("node-a", load=0.15, latency_ms=12.0, error_rate=0.0)
+    reg.heartbeat("node-b", load=0.75, latency_ms=140.0, error_rate=0.1)
+    picked = reg.pick("cortex", strategy="adaptive_qos", preferred_capabilities=["gaming", "self_learn"])
+    assert picked is not None and picked["instance_id"] == "node-a"
+
+    hedger = RequestHedger()
+    for _ in range(10):
+        hedger.record_latency("llm", 10.0)
+    out = hedger.execute(
+        "llm",
+        primary=lambda: (_ for _ in ()).throw(RuntimeError("primary timeout")),
+        backup=lambda: "backup-ok",
+    )
+    assert out["result"] == "backup-ok"
+    assert out["hedged"] is True
+    assert out["hedge_won"] is True
+
+    tc = ThroughputController()
+    for _ in range(5):
+        tc.acquire("infer")
+        tc.release("infer", latency_ms=25.0, error=False)
+    assert tc.current_limit("infer") > 10.0
+    assert tc.lane("infer").min_latency_ms == 25.0
+
+    pool = ConnectionPool()
+    warmed = pool.warm("db:5432", count=3)
+    assert warmed == 3
+    chk = pool.checkout("db:5432")
+    assert chk["acquired"] is True
+
+

@@ -70,6 +70,25 @@ class LoRA:
         self.B = _zeros(self.out_dim, self.rank)
         return W
 
+    def expand_rank(self, new_rank: int, *, seed: int = 101) -> int:
+        """Function-preserving LoRA rank expansion (zero-padded B columns)."""
+        target = max(self.rank, min(int(new_rank), min(self.out_dim, self.in_dim)))
+        if target <= self.rank:
+            return self.rank
+        extra = target - self.rank
+        rng = random.Random(int(seed) & 0xFFFFFFFF)
+        old_scale = self.scale
+        new_scale = self.alpha / float(target)
+        ratio = old_scale / max(new_scale, 1e-12)
+        for i in range(self.out_dim):
+            self.B[i] = [x * ratio for x in self.B[i]] + [0.0] * extra
+        s_a = 1.0 / math.sqrt(max(1, self.in_dim))
+        for _ in range(extra):
+            self.A.append([rng.gauss(0.0, s_a) for _ in range(self.in_dim)])
+        self.rank = target
+        self.scale = new_scale
+        return self.rank
+
     def energy(self) -> float:
         return sum(x * x for row in self.B for x in row)
 
@@ -162,6 +181,15 @@ class LoRABank:
                 ad.merge_into(getattr(L0, name))
                 merged.append(name)
         return {"merged": merged, "energy": sum(a.energy() for a in self.adapters.values())}
+
+    def expand_rank(self, new_rank: int) -> Dict[str, Any]:
+        """Function-preserving rank increase across all adapters in the bank."""
+        ranks = {}
+        for idx, (name, ad) in enumerate(self.adapters.items()):
+            ranks[name] = ad.expand_rank(new_rank, seed=self.seed + 109 * (idx + 1))
+        if ranks:
+            self.rank = max(ranks.values())
+        return {"rank": self.rank, "adapters": ranks}
 
     def snapshot(self) -> Dict[str, Any]:
         return {"rank": self.rank, "alpha": self.alpha, "seed": self.seed,

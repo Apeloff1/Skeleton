@@ -44,10 +44,26 @@ class LearnedWeights:
 
     def fit(self, text: str) -> int:
         n = self.lm.fit([text])
-        self.neural.fit([text])
+        self.neural.fit([text], schedule="cosine")
         if self.transformer is not None:
             self.transformer.fit([text], schedule="cosine")
         return n
+
+    def self_learn(self, texts, *, epochs: int = 2, lr: float = 0.05) -> Dict[str, Any]:
+        """Self-learn across n-gram, neural, and transformer substrates with ratchet."""
+        seq = [texts] if isinstance(texts, str) else [t for t in texts if t]
+        ngram_n = self.lm.fit(seq)
+        neural_info = self.neural.self_learn(seq, epochs=epochs, lr=lr)
+        xf_info = None
+        if self.transformer is not None and hasattr(self.transformer, "specialized_calibrate"):
+            xf_info = self.transformer.specialized_calibrate(
+                seq, epochs=epochs, lr=lr, weight_decay=1e-4, keep_best=True
+            )
+        return {
+            "ngram_fitted": ngram_n,
+            "neural": neural_info,
+            "transformer": xf_info,
+        }
 
     def snapshot(self) -> Dict[str, Any]:
         snap = self.lm.snapshot()

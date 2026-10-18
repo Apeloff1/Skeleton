@@ -174,6 +174,30 @@ class AdversarialRatchetPolicy:
             - self.minimum_strict_metric_gain
         ) * shaped
 
+    def adaptive_thresholds(
+        self,
+        attempt: int,
+        *,
+        accepted_upgrades: int = 0,
+        consecutive_rejections: int = 0,
+        velocity_ewma: float = 0.0,
+    ) -> tuple[float, float]:
+        """Compute adaptive monotonic gain thresholds bounded by policy floors.
+
+        High acceptance momentum or positive utility velocity tightens the bar
+        above the base curve, while rejection pressure relaxes the adaptive
+        bonus back toward (never below) the canonical attempt floor.
+        """
+        base_w = self.weighted_gain_threshold(attempt)
+        base_s = self.strict_metric_gain_threshold(attempt)
+        acc = max(0, int(accepted_upgrades))
+        rej = max(0, int(consecutive_rejections))
+        vel = max(0.0, float(velocity_ewma)) if math.isfinite(float(velocity_ewma)) else 0.0
+        streak_boost = min(0.50, 0.03 * acc + min(0.25, vel * 50.0))
+        rejection_relief = 1.0 / (1.0 + 0.35 * rej)
+        multiplier = 1.0 + streak_boost * rejection_relief
+        return (base_w * multiplier, base_s * multiplier)
+
     @property
     def digest(self) -> str:
         return _digest(
@@ -1765,6 +1789,7 @@ def qualify_adversarial_delivery(
 
 __all__ = [
     "ADVERSARIAL_ATTEMPTS_REQUIRED",
+    "AdaptiveRatchetController",
     "AdversarialAttemptReceipt",
     "AdversarialCampaignReceipt",
     "AdversarialChallengeContext",
@@ -1776,3 +1801,55 @@ __all__ = [
     "FixedAdversarialSuite",
     "qualify_adversarial_delivery",
 ]
+
+
+class AdaptiveRatchetController:
+    """Stateful adaptive ratchet tracker with monotonic floor guarantees."""
+
+    def __init__(self, policy: AdversarialRatchetPolicy | None = None) -> None:
+        self.policy = policy or AdversarialRatchetPolicy()
+        self.accepted_upgrades: int = 0
+        self.consecutive_rejections: int = 0
+        self.velocity_ewma: float = 0.0
+        self.high_water_weighted: float = self.policy.minimum_weighted_gain
+        self.high_water_strict: float = self.policy.minimum_strict_metric_gain
+
+    def thresholds_for_attempt(self, attempt: int) -> tuple[float, float]:
+        w, s = self.policy.adaptive_thresholds(
+            attempt,
+            accepted_upgrades=self.accepted_upgrades,
+            consecutive_rejections=self.consecutive_rejections,
+            velocity_ewma=self.velocity_ewma,
+        )
+        base_w = self.policy.weighted_gain_threshold(attempt)
+        base_s = self.policy.strict_metric_gain_threshold(attempt)
+        return (max(base_w, w), max(base_s, s))
+
+    def record_outcome(
+        self,
+        *,
+        attempt: int,
+        accepted: bool,
+        observed_weighted_gain: float = 0.0,
+    ) -> dict[str, float | int | bool]:
+        w_req, s_req = self.thresholds_for_attempt(attempt)
+        if accepted:
+            self.accepted_upgrades += 1
+            self.consecutive_rejections = 0
+            gain = max(0.0, float(observed_weighted_gain))
+            self.velocity_ewma = 0.7 * self.velocity_ewma + 0.3 * gain
+            self.high_water_weighted = max(self.high_water_weighted, w_req)
+            self.high_water_strict = max(self.high_water_strict, s_req)
+        else:
+            self.consecutive_rejections += 1
+            self.velocity_ewma *= 0.85
+        return {
+            "attempt": attempt,
+            "accepted": accepted,
+            "accepted_upgrades": self.accepted_upgrades,
+            "consecutive_rejections": self.consecutive_rejections,
+            "velocity_ewma": round(self.velocity_ewma, 6),
+            "required_weighted_gain": round(w_req, 6),
+            "required_strict_metric_gain": round(s_req, 6),
+        }
+

@@ -1178,6 +1178,43 @@ class TinyTransformer:
             generated.append(int(nxt))
         return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in generated)
 
+    def expand_depth(self, *, extra_layers: int = 1) -> Dict[str, Any]:
+        """Function-preserving Net2Net-style depth growth for progressive model increase.
+
+        Appends ``extra_layers`` new residual blocks initialized with zero
+        output projections (``Wo = 0``, ``W2 = 0``, ``b2 = 0``) so the residual
+        stream is initially an exact identity mapping while acquiring new
+        trainable capacity for subsequent training.
+        """
+        add_n = max(1, int(extra_layers))
+        self._sync_accelerator()
+        before = self.n_layers
+        for idx in range(add_n):
+            blk = TransformerBlock(
+                self.dim,
+                d_ff=self.d_ff,
+                seed=1337 + 31 * (before + idx),
+                norm=self.norm,
+                ffn_kind=self.ffn_kind,
+                rope_cos=self.rope_cos,
+                rope_sin=self.rope_sin,
+            )
+            blk.Wo = [[0.0] * self.dim for _ in range(self.dim)]
+            if blk.W2:
+                blk.W2 = [[0.0] * self.d_ff for _ in range(self.dim)]
+            if blk.b2:
+                blk.b2 = [0.0] * self.dim
+            self.layers.append(blk)
+        self.n_layers = len(self.layers)
+        if self._accel is not None:
+            try:
+                self._accel.pin()
+            except Exception:
+                self._accel = None
+                self.resident = False
+                self.device = "cpu"
+        return {"layers_before": before, "layers_after": self.n_layers, "added": add_n}
+
     def snapshot(self) -> Dict[str, Any]:
         self._sync_accelerator()
         L0 = self.layers[0]

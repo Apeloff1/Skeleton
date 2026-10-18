@@ -580,6 +580,104 @@ class JeevesCortex:
         out["seal"] = seal
         return out
 
+    def apply_gaming_weights(self, *, rounds: int = 2) -> Dict[str, Any]:
+        """Apply beneficial gaming and game-adjacent weight priors across the cortex."""
+        from skeleton.cortex.improve import apply_gaming_priors
+        return apply_gaming_priors(self, rounds=rounds)
+
+    def upgrade_capacity(
+        self,
+        *,
+        extra_layers: int = 1,
+        lora_rank: int = 4,
+    ) -> Dict[str, Any]:
+        """Acquire capability and progressively increase model depth and LoRA rank."""
+        from skeleton.cortex.production_profile import plan_capacity_escalation
+
+        xf = self.transformer
+        rms = getattr(self, "neo_rms", None)
+        depth_info = {}
+        if xf is not None and hasattr(xf, "expand_depth") and extra_layers > 0:
+            depth_info["neo"] = xf.expand_depth(extra_layers=extra_layers)
+        if rms is not None and hasattr(rms, "expand_depth") and extra_layers > 0:
+            depth_info["neo_rms"] = rms.expand_depth(extra_layers=extra_layers)
+
+        if getattr(xf, "lora", None) is None:
+            self.attach_lora(rank=max(2, int(lora_rank)), alpha=float(max(4, lora_rank * 2)))
+        else:
+            xf.lora.expand_rank(int(lora_rank))
+            if rms is not None and getattr(rms, "lora", None) is not None:
+                rms.lora.expand_rank(int(lora_rank))
+
+        acquired_slots = {}
+        for slot in SLOTS:
+            acquired_slots[slot] = self.acquire(slot)["copied"]
+
+        G = float(getattr(self.genos_engine, "G", 1.0) or 1.0)
+        streak = int(getattr(getattr(self.genos_engine, "ratchet", None), "streak", 0) or 0)
+        plan = plan_capacity_escalation("legacy", genos_g=G, ratchet_streak=streak)
+        return {
+            "depth": depth_info,
+            "lora": xf.lora.to_dict() if getattr(xf, "lora", None) is not None else None,
+            "acquired_slots": acquired_slots,
+            "escalation_plan": plan,
+        }
+
+    def self_learn_cycle(
+        self,
+        stimuli: Optional[Sequence[str]] = None,
+        *,
+        rounds: int = 2,
+        apply_gaming: bool = True,
+        grow_on_streak: bool = False,
+    ) -> Dict[str, Any]:
+        """Enterprise self-learning cycle guarded by the adaptive quality ratchet."""
+        from skeleton.cortex.curriculum import CORE_PAIRS, WALK_PAIRS
+        from skeleton.cortex.gossip import adaptive_gossip
+
+        rounds = max(1, min(16, int(rounds)))
+        texts = list(stimuli) if stimuli else ([a for a, _ in CORE_PAIRS[:6]] + [a for a, _ in WALK_PAIRS])
+        ratchet = self.genos_engine.ratchet
+
+        def _inner_step(lr_scale: float) -> Dict[str, Any]:
+            base_lr = max(0.01, min(0.08, 0.04 * float(lr_scale)))
+            for text in texts[:6]:
+                self.think(text)
+            for slot in SLOTS:
+                port = self.slots.get(slot)
+                w = getattr(port, "weights", None)
+                if w is not None and hasattr(w, "self_learn"):
+                    w.self_learn(texts[:4], epochs=1, lr=base_lr)
+                elif port is not None and hasattr(port, "fit"):
+                    for text in texts[:4]:
+                        port.fit(text)
+            if apply_gaming:
+                self.apply_gaming_weights(rounds=max(1, rounds // 2))
+            xf = self.transformer
+            if xf is not None and hasattr(xf, "specialized_calibrate"):
+                xf.specialized_calibrate(texts, epochs=rounds, lr=base_lr, weight_decay=1e-4, keep_best=True)
+            rms = getattr(self, "neo_rms", None)
+            if rms is not None and hasattr(rms, "specialized_calibrate"):
+                rms.specialized_calibrate(texts, epochs=max(1, rounds // 2), lr=base_lr, weight_decay=1e-4, keep_best=True)
+            if xf is not None and rms is not None:
+                adaptive_gossip(xf, rms, texts[:4], base_alpha=0.20)
+            for slot in SLOTS:
+                self.acquire(slot)
+            sleep_info = self.sleep_cycle(n=6)
+            pulse = self.genos(texts[0] if texts else "plan tensor ttk")
+            return {"sleep": sleep_info, "pulse": pulse, "lr_used": round(base_lr, 4)}
+
+        verdict = ratchet.step(self, _inner_step)
+        capacity_upgrade = None
+        if grow_on_streak and verdict.get("passed") and int(verdict.get("streak") or 0) >= 1:
+            capacity_upgrade = self.upgrade_capacity(extra_layers=1, lora_rank=4)
+        return {
+            "ratchet": verdict,
+            "capacity_upgrade": capacity_upgrade,
+            "mouth": self.speaking_name(),
+            "G": round(float(self.genos_engine.G), 6),
+        }
+
     def save(self, path) -> Dict[str, Any]:
         from pathlib import Path
         import json

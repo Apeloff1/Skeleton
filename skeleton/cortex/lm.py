@@ -94,20 +94,26 @@ class NGramLM:
         stream = pad + body + (END,)
         width = max(0, self.order - 1)
         V = self._vocab_size()
+        s_uni = max(1, self.total)
         lp = 0.0
         n = 0
         for i in range(width, len(stream)):
             ctx = stream[i - width:i] if width else ()
             nxt = stream[i]
+            c_uni = self.unigrams.get(nxt, 0)
+            p_uni = (c_uni + 1.0) / (s_uni + V)
             if self.order <= 1 or not ctx:
-                c = self.unigrams.get(nxt, 0)
-                s = max(1, self.total)
-                p = (c + 1.0) / (s + V)
+                p = p_uni
             else:
                 bucket = self.counts.get(ctx) or {}
                 c = bucket.get(nxt, 0)
                 s = sum(bucket.values())
-                p = (c + 1.0) / (s + V)
+                if s > 0:
+                    lam = s / (s + 2.0)
+                    p_ctx = (c + 0.5) / (s + 0.5 * V)
+                    p = lam * p_ctx + (1.0 - lam) * p_uni
+                else:
+                    p = p_uni
             lp += math.log(max(p, 1e-12))
             n += 1
         return lp / max(1, n)

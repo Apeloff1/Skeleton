@@ -67,16 +67,43 @@ class RequestHedger:
         latency_ms = (time.time_ns() - start) / 1e6
         self.record_latency(subsystem, latency_ms)
         hedged = False
-        if latency_ms > self.hedge_delay_ms(subsystem) and backup and self.budget_allows(subsystem):
+        hedge_won = False
+        if error is not None and backup and self.budget_allows(subsystem):
             stat.hedged += 1
             hedged = True
-            stat.hedge_wasted += 1
+            b_start = time.time_ns()
+            try:
+                result = backup()
+                error = None
+                hedge_won = True
+                stat.hedge_won += 1
+                b_lat = (time.time_ns() - b_start) / 1e6
+                latency_ms = b_lat
+                self.record_latency(subsystem, b_lat)
+            except Exception:  # noqa: BLE001
+                stat.hedge_wasted += 1
+        elif latency_ms > self.hedge_delay_ms(subsystem) and backup and self.budget_allows(subsystem):
+            stat.hedged += 1
+            hedged = True
+            b_start = time.time_ns()
+            try:
+                b_res = backup()
+                b_lat = (time.time_ns() - b_start) / 1e6
+                if b_lat + self.hedge_delay_ms(subsystem) < latency_ms:
+                    result = b_res
+                    hedge_won = True
+                    stat.hedge_won += 1
+                else:
+                    stat.hedge_wasted += 1
+            except Exception:  # noqa: BLE001
+                stat.hedge_wasted += 1
         if error:
             raise error
         return {
             "result": result,
             "latency_ms": round(latency_ms, 2),
             "hedged": hedged,
+            "hedge_won": hedge_won,
             "p95_ms": round(self._p95.get(subsystem, 0.0), 2),
         }
 

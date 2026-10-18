@@ -92,6 +92,26 @@ class ConnectionPool:
             pool.available.append(conn)
         return True
 
+    def warm(self, upstream: str, count: int = 2) -> int:
+        """Pre-warm up to ``count`` idle connections for low-latency bursts."""
+        pool = self._pool(upstream)
+        self._recycle(pool)
+        target = min(pool.max_size, max(0, int(count)))
+        created = 0
+        while len(pool.available) + len(pool.checked_out) < target:
+            now = time.time_ns()
+            conn = Connection(
+                conn_id=uuid.uuid4().hex[:10],
+                upstream=upstream,
+                created_ns=now,
+                last_used_ns=now,
+            )
+            pool.total_created += 1
+            self._connector(upstream)
+            pool.available.append(conn)
+            created += 1
+        return created
+
     def stats(self, upstream: str) -> Dict[str, Any]:
         pool = self._pool(upstream)
         self._recycle(pool)

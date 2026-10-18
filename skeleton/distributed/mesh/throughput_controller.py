@@ -24,10 +24,12 @@ class Lane:
     decrease_factor: float = 0.5
     successes: int = 0
     backoffs: int = 0
+    ewma_latency_ms: float = 0.0
+    min_latency_ms: float = 0.0
 
 
 class ThroughputController:
-    """AIMD concurrency limiter per subsystem lane."""
+    """AIMD + Vegas gradient concurrency limiter per subsystem lane."""
 
     def __init__(self):
         self._lanes: Dict[str, Lane] = {}
@@ -49,11 +51,20 @@ class ThroughputController:
     def release(self, subsystem: str, latency_ms: float, error: bool = False) -> None:
         lane = self.lane(subsystem)
         lane.inflight = max(0, lane.inflight - 1)
-        if error or latency_ms > lane.target_latency_ms * 1.5:
+        lat = max(0.0, float(latency_ms))
+        if lane.ewma_latency_ms <= 0.0:
+            lane.ewma_latency_ms = lat
+        else:
+            lane.ewma_latency_ms = 0.8 * lane.ewma_latency_ms + 0.2 * lat
+        if lane.min_latency_ms <= 0.0 or (lat > 0.0 and lat < lane.min_latency_ms):
+            lane.min_latency_ms = lat
+        if error or lat > lane.target_latency_ms * 1.5:
             lane.limit = max(lane.min_limit, lane.limit * lane.decrease_factor)
             lane.backoffs += 1
         else:
-            lane.limit = min(lane.max_limit, lane.limit + lane.increase_step / max(1, int(lane.limit)))
+            gradient = (lane.min_latency_ms / max(lane.ewma_latency_ms, 1e-3)) if lane.min_latency_ms > 0 else 1.0
+            step = lane.increase_step * max(0.5, min(1.5, gradient))
+            lane.limit = min(lane.max_limit, lane.limit + step / max(1, int(lane.limit)))
             lane.successes += 1
 
     def execute(self, subsystem: str, fn: Callable[[], Any]) -> Dict[str, Any]:
