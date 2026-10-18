@@ -1,10 +1,11 @@
-"""Dragon World Codex v2 — 128 independent 256-level authored controls.
+"""Dragon World Codex v2/v3 — 128 legacy plus 64 authored design controls.
 
-Every axis is named for a concrete world property. This augments rather than
-silently changes the existing 24x16 genome schema. Encoding is a lossless
-1024-bit integer (128 bytes) paired with the previous, fully addressable
-genomic design. No random generator collision is counted as unique authored
-content; identity is reversible across the full address range.
+The legacy 1024-bit identity (128 axes at 256 levels) is immutable. V3 adds
+eight meaning-bearing domains (64 further controls) through a separate,
+reversible high-order 512-bit extension. Zero extension values retain the
+original decimal identity, v2 schema, exact digest and 128-axis semantics.
+The v3 address and digest are explicit; no old source is silently reinterpreted.
+Addresses describe lazily materialized designs, not released or unique games.
 
 These axes model original environmental, cultural, temporal and narrative
 processes inspired by broad genre *concepts*, not copied maps, characters,
