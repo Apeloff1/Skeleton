@@ -207,3 +207,269 @@ class LoRABank:
         return {"rank": self.rank, "n": len(self.adapters),
                 "steps": sum(a.steps for a in self.adapters.values()),
                 "energy": round(sum(a.energy() for a in self.adapters.values()), 8)}
+
+
+class ContextConditionedLoRA:
+    """HyperLoRA / Dynamic HyperNetwork Weight Generator.
+
+    Synthesizes input-conditioned low-rank rank-r diagonal modulation gates
+    g(z) = 1 + tanh(W_hyper * z + b_hyper) from a game brief / genre / console
+    context embedding z, so the effective weight perturbation is:
+        delta(x, z) = (alpha / r) * B * diag(g(z)) * (A * x)
+    """
+
+    def __init__(
+        self,
+        out_dim: int,
+        in_dim: int,
+        *,
+        ctx_dim: int = 8,
+        rank: int = 2,
+        alpha: float = 4.0,
+        seed: int = 0,
+        name: str = "W",
+    ) -> None:
+        self.base = LoRA(out_dim, in_dim, rank=rank, alpha=alpha, seed=seed, name=name)
+        self.ctx_dim = max(1, int(ctx_dim))
+        self.rank = self.base.rank
+        self.alpha = self.base.alpha
+        self.out_dim = self.base.out_dim
+        self.in_dim = self.base.in_dim
+        self.name = self.base.name
+        rng = random.Random((int(seed) ^ 0x5A17C3) & 0xFFFFFFFF)
+        self.W_hyper: Mat = _rand_mat(self.rank, self.ctx_dim, 0.15 / math.sqrt(self.ctx_dim), rng)
+        self.b_hyper: Vec = [0.0] * self.rank
+        self._active_ctx: Vec = [0.0] * self.ctx_dim
+        self.hyper_steps = 0
+
+    def _fit_ctx(self, ctx_vec: Optional[Sequence[float]]) -> Vec:
+        if not ctx_vec:
+            return list(self._active_ctx)
+        raw = [float(v) for v in ctx_vec]
+        if len(raw) >= self.ctx_dim:
+            return raw[: self.ctx_dim]
+        return raw + [0.0] * (self.ctx_dim - len(raw))
+
+    def bind_context(self, ctx_vec: Sequence[float]) -> Vec:
+        self._active_ctx = self._fit_ctx(ctx_vec)
+        return self.gate(self._active_ctx)
+
+    def gate(self, ctx_vec: Optional[Sequence[float]] = None) -> Vec:
+        z = self._fit_ctx(ctx_vec)
+        raw = matvec(self.W_hyper, z)
+        return [1.0 + math.tanh(raw[k] + self.b_hyper[k]) for k in range(self.rank)]
+
+    def delta(self, x: Sequence[float], ctx_vec: Optional[Sequence[float]] = None) -> Vec:
+        ax = matvec(self.base.A, list(x))
+        g = self.gate(ctx_vec)
+        gated = [ax[k] * g[k] for k in range(self.rank)]
+        return scale(matvec(self.base.B, gated), self.base.scale)
+
+    def apply(self, Wx: Sequence[float], x: Sequence[float], ctx_vec: Optional[Sequence[float]] = None) -> Vec:
+        return add(list(Wx), self.delta(x, ctx_vec))
+
+    def step(
+        self,
+        x: Sequence[float],
+        dY: Sequence[float],
+        lr: float,
+        ctx_vec: Optional[Sequence[float]] = None,
+    ) -> Vec:
+        xv = list(x)
+        dy = list(dY)
+        z = self._fit_ctx(ctx_vec)
+        ax = matvec(self.base.A, xv)
+        g = self.gate(z)
+        gated_ax = [ax[k] * g[k] for k in range(self.rank)]
+        s = self.base.scale
+        bt_dy = matvec_T(self.base.B, dy)
+        # Gradient wrt gated rank vector
+        d_gated = [bt_dy[k] * s for k in range(self.rank)]
+        # Gradient wrt hypernetwork gate g_k: dL/dg_k = d_gated[k] * ax[k], dg_k/du_k = 1 - (g_k - 1)^2
+        for k in range(self.rank):
+            th = g[k] - 1.0
+            du = d_gated[k] * ax[k] * max(0.05, 1.0 - th * th)
+            self.b_hyper[k] -= lr * 0.5 * du
+            for c_idx in range(self.ctx_dim):
+                self.W_hyper[k][c_idx] -= lr * 0.5 * du * z[c_idx]
+        # Update base A and B with context-gated activation
+        dz = [d_gated[k] * g[k] for k in range(self.rank)]
+        add_outer(self.base.B, scale(dy, s), gated_ax, -lr)
+        add_outer(self.base.A, dz, xv, -lr)
+        self.base.steps += 1
+        self.hyper_steps += 1
+        return matvec_T(self.base.A, dz)
+
+    def materialize_lora(self, ctx_vec: Optional[Sequence[float]] = None) -> LoRA:
+        """Compile a fast static LoRA adapter for a specific game context vector."""
+        g = self.gate(ctx_vec)
+        compiled = LoRA(
+            self.out_dim,
+            self.in_dim,
+            rank=self.rank,
+            alpha=self.alpha,
+            name=self.name,
+        )
+        compiled.A = [[self.base.A[k][j] * g[k] for j in range(self.in_dim)] for k in range(self.rank)]
+        compiled.B = _copy(self.base.B)
+        compiled.steps = self.base.steps
+        return compiled
+
+    def energy(self) -> float:
+        base_e = self.base.energy()
+        hyper_e = sum(x * x for row in self.W_hyper for x in row) + sum(b * b for b in self.b_hyper)
+        return base_e + hyper_e
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "kind": "hyper-lora",
+            "ctx_dim": self.ctx_dim,
+            "base": self.base.snapshot(),
+            "W_hyper": _copy(self.W_hyper),
+            "b_hyper": list(self.b_hyper),
+            "active_ctx": list(self._active_ctx),
+            "hyper_steps": self.hyper_steps,
+        }
+
+    @classmethod
+    def from_snapshot(cls, data: Dict[str, Any]) -> "ContextConditionedLoRA":
+        base_snap = (data or {}).get("base") or {}
+        base = LoRA.from_snapshot(base_snap)
+        obj = cls(
+            base.out_dim,
+            base.in_dim,
+            ctx_dim=int((data or {}).get("ctx_dim") or 8),
+            rank=base.rank,
+            alpha=base.alpha,
+            name=base.name,
+        )
+        obj.base = base
+        if (data or {}).get("W_hyper"):
+            obj.W_hyper = [list(map(float, row)) for row in data["W_hyper"]]
+        if (data or {}).get("b_hyper"):
+            obj.b_hyper = [float(x) for x in data["b_hyper"]]
+        if (data or {}).get("active_ctx"):
+            obj._active_ctx = [float(x) for x in data["active_ctx"]]
+        obj.hyper_steps = int((data or {}).get("hyper_steps") or 0)
+        return obj
+
+
+class HyperLoRABank:
+    """Bank of context-conditioned HyperLoRA adapters across transformer projections."""
+
+    TARGETS = ("Wq", "Wv", "Wout")
+
+    def __init__(self, *, ctx_dim: int = 8, rank: int = 2, alpha: float = 4.0, seed: int = 0) -> None:
+        self.ctx_dim = max(1, int(ctx_dim))
+        self.rank = max(1, int(rank))
+        self.alpha = float(alpha)
+        self.seed = int(seed) & 0xFFFFFFFF
+        self.adapters: Dict[str, ContextConditionedLoRA] = {}
+
+    def attach(self, lm, targets: Optional[Iterable[str]] = None) -> Dict[str, Any]:
+        names = tuple(targets or self.TARGETS)
+        D = int(getattr(lm, "dim", 8) or 8)
+        V = int(getattr(lm, "V", D) or D)
+        attached = []
+        for i, name in enumerate(names):
+            out_d, in_d = (V, D) if name == "Wout" else (D, D)
+            self.adapters[name] = ContextConditionedLoRA(
+                out_d,
+                in_d,
+                ctx_dim=self.ctx_dim,
+                rank=self.rank,
+                alpha=self.alpha,
+                seed=self.seed + 31 * (i + 1),
+                name=name,
+            )
+            attached.append(name)
+        setattr(lm, "hyper_lora", self)
+        return {"attached": attached, "rank": self.rank, "ctx_dim": self.ctx_dim, "alpha": self.alpha}
+
+    def bind_context(self, ctx_vec: Sequence[float]) -> Dict[str, List[float]]:
+        gates: Dict[str, List[float]] = {}
+        for name, ad in self.adapters.items():
+            gates[name] = [round(v, 6) for v in ad.bind_context(ctx_vec)]
+        return gates
+
+    def fit_contextual(
+        self,
+        lm,
+        contextual_texts: Iterable[tuple[Sequence[float], str]],
+        *,
+        lr: float = 0.04,
+    ) -> Dict[str, Any]:
+        """Train context-conditioned HyperLoRA adapters on (context_vector, text) pairs."""
+        adapter = self.adapters.get("Wout")
+        if adapter is None or not hasattr(lm, "_ids") or not hasattr(lm, "_forward"):
+            return {"steps": 0, "mean_loss": 0.0}
+        ctx_len = max(1, int(getattr(lm, "ctx", 6) or 6))
+        steps = 0
+        total_loss = 0.0
+        for ctx_vec, raw in contextual_texts:
+            if not raw:
+                continue
+            adapter.bind_context(ctx_vec)
+            ids = list(lm._ids(raw))
+            for i in range(1, len(ids)):
+                window = ids[max(0, i - ctx_len):i]
+                if not window:
+                    continue
+                hidden, _ = lm._forward(window)
+                if not hidden:
+                    continue
+                y = list(hidden[-1])
+                base_logits = list(lm._unembed(y))
+                logits = adapter.apply(base_logits, y, ctx_vec)
+                probs = softmax(logits)
+                target = int(ids[i])
+                if target < 0 or target >= len(probs):
+                    continue
+                total_loss += -math.log(max(probs[target], 1e-12))
+                dlog = [p - (1.0 if j == target else 0.0) for j, p in enumerate(probs)]
+                adapter.step(y, dlog, float(lr), ctx_vec)
+                steps += 1
+        return {
+            "steps": steps,
+            "mean_loss": round(total_loss / max(1, steps), 6),
+            "energy": round(sum(a.energy() for a in self.adapters.values()), 8),
+        }
+
+    def compile_static_bank(self, ctx_vec: Sequence[float]) -> LoRABank:
+        """Materialize a standard LoRABank specialized for the given game context vector."""
+        bank = LoRABank(rank=self.rank, alpha=self.alpha, seed=self.seed)
+        for name, ad in self.adapters.items():
+            bank.adapters[name] = ad.materialize_lora(ctx_vec)
+        return bank
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "kind": "hyper-lora-bank",
+            "ctx_dim": self.ctx_dim,
+            "rank": self.rank,
+            "alpha": self.alpha,
+            "seed": self.seed,
+            "adapters": {k: v.snapshot() for k, v in self.adapters.items()},
+        }
+
+    @classmethod
+    def from_snapshot(cls, data: Dict[str, Any]) -> "HyperLoRABank":
+        bank = cls(
+            ctx_dim=int((data or {}).get("ctx_dim") or 8),
+            rank=int((data or {}).get("rank") or 2),
+            alpha=float((data or {}).get("alpha") or 4.0),
+            seed=int((data or {}).get("seed") or 0),
+        )
+        for k, blob in ((data or {}).get("adapters") or {}).items():
+            bank.adapters[str(k)] = ContextConditionedLoRA.from_snapshot(blob)
+        return bank
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "hyper-lora-bank",
+            "ctx_dim": self.ctx_dim,
+            "rank": self.rank,
+            "n": len(self.adapters),
+            "hyper_steps": sum(a.hyper_steps for a in self.adapters.values()),
+            "energy": round(sum(a.energy() for a in self.adapters.values()), 8),
+        }

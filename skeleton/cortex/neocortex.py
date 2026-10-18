@@ -165,10 +165,13 @@ class JeevesCortex:
         self._seal: Dict[str, Any] = {}
         from skeleton.cortex.contact import ContactEngine
         from skeleton.cortex.genos import Genos
-        from skeleton.cortex.own import RepetitionTrainingAutomation
+        from skeleton.cortex.own import RepetitionTrainingAutomation, ZeroShotBlueprintCompiler
+        from skeleton.cortex.rl import DPOPreferenceOptimizer
         self.contact_engine = ContactEngine()
         self.genos_engine = Genos()
         self.repetition_automation = RepetitionTrainingAutomation()
+        self.blueprint_compiler = ZeroShotBlueprintCompiler()
+        self.dpo_optimizer = DPOPreferenceOptimizer()
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -1450,6 +1453,127 @@ class JeevesCortex:
         """Train across the console and ROM asset engineering suite (8-bit DMG/NES to modern)."""
         from skeleton.cortex.improve import train_console_rom_assets
         return train_console_rom_assets(self, consoles=consoles, rounds=rounds)
+
+    def attach_hyper_lora(self, *, ctx_dim: int = 8, rank: int = 2, alpha: float = 4.0, seed: int = 0) -> Dict[str, Any]:
+        """Attach context-conditioned HyperLoRA banks to both speaking and RMS mouths."""
+        xf = self.transformer
+        out: Dict[str, Any] = {"attached": []}
+        if xf is not None and hasattr(xf, "attach_hyper_lora"):
+            out = dict(xf.attach_hyper_lora(ctx_dim=ctx_dim, rank=rank, alpha=alpha, seed=seed))
+        rms = getattr(self, "neo_rms", None)
+        if rms is not None and hasattr(rms, "attach_hyper_lora"):
+            out["neo_rms"] = rms.attach_hyper_lora(ctx_dim=ctx_dim, rank=rank, alpha=alpha, seed=seed + 97)
+        return out
+
+    def merge_model_soup(
+        self,
+        *,
+        density: float = 0.75,
+        scaling_lambda: float = 0.85,
+        slerp_blend: float = 0.25,
+    ) -> Dict[str, Any]:
+        """Merge specialist transformer mouths and slot transformers via TIES-Merging + SLERP Model Soup."""
+        from skeleton.cortex.curriculum import CORE_PAIRS
+        from skeleton.cortex.gossip import task_vector_soup_merge
+
+        xf = self.transformer
+        donors = []
+        for cand in (getattr(self, "neo_rms", None), getattr(self, "backup_transformer", None)):
+            if cand is not None:
+                donors.append(cand)
+        for slot in SLOTS:
+            port = self.slots.get(slot)
+            s_xf = getattr(port, "transformer", None) if port is not None else None
+            if s_xf is not None:
+                donors.append(s_xf)
+        probe = [a for a, _ in list(CORE_PAIRS)[:6]]
+        return task_vector_soup_merge(
+            xf,
+            donors,
+            corpus=probe,
+            density=density,
+            scaling_lambda=scaling_lambda,
+            slerp_blend=slerp_blend,
+        )
+
+    def dream_cycle(self, *, dreams: int = 6, lr: float = 0.04) -> Dict[str, Any]:
+        """Execute counterfactual dreaming consolidation across episodic traces."""
+        return self.sleep.dream_counterfactuals(self, dreams=dreams, lr=lr)
+
+    def dpo_align(
+        self,
+        prompt: str,
+        chosen_text: str,
+        rejected_text: str,
+        *,
+        chosen_mix: Optional[Sequence[float]] = None,
+        rejected_mix: Optional[Sequence[float]] = None,
+    ) -> Dict[str, Any]:
+        """Direct Preference Optimization step aligning language mouth and encounter-mix head."""
+        h = self._stream(prompt)
+        left_head = self.moe.experts["left"].head if (self.moe is not None and "left" in self.moe.experts) else None
+        return self.dpo_optimizer.step_preference_pair(
+            self.transformer,
+            prompt,
+            chosen_text,
+            rejected_text,
+            head=left_head,
+            hidden=h,
+            chosen_mix=chosen_mix,
+            rejected_mix=rejected_mix,
+        )
+
+    def lookahead_speak(
+        self,
+        stimulus: str,
+        *,
+        n: int = 10,
+        lookahead_window: int = 4,
+        required_tokens: Optional[Sequence[str]] = None,
+    ) -> Dict[str, Any]:
+        """Multi-branch lookahead Jacobi speculative decode with neuro-symbolic grammar/budget masking."""
+        from skeleton.cortex.speculative import GrammarBudgetLogitProcessor, lookahead_jacobi_decode
+
+        xf = self.transformer
+        rms = getattr(self, "neo_rms", None)
+        backup = getattr(self, "backup_transformer", None)
+        drafts = [m for m in (rms, backup) if m is not None and int(getattr(m, "V", -1)) == int(getattr(xf, "V", -2))]
+        ids = list(xf._ids(stimulus or "")) or [int(getattr(xf, "unk", 0))]
+        proc = GrammarBudgetLogitProcessor(
+            xf.itos,
+            required_tokens=required_tokens,
+            no_repeat_ngram_size=2,
+        )
+        return lookahead_jacobi_decode(
+            xf,
+            drafts or [xf],
+            ids,
+            n,
+            lookahead_window=lookahead_window,
+            logit_processor=proc,
+        )
+
+    def compile_zero_shot_blueprint(
+        self,
+        brief: str,
+        *,
+        console_target: str = "gb_dmg_rom",
+        genre: str = "action_platformer",
+        tile_count: int = 6,
+        seed: int = 19,
+        use_cache: bool = True,
+    ) -> Dict[str, Any]:
+        """Compile a zero-shot playable game blueprint + ROM tile/palette/OAM/audio bank with memoization."""
+        return self.blueprint_compiler.compile(
+            self,
+            brief,
+            console_target=console_target,
+            genre=genre,
+            tile_count=tile_count,
+            seed=seed,
+            use_cache=use_cache,
+        )
+
 
     def speaking_name(self) -> str:
         if self._mouth_override:

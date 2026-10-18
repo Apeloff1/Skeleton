@@ -31,6 +31,7 @@ class Backend:
     errors: int = 0
     total_latency_ms: float = 0.0
     ewma_latency_ms: float = 0.0
+    latency_slope_ms: float = 0.0
     quality_score: float = 1.0
     in_flight: int = 0
     max_concurrency: int = 0
@@ -112,8 +113,12 @@ class Backend:
         quality = max(0.05, float(self.quality_score))
         lat_factor = 1.0
         obs_lat = self.ewma_latency_ms if self.ewma_latency_ms > 0.0 else self.mean_latency()
-        if latency_budget_ms > 0.0 and obs_lat > latency_budget_ms:
-            lat_factor = 1.0 / (1.0 + (obs_lat - latency_budget_ms) / latency_budget_ms)
+        # Predictive latency projection using EWMA derivative (slope)
+        projected_lat = max(0.0, obs_lat + max(0.0, self.latency_slope_ms) * 1.5)
+        if latency_budget_ms > 0.0 and projected_lat > latency_budget_ms:
+            lat_factor = 1.0 / (1.0 + (projected_lat - latency_budget_ms) / latency_budget_ms)
+        elif self.latency_slope_ms > 10.0:
+            lat_factor = 1.0 / (1.0 + self.latency_slope_ms / max(50.0, obs_lat))
         load_factor = 1.0
         if self.max_concurrency > 0:
             utilization = min(0.95, float(self.in_flight) / float(self.max_concurrency))
@@ -131,6 +136,7 @@ class Backend:
             "error_rate": round(self.error_rate(), 4),
             "mean_latency_ms": round(self.mean_latency(), 2),
             "ewma_latency_ms": round(self.ewma_latency_ms, 2),
+            "latency_slope_ms": round(self.latency_slope_ms, 3),
             "quality_score": round(self.quality_score, 4),
             "in_flight": self.in_flight,
             "max_concurrency": self.max_concurrency,
@@ -373,8 +379,12 @@ class TrafficSplitter:
         alpha = max(0.01, min(1.0, float(ewma_alpha)))
         if b.requests == 1 or b.ewma_latency_ms <= 0.0:
             b.ewma_latency_ms = lat
+            b.latency_slope_ms = 0.0
         else:
+            prev_ewma = b.ewma_latency_ms
             b.ewma_latency_ms = (1.0 - alpha) * b.ewma_latency_ms + alpha * lat
+            inst_slope = b.ewma_latency_ms - prev_ewma
+            b.latency_slope_ms = 0.7 * b.latency_slope_ms + 0.3 * inst_slope
         if error:
             b.errors += 1
             b.consecutive_errors += 1
@@ -434,4 +444,36 @@ class TrafficSplitter:
             "sticky_sessions": len(self._sticky),
             "shadow": self._shadow,
             "shadow_events": len(self._shadow_log),
+        }
+
+    def forecast_brownout(self, *, latency_budget_ms: float = 100.0, horizon_steps: int = 3) -> Dict[str, Any]:
+        """Predict backend brownout risk over `horizon_steps` using EWMA latency + velocity slope."""
+        at_risk: List[str] = []
+        healthy_headroom: List[str] = []
+        forecasts: Dict[str, Dict[str, Any]] = {}
+        steps = max(1, int(horizon_steps))
+        for name, b in self._backends.items():
+            cur = b.ewma_latency_ms if b.ewma_latency_ms > 0.0 else b.mean_latency()
+            predicted = max(0.0, cur + b.latency_slope_ms * steps)
+            will_breach = bool(
+                not b.healthy
+                or b.circuit_state != "closed"
+                or (latency_budget_ms > 0.0 and predicted > latency_budget_ms)
+            )
+            if will_breach:
+                at_risk.append(name)
+            else:
+                healthy_headroom.append(name)
+            forecasts[name] = {
+                "current_ewma_ms": round(cur, 2),
+                "slope_ms": round(b.latency_slope_ms, 3),
+                "predicted_ms": round(predicted, 2),
+                "will_breach_budget": will_breach,
+            }
+        return {
+            "latency_budget_ms": latency_budget_ms,
+            "horizon_steps": steps,
+            "at_risk_backends": at_risk,
+            "healthy_headroom_backends": healthy_headroom,
+            "forecasts": forecasts,
         }

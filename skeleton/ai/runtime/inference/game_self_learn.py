@@ -1074,3 +1074,122 @@ def automated_repetition_training(
         "holdout_isolated": True,
         "promoted": False,
     }
+
+
+def curiosity_frontier_curriculum(
+    model: object,
+    *,
+    top_k_concepts: int = 4,
+    candidates_per_concept: int = 8,
+) -> dict[str, object]:
+    """Active Curiosity-Driven Adversarial Curriculum Generator.
+
+    Probes per-lesson cross-entropy loss across the weakest concepts, ranks
+    individual lessons by epistemic surprise (loss excess over concept mean),
+    and synthesizes holdout-free cross-concept bridge lessons that link pairs
+    of high-surprise concepts (e.g., `console_rom` + `gdscript_gameplay` or
+    `frame_budget` + `combat_feel`) for maximum sample-efficiency learning.
+    """
+    if isinstance(top_k_concepts, bool) or not isinstance(top_k_concepts, int) or top_k_concepts < 1:
+        raise ValueError("top_k_concepts must be a positive int")
+    grouped = practice_by_concept()
+    losses = concept_losses(model)
+    ordered = review_order(losses)
+    focus_concepts = ordered[: min(top_k_concepts, len(ordered))]
+    windows = held_windows()
+
+    surprise_lessons: list[dict[str, object]] = []
+    selected_corpus: list[str] = []
+
+    for concept in focus_concepts:
+        docs = grouped.get(concept, ())[: max(4, int(candidates_per_concept))]
+        c_mean = float(losses.get(concept, 1.0))
+        scored_docs: list[tuple[float, str]] = []
+        for doc in docs:
+            doc_loss = _eval_loss(model, (doc,))
+            surprise = max(0.0, doc_loss - c_mean * 0.85)
+            scored_docs.append((surprise, doc))
+        scored_docs.sort(key=lambda item: (-item[0], item[1]))
+        for surprise_val, doc in scored_docs[:4]:
+            selected_corpus.append(doc)
+            surprise_lessons.append({
+                "concept": concept,
+                "surprise": round(surprise_val, 6),
+                "document": doc,
+            })
+
+    bridge_lessons: list[str] = []
+    for idx in range(len(focus_concepts)):
+        c_a = focus_concepts[idx]
+        c_b = focus_concepts[(idx + 1) % len(focus_concepts)]
+        doc_a = grouped[c_a][0] if grouped.get(c_a) else ""
+        doc_b = grouped[c_b][0] if grouped.get(c_b) else ""
+        if doc_a and doc_b:
+            bridge = f"[Bridge {c_a}<->{c_b}] {doc_a} Meanwhile, {doc_b[0].lower() + doc_b[1:]}"
+            if not leaks_holdout(bridge, windows):
+                bridge_lessons.append(bridge)
+                selected_corpus.append(bridge)
+
+    return {
+        "schema_version": "skeleton.game_self_learn.curiosity.v1",
+        "focus_concepts": focus_concepts,
+        "surprise_lessons": tuple(surprise_lessons),
+        "bridge_lessons": tuple(bridge_lessons),
+        "curriculum_documents": tuple(selected_corpus),
+        "total_documents": len(selected_corpus),
+    }
+
+
+def run_curiosity_self_play_loop(
+    model: object,
+    *,
+    rounds: int = 2,
+    top_k_concepts: int = 4,
+    learning_rate: float = 0.02,
+    optimizer: str = "adamw",
+    eval_documents: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Closed-loop curiosity-driven self-play training with non-regression ratchet."""
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or not 1 <= rounds <= 6:
+        raise ValueError("rounds must be an int in [1, 6]")
+    eval_set = tuple(eval_documents) if eval_documents is not None else practice_documents()[:32]
+    initial_loss = _eval_loss(model, eval_set)
+    history: list[dict[str, object]] = []
+
+    for r_idx in range(rounds):
+        frontier = curiosity_frontier_curriculum(model, top_k_concepts=top_k_concepts)
+        docs = tuple(frontier["curriculum_documents"])
+        saved = _save_model_state(model)
+        before_loss = _eval_loss(model, eval_set)
+        _train_model_on_docs(
+            model,
+            docs,
+            epochs=1,
+            lr=float(learning_rate) * (0.92 ** r_idx),
+            optimizer=optimizer,
+            holdout=eval_set,
+        )
+        after_loss = _eval_loss(model, eval_set)
+        kept = True
+        if after_loss > before_loss:
+            _restore_model_state(model, saved)
+            after_loss = before_loss
+            kept = False
+        history.append({
+            "round": r_idx + 1,
+            "focus_concepts": frontier["focus_concepts"],
+            "bridge_count": len(frontier["bridge_lessons"]),
+            "loss_before": round(before_loss, 6),
+            "loss_after": round(after_loss, 6),
+            "kept": kept,
+        })
+
+    final_loss = _eval_loss(model, eval_set)
+    return {
+        "schema_version": "skeleton.game_self_learn.self_play.v1",
+        "rounds": rounds,
+        "initial_eval_loss": round(initial_loss, 6),
+        "final_eval_loss": round(final_loss, 6),
+        "improved": final_loss <= initial_loss,
+        "history": tuple(history),
+    }

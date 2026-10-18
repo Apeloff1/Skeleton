@@ -1416,6 +1416,82 @@ class TinyTransformer:
             generated.append(int(nxt))
         return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in generated)
 
+    def constrained_generate(
+        self,
+        prefix: str | Sequence[str],
+        n: int = 12,
+        *,
+        seed: int = 0,
+        allowed_tokens: Optional[Sequence[str]] = None,
+        banned_tokens: Optional[Sequence[str]] = None,
+        required_tokens: Optional[Sequence[str]] = None,
+        domain_boost_tokens: Optional[Sequence[str]] = None,
+        no_repeat_ngram_size: int = 2,
+        temperature: float = 0.0,
+        min_p: float = 0.0,
+        use_cache: bool = True,
+    ) -> Dict[str, Any]:
+        """Neuro-symbolic grammar & hardware-budget constrained token generation."""
+        from skeleton.cortex.speculative import GrammarBudgetLogitProcessor
+
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
+        rng = random.Random(int(seed) & 0xFFFFFFFF)
+        if isinstance(prefix, str):
+            ids = self._ids(prefix)
+        else:
+            ids = [self._id(str(t)) for t in prefix] or [self.unk]
+        processor = GrammarBudgetLogitProcessor(
+            self.itos,
+            allowed_tokens=allowed_tokens,
+            banned_tokens=banned_tokens,
+            required_tokens=required_tokens,
+            domain_boost_tokens=domain_boost_tokens,
+            no_repeat_ngram_size=no_repeat_ngram_size,
+        )
+        out = list(ids)
+        cache = KVCache(self.n_layers, self.ctx) if use_cache else None
+        generated: List[int] = []
+        hyper_bank = getattr(self, "hyper_lora", None)
+        for step_idx in range(n):
+            window = out[-self.ctx:]
+            if cache is not None and not self.use_mod:
+                logits = list(self._logits_window(window, cache))
+            else:
+                logits = list(self._logits(window))
+            if hyper_bank is not None and "Wout" in getattr(hyper_bank, "adapters", {}):
+                hidden, _ = self._forward(window)
+                if hidden:
+                    logits = hyper_bank.adapters["Wout"].apply(logits, hidden[-1])
+            masked = processor.process(
+                logits,
+                generated,
+                steps_remaining=max(1, n - step_idx),
+            )
+            nxt = sample_logits(
+                masked,
+                rng,
+                temperature=temperature,
+                min_p=min_p,
+            )
+            out.append(int(nxt))
+            generated.append(int(nxt))
+        tokens_str = tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in generated)
+        req_set = set(required_tokens or ()) & set(self.itos)
+        satisfied = sorted(req_set & set(tokens_str))
+        return {
+            "text": " ".join(tokens_str),
+            "tokens": tokens_str,
+            "token_ids": generated,
+            "required_satisfied": satisfied,
+            "all_required_satisfied": len(satisfied) == len(req_set),
+        }
+
+    def attach_hyper_lora(self, *, ctx_dim: int = 8, rank: int = 2, alpha: float = 4.0, seed: int = 0) -> Dict[str, Any]:
+        from skeleton.cortex.lora import HyperLoRABank
+        return HyperLoRABank(ctx_dim=ctx_dim, rank=rank, alpha=alpha, seed=seed).attach(self)
+
+
     def expand_depth(self, *, extra_layers: int = 1) -> Dict[str, Any]:
         """Function-preserving Net2Net-style depth growth for progressive model increase.
 

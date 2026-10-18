@@ -167,3 +167,26 @@ def test_console_rom_practice_and_automated_repetition_training():
     assert rep_out["final_eval_loss"] < rep_out["initial_eval_loss"]
     assert rep_out["holdout_isolated"] is True
     assert rep_out["promoted"] is False
+
+    from skeleton.ai.runtime.inference.game_self_learn import (
+        curiosity_frontier_curriculum,
+        run_curiosity_self_play_loop,
+    )
+
+    frontier = curiosity_frontier_curriculum(model, top_k_concepts=3)
+    assert frontier["schema_version"] == "skeleton.game_self_learn.curiosity.v1"
+    assert len(frontier["focus_concepts"]) == 3
+    assert len(frontier["bridge_lessons"]) >= 2
+    for doc in frontier["curriculum_documents"]:
+        assert leaks_any_holdout(doc) is False
+
+    sp_out = run_curiosity_self_play_loop(
+        model,
+        rounds=2,
+        top_k_concepts=3,
+        learning_rate=0.03,
+        eval_documents=eval_sample,
+    )
+    assert sp_out["schema_version"] == "skeleton.game_self_learn.self_play.v1"
+    assert sp_out["improved"] is True
+    assert sp_out["final_eval_loss"] <= sp_out["initial_eval_loss"]

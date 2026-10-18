@@ -112,3 +112,56 @@ class ThroughputController:
             } for n, l in self._lanes.items()},
             "rejected": self._rejected,
         }
+
+    def execute_coalesced_batch(
+        self,
+        subsystem: str,
+        items: List[Any],
+        batch_fn: Callable[[List[Any]], List[Any]],
+        *,
+        max_batch_size: int = 8,
+        priority: str = "normal",
+    ) -> Dict[str, Any]:
+        """Coalesce multiple micro-requests into bounded vectorized batches under lane admission control."""
+        if not items:
+            return {"executed": True, "results": [], "batches_run": 0, "coalesced_items": 0}
+        b_size = max(1, int(max_batch_size))
+        results: List[Any] = []
+        batches_run = 0
+        total_latency_ms = 0.0
+        for idx in range(0, len(items), b_size):
+            chunk = items[idx:idx + b_size]
+            if not self.acquire(subsystem, priority=priority):
+                return {
+                    "executed": False,
+                    "reason": "concurrency limit",
+                    "priority": priority,
+                    "batches_run": batches_run,
+                    "partial_results": results,
+                }
+            start = time.time_ns()
+            error = False
+            chunk_out: Any = None
+            try:
+                chunk_out = batch_fn(chunk)
+            except Exception as exc:  # noqa: BLE001
+                error = True
+                chunk_out = exc
+            lat_ms = (time.time_ns() - start) / 1e6
+            total_latency_ms += lat_ms
+            self.release(subsystem, lat_ms, error)
+            if error:
+                raise chunk_out
+            if isinstance(chunk_out, list):
+                results.extend(chunk_out)
+            else:
+                results.append(chunk_out)
+            batches_run += 1
+        return {
+            "executed": True,
+            "results": results,
+            "batches_run": batches_run,
+            "coalesced_items": len(items),
+            "total_latency_ms": round(total_latency_ms, 2),
+            "priority": priority,
+        }

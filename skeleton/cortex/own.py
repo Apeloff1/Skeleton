@@ -941,3 +941,148 @@ class RepetitionTrainingAutomation:
             "hyperweights": hyper_bundle,
             "hyperweight_application": hyper_apply,
         }
+
+
+class ZeroShotBlueprintCompiler:
+    """Zero-Shot Brief-to-Playable-Blueprint Compiler & Predictive Build Memoizer.
+
+    Combines Cortex MoE encounter/pacing/bias heads, context-conditioned
+    HyperLoRA gates, lookahead Jacobi parallel decoding, and hardware-accurate
+    Console/ROM tile-bank synthesis into a single content-addressed blueprint
+    with O(1) predictive semantic memoization.
+    """
+
+    def __init__(self, *, max_cache_entries: int = 128) -> None:
+        self.max_cache_entries = max(8, int(max_cache_entries))
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self.hits = 0
+        self.misses = 0
+
+    def compile(
+        self,
+        neo,
+        brief: str,
+        *,
+        console_target: str = "gb_dmg_rom",
+        genre: str = "action_platformer",
+        tile_count: int = 6,
+        seed: int = 19,
+        use_cache: bool = True,
+    ) -> Dict[str, Any]:
+        import hashlib
+        import json
+        from skeleton.cortex.laws import check
+        from skeleton.cortex.speculative import GrammarBudgetLogitProcessor, lookahead_jacobi_decode
+        from skeleton.forge.hardware import compile_console_rom_envelope, synthesize_rom_tile_bank
+
+        clean_brief = (brief or "soulslike extraction ttk elite dread").strip()
+        cache_key_raw = f"{clean_brief}|{console_target}|{genre}|{int(tile_count)}|{int(seed)}"
+        cache_key = hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()[:24]
+
+        if use_cache and cache_key in self._cache:
+            self.hits += 1
+            cached = dict(self._cache[cache_key])
+            cached["cache_hit"] = True
+            cached["cache_stats"] = {"hits": self.hits, "misses": self.misses, "entries": len(self._cache)}
+            return cached
+
+        self.misses += 1
+        trace = neo.think(clean_brief)
+        h = neo._stream(clean_brief) if hasattr(neo, "_stream") else [0.5] * 8
+
+        # Bind HyperLoRA context if attached on speaking transformer
+        xf = getattr(neo, "transformer", None)
+        rms = getattr(neo, "neo_rms", None)
+        backup = getattr(neo, "backup_transformer", None)
+        hyper_gates = None
+        if xf is not None:
+            if getattr(xf, "hyper_lora", None) is None and hasattr(xf, "attach_hyper_lora"):
+                xf.attach_hyper_lora(ctx_dim=len(h), rank=2, alpha=4.0, seed=seed)
+            if getattr(xf, "hyper_lora", None) is not None:
+                hyper_gates = xf.hyper_lora.bind_context(h)
+
+        # Lookahead Jacobi multi-branch speculative decode across primary + draft mouths
+        jacobi_out = None
+        if xf is not None and hasattr(xf, "_ids"):
+            drafts = [m for m in (rms, backup) if m is not None and int(getattr(m, "V", -1)) == int(getattr(xf, "V", -2))]
+            prefix_ids = list(xf._ids(clean_brief)) or [int(getattr(xf, "unk", 0))]
+            domain_tokens = [t for t in clean_brief.lower().split() if t in getattr(xf, "stoi", {})]
+            proc = GrammarBudgetLogitProcessor(
+                xf.itos,
+                domain_boost_tokens=domain_tokens[:6],
+                no_repeat_ngram_size=2,
+            )
+            jacobi_out = lookahead_jacobi_decode(
+                xf,
+                drafts or [xf],
+                prefix_ids,
+                8,
+                lookahead_window=4,
+                max_jacobi_iters=3,
+                logit_processor=proc,
+            )
+
+        # Predict encounter mix, pacing vector, and loot/combat/heat bias from MoE
+        mix = neo.predict_mix(clean_brief) if hasattr(neo, "predict_mix") else (3, 1, 0)
+        if mix is None:
+            mix = (3, 1, 0)
+        bias = neo.predict_bias(clean_brief) if hasattr(neo, "predict_bias") else "combat"
+        if bias is None:
+            bias = "combat"
+        pacing = (0.50, 0.85, 0.80, 0.72)
+        if getattr(neo, "moe", None) is not None and "left" in neo.moe.experts:
+            aux = getattr(neo.moe.experts["left"], "aux", None)
+            if aux is not None and hasattr(aux, "predict"):
+                pacing = tuple(round(float(x), 4) for x in aux.predict(h))
+
+        # Synthesize hardware-exact ROM tile bank, palette, OAM table, and PSG audio patch
+        rom_envelope = compile_console_rom_envelope(console_target)
+        rom_assets = synthesize_rom_tile_bank(
+            console_target,
+            tile_count=tile_count,
+            seed=seed,
+            pattern=genre,
+        )
+
+        blueprint = {
+            "schema_version": "skeleton.cortex.zero_shot_blueprint.v1",
+            "kind": "zero-shot-game-blueprint",
+            "blueprint_id": f"bp-{cache_key[:12]}",
+            "brief": clean_brief[:160],
+            "genre": genre,
+            "console_target": rom_envelope["profile_key"],
+            "encounter_mix": {"trash": int(mix[0]), "elite": int(mix[1]), "boss": int(mix[2])},
+            "reward_bias": str(bias),
+            "pacing_curve": {
+                "tension": float(pacing[0]),
+                "density": float(pacing[1]),
+                "recovery": float(pacing[2]),
+                "clarity": float(pacing[3]),
+            },
+            "hive_confidence": round(float(trace.hive_value), 4),
+            "hyper_lora_gates": hyper_gates,
+            "jacobi_decode": jacobi_out,
+            "rom_envelope": rom_envelope,
+            "rom_assets": rom_assets,
+            "cache_hit": False,
+            "cache_stats": {"hits": self.hits, "misses": self.misses, "entries": len(self._cache) + 1},
+            "stored_prose": 0,
+            "law": "ok",
+        }
+        digest_payload = json.dumps(
+            {
+                "id": blueprint["blueprint_id"],
+                "mix": blueprint["encounter_mix"],
+                "tile_sha256": rom_assets["tile_sha256"],
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+        blueprint["blueprint_digest"] = hashlib.sha256(digest_payload).hexdigest()
+        verified = check(blueprint)
+
+        if use_cache:
+            if len(self._cache) >= self.max_cache_entries:
+                oldest = next(iter(self._cache))
+                del self._cache[oldest]
+            self._cache[cache_key] = dict(verified)
+        return verified

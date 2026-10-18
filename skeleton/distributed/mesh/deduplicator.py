@@ -34,6 +34,9 @@ class Deduplicator:
         self._hits = 0
         self._conflicts = 0
         self._evictions = 0
+        self._prefetch_hits = 0
+        self._transitions: Dict[str, str] = {}
+        self._last_key: Optional[str] = None
 
     def _hash_payload(self, payload: Dict[str, Any]) -> str:
         return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:16]
@@ -82,7 +85,35 @@ class Deduplicator:
             key=key, payload_hash=payload_hash, response=response,
             status="completed", created_ns=time.time_ns(),
         )
+        if self._last_key is not None and self._last_key != key:
+            self._transitions[self._last_key] = key
+        self._last_key = key
         return {"executed": True, "response": response}
+
+    def speculative_prefetch(
+        self,
+        key: str,
+        payload: Dict[str, Any],
+        fn: Callable[[], Any],
+    ) -> Dict[str, Any]:
+        """Pre-warm the idempotency cache for a predicted follow-up stage key."""
+        self._sweep()
+        payload_hash = self._hash_payload(payload)
+        if key in self._records and self._records[key].payload_hash == payload_hash:
+            self._prefetch_hits += 1
+            return {"prefetched": False, "already_warm": True, "key": key}
+        response = fn()
+        self._records[key] = IdempotencyRecord(
+            key=key,
+            payload_hash=payload_hash,
+            response=response,
+            status="completed",
+            created_ns=time.time_ns(),
+        )
+        return {"prefetched": True, "key": key, "response": response}
+
+    def predict_next_key(self, current_key: str) -> Optional[str]:
+        return self._transitions.get(current_key)
 
     def check(self, key: str) -> Optional[Dict[str, Any]]:
         self._sweep()

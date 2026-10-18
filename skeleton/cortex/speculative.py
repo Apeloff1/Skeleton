@@ -203,4 +203,257 @@ def cooperative_speculative(
     return tuple(published), result
 
 
-__all__ = ["SpeculationResult", "SpeculativeDecoder", "cooperative_speculative", "greedy_speculative"]
+class GrammarBudgetLogitProcessor:
+    """Neuro-Symbolic Grammar & Hardware-Budget Constrained Logit Masker.
+
+    Applies hard masks (-1e9) and soft domain biases to raw token logits during
+    generation to enforce:
+      - allowed/banned token vocabularies (e.g., GDScript syntax or ROM assembly tokens),
+      - non-repeating n-gram diversity constraints,
+      - required keyword urgency boosting as remaining token budget shrinks,
+      - hardware tile/sprite/palette token affinity.
+    """
+
+    def __init__(
+        self,
+        itos: Sequence[str],
+        *,
+        allowed_tokens: Sequence[str] | None = None,
+        banned_tokens: Sequence[str] | None = None,
+        required_tokens: Sequence[str] | None = None,
+        domain_boost_tokens: Sequence[str] | None = None,
+        boost_bias: float = 2.25,
+        no_repeat_ngram_size: int = 2,
+    ) -> None:
+        self.itos = tuple(str(t) for t in itos)
+        self.stoi = {t: i for i, t in enumerate(self.itos)}
+        self.allowed_ids: set[int] | None = (
+            {self.stoi[t] for t in allowed_tokens if t in self.stoi}
+            if allowed_tokens is not None
+            else None
+        )
+        self.banned_ids: set[int] = {self.stoi[t] for t in (banned_tokens or ()) if t in self.stoi}
+        self.required_ids: list[int] = [self.stoi[t] for t in (required_tokens or ()) if t in self.stoi]
+        self.boost_ids: set[int] = {self.stoi[t] for t in (domain_boost_tokens or ()) if t in self.stoi}
+        self.boost_bias = float(boost_bias)
+        self.no_repeat_ngram_size = max(0, int(no_repeat_ngram_size))
+
+    def process(
+        self,
+        logits: Sequence[float],
+        generated_ids: Sequence[int],
+        *,
+        steps_remaining: int = 1,
+    ) -> list[float]:
+        out = [float(x) for x in logits]
+        vocab = len(out)
+        if not vocab:
+            return out
+
+        if self.allowed_ids is not None:
+            for i in range(vocab):
+                if i not in self.allowed_ids:
+                    out[i] = -1e9
+
+        for b_id in self.banned_ids:
+            if 0 <= b_id < vocab:
+                out[b_id] = -1e9
+
+        # Block repeating n-grams
+        n = self.no_repeat_ngram_size
+        if n >= 2 and len(generated_ids) >= n - 1:
+            prefix_tail = tuple(generated_ids[-(n - 1):])
+            blocked: set[int] = set()
+            for idx in range(len(generated_ids) - n + 1):
+                if tuple(generated_ids[idx:idx + n - 1]) == prefix_tail:
+                    blocked.add(int(generated_ids[idx + n - 1]))
+            for blk_id in blocked:
+                if 0 <= blk_id < vocab:
+                    out[blk_id] -= 6.0
+        elif n == 1 and generated_ids:
+            last_id = int(generated_ids[-1])
+            if 0 <= last_id < vocab:
+                out[last_id] -= 4.0
+
+        # Boost domain-relevant tokens
+        for b_id in self.boost_ids:
+            if 0 <= b_id < vocab and out[b_id] > -1e8:
+                out[b_id] += self.boost_bias
+
+        # Escalate urgency for unsatisfied required tokens as budget runs out
+        if self.required_ids:
+            seen = set(int(x) for x in generated_ids)
+            missing = [r_id for r_id in self.required_ids if r_id not in seen and 0 <= r_id < vocab]
+            if missing:
+                urgency = self.boost_bias * (1.0 + float(len(missing)) / max(1.0, float(steps_remaining)))
+                if steps_remaining <= len(missing):
+                    # Force next token from missing required set when budget is tight
+                    for i in range(vocab):
+                        if i not in missing:
+                            out[i] = -1e9
+                        else:
+                            out[i] += urgency
+                else:
+                    for r_id in missing:
+                        if out[r_id] > -1e8:
+                            out[r_id] += urgency
+
+        # Ensure at least one finite unmasked candidate exists
+        if all(x <= -1e8 for x in out):
+            return [float(x) for x in logits]
+        return out
+
+
+def lookahead_jacobi_decode(
+    verifier: object,
+    drafts: Sequence[object] | object,
+    prefix: Sequence[int],
+    n: int,
+    *,
+    lookahead_window: int = 4,
+    max_jacobi_iters: int = 3,
+    logit_processor: GrammarBudgetLogitProcessor | None = None,
+) -> dict[str, object]:
+    """Multi-Branch Lookahead Jacobi Speculative Decoding with N-gram Trajectory Cache.
+
+    Combines parallel multi-draft tree proposals with Jacobi fixed-point
+    lookahead iterations and an online n-gram trajectory cache populated from
+    every Jacobi verification step, accelerating structured game/code/ROM
+    generation while preserving exact verifier greedy/constrained validity.
+    """
+    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+        raise ValueError("n must be a nonnegative integer")
+    draft_list = [drafts] if not isinstance(drafts, (list, tuple)) else list(drafts)
+    draft_list = [d for d in draft_list if d is not None]
+    if not draft_list:
+        draft_list = [verifier]
+    vocab = int(getattr(verifier, "V", -1))
+    for d in draft_list:
+        if int(getattr(d, "V", -2)) != vocab:
+            raise ValueError("all draft models must share vocabulary size V with verifier")
+
+    context = [int(t) for t in prefix]
+    if not context:
+        raise ValueError("lookahead context must be non-empty")
+
+    win = max(1, min(8, int(lookahead_window)))
+    iters = max(1, min(6, int(max_jacobi_iters)))
+    ngram_pool: dict[tuple[int, int], list[int]] = {}
+    published: list[int] = []
+    total_proposed = 0
+    total_accepted = 0
+    jacobi_converged_steps = 0
+    branch_wins: dict[int, int] = {i: 0 for i in range(-1, len(draft_list))}
+
+    def _select_token(model: object, seq: Sequence[int], rem: int) -> int:
+        ctx_len = int(getattr(model, "ctx", 6) or 6)
+        w_seq = [int(x) for x in seq][-ctx_len:] or [0]
+        raw_logits = list(model._logits(w_seq))
+        if logit_processor is not None:
+            raw_logits = logit_processor.process(
+                raw_logits,
+                published + list(seq[len(prefix):]),
+                steps_remaining=max(1, rem),
+            )
+        return max(range(len(raw_logits)), key=lambda idx: (raw_logits[idx], -idx))
+
+    while len(published) < n:
+        room = min(win, n - len(published))
+        candidate_branches: list[tuple[int, list[int]]] = []
+
+        # Branch -1: N-gram lookahead trajectory cache proposal if available
+        if len(context) >= 2:
+            key2 = (context[-2], context[-1])
+            cached_cont = ngram_pool.get(key2)
+            if cached_cont:
+                candidate_branches.append((-1, list(cached_cont[:room])))
+
+        # Branches 0..K-1: Draft models with Jacobi parallel refinement
+        for d_idx, d_model in enumerate(draft_list):
+            cur = list(context)
+            guess: list[int] = []
+            for step_i in range(room):
+                tok = _select_token(d_model, cur, n - len(published) - step_i)
+                guess.append(tok)
+                cur.append(tok)
+            # Jacobi fixed-point refinement over the lookahead window
+            for _ in range(iters - 1):
+                refined: list[int] = []
+                converged = True
+                for pos in range(room):
+                    prefix_slice = context + guess[:pos]
+                    new_tok = _select_token(d_model, prefix_slice, n - len(published) - pos)
+                    if new_tok != guess[pos]:
+                        converged = False
+                    refined.append(new_tok)
+                # Harvest 2-gram -> continuation into lookahead pool
+                full_traj = context[-2:] + guess
+                for k_i in range(len(full_traj) - 2):
+                    k2 = (full_traj[k_i], full_traj[k_i + 1])
+                    ngram_pool[k2] = full_traj[k_i + 2:k_i + 2 + win]
+                guess = refined
+                if converged:
+                    jacobi_converged_steps += 1
+                    break
+            candidate_branches.append((d_idx, guess))
+
+        # Verify all candidate branches against the authoritative verifier and pick longest accepted prefix
+        best_branch_id = 0
+        best_accepted: list[int] = []
+        fallback_tok: int | None = None
+
+        for b_id, branch_tokens in candidate_branches:
+            total_proposed += len(branch_tokens)
+            acc: list[int] = []
+            v_cursor = list(context)
+            for step_i, b_tok in enumerate(branch_tokens):
+                rem = n - len(published) - step_i
+                v_tok = _select_token(verifier, v_cursor, rem)
+                if len(v_cursor) >= 2:
+                    ngram_pool[(v_cursor[-2], v_cursor[-1])] = [v_tok]
+                if v_tok == b_tok:
+                    acc.append(b_tok)
+                    v_cursor.append(b_tok)
+                else:
+                    if fallback_tok is None:
+                        fallback_tok = v_tok
+                    break
+            if len(acc) > len(best_accepted):
+                best_accepted = acc
+                best_branch_id = b_id
+
+        if best_accepted:
+            branch_wins[best_branch_id] = branch_wins.get(best_branch_id, 0) + 1
+            total_accepted += len(best_accepted)
+            for tok in best_accepted:
+                if len(published) < n:
+                    context.append(tok)
+                    published.append(tok)
+        if len(best_accepted) < room and len(published) < n:
+            if fallback_tok is None:
+                fallback_tok = _select_token(verifier, context, n - len(published))
+            context.append(fallback_tok)
+            published.append(fallback_tok)
+
+    itos = list(getattr(verifier, "itos", ()))
+    text = " ".join(itos[t] if 0 <= t < len(itos) else "<unk>" for t in published)
+    return {
+        "text": text,
+        "token_ids": tuple(published),
+        "proposed": total_proposed,
+        "accepted": total_accepted,
+        "acceptance_rate": round(total_accepted / max(1, total_proposed), 4),
+        "jacobi_converged_steps": jacobi_converged_steps,
+        "ngram_pool_size": len(ngram_pool),
+        "branch_wins": branch_wins,
+    }
+
+
+__all__ = [
+    "GrammarBudgetLogitProcessor",
+    "SpeculationResult",
+    "SpeculativeDecoder",
+    "cooperative_speculative",
+    "greedy_speculative",
+    "lookahead_jacobi_decode",
+]

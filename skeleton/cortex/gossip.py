@@ -422,3 +422,257 @@ def redundant_consensus_decode(
         "step_failovers": step_failovers,
         "quorum_agreement": round(sum(agreements) / max(1, len(agreements)), 4),
     }
+
+
+def slerp_vectors(a: Sequence[float], b: Sequence[float], t: float) -> List[float]:
+    """Spherical linear interpolation (SLERP) between two parameter vectors."""
+    import math
+
+    if len(a) != len(b):
+        return list(a)
+    tau = max(0.0, min(1.0, float(t)))
+    if tau == 0.0:
+        return [float(x) for x in a]
+    if tau == 1.0:
+        return [float(y) for y in b]
+    norm_a = math.sqrt(sum(float(x) * float(x) for x in a))
+    norm_b = math.sqrt(sum(float(y) * float(y) for y in b))
+    if norm_a < 1e-12 or norm_b < 1e-12:
+        return _mix_vec(a, b, tau)
+    dot_ab = sum(float(x) * float(y) for x, y in zip(a, b)) / (norm_a * norm_b)
+    dot_ab = max(-1.0, min(1.0, dot_ab))
+    omega = math.acos(dot_ab)
+    sin_omega = math.sin(omega)
+    if abs(sin_omega) < 1e-6:
+        return _mix_vec(a, b, tau)
+    w_a = math.sin((1.0 - tau) * omega) / sin_omega
+    w_b = math.sin(tau * omega) / sin_omega
+    target_norm = (1.0 - tau) * norm_a + tau * norm_b
+    raw = [w_a * (float(x) / norm_a) + w_b * (float(y) / norm_b) for x, y in zip(a, b)]
+    raw_norm = math.sqrt(sum(v * v for v in raw))
+    if raw_norm < 1e-12:
+        return _mix_vec(a, b, tau)
+    scale_factor = target_norm / raw_norm
+    return [v * scale_factor for v in raw]
+
+
+def _ties_merge_vectors(
+    base_vec: Sequence[float],
+    donor_vecs: Sequence[Sequence[float]],
+    weights: Sequence[float],
+    *,
+    density: float = 0.75,
+    scaling_lambda: float = 0.85,
+) -> tuple[List[float], Dict[str, int]]:
+    """TIES-Merging (Trim, Elect Sign, Disjoint Merge) over parameter vectors."""
+    n = len(base_vec)
+    valid_donors = [d for d in donor_vecs if len(d) == n]
+    if not valid_donors:
+        return [float(x) for x in base_vec], {"trimmed": 0, "sign_conflicts": 0, "merged_coords": 0}
+    deltas: List[List[float]] = []
+    trimmed_count = 0
+    keep_k = max(1, int(round(max(0.05, min(1.0, float(density))) * n)))
+    for d in valid_donors:
+        raw_delta = [float(d[i]) - float(base_vec[i]) for i in range(n)]
+        ranked = sorted((abs(v) for v in raw_delta), reverse=True)
+        threshold = ranked[min(keep_k - 1, len(ranked) - 1)] if ranked else 0.0
+        trimmed: List[float] = []
+        for v in raw_delta:
+            if abs(v) >= threshold and abs(v) > 1e-12:
+                trimmed.append(v)
+            else:
+                trimmed.append(0.0)
+                trimmed_count += 1
+        deltas.append(trimmed)
+
+    out: List[float] = []
+    sign_conflicts = 0
+    merged_coords = 0
+    for i in range(n):
+        pos_mass = 0.0
+        neg_mass = 0.0
+        for m_idx, delta in enumerate(deltas):
+            w = float(weights[m_idx]) if m_idx < len(weights) else 1.0
+            val = delta[i] * w
+            if val > 0.0:
+                pos_mass += val
+            elif val < 0.0:
+                neg_mass += abs(val)
+        if pos_mass > 0.0 and neg_mass > 0.0:
+            sign_conflicts += 1
+        elected_sign = 1.0 if pos_mass >= neg_mass else -1.0
+        agree_sum = 0.0
+        agree_w = 0.0
+        for m_idx, delta in enumerate(deltas):
+            val = delta[i]
+            if val == 0.0:
+                continue
+            if (val > 0.0 and elected_sign > 0.0) or (val < 0.0 and elected_sign < 0.0):
+                w = float(weights[m_idx]) if m_idx < len(weights) else 1.0
+                agree_sum += val * w
+                agree_w += w
+        if agree_w > 0.0:
+            merged_coords += 1
+            merged_delta = (agree_sum / agree_w) * float(scaling_lambda)
+        else:
+            merged_delta = 0.0
+        out.append(float(base_vec[i]) + merged_delta)
+    return out, {
+        "trimmed": trimmed_count,
+        "sign_conflicts": sign_conflicts,
+        "merged_coords": merged_coords,
+    }
+
+
+def task_vector_soup_merge(
+    base_lm,
+    specialist_lms: Sequence[Any],
+    *,
+    corpus: Optional[Iterable[str]] = None,
+    density: float = 0.75,
+    scaling_lambda: float = 0.85,
+    slerp_blend: float = 0.25,
+) -> Dict[str, Any]:
+    """TIES-Merging + SLERP Model Soup over specialist transformers with perplexity ratchet."""
+    import math
+
+    if base_lm is None:
+        return {"merged": 0, "reason": "missing-base"}
+    dim = int(getattr(base_lm, "dim", 0) or 0)
+    n_layers = int(getattr(base_lm, "n_layers", 0) or 0)
+    donors = [
+        m for m in (specialist_lms or ())
+        if m is not None
+        and int(getattr(m, "dim", 0) or 0) == dim
+        and int(getattr(m, "n_layers", 0) or 0) == n_layers
+    ]
+    if not donors:
+        return {"merged": 0, "reason": "no-compatible-donors"}
+
+    probe = [t for t in (corpus or ()) if isinstance(t, str) and t.strip()]
+    ppl_before = float(base_lm.perplexity(probe)) if probe and hasattr(base_lm, "perplexity") else None
+    donor_weights: List[float] = []
+    for m in donors:
+        if probe and hasattr(m, "perplexity"):
+            try:
+                p = float(m.perplexity(probe))
+                donor_weights.append(1.0 / max(p if math.isfinite(p) else 1e6, 1e-6))
+            except Exception:
+                donor_weights.append(1.0)
+        else:
+            donor_weights.append(max(1.0, float(getattr(m, "steps", 1) or 1)))
+    w_sum = sum(donor_weights) or 1.0
+    norm_weights = [w / w_sum for w in donor_weights]
+
+    base_snap = base_lm.snapshot()
+    donor_snaps = [m.snapshot() for m in donors]
+    merged_snap = dict(base_snap)
+    stats = {"trimmed": 0, "sign_conflicts": 0, "merged_coords": 0}
+
+    def _merge_mat_ties_slerp(base_mat: List[List[float]], donor_mats: List[List[List[float]]]) -> List[List[float]]:
+        if not base_mat or not base_mat[0]:
+            return [list(r) for r in base_mat]
+        rows, cols = len(base_mat), len(base_mat[0])
+        flat_base = [x for r in base_mat for x in r]
+        flat_donors = [
+            [x for r in dm for x in r]
+            for dm in donor_mats
+            if len(dm) == rows and len(dm[0]) == cols
+        ]
+        if not flat_donors:
+            return [list(r) for r in base_mat]
+        ties_vec, st = _ties_merge_vectors(
+            flat_base,
+            flat_donors,
+            norm_weights,
+            density=density,
+            scaling_lambda=scaling_lambda,
+        )
+        stats["trimmed"] += st["trimmed"]
+        stats["sign_conflicts"] += st["sign_conflicts"]
+        stats["merged_coords"] += st["merged_coords"]
+        if slerp_blend > 0.0:
+            ties_vec = slerp_vectors(flat_base, ties_vec, 1.0 - max(0.0, min(0.95, float(slerp_blend))) * 0.5)
+        return [ties_vec[r * cols:(r + 1) * cols] for r in range(rows)]
+
+    for key in ("E", "P", "Wout"):
+        if isinstance(base_snap.get(key), list):
+            d_mats = [ds.get(key) for ds in donor_snaps if isinstance(ds.get(key), list)]
+            merged_snap[key] = _merge_mat_ties_slerp(base_snap[key], d_mats)
+
+    if isinstance(base_snap.get("bout"), list):
+        d_vecs = [ds.get("bout") for ds in donor_snaps if isinstance(ds.get("bout"), list)]
+        bv, st = _ties_merge_vectors(
+            base_snap["bout"],
+            d_vecs,
+            norm_weights,
+            density=density,
+            scaling_lambda=scaling_lambda,
+        )
+        stats["trimmed"] += st["trimmed"]
+        stats["sign_conflicts"] += st["sign_conflicts"]
+        stats["merged_coords"] += st["merged_coords"]
+        merged_snap["bout"] = bv
+
+    base_layers = list(base_snap.get("layers") or [])
+    new_layers: List[Dict[str, Any]] = []
+    for l_idx, b_blk in enumerate(base_layers):
+        out_blk = dict(b_blk)
+        d_blks = [
+            (ds.get("layers") or [])[l_idx]
+            for ds in donor_snaps
+            if len(ds.get("layers") or []) > l_idx
+        ]
+        for key in ("Wq", "Wk", "Wv", "Wo", "W1", "Wu", "W2", "b1", "bu", "b2", "ln1_g", "ln1_b", "ln2_g", "ln2_b"):
+            bv = b_blk.get(key)
+            if isinstance(bv, list) and bv and isinstance(bv[0], list):
+                d_mats = [db.get(key) for db in d_blks if isinstance(db.get(key), list)]
+                out_blk[key] = _merge_mat_ties_slerp(bv, d_mats)
+            elif isinstance(bv, list):
+                d_vecs = [db.get(key) for db in d_blks if isinstance(db.get(key), list)]
+                mv, st = _ties_merge_vectors(
+                    bv,
+                    d_vecs,
+                    norm_weights,
+                    density=density,
+                    scaling_lambda=scaling_lambda,
+                )
+                stats["trimmed"] += st["trimmed"]
+                stats["sign_conflicts"] += st["sign_conflicts"]
+                stats["merged_coords"] += st["merged_coords"]
+                out_blk[key] = mv
+        new_layers.append(out_blk)
+    merged_snap["layers"] = new_layers
+
+    restored = type(base_lm).from_snapshot(merged_snap)
+    base_lm.E, base_lm.P, base_lm.Wout, base_lm.bout = restored.E, restored.P, restored.Wout, restored.bout
+    base_lm.layers, base_lm.n_layers = restored.layers, restored.n_layers
+    if getattr(base_lm, "tied", False) and hasattr(base_lm, "tie"):
+        base_lm.tie()
+
+    ppl_after = float(base_lm.perplexity(probe)) if probe and hasattr(base_lm, "perplexity") else None
+    rolled_back = False
+    if ppl_before is not None and ppl_after is not None and (not math.isfinite(ppl_after) or ppl_after > ppl_before * 1.02):
+        rb = type(base_lm).from_snapshot(base_snap)
+        base_lm.E, base_lm.P, base_lm.Wout, base_lm.bout = rb.E, rb.P, rb.Wout, rb.bout
+        base_lm.layers, base_lm.n_layers = rb.layers, rb.n_layers
+        if getattr(base_lm, "tied", False) and hasattr(base_lm, "tie"):
+            base_lm.tie()
+        rolled_back = True
+        ppl_after = ppl_before
+
+    if hasattr(base_lm, "checkpoint_redundant_standby"):
+        base_lm.checkpoint_redundant_standby()
+
+    return {
+        "kind": "ties-slerp-model-soup",
+        "merged": 0 if rolled_back else 1,
+        "rolled_back": rolled_back,
+        "donor_count": len(donors),
+        "donor_weights": [round(w, 4) for w in norm_weights],
+        "density": round(float(density), 4),
+        "scaling_lambda": round(float(scaling_lambda), 4),
+        "ppl_before": round(ppl_before, 6) if ppl_before is not None else None,
+        "ppl_after": round(ppl_after, 6) if ppl_after is not None else None,
+        "stats": stats,
+    }

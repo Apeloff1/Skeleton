@@ -833,3 +833,156 @@ def test_console_and_rom_asset_training_and_budget_validation():
     assert rom_train["ingested_exemplars"] >= 14
     recall_gb = neo.recall("gb_dmg_rom Game Boy 8bit rom asset tile sprite palette")
     assert len(recall_gb["hits"]) >= 1
+
+
+def test_hyperlora_ties_slerp_model_soup_constrained_jacobi_dream_dpo_and_zero_shot_blueprint():
+    from skeleton.cortex.gossip import slerp_vectors, task_vector_soup_merge
+    from skeleton.cortex.lora import ContextConditionedLoRA, HyperLoRABank
+    from skeleton.cortex.neocortex import JeevesCortex
+    from skeleton.cortex.speculative import GrammarBudgetLogitProcessor, lookahead_jacobi_decode
+    from skeleton.distributed.mesh.deduplicator import Deduplicator
+    from skeleton.distributed.mesh.throughput_controller import ThroughputController
+    from skeleton.distributed.mesh.traffic_splitter import TrafficSplitter
+    from skeleton.forge.hardware import synthesize_rom_tile_bank
+
+    # 1. ContextConditionedLoRA & HyperLoRABank dynamic weight modulation
+    lm = _mouth(seed=71)
+    hbank = HyperLoRABank(ctx_dim=8, rank=2, alpha=4.0, seed=13)
+    att = hbank.attach(lm)
+    assert "Wout" in att["attached"]
+    gates_a = hbank.bind_context([1.0, -0.5, 0.25, 0.8, -0.2, 0.1, 0.4, -0.9])
+    gates_b = hbank.bind_context([-1.0, 0.5, -0.25, -0.8, 0.2, -0.1, -0.4, 0.9])
+    assert gates_a["Wout"] != gates_b["Wout"]
+    fit_res = hbank.fit_contextual(
+        lm,
+        [
+            ([1.0, 0.0, 0.5, 0.2, 0.0, 0.0, 0.0, 0.0], "alpha beta gamma delta"),
+            ([0.0, 1.0, -0.5, 0.2, 0.0, 0.0, 0.0, 0.0], "beta gamma alpha delta"),
+        ],
+        lr=0.05,
+    )
+    assert fit_res["steps"] > 0
+    static_bank = hbank.compile_static_bank([1.0, 0.0, 0.5, 0.2, 0.0, 0.0, 0.0, 0.0])
+    assert "Wout" in static_bank.adapters
+    restored_hbank = HyperLoRABank.from_snapshot(hbank.snapshot())
+    assert restored_hbank.to_dict()["hyper_steps"] == hbank.to_dict()["hyper_steps"]
+
+    # 2. TIES-Merging + SLERP Model Soup across specialist transformers
+    slerp_mid = slerp_vectors([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], 0.5)
+    assert len(slerp_mid) == 3
+    m_base = _mouth(seed=81)
+    m_spec1 = _mouth(seed=83)
+    m_spec2 = _mouth(seed=89)
+    corpus = ["alpha beta gamma delta", "gamma delta alpha beta"]
+    m_base.specialized_calibrate(corpus, epochs=1, lr=0.02)
+    m_spec1.specialized_calibrate(corpus, epochs=3, lr=0.04)
+    m_spec2.specialized_calibrate(corpus, epochs=3, lr=0.04)
+    soup = task_vector_soup_merge(m_base, [m_spec1, m_spec2], corpus=corpus, density=0.75, scaling_lambda=0.85)
+    assert soup["kind"] == "ties-slerp-model-soup"
+    assert soup["donor_count"] == 2
+    assert soup["ppl_after"] <= soup["ppl_before"] * 1.02
+
+    # 3. Grammar & Budget Constrained Generation + Lookahead Jacobi Speculative Decode
+    c_out = m_spec1.constrained_generate(
+        "alpha",
+        n=6,
+        seed=11,
+        banned_tokens=["epsilon"],
+        required_tokens=["beta", "gamma"],
+        no_repeat_ngram_size=2,
+    )
+    assert "epsilon" not in c_out["tokens"]
+    assert c_out["all_required_satisfied"] is True
+
+    proc = GrammarBudgetLogitProcessor(m_spec1.itos, required_tokens=["beta"], banned_tokens=["epsilon"])
+    jacobi = lookahead_jacobi_decode(
+        m_spec1,
+        [m_spec2, m_base],
+        m_spec1._ids("alpha beta"),
+        8,
+        lookahead_window=4,
+        max_jacobi_iters=3,
+        logit_processor=proc,
+    )
+    assert len(jacobi["token_ids"]) == 8
+    assert jacobi["proposed"] >= 8
+    assert "epsilon" not in jacobi["text"].split()
+
+    # 4. Procedural Console/ROM Tile, Palette, OAM & PSG Audio Synthesizer
+    gb_tiles = synthesize_rom_tile_bank("gb_dmg_rom", tile_count=6, seed=42, pattern="hero_crest")
+    assert gb_tiles["total_tile_bytes"] == 96
+    assert gb_tiles["bytes_per_8x8_tile"] == 16
+    assert gb_tiles["linker_bank0_symbol"] == "00:0200"
+    assert gb_tiles["budget_validation"]["valid"] is True
+    assert len(gb_tiles["oam_table"]) == 6
+
+    snes_tiles = synthesize_rom_tile_bank("snes_rom", tile_count=8, seed=42, pattern="boss_sigil")
+    assert snes_tiles["total_tile_bytes"] == 256
+    assert snes_tiles["bytes_per_8x8_tile"] == 32
+    assert snes_tiles["budget_validation"]["valid"] is True
+
+    # 5. Cortex Dreaming, DPO Alignment, Model Soup, and Zero-Shot Blueprint Compiler
+    neo = JeevesCortex()
+    neo.train(epochs=1)
+    dream_out = neo.dream_cycle(dreams=4, lr=0.04)
+    assert dream_out["kind"] == "counterfactual-dreaming"
+    assert dream_out["dreamed"] == 4
+    assert dream_out["accepted_dreams"] >= 1
+
+    dpo_out = neo.dpo_align(
+        "soulslike extraction",
+        "ttk elite dread",
+        "unk unk unk",
+        chosen_mix=(3.0, 2.0, 1.0),
+        rejected_mix=(8.0, 0.0, 0.0),
+    )
+    assert dpo_out["steps"] == 1
+    assert "dpo_loss" in dpo_out
+
+    soup_neo = neo.merge_model_soup()
+    assert soup_neo["kind"] == "ties-slerp-model-soup"
+
+    bp1 = neo.compile_zero_shot_blueprint(
+        "soulslike extraction ttk elite dread",
+        console_target="gb_dmg_rom",
+        genre="soulslike",
+        tile_count=6,
+    )
+    assert bp1["schema_version"] == "skeleton.cortex.zero_shot_blueprint.v1"
+    assert bp1["cache_hit"] is False
+    assert bp1["rom_assets"]["total_tile_bytes"] == 96
+    bp2 = neo.compile_zero_shot_blueprint(
+        "soulslike extraction ttk elite dread",
+        console_target="gb_dmg_rom",
+        genre="soulslike",
+        tile_count=6,
+    )
+    assert bp2["cache_hit"] is True
+    assert bp2["blueprint_digest"] == bp1["blueprint_digest"]
+
+    # 6. Predictive Brownout Forecasting, Batch Coalescing, and Speculative Prefetch
+    splitter = TrafficSplitter()
+    splitter.set_backend("steady", weight=100)
+    splitter.set_backend("spiking", weight=100)
+    for lat in (20.0, 45.0, 80.0, 120.0):
+        splitter.record("spiking", latency_ms=lat)
+        splitter.record("steady", latency_ms=18.0)
+    forecast = splitter.forecast_brownout(latency_budget_ms=100.0, horizon_steps=3)
+    assert "spiking" in forecast["at_risk_backends"]
+    assert "steady" in forecast["healthy_headroom_backends"]
+
+    tc = ThroughputController()
+    coal = tc.execute_coalesced_batch("inference", [1, 2, 3, 4, 5], lambda chunk: [x * 2 for x in chunk], max_batch_size=2)
+    assert coal["executed"] is True
+    assert coal["batches_run"] == 3
+    assert coal["results"] == [2, 4, 6, 8, 10]
+
+    dedup = Deduplicator()
+    dedup.execute("stage:1", {"brief": "rpg"}, lambda: {"ok": 1})
+    dedup.execute("stage:2", {"brief": "rpg"}, lambda: {"ok": 2})
+    assert dedup.predict_next_key("stage:1") == "stage:2"
+    pre = dedup.speculative_prefetch("stage:3", {"brief": "rpg"}, lambda: {"ok": 3})
+    assert pre["prefetched"] is True
+    replay = dedup.execute("stage:3", {"brief": "rpg"}, lambda: {"ok": 999})
+    assert replay["replay"] is True
+    assert replay["response"] == {"ok": 3}
