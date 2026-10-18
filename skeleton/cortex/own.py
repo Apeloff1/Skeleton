@@ -1336,11 +1336,14 @@ class AdaptiveSequentialDecompiler:
                 block_insns.append(mnemonic)
                 next_pc = pc + max(1, sz)
                 if cat in {"branch", "branch_cond", "call", "return", "interrupt_return"}:
-                    target_addr = (
-                        (next_pc + ((operand_val - 256) if (operand_val is not None and operand_val >= 128 and sz == 2) else (operand_val or 0)))
-                        if cat in {"branch_cond"} and sz == 2
-                        else (operand_val if operand_val is not None else next_pc)
-                    ) & 0xFFFF
+                    if cat in {"branch", "call"} and sz == 3 and operand_val is not None:
+                        target_addr = operand_val & 0x00FF if operand_val >= 0x0100 and (operand_val & 0x00FF) <= block_start else (operand_val & 0xFFFF)
+                    elif cat in {"branch_cond"} and sz == 2:
+                        rel = (operand_val - 256) if (operand_val is not None and operand_val >= 128) else (operand_val or 0)
+                        target_addr = (next_pc + rel) & 0xFFFF
+                    else:
+                        target_addr = (operand_val if operand_val is not None else next_pc) & 0xFFFF
+                    is_back = (target_addr <= block_start) or (cat == "branch" and (target_addr & 0x00FF) <= block_start)
                     basic_blocks.append({
                         "start_addr": block_start,
                         "end_addr": next_pc,
@@ -1351,11 +1354,11 @@ class AdaptiveSequentialDecompiler:
                         "from_block": block_start,
                         "to_addr": target_addr,
                         "edge_kind": cat,
-                        "is_back_edge": target_addr <= block_start,
+                        "is_back_edge": is_back,
                     })
                     if cat == "call":
                         symbols[f"sub_{target_addr:04x}"] = "callable_routine"
-                    elif target_addr <= block_start:
+                    elif is_back:
                         symbols[f"loop_{target_addr:04x}"] = "tight_frame_loop"
                     block_start = next_pc
                     block_insns = []
@@ -1733,17 +1736,20 @@ def hyper_scrutiny_and_review(
             mix = (3, 1, 0)
 
     from skeleton.forge.hardware import CONSOLE_ROM_PROFILES, get_console_rom_profile, validate_rom_asset_budget
-    resolved_console = console_target if console_target in CONSOLE_ROM_PROFILES else "gb_dmg_rom"
-    prof = get_console_rom_profile(resolved_console)
+    try:
+        prof = get_console_rom_profile(console_target)
+        resolved_console = str(prof.get("key") or "gb_dmg_rom")
+    except ValueError:
+        resolved_console = "gb_dmg_rom"
+        prof = get_console_rom_profile(resolved_console)
+    vram_bytes = int(prof.get("vram_kb", 8)) * 1024
     budget_check = validate_rom_asset_budget(
         resolved_console,
         {
-            "tile_bytes": int(prof["vram_tile_budget_bytes"]) // 4,
-            "sprites_per_frame": min(16, int(prof["max_sprites_total"])),
-            "sprites_per_scanline": min(6, int(prof["max_sprites_per_scanline"])),
-            "palettes": min(4, int(prof["max_palettes"])),
-            "rom_bank_bytes": int(prof["rom_bank_bytes"]) // 2,
-            "wram_bytes": int(prof["wram_bytes"]) // 2,
+            "tile_bytes": max(16, vram_bytes // 4),
+            "sprites_total": min(16, int(prof.get("max_sprites_total", 40))),
+            "sprites_per_scanline": min(6, int(prof.get("max_sprites_per_scanline", 10))),
+            "palette_colors": min(4, int(prof.get("colors_on_screen", 4))),
         },
     )
     sim_slack = 0.84
@@ -1779,7 +1785,7 @@ def hyper_scrutiny_and_review(
         "schema_version": "skeleton.cortex.hyper_scrutiny.v2",
         "kind": "hyper-scrutiny-12-axis-review",
         "brief": distill_dialect(brief_text)[:160],
-        "console_target": prof["profile_key"],
+        "console_target": str(prof.get("key") or resolved_console),
         "axes_evaluated": len(SCRUTINY_12_AXES),
         "all_axes_passed": all(v["passed"] for v in axis_verdicts.values()),
         "axis_verdicts": axis_verdicts,
