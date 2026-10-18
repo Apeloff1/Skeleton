@@ -1,0 +1,49 @@
+[
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v1",
+    "cycle": 1,
+    "bytes_trained": 208666701,
+    "budget_bytes": 208666624,
+    "official_tracks": {
+      "visual": 2.0240078380826483,
+      "narrative": 2.008711168421652,
+      "systems": 2.0100562550413024
+    },
+    "torch_best_tracks": {
+      "visual": 2.024007797241211,
+      "narrative": 2.008711099624634,
+      "systems": 2.010056495666504
+    },
+    "model_digest": "c5eec052a38f719117186fdbd8090c9fca53500d2eb5c7b869f45728e0067de0",
+    "ratchet": {
+      "accepts": 499,
+      "rejects": 8222
+    },
+    "promotion": false,
+    "note": "Short pass ids, hidden 128, AdamW peak 1e-3. Full 199 MiB budget."
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "cycle": 2,
+    "bytes_seen": 335229564,
+    "cycle_start_bytes": 208666701,
+    "official_tracks": {
+      "visual": 1.5076881939711142,
+      "narrative": 1.4813217022344867,
+      "systems": 1.5138253624330105
+    },
+    "torch_best_tracks": {
+      "visual": 1.5076881647109985,
+      "narrative": 1.4813216924667358,
+      "systems": 1.5138254165649414
+    },
+    "model_digest": "4ae88a3d121c7376a8c21c24afeb20b4fc6ff58a59767b9d1fe7a0ab0102fa49",
+    "ratchet": {
+      "accepts": 4,
+      "rejects": 1973,
+      "scale": 1.0
+    },
+    "promotion": false,
+    "note": "Long pass ids, a million away from the reserved 13-digit measurement ids. Kept weights are the best holdout state. Further fresh Adam steps at 3e-4 raised a track, and smaller rates did too, so the rest of the 199 MiB budget was not applied."
+  }
+]
