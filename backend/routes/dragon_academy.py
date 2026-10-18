@@ -2163,7 +2163,7 @@ def native_production_analyze_campaign(
         "ok": True,
         "schema": "skeleton.ai.dragon.native_campaign_design_preview.v1",
         "original_campaign_digest": campaign.digest,
-        "chapter_paths": graph_report(chapters),
+        "chapter_paths": jsonable_encoder(graph_report(chapters)),
         "challenge": challenge_report(director),
         "stages": [{"stage": index + 1, "routes": document} for index, document in enumerate(reports)],
         "claim": "solver-derived challenge and branching; no human player enjoyment certified",
