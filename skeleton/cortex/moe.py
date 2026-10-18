@@ -21,6 +21,7 @@ from skeleton.cortex.attn import add, add_outer, dot, matvec, matvec_T, softmax,
 from skeleton.cortex.heads import (
     BiasHead,
     NumericHead,
+    PacingHead,
     PolicyHead,
     RouteHead,
     VetoHead,
@@ -120,7 +121,12 @@ class Expert:
         self.W: Mat = _rand_mat(D, D, 0.05, rng)
         self.b: Vec = zeros(D)
         self.head = _head_for(slot, D, seed)
-        self.aux = PolicyHead(dim=D, seed=seed + 31) if slot == "pfc" else None
+        if slot == "pfc":
+            self.aux = PolicyHead(dim=D, seed=seed + 31)
+        elif slot == "left":
+            self.aux = PacingHead(dim=D, seed=seed + 37)
+        else:
+            self.aux = None
         self.acquired = 0
         self.distills = 0
 
@@ -169,7 +175,7 @@ class Expert:
         if (data or {}).get("head"):
             ex.head = head_from_snapshot(data["head"])
         if (data or {}).get("aux"):
-            ex.aux = PolicyHead.from_snapshot(data["aux"])
+            ex.aux = head_from_snapshot(data["aux"])
         ex.acquired = int((data or {}).get("acquired") or 0)
         ex.distills = int((data or {}).get("distills") or 0)
         return ex
@@ -253,6 +259,14 @@ class ExpertBank:
         mixed, _ = self.forward(h)
         return aux.predict(mixed)
 
+    def predict_pacing(self, h: Sequence[float]) -> Optional[Dict[str, float]]:
+        ex = self.experts["left"]
+        aux = ex.aux
+        if aux is None or int(getattr(aux, "fitted", 0) or 0) < MIN_FITTED:
+            return None
+        mixed, _ = self.forward(h)
+        return aux.predict(mixed)
+
     def credit(
         self,
         slot: str,
@@ -281,6 +295,11 @@ class ExpertBank:
             "policy": (
                 ex_pfc.aux.predict(mixed)
                 if ex_pfc.aux is not None and int(getattr(ex_pfc.aux, "fitted", 0) or 0) >= MIN_FITTED
+                else None
+            ),
+            "pacing": (
+                ex_left.aux.predict(mixed)
+                if ex_left.aux is not None and int(getattr(ex_left.aux, "fitted", 0) or 0) >= MIN_FITTED
                 else None
             ),
         }

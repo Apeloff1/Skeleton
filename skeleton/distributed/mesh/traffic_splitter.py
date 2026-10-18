@@ -74,6 +74,17 @@ class Backend:
         }
 
 
+GAME_STAGE_LATENCY_BUDGETS_MS: Dict[str, float] = {
+    "spec_compile": 40.0,
+    "world_layout": 60.0,
+    "encounter_sim": 80.0,
+    "walk_proof": 90.0,
+    "gdscript_repair": 150.0,
+    "polish_rubric": 120.0,
+    "self_learn_distill": 200.0,
+}
+
+
 class TrafficSplitter:
     """Weighted splitter with sticky sessions, shadowing, and adaptive QoS routing."""
 
@@ -180,6 +191,24 @@ class TrafficSplitter:
         if b is not None and b.in_flight > 0:
             b.in_flight -= 1
         self.record(backend, latency_ms, error=error)
+
+    def route_game_stage(
+        self,
+        stage: str,
+        *,
+        session_id: Optional[str] = None,
+        remaining_deadline_s: Optional[float] = None,
+    ) -> Optional[str]:
+        """Route a game-creation stage with deadline-aware latency budgeting."""
+        stage_budget = GAME_STAGE_LATENCY_BUDGETS_MS.get(str(stage or "").lower(), 100.0)
+        if remaining_deadline_s is not None:
+            rem_ms = max(5.0, float(remaining_deadline_s) * 1000.0 * 0.25)
+            stage_budget = min(stage_budget, rem_ms)
+        return self.route(
+            session_id=session_id,
+            latency_aware=True,
+            latency_budget_ms=stage_budget,
+        )
 
     def record(
         self,

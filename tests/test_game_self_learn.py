@@ -72,3 +72,56 @@ def test_focused_review_and_self_learn_pass_improve_weak_concepts():
     assert report["final_eval_loss"] <= report["initial_eval_loss"]
     measured = concept_losses(model)
     assert set(measured.keys()) == set(grouped.keys())
+
+
+def test_multi_stage_game_creation_finetune_and_mastery_report():
+    from skeleton.ai.runtime.inference.game_self_learn import (
+        GAME_CREATION_STAGES,
+        all_holdout_documents,
+        cross_curriculum_losses,
+        finetune_for_game_creation,
+        game_creation_mastery_report,
+        leaks_any_holdout,
+        pareto_weighted_curriculum,
+        stage_curriculum_documents,
+    )
+    from skeleton.ai.runtime.inference.neural import NeuralLMConfig, NumpyRecurrentLM
+
+    all_held = all_holdout_documents()
+    assert len(all_held) >= 60
+    assert leaks_any_holdout(all_held[0]) is True
+
+    entries = pareto_weighted_curriculum()
+    assert len(entries) >= 150
+    for item in entries:
+        assert leaks_any_holdout(str(item["text"])) is False
+        assert int(item["repetitions"]) in {1, 2, 3}
+
+    for st in GAME_CREATION_STAGES:
+        st_docs = stage_curriculum_documents(st, include_practice=False, pareto_repeat=False)
+        assert len(st_docs) > 0
+
+    model = NumpyRecurrentLM(model_id="finetune-game-test", config=NeuralLMConfig(hidden_size=8, seed=21))
+    eval_sample = stage_curriculum_documents("stage_1_foundation", include_practice=False, pareto_repeat=False)[:4]
+    receipt = finetune_for_game_creation(
+        model,
+        stages=("stage_1_foundation", "stage_2_world_combat_art"),
+        epochs_per_stage=1,
+        remediation_rounds=1,
+        top_weak_concepts=2,
+        learning_rate=0.04,
+        optimizer="adamw",
+        weight_decay=0.01,
+        include_practice=False,
+        eval_documents=eval_sample,
+    )
+    assert receipt["eval_improved"] is True
+    assert receipt["final_eval_loss"] < receipt["initial_eval_loss"]
+    assert receipt["holdout_isolated"] is True
+    assert receipt["promoted"] is False
+
+    mastery = game_creation_mastery_report(model)
+    assert mastery["pillar_count"] >= 25
+    assert 0.0 < float(mastery["mastery_index"]) <= 1.0
+    cross = cross_curriculum_losses(model)
+    assert "english_pareto_train" in cross and "az_train" in cross and "pareto_v2_train" in cross

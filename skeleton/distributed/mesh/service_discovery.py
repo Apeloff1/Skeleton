@@ -46,6 +46,17 @@ class Instance:
         }
 
 
+GAME_STAGE_CAPABILITIES: Dict[str, List[str]] = {
+    "spec_compile": ["spec_compile", "planner", "pfc", "midbrain"],
+    "world_layout": ["world_layout", "right_gestalt", "room_graph"],
+    "encounter_sim": ["encounter_sim", "left_analytic", "ttk_sim"],
+    "walk_proof": ["walk_proof", "left_analytic", "door_graph"],
+    "gdscript_repair": ["gdscript_repair", "code_repair", "core_loop"],
+    "polish_rubric": ["polish_rubric", "qa_review", "scorecard"],
+    "self_learn_distill": ["self_learn_distill", "moe_distill", "ratchet"],
+}
+
+
 class ServiceRegistry:
     """Heartbeat-based service registry with capability routing."""
 
@@ -133,6 +144,33 @@ class ServiceRegistry:
         idx = self._rr_counters.get(service, 0) % len(candidates)
         self._rr_counters[service] = idx + 1
         return candidates[idx]
+
+    def pick_for_game_stage(
+        self,
+        service: str,
+        stage: str,
+        *,
+        max_latency_ms: float = 250.0,
+    ) -> Optional[Dict[str, Any]]:
+        """Select the best subsystem instance for a specific game-creation pipeline stage."""
+        prefs = GAME_STAGE_CAPABILITIES.get(str(stage or "").lower(), [str(stage or "")])
+        candidates = self.lookup(service)
+        if not candidates:
+            return None
+        within_budget = [
+            c for c in candidates
+            if float(c.get("latency_ms", 0.0)) <= max_latency_ms
+        ] or candidates
+        pref_set = set(prefs)
+
+        def _stage_score(c: Dict[str, Any]) -> float:
+            base = float(c.get("health_score", 0.5))
+            caps = set(c.get("capabilities") or ())
+            matched = len(caps & pref_set)
+            affinity = matched / max(1, len(pref_set))
+            return base * (1.0 + 0.75 * affinity)
+
+        return max(within_budget, key=_stage_score)
 
     def card(self) -> Dict[str, Any]:
         self._prune()

@@ -462,3 +462,120 @@ def test_mesh_discovery_hedging_throughput_and_pool_upgrades():
     assert warmed == 3
     chk = pool.checkout("db:5432")
     assert chk["acquired"] is True
+
+
+def test_cortex_game_creation_finetune_planner_qa_and_closed_loop_build():
+    from skeleton.cortex.heads import PacingHead, head_from_snapshot
+    from skeleton.cortex.hemispheres import LeftHemisphere, RightHemisphere
+    from skeleton.cortex.midbrain import Midbrain
+    from skeleton.cortex.neocortex import JeevesCortex
+    from skeleton.cortex.pfc import PrefrontalCortex
+    from skeleton.distributed.mesh.service_discovery import ServiceRegistry
+    from skeleton.distributed.mesh.traffic_splitter import TrafficSplitter
+    from skeleton.forge.game_builder import (
+        RESULT_FIELDS,
+        build_playable_game,
+        finetuned_game_creation_hooks,
+        public_payload,
+    )
+
+    # 1. Verify PacingHead and MoE integration
+    ph = PacingHead(dim=8, seed=29)
+    vec = [0.2, -0.1, 0.4, 0.3, -0.2, 0.1, 0.5, -0.3]
+    loss0 = ph.loss(vec, (0.75, 0.65, 0.85, 0.80))
+    for _ in range(10):
+        ph.step(vec, (0.75, 0.65, 0.85, 0.80), lr=0.2)
+    assert ph.loss(vec, (0.75, 0.65, 0.85, 0.80)) < loss0
+    restored_ph = head_from_snapshot(ph.snapshot())
+    assert restored_ph.predict(vec) == ph.predict(vec)
+
+    # 2. Verify hemisphere, midbrain, and PFC game-creation domain analyzers
+    left = LeftHemisphere()
+    math_env = left.analyze_game_math("soulslike extraction ttk elite dread", {"era": "soulslike"})
+    assert math_env["era"] == "soulslike"
+    assert math_env["enemy_hp"]["trash"] > 0
+    assert math_env["fixed_tick"]["hz"] == 60
+    assert math_env["economy_equilibrium"]["inflation_guarded"] is True
+
+    right = RightHemisphere()
+    spatial_env = right.synthesize_spatial_aesthetic_profile(
+        "metroidvania backtrack lock key",
+        {"era": "metroidvania"},
+    )
+    assert spatial_env["level_topology"] == "ability_gated_lattice"
+    assert spatial_env["art_scale_ladder"]["allocates_65536_buffer"] is False
+
+    mid = Midbrain()
+    stage_route = mid.route_game_stage("compile ttk hp dps sim", stage="prove")
+    assert stage_route["primary_tract"] == "left"
+    assert stage_route["fire_left"] is True
+
+    pfc = PrefrontalCortex()
+    slice_plan = pfc.plan_game_slice("build a soulslike extraction slice", {"era": "soulslike", "genre": "action"})
+    assert slice_plan["veto"] is False
+    assert "single_authoritative_state_writer" in slice_plan["vertical_slice_gates"]
+
+    # 3. Verify JeevesCortex.finetune_for_game_creation and planner/QA hooks inside build_playable_game
+    neo = JeevesCortex()
+    ft_report = neo.finetune_for_game_creation(epochs=1, rounds=1, include_az_curricula=True, grow_capacity=False)
+    assert ft_report["kind"] == "cortex-game-creation-finetune"
+    assert len(ft_report["stages"]) == 4
+    assert neo.predict_pacing("soulslike extraction ttk elite dread") is not None
+
+    planner_hook, qa_hook, _ = finetuned_game_creation_hooks(neo, finetune_rounds=0, learn_on_qa=True)
+    build_res = build_playable_game(
+        "A tight top-down soulslike extraction arena with readable telegraphs",
+        era="soulslike",
+        playtest_mode="off",
+        max_rounds=2,
+        planner=planner_hook,
+        qa=qa_hook,
+    )
+    assert build_res["ok"] is True
+    prod = build_res["spec"].get("production") or {}
+    assert "encounter_mix" in prod
+    assert "ttk_envelope" in prod
+    assert "fixed_tick_contract" in prod
+    assert "art_scale_ladder" in prod
+    assert build_res["qa"]["passed"] is True
+    assert build_res["qa"]["learning"]["learned"] == 1
+    pub = public_payload(build_res)
+    for field in RESULT_FIELDS:
+        assert field in pub
+
+    # 4. Verify end-to-end build_and_learn_game convenience pipeline
+    e2e = neo.build_and_learn_game(
+        "Boomer shooter arena with fast movement and armor pickups",
+        era="boomer_shooter",
+        playtest_mode="off",
+    )
+    assert e2e["build"]["ok"] is True
+    assert e2e["learning"]["learned"] == 1
+    assert e2e["learning"]["reward"] > 0.0
+
+    # 5. Verify mesh game-stage routing and service discovery
+    reg = ServiceRegistry()
+    reg.register(
+        "worker-sim",
+        "game-forge",
+        "10.0.0.10:9000",
+        capabilities=["encounter_sim", "left_analytic", "ttk_sim"],
+    )
+    reg.register(
+        "worker-layout",
+        "game-forge",
+        "10.0.0.11:9000",
+        capabilities=["world_layout", "right_gestalt", "room_graph"],
+    )
+    reg.heartbeat("worker-sim", load=0.2, latency_ms=18.0, error_rate=0.0)
+    reg.heartbeat("worker-layout", load=0.2, latency_ms=18.0, error_rate=0.0)
+    sim_node = reg.pick_for_game_stage("game-forge", "encounter_sim")
+    layout_node = reg.pick_for_game_stage("game-forge", "world_layout")
+    assert sim_node is not None and sim_node["instance_id"] == "worker-sim"
+    assert layout_node is not None and layout_node["instance_id"] == "worker-layout"
+
+    splitter = TrafficSplitter(rng=random.Random(7))
+    splitter.add_backend("stage-fast", weight=100, quality_score=1.0)
+    splitter.record("stage-fast", latency_ms=12.0, error=False)
+    routed = splitter.route_game_stage("spec_compile", session_id="game-sess-1", remaining_deadline_s=30.0)
+    assert routed == "stage-fast"

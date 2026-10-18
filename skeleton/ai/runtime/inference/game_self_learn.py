@@ -8,11 +8,73 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from skeleton.ai.runtime.inference.english_game_pareto import holdout_documents as english_holdouts
-from skeleton.ai.runtime.inference.game_creation_az import holdout_documents as az_holdouts
+from skeleton.ai.runtime.inference.english_game_pareto import (
+    CURRICULUM as ENGLISH_PARETO_CURRICULUM,
+    holdout_documents as english_holdouts,
+    pareto_score as _pareto_score,
+)
+from skeleton.ai.runtime.inference.game_creation_az import (
+    CURRICULUM as AZ_CURRICULUM,
+    holdout_documents as az_holdouts,
+)
+from skeleton.ai.runtime.inference.game_pareto_curriculum import (
+    CURRICULUM as PARETO_V2_CURRICULUM,
+)
 
 PRACTICE_VERSION = "skeleton.game_self_learn.v1"
+FINETUNE_SCHEMA = "skeleton.game_self_learn.finetune.v2"
+MASTERY_SCHEMA = "skeleton.game_self_learn.mastery.v1"
 WINDOW = 40
+
+# Progressive 4-stage game creation curriculum hierarchy:
+# Stage 1: Core Loop, Determinism, Fixed Tick, Controls & Scope
+# Stage 2: Combat, Gameplay, World Topology, Character Coherence & Art Scale
+# Stage 3: Story/Canon Ledger, NPC Systems, Economy, Audio & Interface/A11y
+# Stage 4: Simulation Save/Load, Authoring Tooling, Playtest QA & Release Receipt
+GAME_CREATION_STAGES: dict[str, tuple[str, ...]] = {
+    "stage_1_foundation": (
+        "intent",
+        "core_loop",
+        "controls",
+        "game_logic",
+        "fixed_tick",
+        "mechanics",
+        "pareto_scope",
+        "logic",
+        "tick",
+        "scope",
+    ),
+    "stage_2_world_combat_art": (
+        "combat",
+        "gameplay",
+        "character",
+        "character_coherence",
+        "clothing_color",
+        "items",
+        "world",
+        "graphics_scale",
+        "art_scale",
+        "scale",
+        "clothing",
+    ),
+    "stage_3_narrative_economy_av": (
+        "story",
+        "narrative",
+        "npc",
+        "economy",
+        "audio",
+        "interface",
+        "accessibility",
+    ),
+    "stage_4_production_qa_ship": (
+        "simulation",
+        "tools",
+        "tooling",
+        "playtest",
+        "review",
+        "ship",
+    ),
+}
 
 # Closed slots. Each sentence is original prose built from these lists.
 _ROLES = ("designer", "programmer", "animator", "writer", "composer", "tester")
@@ -442,3 +504,415 @@ def self_learn_pass(
         "concept_loss_after": after_concepts,
         "promoted": False,
     }
+
+
+def all_holdout_documents() -> tuple[str, ...]:
+    """Return every holdout line across English Pareto, A-to-Z, and Pareto v2 curricula."""
+    v2_holdouts = tuple(
+        text
+        for family in PARETO_V2_CURRICULUM.values()
+        for text in family.get("holdout", ())
+    )
+    return tuple(dict.fromkeys((*english_holdouts(), *az_holdouts(), *v2_holdouts)))
+
+
+def all_held_windows() -> tuple[str, ...]:
+    """Return 40-char sliding windows across all three game-creation holdout banks."""
+    windows: list[str] = []
+    for text in all_holdout_documents():
+        if len(text) <= WINDOW:
+            windows.append(text)
+            continue
+        windows.extend(text[index : index + WINDOW] for index in range(len(text) - WINDOW + 1))
+    return tuple(dict.fromkeys(windows))
+
+
+def leaks_any_holdout(text: str, windows: Sequence[str] | None = None) -> bool:
+    """Fail-closed holdout check across all three game-creation curricula."""
+    banned = windows if windows is not None else all_held_windows()
+    return any(window in text for window in banned)
+
+
+def pareto_weighted_curriculum(
+    *,
+    stage: str | None = None,
+    min_pareto_score: int = 0,
+) -> tuple[dict[str, object], ...]:
+    """Synthesize a holdout-safe, Pareto-prioritized game creation curriculum.
+
+    Each entry contains:
+      - `source`: `"english_game_pareto"`, `"game_creation_az"`, or `"game_pareto_v2"`
+      - `family`: pillar/family name
+      - `stage`: stage id in `GAME_CREATION_STAGES`
+      - `impact`, `reusable`, `effort`, `risk`: Pareto integers in [1, 5]
+      - `pareto_score`: `impact * reusable - effort - risk`
+      - `priority_weight`: `(impact * reusable) / (1.0 + 0.5 * (effort + risk))`
+      - `repetitions`: integer emphasis count in `{1, 2, 3}` derived from Pareto priority
+      - `text`: lesson text verified free of any 40-character holdout window
+    """
+    if stage is not None and stage not in GAME_CREATION_STAGES:
+        raise ValueError(f"unknown stage {stage!r}; expected one of {tuple(GAME_CREATION_STAGES)}")
+    family_to_stage: dict[str, str] = {}
+    for stage_name, families in GAME_CREATION_STAGES.items():
+        for fam in families:
+            family_to_stage.setdefault(fam, stage_name)
+
+    windows = all_held_windows()
+    sources = (
+        ("english_game_pareto", ENGLISH_PARETO_CURRICULUM),
+        ("game_creation_az", AZ_CURRICULUM),
+        ("game_pareto_v2", PARETO_V2_CURRICULUM),
+    )
+    entries: list[dict[str, object]] = []
+    seen_texts: set[str] = set()
+    for source_name, curr in sources:
+        for family_name, family_body in curr.items():
+            assigned_stage = family_to_stage.get(family_name, "stage_2_world_combat_art")
+            if stage is not None and assigned_stage != stage:
+                continue
+            for row in family_body.get("train", ()):
+                impact, reusable, effort, risk, text = row
+                if text in seen_texts or leaks_any_holdout(text, windows):
+                    continue
+                score = _pareto_score(row)
+                if score < min_pareto_score:
+                    continue
+                seen_texts.add(text)
+                priority = round((float(impact) * float(reusable)) / (1.0 + 0.5 * float(effort + risk)), 4)
+                reps = 3 if score >= 20 else (2 if score >= 14 else 1)
+                entries.append({
+                    "source": source_name,
+                    "family": family_name,
+                    "stage": assigned_stage,
+                    "impact": int(impact),
+                    "reusable": int(reusable),
+                    "effort": int(effort),
+                    "risk": int(risk),
+                    "pareto_score": int(score),
+                    "priority_weight": priority,
+                    "repetitions": reps,
+                    "text": text,
+                })
+    entries.sort(key=lambda item: (-float(item["priority_weight"]), -int(item["pareto_score"]), str(item["family"])))
+    return tuple(entries)
+
+
+def stage_curriculum_documents(
+    stage: str,
+    *,
+    include_practice: bool = True,
+    pareto_repeat: bool = True,
+) -> tuple[str, ...]:
+    """Return ordered training documents for one progressive game-creation stage."""
+    if stage not in GAME_CREATION_STAGES:
+        raise ValueError(f"unknown stage {stage!r}")
+    rows = pareto_weighted_curriculum(stage=stage)
+    docs: list[str] = []
+    for item in rows:
+        reps = int(item["repetitions"]) if pareto_repeat else 1
+        docs.extend([str(item["text"])] * reps)
+    if include_practice:
+        by_concept = practice_by_concept()
+        for family in GAME_CREATION_STAGES[stage]:
+            if family in by_concept:
+                docs.extend(by_concept[family])
+    windows = all_held_windows()
+    return tuple(doc for doc in docs if not leaks_any_holdout(doc, windows))
+
+
+def cross_curriculum_losses(model: object) -> dict[str, dict[str, float]]:
+    """Evaluate per-family train and holdout losses across all game-creation curricula."""
+    english_train: dict[str, float] = {}
+    english_holdout: dict[str, float] = {}
+    for name, body in ENGLISH_PARETO_CURRICULUM.items():
+        english_train[name] = _eval_loss(model, tuple(r[4] for r in body["train"]))
+        english_holdout[name] = _eval_loss(model, tuple(body["holdout"]))
+
+    az_train: dict[str, float] = {}
+    az_holdout: dict[str, float] = {}
+    for name, body in AZ_CURRICULUM.items():
+        az_train[name] = _eval_loss(model, tuple(r[4] for r in body["train"]))
+        az_holdout[name] = _eval_loss(model, tuple(body["holdout"]))
+
+    v2_train: dict[str, float] = {}
+    v2_holdout: dict[str, float] = {}
+    for name, body in PARETO_V2_CURRICULUM.items():
+        v2_train[name] = _eval_loss(model, tuple(r[4] for r in body["train"]))
+        v2_holdout[name] = _eval_loss(model, tuple(body["holdout"]))
+
+    stage_losses: dict[str, float] = {}
+    for stage_name in GAME_CREATION_STAGES:
+        stage_docs = stage_curriculum_documents(stage_name, include_practice=False, pareto_repeat=False)
+        if stage_docs:
+            stage_losses[stage_name] = _eval_loss(model, stage_docs)
+
+    return {
+        "english_pareto_train": english_train,
+        "english_pareto_holdout": english_holdout,
+        "az_train": az_train,
+        "az_holdout": az_holdout,
+        "pareto_v2_train": v2_train,
+        "pareto_v2_holdout": v2_holdout,
+        "practice_concepts": concept_losses(model),
+        "stages": stage_losses,
+    }
+
+
+def game_creation_mastery_report(model: object) -> dict[str, object]:
+    """Compute a comprehensive game-creation mastery report across all pillars and stages."""
+    losses = cross_curriculum_losses(model)
+    pillar_losses: dict[str, float] = {}
+    for group in ("english_pareto_train", "az_train", "pareto_v2_train", "practice_concepts"):
+        for k, v in losses[group].items():
+            if k in pillar_losses:
+                pillar_losses[k] = 0.5 * (pillar_losses[k] + float(v))
+            else:
+                pillar_losses[k] = float(v)
+
+    ordered_weakest = tuple(sorted(pillar_losses, key=lambda k: (-pillar_losses[k], k)))
+    ordered_strongest = tuple(sorted(pillar_losses, key=lambda k: (pillar_losses[k], k)))
+
+    all_holdouts = all_holdout_documents()
+    overall_holdout_loss = _eval_loss(model, all_holdouts)
+    mean_pillar_loss = sum(pillar_losses.values()) / max(1, len(pillar_losses))
+    # Bounded mastery index in (0, 1] inversely proportional to loss.
+    mastery_index = round(1.0 / (1.0 + max(0.0, mean_pillar_loss) / 5.0), 4)
+
+    return {
+        "schema_version": MASTERY_SCHEMA,
+        "pillar_count": len(pillar_losses),
+        "mean_pillar_loss": round(mean_pillar_loss, 6),
+        "overall_holdout_loss": round(overall_holdout_loss, 6),
+        "mastery_index": mastery_index,
+        "weakest_pillars": ordered_weakest[:6],
+        "strongest_pillars": ordered_strongest[:6],
+        "stage_losses": {k: round(v, 6) for k, v in losses["stages"].items()},
+        "losses": losses,
+        "holdout_isolated": True,
+        "promoted": False,
+    }
+
+
+def _save_model_state(model: object) -> tuple[str, object]:
+    if hasattr(model, "to_dict") and callable(model.to_dict):
+        return ("dict", model.to_dict())
+    if hasattr(model, "snapshot") and callable(model.snapshot):
+        return ("snapshot", model.snapshot())
+    return ("none", None)
+
+
+def _restore_model_state(model: object, saved: tuple[str, object]) -> None:
+    kind, payload = saved
+    if kind == "dict" and payload is not None:
+        restored = type(model).from_dict(payload)
+        model.embedding = restored.embedding
+        model.recurrent = restored.recurrent
+        model.hidden_bias = restored.hidden_bias
+        model.output = restored.output
+        model.output_bias = restored.output_bias
+    elif kind == "snapshot" and payload is not None:
+        restored = type(model).from_snapshot(payload)
+        model.E, model.P, model.Wout, model.bout = restored.E, restored.P, restored.Wout, restored.bout
+        model.layers, model.n_layers = restored.layers, restored.n_layers
+        model.fitted, model.steps = restored.fitted, restored.steps
+        if getattr(model, "tied", False) and hasattr(model, "tie"):
+            model.tie()
+
+
+def _train_model_on_docs(
+    model: object,
+    docs: Sequence[str],
+    *,
+    epochs: int,
+    lr: float,
+    optimizer: str,
+    weight_decay: float,
+    gradient_clip: float,
+    holdout: Sequence[str],
+) -> None:
+    if hasattr(model, "train") and hasattr(model, "to_dict"):
+        model.train(
+            tuple(docs),
+            epochs=epochs,
+            learning_rate=lr,
+            gradient_clip=gradient_clip,
+            optimizer=optimizer,
+            weight_decay=weight_decay,
+        )
+    elif hasattr(model, "specialized_calibrate"):
+        model.specialized_calibrate(
+            tuple(docs),
+            epochs=epochs,
+            lr=lr,
+            weight_decay=weight_decay,
+            holdout=tuple(holdout),
+        )
+    elif hasattr(model, "fit"):
+        for _ in range(max(1, epochs)):
+            model.fit(tuple(docs), lr=lr, schedule="cosine")
+    else:
+        raise TypeError("unsupported learner model for finetune_for_game_creation")
+
+
+def finetune_for_game_creation(
+    model: object,
+    *,
+    stages: Sequence[str] | None = None,
+    epochs_per_stage: int = 1,
+    remediation_rounds: int = 2,
+    top_weak_concepts: int = 5,
+    learning_rate: float = 0.015,
+    optimizer: str = "adamw",
+    weight_decay: float = 0.01,
+    gradient_clip: float = 1.0,
+    include_practice: bool = True,
+    eval_documents: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Multi-stage Pareto-prioritized game creation finetuning pipeline with ratchet rollback.
+
+    Executes:
+      1. Progressive stage training across `GAME_CREATION_STAGES` (Foundation ->
+         World/Combat/Art -> Narrative/Economy/AV -> Production/QA/Ship), repeating
+         high-Pareto lessons more frequently and stepping down the learning rate
+         across stages.
+      2. Per-stage non-regression ratchet: if a stage worsens the evaluation loss,
+         the pre-stage weights are restored and re-attempted with halved learning rate.
+      3. Targeted remediation pass (`self_learn_pass`) on the learner's weakest
+         game-creation concepts.
+      4. Full pre/post mastery report across all three game-creation curricula.
+    """
+    if isinstance(epochs_per_stage, bool) or not isinstance(epochs_per_stage, int) or not 1 <= epochs_per_stage <= 8:
+        raise ValueError("epochs_per_stage must be an int in [1, 8]")
+    if isinstance(remediation_rounds, bool) or not isinstance(remediation_rounds, int) or not 1 <= remediation_rounds <= 8:
+        raise ValueError("remediation_rounds must be an int in [1, 8]")
+    stage_Order = tuple(stages) if stages is not None else tuple(GAME_CREATION_STAGES)
+    for st in stage_Order:
+        if st not in GAME_CREATION_STAGES:
+            raise ValueError(f"unknown stage {st!r}")
+
+    # Default evaluation probe combines holdout-free high-Pareto lessons and practice sample.
+    if eval_documents is not None:
+        eval_set = tuple(eval_documents)
+    else:
+        top_pareto_docs = tuple(str(r["text"]) for r in pareto_weighted_curriculum(min_pareto_score=16)[:24])
+        eval_set = top_pareto_docs + practice_documents()[:24]
+    if not eval_set:
+        raise ValueError("eval_documents must not be empty")
+
+    holdout_set = all_holdout_documents()
+    initial_eval_loss = _eval_loss(model, eval_set)
+    initial_holdout_loss = _eval_loss(model, holdout_set)
+    before_mastery = game_creation_mastery_report(model)
+
+    stage_receipts: list[dict[str, object]] = []
+    current_best_loss = initial_eval_loss
+    total_scheduled_docs = 0
+
+    for idx, stage_name in enumerate(stage_Order):
+        stage_docs = stage_curriculum_documents(
+            stage_name,
+            include_practice=include_practice,
+            pareto_repeat=True,
+        )
+        if not stage_docs:
+            continue
+        # Progressive cosine-like step-down across stages so later specialization
+        # does not overwrite Stage 1 core-loop and fixed-tick foundations.
+        stage_lr = float(learning_rate) * (0.88 ** idx)
+        saved_state = _save_model_state(model)
+        before_stage_loss = current_best_loss
+
+        _train_model_on_docs(
+            model,
+            stage_docs,
+            epochs=epochs_per_stage,
+            lr=stage_lr,
+            optimizer=optimizer,
+            weight_decay=weight_decay,
+            gradient_clip=gradient_clip,
+            holdout=eval_set,
+        )
+        after_stage_loss = _eval_loss(model, eval_set)
+        retried = False
+        kept = True
+        if after_stage_loss > before_stage_loss:
+            # Ratchet rollback + retry at 0.5x lr on top-Pareto subset of the stage.
+            _restore_model_state(model, saved_state)
+            retried = True
+            core_stage_docs = stage_curriculum_documents(
+                stage_name,
+                include_practice=False,
+                pareto_repeat=False,
+            )
+            if core_stage_docs:
+                _train_model_on_docs(
+                    model,
+                    core_stage_docs,
+                    epochs=1,
+                    lr=stage_lr * 0.5,
+                    optimizer=optimizer,
+                    weight_decay=weight_decay,
+                    gradient_clip=gradient_clip,
+                    holdout=eval_set,
+                )
+                retry_loss = _eval_loss(model, eval_set)
+                if retry_loss <= before_stage_loss:
+                    after_stage_loss = retry_loss
+                else:
+                    _restore_model_state(model, saved_state)
+                    after_stage_loss = before_stage_loss
+                    kept = False
+            else:
+                after_stage_loss = before_stage_loss
+                kept = False
+
+        current_best_loss = after_stage_loss
+        total_scheduled_docs += len(stage_docs)
+        stage_receipts.append({
+            "stage": stage_name,
+            "documents": len(stage_docs),
+            "learning_rate": round(stage_lr, 6),
+            "loss_before": round(before_stage_loss, 6),
+            "loss_after": round(after_stage_loss, 6),
+            "improved": after_stage_loss < before_stage_loss,
+            "retried": retried,
+            "kept": kept,
+        })
+
+    # Stage 5: Targeted self-learning remediation pass on the weakest concepts.
+    remediation = self_learn_pass(
+        model,
+        rounds=remediation_rounds,
+        top_concepts=top_weak_concepts,
+        learning_rate=float(learning_rate) * 0.65,
+        optimizer=optimizer,
+        weight_decay=weight_decay,
+        gradient_clip=gradient_clip,
+        eval_documents=eval_set,
+    )
+    total_scheduled_docs += int(remediation["scheduled_documents"])
+
+    final_eval_loss = _eval_loss(model, eval_set)
+    final_holdout_loss = _eval_loss(model, holdout_set)
+    after_mastery = game_creation_mastery_report(model)
+
+    return {
+        "schema_version": FINETUNE_SCHEMA,
+        "stages_executed": tuple(r["stage"] for r in stage_receipts),
+        "stage_receipts": tuple(stage_receipts),
+        "remediation": remediation,
+        "total_scheduled_documents": total_scheduled_docs,
+        "initial_eval_loss": round(initial_eval_loss, 6),
+        "final_eval_loss": round(final_eval_loss, 6),
+        "initial_holdout_loss": round(initial_holdout_loss, 6),
+        "final_holdout_loss": round(final_holdout_loss, 6),
+        "eval_improved": final_eval_loss < initial_eval_loss,
+        "holdout_improved": final_holdout_loss < initial_holdout_loss,
+        "mastery_before": before_mastery["mastery_index"],
+        "mastery_after": after_mastery["mastery_index"],
+        "weakest_pillars_before": before_mastery["weakest_pillars"],
+        "weakest_pillars_after": after_mastery["weakest_pillars"],
+        "holdout_isolated": True,
+        "promoted": False,
+    }
+

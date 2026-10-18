@@ -506,6 +506,9 @@ class JeevesCortex:
     def predict_policy(self, stimulus: str):
         return self.moe.predict_policy(self._stream(stimulus))
 
+    def predict_pacing(self, stimulus: str):
+        return self.moe.predict_pacing(self._stream(stimulus))
+
     def _stream(self, stim: str) -> List[float]:
         H = self._hidden_seq(stim)
         if len(H) >= 2:
@@ -677,6 +680,347 @@ class JeevesCortex:
             "capacity_upgrade": capacity_upgrade,
             "mouth": self.speaking_name(),
             "G": round(float(self.genos_engine.G), 6),
+        }
+
+    def finetune_for_game_creation(
+        self,
+        *,
+        epochs: int = 2,
+        rounds: int = 2,
+        include_az_curricula: bool = True,
+        grow_capacity: bool = False,
+    ) -> Dict[str, Any]:
+        """Comprehensive multi-stage game creation finetuning across all cortex substrates."""
+        from skeleton.ai.runtime.inference.game_self_learn import (
+            GAME_CREATION_STAGES,
+            pareto_weighted_curriculum,
+        )
+        from skeleton.cortex.curriculum import CORE_PAIRS, WALK_PAIRS
+        from skeleton.cortex.gossip import adaptive_gossip
+
+        epochs = max(1, min(8, int(epochs)))
+        rounds = max(1, min(8, int(rounds)))
+
+        base_train = self.train(epochs=epochs, auto_surpass=True)
+        gaming_priors = self.apply_gaming_weights(rounds=rounds)
+
+        stage_summaries: List[Dict[str, Any]] = []
+        eval_texts = [a for a, _ in list(CORE_PAIRS)] + [a for a, _ in list(WALK_PAIRS)]
+        if include_az_curricula:
+            for idx, stage_name in enumerate(GAME_CREATION_STAGES):
+                rows = pareto_weighted_curriculum(stage=stage_name, min_pareto_score=14)
+                stage_docs = [str(r["text"]) for r in rows[:8]]
+                if not stage_docs:
+                    continue
+                stage_lr = max(0.01, 0.035 * (0.88 ** idx))
+                for doc in stage_docs[:4]:
+                    self.think(doc)
+                for slot in SLOTS:
+                    port = self.slots.get(slot)
+                    w = getattr(port, "weights", None)
+                    if w is not None and hasattr(w, "self_learn"):
+                        w.self_learn(stage_docs[:4], epochs=1, lr=stage_lr)
+                    elif port is not None and hasattr(port, "fit"):
+                        for doc in stage_docs[:4]:
+                            port.fit(doc)
+                stage_summaries.append({
+                    "stage": stage_name,
+                    "lessons_ingested": len(stage_docs),
+                    "lr": round(stage_lr, 4),
+                })
+
+        xf = self.transformer
+        rms = getattr(self, "neo_rms", None)
+        if xf is not None and hasattr(xf, "specialized_calibrate"):
+            xf.specialized_calibrate(eval_texts, epochs=rounds, lr=0.035, weight_decay=1e-4, holdout=eval_texts)
+        if rms is not None and hasattr(rms, "specialized_calibrate"):
+            rms.specialized_calibrate(eval_texts, epochs=max(1, rounds // 2), lr=0.03, weight_decay=1e-4, holdout=eval_texts)
+        if xf is not None and rms is not None:
+            adaptive_gossip(xf, rms, eval_texts, max_alpha=0.20)
+
+        for slot in SLOTS:
+            self.acquire(slot)
+            self.surpass(slot)
+
+        sleep_out = self.sleep_cycle(n=8)
+        seal = self.elect_mouth(texts=eval_texts)
+        cap_out = self.upgrade_capacity(extra_layers=1, lora_rank=4) if grow_capacity else None
+        from skeleton.cortex.metrics import evaluate as _eval_metrics
+        metrics = _eval_metrics(self)
+
+        return {
+            "kind": "cortex-game-creation-finetune",
+            "curriculum_train": base_train,
+            "gaming_priors": gaming_priors,
+            "stages": stage_summaries,
+            "sleep": sleep_out,
+            "mouth": seal.get("winner"),
+            "capacity_upgrade": cap_out,
+            "metrics": metrics,
+            "G": round(float(self.genos_engine.G), 6),
+        }
+
+    def plan_game_spec(self, spec: Dict[str, Any]) -> Dict[str, Any]:
+        """Enrich a `skeleton.game_design_spec.v1` using cortex hemispheres, PFC, and MoE."""
+        if not isinstance(spec, dict):
+            return spec
+        brief_text = str(spec.get("brief") or spec.get("fantasy") or spec.get("title") or "playable game")
+        era = str(spec.get("era") or "extraction_now")
+        genre = str(spec.get("genre") or "action")
+
+        stim = f"{era} {genre} {brief_text}".strip()
+        trace = self.think(stim, {"era": era, "genre": genre})
+
+        left_port = self.slots.get("left")
+        right_port = self.slots.get("right")
+        pfc_port = self.slots.get("pfc")
+
+        math_env = (
+            left_port.analyze_game_math(stim, {"era": era})
+            if hasattr(left_port, "analyze_game_math")
+            else {}
+        )
+        spatial_env = (
+            right_port.synthesize_spatial_aesthetic_profile(stim, {"era": era})
+            if hasattr(right_port, "synthesize_spatial_aesthetic_profile")
+            else {}
+        )
+        slice_plan = (
+            pfc_port.plan_game_slice(stim, {"era": era, "genre": genre})
+            if hasattr(pfc_port, "plan_game_slice")
+            else {}
+        )
+        coop = self.moe.cooperate(self._stream(stim))
+
+        mix = coop.get("mix") or (
+            tuple(math_env.get("encounter_mix", {}).values())
+            if isinstance(math_env.get("encounter_mix"), dict)
+            else (3, 1, 0)
+        )
+        bias = coop.get("bias") or spatial_env.get("spatial_bias") or "balanced"
+        pacing = coop.get("pacing") or {}
+        ttk_targets = math_env.get("ttk_targets") or {"trash": 1.1, "elite": 4.5, "boss": 60.0}
+        fixed_tick = math_env.get("fixed_tick") or {"hz": 60, "frame_budget_ms": 16.67}
+        econ = math_env.get("economy_equilibrium") or {"tap_sink_ratio": 0.82}
+        art = spatial_env.get("art_scale_ladder") or {"authoring_divisor": 2, "palette_profile": "hearth_linen_readable"}
+        audio = spatial_env.get("audio_cadence") or {"bpm": 116}
+        readability = spatial_env.get("combat_readability") or {"telegraph_ticks": 18}
+
+        existing_prod = dict(spec.get("production") or {}) if isinstance(spec.get("production"), dict) else {}
+        enriched_prod: Dict[str, str] = {}
+        for k, v in existing_prod.items():
+            if isinstance(k, str) and isinstance(v, str) and len(enriched_prod) < 4:
+                enriched_prod[k[:32]] = v[:240]
+
+        cortex_notes = {
+            "cortex_mouth": f"{trace.mouth} hive={trace.hive_value:.2f} G={trace.G:.3f}",
+            "encounter_mix": f"trash={mix[0]} elite={mix[1]} boss={mix[2]} bias={bias}",
+            "ttk_envelope": (
+                f"dps={math_env.get('primary_dps', 108.0)} "
+                f"trash={ttk_targets.get('trash', 1.1)}s "
+                f"elite={ttk_targets.get('elite', 4.5)}s "
+                f"boss={ttk_targets.get('boss', 60.0)}s"
+            ),
+            "thermal_budget": (
+                f"vent_duty={math_env.get('vent_duty_cycle', 0.0)} "
+                f"thermal_mult={math_env.get('thermal_multiplier', 1.0)} "
+                f"collapse_max={math_env.get('collapse_max_s', 320.0)}s"
+            ),
+            "fixed_tick_contract": (
+                f"{fixed_tick.get('hz', 60)}Hz dt={fixed_tick.get('dt_s', 0.016667)}s "
+                f"budget={fixed_tick.get('frame_budget_ms', 16.67)}ms catchup=4"
+            ),
+            "level_topology": (
+                f"{spatial_env.get('level_topology', 'landmark_spoke_region')} "
+                f"telegraph={readability.get('telegraph_ticks', 18)}t "
+                f"bpm={audio.get('bpm', 116)}"
+            ),
+            "art_scale_ladder": (
+                f"divisor={art.get('authoring_divisor', 2)} "
+                f"palette={art.get('palette_profile', 'hearth_linen_readable')} "
+                f"no_65536_alloc=true"
+            ),
+            "economy_pacing": (
+                f"tap_sink={econ.get('tap_sink_ratio', 0.82)} "
+                f"ttk_norm={pacing.get('ttk_norm', 0.6)} "
+                f"core_verb={slice_plan.get('core_verb', genre)}"
+            ),
+        }
+        for k, v in cortex_notes.items():
+            if len(enriched_prod) < 12:
+                enriched_prod[k[:32]] = str(v)[:240]
+
+        out = dict(spec)
+        out["production"] = enriched_prod
+        return out
+
+    def review_game_build(self, build: Dict[str, Any]) -> Dict[str, Any]:
+        """Inspect a proved game build, score quality, and request repair if recoverable."""
+        if not isinstance(build, dict):
+            return {"passed": False, "issues": [{"severity": "blocker", "source": "cortex_qa", "detail": "invalid build"}], "repair_requested": False}
+
+        spec = build.get("spec") if isinstance(build.get("spec"), dict) else {}
+        check_info = build.get("check") if isinstance(build.get("check"), dict) else {}
+        core_loop = build.get("core_loop") if isinstance(build.get("core_loop"), dict) else {}
+        playtest_info = build.get("playtest") if isinstance(build.get("playtest"), dict) else None
+        files = build.get("files") if isinstance(build.get("files"), dict) else {}
+
+        issues: List[Dict[str, Any]] = []
+        repair_requested = False
+
+        check_ok = bool(check_info.get("ok", True))
+        problems = [str(p) for p in (check_info.get("problems") or [])]
+        if not check_ok or problems:
+            for prob in problems[:6]:
+                issues.append({"severity": "blocker", "source": "gdscript_check", "detail": prob})
+            if not any("deadline exceeded" in p for p in problems):
+                repair_requested = True
+
+        loop_passed = bool(core_loop.get("passed", True))
+        if not loop_passed and core_loop:
+            issues.append({
+                "severity": "blocker",
+                "source": "core_loop",
+                "detail": f"core loop marker failed: {core_loop.get('marker')!r}",
+            })
+            repair_requested = True
+
+        if files and "project.godot" not in files:
+            issues.append({
+                "severity": "blocker",
+                "source": "project_structure",
+                "detail": "missing project.godot in emitted files",
+            })
+            repair_requested = True
+
+        if playtest_info is not None:
+            status = str(playtest_info.get("status") or "")
+            if status not in {"", "passed", "unavailable"} and not playtest_info.get("passed", False):
+                issues.append({
+                    "severity": "blocker",
+                    "source": "playtest",
+                    "detail": f"playtest status={status}",
+                })
+                if status != "unavailable":
+                    repair_requested = True
+
+        era = str(spec.get("era") or "extraction_now")
+        genre = str(spec.get("genre") or "action")
+        stim = f"qa review {era} {genre} files={len(files)} ok={bool(build.get('ok'))}"
+        trace = self.think(stim, {"era": era, "genre": genre})
+
+        passed = bool(build.get("ok", False)) and len(issues) == 0
+        return {
+            "passed": passed,
+            "issues": issues,
+            "repair_requested": repair_requested and not passed,
+            "cortex_review": {
+                "mouth": trace.mouth,
+                "hive_confidence": round(trace.hive_value, 4),
+                "genos_G": round(trace.G, 4),
+                "era": era,
+                "genre": genre,
+                "file_count": len(files),
+            },
+        }
+
+    def learn_from_game_build(self, build_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Close the self-learning loop from a completed game build, simulation, and walk."""
+        if not isinstance(build_result, dict):
+            return {"learned": 0}
+        spec = build_result.get("spec") if isinstance(build_result.get("spec"), dict) else {}
+        pipeline = build_result.get("pipeline") if isinstance(build_result.get("pipeline"), dict) else {}
+        operator = build_result.get("_operator") if isinstance(build_result.get("_operator"), dict) else {}
+        era = str(spec.get("era") or pipeline.get("era") or operator.get("era") or "extraction_now")
+        genre = str(spec.get("genre") or "action")
+        ok = bool(build_result.get("ok"))
+
+        sim_data = operator.get("sim") if isinstance(operator.get("sim"), dict) else {}
+        walk_data = sim_data.get("walk") if isinstance(sim_data.get("walk"), dict) else {}
+        collapse_max = float(walk_data.get("collapse_max") or sim_data.get("collapse_max") or 320.0)
+        walk_t = float(walk_data.get("t") or (collapse_max * 0.35 if ok else collapse_max))
+        slack = max(0.0, min(1.0, (collapse_max - walk_t) / max(collapse_max, 1.0))) if ok else 0.0
+
+        left_port = self.slots.get("left")
+        math_env = (
+            left_port.analyze_game_math(f"{era} {genre}", {"era": era})
+            if hasattr(left_port, "analyze_game_math")
+            else {}
+        )
+        mix_dict = math_env.get("encounter_mix") or {"trash": 4, "elite": 1, "boss": 0}
+        mix_tuple = (
+            int(mix_dict.get("trash", 4)),
+            int(mix_dict.get("elite", 1)),
+            int(mix_dict.get("boss", 0)),
+        )
+
+        observed_stim = (
+            f"HP = DPS x TTK ; observed mix trash={mix_tuple[0]} "
+            f"elite={mix_tuple[1]} boss={mix_tuple[2]} slack={slack:.2f} {era.replace('_', ' ')}"
+        )
+        self.think(observed_stim, {"era": era, "genre": genre})
+        from skeleton.cortex.curriculum import _ingest_observed_mix
+        _ingest_observed_mix(self, observed_stim)
+
+        reward = round((0.65 * slack + 0.35 * (1.0 if ok else 0.0)), 4)
+        rl_info = self.reinforce(observed_stim, mix_tuple, reward)
+
+        h = self._stream(observed_stim)
+        if "left" in self.moe.experts and getattr(self.moe.experts["left"], "aux", None) is not None:
+            thermal_margin = max(0.0, min(1.0, 1.0 - float(walk_data.get("heat_peak", 40.0)) / 100.0))
+            self.moe.experts["left"].aux.step(
+                h,
+                (slack, thermal_margin, 0.82, 0.78),
+                lr=0.10,
+            )
+
+        for slot in SLOTS:
+            port = self.slots.get(slot)
+            if port is not None and hasattr(port, "fit"):
+                port.fit(observed_stim)
+            self.acquire(slot)
+
+        sleep_info = self.sleep_cycle(n=4)
+        return {
+            "learned": 1,
+            "era": era,
+            "genre": genre,
+            "ok": ok,
+            "slack": round(slack, 4),
+            "reward": reward,
+            "mix": mix_tuple,
+            "reinforce": rl_info,
+            "sleep": sleep_info,
+            "own_size": self.own.size,
+        }
+
+    def build_and_learn_game(
+        self,
+        brief: str | Dict[str, Any],
+        *,
+        era: str | None = None,
+        playtest_mode: str = "off",
+        max_rounds: int = 2,
+        deadline_s: float | None = 120.0,
+    ) -> Dict[str, Any]:
+        """End-to-end cortex-guided game creation: plan -> build -> QA -> self-learn."""
+        from skeleton.forge.game_builder import build_playable_game, cortex_planner_hook, cortex_qa_hook
+
+        planner = cortex_planner_hook(self)
+        qa = cortex_qa_hook(self, learn=False)
+        result = build_playable_game(
+            brief,
+            era=era,
+            playtest_mode=playtest_mode,
+            max_rounds=max_rounds,
+            planner=planner,
+            qa=qa,
+            deadline_s=deadline_s,
+        )
+        learning = self.learn_from_game_build(result)
+        return {
+            "build": result,
+            "learning": learning,
         }
 
     def save(self, path) -> Dict[str, Any]:

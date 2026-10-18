@@ -200,33 +200,40 @@ def apply_gaming_priors(neo, *, rounds: int = 2) -> Dict[str, Any]:
                 "HP = DPS x TTK ; observed mix trash=6 elite=2 boss=0 slack=0.70 soulslike",
                 (6.0, 2.0, 0.0),
                 "heat",
+                (0.75, 0.65, 0.85, 0.80),
             ),
             (
                 "HP = DPS x TTK ; observed mix trash=4 elite=1 boss=0 slack=0.80 extraction now",
                 (4.0, 1.0, 0.0),
                 "loot",
+                (0.55, 0.78, 0.82, 0.72),
             ),
             (
                 "HP = DPS x TTK ; observed mix trash=2 elite=0 boss=0 slack=0.88 arcade golden age",
                 (2.0, 0.0, 0.0),
                 "combat",
+                (0.25, 0.90, 0.78, 0.60),
             ),
-            ("soulslike extraction ttk elite dread", (6.0, 2.0, 0.0), "heat"),
-            ("cozy wholesome intimacy grind farm", (1.0, 0.0, 0.0), "balanced"),
-            ("boomer shooter movement gun poetry ttk", (6.0, 1.0, 0.0), "combat"),
-            ("horror survival dread heat scarcity", (3.0, 2.0, 0.0), "heat"),
+            ("soulslike extraction ttk elite dread", (6.0, 2.0, 0.0), "heat", (0.75, 0.65, 0.85, 0.80)),
+            ("cozy wholesome intimacy grind farm", (1.0, 0.0, 0.0), "balanced", (0.90, 0.95, 0.88, 0.90)),
+            ("boomer shooter movement gun poetry ttk", (6.0, 1.0, 0.0), "combat", (0.30, 0.82, 0.80, 0.65)),
+            ("horror survival dread heat scarcity", (3.0, 2.0, 0.0), "heat", (0.80, 0.60, 0.86, 0.85)),
         ]
         for _ in range(max(4, rounds * 4)):
-            for stim, mix_target, bias_target in gaming_mix_priors:
+            for stim, mix_target, bias_target, pacing_target in gaming_mix_priors:
                 h = neo._stream(stim)
                 if "left" in moe.experts:
                     moe.experts["left"].head.step(h, mix_target, lr=0.14)
+                    if getattr(moe.experts["left"], "aux", None) is not None:
+                        moe.experts["left"].aux.step(h, pacing_target, lr=0.12)
                 if "right" in moe.experts:
                     moe.experts["right"].head.step(h, bias_target, lr=0.10)
                 if "midbrain" in moe.experts:
                     moe.experts["midbrain"].head.step(h, (0.65, 0.55, 0.55), lr=0.08)
                 if "pfc" in moe.experts:
                     moe.experts["pfc"].head.step(h, 0.0, lr=0.08)
+                    if getattr(moe.experts["pfc"], "aux", None) is not None:
+                        moe.experts["pfc"].aux.step(h, (1.0, 1.0 if bias_target in {"heat", "loot"} else 0.0), lr=0.10)
                 moe_updates += 1
 
     after_steps = int(getattr(xf, "steps", 0) or 0)
