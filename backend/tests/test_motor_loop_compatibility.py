@@ -28,6 +28,6 @@ def test_mongo_operations_follow_current_loop_after_restarts() -> None:
 
 
 def test_single_canonical_motor_client_retained() -> None:
-    assert core_db.client is client
-    assert content_db.client is client
-    assert swarm_db.client is client
+    assert core_db._client is client
+    assert content_db._client is client
+    assert swarm_db._client is client
