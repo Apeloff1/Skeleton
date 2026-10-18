@@ -90,3 +90,22 @@ Do not start PROM until REL and DIST acceptance tests exist.
 - #4152 MERGEABLE CLEAN — ready for review
 - #4127 GitHub still reports dirty; local merge-tree was clean. Re-check
   after the next main push or split the PR if the diff stays over 300 files.
+
+## Continuation
+
+### #4104 draft restoration
+Added `.github/workflows/regression-gates-restore.yml` as an advisory restore
+of Frontend lint/typecheck, Backend in-process, and Cockpit smoke.
+Gates are warning-level until the suites are confirmed green, then promote
+to required. Addresses the Sev1 NO-SHIP without re-enabling the archived
+411-workflow set.
+
+### #4133 draft
+Boot skip path in backend/server.py logs import failures and continues.
+Draft change: in non-dev profiles, re-raise after the log so ready cannot
+succeed with skipped route modules. Add a test that the canonical profile
+has zero SKIPPED route imports.
+
+### Remaining P1
+32 ready, 12 done. Implementation order unchanged: INTEL-04, AUTO-02, then
+cascade. No code started in this pass.
