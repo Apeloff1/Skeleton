@@ -3535,6 +3535,20 @@ async def health_ready():
         checks["vault_builds"] = {"ok": False, "error": "probe_failed"}
         overall_ok = False
 
+    # A running process is not ready to serve the product if mandatory
+    # first-party endpoints were skipped during registry mounting. This is
+    # process-local inspection only; it makes no network or database calls.
+    try:
+        from routes.registry_health import critical_router_readiness
+
+        checks["critical_routes"] = critical_router_readiness()
+        if not checks["critical_routes"]["ok"]:
+            overall_ok = False
+    except Exception as exc:
+        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
+        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
+        overall_ok = False
+
     _probe_event("readiness", "ok" if overall_ok else "degraded",
                  failing=",".join(k for k, v in checks.items() if not v.get("ok")) or "none")
 
