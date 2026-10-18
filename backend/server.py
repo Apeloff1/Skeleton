@@ -1450,7 +1450,7 @@ async function* fetchPaginated(baseUrl, options = {}) {
     
     try {
         while (hasMore) {
-            console.log(\`Fetching page \${page}...\`);
+            console.log(`Fetching page ${page}...`);
             await new Promise(r => setTimeout(r, 100));
             const data = Array.from({length: 5}, (_, i) => ({
                 id: (page - 1) * 5 + i + 1,
@@ -1470,10 +1470,10 @@ async function* fetchPaginated(baseUrl, options = {}) {
 async function processData() {
     const results = [];
     for await (const { page, data } of fetchPaginated('/api')) {
-        console.log(\`Page \${page}: \${data.length} items\`);
+        console.log(`Page ${page}: ${data.length} items`);
         results.push(...data);
     }
-    console.log(\`Total: \${results.length} items\`);
+    console.log(`Total: ${results.length} items`);
 }
 
 processData();''',
@@ -1504,7 +1504,7 @@ function createReactive(target, onChange) {
 const state = createReactive(
     { user: { name: 'Dev', level: 1 }, items: [] },
     (prop, newVal, oldVal) => {
-        console.log(\`Changed: \${prop} = \${JSON.stringify(newVal)}\`);
+        console.log(`Changed: ${prop} = ${JSON.stringify(newVal)}`);
     }
 );
 
@@ -1545,15 +1545,15 @@ class PromisePool {
 
 const simulateTask = async (id) => {
     const duration = Math.random() * 300 + 100;
-    console.log(\`Task \${id} started\`);
+    console.log(`Task ${id} started`);
     await new Promise(r => setTimeout(r, duration));
-    console.log(\`Task \${id} done\`);
+    console.log(`Task ${id} done`);
     return { id, duration };
 };
 
 const pool = new PromisePool(3);
 pool.map([1,2,3,4,5,6], simulateTask).then(r => {
-    console.log(\`All done: \${r.length} tasks\`);
+    console.log(`All done: ${r.length} tasks`);
 });''',
             "description": "Concurrent task execution with limit",
             "complexity": CodeComplexity.COMPLEX
@@ -1734,7 +1734,7 @@ int main() {
             }
             connectedCallback() { this.render(); }
             render() {
-                this.shadowRoot.innerHTML = \`
+                this.shadowRoot.innerHTML = `
                     <style>
                         .counter { background: linear-gradient(135deg, #667eea, #764ba2);
                             padding: 1.5rem; border-radius: 12px; display: flex; align-items: center; gap: 1rem; }
@@ -1744,9 +1744,9 @@ int main() {
                     </style>
                     <div class="counter">
                         <button id="dec">-</button>
-                        <span id="val">\${this.count}</span>
+                        <span id="val">${this.count}</span>
                         <button id="inc">+</button>
-                    </div>\`;
+                    </div>`;
                 this.shadowRoot.getElementById('inc').onclick = () => { this.count++; this.update(); };
                 this.shadowRoot.getElementById('dec').onclick = () => { this.count--; this.update(); };
             }

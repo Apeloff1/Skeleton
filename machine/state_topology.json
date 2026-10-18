@@ -1017,6 +1017,37 @@
       ]
     },
     {
+      "id": "dragon-conversation-micro-projection",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume",
+      "logical_location": "operator-supplied SQLite connection on app.state.dragon_conversation_binding; tables dragon_conversation_micro_logs, dragon_conversation_micro_terms, dragon_conversation_micro_fences",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "opt-in-derived-projection",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "one SQLite transaction per ten-step checkpoint, deletion, or expiry batch on the injected connection",
+      "consistency": "derived ten-step interest checkpoints of committed canonical conversation windows; raw transcript text is not copied; retrieval rechecks current retention consent and never treats a stored training flag as permission",
+      "retention": "checkpoint expiry is at most seven days and deletion follows canonical retention revocation; the projection is discardable",
+      "backup_restore": "optional; restore canonical conversation thread and message authority first, then rebuild only windows whose current consent still allows retention",
+      "migration": "rebuild from conversation-thread-state and conversation-message-state; do not migrate this projection as an independent transcript",
+      "derived_from": [
+        "conversation-thread-state",
+        "conversation-message-state"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "skeleton/ai/webcrawler/dragon_conversation_micro_logs.py",
+        "backend/core/dragon_conversation_binding.py",
+        "backend/core/dragon_runtime_bridge.py",
+        "backend/tests/test_dragon_conversation_binding.py",
+        "tests/test_ai_dragon_resource_cognition.py",
+        "docs/ai/dragon-runtime-conversation-2026-10-10.md"
+      ]
+    },
+    {
       "id": "dragon-practice-state",
       "owner_plane": "feedback-learning",
       "physical_store": "backend-data-volume",
@@ -1227,6 +1258,14 @@
       "mode": "explicit-bounded-reference-exercise",
       "rule": "Only a current approved reference with explicit practice consent may label a fixed coded reference exercise. Durable finite credits precede execution; current source checks and actual transitions precede completion.",
       "failure": "Interruption retains only measured partial checkpoints, never XP/mastery; repeated cancellation drains the local physical worker before releasing its handle."
+    },
+    {
+      "id": "conversation-to-dragon-micro-projection",
+      "from": "conversation-message-state",
+      "to": "dragon-conversation-micro-projection",
+      "mode": "consented-derived-checkpoint",
+      "rule": "After a tenth committed canonical sequence, the optional Dragon binding may store game-topic factors and message references. It reads current retention consent from canonical policy and omits raw message text.",
+      "failure": "Projection failure, missing consent, or revocation leaves canonical messages committed and discards or deletes the derived checkpoint. The projection cannot roll back a message."
     }
   ],
   "recovery_order": [
@@ -1265,6 +1304,7 @@
     "tool side-effect recovery consults the idempotency ledger before any retry",
     "usage consumption is monotonic across retries, repairs and resumed turns",
     "conversation thread/message authority is server-side durable state; client-submitted history never becomes authoritative by being sent to a model",
+    "dragon conversation micro checkpoints are a discardable derived projection of committed message references and never a second transcript authority",
     "assistant conversation messages reference canonical operation/execution results rather than treating provider text as standalone durable truth",
     "conversation edit/regenerate preserves immutable branch lineage and never silently rewrites historical tool/action receipts",
     "verification receipts persist observable claims, evidence references, checks and outcomes but never require hidden chain-of-thought",

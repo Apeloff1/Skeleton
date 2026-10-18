@@ -8,6 +8,7 @@ from skeleton.client.agents import AgentsClient
 from skeleton.client.auth import AuthClient
 from skeleton.client.builds import BuildsClient
 from skeleton.client.cancel import CancelToken
+from skeleton.client.events import EventsClient
 from skeleton.client.errors import (
     SkeletonCancelledError,
     SkeletonClientError,
@@ -40,6 +41,7 @@ __all__ = [
     "AuthClient",
     "BuildsClient",
     "CancelToken",
+    "EventsClient",
     "GatewayClient",
     "MemoryClient",
     "Project",

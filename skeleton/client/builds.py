@@ -16,6 +16,9 @@ from skeleton.client.cancel import CancelToken
 from skeleton.client.gateway import GatewayClient
 from skeleton.client.streaming import StreamEvent, stream_events
 
+# GET /api/v1/events (canonical realtime stream, #4128) is declared in
+# skeleton.client.events.SDK_ROUTES; stream_events uses it via skeleton.client.realtime.
+
 SDK_ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", "/api/v1/engine/executions"),
     ("GET", "/api/v1/engine/executions/{execution_id}"),
@@ -108,13 +111,52 @@ class BuildsClient:
         *,
         last_event_id: str | None = None,
         cursor: str | None = None,
+        channels: tuple[str, ...] = ("build", "agent"),
+        transport: Any = None,
+        http_client: Any = None,
+        on_reset: Callable[[Any], Any] | None = None,
+        realtime_options: Mapping[str, Any] | None = None,
     ) -> Iterator[StreamEvent]:
-        """PROVISIONAL: the transport is pending Walt's realtime decision and
-        will delegate to ``skeleton/client/realtime``.
+        """Live events for one execution from the canonical ``GET /api/v1/events``.
 
+        Delegates to ``skeleton.client.realtime.RealtimeClient`` (#4128) through
+        :func:`skeleton.client.events.stream_realtime`, filtered server-side with
+        ``?job_id=<execution_id>`` with required actor/tenant scope and the
+        GatewayClient bearer service credential. Resumes
+        from ``last_event_id`` (or ``cursor``; both are sent as Last-Event-ID),
+        reconnects with jittered backoff, and yields ``stream.reset`` /
+        ``stream.lagged`` control events. Runs until ``cancel`` fires or the
+        generator is closed. Seal: the gateway's ``x-gf-seal`` per connect.
+        """
+        from skeleton.client.events import stream_realtime
+        if not execution_id:
+            raise ValueError("execution_id is required")
+        return stream_realtime(
+            self._gw, channels=channels, job_id=execution_id,
+            actor_id=self.actor_id, tenant_id=self.tenant_id,
+            last_event_id=last_event_id, cursor=cursor, cancel=cancel,
+            transport=transport, http_client=http_client, on_reset=on_reset,
+            realtime_options=realtime_options,
+        )
+    def stream_execution_events(
+        self,
+        execution_id: str,
+        cancel: CancelToken | None = None,
+        *,
+        last_event_id: str | None = None,
+        cursor: str | None = None,
+    ):
+        """One-shot read of the per-execution filtered view.
+
+        GET /api/v1/engine/executions/{id}/events (SSE when the hub is
+        mounted, otherwise today's JSON snapshot). No reconnect. This is the
+        pre-#4128 stream_events behaviour, kept for snapshot-style callers.
+
+        PROVISIONAL: the transport is pending Walt's realtime decision and
+        will delegate to skeleton/client/realtime.
         Yields SSE v1 envelopes, or the events of today's JSON snapshot.
-        Resume uses ``last_event_id`` (sent as the Last-Event-ID header) or
-        ``cursor`` (sent as ``?cursor=``). It does not reconnect.
+        Resume uses last_event_id (sent as the Last-Event-ID header) or
+        cursor (sent as ?cursor=). It does not reconnect.
         """
         return stream_events(
             self._gw, f"/api/v1/engine/executions/{_seg(execution_id)}/events",

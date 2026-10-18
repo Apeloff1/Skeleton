@@ -91,6 +91,10 @@ def _iter_paths(routes: object, prefix: str, stack: tuple[int, ...]):
                         raise RuntimeError(_UNINSPECTABLE)
                     continue
                 yield from _iter_paths(children, full, here)
+            elif isinstance(getattr(route, "routes", None), (list, tuple)):
+                # Structural route wrappers (including test/studio adapters)
+                # can expose child routes without being Starlette Mounts.
+                yield from _iter_paths(route.routes, full, here)
             continue
         if original is not None:
             context = getattr(route, "include_context", None)
@@ -98,6 +102,18 @@ def _iter_paths(routes: object, prefix: str, stack: tuple[int, ...]):
             if not isinstance(extra, str):
                 raise RuntimeError(_UNINSPECTABLE)
             yield from _iter_paths(getattr(original, "routes", None), _join(prefix, extra), here)
+            continue
+        candidates = getattr(route, "effective_candidates", None)
+        if callable(candidates):
+            # FastAPI and local router adapters may expose a lazy route list.
+            # Inspect every candidate; refuse opaque or malformed results.
+            try:
+                nested = candidates()
+            except Exception as exc:
+                raise RuntimeError(_UNINSPECTABLE) from exc
+            if not isinstance(nested, (list, tuple)):
+                raise RuntimeError(_UNINSPECTABLE)
+            yield from _iter_paths(nested, prefix, here)
             continue
         if isinstance(getattr(route, "host", None), str):
             # Starlette Host: same path space, walk its app's table (opaque -> refuse).
@@ -119,13 +135,22 @@ def iter_route_paths(app: object) -> list[str]:
 
 
 def reject_cortex_secret_routes(app: object) -> None:
-    """Refuse app startup if a registered HTTP path exposes cortex secrets."""
+    """Refuse startup if any inspectable route reaches cortex secrets.
+
+    Includes FastAPI lazy routers, structural candidates and nested mounts;
+    opaque/uninspectable entries are rejected by iter_route_paths.
+    """
     for path in iter_route_paths(app):
-        if _is_secrets(path):
-            raise RuntimeError(
-                "unchartered cortex secrets HTTP route is forbidden: "
-                "keep cortex_routes unmounted"
-            )
+        _reject_secret_path(path)
+
+
+def _reject_secret_path(path: str) -> None:
+    """Reject normalized and multiply percent-decoded cortex secret aliases."""
+    if _is_secrets(path):
+        raise RuntimeError(
+            "unchartered cortex secrets HTTP route is forbidden: "
+            "keep cortex_routes unmounted"
+        )
 
 
 class CortexRouteGuardMiddleware:

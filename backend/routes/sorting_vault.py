@@ -5,7 +5,7 @@ Connects to: Code Vault, Asset Vault, Template Vault, Snippet Vault, Project Vau
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
@@ -54,8 +54,15 @@ class SortingRule(BaseModel):
     name: str
     conditions: List[Dict[str, Any]] = Field(..., min_length=1, max_length=100)
     action: str = Field(..., min_length=1, max_length=50)  # move_to_folder, tag, archive, star
-    target: str = Field(..., min_length=1, max_length=200)
+    # star/archive/tag do not need a folder. move_to_folder still requires one.
+    target: str = Field(default="", max_length=200)
     enabled: bool = True
+
+    @model_validator(mode="after")
+    def move_requires_target(self):
+        if self.action == "move_to_folder" and not str(self.target or "").strip():
+            raise ValueError("move_to_folder requires a target")
+        return self
 
 class VaultConnection(BaseModel):
     vault_id: str
