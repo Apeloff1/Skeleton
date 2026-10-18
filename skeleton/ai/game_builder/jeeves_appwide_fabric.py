@@ -370,6 +370,7 @@ OPERATIONS = {
     "game.compile.original":("compute", "bounded replay-verified browser game compiler",True),
     "game.compile.native":("compute", "bounded original game plus native source compiler",True),
     "game.mirror.review":("compute", "adversarial original game replay and source mirror",True),
+    "system.triad":("compute", "Jeeves, Dragon, and adversarial connection of every game-builder part",True),
     "companion.simulate":("compute", "consent-bound Dragon state machine rehearsal",False),
     "crawler.catalog":("read", "existing source workers and acquisition state",False),
     "tool.fabric":("read", "native canonical tool contract and executor status",False),
@@ -501,6 +502,14 @@ class JeevesAppwideRuntime:
                                  session=params.get("session"),
                                  cast=params.get("cast"),region=params.get("region"),
                                  act=params.get("act"),scene=params.get("scene"))
+        elif action=="system.triad":
+            from .studio_role_triad import connect_system_triad
+            if set(params) - {"seed", "mirror_attempts"}:
+                raise JeevesAppwideError("role triad accepts only seed and mirror attempts")
+            result=connect_system_triad(
+                seed=params.get("seed", 17),
+                mirror_attempts=params.get("mirror_attempts", 64),
+                authorized=True)
         elif action in (
             "forge.kinds","forge.graph","game.compile.original",
             "game.compile.native","game.mirror.review","companion.simulate",
