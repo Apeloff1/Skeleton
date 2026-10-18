@@ -70,12 +70,11 @@ class AppAssemblySourcePathsTests(unittest.TestCase):
         bootstrap = manual.split("## Mandatory bootstrap", 1)[1].split(
             "Do not infer architecture", 1
         )[0]
-        ordered_sources = re.findall(r"(?m)^\\d+\\. \\u0060([^\\u0060]+)\\u0060$", bootstrap)
+        ordered_sources = re.findall(r"(?m)^\d+\. `([^`]+)`$", bootstrap)
         self.assertEqual(ordered_sources, construction["provider_bootstrap"]["must_read"])
-        self.assertIn(f"Architecture tag: \`{architecture['architecture_tag']}\`", manual)
-        self.assertIn(f"Construction version: \`{construction['construction_version']}\`", manual)
-        self.assertIn("| Runtime model provider boundary | \`skeleton/provider_runtime.py\`", manual)
-
+        self.assertIn(f"Architecture tag: `{architecture['architecture_tag']}`", manual)
+        self.assertIn(f"Construction version: `{construction['construction_version']}`", manual)
+        self.assertIn("| Runtime model provider boundary | `skeleton/provider_runtime.py`", manual)
 
 if __name__ == "__main__":
     unittest.main()
