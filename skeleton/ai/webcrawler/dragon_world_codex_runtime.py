@@ -268,6 +268,50 @@ def codex_cell(address:CodexAddress,state:CodexState,
         glider_trained=state.axis_mastery[128+EXTENSION_AXIS_INDEX["glider_lift"]]>=2
         reachable=(island and (bridges>=128 or glider_trained or
                    "cross_sky_islands" in state.opened_gates))
+        # Coupled systems, not isolated cosmetic knobs: these bounded scores
+        # combine geography, ecology, migration, engineering and visual design.
+        # Each derived profile is source-deterministic and changes with edits.
+        base["world_interactions"]={
+            "sky_settlement_viability":max(0,min(255,(
+                sky+codex.level("floating_settlements")+
+                codex.level("thermal_updrafts")+
+                codex.level("construction_integrity")-
+                shear-codex.level("aerial_isolation"))//3)),
+            "aerial_trade_access":max(0,min(255,(
+                codex.level("airship_lanes")+
+                codex.level("trade_route_activity")+bridges-
+                codex.level("fast_travel_cost"))//3)),
+            "migration_and_habitat":max(0,min(255,(
+                codex.level("migration_corridors")+
+                codex.level("creature_sociality")+
+                codex.level("ecological_feedback")-
+                codex.level("wilderness_encroachment"))//3)),
+            "underground_hazard":max(0,min(255,(
+                codex.level("magma_tides")+
+                codex.level("tectonic_ruptures")+
+                codex.level("deep_strata")-
+                codex.level("construction_integrity"))//3)),
+            "ocean_travel_pressure":max(0,min(255,(
+                codex.level("deepwater_pressure")+
+                codex.level("underwater_currents")+
+                codex.level("supercell_frequency")-
+                codex.level("amphibious_travel"))//3)),
+            "cinematic_scene_depth":max(0,min(255,(
+                codex.level("camera_parallax")+
+                codex.level("horizon_depth")+
+                codex.level("volumetric_lighting")+
+                codex.level("atmospheric_perspective"))//4)),
+            "dynamic_environment_response":max(0,min(255,(
+                codex.level("weather_reactivity")+
+                codex.level("environmental_animation")+
+                codex.level("physical_weather_coupling")+
+                codex.level("terrain_erosion_rate"))//4)),
+            "persistent_social_consequence":max(0,min(255,(
+                codex.level("faction_memory_depth")+
+                codex.level("consequence_persistence")+
+                codex.level("settlement_interdependence")+
+                codex.level("recovery_complexity"))//4)),
+        }
         base["aerial_topology"]={
             "sky_island_present":island,
             "sky_island_elevation":(8+sky//12+state.altitude*4 if island else 0),
