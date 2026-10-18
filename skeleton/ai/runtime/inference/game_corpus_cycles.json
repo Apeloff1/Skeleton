@@ -225,5 +225,80 @@
       "rollback_trigger": "keep the rollback network when any track is above its half target",
       "promotion": false
     }
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "bytes_trained": 35003063,
+    "cycle_start": 34486389,
+    "cycle_bytes": 516674,
+    "goal": 42874997,
+    "official_tracks": {
+      "visual": 1.5016526719163024,
+      "narrative": 1.4629118592428343,
+      "systems": 1.4966765903978754,
+      "review": 1.4978585346301407,
+      "practice": 1.4873938926672934
+    },
+    "torch_best_tracks": {
+      "visual": 1.501652717590332,
+      "narrative": 1.46291184425354,
+      "systems": 1.4966766834259033,
+      "review": 1.4978584051132202,
+      "practice": 1.4873939752578735
+    },
+    "ratchet": {
+      "margin": 1e-05,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 8,
+      "rejects": 23,
+      "accept_rate": 0.0
+    },
+    "model_digest": "9121fca460dd2d4e014d7a57659e932f19f0577b5672a71fa24c3d964c039a78",
+    "seconds": 21.284,
+    "loss_focus": null,
+    "selection": "maximal",
+    "promotion": false,
+    "enterprise": {
+      "schema": "skeleton.game_finetune_enterprise.v1",
+      "standardized": true,
+      "enterprise_qualified": false,
+      "owner": "skeleton.ai.runtime.inference",
+      "runtime_root_added": false,
+      "levels": {
+        "L00": "inference package owns the byte network and the local transformer candidate",
+        "L01": "no new runtime root; NumpyRecurrentLM and TinyTransformer stay the owners",
+        "L02": "half targets are half the measured baseline; holdout text is not a training target",
+        "L03": "promotion stays false; a serving checkpoint is not replaced",
+        "L04": "each round tries every legal source and keeps the prediction step that raises every track",
+        "L05": "weights stay under the gitignored checkpoint directory",
+        "L06": "original lessons only; no personal data and no commercial game text",
+        "L07": "a rejected or non-finite step restores the weights",
+        "L08": "official track losses, digest, accepts, and rejects are on the receipt",
+        "L09": "byte budget, learning rate, hidden size, and seconds are recorded",
+        "L10": "official NumpyRecurrentLM reload is the acceptance measurement",
+        "L11": "rollback digest is the pre-finetune network; use it when the half is not met",
+        "L12": "PAUSE saves and waits; a reject plateau keeps the best weights",
+        "L13": "not an enterprise-qualified volume; the half target is explicit and unmet until measured"
+      },
+      "half_targets": {
+        "visual": 0.7527518508867604,
+        "narrative": 0.7383703856276141,
+        "systems": 0.75549293202513,
+        "review": 0.7797221628378603,
+        "practice": 0.7636280441484232
+      },
+      "half_met": {
+        "visual": false,
+        "narrative": false,
+        "systems": false,
+        "review": false,
+        "practice": false
+      },
+      "half_met_all": false,
+      "rollback_digest": "0e45ff72aaea58646e918e9a0442c3df30ee6912a060a663674c463531c1da75",
+      "rollback_trigger": "keep the rollback network when any track is above its half target",
+      "promotion": false
+    }
   }
 ]
