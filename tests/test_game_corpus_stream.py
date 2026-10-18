@@ -85,21 +85,49 @@ def test_track_holdouts_are_outside_the_training_serials():
         assert render(domain, 0) not in held
 
 
-def test_ratchet_tightens_and_does_not_loosen():
+def test_ratchet_keeps_a_mean_gain_and_blocks_a_track_collapse():
     ratchet = AdaptiveRatchet()
     before = {"visual": 2.0, "narrative": 2.0, "systems": 2.0}
     assert ratchet.observe(before, {name: 1.5 for name in before}) is True
-    tightened_margin = ratchet.margin
-    assert tightened_margin > 0
-    tiny = {name: before[name] - tightened_margin / 2 for name in before}
+    assert ratchet.margin > 0
+    collapsed = {"visual": 1.0, "narrative": 1.0, "systems": 2.5}
+    assert ratchet.observe(before, collapsed) is False
+    tiny = {name: before[name] - ratchet.margin / 2 for name in before}
     assert ratchet.observe(before, tiny) is False
-    assert ratchet.margin == tightened_margin
-    for _ in range(7):
-        assert ratchet.observe(before, tiny) is False
-    assert ratchet.margin == tightened_margin / 2
-    assert ratchet.tighten(0, 100) > ratchet.tighten(50, 100) > ratchet.tighten(100, 100)
-    assert ratchet.tighten(0, 100) == ratchet.scale
-    assert ratchet.scale == ratchet.min_scale
+
+
+def test_ratchet_shrinks_steps_and_tightens_across_the_cycle():
+    ratchet = AdaptiveRatchet()
+    before = {"visual": 2.0, "narrative": 2.0, "systems": 2.0}
+    worse = {name: 2.1 for name in before}
+    scale = ratchet.scale
+    locked = ratchet.margin
+    for _ in range(4):
+        assert ratchet.observe(before, worse) is False
+    assert ratchet.scale < scale
+    assert ratchet.margin < locked
+    assert ratchet.margin >= ratchet.margin_floor
+    fresh = AdaptiveRatchet()
+    assert fresh.tighten(0, 100) > fresh.tighten(50, 100) > fresh.tighten(100, 100)
+    assert fresh.scale == fresh.min_scale
+
+
+def test_another_cycle_continues_from_the_saved_network():
+    root = Path(tempfile.mkdtemp())
+    first = train_budget(budget_bytes=4096, checkpoint_dir=root, hidden=32, chunk_docs=8)
+    second = train_budget(
+        additional_bytes=4096,
+        peak_lr=3e-4,
+        checkpoint_dir=root,
+        hidden=32,
+        chunk_docs=8,
+    )
+    assert second["bytes_trained"] >= first["bytes_trained"] + 4096
+    assert second["cycle_bytes"] >= 4096
+    assert second["promotion"] is False
+    assert second["adamw"]["lr"] == 3e-4
+    assert set(first["mastery"]) <= set(second["mastery"])
+    assert second["schema"] == "skeleton.game_adaptive_ratchet.v2"
 
 
 def test_a_short_budget_trains_without_promoting():

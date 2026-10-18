@@ -1,9 +1,10 @@
 """Adaptive ratchet for the game-creation byte network.
 
-AdamW uses the standard betas, epsilon, and decoupled weight decay. The
-ratchet keeps a step only when every holdout track improves, then tightens
-the required gain and the step scale. It does not loosen. Holdout text is
-never a training target, and nothing here promotes a checkpoint.
+AdamW uses the standard betas, epsilon, and decoupled weight decay. A chunk
+is kept when the mean holdout improves and no track regresses past an
+adaptive slack. The step scale hunts a stable acceptance rate under a cosine
+ceiling that tightens across the cycle. Holdout text is never a training
+target, and nothing here promotes a checkpoint.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import json
 import math
 import os
 import time
+from collections import deque
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -30,7 +32,7 @@ from skeleton.ai.runtime.inference.game_corpus_stream import (
 from skeleton.ai.runtime.inference.neural import BOS, EOS, NeuralLMConfig, NumpyRecurrentLM
 from skeleton.jeeves.matrices import SamMatrix
 
-SCHEMA = "skeleton.game_adaptive_ratchet.v1"
+SCHEMA = "skeleton.game_adaptive_ratchet.v2"
 ADAMW_LR = 1e-3
 ADAMW_BETAS = (0.9, 0.999)
 ADAMW_EPS = 1e-8
@@ -41,55 +43,91 @@ WARMUP_BYTES = 1024 * 1024
 
 
 class AdaptiveRatchet:
-    """Acceptance bar and step scale. Both move only toward a tighter fit."""
+    """Mean-gain gate, per-track slack, and a step scale that hunts a stable accept rate."""
 
-    def __init__(self, *, margin_cap: float = 5e-4, min_scale: float = 0.05) -> None:
-        if margin_cap <= 0 or min_scale <= 0 or min_scale > 1:
+    def __init__(
+        self,
+        *,
+        margin_cap: float = 5e-4,
+        min_scale: float = 0.05,
+        slack: float = 1e-4,
+        slack_cap: float = 5e-4,
+        target_accept: float = 0.4,
+    ) -> None:
+        if margin_cap <= 0 or min_scale <= 0 or min_scale > 1 or slack <= 0 or slack_cap < slack:
             raise ValueError("ratchet bounds are invalid")
-        self.margin = 0.0
+        if not 0.05 <= target_accept <= 0.8:
+            raise ValueError("target_accept is out of range")
+        self.margin = 1e-5
+        self.margin_floor = 1e-6
         self.margin_cap = float(margin_cap)
         self.scale = 1.0
         self.min_scale = float(min_scale)
+        self.slack = float(slack)
+        self.slack_cap = float(slack_cap)
+        self.target_accept = float(target_accept)
+        self.ceiling = 1.0
         self.accepts = 0
         self.rejects = 0
         self.reject_streak = 0
+        self.recent: deque[int] = deque(maxlen=16)
 
     def observe(self, before: Mapping[str, float], after: Mapping[str, float]) -> bool:
         if set(before) != set(after) or not before:
             raise ValueError("ratchet tracks must match")
         gains = {name: float(before[name]) - float(after[name]) for name in before}
-        accepted = all(gain > self.margin for gain in gains.values())
+        mean_gain = sum(gains.values()) / len(gains)
+        worst = min(gains.values())
+        accepted = mean_gain > self.margin and worst >= -self.slack
+        self.recent.append(int(accepted))
         if accepted:
             self.accepts += 1
             self.reject_streak = 0
-            smallest = min(gains.values())
-            # The bar rises toward a fraction of the gain and stays capped.
-            self.margin = min(self.margin_cap, max(self.margin, smallest * 0.25))
+            # The bar only rises on a kept step. A reject run is what eases it.
+            self.margin = min(self.margin_cap, max(self.margin, mean_gain * 0.2))
+            self.slack = max(1e-5, self.slack * 0.98)
         else:
             self.rejects += 1
             self.reject_streak += 1
-            # After a run of rejects, ease the bar so a smaller real gain can pass.
-            # The step scale still tightens with the byte budget.
-            if self.reject_streak >= 8 and self.margin > 0:
-                self.margin *= 0.5
+            if self.reject_streak >= 4:
+                self.scale = max(self.min_scale, self.scale * 0.9)
+                self.slack = min(self.slack_cap, self.slack * 1.15)
+                self.margin = max(self.margin_floor, self.margin * 0.5)
                 self.reject_streak = 0
+        self._adapt_scale()
+        self.scale = min(self.scale, self.ceiling)
         return accepted
 
-    def tighten(self, bytes_done: int, budget_bytes: int) -> float:
-        """Cosine step scale from 1 at the start of the budget to the floor at the end."""
-        if budget_bytes < 1:
-            raise ValueError("budget_bytes must be positive")
-        progress = min(1.0, max(0.0, bytes_done / budget_bytes))
-        scheduled = self.min_scale + (1.0 - self.min_scale) * 0.5 * (1.0 + math.cos(math.pi * progress))
-        self.scale = min(self.scale, scheduled)
+    def _adapt_scale(self) -> None:
+        if len(self.recent) < 8:
+            return
+        rate = sum(self.recent) / len(self.recent)
+        if rate < self.target_accept - 0.15:
+            self.scale = max(self.min_scale, self.scale * 0.95)
+        elif rate > self.target_accept + 0.2:
+            self.scale = min(self.ceiling, self.scale * 1.02)
+
+    def tighten(self, cycle_bytes: int, cycle_budget: int) -> float:
+        """Cosine ceiling from 1 at the start of this cycle to the floor at the end."""
+        if cycle_budget < 1:
+            raise ValueError("cycle_budget must be positive")
+        progress = min(1.0, max(0.0, cycle_bytes / cycle_budget))
+        self.ceiling = self.min_scale + (1.0 - self.min_scale) * 0.5 * (1.0 + math.cos(math.pi * progress))
+        self.scale = min(self.scale, self.ceiling)
         return self.scale
 
     def snapshot(self) -> dict[str, float | int]:
+        rate = (sum(self.recent) / len(self.recent)) if self.recent else 0.0
         return {
             "margin": self.margin,
             "scale": self.scale,
+            "ceiling": self.ceiling,
+            "slack": self.slack,
             "accepts": self.accepts,
             "rejects": self.rejects,
+            "reject_streak": self.reject_streak,
+            "accept_rate": rate,
+            "recent": [int(item) for item in self.recent],
         }
 
 
@@ -159,6 +197,10 @@ def _save_checkpoint(
     mastery: SamMatrix,
     bytes_done: int,
     best_state: dict[str, torch.Tensor],
+    goal: int,
+    cycle_start: int,
+    replay: deque[tuple[str, str]],
+    domain_ema: Mapping[str, float],
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -166,30 +208,136 @@ def _save_checkpoint(
         "optimizer": opt.state_dict(),
         "ratchet": ratchet.snapshot(),
         "mastery": mastery.snapshot(),
+        "sam_records": mastery.export_records(),
         "bytes_done": bytes_done,
         "best_state": best_state,
         "hidden": model.hidden,
+        "goal": goal,
+        "cycle_start": cycle_start,
+        "replay": list(replay),
+        "domain_ema": dict(domain_ema),
     }
     tmp = path.with_suffix(".tmp")
     torch.save(payload, tmp)
     os.replace(tmp, path)
 
 
+def _restore_learning(
+    mastery: SamMatrix,
+    saved: Mapping[str, Any],
+    replay: deque[tuple[str, str]],
+    domain_ema: dict[str, float],
+) -> None:
+    """Carry review memory, accepted text, and domain difficulty into the next cycle."""
+    records = saved.get("sam_records")
+    if isinstance(records, list) and records:
+        mastery.load_records(records)
+    ema = saved.get("domain_ema")
+    if isinstance(ema, dict):
+        for name, value in ema.items():
+            numeric = float(value)
+            if math.isfinite(numeric):
+                domain_ema[str(name)] = numeric
+    stored = saved.get("replay", [])
+    if isinstance(stored, list):
+        for item in stored:
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                replay.append((str(item[0]), str(item[1])))
+
+
+def _restore_ratchet(ratchet: AdaptiveRatchet, saved: Mapping[str, Any]) -> None:
+    state = saved.get("ratchet", {})
+    if not isinstance(state, dict):
+        return
+    ratchet.margin = float(state.get("margin", ratchet.margin))
+    ratchet.slack = float(state.get("slack", ratchet.slack))
+    ratchet.accepts = int(state.get("accepts", 0))
+    ratchet.rejects = int(state.get("rejects", 0))
+    ratchet.scale = float(state.get("scale", 1.0))
+    ratchet.ceiling = float(state.get("ceiling", ratchet.ceiling))
+    ratchet.reject_streak = int(state.get("reject_streak", 0))
+    ratchet.recent.clear()
+    recent = state.get("recent", [])
+    if isinstance(recent, list):
+        ratchet.recent.extend(int(item) for item in recent)
+    ratchet.scale = min(max(ratchet.scale, ratchet.min_scale), ratchet.ceiling)
+
+
+def _warmup(cycle_bytes: int, *, continuation: bool) -> float:
+    ramp = min(1.0, max(cycle_bytes, 1) / WARMUP_BYTES)
+    # A continuation already has a fitted network, so the step starts small
+    # rather than at zero and can still climb while the accept rate allows it.
+    if continuation:
+        return 0.15 + 0.85 * ramp
+    return ramp
+
+
+def _append_ledger(path: Path, receipt: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows: list[dict[str, Any]] = []
+    if path.exists():
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, list):
+            raise ValueError("cycle ledger must be a list")
+        rows = loaded
+    row = {
+        "schema": receipt["schema"],
+        "bytes_trained": receipt["bytes_trained"],
+        "cycle_start": receipt["cycle_start"],
+        "cycle_bytes": receipt["cycle_bytes"],
+        "goal": receipt["goal"],
+        "official_tracks": receipt["official_tracks"],
+        "torch_best_tracks": receipt["torch_best_tracks"],
+        "ratchet": {
+            key: receipt["ratchet"][key]
+            for key in ("margin", "scale", "slack", "accepts", "rejects", "accept_rate")
+            if key in receipt["ratchet"]
+        },
+        "model_digest": receipt["model_digest"],
+        "seconds": receipt["seconds"],
+        "promotion": False,
+    }
+    if rows and rows[-1].get("model_digest") == row["model_digest"] and rows[-1].get("bytes_trained") == row["bytes_trained"]:
+        rows[-1] = row
+    else:
+        rows.append(row)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _fresh_optimizer(parameters: list[torch.nn.Parameter], peak_lr: float) -> torch.optim.AdamW:
+    return torch.optim.AdamW(
+        parameters,
+        lr=peak_lr,
+        betas=ADAMW_BETAS,
+        eps=ADAMW_EPS,
+        weight_decay=ADAMW_WEIGHT_DECAY,
+    )
+
+
 def train_budget(
     *,
     budget_bytes: int = BUDGET_BYTES,
+    additional_bytes: int | None = None,
+    peak_lr: float = ADAMW_LR,
     checkpoint_dir: Path | str = Path(".skeleton/game-corpus-199"),
     hidden: int = HIDDEN,
     chunk_docs: int = 192,
+    ledger_path: Path | str | None = None,
     log: Any = None,
 ) -> dict[str, Any]:
-    """Train until `budget_bytes` of original text have been stepped.
+    """Train until the byte goal is met.
 
-    A PAUSE file in the checkpoint directory finishes the current chunk,
-    saves, and waits. Removing the file resumes the same run.
+    `additional_bytes` continues a saved network for another measured cycle.
+    A PAUSE file finishes the current chunk, saves, and waits.
     """
     if isinstance(budget_bytes, bool) or not isinstance(budget_bytes, int) or budget_bytes < 1:
         raise ValueError("budget_bytes must be a positive int")
+    if additional_bytes is not None and (isinstance(additional_bytes, bool) or additional_bytes < 1):
+        raise ValueError("additional_bytes must be a positive int")
+    if not isinstance(peak_lr, (int, float)) or isinstance(peak_lr, bool) or not 0.0 < float(peak_lr) <= 1.0:
+        raise ValueError("peak_lr must be in (0, 1]")
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     pause = root / "PAUSE"
@@ -199,16 +347,13 @@ def train_budget(
     tracks = track_holdouts()
     model = ByteRNN(hidden)
     parameters = [p for p in model.parameters() if p.requires_grad]
-    opt = torch.optim.AdamW(
-        parameters,
-        lr=ADAMW_LR,
-        betas=ADAMW_BETAS,
-        eps=ADAMW_EPS,
-        weight_decay=ADAMW_WEIGHT_DECAY,
-    )
+    peak_lr = float(peak_lr)
+    opt = _fresh_optimizer(parameters, peak_lr)
     ratchet = AdaptiveRatchet()
     mastery = SamMatrix()
     stream = CorpusStream()
+    replay: deque[tuple[str, str]] = deque(maxlen=256)
+    domain_ema: dict[str, float] = {}
     bytes_done = 0
     best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
     best_scores = _scores(model, tracks)
@@ -216,20 +361,38 @@ def train_budget(
         saved = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         if int(saved["hidden"]) != hidden:
             raise ValueError("checkpoint hidden size does not match")
-        model.load_state_dict(saved["model"])
-        opt.load_state_dict(saved["optimizer"])
-        ratchet.margin = float(saved["ratchet"]["margin"])
-        ratchet.accepts = int(saved["ratchet"]["accepts"])
-        ratchet.rejects = int(saved["ratchet"]["rejects"])
-        # The schedule owns the step scale. A resumed run does not keep a collapsed value.
-        ratchet.scale = 1.0
+        model.load_state_dict(saved["best_state"])
+        _pin(model)
         bytes_done = int(saved["bytes_done"])
-        best_state = saved["best_state"]
-        model.load_state_dict(best_state)
+        best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
         best_scores = _scores(model, tracks)
+        goal = bytes_done + additional_bytes if additional_bytes is not None else budget_bytes
+        _restore_learning(mastery, saved, replay, domain_ema)
+        same_cycle = int(saved.get("goal", -1)) == goal
+        if same_cycle:
+            model.load_state_dict(saved["model"])
+            _pin(model)
+            opt.load_state_dict(saved["optimizer"])
+            _restore_ratchet(ratchet, saved)
+            cycle_start = int(saved.get("cycle_start", bytes_done))
+        else:
+            opt = _fresh_optimizer(parameters, peak_lr)
+            ratchet = AdaptiveRatchet()
+            cycle_start = bytes_done
+    else:
+        goal = additional_bytes if additional_bytes is not None else budget_bytes
+        cycle_start = 0
     started = time.perf_counter()
     model.train()
-    while bytes_done < budget_bytes:
+    if log is not None:
+        print(
+            f"cycle_start={cycle_start} bytes={bytes_done} goal={goal} "
+            f"tracks={ {k: round(v, 6) for k, v in best_scores.items()} } "
+            f"replay={len(replay)} mastered={len(mastery.snapshot())}",
+            file=log,
+            flush=True,
+        )
+    while bytes_done < goal:
         if pause.exists():
             _save_checkpoint(
                 ckpt_path,
@@ -239,9 +402,13 @@ def train_budget(
                 mastery=mastery,
                 bytes_done=bytes_done,
                 best_state=best_state,
+                goal=goal,
+                cycle_start=cycle_start,
+                replay=replay,
+                domain_ema=domain_ema,
             )
             status_path.write_text(
-                json.dumps({"state": "paused", "bytes_done": bytes_done, "budget_bytes": budget_bytes}) + "\n",
+                json.dumps({"state": "paused", "bytes_done": bytes_done, "goal": goal}) + "\n",
                 encoding="utf-8",
             )
             if log is not None:
@@ -250,45 +417,68 @@ def train_budget(
                 time.sleep(0.5)
             if log is not None:
                 print("resumed", file=log, flush=True)
-        due = set(mastery.review_queue(limit=8))
-        for name in due:
+        review = set(mastery.review_queue(limit=6))
+        if domain_ema:
+            level = sorted(domain_ema.values())[len(domain_ema) // 2]
+            level = level if level > 0 else 1.0
+            for name, ema in domain_ema.items():
+                stream.weights[name] = min(3.0, max(0.5, ema / level))
+        for name in review:
             if name in stream.weights:
-                stream.weights[name] = max(stream.weights[name], 2.0)
+                stream.weights[name] = min(3.0, max(stream.weights[name], 1.5))
+        fresh_docs = chunk_docs if len(replay) < 32 else max(1, int(chunk_docs * 0.6))
         batch: list[tuple[str, str]] = []
         batch_bytes = 0
-        while len(batch) < chunk_docs and bytes_done + batch_bytes < budget_bytes:
+        while len(batch) < fresh_docs and bytes_done + batch_bytes < goal:
             domain, text = stream.next_document()
+            batch.append((domain, text))
+            batch_bytes += len(text.encode("utf-8"))
+        replay_index = 0
+        while len(batch) < chunk_docs and replay and bytes_done + batch_bytes < goal:
+            domain, text = replay[replay_index % len(replay)]
+            replay_index += 1
             batch.append((domain, text))
             batch_bytes += len(text.encode("utf-8"))
         if not batch:
             break
         before = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
         opt_state = copy.deepcopy(opt.state_dict())
-        warmup = min(1.0, max(bytes_done, 1) / WARMUP_BYTES)
-        ratchet.tighten(bytes_done, budget_bytes)
-        opt.param_groups[0]["lr"] = ADAMW_LR * warmup * ratchet.scale
+        cycle_bytes = max(0, bytes_done - cycle_start)
+        cycle_budget = max(1, goal - cycle_start)
+        warmup = _warmup(cycle_bytes, continuation=cycle_start > 0)
+        ratchet.tighten(cycle_bytes, cycle_budget)
+        opt.param_groups[0]["lr"] = peak_lr * warmup * ratchet.scale
         loss = _batch_loss(model, [text for _domain, text in batch])
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(parameters, GRAD_CLIP)
         opt.step()
         _pin(model)
+        domain_loss = float(loss.detach())
+        if not math.isfinite(domain_loss):
+            model.load_state_dict(before)
+            opt.load_state_dict(opt_state)
+            _pin(model)
+            ratchet.scale = max(ratchet.min_scale, ratchet.scale * 0.5)
+            bytes_done += batch_bytes
+            continue
         after_scores = _scores(model, tracks)
         kept = ratchet.observe(best_scores, after_scores)
-        domain_loss = float(loss.detach())
         for domain, _text in batch:
-            mastery.record_attempt(domain, success=kept and domain_loss < 2.5, weight=0.05)
-            if not kept:
-                stream.weights[domain] = min(4.0, stream.weights[domain] + 0.01)
+            previous = domain_ema.get(domain, domain_loss)
+            domain_ema[domain] = 0.9 * previous + 0.1 * domain_loss
+            mastery.record_attempt(domain, success=kept, weight=0.08 if kept else 0.02)
         if kept:
             best_scores = after_scores
             best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+            for item in batch:
+                replay.append(item)
         else:
             model.load_state_dict(before)
             opt.load_state_dict(opt_state)
             _pin(model)
         bytes_done += batch_bytes
-        if log is not None and (bytes_done // (8 * 1024 * 1024) != (bytes_done - batch_bytes) // (8 * 1024 * 1024) or bytes_done >= budget_bytes):
+        if log is not None and (bytes_done // (8 * 1024 * 1024) != (bytes_done - batch_bytes) // (8 * 1024 * 1024) or bytes_done >= goal):
             print(
                 f"bytes={bytes_done} loss={domain_loss:.4f} "
                 f"tracks={ {k: round(v, 4) for k, v in best_scores.items()} } "
@@ -313,6 +503,10 @@ def train_budget(
         mastery=mastery,
         bytes_done=bytes_done,
         best_state=best_state,
+        goal=goal,
+        cycle_start=cycle_start,
+        replay=replay,
+        domain_ema=domain_ema,
     )
     weights_path = root / "model.json"
     tmp = weights_path.with_suffix(".json.tmp")
@@ -321,10 +515,14 @@ def train_budget(
     receipt = {
         "schema": SCHEMA,
         "budget_bytes": budget_bytes,
+        "additional_bytes": additional_bytes,
+        "goal": goal,
+        "cycle_start": cycle_start,
         "bytes_trained": bytes_done,
+        "cycle_bytes": bytes_done - cycle_start,
         "hidden_size": hidden,
         "adamw": {
-            "lr": ADAMW_LR,
+            "lr": peak_lr,
             "betas": list(ADAMW_BETAS),
             "eps": ADAMW_EPS,
             "weight_decay": ADAMW_WEIGHT_DECAY,
@@ -345,13 +543,27 @@ def train_budget(
     }
     (root / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     status_path.write_text(json.dumps({"state": "complete", "bytes_done": bytes_done}) + "\n", encoding="utf-8")
+    if ledger_path is not None:
+        _append_ledger(Path(ledger_path), receipt)
     return receipt
 
 
 def main() -> None:
     import sys
 
-    print(json.dumps(train_budget(log=sys.stdout), indent=2), flush=True)
+    print(
+        json.dumps(
+            train_budget(
+                additional_bytes=BUDGET_BYTES,
+                peak_lr=3e-4,
+                chunk_docs=96,
+                ledger_path=Path("skeleton/ai/runtime/inference/game_corpus_cycles.json"),
+                log=sys.stdout,
+            ),
+            indent=2,
+        ),
+        flush=True,
+    )
 
 
 if __name__ == "__main__":
