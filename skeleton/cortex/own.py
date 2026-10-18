@@ -8,6 +8,7 @@ Two cortices interchange by exporting a Tract plus weights.
 """
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 import hashlib
 import json
