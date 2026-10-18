@@ -209,62 +209,62 @@ jobs:
           tests/test_generated_code_sandbox.py
       - name: Process invocation safety gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_process_safety.py
+        run: python scripts/check_process_safety.py
       - name: Unsafe deserialization safety gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_deserialization_safety.py
+        run: python scripts/check_deserialization_safety.py
       - name: Dynamic import safety gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_dynamic_import_safety.py
+        run: python scripts/check_dynamic_import_safety.py
       - name: Tar archive extraction safety gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_archive_extraction_safety.py
+        run: python scripts/check_archive_extraction_safety.py
       - name: High-confidence Python and JavaScript SAST gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_sast_security.py
+        run: python scripts/check_sast_security.py
       - name: Core/tooling Python high-confidence SAST gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
         run: python scripts/check_repository_python_sast.py
       - name: Security exception policy gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_security_exceptions.py
+        run: python scripts/check_security_exceptions.py
       - name: JavaScript child_process alias safety gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_js_process_alias_safety.py
+        run: python scripts/check_js_process_alias_safety.py
       - name: GitHub Actions workflow security gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_workflow_security.py
+        run: python scripts/check_workflow_security.py
       - name: GitHub Actions repository allowlist
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_workflow_action_allowlist.py
+        run: python scripts/check_workflow_action_allowlist.py
       - name: GitHub Actions token permissions
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_workflow_permissions.py
+        run: python scripts/check_workflow_permissions.py
       - name: Verify specialized CI tier contract
         if: steps.scope.outputs.full == 'true'
         working-directory: .
         run: python scripts/check_ci_workflow_tiers.py
       - name: GitHub Actions trigger-fanout audit
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_workflow_trigger_fanout.py
+        run: python scripts/check_workflow_trigger_fanout.py
       - name: GitHub Actions concurrency collision audit
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_workflow_concurrency.py
+        run: python scripts/check_workflow_concurrency.py
       - name: GitHub Actions workflow_run branch-completion contract
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_workflow_run_branch_completions.py
+        run: python scripts/check_workflow_run_branch_completions.py
       - name: Repository secret hygiene gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_secret_hygiene.py
+        run: python scripts/check_secret_hygiene.py
       - name: Repository malware and IOC gate
         if: steps.scope.outputs.full == 'true'
-        run: python backend/scripts/check_malware_iocs.py
+        run: python scripts/check_malware_iocs.py
       - name: Live-service backend test boundary
         if: steps.scope.outputs.full == 'true'
         run: |
-          python backend/scripts/check_live_service_test_boundaries.py
-          python -m pytest -q --noconftest backend/tests/test_live_service_test_boundaries.py
+          python scripts/check_live_service_test_boundaries.py
+          python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
       # Deep adversarial suite is specialized; scanner policy remains on PRs.
       - name: Security, provider-chaos, and developer-tooling adversarial regression tests
         if: steps.scope.outputs.full == 'true' && github.event_name == 'workflow_dispatch'
