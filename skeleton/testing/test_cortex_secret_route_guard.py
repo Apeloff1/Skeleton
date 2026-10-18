@@ -74,6 +74,48 @@ def test_route_inventory_is_required() -> None:
         )
 
 
+
+def test_lazy_included_router_prefixes_cannot_hide_nested_secret_paths() -> None:
+    # Lazy included routers may preserve their prefix rather than providing
+    # precomposed absolute paths on the outer FastAPI application.
+    leaf = SimpleNamespace(path="/secrets/rotate")
+    nested = SimpleNamespace(
+        path=None,
+        original_router=SimpleNamespace(routes=[leaf]),
+        include_context=SimpleNamespace(prefix="/v1"),
+    )
+    app = SimpleNamespace(routes=[
+        SimpleNamespace(
+            path=None,
+            original_router=SimpleNamespace(routes=[nested]),
+            include_context=SimpleNamespace(prefix="/api"),
+        ),
+    ])
+    with pytest.raises(RuntimeError, match="cortex secrets"):
+        reject_cortex_secret_routes(app)
+
+
+def test_uninspectable_router_candidates_fail_closed() -> None:
+    for candidates in (lambda: None, lambda: [SimpleNamespace(path=None)]):
+        router = SimpleNamespace(path=None, effective_candidates=candidates)
+        with pytest.raises(RuntimeError, match="uninspectable"):
+            reject_cortex_secret_routes(SimpleNamespace(routes=[router]))
+
+
+def test_opaque_mount_cannot_mask_secret_prefix() -> None:
+    # An ASGI app without routes is acceptable only where it cannot
+    # possibly serve the protected /api/v1/secrets prefix.
+    opaque = SimpleNamespace()
+    for path in ("/", "/api", "/api/v1", "/api/v1/secrets"):
+        route = SimpleNamespace(path=path, app=opaque)
+        with pytest.raises(RuntimeError, match="uninspectable"):
+            reject_cortex_secret_routes(SimpleNamespace(routes=[route]))
+    reject_cortex_secret_routes(
+        SimpleNamespace(routes=[SimpleNamespace(path="/public", app=opaque)])
+    )
+
+
+
 def test_real_application_factory_rejects_unchartered_cortex_paths() -> None:
     from skeleton.api.server import create_app
 
