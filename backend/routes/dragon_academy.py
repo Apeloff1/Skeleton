@@ -2164,6 +2164,21 @@ class NativePuzzleGridValidationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     levels: list[NativeOriginalGrid] = Field(min_length=1, max_length=8)
 
+    @model_validator(mode="after")
+    def require_bounded_puzzle_actors(self):
+        # Shape and character admission alone allows boards with a player in
+        # every cell. Reject impossible actor layouts before solver work.
+        for rows in self.levels:
+            flat = "".join(rows)
+            players = flat.count("@")
+            crates = flat.count("$")
+            goals = flat.count("o")
+            if players != 1 or crates not in (1, 2, 3) or goals != crates:
+                raise ValueError(
+                    "Original puzzle needs one player and 1..3 crates with matching goals"
+                )
+        return self
+
 
 @router.post("/native/production/puzzle/validate")
 def native_production_validate_puzzle(
