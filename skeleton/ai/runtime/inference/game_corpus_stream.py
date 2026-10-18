@@ -1,0 +1,475 @@
+"""Original game-creation corpus, streamed up to a byte budget.
+
+The lines are written for this tree. They are not excerpts from commercial
+games, manuals, or soundtracks. Held-out lines, including the English and
+A-to-Z measurement sentences, are a filter and never a training target.
+"""
+from __future__ import annotations
+
+import string
+from collections.abc import Iterator, Mapping
+
+BUDGET_BYTES = 199 * 1024 * 1024
+WINDOW = 40
+HOLDOUT_SERIAL = 10**12
+
+# Measurement sentences from the English and A-to-Z packs. Training text that
+# shares a 40-character window with any of these is discarded.
+DENYLIST: tuple[str, ...] = (
+    "When two scripts both subtract health, pick a single writer, route the other through an event, and replay the last fixed tick to prove the total matches the rule.",
+    "A puzzle saved during an animation stores the rule state rather than a decorative frame, and the loaded collision pose must agree with that state.",
+    "If the display rate falls from sixty to twenty, travel distance per simulated second stays put because the tick, not the picture rate, advances movement.",
+    "A replay stores the seed and the per-tick input words. Rebuilding the match from that file must match positions at the sampled ticks.",
+    "Choosing a 32k source and a 16k target is a divisor of 2 on the ladder, and the planner returns that divisor without building either bitmap.",
+    "Use nearest upscale when the palette must stay intact. Use a box average only when a mixed channel value is an accepted authoring choice.",
+    "If a winter scene adds a scarf, record the accessory on the sheet and leave skin, eyes, and hair untouched unless the scene states a reason.",
+    "A close portrait and a distant sprite of the same person use one sheet. The distant sprite may use fewer pixels and must not rename the eye colour.",
+    "A mended hem uses the trim colour for the repair mark and keeps the primary cloth colour on the rest of the garment.",
+    "Faded wear may darken an edge toward the outline colour in the micro pattern while the stored primary colour stays the same token.",
+    "Swapping a copper lantern for a gold lantern changes item colour only. The hand region, the light rule, and the rest of the character sheet stay.",
+    "A charm on the torso combines an accessory with an item kind. Clearing the charm clears those two fields and leaves eye colour and cloth alone.",
+    "The vertical slice is done when the core verb, its feedback, and one fair failure can be played from a fresh start without the deferred feature list.",
+    "A new biome is lower priority than a broken retry. Repair the retry, then decide whether the biome changes a real decision.",
+    "If players fail before they can see the tell, lengthen the telegraph or move the camera. Do not start by raising health.",
+    "A boss with two readable phases is enough for the slice. A third phase waits until both earlier phases have a fair counter.",
+    "A pitch that cannot name the repeated verb is still a theme, and the next writing task is that verb.",
+    "Session length is a design constraint. It decides how much tutorial, travel, and failure recovery the slice may contain.",
+    "If the loop needs a designer sitting beside the player, the state log is missing and the slice is not ready for content.",
+    "Success and failure both need a visible cause. A flag that flips offscreen is not yet a finished loop.",
+    "A second read of the device mid-tick can disagree with the first and make a jump depend on call order.",
+    "Controller and keyboard should enter the same action table. Scattering device names through collision code breaks ports.",
+    "A crowd variant copies the sheet and changes one named field. It does not repaint the face with an unnamed dye.",
+    "Dialogue portraits and the doll in the world read one sheet so eye colour cannot drift between scenes.",
+    "Landmarks should be nameable by a player who has walked the space once. If they cannot, the layout is not readable yet.",
+    "Streaming a room must not drop the door flag. The room can arrive late. The state cannot.",
+    "If players fail before the tell is visible, lengthen the tell or move the camera before changing health totals.",
+    "Two readable boss phases are enough for a slice. A third phase waits until each earlier phase has a fair counter.",
+    "An exploit that turns a craft into free money is audited at the source and the sink before any price table is rewritten.",
+    "Item colour is presentation. The economy rule keys on item kind so a recolor cannot mint a new resource.",
+    "A character does not repeat a secret they never witnessed. Knowledge boundaries are data, not a tone of voice.",
+    "When two endings disagree on a shared fact, fix the ledger before writing more epilogue lines.",
+    "A coarser raster keeps the sheet names for skin, eyes, hair, cloth, and items. Pixel count is not the identity.",
+    "Scale2x and nearest are palette tools. They are not a certificate that the picture is native console hardware.",
+    "Melody timing is an absolute beat from the index and the tempo. It is not a chain of equal gaps that drift.",
+    "Voice lines reference the ledger id of the speaker. A swapped portrait does not silently take another person's line.",
+    "If a player cannot tell which object accepts the verb, the interface failed before the difficulty did.",
+    "Text that will be translated keeps a stable id and room to grow. The logic reads the id, not the English width.",
+    "Display rate can fall from sixty to twenty without changing travel per simulated second, because the tick advances movement.",
+    "A replay stores the seed and the per-tick inputs. Rebuilding the match must match positions at the sampled ticks.",
+    "An editor action that depends on click timing is not ready. The same data edit must serialize to the same bytes.",
+    "Migrations keep the old file. They write a new version beside it and refuse to guess missing fields.",
+    "If every tester misses the same door, the door's read is the defect. Adding a hint line is the second option, not the first.",
+    "Difficulty complaints after an unread telegraph are camera and timing work. They are not an invitation to inflate health.",
+    "A folder of loose files is not a release. The receipt has to point at one hash and the commands that produced it.",
+    "Cutting a feature to meet the frame budget is recorded. Hiding the miss by skipping input is not an acceptable cut.",
+)
+
+SLOTS: dict[str, tuple[str, ...]] = {
+    "role": ("designer", "programmer", "animator", "writer", "composer", "tester", "rigger", "lighter"),
+    "asset": ("sprite sheet", "portrait plate", "prop mesh", "cloth card", "icon atlas", "cinematic plate"),
+    "field": ("health", "position", "inventory", "item kind", "door flag", "tick index"),
+    "eye": ("amber", "grey", "green", "hazel", "violet", "brown"),
+    "hair": ("braid", "crop", "coils", "bun", "waves", "side part"),
+    "hair_color": ("black", "copper", "ash", "gold", "white", "auburn"),
+    "skin": ("warm sand", "cool olive", "deep brown", "fair rose", "golden tan", "ebony"),
+    "cloth": ("linen", "wool", "silk", "canvas", "felt", "denim"),
+    "wear": ("fresh", "worn", "mended", "faded", "weathered"),
+    "item": ("lantern", "satchel", "map", "key", "charm", "compass"),
+    "item_color": ("copper", "gold", "field green", "dusk blue", "hearth red", "harbor grey"),
+    "place": ("winter court", "harbor lane", "hearth hall", "field gate", "dusk stair", "pine mill"),
+    "shot": ("wide", "close", "over-shoulder", "insert", "tracking", "low-angle"),
+    "beat": ("approach", "threat", "choice", "revelation", "rest", "button"),
+    "move": ("holds", "pushes in", "racks focus", "pans", "tilts", "settles"),
+    "garment": ("coat", "hem", "cloak", "sleeve", "collar", "sash"),
+    "light": ("rim light", "practical lantern", "dusk bounce", "hearth glow", "overcast", "moon edge"),
+    "rate": ("sixty", "thirty", "twenty", "fifteen"),
+    "tier": ("65536", "32768", "16384", "8192", "4096"),
+    "verb": ("jump", "strike", "speak", "open", "craft", "sneak"),
+    "failure": ("missed tell", "late press", "empty resource", "blocked route"),
+    "grant": ("author grant", "studio grant", "work-for-hire record", "public-domain dedication"),
+    "screen": ("inventory", "map", "settings", "dialogue", "shop", "pause"),
+    "region": ("hand", "torso", "head", "back"),
+    "pattern": ("plain", "stripe", "check", "hem", "speck"),
+    "note": ("pickup", "footstep", "hit", "failure sting", "discovery"),
+}
+
+# Tracks the adaptive ratchet watches. Every name is also a corpus domain.
+TRACKS: dict[str, tuple[str, ...]] = {
+    "visual": ("sprites", "assets", "character", "clothing", "hair", "eyes", "items", "facial", "palette"),
+    "narrative": (
+        "story",
+        "cinematics",
+        "cutscenes",
+        "cinematic_playwright",
+        "playwright",
+        "dialogue",
+        "quests",
+        "voice",
+    ),
+    "systems": ("legal", "coding", "world", "combat", "economy", "physics", "save_state", "input", "build"),
+}
+
+TEMPLATES: dict[str, tuple[str, ...]] = {
+    "legal": (
+        "Pass {n}. The {role} files a {grant} for the {asset}. The record names the author and the revision, and a missing grant keeps that file out of the shipping build.",
+        "Pass {n}. A collaborator may replace the {asset} for the {place} only after the change is written down. The previous revision stays addressable so the cut can be restored.",
+        "Pass {n}. Age-rating notes for the {place} list the {verb} and the {failure}. They describe the authored scene. They do not copy a commercial rating form.",
+    ),
+    "coding": (
+        "Pass {n}. The {role} steps {field} on a fixed interval. Render may interpolate. A long frame runs several ticks or slows, and it does not take one giant step.",
+        "Pass {n}. One owner writes {field}. The {verb} emits an event that owner applies. A second writer of {field} is a defect, logged with the rule id.",
+        "Pass {n}. Input for {verb} is sampled once at the start of tick {n}. Menus and play share the action table, so a rebound does not fork the rule.",
+    ),
+    "sprites": (
+        "Pass {n}. The {asset} for the {item} names its palette, its pixel size, and its author. Nearest growth repeats pixels. A box step may mix a channel and stays an authoring choice.",
+        "Pass {n}. A {tier} plan for the {place} sprite names the divisor and allocates no full-tier bitmap. The sheet still stores the {item_color} {item}.",
+        "Pass {n}. Silhouette for the {verb} pose reads at play distance. The {role} checks the shape in the {light}, with a cue besides hue.",
+    ),
+    "assets": (
+        "Pass {n}. The registry row for the {asset} stores source, hash, resolution, and target limits. A second export from the same inputs matches or explains the difference.",
+        "Pass {n}. The {role} refuses an {asset} whose source file is missing. The build copies from the registry, not from a loose folder.",
+        "Pass {n}. Wear on the {asset} is {wear}. That mark changes the micro pattern and leaves the {cloth} token in the record.",
+    ),
+    "character": (
+        "Pass {n}. The person at the {place} is written once: skin {skin}, eyes {eye}, hair {hair_color} {hair}. Portraits and the doll copy that sheet.",
+        "Pass {n}. A scarf at the {place} is an accessory on the sheet. Skin, eyes, and hair change only when the ledger names a cause. Pass id {n}.",
+        "Pass {n}. Coherence is the variables, not the pixel count. A coarser view of this person keeps skin {skin} and eye {eye}.",
+    ),
+    "world": (
+        "Pass {n}. The {place} has a landmark a player can name, a {failure} risk, and a route back. Empty space is not yet a level.",
+        "Pass {n}. The door at the {place} is a flag. Art shows closed and open. The flag, not the picture, decides whether {verb} may pass.",
+        "Pass {n}. Streaming the {place} may arrive late. The {field} for that room is already in the authoritative record.",
+    ),
+    "story": (
+        "Pass {n}. The ledger for the {place} records who knows the {item}, which promise stands, and which fact is shared by every branch.",
+        "Pass {n}. A branch may add a fact about the {item}. It may not silently rewrite a shared fact. Repair the smallest set of later lines. Pass {n}.",
+        "Pass {n}. The {role} does not give a speaker a secret they never witnessed. Knowledge is data on the ledger, pass {n}.",
+    ),
+    "cinematics": (
+        "Pass {n}. Shot {n} is a {shot} on the {place}. The camera {move} during the {beat}. Gameplay state does not advance inside the shot.",
+        "Pass {n}. The {light} motivates the {shot}. Exposure may change for the picture. Health and inventory stay on the simulation clock.",
+        "Pass {n}. An in-engine cinematic at the {place} uses the same sheet: eyes {eye}, hair {hair}. A rendered plate may not invent a new face.",
+    ),
+    "cutscenes": (
+        "Pass {n}. The cutscene at the {place} is skippable after the first view, and the skip lands on the same {field} as playing it through.",
+        "Pass {n}. Dialogue in the cutscene references the speaker id. A swapped portrait does not take another person's line. Pass {n}.",
+        "Pass {n}. The {beat} in this cutscene has a readable cause. If the player can {verb} afterward, the exit state lists that verb.",
+    ),
+    "cinematic_playwright": (
+        "Pass {n}. The playwright marks beat {beat} for the {place}: who wants what, what blocks them, and the {shot} that shows the turn.",
+        "Pass {n}. Lines stay in the speaker's vocabulary. The {item} is named the same way in the wide shot and the {shot} insert. Pass {n}.",
+        "Pass {n}. A button line ends the scene on a decision. The playwright writes the payoff and one path that skips it, both legal in the ledger.",
+    ),
+    "playwright": (
+        "Pass {n}. The interface test opens the {screen} screen, chooses {verb}, and expects {field} in the state line. It does not assert on a pixel colour.",
+        "Pass {n}. The test for the {screen} screen runs from a fresh save at the {place}. A failure names the missing affordance, not a flaky wait.",
+        "Pass {n}. Keyboard, pad, and pointer walk the same {screen} actions. The test script shares that table with the game. Pass {n}.",
+    ),
+    "items": (
+        "Pass {n}. The {item_color} {item} changes item colour only. Kind, the {region} mount, and the use rule stay on their tokens.",
+        "Pass {n}. Inventory keys on item kind. The picture reads {item_color}. Losing the picture still leaves the {item} kind in the state record.",
+        "Pass {n}. A {item} on the {region} does not overwrite hair {hair} or eye {eye}. Those factors have their own fields. Pass {n}.",
+    ),
+    "clothing": (
+        "Pass {n}. The {garment} is {cloth}, {wear}, pattern {pattern}. Wear edits the micro pattern and does not retint skin {skin}.",
+        "Pass {n}. Trim on the {garment} is a named colour. A repair mark may use the trim. The primary {cloth} token stays put. Pass {n}.",
+        "Pass {n}. Outline of the {garment} is its own token. A coarser raster may blend pixels and must still store the outline name.",
+    ),
+    "hair": (
+        "Pass {n}. Hair is {hair_color} {hair}, placed on a stable region of the head. A coarser grid keeps the hair token even when strands merge.",
+        "Pass {n}. The {role} does not let a hat replace the hair record. The hat is an accessory. Hair {hair} remains underneath. Pass {n}.",
+        "Pass {n}. A crowd extra at the {place} copies the hair sheet and changes one field. It does not invent an unnamed dye. Pass {n}.",
+    ),
+    "eyes": (
+        "Pass {n}. Eye colour is {eye} on every portrait and on the doll. A {shot} may show fewer pixels and may not rename the eye.",
+        "Pass {n}. The catchlight is {light}. It is a render choice. The stored eye token remains {eye}. Pass {n}.",
+        "Pass {n}. A blink is animation. It does not write a new eye colour. The sheet at pass {n} still says {eye}.",
+    ),
+    "facial": (
+        "Pass {n}. Brow, lips, and eyes {eye} are separate tokens on the face. A expression pose blends shapes and leaves the tokens stored.",
+        "Pass {n}. Skin {skin} and lips share no channel by accident. The {role} checks the face under {light} at the {place}.",
+    ),
+    "palette": (
+        "Pass {n}. The palette groups {item_color} with {cloth} and eye {eye}. Swapping the palette recolors inside closed names.",
+        "Pass {n}. An unknown colour name fails the sheet. Layout does not invent a channel to hide a typo. Pass {n}.",
+    ),
+    "audio": (
+        "Pass {n}. The {note} is a short synthesized envelope tied to one state change. Tempo is a quarter from the beats, not a chain of equal gaps.",
+        "Pass {n}. A picture running at {rate} does not skip the accent the simulation already marked. The tick is the clock. Pass {n}.",
+    ),
+    "music": (
+        "Pass {n}. The cue for the {place} uses a scale, a seed, and a tempo. Notes are frequency steps written for this project.",
+        "Pass {n}. Music, effects, and voice sit on separate buses. A muted bus still lets the {verb} simulation advance. Pass {n}.",
+    ),
+    "voice": (
+        "Pass {n}. The voice line stores the speaker id and the ledger fact it is allowed to say. Pass {n} does not borrow another face.",
+        "Pass {n}. A {shot} reaction at the {place} waits for the line to end or for a skip that lands on the same dialogue flag.",
+    ),
+    "animation": (
+        "Pass {n}. Clips are named idle, move, {verb}, hurt, and recover. The state flag is authoritative. The frame is a sample.",
+        "Pass {n}. Cancelling {verb} on this tick clears the hurtbox even if the picture holds the old pose for one interpolated frame.",
+    ),
+    "camera": (
+        "Pass {n}. The gameplay camera shows the {failure} before the hit frame. A {shot} cinematic camera does not fight that read.",
+        "Pass {n}. Shake is cosmetic. At {rate} frames it may drop. Damage from {verb} may not. Pass {n}.",
+    ),
+    "lighting": (
+        "Pass {n}. The {light} at the {place} is motivated by a source the player can name. Gameplay readability outranks a darker mood.",
+        "Pass {n}. A night variant keeps eye {eye} and cloth {cloth} tokens. Only the {light} rig changes. Pass {n}.",
+    ),
+    "combat": (
+        "Pass {n}. The {beat} gives time to answer with {verb}. A late answer gets a recovery. Difficulty changes counts, not a hidden hitbox.",
+        "Pass {n}. Two readable phases at the {place} are enough until each has a counter and a rest. Pass {n} does not add a third blindly.",
+    ),
+    "economy": (
+        "Pass {n}. The {item} has a source, a sink, and a capacity. Craft shows the recipe and a use. The check reads item kind.",
+        "Pass {n}. A vendor price for the {item_color} {item} has a driver. Buying and selling the same stack at a profit is a defect. Pass {n}.",
+    ),
+    "interface": (
+        "Pass {n}. The {screen} screen shows the next legal {verb}, the resource that limits it, and the {failure} if the verb is refused.",
+        "Pass {n}. Colour is not the only channel on the {screen} screen. A word or a shape names the {item}. Pass {n}.",
+    ),
+    "accessibility": (
+        "Pass {n}. The first settings page offers remaps, captions, contrast, and a way to reduce shake. Pass {n} does not hide those behind a clear.",
+        "Pass {n}. Focus order on the {screen} screen is data. Pad and pointer move through the same {verb} actions.",
+    ),
+    "localization": (
+        "Pass {n}. The {screen} string keeps a stable id and room to grow. Logic reads the id, not the English width. Pass {n}.",
+        "Pass {n}. The speaker's name and the {item} name are separate ids so a translation can reorder them.",
+    ),
+    "physics": (
+        "Pass {n}. Motion, cooldown, and the {verb} arc read the fixed interval. They do not read the {rate} display frame time.",
+        "Pass {n}. The {item} on the {region} collides on its layer. Cloth {cloth} does not become a second collider. Pass {n}.",
+    ),
+    "behavior": (
+        "Pass {n}. The opponent at the {place} telegraphs {beat}, then commits, then rests. The counter is a {verb} the player already owns.",
+        "Pass {n}. The same seed and inputs reproduce the encounter. The {role} tunes the data, not a one-off outcome. Pass {n}.",
+    ),
+    "level_design": (
+        "Pass {n}. Traversal at the {place} teaches {verb} in a safe pocket, then with one {failure}, then with a second verb already owned.",
+        "Pass {n}. A shortcut at the {place} still respects the door flag. A skip that voids a required {field} is a defect.",
+    ),
+    "save_state": (
+        "Pass {n}. The save stores the tick index, the random stream, and {field}. Load rejects a record that fails its checks.",
+        "Pass {n}. A save during the {shot} stores the rule state. The decorative frame is not the resume pose. Pass {n}.",
+    ),
+    "input": (
+        "Pass {n}. The {verb} buffer is captured at the tick edge, consumed in order, and can be replayed to the same {field}.",
+        "Pass {n}. Remap lives in one table. The {screen} screen and the {place} fight both read it. Pass {n}.",
+    ),
+    "vfx": (
+        "Pass {n}. The {note} burst and the {light} flash are listeners. They may drop on a slow machine. The {field} write may not.",
+        "Pass {n}. Particles for the {item} use the item colour token {item_color}. They do not recolor hair {hair_color}.",
+    ),
+    "materials": (
+        "Pass {n}. {cloth} and metal stay named factors. The shader for the {garment} reads those tokens under the {light}.",
+        "Pass {n}. A wet variant at the {place} is a material flag. It does not change eye {eye} or skin {skin}. Pass {n}.",
+    ),
+    "shader": (
+        "Pass {n}. The shader for the {asset} fails closed when a texture is missing. It does not sample an unnamed colour.",
+        "Pass {n}. Outline of the {garment} is redrawn from the stored token after the {tier} downsample. Pass {n}.",
+    ),
+    "particles": (
+        "Pass {n}. Particle count for the {verb} scales down before the simulation tick does. Pass {n} keeps the hit authoritative.",
+        "Pass {n}. Dust at the {place} is local to the {light}. It is not a collision volume.",
+    ),
+    "rigging": (
+        "Pass {n}. The {role} binds the {garment} to the body and the {item} to the {region}. Eyes {eye} stay on the face rig.",
+        "Pass {n}. A cloth sim for {cloth} is cosmetic. The gameplay {region} mount is the item token, pass {n}.",
+    ),
+    "dialogue": (
+        "Pass {n}. The line at the {place} names the {item} the way the ledger does. A {beat} may add a fact and may not erase a shared one.",
+        "Pass {n}. Each speaker keeps a vocabulary. Pass {n} does not put another person's knowledge in this mouth.",
+    ),
+    "quests": (
+        "Pass {n}. The quest at the {place} has a clue in the world, a {verb}, and a resolution on every reachable ending.",
+        "Pass {n}. Turning in the {item} writes one flag. The {screen} log reads that flag, not the icon. Pass {n}.",
+    ),
+    "build": (
+        "Pass {n}. The release names the revision, the {asset} registry digest, the commands, and the artifact hash.",
+        "Pass {n}. A bad export of the {asset} rolls back by hash. The previous good build stays. Pass {n}.",
+    ),
+    "performance": (
+        "Pass {n}. The frame budget at {rate} splits input, simulation, collision, audio, and the draw. Measure it on the slow target.",
+        "Pass {n}. A {tier} plan does not allocate the full bitmap. The {role} crops first. Pass {n}.",
+    ),
+    "color_script": (
+        "Pass {n}. The {place} script sets {light} against cloth {cloth} and eye {eye} so the actor separates from the ground.",
+        "Pass {n}. A flash of {item_color} marks the {item} pickup. The face keeps skin {skin}. Pass {n}.",
+    ),
+    "weather": (
+        "Pass {n}. Weather at the {place} changes the {light} and the footstep {note}. It does not rewrite the door flag.",
+        "Pass {n}. Rain darkens the micro pattern of {wear} {cloth}. The stored cloth token is unchanged. Pass {n}.",
+    ),
+    "props": (
+        "Pass {n}. The {item} prop at the {place} has a kind, a colour {item_color}, and a mount {region}. The mesh is not the rule.",
+        "Pass {n}. A broken prop swaps to a {wear} state. Gameplay still reads the item kind. Pass {n}.",
+    ),
+    "haptics": (
+        "Pass {n}. The {verb} pulse is tied to the tick, not to the {rate} display. A missing rumble motor still applies the rule.",
+        "Pass {n}. The {failure} buzz is shorter than the success pulse so the {screen} screen can name which one fired. Pass {n}.",
+    ),
+    "trailer": (
+        "Pass {n}. The trailer uses shots from the {place} that exist in the build. It does not invent a {verb} the slice cannot play.",
+        "Pass {n}. Titles over the {shot} leave the character sheet readable: eyes {eye}, hair {hair_color}. Pass {n}.",
+    ),
+    "inventory": (
+        "Pass {n}. The {screen} grid shows kind and {item_color} for the {item}. Capacity is data. A full bag refuses the add and says why.",
+        "Pass {n}. Sorting the bag does not rewrite {field}. Order is a view. Pass {n}.",
+    ),
+    "netcode": (
+        "Pass {n}. Peers exchange inputs for a tick and simulate only after the set is complete. Guessed motion is presentation until the inputs arrive.",
+        "Pass {n}. The host does not silently rewrite a peer's {field}. Disagreement rolls back to the last agreed tick. Pass {n}.",
+    ),
+    "crowd": (
+        "Pass {n}. A crowd member at the {place} copies the sheet and changes hair {hair} or cloth {cloth}, one field only.",
+        "Pass {n}. The crowd uses the same {verb} set as the lead. A cheaper lod drops particles, not the collision layer. Pass {n}.",
+    ),
+}
+
+
+def domains() -> tuple[str, ...]:
+    return tuple(TEMPLATES)
+
+
+def _formatter_fields(template: str) -> tuple[str, ...]:
+    fields = []
+    for _literal, name, _spec, _conv in string.Formatter().parse(template):
+        if name:
+            fields.append(name)
+    return tuple(fields)
+
+
+def validate_templates() -> dict[str, int]:
+    missing_tracks = [name for names in TRACKS.values() for name in names if name not in TEMPLATES]
+    if missing_tracks:
+        raise ValueError(f"track domain missing templates: {missing_tracks}")
+    required = {
+        "legal",
+        "coding",
+        "sprites",
+        "assets",
+        "character",
+        "world",
+        "story",
+        "cinematics",
+        "cutscenes",
+        "cinematic_playwright",
+        "playwright",
+        "items",
+        "clothing",
+        "hair",
+        "eyes",
+    }
+    absent = required - set(TEMPLATES)
+    if absent:
+        raise ValueError(f"required domains missing: {sorted(absent)}")
+    for domain, templates in TEMPLATES.items():
+        if len(templates) < 2:
+            raise ValueError(f"{domain} needs two templates")
+        for template in templates:
+            if "{n}" not in template or len(template) < 40:
+                raise ValueError(f"{domain} template is thin")
+            for field in _formatter_fields(template):
+                if field != "n" and field not in SLOTS:
+                    raise ValueError(f"{domain} uses unknown slot {field}")
+    return {"domains": len(TEMPLATES), "templates": sum(len(v) for v in TEMPLATES.values())}
+
+
+def render(domain: str, serial: int) -> str:
+    templates = TEMPLATES[domain]
+    template = templates[serial % len(templates)]
+    values: dict[str, object] = {"n": serial}
+    mix = serial // len(templates)
+    for field in _formatter_fields(template):
+        if field == "n":
+            continue
+        options = SLOTS[field]
+        values[field] = options[mix % len(options)]
+        mix //= len(options)
+    return template.format(**values)
+
+
+def banned_windows(texts: tuple[str, ...] | list[str]) -> set[str]:
+    found: set[str] = set()
+    for text in texts:
+        if len(text) <= WINDOW:
+            found.add(text)
+            continue
+        found.update(text[index : index + WINDOW] for index in range(len(text) - WINDOW + 1))
+    return found
+
+
+def leaks(text: str, banned: set[str]) -> bool:
+    if len(text) < WINDOW:
+        return text in banned
+    return any(text[index : index + WINDOW] in banned for index in range(len(text) - WINDOW + 1))
+
+
+def holdout_documents() -> tuple[str, ...]:
+    """Reserved serials. The training stream starts at zero and does not use these."""
+    validate_templates()
+    rows = [render(domain, HOLDOUT_SERIAL + offset) for domain in TEMPLATES for offset in (0, 1)]
+    if len(rows) != len(set(rows)):
+        raise RuntimeError("corpus holdout collided")
+    return tuple(rows)
+
+
+def track_holdouts() -> dict[str, tuple[str, ...]]:
+    by_domain = {}
+    for domain, offset in ((domain, offset) for domain in TEMPLATES for offset in (0, 1)):
+        by_domain.setdefault(domain, []).append(render(domain, HOLDOUT_SERIAL + offset))
+    return {
+        track: tuple(text for domain in names for text in by_domain[domain])
+        for track, names in TRACKS.items()
+    }
+
+
+class CorpusStream:
+    """Weighted stream. Callers may raise a domain weight to review a weak area."""
+
+    def __init__(self, weights: Mapping[str, float] | None = None) -> None:
+        validate_templates()
+        self.weights = {domain: 1.0 for domain in TEMPLATES}
+        if weights:
+            for domain, weight in weights.items():
+                if domain not in self.weights:
+                    raise ValueError(f"unknown domain {domain}")
+                self.weights[domain] = float(weight)
+        self.counts = {domain: 0 for domain in TEMPLATES}
+        self.serial = {domain: 0 for domain in TEMPLATES}
+        # Own holdouts are reserved by serial. The 40-character filter is for the
+        # English and A-to-Z measurement lines, which use different wording.
+        self.banned = banned_windows(DENYLIST)
+
+    def next_document(self) -> tuple[str, str]:
+        for _ in range(10000):
+            domain = max(
+                self.weights,
+                key=lambda name: (
+                    self.weights[name] / (self.counts[name] + 1),
+                    -self.serial[name],
+                    name,
+                ),
+            )
+            serial = self.serial[domain]
+            if serial >= HOLDOUT_SERIAL:
+                raise RuntimeError("training serial entered the holdout range")
+            self.serial[domain] = serial + 1
+            text = render(domain, serial)
+            if len(text) < 40 or leaks(text, self.banned):
+                continue
+            self.counts[domain] += 1
+            return domain, text
+        raise RuntimeError("corpus stream could not find a clean document")
+
+
+def iter_documents(budget_bytes: int, stream: CorpusStream | None = None) -> Iterator[tuple[str, str]]:
+    if isinstance(budget_bytes, bool) or not isinstance(budget_bytes, int) or budget_bytes < 1:
+        raise ValueError("budget_bytes must be a positive int")
+    source = stream or CorpusStream()
+    produced = 0
+    while produced < budget_bytes:
+        domain, text = source.next_document()
+        produced += len(text.encode("utf-8"))
+        yield domain, text
