@@ -62,7 +62,7 @@ class WeatherTests(unittest.TestCase):
 
 class FramerateTests(unittest.TestCase):
     def test_all_30_50_120_modes(self):
-        for fps in (30, 50, 120):
+        for fps in (30, 50, 60, 120):
             clock = PresentationClock(fps)
             self.assertEqual(clock.deadline(fps), 1_000_000_000)
             frames = [clock.next_frame() for _ in range(fps + 1)]
