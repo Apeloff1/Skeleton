@@ -1239,11 +1239,84 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                 prepared, state.inputs.goal, tuple(state.observations),
                 answer=draft.answer,
             )
+            adversarial = self._verifier_adversary.review(
+                prepared, state.inputs.goal, tuple(state.observations),
+                answer=draft.answer,
+            )
+            with self._adaptive_lock:
+                self._delivery_adversarial_receipts[state.run_id] = adversarial.digest
             state.trace.emit("adaptive.working_context_delivery_verified", {
                 "receipt": prepared.fingerprint,
                 "verifier_integrity": first,
                 "verifier_scope": second,
+                "verifier_of_verifiers": adversarial.digest,
+                "adversarial_attacks": len(adversarial.attacks),
             })
+            required_kind = required_delivery_kind(state.inputs.goal)
+            binding = self._delivery_quality_bindings.get(state.run_id)
+            if required_kind is not None and binding is None:
+                return False, "mandatory code/game quality checker registration missing"
+            if binding is not None:
+                if required_kind is not None and binding.kind != required_kind:
+                    return False, "delivery kind does not match registered quality checkers"
+                metadata_requirements = state.inputs.goal.metadata.get(
+                    "additional_quality_requirements", (),
+                )
+                if not isinstance(metadata_requirements, (tuple, list)) or any(
+                    not isinstance(x, str) for x in metadata_requirements
+                ):
+                    return False, "invalid additional code-quality requirements"
+                extras = tuple(dict.fromkeys(
+                    tuple(metadata_requirements) + binding.additional_requirements
+                ))
+                sources = dict(binding.source_reader())
+                review = self._code_delivery_quality_reviewer.inspect(
+                    binding.kind, sources,
+                    checkers=binding.checkers,
+                    additional_requirements=extras,
+                    discover=binding.discover,
+                    repair=binding.repair,
+                    authorize_repairs=binding.authorize_repairs,
+                )
+                latest = dict(binding.source_reader())
+                if latest != dict(review.scrutiny.files):
+                    return False, "reviewed source was not committed to the host source"
+                with self._adaptive_lock:
+                    self._delivery_quality_reports[state.run_id] = review
+                if not review.releasable:
+                    return False, "mandatory quality gate blocked: " + "; ".join(
+                        review.failures[:8]
+                    )
+                quality_adversarial = self._quality_verifier_adversary.review(
+                    review, files=latest, kind=binding.kind, required=extras,
+                )
+                state.trace.emit("adaptive.code_quality_verified", {
+                    "kind": binding.kind,
+                    "receipt": review.digest,
+                    "adversarial": quality_adversarial,
+                    "passes": len(review.scrutiny.receipts),
+                    "repairs": review.scrutiny.corrections,
+                    "standards": list(review.standards),
+                })
+                from .types import EvidenceKind
+                state.ledger.append(EvidenceArtifact(
+                    evidence_id=stable_id("qualityevidence", {
+                        "run": state.run_id, "receipt": review.digest,
+                    }),
+                    kind=EvidenceKind.DERIVED,
+                    source="jeeves-code-delivery-quality",
+                    payload={
+                        "kind": binding.kind,
+                        "source_digest": review.source_digest,
+                        "receipt": review.digest,
+                        "reviewer_adversarial_receipt": quality_adversarial,
+                        "checker_evidence": [list(x) for x in review.checker_evidence],
+                        "passes": len(review.scrutiny.receipts),
+                        "corrections": review.scrutiny.corrections,
+                    },
+                    observed_at=self._wall_clock(),
+                    confidence=1.0,
+                ))
             return True, None
         except Exception as exc:
             return False, f"{type(exc).__name__}: {str(exc)[:320]}"
