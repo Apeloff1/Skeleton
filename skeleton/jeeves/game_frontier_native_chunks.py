@@ -100,3 +100,128 @@ def inspect_native_chunks(sample: Mapping, *, expected_chunk_size_m: float = 32.
     }
     source["receipt_digest"]=_digest(source)
     return source
+
+
+def compare_native_chunk_transitions(
+    current: Mapping, *,
+    previous: Mapping | None = None,
+    expected_chunk_size_m: float = 32.,
+    max_speed_mps: float = 500.,
+) -> dict:
+    """Independently compare two reported native fixed-tick scene partitions.
+
+    This second ledger is based on reported Godot physics actors. A recorded
+    contact count is observational context, *not* collision impulse/force.
+    The source frame double verifier separately enforces all game/GDD laws.
+    """
+    if (type(max_speed_mps) not in (int,float) or
+        not math.isfinite(max_speed_mps) or
+        not 0 < max_speed_mps <= 1e5):
+        raise NativeChunkError("finite native motion budget required")
+    checked=inspect_native_chunks(
+        current,expected_chunk_size_m=expected_chunk_size_m,
+        require_native_partition="native_chunks" in current)
+    older=(inspect_native_chunks(
+        previous,expected_chunk_size_m=expected_chunk_size_m,
+        require_native_partition="native_chunks" in previous)
+        if previous is not None else None)
+    if (type(current.get("native_tick")) is not int or
+        current["native_tick"]<0 or
+        current.get("fps") not in (30,50,60,120)):
+        raise NativeChunkError("valid game engine fixed-tick count required")
+    if previous is None:
+        if current["native_tick"]!=0:
+            raise NativeChunkError("native observation chain must start at tick 0")
+    else:
+        if (type(previous.get("native_tick")) is not int or
+            current["native_tick"]!=previous["native_tick"]+1 or
+            current.get("fps")!=previous.get("fps") or
+            current.get("scene_candidate_digest")!=
+                previous.get("scene_candidate_digest") or
+            current.get("signed_gdd_digest")!=
+                previous.get("signed_gdd_digest")):
+            raise NativeChunkError("native frame or signed scene identity drift")
+    now={item["id"]:item for item in current["actors"]}
+    old={item["id"]:item for item in previous["actors"]} if previous else {}
+    if previous is not None and set(now)!=set(old):
+        raise NativeChunkError("native actor births/despawns require signed world authority")
+    old_cells={
+        actor_id:(math.floor(_point(row["world_xyz_m"])[0]/expected_chunk_size_m),
+                  math.floor(_point(row["world_xyz_m"])[1]/expected_chunk_size_m))
+        for actor_id,row in old.items()
+    }
+    new_cells={
+        actor_id:(math.floor(_point(row["world_xyz_m"])[0]/expected_chunk_size_m),
+                  math.floor(_point(row["world_xyz_m"])[1]/expected_chunk_size_m))
+        for actor_id,row in now.items()
+    }
+    actor_changes=[]
+    for key in sorted(now):
+        record=now[key]
+        prev=old.get(key)
+        if prev is not None and prev.get("source_digest")!=record.get("source_digest"):
+            raise NativeChunkError("native asset identity silently changed")
+        xyz=_point(record["world_xyz_m"])
+        vel=_point(record["velocity_xyz_mps"])
+        speed=math.sqrt(sum(v*v for v in vel))
+        if speed>max_speed_mps:
+            raise NativeChunkError("observed native speed beyond source budget")
+        prior_xyz=_point(prev["world_xyz_m"]) if prev is not None else None
+        displacement=(math.dist(xyz,prior_xyz) if prior_xyz is not None else 0.)
+        if displacement>max_speed_mps/current["fps"] + .001:
+            raise NativeChunkError("native chunk actor moved too far in one tick")
+        contact_before=prev.get("contact_count") if prev is not None else None
+        contact_after=record.get("contact_count")
+        if contact_before is not None and (type(contact_before) is not int or
+                                           not 0<=contact_before<=64):
+            raise NativeChunkError("previous native contacts invalid")
+        actor_changes.append({
+            "actor_id":key,"asset_digest":record["source_digest"],
+            "from_chunk":list(old_cells[key]) if prev is not None else None,
+            "to_chunk":list(new_cells[key]),
+            "migrated":bool(prev is not None and old_cells[key]!=new_cells[key]),
+            "displacement_m":displacement,
+            "speed_mps":speed,
+            "contact_count_before":contact_before,
+            "contact_count_after":contact_after,
+            "contact_count_delta":(
+                contact_after-contact_before if
+                type(contact_after) is int and type(contact_before) is int
+                else None),
+            "authority":"reported_native_motion_not_impulse_force",
+        })
+    transitions=[]
+    for coord in sorted(set(old_cells.values())|set(new_cells.values())):
+        entered=sorted(key for key in new_cells
+                       if new_cells[key]==coord and old_cells.get(key)!=coord)
+        exited=sorted(key for key in old_cells
+                      if old_cells[key]==coord and new_cells.get(key)!=coord)
+        residents=sorted(key for key in new_cells if new_cells[key]==coord)
+        if entered or exited or previous is None:
+            transitions.append({
+                "chunk_xy":list(coord),"entered":entered,"exited":exited,
+                "residents":residents,"retired":bool(exited and not residents),
+            })
+    migrations=sum(bool(e["migrated"]) for e in actor_changes)
+    if previous is not None and (
+        sum(len(x["entered"]) for x in transitions)!=migrations or
+        sum(len(x["exited"]) for x in transitions)!=migrations):
+        raise NativeChunkError("native chunk transition flow not conserved")
+    root={
+        "schema":"skeleton.game.native_chunk_transitions.v1",
+        "frame":current["native_tick"],"fps":current["fps"],
+        "source_capture_digest":_digest(current),
+        "previous_capture_digest":_digest(previous) if previous is not None else None,
+        "native_partition_digest":checked["receipt_digest"],
+        "previous_partition_digest":older["receipt_digest"] if older else None,
+        "scene_candidate_digest":current.get("scene_candidate_digest"),
+        "signed_gdd_digest":current.get("signed_gdd_digest"),
+        "actor_count":len(now),"migrations":migrations,
+        "retired_chunk_count":sum(bool(x["retired"]) for x in transitions),
+        "actors":actor_changes,"chunk_transitions":transitions,
+        "verifier_a_source_integrity":True,
+        "verifier_b_motion_partition_conservation":True,
+        "authority":"runtime_sample_consistency_not_native_attestation",
+    }
+    root["receipt_digest"]=_digest(root)
+    return root
