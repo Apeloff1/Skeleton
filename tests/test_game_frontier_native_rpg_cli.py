@@ -112,3 +112,17 @@ class NativeRPGEvidenceCLITests(unittest.TestCase):
             self.assertEqual(main(self.argv("--event-flags-json",str(f))),0)
         self.assertEqual(json.loads(out.getvalue())[
             "evaluation"]["candidate_fire_count"],1)
+
+    def test_actor_binding_and_scene_source_identity_cannot_be_swapped(self):
+        original=json.loads(self.pages_json.read_text())
+        mutated=dict(original,source_actor_id="villain")
+        self.pages_json.write_text(json.dumps(mutated))
+        with redirect_stderr(io.StringIO()):
+            self.assertEqual(main(self.argv()),2)
+        self.pages_json.write_text(json.dumps(original))
+        wrong_scene=json.loads(self.scene_json.read_text())
+        wrong_scene["native_capture"]["candidate_digest"]="f"*64
+        wrong_scene["origin_candidate_digest"]="f"*64
+        self.scene_json.write_text(json.dumps(wrong_scene))
+        with redirect_stderr(io.StringIO()):
+            self.assertEqual(main(self.argv()),2)

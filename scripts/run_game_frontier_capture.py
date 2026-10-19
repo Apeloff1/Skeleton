@@ -161,7 +161,20 @@ def main(argv: list[str] | None = None) -> int:
                         max_aligned_frames=arguments.comparison_max_frames,
                         tolerance_m=arguments.comparison_tolerance_m)}
             elif arguments.operation=="evaluate-events":
-                pages=parse_native_rpg_pages(_operator_json(arguments.event_pages_json))
+                raw_pages=_operator_json(arguments.event_pages_json)
+                if ("source_actor_id" in raw_pages and
+                    raw_pages["source_actor_id"]!=arguments.actor_id):
+                    raise ValueError("event page source actor differs from selected game actor")
+                if arguments.actor_id not in catalog:
+                    raise ValueError("runtime event actor is absent from authorized scene catalog")
+                initial=journal.native_sample(0)
+                if (initial is None or
+                    initial.get("scene_candidate_digest")!=settings["candidate_digest"] or
+                    initial.get("signed_gdd_digest")!=gdd.source_digest or
+                    {item["id"]:item["source_digest"]
+                     for item in initial.get("actors",[])}!=catalog):
+                    raise ValueError("event journal actor or scene identity differs from Forge source")
+                pages=parse_native_rpg_pages(raw_pages)
                 flags={}
                 if arguments.event_flags_json is not None:
                     raw_flags=_operator_json(arguments.event_flags_json)
