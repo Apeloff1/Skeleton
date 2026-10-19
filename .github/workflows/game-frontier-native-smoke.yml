@@ -12,6 +12,7 @@ on:
       - "scripts/build_game_frontier_quest_smoke_approvals.py"
       - "scripts/run_game_frontier_quest_tools.py"
       - "scripts/run_game_frontier_godot_dispatch.py"
+      - "scripts/run_game_frontier_endurance.py"
       - "scripts/qualify_game_frontier_godot.py"
       - "scripts/run_game_frontier_capture.py"
       - "scripts/validate_game_frontier_native_smoke.py"
@@ -252,6 +253,26 @@ jobs:
                             "window_count":batch["window_count"],
                             "source_frame_count":batch["verified_frame_count"],
                             "audit_root":evidence["receipt_digest"]}))
+          PY
+            # Finite crash/restart test against actual Godot native observations.
+            # Covers WAL rollback, receipt-preserving rotation and cold replay.
+            python scripts/run_game_frontier_endurance.py \
+              "${quest_cli_args[@]}" \
+              --vault "$RUNNER_TEMP/frontier-game-endurance-$fps.sqlite" \
+              --cycles 12 --retain-latest 2 --crash-interval 3 \
+              > "$RUNNER_TEMP/frontier-game-endurance-$fps.json"
+            python - "$RUNNER_TEMP/frontier-game-endurance-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          report=json.loads(Path(sys.argv[1]).read_text())
+          assert report["cycles_executed"]==12
+          assert report["source_frames_cold_replayed"]>=4
+          assert report["crash_rollbacks_executed"]>=1
+          assert report["cycle_evidence"][-1]["replayed_through"]==report["source_head_frame"]
+          assert len(report["final_vault_receipt_digest"])==64
+          print(json.dumps({"native_endurance_restarts":report["cycles_executed"],
+                            "verified_rollbacks":report["crash_rollbacks_executed"],
+                            "source_ticks":report["source_frames_cold_replayed"]}))
           PY
             # Install verified commands as DATA, rerun Godot and independently
             # compare the actual engine's persisted quest/flag/dialogue receipt.
