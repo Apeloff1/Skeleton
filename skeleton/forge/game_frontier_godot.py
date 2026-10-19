@@ -87,6 +87,9 @@ var _native_flight_instruments_visible: bool = true
 var _game_route_waypoints: Array = []
 var _game_route_cursor: int = 0
 var _game_route_label: Label
+var _virtual_camera_mode: int = 0
+var _virtual_camera_orbit_s: float = 0.0
+var _virtual_camera_mode_label: Label
 var _approved_cue_timeline: Array = []
 var _approved_cue_cursor: int = 0
 var _approved_cue_label: Label
@@ -117,6 +120,7 @@ func _ready() -> void:
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
     _create_camera(data.get("projection", {}), data.get("world_variant", {}))
+    _create_game_cinematic_camera_control()
     _create_lighting(data.get("world_variant", {}),
                      data.get("photometric_3d", []), data.get("atmosphere", {}))
     _create_water(data.get("liquid", {}), data.get("tides", {}))
@@ -365,6 +369,70 @@ func _create_virtual_game_gps(nav: Dictionary) -> void:
                                    340 + (float(cell[1]) + .5) / rows * 160))
         hud.add_child(line)
     add_child(hud)
+
+func _create_game_cinematic_camera_control() -> void:
+    if _native_camera == null or _aero_character == null:
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "GameCinematicCameraDirector"
+    var label := Label.new()
+    label.name = "GameCameraModeReadout"
+    label.position = Vector2(20, 185)
+    label.add_theme_color_override("font_color", Color(.99, .77, .5))
+    overlay.add_child(label)
+    add_child(overlay)
+    _virtual_camera_mode_label = label
+    _refresh_game_camera_mode()
+
+
+func _refresh_game_camera_mode() -> void:
+    if _virtual_camera_mode_label == null:
+        return
+    var modes := ["Scene authored", "Follow avatar", "Orbit cinematic",
+                  "Overhead inspection"]
+    _virtual_camera_mode_label.text = (
+        "FICTIONAL CAMERA (C changes): " + modes[_virtual_camera_mode]
+    )
+    if _native_camera != null:
+        _native_camera.projection = (
+            Camera3D.PROJECTION_ORTHOGONAL if _virtual_camera_mode == 3
+            else Camera3D.PROJECTION_PERSPECTIVE
+        )
+        if _virtual_camera_mode == 3:
+            _native_camera.size = 21.0
+
+
+func _cycle_game_cinematic_camera() -> void:
+    if _native_camera == null:
+        return
+    _virtual_camera_mode = (_virtual_camera_mode + 1) % 4
+    _refresh_game_camera_mode()
+
+
+func _update_game_cinematic_camera(delta: float) -> void:
+    if _native_camera == null or _aero_character == null:
+        return
+    if _virtual_camera_mode == 0 and not _native_follow_cam:
+        return
+    var target: Vector3 = _aero_character.global_position
+    var offset := Vector3(9., 6., 16.)
+    if _virtual_camera_mode == 2:
+        _virtual_camera_orbit_s += minf(delta, .1)
+        offset = Vector3(
+            cos(_virtual_camera_orbit_s * .38)*15., 6.,
+            sin(_virtual_camera_orbit_s * .38)*15.
+        )
+    elif _virtual_camera_mode == 3:
+        offset = Vector3(.01, 21., .1)
+    var lerp_fraction := minf(1., delta * 3.5)
+    _native_camera.global_position = _native_camera.global_position.lerp(
+        target + offset, lerp_fraction
+    )
+    if _virtual_camera_mode == 3:
+        _native_camera.look_at(target, Vector3(0, 0, -1))
+    else:
+        _native_camera.look_at(target + Vector3(0., 1., 0.))
+
 
 func _create_camera(spec: Dictionary, variant: Dictionary) -> void:
     var camera := Camera3D.new()
@@ -1680,6 +1748,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
     var key := event as InputEventKey
     if not key.pressed or key.echo:
         return
+    if key.physical_keycode == KEY_C and _native_camera != null:
+        _cycle_game_cinematic_camera()
+        get_viewport().set_input_as_handled()
+        return
     if key.physical_keycode == KEY_M and not _game_route_waypoints.is_empty():
         _cycle_virtual_route_waypoint()
         get_viewport().set_input_as_handled()
@@ -1843,11 +1915,7 @@ func _process(delta: float) -> void:
     _cloud_elapsed += min(delta, 0.25)
     _update_clouds()
     _animate_approved_fx(delta)
-    if _native_follow_cam and _native_camera != null and _aero_character != null:
-        var avatar: Vector3 = _aero_character.global_position
-        _native_camera.global_position = _native_camera.global_position.lerp(
-            avatar + Vector3(9, 6, 16),minf(1.0,delta * 3.5))
-        _native_camera.look_at(avatar + Vector3(0, 1, 0))
+    _update_game_cinematic_camera(delta)
 '''
 
 
