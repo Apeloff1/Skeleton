@@ -178,6 +178,39 @@ class GDDNavigationFrameTests(unittest.TestCase):
                 compose_virtual_navigation(
                     request(),frame=second,gdd=source,previous_frame=first)
 
+    def test_navigation_receipt_chain_rejects_map_swaps_and_tampering(self):
+        signed=bind_signed_gdd(gdd())
+        first=advance_frame(frame_index=0,fps=60,gdd=signed,
+            objects=(FrameObject("hero",PLAYER,Vec3(6,0,0),"a"*64),))
+        initial=compose_virtual_navigation(request(),frame=first,gdd=signed)
+        actor=PLAYER+Vec3(.1,0,0)
+        second=advance_frame(frame_index=1,fps=60,gdd=signed,
+            objects=(FrameObject("hero",actor,Vec3(6,0,0),"a"*64),),
+            previous=first,
+            notes=(GDDFrameNote(1,"design_context",
+                "Navigation fix and movement remain bound to the GDD."),))
+        latest=compose_virtual_navigation(
+            request(actor),frame=second,gdd=signed,previous_frame=first,
+            previous_navigation=initial)
+        self.assertEqual(latest["previous_navigation_receipt_digest"],
+                         initial["receipt_digest"])
+        self.assertEqual(latest["frame_index"],1)
+        corrupt=dict(initial)
+        corrupt["world_xyz_m"]=[1000,1000,1000]
+        with self.assertRaises(VirtualPositionError):
+            compose_virtual_navigation(
+                request(actor),frame=second,gdd=signed,
+                previous_frame=first,previous_navigation=corrupt)
+        alternate=replace(request(actor),world=GameMap(
+            "frontier","original",16,16,10,north_rotation_deg=30))
+        with self.assertRaises(VirtualPositionError):
+            compose_virtual_navigation(
+                alternate,frame=second,gdd=signed,
+                previous_frame=first,previous_navigation=initial)
+        with self.assertRaises(VirtualPositionError):
+            compose_virtual_navigation(request(actor),
+                previous_navigation=initial)
+
     def test_scene_and_real_gps_sources_are_separate(self):
         anchor=bind_signed_gdd(gdd())
         frame_entities=(FrameObject("hero",PLAYER,Vec3(0,0,0),"a"*64),)
@@ -239,11 +272,19 @@ class GDDNavigationFrameTests(unittest.TestCase):
         later=compile_studio_frame(next_studio,source,frame_index=1,fps=60,
             preceding_frames=(initial["record"],),
             virtual_navigation=replace(request(moved),actor_id="hero:0"),
+            previous_virtual_navigation=initial["virtual_game_gps"],
             entity_velocities={"hero:0":(6.,0.,0.)},
             notes=(GDDFrameNote(1,"design_context",
                                "Navigation through gusty air continues."),))
         self.assertEqual(later["gdd_ai_context"]["final_verified_frame"],1)
         self.assertEqual(later["note_count"],1)
+        self.assertEqual(later["virtual_game_gps"]["previous_navigation_receipt_digest"],
+                         initial["virtual_game_gps"]["receipt_digest"])
+        self.assertEqual(
+            later["gdd_ai_context"]["verified_virtual_navigation"]["frame_receipt_digest"],
+            later["frame_receipt_digest"])
+        self.assertTrue(
+            later["gdd_ai_context"]["verified_virtual_navigation"]["requires_human_canon_approval"])
         with self.assertRaises(StudioError):
             replace(studio,virtual_game_map=GameMap(
                 "otherworld","original",10,10,1))
