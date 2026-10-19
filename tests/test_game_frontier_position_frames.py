@@ -224,6 +224,33 @@ class SceneAndStudioIntegrationTests(unittest.TestCase):
         self.assertNotIn("longitude_deg",json_location)
         self.assertNotIn('"altitude_m"',json_location)
 
+    def test_secondary_auditor_rejects_unredacted_fix_and_unverified_frame(self):
+        from tests.test_game_frontier_advanced_scene import scene_params
+        from skeleton.jeeves.game_frontier import compile_frontier_scene
+        from skeleton.jeeves.game_frontier_realism import audit_scene_realism
+        source=bind_signed_gdd(gdd())
+        original=compile_frontier_scene(**scene_params(),
+            gps_fix=fix(),gps_consent=grant(),gps_now_ms=5000,
+            frame_gdd=source,frame_index=0,frame_objects=objects(),
+        ).manifest
+        self.assertTrue(original["realism_audit"]["reference_checks_passed"])
+        self.assertIn("position_fix",original["realism_audit"]["participating_domains"])
+        self.assertIn("gdd_frame",original["realism_audit"]["participating_domains"])
+        altered=dict(original)
+        unsafe=dict(original["position_fix"])
+        unsafe["coordinates_redacted"]=False
+        altered["position_fix"]=unsafe
+        result=audit_scene_realism(altered)
+        self.assertFalse(result.reference_checks_passed)
+        altered=dict(original)
+        badframe=dict(original["frame_progress"])
+        badframe["verifier_b"]=False
+        altered["frame_progress"]=badframe
+        result=audit_scene_realism(altered)
+        self.assertFalse(result.reference_checks_passed)
+        self.assertTrue(any(x.domain=="gdd_frame" and not x.passed
+                            for x in result.invariants))
+
     def test_scene_rejects_unsigned_gdd_and_missing_location_permission(self):
         from tests.test_game_frontier_advanced_scene import scene_params
         from skeleton.jeeves.game_frontier import compile_frontier_scene
