@@ -794,6 +794,9 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _approved_branch_options = next_branch_options
     # One atomic document recording the actual Godot dispatch outcome.
     # Canonical GDD and native physics frame evidence are never rewritten.
+    var cue_ticks: Array = []
+    for cue_item in next_cues:
+        cue_ticks.append(int(cue_item["source_frame"]))
     var accepted := {
         "schema":"skeleton.game.godot_approved_dispatch_receipt.v1",
         "dispatch_file_sha256":expected_sha,
@@ -809,7 +812,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "visualized_item_ids":_approved_inventory_visuals,
         "executed_action_trace":next_action_trace,
         "presentation_cues":next_cues,
-        "cue_timeline_frame_index":[int(cue["source_frame"]) for cue in next_cues],
+        "cue_timeline_frame_index":cue_ticks,
         "read_only_branch_options":_approved_branch_options,
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
     }
