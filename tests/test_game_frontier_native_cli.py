@@ -196,7 +196,7 @@ class OperatorCLIRegressionTests(unittest.TestCase):
         def checksum(source):
             return sha256(json.dumps(source,sort_keys=True,separators=(",",":"),
                                      allow_nan=False).encode()).hexdigest()
-        self.capture.write_text("".join(json.dumps(self.sample(n))+"\\n"
+        self.capture.write_text("".join(json.dumps(self.sample(n))+"\n"
                                         for n in range(4)))
         code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture))
         self.assertEqual(code,0,err)
