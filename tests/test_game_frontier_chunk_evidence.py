@@ -122,8 +122,11 @@ class FrameChunkEvidenceTests(unittest.TestCase):
                 previous_evidence=prior_proof),(True,True))
             arrive=[r for r in proof["receipts"] if "hero" in r["arriving_entities"]]
             leave=[r for r in proof["receipts"] if "hero" in r["departing_entities"]]
+            leave += [r for r in proof["retired_chunks"]
+                      if any(e["entity_id"]=="hero" for e in r["departing_entities"])]
             self.assertEqual(len(arrive),1)
             self.assertEqual(len(leave),1)
+            self.assertEqual(proof["retired_chunk_count"],1)
             self.assertEqual(proof["source_note_count"],1)
             self.assertEqual(arrive[0]["gdd_world_law_links"][0]["world_law_index"],1)
 
