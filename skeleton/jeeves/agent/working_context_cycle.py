@@ -35,14 +35,58 @@ class PageClicker:
 
 
 def observation_digest(observation: ToolObservation) -> str:
+    """Bind every authoritative observation field, including evidence identity.
+
+    An evidence ID alone cannot prevent a forged citation from changing its
+    source, hash, confidence or URI while retaining the same ID.
+    """
     return stable_fingerprint({
         "id": observation.call_id,
         "tool": observation.tool_name,
         "ok": observation.ok,
         "payload": observation.payload,
         "error": observation.error,
-        "evidence": [ref.evidence_id for ref in observation.evidence],
+        "evidence": [
+            {
+                "id": ref.evidence_id, "kind": ref.kind.value,
+                "source": ref.source, "fingerprint": ref.fingerprint,
+                "confidence": ref.confidence, "observed_at": ref.observed_at,
+                "uri": ref.uri,
+            }
+            for ref in observation.evidence
+        ],
+        "latency_ms": observation.latency_ms,
+        "cached": observation.cached,
     })
+
+
+def _goal_digest(goal: Goal) -> str:
+    """Pin policy-bearing goal metadata, not only the textual request."""
+    return stable_fingerprint({
+        "goal_id": goal.goal_id, "objective": goal.objective,
+        "criteria": list(goal.success_criteria),
+        "constraints": list(goal.constraints),
+        "metadata": dict(goal.metadata),
+    })
+
+
+def _incomplete_negative(payload: Mapping[str, object]) -> bool:
+    """A partial or contradictory search result never proves an empty scope."""
+    if (payload.get("partial") is True or payload.get("truncated") is True
+            or payload.get("complete") is False
+            or payload.get("has_more") is True):
+        return True
+    if any(payload.get(key) for key in (
+        "next_cursor", "next_page", "next_token", "continuation_token",
+    )):
+        return True
+    for key in ("results", "items", "matches", "hits"):
+        value = payload.get(key)
+        if value is not None and not isinstance(value, (list, tuple)):
+            return True
+        if value:
+            return True
+    return False
 
 
 def is_no_found(observation: ToolObservation) -> bool:
@@ -51,7 +95,7 @@ def is_no_found(observation: ToolObservation) -> bool:
         value = observation.payload
         if not isinstance(value, dict):
             return False
-        if value.get("partial") is True or value.get("truncated") is True:
+        if _incomplete_negative(value):
             return False
         if value.get("status") in {"not_found", "no_results", "no_matches"}:
             return True
@@ -135,6 +179,7 @@ class PreparedDelivery:
             "notes": [note.fingerprint for note in self.notes],
             "receipt": self.receipts[-1].digest if self.receipts else None,
             "pages": self.page_count,
+            "freed_chars": self.freed_chars,
             "refill": self.refill,
         })
 
@@ -173,11 +218,11 @@ class WorkingContextCycle:
     def prepare(self, goal: Goal, observations: Sequence[ToolObservation],
                 *, refill_text: str = "") -> PreparedDelivery:
         original = tuple(observations)
+        if any(not isinstance(item, ToolObservation) for item in original):
+            raise TypeError("observations must be ToolObservation")
         ids = [item.call_id for item in original]
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate tool observation IDs in delivery")
-        if any(not isinstance(item, ToolObservation) for item in original):
-            raise TypeError("observations must be ToolObservation")
         failed = tuple(item for item in original if is_no_found(item))
         if len(failed) > self.max_notes:
             # Do not silently drop evidence: on overflow, the unabridged context remains.
@@ -199,7 +244,8 @@ class WorkingContextCycle:
             digest = observation_digest(item)
             serial = record("no_found_compacted", digest)
             notes.append(NoFoundNote(item.call_id, item.tool_name, _scope(item), digest, serial))
-        kept = tuple(item for item in original if item.call_id not in {note.call_id for note in notes})
+        removed = {note.call_id for note in notes}
+        kept = tuple(item for item in original if item.call_id not in removed)
         cleaned_refill = refill_text.strip()[:self.max_refill_chars] if notes else ""
         if notes:
             record("refill_context", stable_fingerprint({"goal": goal.goal_id, "refill": cleaned_refill,
@@ -210,10 +256,7 @@ class WorkingContextCycle:
             "call": item.call_id
         })) for item in failed) - sum(len(note.text) for note in notes))
         return PreparedDelivery(
-            goal_digest=stable_fingerprint({
-                "goal_id": goal.goal_id, "objective": goal.objective,
-                "criteria": list(goal.success_criteria), "constraints": list(goal.constraints),
-            }),
+            goal_digest=_goal_digest(goal),
             original_digests=tuple((item.call_id, observation_digest(item)) for item in original),
             active_observations=kept,
             notes=tuple(notes),
@@ -230,10 +273,7 @@ class IntegrityVerifier:
     @staticmethod
     def verify(prepared: PreparedDelivery, goal: Goal,
                observations: Sequence[ToolObservation]) -> None:
-        expected_goal = stable_fingerprint({
-            "goal_id": goal.goal_id, "objective": goal.objective,
-            "criteria": list(goal.success_criteria), "constraints": list(goal.constraints),
-        })
+        expected_goal = _goal_digest(goal)
         if prepared.goal_digest != expected_goal:
             raise ValueError("working context changed the original goal")
         original = tuple(observations)
@@ -242,10 +282,11 @@ class IntegrityVerifier:
         removed = {note.call_id for note in prepared.notes}
         if removed != {x.call_id for x in original if is_no_found(x)}:
             raise ValueError("working context removed non-no-found observation")
-        if tuple(x.call_id for x in prepared.active_observations) != tuple(
-            x.call_id for x in original if x.call_id not in removed
+        expected_active = tuple(x for x in original if x.call_id not in removed)
+        if tuple(observation_digest(x) for x in prepared.active_observations) != tuple(
+            observation_digest(x) for x in expected_active
         ):
-            raise ValueError("working context lost active evidence")
+            raise ValueError("working context changed active evidence or source order")
         by_id = {x.call_id: x for x in original}
         if any(note.source_digest != observation_digest(by_id[note.call_id]) for note in prepared.notes):
             raise ValueError("no-found note source was modified")
@@ -279,6 +320,14 @@ class IntegrityVerifier:
             previous = receipt.digest
         if prepared.page_count != len(prepared.receipts):
             raise ValueError("page counter disagrees with receipts")
+        expected_freed = max(0, sum(len(canonical_json({
+            "payload": item.payload, "error": item.error, "tool": item.tool_name,
+            "call": item.call_id,
+        })) for item in original if item.call_id in removed) - sum(
+            len(note.text) for note in prepared.notes
+        ))
+        if prepared.freed_chars != expected_freed:
+            raise ValueError("compaction space accounting does not match source")
 
 
 class ScopeVerifier:
@@ -293,6 +342,11 @@ class ScopeVerifier:
             raise ValueError("observation IDs are not unique")
         if len(prepared.notes) > 50000 or len(prepared.refill) > 65536:
             raise ValueError("working memory exceeds bounds")
+        authoritative_active = tuple(x for x in observations if not is_no_found(x))
+        if tuple(observation_digest(x) for x in prepared.active_observations) != tuple(
+            observation_digest(x) for x in authoritative_active
+        ):
+            raise ValueError("retained observation source or evidence changed")
         for note in prepared.notes:
             obs = original.get(note.call_id)
             # Deliberately re-evaluate source assertions independently of
@@ -301,7 +355,7 @@ class ScopeVerifier:
             if obs is not None:
                 if obs.ok and isinstance(obs.payload, dict):
                     data = obs.payload
-                    complete = data.get("partial") is not True and data.get("truncated") is not True
+                    complete = not _incomplete_negative(data)
                     valid_negative = complete and (
                         data.get("status") in ("not_found", "no_results", "no_matches")
                         or (data.get("found") is False and data.get("complete") is True)
