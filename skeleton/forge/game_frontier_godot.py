@@ -731,11 +731,23 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             push_error("Nonintegral signed inventory source count")
             return
         expected_inventory[item_id] = int(amount)
+    var expected_trace: Array = bundle.get("expected_action_trace", []).duplicate(true)
+    for trace_item in expected_trace:
+        if typeof(trace_item) != TYPE_DICTIONARY:
+            push_error("Approved source action trace row is not an object")
+            return
+        var trace_row: Dictionary = trace_item
+        for numeric_key in ["frame", "action_index"]:
+            var source_number: Variant = trace_row.get(numeric_key, -1)
+            if float(source_number) < 0.0 or float(source_number) != floorf(float(source_number)):
+                push_error("Approved source action trace index is not integral")
+                return
+            trace_row[numeric_key] = int(source_number)
     if (next_flags != bundle.get("expected_flags", {})
         or next_quests != expected_quests
         or next_inventory != expected_inventory
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})
-        or next_action_trace != bundle.get("expected_action_trace", [])):
+        or next_action_trace != expected_trace):
         push_error("Engine RPG reducer diverged from independently replayed state")
         return
     for quest_id in next_quests.keys():
