@@ -70,8 +70,16 @@ def inspect_runtime_virtual_gps(
         if previous is not None:
             if previous_native is None:
                 raise RuntimeGameNavigationError("previous runtime GPS native sample absent")
-            previous_navigation=compose_virtual_navigation(
+            # Survey sightings are measured at the requested/current frame.
+            # Replaying them against an earlier actor position is physically
+            # inconsistent. The prior frame is located with virtual beacons;
+            # the independent survey is applied only to the current fix.
+            from dataclasses import replace
+            prior_request=replace(
                 _candidate(request,_actor(previous,request.actor_id)),
+                controls=(),sightings=())
+            previous_navigation=compose_virtual_navigation(
+                prior_request,
                 frame=previous,gdd=journal.gdd,previous_frame=before_prior)
         current=compose_virtual_navigation(
             _candidate(request,_actor(frame,request.actor_id)),
