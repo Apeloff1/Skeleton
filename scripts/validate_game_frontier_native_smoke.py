@@ -34,12 +34,14 @@ def validate_native_trace(
     capture: Path, scene: Path, *, min_ticks: int = 4,
     max_ticks: int = 6000,
     minimum_actor_displacement_m: float = 0.01,
+    require_dynamics: bool = False,
 ) -> dict:
     if (type(min_ticks) is not int or type(max_ticks) is not int or
         not 2<=min_ticks<=max_ticks<=1_000_000 or
         type(minimum_actor_displacement_m) not in (int,float) or
         not math.isfinite(minimum_actor_displacement_m) or
-        not 0<minimum_actor_displacement_m<=100):
+        not 0<minimum_actor_displacement_m<=100 or
+        type(require_dynamics) is not bool):
         raise NativeSmokeError("bounded native runtime acceptance parameters required")
     for path in (capture,scene):
         if not path.is_file() or path.is_symlink():
@@ -73,6 +75,8 @@ def validate_native_trace(
     observed_chunks=set()
     observed_migrations=0
     observed_contact_actors=0
+    verified_dynamics_ticks=0
+    max_kinetic_energy_j=0.
     trace_root=sha256()
     count=0
     with capture.open("rb") as source:
@@ -118,6 +122,14 @@ def validate_native_trace(
                     record,previous=previous,expected_chunk_size_m=units)
             except NativeChunkError as exc:
                 raise NativeSmokeError("native per-chunk physics evidence inconsistent") from exc
+            if require_dynamics and not partition.get("native_dynamics_verified"):
+                raise NativeSmokeError("native Godot dynamics telemetry required")
+            if partition.get("native_dynamics_verified"):
+                from skeleton.jeeves.game_frontier_native_dynamics import inspect_native_dynamics
+                dynamics=inspect_native_dynamics(record,require_telemetry=True)
+                verified_dynamics_ticks+=1
+                max_kinetic_energy_j=max(max_kinetic_energy_j,
+                                         dynamics["total_kinetic_energy_j"])
             observed_chunks.update(tuple(x["chunk_xy"]) for x in partition["chunks"])
             observed_migrations+=motion["migrations"]
             coordinate=incoming[primary]["world_xyz_m"]
@@ -143,6 +155,8 @@ def validate_native_trace(
         "distinct_game_chunks_observed":len(observed_chunks),
         "cross_chunk_migrations_observed":observed_migrations,
         "positive_contact_count_observations":observed_contact_actors,
+        "native_dynamics_ticks_verified":verified_dynamics_ticks,
+        "peak_reported_kinetic_energy_j":max_kinetic_energy_j,
         "source_capture_sha256":trace_root.hexdigest(),
         "signed_gdd_digest":settings["gdd_digest"],
         "candidate_digest":settings["candidate_digest"],
@@ -158,10 +172,12 @@ def main(argv:list[str]|None=None)->int:
     parser.add_argument("--scene-json",required=True,type=Path)
     parser.add_argument("--min-ticks",type=int,default=4)
     parser.add_argument("--max-ticks",type=int,default=6000)
+    parser.add_argument("--require-dynamics",action="store_true")
     args=parser.parse_args(argv)
     try:
         report=validate_native_trace(args.capture_jsonl,args.scene_json,
-            min_ticks=args.min_ticks,max_ticks=args.max_ticks)
+            min_ticks=args.min_ticks,max_ticks=args.max_ticks,
+            require_dynamics=args.require_dynamics)
     except (ValueError,TypeError,KeyError,IndexError,OSError) as exc:
         print(f"Game Frontier native trace rejected: {exc}",file=sys.stderr)
         return 2

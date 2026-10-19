@@ -507,10 +507,38 @@ func _record_native_physics() -> void:
         var p: Vector3 = actor.global_position
         var v := Vector3.ZERO
         var contacts := 0
+        var dynamics: Dictionary = {}
         if actor is RigidBody3D:
             var rigid := actor as RigidBody3D
             v = rigid.linear_velocity
-            contacts = rigid.get_colliding_bodies().size()
+            var collisions: Array[Node3D] = rigid.get_colliding_bodies()
+            contacts = collisions.size()
+            var peer_ids: Array[String] = []
+            for collision in collisions:
+                var peer_index: int = _native_capture_nodes.find(collision)
+                if peer_index >= 0 and peer_index != index:
+                    peer_ids.append(str(_native_capture_actors[peer_index]["id"]))
+            peer_ids.sort()
+            var material: PhysicsMaterial = rigid.physics_material_override
+            var friction: float = 1.0
+            var restitution: float = 0.0
+            if material != null:
+                friction = material.friction
+                restitution = material.bounce
+            dynamics = {
+                "mode": "rigid", "mass_kg": rigid.mass,
+                "friction": friction, "restitution": restitution,
+                "kinetic_energy_j": 0.5 * rigid.mass * v.length_squared(),
+                "contact_actor_ids": peer_ids,
+                "external_contact_count": maxi(0, contacts - peer_ids.size()),
+            }
+        else:
+            dynamics = {
+                "mode": "static", "mass_kg": 0.0,
+                "friction": 1.0, "restitution": 0.0,
+                "kinetic_energy_j": 0.0, "contact_actor_ids": [],
+                "external_contact_count": 0,
+            }
         var xyz: Array = [p.x, -p.z, p.y]
         var cell: Array = [
             int(floor(float(xyz[0]) / _native_chunk_size_m)),
@@ -521,6 +549,7 @@ func _record_native_physics() -> void:
             "source_digest": str(src["source_digest"]),
             "source_kind": str(src.get("source_kind", "generated_source_proxy")),
             "contact_count": contacts,
+            "physics_body": dynamics,
             "world_xyz_m": xyz,
             "velocity_xyz_mps": [v.x, -v.z, v.y],
         })
@@ -536,6 +565,7 @@ func _record_native_physics() -> void:
     chunks.sort_custom(_native_chunk_less)
     var row := {
         "schema": "skeleton.game.native_physics_observation.v1",
+        "native_dynamics_schema": "skeleton.game.native_actor_dynamics.v1",
         "native_engine": "godot4_physics",
         "authority": "untrusted_native_candidate_observation_not_attested",
         "scene_candidate_digest": _native_candidate_sha,

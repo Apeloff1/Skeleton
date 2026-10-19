@@ -13,6 +13,10 @@ import json
 import math
 from typing import Mapping
 
+from .game_frontier_native_dynamics import (
+    inspect_native_dynamics, compare_native_dynamics, NativeDynamicsError,
+)
+
 
 class NativeChunkError(ValueError):
     pass
@@ -45,6 +49,10 @@ def inspect_native_chunks(sample: Mapping, *, expected_chunk_size_m: float = 32.
         not isinstance(sample,Mapping)):
         raise NativeChunkError("valid bounded typed source required")
     units=float(expected_chunk_size_m)
+    try:
+        dynamics=inspect_native_dynamics(sample)
+    except NativeDynamicsError as exc:
+        raise NativeChunkError("native mass/material/contact telemetry invalid") from exc
     actors=sample.get("actors")
     if not isinstance(actors,list) or not 1<=len(actors)<=256:
         raise NativeChunkError("native game actor count 1..256 required")
@@ -98,6 +106,9 @@ def inspect_native_chunks(sample: Mapping, *, expected_chunk_size_m: float = 32.
         "native_partition_confirmed":native_matches,
         "authority":"reported_native_physics_partition_not_GPU_attestation",
     }
+    if dynamics is not None:
+        source["native_dynamics_digest"]=dynamics["receipt_digest"]
+        source["native_dynamics_verified"]=True
     source["receipt_digest"]=_digest(source)
     return source
 
@@ -223,5 +234,12 @@ def compare_native_chunk_transitions(
         "verifier_b_motion_partition_conservation":True,
         "authority":"runtime_sample_consistency_not_native_attestation",
     }
+    try:
+        dynamics_delta=compare_native_dynamics(current,previous=previous)
+    except NativeDynamicsError as exc:
+        raise NativeChunkError("native body dynamics chain invalid") from exc
+    if dynamics_delta is not None:
+        root["native_dynamics_transition_digest"]=dynamics_delta["receipt_digest"]
+        root["native_dynamics_energy_delta_j"]=dynamics_delta["total_kinetic_energy_delta_j"]
     root["receipt_digest"]=_digest(root)
     return root

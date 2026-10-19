@@ -80,7 +80,7 @@ jobs:
           python scripts/validate_game_frontier_native_smoke.py \
             --capture-jsonl "$capture" \
             --scene-json "$RUNNER_TEMP/frontier-project/frontier/data/scene.json" \
-            --min-ticks 4 --max-ticks 20
+            --min-ticks 4 --max-ticks 20 --require-dynamics
           python scripts/run_game_frontier_capture.py ingest \
             --signed-gdd "$RUNNER_TEMP/frontier-project/signed_gdd.json" \
             --scene-json "$RUNNER_TEMP/frontier-project/frontier/data/scene.json" \
