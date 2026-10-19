@@ -123,6 +123,14 @@ class SurveyTests(unittest.TestCase):
         with self.assertRaises(PositionError):
             solve_control_survey(c,(s[0],replace(s[1],horizontal_range_m=1000)))
 
+    def test_redundant_third_station_detects_bearing_outlier(self):
+        c,s=self.stations()
+        east_degrees=degrees(100/(EARTH_RADIUS_M*cos(radians(60))))
+        third=SurveyControl("west",60,10-east_degrees,830,True)
+        sightings=(*s,SurveySighting("west",45,.1))
+        with self.assertRaises(PositionError):
+            solve_control_survey((*c,third),sightings,maximum_rms_m=5)
+
     def test_survey_disagreement_is_explicit_not_silently_blended(self):
         c,s=self.stations()
         surveyed=solve_control_survey(c,s)
