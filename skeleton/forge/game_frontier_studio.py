@@ -322,6 +322,22 @@ def compile_studio_frame(
     ) if use_incremental or prior is None else None
     context=(cursor_ai_context(latest_cursor,anchor) if latest_cursor
              else ai_design_context(anchor,(*preceding_frames,frame)))
+    # AI receives *verified virtual game-map context*, never OS GPS or
+    # an invented GDD rule. Notes remain suggestions for human review.
+    if game_nav is not None:
+        context = dict(context)
+        context["verified_virtual_navigation"] = {
+            "world_id": game_nav["world_id"],
+            "realm_id": game_nav["realm_id"],
+            "map_tile_xy": game_nav["map_tile_xy"],
+            "position_xyz_m": game_nav["world_xyz_m"],
+            "range_uncertainty_m": game_nav["horizontal_uncertainty_m"],
+            "navigation_receipt_digest": game_nav["receipt_digest"],
+            "frame_receipt_digest": frame.receipt_digest,
+            "source_world_laws_digest": anchor.source_digest,
+            "requires_human_canon_approval": True,
+            "authority": "AI_design_context_only_virtual_coordinates",
+        }
     base=compile_studio_project(project)
     return {
         "schema":"skeleton.forge.studio_frame_candidate.v1",
