@@ -37,6 +37,10 @@ from .code_delivery_quality import (
     QualityVerifierAdversary, required_delivery_kind,
 )
 from .code_scrutiny_loop import Discovery, Repair
+from .final_delivery_reviews import (
+    ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
+    FinalReviewAdversary, MeasuredCriterion, SourceProvenance,
+)
 from .context_repository import (
     ContextEntry,
     ContextKind,
@@ -223,6 +227,16 @@ class _DeliveryQualityBinding:
     authorize_repairs: bool
 
 
+@dataclass(frozen=True, slots=True)
+class _FinalReviewBinding:
+    kind: str
+    source_reader: Callable[[str], Mapping[str, str]]
+    metric_reader: Callable[[Mapping[str, str]], Sequence[MeasuredCriterion]]
+    rights_reader: Callable[[Mapping[str, str]], Sequence[SourceProvenance]]
+    copyright_checker: ContentChecker
+    rewrite_checker: ContentChecker
+
+
 @dataclass(slots=True)
 class _AdaptiveState:
     run_id: str
@@ -282,6 +296,11 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         self._code_delivery_quality_reviewer = CodeDeliveryQualityReviewer()
         self._verifier_adversary = AdversarialVerifierReviewer()
         self._quality_verifier_adversary = QualityVerifierAdversary()
+        self._final_review_bindings: dict[str, _FinalReviewBinding] = {}
+        self._final_review_reports: dict[str, FinalReleaseReview] = {}
+        self._final_review_proofs: dict[str, str] = {}
+        self._final_reviewer = ComparativeObjectiveFinalReviewer()
+        self._final_reviewer_adversary = FinalReviewAdversary()
 
     def run(self, inputs: RunInputs) -> AgentResult:
         result = super().run(inputs)
@@ -1230,6 +1249,112 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         with self._adaptive_lock:
             return self._delivery_quality_reports.get(require_id("run_id", run_id))
 
+    def register_final_review(
+        self, run_id: str, *, kind: str,
+        source_reader: Callable[[str], Mapping[str, str]],
+        metric_reader: Callable[[Mapping[str, str]], Sequence[MeasuredCriterion]],
+        rights_reader: Callable[[Mapping[str, str]], Sequence[SourceProvenance]],
+        copyright_checker: ContentChecker,
+        rewrite_checker: ContentChecker,
+    ) -> None:
+        """Bind independent comparative, rights and rewrite checkers to one run.
+
+        Source reader MUST include exact final response text as
+        delivery/jeeves_final_answer.md. Registration grants no rights itself.
+        """
+        run_key = require_id("run_id", run_id)
+        if kind not in {"code", "game", "creative"}:
+            raise ValueError("final review requires code, game or creative kind")
+        if any(not callable(callback) for callback in (
+            source_reader, metric_reader, rights_reader,
+            copyright_checker, rewrite_checker,
+        )):
+            raise ValueError("all final review adapters must be callable")
+        with self._adaptive_lock:
+            self._final_review_bindings[run_key] = _FinalReviewBinding(
+                kind, source_reader, metric_reader, rights_reader,
+                copyright_checker, rewrite_checker,
+            )
+
+    def final_review_receipt(self, run_id: str) -> FinalReleaseReview | None:
+        with self._adaptive_lock:
+            return self._final_review_reports.get(require_id("run_id", run_id))
+
+    def _verify_final_content_review(
+        self, state: _RunState, answer: str,
+        *, kind: str, quality: QualityReleaseReceipt | None,
+    ) -> tuple[bool, str | None]:
+        binding = self._final_review_bindings.get(state.run_id)
+        if binding is None:
+            return False, "mandatory comparative/objective/copyright/rewrite review missing"
+        if binding.kind != kind:
+            return False, "final content review domain mismatch"
+        reviewed = dict(binding.source_reader(answer))
+        if reviewed.get("delivery/jeeves_final_answer.md") != answer:
+            return False, "final answer text is not present in the reviewed content"
+        if quality is not None:
+            latest_quality_sources = dict(self._delivery_quality_bindings[
+                state.run_id
+            ].source_reader())
+            if any(reviewed.get(path) != content
+                   for path, content in latest_quality_sources.items()):
+                return False, "final review omitted or changed a quality-reviewed artifact"
+        review = self._final_reviewer.inspect(
+            kind, reviewed, metrics=tuple(binding.metric_reader(dict(reviewed))),
+            provenance=tuple(binding.rights_reader(dict(reviewed))),
+            copyright_checker=binding.copyright_checker,
+            rewrite_checker=binding.rewrite_checker,
+            upstream_quality_digest=quality.digest if quality else None,
+        )
+        with self._adaptive_lock:
+            self._final_review_reports[state.run_id] = review
+        if not review.passed:
+            return False, "final copyright/creative review blocked: " + "; ".join(
+                review.findings[:8]
+            )
+        proof = self._final_reviewer_adversary.challenge(
+            review, reviewed, upstream_quality_digest=quality.digest if quality else None,
+        )
+        with self._adaptive_lock:
+            self._final_review_proofs[state.run_id] = proof
+        state.trace.emit("adaptive.final_content_review_verified", {
+            "kind": kind, "final_receipt": review.fingerprint,
+            "comparison_metrics": len(review.measurements),
+            "copyright_evidence": review.copyright.evidence_ref,
+            "creative_rewrite_evidence": review.creative_rewrite.evidence_ref,
+            "verifier_adversary": proof,
+            "page_count": len(review.receipts),
+        })
+        from .types import EvidenceKind
+        state.ledger.append(EvidenceArtifact(
+            evidence_id=stable_id("finalreviewevidence", {
+                "run": state.run_id, "review": review.fingerprint,
+            }),
+            kind=EvidenceKind.DERIVED,
+            source="jeeves-final-content-review",
+            payload={
+                "review": review.fingerprint,
+                "verifier_adversary": proof,
+                "source_digest": review.source_digest,
+                "metric_evidence": [
+                    {"axis": metric.axis, "candidate": metric.observed_evidence,
+                     "baseline": metric.baseline_evidence,
+                     "target": metric.target_evidence}
+                    for metric in review.measurements
+                ],
+                "rights_evidence": [item.rights_evidence for item in review.provenance],
+                "copyright_evidence": review.copyright.evidence_ref,
+                "rewrite_evidence": review.creative_rewrite.evidence_ref,
+                "stage_receipts": [receipt.digest for receipt in review.receipts],
+                "review_scope": [
+                    review.copyright.review_scope, review.creative_rewrite.review_scope,
+                ],
+            },
+            observed_at=self._wall_clock(),
+            confidence=1.0,
+        ))
+        return True, None
+
     def _delivery_verify(self, state: _RunState, draft) -> tuple[bool, str | None]:
         prepared = self._working_deliveries.get(state.run_id)
         if prepared is None:
@@ -1317,6 +1442,15 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                     observed_at=self._wall_clock(),
                     confidence=1.0,
                 ))
+            final_kind = (
+                "creative" if state.inputs.goal.metadata.get("delivery_kind") == "creative"
+                else required_kind
+            )
+            if final_kind is not None:
+                return self._verify_final_content_review(
+                    state, draft.answer, kind=final_kind,
+                    quality=self._delivery_quality_reports.get(state.run_id),
+                )
             return True, None
         except Exception as exc:
             return False, f"{type(exc).__name__}: {str(exc)[:320]}"
