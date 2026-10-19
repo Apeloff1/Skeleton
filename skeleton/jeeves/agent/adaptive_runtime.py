@@ -1297,8 +1297,16 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             latest_quality_sources = dict(self._delivery_quality_bindings[
                 state.run_id
             ].source_reader())
+            # A fresh source reader alone is not release evidence: both readers
+            # could observe a new version after the quality receipt was issued.
+            # The copyright/rewrite review must bind the *exact* quality-audited
+            # bytes, and the host must still serve that same version.
+            audited_sources = dict(quality.scrutiny.files)
+            if (not quality.releasable
+                    or latest_quality_sources != audited_sources):
+                return False, "quality-reviewed sources changed before final review"
             if any(reviewed.get(path) != content
-                   for path, content in latest_quality_sources.items()):
+                   for path, content in audited_sources.items()):
                 return False, "final review omitted or changed a quality-reviewed artifact"
         review = self._final_reviewer.inspect(
             kind, reviewed, metrics=tuple(binding.metric_reader(dict(reviewed))),
