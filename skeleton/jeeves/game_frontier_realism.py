@@ -60,7 +60,7 @@ _DOMAINS = (
     "liquid", "tides", "light", "leaf_shadow", "characters",
     "environment", "structures", "biome", "audio", "chunks",
     "balance", "elastic_skin", "instruments", "rpg_events",
-    "position_fix", "gdd_frame",
+    "position_fix", "gdd_frame", "virtual_game_gps",
 )
 
 
@@ -365,6 +365,50 @@ def audit_scene_realism(manifest: Mapping) -> RealismAudit:
                   0<survey_uncertainty and control.get("retains_coordinates") is False and
                   int(control.get("control_count",0))>=2,
                   "independent_user_verified_wgs84_controls")
+    virtual = manifest.get("virtual_game_gps")
+    if isinstance(virtual,Mapping):
+        from .game_frontier_virtual_navigation import _digest
+        uncertainty=measurement("virtual_game_gps","accuracy_m",
+                                virtual["horizontal_uncertainty_m"],"m")
+        residual=measurement("virtual_game_gps","range_residual_m",
+                             virtual["range_residual_m"],"m")
+        tile=virtual.get("map_tile_xy",[])
+        try:
+            sealed=_digest({k:v for k,v in virtual.items() if k!="receipt_digest"})
+        except Exception:
+            sealed=""
+        check("virtual_game_gps","fictional_only_never_hardware",
+              virtual.get("device_location_used") is False and
+              virtual.get("source")=="fictional_simulated_beacons_no_device_gps" and
+              virtual.get("fictional_datum")=="planet_local_enu_not_earth_wgs84" and
+              virtual.get("authority")==
+                "virtual_game_navigation_candidate_no_world_mutation",
+              "fictional_world_coordinates_cannot_be_mixed_with_earth_gnss")
+        check("virtual_game_gps","range_geometry_and_map_bounds",
+              0<=residual<=5 and 0<uncertainty<100000 and
+              virtual.get("beacon_count",0)>=4 and
+              isinstance(tile,(list,tuple)) and len(tile)==2 and
+              all(type(i) is int for i in tile) and
+              0<=tile[0]<virtual.get("map_width_tiles",0) and
+              0<=tile[1]<virtual.get("map_height_tiles",0),
+              "multilateration_and_authored_map_grid")
+        check("virtual_game_gps","candidate_receipt_hash",
+              sealed==virtual.get("receipt_digest") and
+              type(virtual.get("receipt_digest")) is str,
+              "recompute_content_sha256_not_boolean_only")
+        if isinstance(virtual.get("survey"),Mapping):
+            check("virtual_game_gps","independent_virtual_survey",
+                  virtual["survey"].get("consistent") is True and
+                  virtual["survey"].get("separation_m",float("inf")) <=
+                  virtual["survey"].get("tolerance_m",-1),
+                  "fictional_survey_controls_not_cadastral")
+        if isinstance(manifest.get("frame_progress"),Mapping):
+            frame_source=manifest["frame_progress"]
+            check("virtual_game_gps","double_verified_frame_and_gdd_link",
+                  virtual.get("frame_receipt_digest")==frame_source.get("receipt_digest") and
+                  virtual.get("gdd_digest")==frame_source.get("gdd_digest") and
+                  virtual.get("double_verified") is True,
+                  "signed_gdd_and_two_independent_frame_verifiers")
     frame=manifest.get("frame_progress")
     if isinstance(frame,Mapping):
         frame_no=measurement("gdd_frame","frame_index",frame["frame_index"],"frames")
