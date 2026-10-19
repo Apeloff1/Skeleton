@@ -16,6 +16,20 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/health", tags=["health"])
 
+# First-party product routes whose absence must fail deployment readiness.
+# Optional plugins may degrade, but these shipped application capabilities may
+# not silently disappear behind register_routes' optional import fallback.
+CRITICAL_BOOT_ROUTERS = frozenset({
+    "routes.creator_economy",
+    "routes.marketplace",
+    "routes.git_operations",
+    "routes.jeeves_media",
+    "routes.lafs",
+    "routes.sorting_vault",
+    "routes.swarm_cold_legion",
+    "routes.swarm_hub",
+})
+
 # Filled in by core.routes_registry.register_known_routes — the helper
 # stores its last summary report here so we can surface it via API.
 _LAST_REPORT: dict[str, Any] = {
@@ -30,6 +44,26 @@ def record_registry_report(report: dict[str, Any]) -> None:
     """Called from core.routes_registry.register_known_routes()."""
     global _LAST_REPORT
     _LAST_REPORT = {**report, "at": time.time()}
+
+
+def critical_router_readiness() -> dict[str, Any]:
+    """Bounded, I/O-free readiness check for required first-party routes.
+
+    No exception details are exposed: health reports reveal only which
+    declared application capabilities failed to mount or were unregistered.
+    """
+    from core.routes_registry import KNOWN_ROUTES, KNOWN_ROUTES_WITH_PREFIX
+
+    registered = {entry[0] for entry in (*KNOWN_ROUTES, *KNOWN_ROUTES_WITH_PREFIX)}
+    skipped = {
+        str(failure).split(" ", 1)[0]
+        for failure in _LAST_REPORT.get("skipped_names", ())
+    }
+    missing = sorted((CRITICAL_BOOT_ROUTERS - registered) | (CRITICAL_BOOT_ROUTERS & skipped))
+    checked = bool(_LAST_REPORT.get("at")) and (
+        int(_LAST_REPORT.get("ok", 0)) + int(_LAST_REPORT.get("skipped", 0)) > 0
+    )
+    return {"ok": checked and not missing, "missing": missing, "report_available": checked}
 
 
 @router.get("/registry")
