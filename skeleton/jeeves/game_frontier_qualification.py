@@ -143,6 +143,7 @@ def qualify_frame_performance(
     *,
     observation_start_ns: int,
     observation_end_ns: int,
+    approved_licenses: Iterable[str],
     tolerance: float = 0.05,
 ) -> FramePerformance:
     """Reject mismatched/replayed receipts and measure, but do not certify them.
@@ -160,6 +161,9 @@ def qualify_frame_performance(
         raise FrontierQualificationError("observation interval must be positive")
     if type(tolerance) not in (int, float) or not math.isfinite(tolerance) or not 0 <= tolerance <= .5:
         raise FrontierQualificationError("invalid FPS tolerance")
+    allowed = frozenset(approved_licenses)
+    if not allowed or len(allowed) > 64:
+        raise FrontierQualificationError("explicit operator-approved license list required")
     fps = reqs[0].presentation_fps
     if any(r.presentation_fps != fps for r in reqs):
         raise FrontierQualificationError("mixed modes must be measured separately")
@@ -169,7 +173,7 @@ def qualify_frame_performance(
     for request, answer in zip(reqs, replies):
         request.checkpoint.require_ready(
             capability="action_conditioned_frame",
-            allowed_licenses=(request.checkpoint.license_id,),
+            allowed_licenses=allowed,
         )
         if request.frame_index in frame_ids:
             raise FrontierQualificationError("duplicate/replayed frame index")
