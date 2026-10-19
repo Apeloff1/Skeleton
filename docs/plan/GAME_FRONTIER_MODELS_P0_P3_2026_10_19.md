@@ -196,3 +196,110 @@ contact animation, character-accessible shelter decisions, skin subsurface
 scattering, damp hair clumping, water boots buoyancy and fluid drag, time-of-day
 shadow drift, moonlight/sunlight seasonal light schedules, and corrosion/rot
 sensitive to local biomes.
+
+
+## Next milestone — legacy-to-modern, atmosphere, tidal water, shadow coherence
+
+### Implemented reference mechanics and technical boundaries
+
+**Old + new:** `game_frontier_mesh_evolution.py` reconstructs indexed 3D
+voxel-extruded geometry from a lawful original pixel silhouette, retains
+exact source digests, emits explicit normal/vertex/source pixel mappings and
+enforces per-era mesh budgets. This implements executable legacy and modern
+mesh targets, not neural upscaling or final PBR asset design.
+
+**RPG game studio:** `skeleton/forge/game_frontier_studio.py` adds typed
+world/era/projection authored projects, multi-layer tile maps, prefab placement
+and declarative conditional event pages, with enumerated tools spanning
+quests, dialogue, cutscenes, battle, party, class, inventory, economy, 3D,
+weather, music/audio, tides and material/light/chunk inspection. Event actions
+are proposals, **never executed** by loading a data file. Visual editors and
+native engine actions are still pending.
+
+**Atmosphere @830 m / 2723 ft:** `game_frontier_ecosystem.py` implements
+ISA-derived altitude pressure, moist-air density, fog-specific optical
+extinction, rain-induced air-quality *proxy*, measured acoustical delay and an
+optional game-specific reduction in cold wind movement. Physical fog/humidity
+and wind models must not be conflated. This is a bounded scientific reference,
+not real weather observation.
+
+**Tides:** moon+solar semidiurnal signal plus derivative, alignment,
+sunlight cycle; spring/neap interference, coastal current proxy.
+Ocean basin geometry and real tidal constituents are not inferred.
+
+**Water:** grid of bed elevations and water columns, bounded conservative
+four-neighbor donor-normalized transfer, rain evaporation volume receipts,
+and character immersion/buoyancy/drag/splash/gait candidates.
+Tide is a water level offset in the composed scene. Real GPU 3D liquid,
+river currents, shoreline constraints and force feedback remain open.
+
+**Motion-coherent leaf shadows:** `game_frontier_photometry.py` updates a
+leaf’s actual 3D rectangle using wind/impact spring integration. One pose
+drives the ray-hit rectangle and four-corner projection; two independent
+checks compare analytic geometric shadow area and five ray probes. Shadow
+size therefore changes with 3D pose, sun direction and leaf dimensions,
+not a disconnected animation curve. Actual GPU ray-traced shadow parity is
+still unverified.
+
+**3D source/air/environment dampening:** each surface samples explicit
+light-source 3D distance, source radius, material wetness, normal incidence,
+occluder alpha transmittance, foliage intersections, rain, fog and cloud
+optical depth. Light has inverse-square distance falloff and a bounded
+source-size near-field correction; atmospheric absorption uses Beer-Lambert
+optical transmission. Godot source materializer uses only atmospheric
+transmittance for global directional light so its *native* geometric
+shadow mapping does not double-darken blocked light.
+
+**Shrubs and rocks:** wind-sensitive shrub tip spring, sliding/rolling
+small-rock reference dynamics and explicit impact impulses from the
+character’s collision contact. Same-frame shrub/rock/character geometry
+is available as 3D ray occluders and as Godot shadow casters; this is
+not global rigid/soft-body native physics authority.
+
+**Every-era chunks:** `game_frontier_chunks.py` partitions source faces
+by chunk centroid, retaining original vertex indices and source-face IDs.
+Verifier A recomputes canonical payload SHA-256. Verifier B independently
+reconstructs every source face and checks spatial bounds and exact coverage.
+`verify_registered_era_chunks` performs both for each currently registered
+`EngineEra`. This is a verifiable *engine-neutral* chunking primitive,
+not yet a claim that all engine streaming paths invoke it.
+
+**Source scene integration:** `game_frontier.py` receives typed optional
+air/moon/tide/grid/wind/leaf/foliage/light/sprite/chunk inputs and emits
+hashed candidate receipts while preserving previous call signatures.
+`skeleton/forge/game_frontier_godot.py` exports native geometry, environmental
+fog, light energy, verified leaf shadow polygons, a water surface, dynamic
+terrain object snapshots and predictable camera modes. It does **not** certify
+a real Godot renderer run or a gameplay build.
+
+### Traceable validation
+
+- Source candidate regression evidence: 74 passed in the targeted workflow
+  on commit `e4808381d13acff629157ed3fb9d29a96b9a7aaa`,
+  run `39188366694`.
+- That suite includes 830m pressure and density gradients, fog visibility,
+  rain response, phase-dependent tides, conserved water volume, buoyancy,
+  audio delay/occlusion, 3D leaf shadow area/rays, dynamic leaf position,
+  3D light distance and atmospheric dampening, independent chunk
+  tampering detection, old/modern source digest identity, RPG authoring,
+  and the integrated Forge candidate export.
+- Earlier run `39188228664` failed because an optional biome solver was
+  invoked for a pre-existing 2s scene despite its 0.25s local step limit.
+  The fix skips absent actors and substeps active biome references.
+- The clean tested commit is source and unit-test evidence only; the
+  full native Godot/GPU/runtime/ML testing burden remains P0–P3 open.
+
+### Next actionable milestone order
+
+1. Native scene/mesh importer proving all-era chunk streaming and dual
+   verification at load/update/save boundaries, not just dry-run coverage.
+2. Godot headless compilation/export and actual visible leaf/sun/3D shadow
+   motion screenshots; reject phase/size mismatches before admission.
+3. Forge-canonical RPG studio UI, event graph, scene/story canon validation
+   and old/new game build controls.
+4. Couple actual water grid and character collision forces to native game
+   physics and shoreline meshes with longer simulation/restore receipts.
+5. GPU-accelerated tracing, soft materials, physics weather/audio and
+   resource-governed real 30/50/60/120 fps profiles.
+6. Licensed learned model checkpoint serving and release benchmarks through
+   existing provider, training and promotion planes.
