@@ -605,14 +605,22 @@ class FrameReceiptJournal:
                 continue
             native=self.native_sample(index)
             native_proof=self.native_chunk_evidence(index)
-            if (native is None)!=(native_proof is None):
-                raise FrameJournalError("native timeline evidence incomplete")
+            native_transition=self.native_chunk_transitions(index)
+            if ((native is None)!=(native_proof is None) or
+                (native is None)!=(native_transition is None)):
+                raise FrameJournalError("native timeline evidence or transition incomplete")
             if native is not None:
                 self._validate_native_sample(frame,native)
                 if native_proof!=inspect_native_chunks(
                     native,expected_chunk_size_m=self.chunk_size_m,
                     require_native_partition="native_chunks" in native):
                     raise FrameJournalError("native timeline chunk source forged")
+                expected_transition=compare_native_chunk_transitions(
+                    native,previous=self.native_sample(index-1) if index else None,
+                    expected_chunk_size_m=self.chunk_size_m,
+                    max_speed_mps=self.max_speed_mps)
+                if expected_transition!=native_transition:
+                    raise FrameJournalError("native timeline transition source forged")
             delta=self.frame_delta(index)
             result={
                 "frame":index,"fps":frame.fps,
@@ -626,6 +634,12 @@ class FrameReceiptJournal:
                 "chunk_evidence_digest":proof["receipt_digest"],
                 "native_evidence_digest":(
                     native_proof["receipt_digest"] if native_proof else None),
+                "native_transition_digest":(
+                    native_transition["receipt_digest"] if native_transition else None),
+                "native_contact_observation_count":(
+                    sum(1 for actor in native_transition["actors"]
+                        if type(actor["contact_count_after"]) is int and
+                        actor["contact_count_after"]>0) if native_transition else None),
                 "delta_digest":delta["receipt_digest"] if delta else None,
                 "authority":"verified_source_evidence_cursor_not_native_gpu_proof",
             }
