@@ -369,7 +369,7 @@ def audit_scene_realism(manifest: Mapping) -> RealismAudit:
     if isinstance(frame,Mapping):
         frame_no=measurement("gdd_frame","frame_index",frame["frame_index"],"frames")
         count=measurement("gdd_frame","chunk_count",frame["chunk_count"],"chunks")
-        checks=(frame.get("double_verified") is True and
+        frame_checks_ok=(frame.get("double_verified") is True and
                 frame.get("verifier_a") is True and
                 frame.get("verifier_b") is True and
                 type(frame.get("gdd_digest")) is str and
@@ -379,7 +379,7 @@ def audit_scene_realism(manifest: Mapping) -> RealismAudit:
                 frame_no>=0 and count>=1 and
                 len(frame.get("chunks",[]))==count)
         check("gdd_frame","scene_has_double_verified_frame_receipt",
-              bool(checks),"independent_chunk_hash_and_temporal_gdd_verifiers")
+              bool(frame_checks_ok),"independent_chunk_hash_and_temporal_gdd_verifiers")
         check("gdd_frame","context_authority_remains_provisional",
               frame.get("ai_authority")==
               "suggested_context_only_signed_gdd_unchanged",
