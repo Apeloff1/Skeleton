@@ -69,6 +69,9 @@ var _approved_dialogue_cursor: int = 0
 var _approved_dialogue_panel: PanelContainer
 var _approved_dialogue_label: Label
 var _approved_gameplay_label: Label
+var _approved_cue_timeline: Array = []
+var _approved_cue_cursor: int = 0
+var _approved_cue_label: Label
 
 func _vec(data: Array) -> Vector3:
     return Vector3(float(data[0]), float(data[2]), -float(data[1]))
@@ -763,6 +766,8 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _approved_inventory_visuals = _create_approved_inventory_objects(next_inventory)
     _approved_gameplay_npc_emotions = next_npc_emotions
     _approved_gameplay_cues = next_cues
+    _approved_cue_timeline = next_cues.duplicate(true)
+    _approved_cue_cursor = 0
     _approved_npc_visuals = _show_approved_npc_reactions(next_npc_emotions)
     if _approved_npc_visuals.size() != next_npc_emotions.size():
         push_error("Approved NPC reactions did not resolve to native source actors")
@@ -786,12 +791,14 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "visualized_item_ids":_approved_inventory_visuals,
         "executed_action_trace":next_action_trace,
         "presentation_cues":next_cues,
+        "cue_timeline_frame_index":[int(cue["source_frame"]) for cue in next_cues],
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
     }
     if not _persist_verified_gameplay_receipt(accepted):
         return
     _create_approved_gameplay_inspector(accepted)
     _create_approved_dialogue_view()
+    _create_approved_cue_timeline()
 
 
 func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
@@ -913,6 +920,51 @@ func _create_approved_gameplay_inspector(record: Dictionary) -> void:
     hud.add_child(inspector)
     add_child(hud)
     _approved_gameplay_label = inspector
+
+
+func _create_approved_cue_timeline() -> void:
+    if _approved_cue_timeline.is_empty():
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedCinematicTimeline"
+    var panel := PanelContainer.new()
+    panel.name = "ApprovedCinematicCuePanel"
+    panel.position = Vector2(20, 625)
+    panel.custom_minimum_size = Vector2(330, 95)
+    var content := VBoxContainer.new()
+    var label := Label.new()
+    label.name = "ApprovedCinematicCue"
+    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    content.add_child(label)
+    var advance := Button.new()
+    advance.name = "NextApprovedCue"
+    advance.text = "Next approved cue (T)"
+    advance.pressed.connect(_next_approved_cue)
+    content.add_child(advance)
+    panel.add_child(content)
+    overlay.add_child(panel)
+    add_child(overlay)
+    _approved_cue_label = label
+    _show_approved_cue()
+
+
+func _show_approved_cue() -> void:
+    if _approved_cue_label == null:
+        return
+    var cue: Dictionary = _approved_cue_timeline[_approved_cue_cursor]
+    _approved_cue_label.text = (
+        "Authored game cue " + str(_approved_cue_cursor + 1) +
+        "/" + str(_approved_cue_timeline.size()) +
+        " | evidence frame " + str(cue["source_frame"]) +
+        "\n" + str(cue["kind"]) + ": " + str(cue["cue"]).substr(0, 160)
+    )
+
+
+func _next_approved_cue() -> void:
+    if _approved_cue_timeline.is_empty():
+        return
+    _approved_cue_cursor = (_approved_cue_cursor + 1) % _approved_cue_timeline.size()
+    _show_approved_cue()
 
 
 func _create_approved_dialogue_view() -> void:
@@ -1236,6 +1288,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     var key := event as InputEventKey
     if not key.pressed or key.echo:
+        return
+    if key.physical_keycode == KEY_T and not _approved_cue_timeline.is_empty():
+        _next_approved_cue()
+        get_viewport().set_input_as_handled()
         return
     if key.physical_keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE] and _approved_dialogue_panel != null and _approved_dialogue_panel.visible:
         _advance_approved_dialogue()
