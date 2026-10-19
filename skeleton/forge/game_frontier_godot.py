@@ -619,6 +619,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var next_flags: Dictionary = bundle["initial_flags"].duplicate(true)
     var next_quests: Dictionary = {}
     var next_cues: Array = []
+    var next_action_trace: Array = []
     var next_inventory: Dictionary = {}
     var next_npc_emotions: Dictionary = {}
     var last_tick: int = -1
@@ -699,6 +700,13 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             # Only typed commands with an approved runtime gateway may run.
             push_error("Unsupported game world mutation rejected by dispatcher")
             return
+        next_action_trace.append({
+            "frame":frame,"page_id":str(row.get("page_id", "")),
+            "action_index":int(row.get("action_index", -1)),
+            "kind":kind,
+            "native_frame_receipt_digest":str(row.get("native_frame_receipt_digest", "")),
+            "approved_event_evidence_digest":str(row.get("approved_event_evidence_digest", "")),
+        })
     # Godot JSON.parse_string decodes JSON numeric fields as float. The
     # Python quest source defines transition ticks and inventory counts as
     # integers; normalize only these known typed keys before strict equality.
@@ -720,7 +728,8 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     if (next_flags != bundle.get("expected_flags", {})
         or next_quests != expected_quests
         or next_inventory != expected_inventory
-        or next_npc_emotions != bundle.get("expected_npc_emotions", {})):
+        or next_npc_emotions != bundle.get("expected_npc_emotions", {})
+        or next_action_trace != bundle.get("expected_action_trace", [])):
         push_error("Engine RPG reducer diverged from independently replayed state")
         return
     for quest_id in next_quests.keys():
@@ -750,6 +759,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "actions_applied":actions.size(),
         "quests":next_quests,"flags":next_flags,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,
+        "executed_action_trace":next_action_trace,
         "presentation_cues":next_cues,
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
     }

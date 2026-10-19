@@ -129,6 +129,12 @@ def compile_native_godot_dispatch(
         "expected_npc_emotions":npc_moods,
         "expected_quests":checkpoint["quests"],
         "actions":commands,
+        "expected_action_trace":[{
+            "frame":c["frame"],"page_id":c["page_id"],
+            "action_index":c["action_index"],"kind":c["kind"],
+            "native_frame_receipt_digest":c["native_frame_receipt_digest"],
+            "approved_event_evidence_digest":c["approved_event_evidence_digest"],
+        } for c in commands],
     }
     result["receipt_digest"]=_sha(result)
     return result

@@ -35,6 +35,9 @@ class NativeEngineDispatchTests(NativeQuestBatchTests):
         self.assertEqual(data["quest_edges"]["chapter_1"]["start"],
                          ["middle","alternate"])
         self.assertEqual(len(dispatch_file_sha256(data)),64)
+        self.assertEqual(len(data["expected_action_trace"]),6)
+        self.assertEqual(data["expected_action_trace"][0]["page_id"],"begin")
+        self.assertEqual(len(data["expected_action_trace"][0]["native_frame_receipt_digest"]),64)
         self.assertTrue(canonical_dispatch_json(data).endswith("\n"))
         self.assertTrue(verify_native_godot_dispatch(
             self.journal,self.pages,self.graph,self.approved,

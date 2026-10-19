@@ -135,7 +135,7 @@ def _verify(args):
         "schema","dispatch_file_sha256","dispatch_receipt_digest",
         "signed_gdd_digest","scene_candidate_digest","actor_id",
         "source_through_frame","actions_applied","quests","flags",
-        "presentation_cues","inventory","npc_emotions","authority",
+        "presentation_cues","inventory","npc_emotions","executed_action_trace","authority",
     }
     allowed_cues={"show_dialogue","play_cutscene","play_music",
                   "spatial_audio","change_camera","inspect_instrument",
@@ -159,10 +159,12 @@ def _verify(args):
         or receipt["flags"]!=bundle["expected_flags"]
         or receipt["inventory"]!=bundle["expected_inventory"]
         or receipt["npc_emotions"]!=bundle["expected_npc_emotions"]
-        or receipt["presentation_cues"]!=expected_cues):
+        or receipt["presentation_cues"]!=expected_cues
+        or receipt["executed_action_trace"]!=bundle["expected_action_trace"]):
         raise GodotDispatchError("actual Godot engine gameplay state does not match source replay")
     return {
         "operation":"verify","verified_engine_actions":len(bundle["actions"]),
+        "verified_action_receipts":len(receipt["executed_action_trace"]),
         "verified_quest_count":len(receipt["quests"]),
         "verified_cue_count":len(expected_cues),
         "dispatch_file_sha256":expected,
