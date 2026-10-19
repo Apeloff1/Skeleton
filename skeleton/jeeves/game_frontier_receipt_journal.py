@@ -114,6 +114,12 @@ class FrameReceiptJournal:
                     max_speed REAL NOT NULL, fps INTEGER,
                     head INTEGER NOT NULL DEFAULT -1
                 );
+                CREATE TABLE IF NOT EXISTS frontier_native_samples (
+                    track TEXT NOT NULL, frame INTEGER NOT NULL,
+                    content_digest TEXT NOT NULL,
+                    PRIMARY KEY(track,frame),
+                    FOREIGN KEY(content_digest) REFERENCES frontier_blobs(digest)
+                );
                 CREATE TABLE IF NOT EXISTS frontier_commits (
                     track TEXT NOT NULL, frame INTEGER NOT NULL,
                     frame_digest TEXT NOT NULL, evidence_digest TEXT NOT NULL,
@@ -195,8 +201,54 @@ class FrameReceiptJournal:
             raise FrameJournalError("frame evidence or predecessor index conflict")
         return actual,proof
 
+    def _validate_native_sample(self, frame: FrameReceipt, sample: Mapping) -> None:
+        """Cross-check an untrusted Godot observation against stored actor state.
+
+        This verifies consistency, never authenticates the origin of a
+        client-supplied JSONL file as a trusted GPU observation.
+        """
+        if (not isinstance(sample,Mapping) or
+            sample.get("schema")!="skeleton.game.native_physics_observation.v1" or
+            sample.get("native_engine")!="godot4_physics" or
+            sample.get("native_tick")!=frame.frame_index or
+            sample.get("fps")!=frame.fps or
+            sample.get("signed_gdd_digest")!=self.gdd.source_digest or
+            type(sample.get("scene_candidate_digest")) is not str or
+            len(sample["scene_candidate_digest"])!=64 or
+            type(sample.get("ticks_usec")) is not int or
+            sample["ticks_usec"]<0 or
+            sample.get("authority")!="untrusted_native_candidate_observation_not_attested"):
+            raise FrameJournalError("native observation schema/source rejected")
+        native=sample.get("actors")
+        observed={x.entity_id:x for c in frame.chunks for x in c.objects}
+        if not isinstance(native,list) or len(native)!=len(observed) or not native:
+            raise FrameJournalError("native sample must account for all source actors")
+        names=set()
+        for item in native:
+            if not isinstance(item,Mapping) or item.get("id") not in observed:
+                raise FrameJournalError("native observation unknown actor")
+            name=item["id"]
+            if name in names:
+                raise FrameJournalError("native observation duplicate actor")
+            names.add(name)
+            if item.get("source_digest")!=observed[name].source_digest:
+                raise FrameJournalError("native source asset hash mismatch")
+            for key,expected in (
+                ("world_xyz_m",observed[name].position),
+                ("velocity_xyz_mps",observed[name].velocity),
+            ):
+                data=item.get(key)
+                if (not isinstance(data,list) or len(data)!=3 or
+                    any(type(x) not in (float,int) or not math.isfinite(x)
+                        or abs(x)>1e8 for x in data)):
+                    raise FrameJournalError("malformed native kinematic sample")
+                if any(abs(float(x)-float(y))>1e-5 for x,y in
+                       zip(data,(expected.x,expected.y,expected.z))):
+                    raise FrameJournalError("native source disagrees with frame kinematics")
+
     def append(self, frame: FrameReceipt,
-               evidence: Mapping | None = None) -> dict:
+               evidence: Mapping | None = None, *,
+               native_capture: Mapping | None = None) -> dict:
         """Commit only an independently verified next frame, atomically.
 
         If the same index is submitted twice, refuse; callers can load and
@@ -228,10 +280,17 @@ class FrameReceiptJournal:
                 chunk_size_m=self.chunk_size_m,
                 max_speed_mps=self.max_speed_mps)):
                 raise FrameJournalError("chunk evidence has not passed independent replay")
-            for identity,payload in (
+            native_hash=None
+            if native_capture is not None:
+                self._validate_native_sample(frame,native_capture)
+                native_hash=digest(native_capture)
+            blobs=[
                 (frame.receipt_digest,frame.payload()),
                 (expected["receipt_digest"],expected),
-            ):
+            ]
+            if native_hash is not None:
+                blobs.append((native_hash,dict(native_capture)))
+            for identity,payload in blobs:
                 bare = ({k:v for k,v in payload.items() if k!="receipt_digest"}
                         if "receipt_digest" in payload else payload)
                 if digest(bare)!=identity:
@@ -246,6 +305,10 @@ class FrameReceiptJournal:
                 "VALUES(?,?,?,?,?)",
                 (self.track,frame.frame_index,frame.receipt_digest,
                  expected["receipt_digest"],frame.previous_digest))
+            if native_hash is not None:
+                self._db.execute(
+                    "INSERT INTO frontier_native_samples(track,frame,content_digest) VALUES(?,?,?)",
+                    (self.track,frame.frame_index,native_hash))
             changed=self._db.execute(
                 "UPDATE frontier_tracks SET head=?,fps=? WHERE name=? AND head=?",
                 (frame.frame_index,frame.fps,self.track,head)).rowcount
@@ -255,6 +318,7 @@ class FrameReceiptJournal:
             return {"frame":frame.frame_index,
                     "frame_digest":frame.receipt_digest,
                     "chunk_evidence_digest":expected["receipt_digest"],
+                    "native_capture_digest":native_hash,
                     "track":self.track,
                     "authority":"journal_committed_verified_candidate_only"}
         except Exception:
@@ -262,7 +326,8 @@ class FrameReceiptJournal:
             raise
 
     def advance(self, objects: tuple[FrameObject,...], *, fps: int = 60,
-                notes: tuple[GDDFrameNote,...] = ()) -> dict:
+                notes: tuple[GDDFrameNote,...] = (),
+                native_capture: Mapping | None = None) -> dict:
         """Produce source frame from host-observed actor samples and commit."""
         head,saved_fps=self._head()
         previous=self.load(head)[0] if head>=0 else None
@@ -275,7 +340,13 @@ class FrameReceiptJournal:
                 chunk_size_m=self.chunk_size_m,max_speed_mps=self.max_speed_mps)
         except (FrameCoherenceError, ValueError) as exc:
             raise FrameJournalError("source frame failed canonical temporal/GDD verification") from exc
-        return self.append(frame)
+        return self.append(frame,native_capture=native_capture)
+
+    def native_sample(self, frame_index: int) -> dict | None:
+        row=self._db.execute(
+            "SELECT content_digest FROM frontier_native_samples WHERE track=? AND frame=?",
+            (self.track,frame_index)).fetchone()
+        return self._blob(row[0]) if row else None
 
     def replay(self, *, through: int | None = None) -> dict:
         """Replay the entire retained prefix, fail closed at first corruption."""
@@ -295,6 +366,15 @@ class FrameReceiptJournal:
                 previous_evidence=old_evidence,
                 chunk_size_m=self.chunk_size_m,
                 max_speed_mps=self.max_speed_mps)
+            native=self.native_sample(index)
+            if native is not None:
+                self._validate_native_sample(frame,native)
+                if index and self.native_sample(index-1) is not None and (
+                    native["scene_candidate_digest"]!=
+                    self.native_sample(index-1)["scene_candidate_digest"] or
+                    native["ticks_usec"]<=self.native_sample(index-1)["ticks_usec"]
+                ):
+                    raise FrameJournalError("native candidate/timing discontinuity")
             if not(a and b and e1 and e2):
                 raise FrameJournalError(f"replay verification failed at frame {index}")
             previous,old_evidence=frame,proof
@@ -329,6 +409,11 @@ class FrameReceiptJournal:
                 "INSERT INTO frontier_commits(track,frame,frame_digest,evidence_digest,previous_frame_digest) "
                 "SELECT ?,frame,frame_digest,evidence_digest,previous_frame_digest "
                 "FROM frontier_commits WHERE track=? AND frame<=? ORDER BY frame",
+                (name,self.track,through))
+            self._db.execute(
+                "INSERT INTO frontier_native_samples(track,frame,content_digest) "
+                "SELECT ?,frame,content_digest FROM frontier_native_samples "
+                "WHERE track=? AND frame<=?",
                 (name,self.track,through))
             self._db.execute("COMMIT")
         except Exception:
