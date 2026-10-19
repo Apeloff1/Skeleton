@@ -244,7 +244,7 @@ class SourceCalibratedDynamicsTests(unittest.TestCase):
                     }
                 samples.append(record)
             def save():
-                capture.write_text("".join(json.dumps(x)+"\\n" for x in samples))
+                capture.write_text("".join(json.dumps(x)+"\n" for x in samples))
             save()
             self.assertTrue(validate_native_trace(
                 capture,scene,require_dynamics=True)["source_primary_dynamics_verified"])
