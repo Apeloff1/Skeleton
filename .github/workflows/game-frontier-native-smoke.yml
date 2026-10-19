@@ -9,6 +9,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "scripts/build_game_frontier_smoke.py"
+      - "scripts/build_game_frontier_quest_smoke_approvals.py"
       - "scripts/qualify_game_frontier_godot.py"
       - "scripts/run_game_frontier_capture.py"
       - "scripts/validate_game_frontier_native_smoke.py"
@@ -115,6 +116,46 @@ jobs:
                             "source_prefix":obj["source_prefix_verified_frames"],
                             "candidate_fire_count":obj["candidate_fire_count"]}))
           PY
+            # CI ONLY: select known test quest events from genuine signed
+            # Godot frame receipts, then run the operator CLI simulation.
+            # No production approval identity is asserted by this fixture.
+            python scripts/build_game_frontier_quest_smoke_approvals.py \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" \
+              --event-pages-json "$project/native_rpg_pages.json" \
+              --quest-graph-json "$project/native_quest_graph.json" \
+              --output "$RUNNER_TEMP/frontier-fixture-approved-$fps.json" \
+              > "$RUNNER_TEMP/frontier-quest-fixture-$fps.json"
+            python scripts/run_game_frontier_capture.py simulate-quests \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" \
+              --event-pages-json "$project/native_rpg_pages.json" \
+              --quest-graph-json "$project/native_quest_graph.json" \
+              --quest-approvals-json "$RUNNER_TEMP/frontier-fixture-approved-$fps.json" \
+              --actor-id hero \
+              > "$RUNNER_TEMP/frontier-quest-session-$fps.json"
+            python - "$RUNNER_TEMP/frontier-quest-session-$fps.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          result=json.loads(Path(sys.argv[1]).read_text())["gameplay_session"]
+          trial=result["final_quests"].get("sky_trial")
+          assert trial is not None and trial["stage"]=="finished", trial
+          assert trial["completed"] is True
+          assert result["final_flags"]["quest_active"] is True
+          assert result["approved_page_count"]==2
+          assert result["authority"]=="operator_selected_local_gameplay_simulation_not_engine_world_save"
+          assert all(len(e["receipt_digest"])==64 for e in result["entries"])
+          print(json.dumps({"native_quest_completed":True,
+                            "source_frames":result["source_prefix_verified_frames"],
+                            "receipt_root":result["receipt_digest"]}))
+          PY
+            echo "#### Real Godot $fps Hz approved CI quest simulation" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/frontier-quest-fixture-$fps.json" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~' >> "$GITHUB_STEP_SUMMARY"
             echo "#### Real Godot ${fps} Hz RPG proposals" >> "$GITHUB_STEP_SUMMARY"
             echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
             cat "$RUNNER_TEMP/frontier-rpg-events-${fps}.json" >> "$GITHUB_STEP_SUMMARY"

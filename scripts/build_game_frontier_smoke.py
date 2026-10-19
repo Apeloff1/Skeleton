@@ -141,7 +141,7 @@ renderer/rendering_method.mobile="gl_compatibility"
     from skeleton.jeeves.game_frontier_native_quest_session import parse_native_quest_graph
     quest_graph=parse_native_quest_graph(quest_graph)
     overlay={"project.godot":project_godot,**overlay,
-             "native_quest_graph.json":json.dumps(quest_graph,sort_keys=True)+"\\n",
+             "native_quest_graph.json":json.dumps(quest_graph,sort_keys=True)+"\n",
              "signed_gdd.json":json.dumps(bible,sort_keys=True)+"\n",
              "native_rpg_pages.json":json.dumps(pages,sort_keys=True)+"\n"}
     for filename,content in overlay.items():
