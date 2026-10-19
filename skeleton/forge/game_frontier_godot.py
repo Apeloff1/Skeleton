@@ -23,6 +23,11 @@ var _cloud_tracks: Array = []
 var _cloud_elapsed: float = 0.0
 var _cloud_step_s: float = 1.0
 var _cloud_duration_s: float = 1.0
+var _aero_character: RigidBody3D
+var _aero_wind: Vector3 = Vector3.ZERO
+var _aero_density: float = 1.2
+var _aero_cd: float = 1.0
+var _aero_area: float = 0.7
 
 func _vec(data: Array) -> Vector3:
     return Vector3(float(data[0]), float(data[2]), -float(data[1]))
@@ -46,6 +51,7 @@ func _ready() -> void:
     _create_water(data.get("liquid", {}), data.get("tides", {}))
     _create_leaf_shadows(data.get("leaf_shadows", []))
     _create_biome_objects(data.get("biome_motion", {}))
+    _create_advanced_character(data.get("advanced_physics", {}))
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
 
@@ -184,6 +190,56 @@ func _create_biome_objects(biome: Dictionary) -> void:
         node.rotation.z = float(rock["rotation_radians"])
         node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
         add_child(node)
+
+func _create_advanced_character(info: Dictionary) -> void:
+    if info.is_empty() or str(info.get("authority", "")) != "candidate_only_no_native_mutation":
+        return
+    var body_data: Dictionary = info.get("body", {})
+    var aero: Dictionary = info.get("aero_coefficients", {})
+    if body_data.is_empty() or aero.is_empty():
+        return
+    var radius := float(body_data.get("radius_m", 0.5))
+    var mass := float(body_data.get("mass_kg", 80.0))
+    if radius <= 0 or mass <= 0:
+        return
+    var dynamic := RigidBody3D.new()
+    dynamic.name = "AdvancedPhysicsReferenceBody"
+    dynamic.mass = mass
+    dynamic.position = _vec(body_data["position_xyz"])
+    dynamic.linear_velocity = _vec(body_data["velocity_xyz"])
+    dynamic.angular_velocity = _vec(body_data["angular_velocity_xyz"])
+    var sphere := SphereShape3D.new()
+    sphere.radius = radius
+    var collider := CollisionShape3D.new()
+    collider.shape = sphere
+    dynamic.add_child(collider)
+    var render := MeshInstance3D.new()
+    var shape := SphereMesh.new()
+    shape.radius = radius
+    shape.height = radius * 2
+    render.mesh = shape
+    render.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+    dynamic.add_child(render)
+    var physical := PhysicsMaterial.new()
+    physical.friction = clamp(float(body_data.get("friction", .6)), 0.0, 1.0)
+    physical.bounce = clamp(float(body_data.get("restitution", .1)), 0.0, 1.0)
+    dynamic.physics_material_override = physical
+    add_child(dynamic)
+    _aero_character = dynamic
+    _aero_wind = _vec(info["airflow_velocity_xyz"])
+    _aero_density = clamp(float(info["air_density_kg_m3"]), .01, 10.0)
+    _aero_cd = clamp(float(aero.get("drag_coefficient", 1.0)), .001, 5.0)
+    _aero_area = clamp(float(aero.get("projected_area_m2", .7)), .001, 10000.0)
+
+func _physics_process(delta: float) -> void:
+    if _aero_character == null or delta < 0:
+        return
+    # Native solver updates the body after each fixed physics tick. Apply
+    # quadratic air drag using *current* relative wind, not a stale impulse.
+    var relative := _aero_character.linear_velocity - _aero_wind
+    var speed := relative.length()
+    var drag_n := -0.5 * _aero_density * _aero_cd * _aero_area * speed * relative
+    _aero_character.apply_central_force(drag_n)
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]
@@ -365,6 +421,8 @@ def emit_frontier_godot_overlay(
         "tides": manifest.get("tides") or {},
         "liquid": manifest.get("liquid") or {},
         "biome_motion": manifest.get("biome_motion") or {},
+        "advanced_physics": manifest.get("advanced_physics") or {},
+        "realism_audit": manifest.get("realism_audit") or {},
         "geometry": {
             "vertices": [[v.x, v.y, v.z] for v in vertices],
             "triangles": [list(face) for face in triangles],
