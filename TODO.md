@@ -13,7 +13,7 @@ runtime release readiness. All inference/training keeps existing authority.
 
 - [x] GF-P0-01 Genie-inspired deterministic wind-field primitives with altitude interpolation, turbulence, temporal/spatial coherence.
 - [x] GF-P0-02 Adaptive clouds with midpoint wind advection, shear-based stretch, per-cloud orientation, optional world wrapping.
-- [x] GF-P0-03 LingBot-inspired exact presentation clocks at **30, 50, 120 FPS** with bounded catchup and physics-clock isolation.
+- [x] GF-P0-03 LingBot-inspired exact presentation clocks at **30, 50, 60, 120 FPS** with bounded catchup and physics-clock isolation.
 - [x] GF-P0-04 World-axis generation for terrain, temperature, humidity, verticality, sky islands, volatility, biomes.
 - [x] GF-P0-05 HY-World-inspired skeletal-bone-to-polygon meshes; reduce polygon counts by engine era and available triangle budget.
 - [x] GF-P0-06 TRELLIS-inspired simulation-ready mesh data with bone influences, collision capsules, animation sample transforms.
@@ -23,9 +23,24 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-10 Add primitive and integration regression tests (execution/green CI not yet proven).
 - [x] GF-P0-19 Add candidate-only model checkpoint, frame throughput and simulation-ready 3D evidence contracts.
 - [x] GF-P0-20 Add independent license allowlist, external receipt identity, measured-versus-requested FPS checks.
-- [x] GF-P0-21 Add opt-in 30/50/120 FPS bridge to canonical per-era simulation timing, with cross-mode tests.
+- [x] GF-P0-21 Add opt-in 30/50/60/120 FPS bridge to canonical per-era simulation timing, with cross-mode tests.
+- [x] GF-P0-22 Add **60 FPS**, preserving 30/50/60/120 and canonical physics tick rates.
+- [x] GF-P0-23 Eight distinct world-variant generation transforms: inverse, mirror, elemental, ethereal, mythic, lensed, shadow, celestial.
+- [x] GF-P0-24 Top-down, platformer, full 3D and depth-weighted 2.5D/2.6D/2.7D/2.8D/2.9D projection candidates.
+- [x] GF-P0-25 Skin elasticity, cloth and hair soft-node spring motion; wetness/mass/wind damping and anchor displacement reference solver.
+- [x] GF-P0-26 Weather-aware player motion, traction, wind load, body temperature, rain and snow interaction.
+- [x] GF-P0-27 Adaptive character-plane collision, material restitution, recorded impact impulse and damage candidates.
+- [x] GF-P0-28 Environment soil saturation/erosion/foliage/snow/debris adaptation with simulated impacts.
+- [x] GF-P0-29 Construction progress, house integrity, long-term climate damage, natural growth and explicit maintenance.
+- [x] GF-P0-30 Liquid-aware hair, clothing, boots; protection/thermal and slip-risk character cognition.
+- [x] GF-P0-31 CPU shadow ray intersections for character and environment occluders plus area-light, wet-surface specular.
+- [x] GF-P0-32 Scene-candidate composition exports projection, variants, impacts, wear, awareness and ray-lighting evidence.
+- [x] GF-P0-33 Focused regression source plus opt-in path-scoped frontier GitHub workflow (actual green run pending).
+- [ ] GF-P0-34 Wire reference soft-body, weather, lifecycle and character collision outputs into authoritative Godot/era runtime.
+- [ ] GF-P0-35 Convert projected polygons and character-aware ray shadows into visible graphics with native renderer reference screenshots.
+- [ ] GF-P0-36 Persist world variants, structures, weather fields and motion state with history/canon/backups.
 - [x] GF-P0-22 Export Godot overlay scene with posed polygons, generated bone capsules, sky islands and source-wind cloud animation paths.
-- [x] GF-P0-23 Add exporter custody/regression tests and apply 30/50/120 requested FPS cap to preview script.
+- [x] GF-P0-23 Add exporter custody/regression tests and apply 30/50/60/120 requested FPS cap to preview script.
 - [ ] GF-P0-11 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
@@ -41,7 +56,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-02 Deploy authorized real visual world-model checkpoint; record architecture and support matrix.
 - [ ] GF-P1-03 Build continuous observation+action+camera history and compact, durable temporal latent/world memory.
 - [ ] GF-P1-04 Add visual continuity, occlusion, viewpoint revisit and long-horizon drift evaluation.
-- [ ] GF-P1-05 Implement variable-latency neural sampling with 30/50/120 FPS fallback, frame interpolation/drop policy and metrics.
+- [ ] GF-P1-05 Implement variable-latency neural sampling with 30/50/60/120 FPS fallback, frame interpolation/drop policy and metrics.
 - [ ] GF-P1-06 Add GPU/CPU fallback scheduling with adaptive graphics quality, render resolution, latency and power governors.
 - [ ] GF-P1-07 Import HY-World-like licensed mesh/3DGS/depth/normal/camera outputs; validate source license and coordinates.
 - [ ] GF-P1-08 Build skeleton-guided remeshing, bone correspondence, LODs, skin-weight transfer and seam-preservation metrics.
@@ -52,6 +67,12 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-13 Add world-axis auto-generation request schema and adaptive weather/terrain/cloud visual constraints.
 - [ ] GF-P1-14 Integrate grounded music, VFX, cinematic camera motion and synchronized event staging.
 - [ ] GF-P1-15 Add visual 3D asset quality and IP similarity adjudication before promotion.
+- [ ] GF-P1-16 Rigged skin deformation with vertex weights, collision-aware cloth self-contact and root-motion coupling to production physics.
+- [ ] GF-P1-17 Calibrated rain/snow/fluid solver for cloth/hair/boots and continuous environmental heat transfer.
+- [ ] GF-P1-18 GPU renderer integration of character/environment occlusion, BVH spatial acceleration, traced reflections and soft shadows.
+- [ ] GF-P1-19 Full world-family graph and cross-world transitions preserving identity, canon, biome climate and physical rules.
+- [ ] GF-P1-20 Parallax layer/material synthesis and camera editor controls per 2.5–2.9D projection level.
+- [ ] GF-P1-21 Native gameplay rig, clothing, impact and structure wear benchmarks per historical console era.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -70,10 +91,15 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-13 Compare neural and deterministic physics over long horizons, including weather, wind, collisions and destruction.
 - [ ] GF-P2-14 Create Dragon/Jeeves/adversary learning triangle with independently measured, not self-graded improvements.
 - [ ] GF-P2-15 Verify end-to-end playable game generation, objective completion, win/loss detection and failure recovery.
+- [ ] GF-P2-16 Cognitive character planning for heat/cold, storms, shelter, liquid interactions, slippery surfaces and impact responses.
+- [ ] GF-P2-17 Multi-character skin/hair/garment interaction and wet/dry season, wind/water, high-speed simulation sweeps.
+- [ ] GF-P2-18 Construction crews, resource supply, scheduled maintenance and accelerated weather-aging simulations across years.
+- [ ] GF-P2-19 Elemental/ethereal/celestial/mythic inverse/mirror realm puzzle/physics/lighting scenario validation.
+- [ ] GF-P2-20 Full ray-traced cinematics (moving lights, dynamic geometry, shadow continuity and multi-view evidence).
 
 ## P3 — Production qualification and large-scale world operation
 
-- [ ] GF-P3-01 Run real GPU serving load tests per 30/50/120 mode, with measured generated versus displayed frame rates.
+- [ ] GF-P3-01 Run real GPU serving load tests per 30/50/60/120 mode, with measured generated versus displayed frame rates.
 - [ ] GF-P3-02 Qualify 3D level scalability, chunk streaming, weather and cloud LOD under low/high device profiles.
 - [ ] GF-P3-03 Add spatial/neural memory compaction and world-state restore beyond hour/day/week production runs.
 - [ ] GF-P3-04 Profile persistent project runs lasting weeks/months, crash resume, backups, lease recovery and budget limits.
@@ -87,6 +113,11 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-12 Finish VOL L00–L13 research/implementation/assurance dossiers and exact-head enterprise benchmarking.
 - [ ] GF-P3-13 Verify production feature parity claims strictly from executed inference and generated/exported scenes.
 - [ ] GF-P3-14 Merge only after review and acceptable CI; reconcile conflicts, retain rights and safety gates.
+- [ ] GF-P3-15 GPU/CPU parity and frame-time telemetry for 30/50/60/120 FPS including pseudo-depth view modes.
+- [ ] GF-P3-16 Multi-year world and building restoration, freeze-thaw/flood/fire long-tail damage and maintenance economic qualification.
+- [ ] GF-P3-17 Per-era visual QA of dynamic hair/cloth and character-aware ray tracing under mobile/PC/console performance envelopes.
+- [ ] GF-P3-18 Gameplay across all nine world families (including original) and eight projection modes; continuity/transition acceptance.
+- [ ] GF-P3-19 Frame and sensor evidence separate computed reference motion from authoritative GPU/physics outcomes.
 
 ## Source references
 
