@@ -14,6 +14,7 @@ on:
       - "scripts/run_game_frontier_godot_dispatch.py"
       - "scripts/run_game_frontier_endurance.py"
       - "scripts/verify_game_frontier_instruments.py"
+      - "scripts/verify_game_frontier_dash.py"
       - "scripts/qualify_game_frontier_godot.py"
       - "scripts/run_game_frontier_capture.py"
       - "scripts/validate_game_frontier_native_smoke.py"
@@ -323,7 +324,7 @@ jobs:
             dispatch_user="$RUNNER_TEMP/frontier-dispatch-runtime-$fps"
             mkdir -p "$dispatch_user"
             XDG_DATA_HOME="$dispatch_user" "$FRONTIER_GODOT" \
-              --headless --path "$project" --quit-after 5 \
+              --headless --path "$project" --quit-after 8 \
               > "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log" 2>&1
             dispatch_receipt="$(find "$dispatch_user" -type f \
               -name frontier_approved_gameplay_receipt.json -print -quit)"
@@ -332,6 +333,68 @@ jobs:
               tail -n 80 "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log"
               exit 1
             fi
+            # Milestones 1-5: actual physics difference after a level-2 skill.
+            # Baseline has no command-line dash. The alternate Godot process
+            # uses the same approved GDD, script and inputs plus one explicit
+            # CI-only player-key equivalent at native physics frame 2.
+            control_physics="$(find "$dispatch_user" -type f \
+              -name frontier_native_physics.jsonl -print -quit)"
+            test -n "$control_physics"
+            test -s "$control_physics"
+            cp "$control_physics" "$RUNNER_TEMP/frontier-dash-control-$fps.jsonl"
+            dash_user="$RUNNER_TEMP/frontier-dash-active-$fps"
+            mkdir -p "$dash_user"
+            XDG_DATA_HOME="$dash_user" "$FRONTIER_GODOT" \
+              --headless --path "$project" --quit-after 8 \
+              -- --frontier-ci-wind-dash \
+              > "$RUNNER_TEMP/frontier-dash-active-$fps.log" 2>&1
+            dash_physics="$(find "$dash_user" -type f \
+              -name frontier_native_physics.jsonl -print -quit)"
+            dash_activations="$(find "$dash_user" -type f \
+              -name frontier_local_ability_activations.jsonl -print -quit)"
+            dash_save="$(find "$dash_user" -type f \
+              -name frontier_approved_gameplay_receipt.json -print -quit)"
+            if test -z "$dash_physics" || test -z "$dash_activations" || test -z "$dash_save"; then
+              echo "::error::Expected true source-unlocked Godot wind dash was not executed"
+              tail -n 80 "$RUNNER_TEMP/frontier-dash-active-$fps.log"
+              exit 1
+            fi
+            test -s "$dash_physics"
+            test -s "$dash_activations"
+            cmp "$dash_save" "$dispatch_receipt"
+            python scripts/verify_game_frontier_dash.py \
+              --control-jsonl "$RUNNER_TEMP/frontier-dash-control-$fps.jsonl" \
+              --activated-jsonl "$dash_physics" \
+              --ability-jsonl "$dash_activations" \
+              --dispatch-json "$project/frontier/data/native_gameplay_dispatch.json" \
+              --fps "$fps" \
+              > "$RUNNER_TEMP/frontier-dash-differential-$fps.json"
+            python - "$RUNNER_TEMP/frontier-dash-differential-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          proof=json.loads(Path(sys.argv[1]).read_text())
+          assert proof["frame_count"]>=4, proof
+          assert proof["approved_skill_level"]==2, proof
+          assert proof["activation_tick"]==2, proof
+          assert proof["peak_added_velocity_along_impulse_mps"]>.12, proof
+          assert len(proof["receipt_digest"])==64
+          print(json.dumps({"godot_wind_dash_physics_verified":True,
+                            "fps":proof["fps"],
+                            "added_speed_mps":proof["peak_added_velocity_along_impulse_mps"],
+                            "dual_run_evidence":proof["receipt_digest"]}))
+          PY
+            # A new engine process lacking the opt-in command is forbidden
+            # to re-execute or append an already approved local player action.
+            pre_restart_ability="$(sha256sum "$dash_activations" | cut -d ' ' -f 1)"
+            XDG_DATA_HOME="$dash_user" "$FRONTIER_GODOT" \
+              --headless --path "$project" --quit-after 5 \
+              > "$RUNNER_TEMP/frontier-dash-restart-$fps.log" 2>&1
+            post_restart_ability="$(sha256sum "$dash_activations" | cut -d ' ' -f 1)"
+            if test "$pre_restart_ability" != "$post_restart_ability"; then
+              echo "::error::Wind dash spuriously replayed across process restart"
+              exit 1
+            fi
+            cmp "$dash_save" "$dispatch_receipt"
             # Relaunch Godot against the same user:// directory. It must
             # *reuse* its exact independently verified local gameplay state.
             # A newly written or rewritten save would fail byte identity.
