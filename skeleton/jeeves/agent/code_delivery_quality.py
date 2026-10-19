@@ -44,8 +44,8 @@ _ACTION = re.compile(
 def required_delivery_kind(goal: Goal) -> str | None:
     """Classify explicitly flagged builds and clearly executable coding tasks."""
     kind = goal.metadata.get("delivery_kind")
-    if kind is not None and kind not in {"code", "game", "non_code"}:
-        raise ValueError("delivery_kind must be code, game, or non_code")
+    if kind is not None and kind not in {"code", "game", "creative", "non_code"}:
+        raise ValueError("delivery_kind must be code, game, creative, or non_code")
     if kind in {"code", "game"}:
         return str(kind)
     objective = goal.objective
