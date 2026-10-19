@@ -21,7 +21,7 @@ from tests.test_game_frontier_position_frames import gdd
 
 def players(x=1., count=8):
     return tuple(FrameObject(f"actor-{i}",
-                             Vec3(x if i==0 else i*10+1,0,2),
+                             Vec3(x if i==0 else (i+1)*100+1,0,2),
                              Vec3(6 if i==0 else 0,0,0),
                              f"{i%10}"*64) for i in range(count))
 
@@ -121,7 +121,7 @@ class DurableDeltaTests(unittest.TestCase):
             source.fork("undo_8",through=8)
         with FrameReceiptJournal(self.path,self.gdd,track="undo_8") as replay:
             self.assertEqual(replay.replay()["verified_frames"],9)
-            replay.advance(players(2.45),fps=60,include_delta=True)
+            replay.advance(players(2.47),fps=60,include_delta=True)
             self.assertEqual(replay.replay()["verified_frames"],10)
         with FrameReceiptJournal(self.path,self.gdd) as original:
             self.assertEqual(original.stats()["head"],15)
