@@ -463,6 +463,19 @@ def audit_scene_realism(manifest: Mapping) -> RealismAudit:
                   r.get("signed_gdd_digest")==frame_proof.get("signed_gdd_digest")
                   for r in receipts),
               "recomputed_per_chunk_receipt_hashes")
+        retired=frame_proof.get("retired_chunks",[])
+        check("frame_chunk_evidence","retired_chunk_migration_receipts",
+              isinstance(retired,list) and
+              len(retired)==frame_proof.get("retired_chunk_count",0) and
+              all(sealed_chunk_record(r) and
+                  r.get("verifier_a",{}).get("passed") is True and
+                  r.get("verifier_b",{}).get("passed") is True and
+                  r.get("new_source_frame_digest")==frame_proof.get("source_frame_digest")
+                  for r in retired) and
+              sum(len(r.get("departing_entities",[])) for r in receipts)+
+              sum(len(r.get("departing_entities",[])) for r in retired)==
+                  frame_proof.get("cross_chunk_migrations",0),
+              "all_departures_accounted_for_including_empty_retired_cells")
         measurement("frame_chunk_evidence","migrations",
                     frame_proof.get("cross_chunk_migrations",0),"actors")
         check("frame_chunk_evidence","complete_entity_coverage",
