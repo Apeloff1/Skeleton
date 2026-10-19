@@ -20,6 +20,10 @@ from skeleton.jeeves.game_frontier_instruments import (
     sight_sextant, sight_bubble_sextant, barometric_altimeter,
     trigonometric_altimeter, instrument_manifest, InstrumentError,
 )
+from skeleton.forge.game_frontier_studio import (
+    StudioProject, MapLayer, StudioEvent, compile_studio_project, StudioError,
+)
+from skeleton.jeeves.game_frontier_worlds import ProjectionMode, WorldFamily
 from skeleton.forge.game_frontier_rpg_events import (
     EnvironmentalTrigger, RPGEventPage, RPGEventAction,
     evaluate_environment_events, event_authoring_catalog, RPGEventError,
@@ -230,6 +234,36 @@ class RPGEnvironmentTests(unittest.TestCase):
             EnvironmentalTrigger("not_real_signal","above",3)
         with self.assertRaises(RPGEventError):
             RPGEventAction("run_remote_code","world","scene","payload")
+
+
+class StudioEnvironmentalEditorTests(unittest.TestCase):
+    def test_modern_studio_serializes_environmental_event_graph(self):
+        page=RPGEventPage("rain_alarm",5,(
+            EnvironmentalTrigger("rain_mm_h","cross_up",25),
+        ),(RPGEventAction("play_cutscene","cinematic","hero","flood"),))
+        studio=StudioProject("game","modern",ProjectionMode.DEPTH_29,
+                             WorldFamily.CELESTIAL,
+                             (MapLayer("floor",1,1,("grass",),(0,)),),
+                             environmental_pages=(page,))
+        result=compile_studio_project(studio)
+        self.assertIn("elastic_body_skin3d_editor",result["editors"])
+        self.assertIn("instrument_event_graph",result["editors"])
+        self.assertIn("center_of_mass_inspector",result["editors"])
+        self.assertEqual(result["environmental_pages"][0]["id"],"rain_alarm")
+        self.assertEqual(result["environmental_pages"][0]["conditions"][0]["signal"],
+                         "rain_mm_h")
+        self.assertEqual(result,compile_studio_project(studio))
+
+    def test_cannot_create_colliding_old_new_event_ids(self):
+        page=RPGEventPage("same",2,(
+            EnvironmentalTrigger("wind_mps","above",20),
+        ),(RPGEventAction("change_camera","cinematic","hero","wide"),))
+        old=StudioEvent("same","interact","",False,"show_dialogue","hero","hi")
+        with self.assertRaises(StudioError):
+            StudioProject("game","early_3d",ProjectionMode.TOP_DOWN,
+                          WorldFamily.ORIGINAL,
+                          (MapLayer("ground",1,1,("floor",),(0,)),),
+                          events=(old,),environmental_pages=(page,))
 
 
 class SuiteIntegrationTests(unittest.TestCase):
