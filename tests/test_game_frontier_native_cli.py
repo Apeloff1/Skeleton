@@ -257,6 +257,54 @@ class OperatorCLIRegressionTests(unittest.TestCase):
         self.assertEqual(code,0,err)
         self.assertEqual(json.loads(out)["gameplay_session"]["final_quests"],
                          report["final_quests"])
+        # Real durable resume: first source window creates an exclusive
+        # checkpoint; later command is anchored to its separately recorded
+        # hash, and cannot overwrite or silently regenerate that file.
+        first=self.directory/"sky-route-checkpoint-1.json"
+        second=self.directory/"sky-route-checkpoint-2.json"
+        args=(*opts,"--event-limit","2")
+        code,out,err=self.run_command("advance-quests",*args,
+                                      "--through","1",
+                                      "--checkpoint-output-json",str(first))
+        self.assertEqual(code,0,err)
+        start=json.loads(out)["gameplay_window"]
+        self.assertEqual(start["checkpoint"]["frame"],1)
+        self.assertEqual(start["checkpoint"],
+                         json.loads(first.read_text()))
+        self.assertEqual(start["checkpoint"]["approved_page_count"],1)
+        trusted=start["checkpoint"]["receipt_digest"]
+        code,out,err=self.run_command(
+            "advance-quests",*args,"--through","3",
+            "--checkpoint-input-json",str(first),
+            "--expected-checkpoint-digest",trusted,
+            "--checkpoint-output-json",str(second))
+        self.assertEqual(code,0,err)
+        resumed=json.loads(out)["gameplay_window"]
+        self.assertEqual(resumed["checkpoint"]["frame"],3)
+        self.assertEqual(resumed["checkpoint"]["quests"],report["final_quests"])
+        self.assertEqual(resumed["checkpoint"]["last_session_receipt_digest"],
+                         report["last_session_receipt_digest"])
+        self.assertEqual(start["entries"]+resumed["entries"],report["entries"])
+        self.assertEqual(resumed["previous_checkpoint_digest"],trusted)
+        self.assertEqual(resumed["checkpoint"],json.loads(second.read_text()))
+        code,out,err=self.run_command(
+            "advance-quests",*args,"--through","3",
+            "--checkpoint-input-json",str(first),
+            "--expected-checkpoint-digest","0"*64,
+            "--checkpoint-output-json",str(self.directory/"bad-digest.json"))
+        self.assertEqual(code,2)
+        self.assertIn("independent trusted checkpoint digest",err)
+        self.assertFalse((self.directory/"bad-digest.json").exists())
+        code,out,err=self.run_command("advance-quests",*args,
+                                      "--through","1",
+                                      "--checkpoint-output-json",str(first))
+        self.assertEqual(code,2)
+        self.assertIn("new safe file",err)
+        with self.assertRaises(SystemExit):
+            self.run_command(
+                "advance-quests",*args,"--through","3",
+                "--checkpoint-input-json",str(first),
+                "--checkpoint-output-json",str(self.directory/"missing-anchor.json"))
         manifest["approvals"][0]["event_evidence_digest"]="0"*64
         manifest["receipt_digest"]=checksum({k:v for k,v in manifest.items()
                                              if k!="receipt_digest"})
