@@ -49,6 +49,7 @@ from .game_frontier_advanced_physics import (
 )
 from .game_frontier_realism import audit_scene_realism
 from .game_frontier_weather_physics import Microclimate, evolve_microclimate
+from .game_frontier_character_suite import CharacterSuiteConfig, compile_character_suite
 
 FRONTIER_SCENE_SCHEMA = "skeleton.game.frontier_scene_candidate.v1"
 FRONTIER_MODEL_STATUS = "engine_candidate_only_no_proprietary_weights"
@@ -121,6 +122,7 @@ def compile_frontier_scene(
     advanced_other_body: RigidBody | None = None,
     advanced_turbulence_amplitude: float = 0.,
     advanced_microclimate: Microclimate | None = None,
+    character_suite: CharacterSuiteConfig | None = None,
 ) -> FrontierSceneCandidate:
     """Produce a content-addressed, inspectable, playable-engine-side proposal.
 
@@ -451,6 +453,13 @@ def compile_frontier_scene(
             },
             "authority": "candidate_only_no_native_mutation",
         }
+    # Opt-in character suite: barycentric load, elastic mesh, simulated
+    # instruments and RPG conditions. No event or physics execution.
+    character_suite_receipt = (compile_character_suite(
+        character_suite, skeleton=skeleton, mesh=mesh,
+        animation=animation, animation_time_ms=animation_time_ms,
+        delta_s=delta_s, weather=physical_weather,
+    ) if character_suite is not None else None)
     prediction = None
     if speculative_input is not None:
         anticipated = anticipate_user_motion(speculative_input, horizon_ms=prediction_horizon_ms)
@@ -684,6 +693,7 @@ def compile_frontier_scene(
             "original_source_preserved": m.source_preserved,
         } for m in old_new_meshes],
         "advanced_physics": advanced_receipt,
+        "character_suite": character_suite_receipt,
         "governance": {
             "neural_model_checkpoint_loaded": False,
             "gameplay_action_executed": False,
