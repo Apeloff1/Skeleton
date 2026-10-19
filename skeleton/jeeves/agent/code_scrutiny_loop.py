@@ -186,16 +186,47 @@ def _check_adapters(items: Sequence[CodeFinding], files: Mapping[str, str], name
 
 
 def verify_scrutiny_receipts(outcome: ScrutinyOutcome) -> None:
+    """Reconstruct the audited result, not merely the receipt-to-receipt hashes.
+
+    Every final outcome must refer to the exact bytes and findings inspected in
+    its last pass. The clean-run count is independently reconstructed so forged
+    stability counters cannot turn a one-pass check into release authority.
+    """
+    if not outcome.receipts:
+        raise ValueError("code scrutiny has no completed review pass")
+    if (type(outcome.corrections) is not int or outcome.corrections < 0
+            or outcome.corrections >= len(outcome.receipts)):
+        raise ValueError("code scrutiny correction count is inconsistent")
     previous = "0" * 64
+    clean_run = 0
+    last_clean_root: str | None = None
     for i, item in enumerate(outcome.receipts, 1):
+        if item.action not in {"clean_review", "errors_found"}:
+            raise ValueError("unknown code scrutiny receipt action")
         expected = ScrutinyReceipt.create(i, item.source_root, item.findings_root,
                                           item.action, previous)
         if expected != item:
             raise ValueError("code scrutiny receipt chain or sequence was tampered")
+        if item.action == "clean_review":
+            clean_run = clean_run + 1 if item.source_root == last_clean_root else 1
+            last_clean_root = item.source_root
+        else:
+            clean_run = 0
+            last_clean_root = None
         previous = item.digest
-    if outcome.success:
-        if outcome.findings or outcome.stable_passes < 2 or not outcome.receipts:
-            raise ValueError("premature clean status in code scrutiny")
+    final = outcome.receipts[-1]
+    if final.source_root != stable_fingerprint(dict(outcome.files)):
+        raise ValueError("code scrutiny result contains source not reviewed in final pass")
+    if final.findings_root != stable_fingerprint(
+        [item.fingerprint for item in outcome.findings]
+    ):
+        raise ValueError("code scrutiny findings differ from final reviewed findings")
+    if final.action != ("errors_found" if outcome.findings else "clean_review"):
+        raise ValueError("code scrutiny final action disagrees with findings")
+    if outcome.stable_passes != clean_run:
+        raise ValueError("code scrutiny clean-pass count was tampered")
+    if outcome.success and (outcome.findings or clean_run < 2):
+        raise ValueError("premature clean status in code scrutiny")
 
 
 class CodeScrutinyLoop:
@@ -284,6 +315,10 @@ class CodeScrutinyLoop:
                 return result("blocked_no_repair", "No authorized correction adapter is available")
             if not authorized:
                 return result("blocked_not_authorized", "Source correction was not authorized")
+            if index == self.policy.maximum_passes:
+                # A repaired file would not receive its mandatory final scan.
+                # Keep the last inspected source and report exhausted budget.
+                return result("budget_exhausted", "No passes remain to verify a correction")
             repaired = _validated_files(repair(dict(sources), last_findings, index), self.policy)
             if set(repaired) != set(sources):
                 raise ValueError("repair adapter cannot add or drop reviewed files")
