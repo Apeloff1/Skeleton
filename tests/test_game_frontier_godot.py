@@ -10,13 +10,16 @@ from skeleton.jeeves.game_frontier import compile_frontier_scene
 from skeleton.jeeves.game_frontier_dynamics import (
     Cloud, WindField, WindLayer, WindVector, WorldAxis,
 )
+from skeleton.jeeves.game_frontier_worlds import (
+    CameraSpec, ProjectionMode, WorldFamily, WorldVariant,
+)
 from skeleton.jeeves.game_frontier_production import (
     AnimationClip, AnimationKeyframe, Bone, BonePose,
     CharacterSkeleton, Percept, Vec3,
 )
 
 
-def source_scene():
+def source_scene(*, fps=120, world_variant=None, camera=None):
     skeleton = CharacterSkeleton((
         Bone("torso", -1, Vec3(0, 0, 0), Vec3(0, 0, 2), .25),
     ))
@@ -35,7 +38,8 @@ def source_scene():
         clouds=(Cloud("shelf", 1, 2, 300, .8),),
         time_s=10, delta_s=2,
         skeleton=skeleton, animation=clip, animation_time_ms=0,
-        era="early_3d", fps=120,
+        era="early_3d", fps=fps,
+        world_variant=world_variant, camera=camera,
         evidence=(Percept("actor", "character", True, 1, 1,
                           "f" * 64),),
         world_goal_kind="character",
@@ -69,6 +73,25 @@ class ForgeFrontierExportTests(unittest.TestCase):
         self.assertNotEqual(data["clouds"][0]["samples"][0]["x_m"],
                             data["clouds"][0]["samples"][-1]["x_m"])
         self.assertEqual(data["admission"], "candidate_only_not_godot_verified")
+
+    def test_60fps_shadow_realm_and_27d_camera_export(self):
+        candidate = source_scene(
+            fps=60,
+            world_variant=WorldVariant(WorldFamily.SHADOW, intensity=1),
+            camera=CameraSpec(ProjectionMode.DEPTH_27),
+        )
+        files = emit_frontier_godot_overlay(candidate)
+        data = json.loads(files["frontier/data/scene.json"])
+        script = files["frontier/frontier_scene.gd"]
+        self.assertEqual(data["requested_fps"], 60)
+        self.assertEqual(data["projection"]["mode"], "2.7d")
+        self.assertEqual(data["world_variant"]["family"], "shadow")
+        self.assertEqual(data["world"]["temperature"], candidate.manifest["world_variant"]["temperature"])
+        self.assertIn("SHADOW_CASTING_SETTING_ON", script)
+        self.assertIn("shadow_enabled = true", script)
+        self.assertIn("camera.projection = Camera3D.PROJECTION_ORTHOGONAL", script)
+        self.assertIn("return Vector3(float(data[0]), float(data[2]), -float(data[1]))", script)
+        self.assertIn("data.get(\"projection\", {})", script)
 
     def test_exact_custody_rejects_tampered_manifest(self):
         with self.assertRaises(FrontierGodotError):
