@@ -252,6 +252,7 @@ def compile_studio_frame(
     entity_velocities: dict[str, tuple[float,float,float]] | None = None,
     previous_frame: object | None = None,
     context_cursor: object | None = None,
+    previous_chunk_evidence: dict | None = None,
     virtual_navigation: VirtualNavigationRequest | None = None,
     previous_virtual_navigation: dict | None = None,
 ) -> dict:
@@ -269,6 +270,7 @@ def compile_studio_frame(
         cursor_ai_context,
     )
     from skeleton.jeeves.game_frontier_production import Vec3
+    from skeleton.jeeves.game_frontier_chunk_evidence import build_frame_chunk_receipts
     if not isinstance(project, StudioProject):
         raise StudioError("typed Studio project required")
     anchor=bind_signed_gdd(signed_gdd)
@@ -310,6 +312,8 @@ def compile_studio_frame(
         frame_index=frame_index,fps=fps,gdd=anchor,
         objects=tuple(objects),previous=prior,notes=tuple(notes),
     )
+    chunk_evidence=build_frame_chunk_receipts(
+        frame,anchor,previous=prior,previous_evidence=previous_chunk_evidence)
     if previous_virtual_navigation is not None and virtual_navigation is None:
         raise StudioError("prior GPS receipt requires a current virtual map observation")
     if virtual_navigation is not None:
@@ -342,6 +346,9 @@ def compile_studio_frame(
             "requires_human_canon_approval": True,
             "authority": "AI_design_context_only_virtual_coordinates",
         }
+    context=dict(context)
+    context["frame_chunk_evidence_digest"]=chunk_evidence["receipt_digest"]
+    context["chunk_evidence_source_gdd"]=anchor.source_digest
     base=compile_studio_project(project)
     return {
         "schema":"skeleton.forge.studio_frame_candidate.v1",
@@ -358,6 +365,8 @@ def compile_studio_frame(
         "verified_a":frame.verifier_a_integrity,
         "verified_b":frame.verifier_b_coherence,
         "frame_receipt_digest":frame.receipt_digest,
+        "frame_chunk_evidence":chunk_evidence,
+        "chunk_evidence_digest":chunk_evidence["receipt_digest"],
         "note_count":len(frame.note_from_previous),
         "gdd_ai_context":context,
         "virtual_game_gps":game_nav,
