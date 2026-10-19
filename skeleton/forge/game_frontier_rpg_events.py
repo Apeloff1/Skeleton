@@ -33,6 +33,11 @@ RPG_ENVIRONMENT_SIGNALS = frozenset((
     "bubble_sextant_altitude_deg", "npc_reputation", "quest_progress",
     "party_morale", "music_intensity", "sound_occlusion",
     "sky_island_height_m",
+    # Derived exclusively from independently replayed native physics ticks.
+    "native_actor_speed_mps", "native_vertical_speed_mps",
+    "native_contact_count", "native_kinetic_energy_j",
+    "native_gameplay_zone_entries", "native_gameplay_zone_exits",
+    "native_gameplay_zone_occupants",
 ))
 
 ACTIONS = frozenset((
