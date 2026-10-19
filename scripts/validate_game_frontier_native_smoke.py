@@ -30,6 +30,9 @@ from skeleton.jeeves.game_frontier_native_control import (
 from skeleton.jeeves.game_frontier_native_zones import (
     normalize_gameplay_zones,inspect_native_gameplay_zones,NativeZoneError,
 )
+from skeleton.jeeves.game_frontier_native_fields import (
+    normalize_native_force_fields,inspect_native_force_fields,NativeForceFieldError,
+)
 
 
 class NativeSmokeError(ValueError):
@@ -42,6 +45,7 @@ def validate_native_trace(
     minimum_actor_displacement_m: float = 0.01,
     require_dynamics: bool = False,
     require_zones: bool = False,
+    require_fields: bool = False,
 ) -> dict:
     if (type(min_ticks) is not int or type(max_ticks) is not int or
         not 2<=min_ticks<=max_ticks<=1_000_000 or
@@ -49,7 +53,8 @@ def validate_native_trace(
         not math.isfinite(minimum_actor_displacement_m) or
         not 0<minimum_actor_displacement_m<=100 or
         type(require_dynamics) is not bool or
-        type(require_zones) is not bool):
+        type(require_zones) is not bool or
+        type(require_fields) is not bool):
         raise NativeSmokeError("bounded native runtime acceptance parameters required")
     for path in (capture,scene):
         if not path.is_file() or path.is_symlink():
@@ -92,6 +97,13 @@ def validate_native_trace(
         raise NativeSmokeError("unsigned or invalid authored zone volume") from exc
     if require_zones and not zones:
         raise NativeSmokeError("gameplay-zone smoke requires authored source zones")
+    try:
+        fields=normalize_native_force_fields(
+            settings.get("gameplay_force_fields",()),allowed_actors={primary})
+    except NativeForceFieldError as exc:
+        raise NativeSmokeError("authored native gameplay force fields invalid") from exc
+    if require_fields and not fields:
+        raise NativeSmokeError("real Godot field physics qualification needs authorized force field")
     prescribed=settings.get("primary_source_dynamics")
     if prescribed is None:
         if require_dynamics:
@@ -117,6 +129,8 @@ def validate_native_trace(
     observed_contact_actors=0
     verified_dynamics_ticks=0
     verified_zone_ticks=0
+    verified_field_ticks=0
+    nonzero_field_steps=0
     zone_enter_events=0
     zone_exit_events=0
     max_kinetic_energy_j=0.
@@ -158,6 +172,18 @@ def validate_native_trace(
                     verify_native_reference_input(record,controls,actor_id=primary)
                 except NativeControlError as exc:
                     raise NativeSmokeError("source reference controller record invalid") from exc
+            if fields:
+                try:
+                    field_proof=inspect_native_force_fields(
+                        record,previous=previous,expected_catalog=fields)
+                except NativeForceFieldError as exc:
+                    raise NativeSmokeError(f"authored engine force/position mismatch: {exc}") from exc
+                verified_field_ticks+=int(field_proof is not None)
+                nonzero_field_steps+=sum(
+                    sum(float(x)*float(x) for x in step["force_world_xyz_n"])>.000001
+                    for step in record["previous_step_field_forces"])
+            elif "native_force_field_schema" in record:
+                raise NativeSmokeError("unauthorized field forces from native engine")
             if zones:
                 try:
                     zone_proof=inspect_native_gameplay_zones(
@@ -215,6 +241,8 @@ def validate_native_trace(
     if count<min_ticks:
         raise NativeSmokeError("native game did not emit enough fixed physics ticks")
     motion=math.dist(start,finish)
+    if require_fields and (verified_field_ticks!=count or nonzero_field_steps<1):
+        raise NativeSmokeError("native source physics fields were not executed")
     if require_zones and (
         verified_zone_ticks!=count or zone_enter_events<1 or zone_exit_events<1):
         raise NativeSmokeError("native gameplay zone entry/exit not observed")
@@ -232,6 +260,8 @@ def validate_native_trace(
         "positive_contact_count_observations":observed_contact_actors,
         "native_dynamics_ticks_verified":verified_dynamics_ticks,
         "native_gameplay_zone_ticks_verified":verified_zone_ticks,
+        "native_field_timestep_receipts_verified":verified_field_ticks,
+        "native_field_nonzero_force_steps":nonzero_field_steps,
         "native_zone_enter_events":zone_enter_events,
         "native_zone_exit_events":zone_exit_events,
         "peak_reported_kinetic_energy_j":max_kinetic_energy_j,
@@ -257,12 +287,14 @@ def main(argv:list[str]|None=None)->int:
     parser.add_argument("--max-ticks",type=int,default=6000)
     parser.add_argument("--require-dynamics",action="store_true")
     parser.add_argument("--require-zones",action="store_true")
+    parser.add_argument("--require-fields",action="store_true")
     args=parser.parse_args(argv)
     try:
         report=validate_native_trace(args.capture_jsonl,args.scene_json,
             min_ticks=args.min_ticks,max_ticks=args.max_ticks,
             require_dynamics=args.require_dynamics,
-            require_zones=args.require_zones)
+            require_zones=args.require_zones,
+            require_fields=args.require_fields)
     except (ValueError,TypeError,KeyError,IndexError,OSError) as exc:
         print(f"Game Frontier native trace rejected: {exc}",file=sys.stderr)
         return 2

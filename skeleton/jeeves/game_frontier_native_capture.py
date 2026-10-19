@@ -22,6 +22,9 @@ from .game_frontier_native_control import verify_native_reference_input
 from .game_frontier_native_zones import (
     normalize_gameplay_zones, inspect_native_gameplay_zones, NativeZoneError,
 )
+from .game_frontier_native_fields import (
+    normalize_native_force_fields,inspect_native_force_fields,NativeForceFieldError,
+)
 
 
 class NativeObservationError(ValueError):
@@ -51,6 +54,7 @@ class GodotPhysicsCaptureIngestor:
         expected_reference_controls: Mapping | None = None,
         controlled_actor_id: str | None = None,
         expected_gameplay_zones: object = (),
+        expected_gameplay_force_fields: object = (),
     ) -> None:
         if not isinstance(journal,FrameReceiptJournal):
             raise NativeObservationError("durable canonical frame journal required")
@@ -79,6 +83,11 @@ class GodotPhysicsCaptureIngestor:
             else None)
         self.controlled_actor_id=controlled_actor_id
         try:
+            self.expected_gameplay_force_fields=normalize_native_force_fields(
+                expected_gameplay_force_fields,allowed_actors=set(self.assets))
+        except NativeForceFieldError as exc:
+            raise NativeObservationError("unauthorized native physics field catalog") from exc
+        try:
             self.expected_gameplay_zones=normalize_gameplay_zones(
                 expected_gameplay_zones,allowed_actors=set(self.assets))
         except NativeZoneError as exc:
@@ -101,6 +110,16 @@ class GodotPhysicsCaptureIngestor:
                 raise NativeObservationError("native gameplay zone source or transition forged") from exc
         elif "native_zone_schema" in native:
             raise NativeObservationError("unauthorized native gameplay zone telemetry")
+        if self.expected_gameplay_force_fields:
+            try:
+                previous=self.journal.native_sample(tick-1) if type(tick) is int and tick>0 else None
+                inspect_native_force_fields(
+                    native,previous=previous,
+                    expected_catalog=self.expected_gameplay_force_fields)
+            except NativeForceFieldError as exc:
+                raise NativeObservationError("native gameplay physics field receipt forged") from exc
+        elif "native_force_field_schema" in native:
+            raise NativeObservationError("unauthorized native physics force field telemetry")
         if self.expected_reference_controls is not None:
             try:
                 verify_native_reference_input(

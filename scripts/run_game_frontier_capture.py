@@ -141,7 +141,8 @@ def main(argv: list[str] | None = None) -> int:
                     allowed_assets=catalog,max_samples=arguments.max_samples,
                     expected_reference_controls=settings.get("reference_controls"),
                     controlled_actor_id=settings["actor_id"],
-                    expected_gameplay_zones=settings.get("gameplay_zones",()))
+                    expected_gameplay_zones=settings.get("gameplay_zones",()),
+                    expected_gameplay_force_fields=settings.get("gameplay_force_fields",()))
                 result=worker.ingest_file(arguments.capture_jsonl,
                                           resume=arguments.resume)
                 report={"operation":"ingest",

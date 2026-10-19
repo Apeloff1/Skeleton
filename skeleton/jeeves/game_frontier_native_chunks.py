@@ -23,6 +23,11 @@ from .game_frontier_native_zones import (
 )
 
 
+from .game_frontier_native_fields import (
+    inspect_native_force_fields, NativeForceFieldError,
+)
+
+
 class NativeChunkError(ValueError):
     pass
 
@@ -54,6 +59,10 @@ def inspect_native_chunks(sample: Mapping, *, expected_chunk_size_m: float = 32.
         not isinstance(sample,Mapping)):
         raise NativeChunkError("valid bounded typed source required")
     units=float(expected_chunk_size_m)
+    try:
+        force_proof=inspect_native_force_fields(sample)
+    except NativeForceFieldError as exc:
+        raise NativeChunkError("native field frame receipt invalid") from exc
     try:
         zone_proof=inspect_native_gameplay_zones(sample)
     except NativeZoneError as exc:
@@ -115,6 +124,9 @@ def inspect_native_chunks(sample: Mapping, *, expected_chunk_size_m: float = 32.
         "native_partition_confirmed":native_matches,
         "authority":"reported_native_physics_partition_not_GPU_attestation",
     }
+    if force_proof is not None:
+        source["native_field_digest"]=force_proof["receipt_digest"]
+        source["native_field_step_count"]=force_proof["step_force_count"]
     if zone_proof is not None:
         source["native_zone_digest"]=zone_proof["receipt_digest"]
         source["native_zone_occupant_count"]=zone_proof["occupant_count"]
@@ -246,6 +258,13 @@ def compare_native_chunk_transitions(
         "verifier_b_motion_partition_conservation":True,
         "authority":"runtime_sample_consistency_not_native_attestation",
     }
+    try:
+        field_transition=inspect_native_force_fields(current,previous=previous)
+    except NativeForceFieldError as exc:
+        raise NativeChunkError("native field per-tick force source invalid") from exc
+    if field_transition is not None:
+        root["native_field_transition_digest"]=field_transition["receipt_digest"]
+        root["native_field_applied_step_count"]=field_transition["step_force_count"]
     try:
         zone_proof=inspect_native_gameplay_zones(current,previous=previous)
     except NativeZoneError as exc:
