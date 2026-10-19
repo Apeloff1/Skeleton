@@ -135,7 +135,7 @@ def _verify(args):
         "schema","dispatch_file_sha256","dispatch_receipt_digest",
         "signed_gdd_digest","scene_candidate_digest","actor_id",
         "source_through_frame","actions_applied","quests","flags",
-        "quest_progression_history","runtime_ui_modules",
+        "quest_progression_history","runtime_ui_modules","approved_camera_mode",
         "presentation_cues","inventory","npc_emotions","visualized_npc_ids",
         "executed_action_trace","visualized_item_ids","cue_timeline_frame_index",
         "read_only_branch_options","visualized_fx_page_ids","authority",
@@ -161,6 +161,8 @@ def _verify(args):
         or type(receipt["actions_applied"]) is not int
         or receipt["actions_applied"]!=len(bundle["actions"])
         or receipt["quests"]!=bundle["expected_quests"]
+        or type(receipt["approved_camera_mode"]) is not int
+        or receipt["approved_camera_mode"]!=bundle["expected_camera_mode"]
         or receipt["runtime_ui_modules"]!=[
             "virtual_flight_instruments","native_landing_risk",
             "cinematic_camera_director"]
@@ -180,6 +182,7 @@ def _verify(args):
         "operation":"verify","verified_engine_actions":len(bundle["actions"]),
         "verified_action_receipts":len(receipt["executed_action_trace"]),
         "verified_quest_count":len(receipt["quests"]),
+        "approved_native_camera_mode":receipt["approved_camera_mode"],
         "verified_live_interface_modules":len(receipt["runtime_ui_modules"]),
         "verified_quest_history_entries":len(receipt["quest_progression_history"]),
         "verified_npc_reactions":len(receipt["visualized_npc_ids"]),

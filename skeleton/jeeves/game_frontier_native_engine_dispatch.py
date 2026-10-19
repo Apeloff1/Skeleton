@@ -19,6 +19,9 @@ from .game_frontier_native_quest_audit import audit_native_quest_checkpoint
 from .game_frontier_native_session_checkpoint import advance_native_quest_window
 
 
+_CAMERA_MODES={"authored":0,"follow":1,"orbit":2,"overhead":3}
+
+
 _ALLOWED=frozenset((
     "start_quest","advance_quest","set_flag","show_dialogue",
     "play_cutscene","play_music","spatial_audio","change_camera",
@@ -52,6 +55,7 @@ def compile_native_godot_dispatch(
     commands=[]
     inventory={}
     npc_moods={}
+    selected_camera=0
     signed_actors={a["id"] for a in journal.native_sample(0)["actors"]}
     cursor=None
     for first in range(0,last+1,frames_per_window):
@@ -69,6 +73,10 @@ def compile_native_godot_dispatch(
                     if action["kind"] not in _ALLOWED:
                         raise NativeQuestSessionError(
                             "Godot dispatcher refuses unimplemented world mutations")
+                    if action["kind"]=="change_camera":
+                        if action["value"] not in _CAMERA_MODES:
+                            raise NativeQuestSessionError("unauthorized Godot camera preset")
+                        selected_camera=_CAMERA_MODES[action["value"]]
                     if action["kind"]=="craft_item":
                         item=action["value"]
                         if (not item or len(item)>128 or
@@ -154,6 +162,7 @@ def compile_native_godot_dispatch(
         "initial_flags":dict(approvals["initial_flags"]),
         "expected_flags":checkpoint["flags"],
         "expected_inventory":inventory,
+        "expected_camera_mode":selected_camera,
         "expected_npc_emotions":npc_moods,
         "expected_quests":checkpoint["quests"],
         "actions":commands,

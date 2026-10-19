@@ -92,6 +92,8 @@ renderer/rendering_method.mobile="gl_compatibility"
                      "target":"hero","value":"island:curious"},
                     {"kind":"trigger_impact_fx","channel":"cinematic",
                      "target":"hero","value":"sky_trial_awaken_fx"},
+                    {"kind":"change_camera","channel":"cinematic",
+                     "target":"hero","value":"orbit"},
                 ],
                 "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
             },

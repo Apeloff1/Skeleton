@@ -11,6 +11,12 @@ from skeleton.jeeves.game_frontier_native_quest_session import NativeQuestSessio
 
 
 class NativeEngineDispatchTests(NativeQuestBatchTests):
+    def test_camera_presets_restrict_cinematic_world_mutations(self):
+        from skeleton.jeeves.game_frontier_native_engine_dispatch import _CAMERA_MODES
+        self.assertEqual(_CAMERA_MODES, {
+            "authored":0,"follow":1,"orbit":2,"overhead":3})
+        self.assertNotIn("arbitrary_script",_CAMERA_MODES)
+
     def dispatch(self,approved=None,checkpoint=None):
         approved=approved if approved is not None else self.approved
         checkpoint=checkpoint or self.replay()["head_checkpoint"]
@@ -31,6 +37,7 @@ class NativeEngineDispatchTests(NativeQuestBatchTests):
         self.assertEqual(data["expected_quest_history"][-1]["objective"],"Finish the route")
         self.assertEqual(data["expected_inventory"],{})
         self.assertEqual(data["expected_npc_emotions"],{})
+        self.assertEqual(data["expected_camera_mode"],0)
         self.assertEqual(data["quest_titles"]["chapter_1"],"The Wind Islands")
         self.assertEqual(data["available_branch_options"]["chapter_1"],[])
         self.assertEqual(data["quest_objectives"]["chapter_1"]["ending"],"Finish the route")

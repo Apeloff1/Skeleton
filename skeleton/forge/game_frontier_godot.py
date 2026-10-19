@@ -856,6 +856,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var next_flags: Dictionary = bundle["initial_flags"].duplicate(true)
     var next_quests: Dictionary = {}
     var next_cues: Array = []
+    var next_camera_mode: int = 0
     var next_quest_history: Array = []
     var next_action_trace: Array = []
     var next_inventory: Dictionary = {}
@@ -920,6 +921,18 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 push_error("Approved NPC emotion command invalid")
                 return
             next_npc_emotions[mood_parts[0]] = mood_parts[1]
+        elif kind == "change_camera":
+            var camera_modes := {
+                "authored":0,"follow":1,"orbit":2,"overhead":3
+            }
+            if not camera_modes.has(value):
+                push_error("Unapproved cinematic camera mode rejected")
+                return
+            next_camera_mode = int(camera_modes[value])
+            next_cues.append({
+                "kind":kind,"cue":value,"source_frame":frame,
+                "page_id":str(row.get("page_id","")),
+            })
         elif kind == "set_flag":
             var pair := value.split("=")
             if pair.size() != 2 or not ["true", "false"].has(pair[1]):
@@ -927,7 +940,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 return
             next_flags[pair[0]] = pair[1] == "true"
         elif ["show_dialogue", "play_cutscene", "play_music",
-              "spatial_audio", "change_camera", "inspect_instrument",
+              "spatial_audio", "inspect_instrument",
               "trigger_impact_fx", "trigger_foliage_fx"].has(kind):
             next_cues.append({
                 "kind":kind, "cue":value, "source_frame":frame,
@@ -1008,6 +1021,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         or next_inventory != expected_inventory
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})
         or next_action_trace != expected_trace
+        or next_camera_mode != int(bundle.get("expected_camera_mode", -1))
         or next_quest_history != expected_history):
         push_error("Engine RPG reducer diverged from independently replayed state")
         return
@@ -1019,6 +1033,8 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             push_error("Approved quest stage has no source-authored objective")
             return
     _approved_quest_history = next_quest_history
+    _virtual_camera_mode = next_camera_mode
+    _refresh_game_camera_mode()
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
     _approved_gameplay_inventory = next_inventory
@@ -1072,6 +1088,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "source_through_frame":bundle["source_through_frame"],
         "actions_applied":actions.size(),
         "quests":next_quests,"flags":next_flags,
+        "approved_camera_mode":next_camera_mode,
         "runtime_ui_modules":runtime_ui_modules,
         "quest_progression_history":next_quest_history,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,

@@ -327,11 +327,12 @@ jobs:
           import json,sys
           from pathlib import Path
           proof=json.loads(Path(sys.argv[1]).read_text())
-          assert proof["verified_engine_actions"]==7, proof
+          assert proof["verified_engine_actions"]==8, proof
+          assert proof["approved_native_camera_mode"]==2, proof
           assert proof["verified_quest_count"]==1, proof
           assert proof["verified_live_interface_modules"]==3, proof
-          assert proof["verified_cue_count"]==2, proof
-          assert proof["verified_action_receipts"]==7, proof
+          assert proof["verified_cue_count"]==3, proof
+          assert proof["verified_action_receipts"]==8, proof
           assert proof["verified_fx_cues"]==1, proof
           assert proof["verified_npc_reactions"]==1, proof
           assert proof["verified_inventory_visuals"]==1, proof
