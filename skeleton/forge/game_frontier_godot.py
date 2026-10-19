@@ -48,6 +48,7 @@ func _ready() -> void:
     else:
         _create_character(data["geometry"], data["colliders"])
     _create_character_suite_inspector(suite)
+    _create_virtual_game_gps(data.get("virtual_game_gps", {}))
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
     _create_camera(data.get("projection", {}), data.get("world_variant", {}))
@@ -151,6 +152,45 @@ func _create_character_suite_inspector(suite: Dictionary) -> void:
             label.text += str(event.get("page", "event")) + ": " + str(event.get("actions", [])) + "\\n"
     panel.add_child(label)
     add_child(panel)
+
+func _create_virtual_game_gps(nav: Dictionary) -> void:
+    if nav.is_empty():
+        return
+    if bool(nav.get("device_location_used", true)):
+        push_error("Virtual game map must not receive device GPS")
+        return
+    if str(nav.get("authority", "")) != "virtual_game_navigation_candidate_no_world_mutation":
+        push_error("Untrusted game navigation source")
+        return
+    var hud := CanvasLayer.new()
+    hud.name = "VirtualGameGPS"
+    var label := Label.new()
+    label.name = "VirtualMapCoordinateReadout"
+    label.position = Vector2(20, 200)
+    label.text = "VIRTUAL GAME GPS — FICTIONAL WORLD ONLY\\n"
+    label.text += str(nav.get("world_id", "")) + " / " + str(nav.get("realm_id", "")) + "\\n"
+    label.text += "XYZ(m): " + str(nav.get("world_xyz_m", [])) + "\\n"
+    label.text += "Map tile: " + str(nav.get("map_tile_xy", [])) + "\\n"
+    label.text += "Virtual accuracy(m): " + str(nav.get("horizontal_uncertainty_m", "?")) + "\\n"
+    if typeof(nav.get("survey")) == TYPE_DICTIONARY:
+        label.text += "Fictional surveyed fix: " + str(nav["survey"].get("world_xyz_m", [])) + "\\n"
+    hud.add_child(label)
+    var route: Variant = nav.get("route")
+    if typeof(route) == TYPE_DICTIONARY:
+        var tile_path: Array = route.get("tiles", [])
+        var line := Line2D.new()
+        line.name = "VirtualMinimapPath"
+        line.width = 2
+        line.default_color = Color(.2, .8, 1.0, 1.0)
+        var cols := max(1.0, float(nav.get("map_width_tiles", 1)))
+        var rows := max(1.0, float(nav.get("map_height_tiles", 1)))
+        # Render a bounded path preview; routing remains game-map candidate.
+        for index in range(min(128, tile_path.size())):
+            var cell: Array = tile_path[index]
+            line.add_point(Vector2(20 + (float(cell[0]) + .5) / cols * 160,
+                                   340 + (float(cell[1]) + .5) / rows * 160))
+        hud.add_child(line)
+    add_child(hud)
 
 func _create_camera(spec: Dictionary, variant: Dictionary) -> void:
     var camera := Camera3D.new()
@@ -527,6 +567,7 @@ def emit_frontier_godot_overlay(
         "advanced_physics": manifest.get("advanced_physics") or {},
         "realism_audit": manifest.get("realism_audit") or {},
         "character_suite": manifest.get("character_suite") or {},
+        "virtual_game_gps": manifest.get("virtual_game_gps") or {},
         "geometry": {
             "vertices": [[v.x, v.y, v.z] for v in vertices],
             "triangles": [list(face) for face in triangles],
