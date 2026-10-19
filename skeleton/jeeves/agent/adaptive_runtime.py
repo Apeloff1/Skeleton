@@ -45,7 +45,10 @@ from .delivery_assurance_milestones import (
 )
 from .delivery_milestone_workbench import (
     ACCEPTANCE_CRITERIA, AcceptanceCriterion, ExecutionBatch,
-    HostChecker, execute_milestone_batch,
+    ExecutionVerdict, HostChecker, execute_milestone_batch,
+)
+from .delivery_milestone_queue import (
+    MilestoneQueue, WorkLease,
 )
 from .final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
@@ -314,6 +317,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         self._final_reviewer_adversary = FinalReviewAdversary()
         self._release_evidence_journals: dict[str, ReleaseEvidenceJournal] = {}
         self._milestone_boards: dict[str, MilestoneBoard] = {}
+        self._milestone_queues: dict[str, MilestoneQueue] = {}
 
     def run(self, inputs: RunInputs) -> AgentResult:
         result = super().run(inputs)
@@ -1312,6 +1316,78 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         with self._adaptive_lock:
             return self._milestone_boards.get(require_id("run_id", run_id))
 
+    def assurance_work_queue(self, run_id: str) -> MilestoneQueue | None:
+        with self._adaptive_lock:
+            return self._milestone_queues.get(require_id("run_id", run_id))
+
+    def begin_assurance_work_queue(
+        self, run_id: str, *, source_commit: str, artifact_digest: str,
+        max_attempts: int = 3, lease_seconds: float = 120.0,
+    ) -> MilestoneQueue:
+        """Begin a durable host-driven execution queue without fake passes."""
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            if key in self._milestone_queues:
+                raise ValueError("assurance queue already exists for this run")
+            previous = self._milestone_boards.get(key)
+            if previous is not None and previous.receipts:
+                raise ValueError("cannot replace an existing milestone board with a new queue")
+            queue = MilestoneQueue.start(
+                source_commit, artifact_digest, max_attempts=max_attempts,
+                lease_seconds=lease_seconds,
+            )
+            if previous is not None and previous.source_commit != source_commit:
+                raise ValueError("queue would change pinned source commit")
+            self._milestone_queues[key] = queue
+            self._milestone_boards[key] = queue.board
+            return queue
+
+    def claim_assurance_work(
+        self, run_id: str, *, owner: str, now: float,
+    ) -> WorkLease | None:
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            if queue is None:
+                raise ValueError("assurance work queue not registered")
+            updated, lease = queue.claim(owner, now)
+            self._milestone_queues[key] = updated
+            return lease
+
+    def settle_assurance_work(
+        self, run_id: str, *, lease: WorkLease, now: float,
+        primary: HostChecker | None, independent: HostChecker | None,
+    ) -> ExecutionVerdict:
+        """Commit a verified work lease with optimistic state consistency."""
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            if queue is None:
+                raise ValueError("assurance work queue not registered")
+        updated, verdict = queue.settle(
+            lease, now, primary, independent,
+        )
+        with self._adaptive_lock:
+            latest = self._milestone_queues.get(key)
+            if latest is None or latest.fingerprint != queue.fingerprint:
+                raise ValueError("concurrent work result: lease must be rechecked")
+            self._milestone_queues[key] = updated
+            self._milestone_boards[key] = updated.board
+            return verdict
+
+    def recover_assurance_work(
+        self, run_id: str, *, now: float,
+    ) -> MilestoneQueue:
+        """Explicitly expire abandoned leases without background execution."""
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            if queue is None:
+                raise ValueError("assurance work queue not registered")
+            recovered = queue.expire(now)
+            self._milestone_queues[key] = recovered
+            return recovered
+
     def advance_assurance_milestones(
         self, run_id: str, *, source_commit: str, artifact_digest: str,
         checkers: Mapping[str, tuple[HostChecker | None, HostChecker | None]],
@@ -1324,6 +1400,8 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         """
         key = require_id("run_id", run_id)
         with self._adaptive_lock:
+            if key in self._milestone_queues:
+                raise ValueError("cannot bypass active assurance queue and its work leases")
             board = self._milestone_boards.get(key)
             if board is None:
                 board = MilestoneBoard.begin(source_commit)

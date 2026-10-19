@@ -160,6 +160,7 @@ jobs:
             skeleton/jeeves/agent/delivery_evidence_journal.py \
             skeleton/jeeves/agent/delivery_assurance_milestones.py \
             skeleton/jeeves/agent/delivery_milestone_workbench.py \
+            skeleton/jeeves/agent/delivery_milestone_queue.py \
             skeleton/jeeves/agent/runtime.py \
             skeleton/jeeves/agent/adaptive_runtime.py
           python -m pytest -q --noconftest \
@@ -169,7 +170,8 @@ jobs:
             tests/test_jeeves_final_delivery_reviews.py \
             tests/test_jeeves_delivery_evidence_journal.py \
             tests/test_jeeves_delivery_assurance_milestones.py \
-            tests/test_jeeves_delivery_milestone_workbench.py
+            tests/test_jeeves_delivery_milestone_workbench.py \
+            tests/test_jeeves_delivery_milestone_queue.py
 
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'

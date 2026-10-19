@@ -170,3 +170,32 @@ real, scoped evidence from the exact source commit and artifact digest.
 
 An absence of live adapters yields **0 verified of 100**, not an automatic
 perfect score. Production stage admission is a separate decision.
+
+
+## Real milestone queue, no unattended actions
+
+delivery_milestone_queue.py provides a deterministic in-memory scheduler for the
+100 acceptance checks. Each item has bounded attempts, a stable ID, priority,
+explicit state, prerequisite and retry clock. Only the host can claim work and
+supply the clock or source-bound measurement callbacks. Typed leases prevent
+double completion and reject expired, foreign or stale tokens. Lease expiration
+recovers an abandoned unit of work; exhausted retries mark it failed rather
+than spinning forever. Completed results must carry the workbench's two
+independent source-bound attestations.
+
+Queue snapshots and event chains are content-addressed, serial and
+replay-checked. Source commit and artifact digest must match on restore.
+Queue state and milestone-board state are checked for consistency.
+
+The adaptive runtime exposes begin_assurance_work_queue(),
+claim_assurance_work(), settle_assurance_work(), recover_assurance_work()
+and assurance_work_queue() as host-side entry points. It disallows mixing the
+direct milestone batch API with an active lease-managed queue for the same
+run, and uses an optimistic source-state check to reject concurrent settlement.
+External durable persistence, cross-process locking, server-side scheduling,
+actual CI/Godot execution and independent copyright review still require
+their real host services; the queue does not claim those exist.
+
+The hundred objectives must be supported by independently captured
+measurements before the board can mark them passed. Running fixture tests,
+creating a milestone definition or queuing work is not certification.
