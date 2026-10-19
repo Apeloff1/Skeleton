@@ -175,3 +175,91 @@ field resolution, aerodynamics/cloth/liquid coupling and IK. P2 adds actor
 perception, autonomous traversal and multiactor adversarial tests. P3 is
 long-horizon state parity, native benchmarks, operator documentation,
 rollback, provenance and first-install/export evidence.
+
+
+## 2026-10-19 continuation — body mass, ElasticBodySkin3D, instruments and RPG triggers
+
+### L00–L02: owner, mathematics and typed contracts
+
+- `game_frontier_body_balance.py` derives total and carried mass, 3D COM,
+  symmetric inertia tensor with spherical-segment intrinsic inertia, dynamic
+  balance offset, signed support-polygon margin and approximate per-foot loads.
+  Contact-load sharing is a bounded inverse-distance estimate; native
+  contact Jacobian, actual center of pressure and locomotion stability remain
+  separate work.
+- `game_frontier_elastic_skin3d.py` implements the `ElasticBodySkin3D`
+  wrapper for canonical `CharacterSkeleton`, `SkinnedMesh`, `AnimationClip`.
+  It uses indexed triangle adjacency, current-pose bone anchors, explicit
+  pinned vertices, wind/impact/gravity, temperature-sensitive shear stiffness,
+  wetness-influenced mass, bounded substeps and poststep link-strain projection.
+  Output is an immutable vertex snapshot with source geometry digest,
+  collision count and strain evidence. This is not anatomically validated FEM.
+- Godot `skeleton/forge/game_frontier_godot.py` exports a preview
+  `SoftBody3D`, preserving **shared indexed vertices** in `ArrayMesh`:
+  triangle-soup faces would disconnect the deformable topology.
+  `SoftBody3D.set_point_pinned`, total_mass, damping_coefficient,
+  linear_stiffness and native cast shadows are set from bounded candidate data.
+  It does not yet attach these pins to a running Skeleton3D rig, simulate
+  multiphysics clothes or prove Godot/Jolt engine parity.
+- `game_frontier_instruments.py` implements six instrument families:
+  gyroscope, magnetic compass, natural-horizon sextant, artificial-horizon
+  bubble sextant, calibrated pressure altimeter and trigonometric survey
+  altimeter. ENU coordinates; sextant sighting uses **supplied** celestial
+  directions, not invented ephemerides or GPS; `NavigationEnvironment`
+  declares latitude/longitude/altitude, magnetic declination, dip, local
+  anomaly, pressure, temperature and acceleration. Altimeters expose metre
+  and feet readings and calibration source. Gyro source rate/bias/drift are
+  supplied; it is Euler reference not full INS fusion.
+- `game_frontier_character_suite.py` composes the above into one typed
+  optional game-scene pass, with deterministic source receipts and exactly
+  one candidate-only authority flag.
+
+### L03–L05: advanced RPG triggers and source custody
+
+- `skeleton/forge/game_frontier_rpg_events.py` registers numeric and edge
+  comparators, ranges, hysteresis, bounded cooldowns, prerequisite quest flags,
+  priority ordering, and conflict resolution by channel plus target. Events
+  include climate, lunar/solar tide, air density/altitude, shadows, rain, wind,
+  slip/ice, compression/skin strain, equipment mass, collision impulse,
+  instrument readings, game quests, party morale and environmental changes.
+- The existing `game_frontier_studio.py` now permits typed environmental
+  event pages alongside legacy interaction events with explicit ID separation.
+  Its catalog exposes new authoring tools for rig skin, physical mass painter,
+  center-of-mass visualization, navigation calibration, instrument tables,
+  RPG event triggers and environmental timelines.
+- The scene composer fills event signals from **existing scene-derived
+  observations** (weather, pressure, tides, physics contacts, microclimate,
+  light, structures, biome, sonar-like audio and instruments). Explicit
+  conflicting values are rejected; incomplete signals are disclosed.
+- Trigger actions remain proposals and are never executed in the exporter.
+  Godot inspection prints `SIMULATED INSTRUMENTS (NOT GPS)` and
+  `RPG ENVIRONMENT PROPOSALS (NOT EXECUTED)`.
+
+### L06–L09: fail-closed behaviors
+
+Invalid load distribution (duplicate segments, insufficient support polygon,
+negative weights), invalid skin mesh/pins, nonfinite fields, incompatible
+instrument prerequisites and inconsistent event signal sources are rejected.
+Sensor gyroscope bias and secular drift, magnetic declination, index
+errors, bubble tilt and atmosphere assumptions are explicitly visible.
+Horizon sextants reject obscured natural horizons; bubble sextants remain
+measurable with instrument-attitude bias and must not be confused with natural
+sextant results. Non-opt-in scene candidates retain the prior static geometry.
+Environment events only read canonical clock and last-fired receipts.
+
+### L10–L13: evidence and unclosed native work
+
+Focused GitHub Actions run `39192950014` passed **121 tests** at source
+commit `f6b7c551c165538a492c3ee509ab1f45fcbbba27`.
+This checks the combined scene source, exports, weight invariants,
+instrument observations, event ordering and backward compatibility.
+It is not a native Godot import or a measured physics performance run.
+Current tracked P0–P3 To-Do: **199** milestones, with 73 checked as committed
+source and 126 remaining.
+
+Required next steps: Godot 4 headless parse and screenshot of indexed
+SoftBody3D, direct bone/pin attachment, collision+skin volume preservation,
+multi-material tissue rig, world authority dispatch of RPG actions,
+save/restore of calibration/cooldowns, real ephemeris and astronomical
+positioning, mass/grip replay equivalence at 30/50/60/120 FPS, and historical
+console/modern mobile/GPU budget qualification.
