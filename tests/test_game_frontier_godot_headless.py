@@ -56,6 +56,21 @@ class NativeHeadlessScriptTests(unittest.TestCase):
         self.assertEqual(proof["authority"],
             "operator_run_local_headless_import_play_not_GPU_or_gameplay_attestation")
 
+    def test_operator_cli_invokes_documented_scene_and_import_flags(self):
+        self.write_binary(
+            "from pathlib import Path\n"
+            "import sys\n"
+            "with Path('argv.log').open('a') as output:\n"
+            "    output.write(' '.join(sys.argv[1:]) + '\\n')\n"
+        )
+        self.qualify()
+        phases=(self.project/"argv.log").read_text().splitlines()
+        self.assertEqual(len(phases),2)
+        self.assertIn("--import",phases[0])
+        self.assertIn("--scene",phases[1])
+        self.assertIn("--quit-after 5",phases[1])
+        self.assertIn("res://frontier/frontier_scene.tscn",phases[1])
+
     def test_refuse_unsigned_binary_changes(self):
         with self.assertRaises(GodotQualificationError):
             qualify_project(binary=self.binary,expected_sha256="a"*64,
