@@ -113,7 +113,7 @@ class NativeCaptureTests(unittest.TestCase):
                 self.assertEqual(journal.native_sample(1)["native_tick"],1)
                 self.assertEqual(journal.replay()["verified_frames"],2)
                 journal.fork("recovery",through=0)
-                self.assertEqual(journal.stats()["deduplicated_blobs"],6)
+                self.assertEqual(journal.stats()["deduplicated_blobs"],8)  # frame, chunk, native sample, native chunk proof
             with FrameReceiptJournal(self.db,self.anchor,track="recovery") as recovered:
                 self.assertEqual(recovered.replay()["verified_frames"],1)
                 self.assertEqual(recovered.native_sample(0)["scene_candidate_digest"],
