@@ -59,6 +59,7 @@ _DOMAINS = (
     "aerodynamics", "climbing", "collision", "atmosphere",
     "liquid", "tides", "light", "leaf_shadow", "characters",
     "environment", "structures", "biome", "audio", "chunks",
+    "balance", "elastic_skin", "instruments", "rpg_events",
 )
 
 
@@ -260,6 +261,84 @@ def audit_scene_realism(manifest: Mapping) -> RealismAudit:
               item["coverage_valid"] is True and
               item["spatial_bounds_valid"] is True,
               "digest_and_topology_bounded_seam_proof")
+
+    suite = manifest.get("character_suite")
+    if isinstance(suite, Mapping):
+        balance = suite.get("weight_distribution")
+        if isinstance(balance, Mapping):
+            total=measurement("balance","total_mass",balance["total_mass_kg"],"kg")
+            cargo=measurement("balance","carried_mass",balance["carried_mass_kg"],"kg")
+            margin=measurement("balance","support_margin",balance["support_margin_m"],"m")
+            loads=balance.get("load_per_foot_n",[])
+            if not isinstance(loads,(list,tuple)):
+                raise RealismAuditError("balance foot loads must be a sequence")
+            share=sum(measurement("balance",f"foot_load_{i}",item[1],"N")
+                      for i,item in enumerate(loads))
+            check("balance","mass_and_foot_load_conservation",
+                  total>0 and 0<=cargo<=total and
+                  abs(share-total*9.80665)<=max(1e-5,total*9.80665*1e-7),
+                  "segmented_mass_and_support_foot_sum")
+            inertia=balance.get("inertia_tensor_kg_m2",[])
+            symmetric=(isinstance(inertia,(list,tuple)) and len(inertia)==3 and
+                       all(isinstance(row,(list,tuple)) and len(row)==3
+                           for row in inertia))
+            if symmetric:
+                symmetric=all(
+                    type(inertia[i][j]) in (float,int) and
+                    type(inertia[j][i]) in (float,int) and
+                    math.isfinite(inertia[i][j]) and
+                    math.isclose(inertia[i][j],inertia[j][i],abs_tol=1e-7)
+                    for i in range(3) for j in range(3))
+                symmetric=symmetric and all(inertia[i][i]>0 for i in range(3))
+            check("balance","inertia_tensor_symmetric_positive_diagonal",
+                  bool(symmetric),"3d_mass_distribution")
+            check("balance","stability_label_consistency",
+                  not balance.get("stable",False) or margin>=-1e-8,
+                  "support_polygon_candidate_not_native_contact")
+        elastic=suite.get("elastic_skin3d")
+        if isinstance(elastic,Mapping):
+            n=measurement("elastic_skin","vertex_count",elastic["vertex_count"],"count")
+            strain=measurement("elastic_skin","max_strain",elastic["max_strain"])
+            wetness=measurement("elastic_skin","wetness",elastic["wetness"])
+            temperature=measurement("elastic_skin","temperature",
+                                    elastic["temperature_c"],"degC")
+            coordinates=elastic.get("positions_xyz",[])
+            pinned=elastic.get("pinned_vertices",[])
+            check("elastic_skin","rig_and_pin_topology_consistent",
+                  type(elastic["vertex_count"]) is int and
+                  1<=elastic["vertex_count"]<=16384 and
+                  len(coordinates)==n and
+                  all(isinstance(point,(list,tuple)) and len(point)==3 and
+                      all(type(v) in (float,int) and math.isfinite(v)
+                          for v in point) for point in coordinates) and
+                  bool(pinned) and len(set(pinned))==len(pinned) and
+                  all(type(i) is int and 0<=i<n for i in pinned),
+                  "rigged_deformed_mesh_source")
+            check("elastic_skin","wetness_temperature_strain_bounds",
+                  0<=wetness<=1 and -120<=temperature<=120 and
+                  0<=strain<=10,
+                  "bounded_skin_reference_thermomechanics")
+        instruments=suite.get("instruments")
+        if isinstance(instruments,Mapping):
+            entries=instruments.get("readings",[])
+            measurement("instruments","reading_count",len(entries),"count")
+            check("instruments","simulated_custody_only",
+                  instruments.get("authority")==
+                  "simulation_only_no_location_fix" and
+                  type(instruments.get("digest")) is str and
+                  len(instruments.get("digest",""))==64 and
+                  len(entries)<=32,
+                  "instrument_derived_not_live_geolocation")
+        events=suite.get("rpg_events")
+        if isinstance(events,Mapping):
+            admitted=events.get("accepted",[])
+            measurement("rpg_events","proposal_count",len(admitted),"count")
+            check("rpg_events","proposals_never_executed",
+                  events.get("executed") is False and
+                  all(type(x.get("source_evidence")) is str and
+                      len(x["source_evidence"])==64
+                      for x in admitted),
+                  "canonical_authority_must_dispatch")
 
     payload = {
         "measurements": [m.__dict__ for m in readings],
