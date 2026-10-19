@@ -421,6 +421,80 @@ class PolicyHead:
         return h
 
 
+class PacingHead:
+    """Hidden → (ttk_norm, thermal_margin, tap_sink_balance, telegraph_lead) in [0, 1]^4."""
+
+    kind = "pacing"
+    axes: Tuple[str, ...] = ("ttk_norm", "thermal_margin", "tap_sink_balance", "telegraph_lead")
+
+    def __init__(self, dim: int = 8, *, seed: int = 29) -> None:
+        rng = random.Random(int(seed) & 0xFFFFFFFF)
+        D = max(2, int(dim))
+        self.W: Mat = _rand_mat(4, D, 0.08, rng)
+        self.b: Vec = zeros(4)
+        self.dim = D
+        self.fitted = 0
+        self.steps = 0
+        self.last_loss = 0.0
+
+    def activate(self, h: Sequence[float]) -> Vec:
+        v = list(h)[: self.dim] + [0.0] * max(0, self.dim - len(h))
+        return [_sig(dot(self.W[i], v) + self.b[i]) for i in range(4)]
+
+    def predict(self, h: Sequence[float]) -> Dict[str, float]:
+        a = self.activate(h)
+        return {name: round(float(a[i]), 4) for i, name in enumerate(self.axes)}
+
+    def loss(self, h: Sequence[float], target: Sequence[float]) -> float:
+        pred = self.activate(h)
+        tgt = [max(0.0, min(1.0, float(x))) for x in list(target)[:4]]
+        while len(tgt) < 4:
+            tgt.append(0.5)
+        return mse(pred, tgt)
+
+    def step(self, h: Sequence[float], target: Sequence[float], *, lr: float = 0.12) -> float:
+        v = list(h)[: self.dim] + [0.0] * max(0, self.dim - len(h))
+        raw = [dot(self.W[i], v) + self.b[i] for i in range(4)]
+        s = [_sig(x) for x in raw]
+        tgt = [max(0.0, min(1.0, float(x))) for x in list(target)[:4]]
+        while len(tgt) < 4:
+            tgt.append(0.5)
+        loss = mse(s, tgt)
+        dlog = [(2.0 / 4.0) * (s[i] - tgt[i]) * _dsig(s[i]) for i in range(4)]
+        add_outer(self.W, dlog, v, -lr)
+        for i in range(4):
+            self.b[i] -= lr * dlog[i]
+        self.steps += 1
+        self.fitted += 1
+        self.last_loss = loss
+        return loss
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "dim": self.dim,
+            "fitted": self.fitted,
+            "steps": self.steps,
+            "W": _copy_mat(self.W),
+            "b": list(self.b),
+            "last_loss": self.last_loss,
+        }
+
+    @classmethod
+    def from_snapshot(cls, data: Dict[str, Any]) -> "PacingHead":
+        h = cls(dim=int((data or {}).get("dim") or 8), seed=0)
+        raw = (data or {}).get("W")
+        if raw:
+            h.W = [list(map(float, row)) for row in raw]
+        b = (data or {}).get("b")
+        if b:
+            h.b = [float(x) for x in b]
+        h.fitted = int((data or {}).get("fitted") or 0)
+        h.steps = int((data or {}).get("steps") or 0)
+        h.last_loss = float((data or {}).get("last_loss") or 0.0)
+        return h
+
+
 def head_from_snapshot(data: Dict[str, Any]):
     kind = str((data or {}).get("kind") or "")
     if kind == "numeric":
@@ -433,7 +507,9 @@ def head_from_snapshot(data: Dict[str, Any]):
         return VetoHead.from_snapshot(data)
     if kind == "policy":
         return PolicyHead.from_snapshot(data)
+    if kind == "pacing":
+        return PacingHead.from_snapshot(data)
     return NumericHead.from_snapshot(data)
 
 
-Head = Union[NumericHead, BiasHead, RouteHead, VetoHead, PolicyHead]
+Head = Union[NumericHead, BiasHead, RouteHead, VetoHead, PolicyHead, PacingHead]

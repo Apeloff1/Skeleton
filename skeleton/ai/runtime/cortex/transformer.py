@@ -342,6 +342,19 @@ class TransformerBlock:
             return add(u, ff)
         return u
 
+    def has_finite_weights(self) -> bool:
+        """Return True iff every weight matrix and bias vector in this block is finite."""
+        for mat in (self.Wq, self.Wk, self.Wv, self.Wo, self.W1, self.Wu, self.W2):
+            for row in mat:
+                for val in row:
+                    if not math.isfinite(val):
+                        return False
+        for vec in (self.b1, self.bu, self.b2, self.ln1_g, self.ln1_b, self.ln2_g, self.ln2_b):
+            for val in vec:
+                if not math.isfinite(val):
+                    return False
+        return True
+
 
 class KVCache:
     """Window-relative key/value bank. Reset when the window origin moves."""
@@ -956,28 +969,336 @@ class TinyTransformer:
         self.fitted += len(corpus)
         return n
 
-    def logprob(self, text: str) -> float:
+    def logprob(self, text: str, *, cached: bool = False) -> float:
         ids = self._ids(text)
         if len(ids) < 2:
             return math.log(1.0 / max(1, self.V))
         lp = 0.0
         n = 0
+        cache = KVCache(self.n_layers, self.ctx) if (cached and not self.use_mod) else None
         for i in range(1, len(ids)):
             window = ids[max(0, i - self.ctx):i]
-            p = softmax(self._logits(window))
+            logits = self._logits_window(window, cache) if cache is not None else self._logits(window)
+            p = softmax(logits)
             lp += math.log(max(p[ids[i]], 1e-12))
             n += 1
         return lp / max(1, n)
 
-    def perplexity(self, texts: Iterable[str] | str) -> float:
+    def perplexity(self, texts: Iterable[str] | str, *, cached: bool = False) -> float:
         if isinstance(texts, str):
             seq = [texts]
         else:
             seq = [t for t in texts if t]
         if not seq:
             return float(self.V)
-        mean = sum(self.logprob(t) for t in seq) / len(seq)
+        mean = sum(self.logprob(t, cached=cached) for t in seq) / len(seq)
         return math.exp(-mean)
+
+    def _apply_weight_decay(self, factor: float) -> None:
+        if factor == 1.0:
+            return
+        for row in self.E:
+            for d in range(len(row)):
+                row[d] *= factor
+        if not self.tied:
+            for row in self.Wout:
+                for d in range(len(row)):
+                    row[d] *= factor
+        for layer in self.layers:
+            for mat in (layer.Wq, layer.Wk, layer.Wv, layer.Wo, layer.W1, layer.Wu, layer.W2):
+                for row in mat:
+                    for d in range(len(row)):
+                        row[d] *= factor
+
+    def specialized_calibrate(
+        self,
+        texts: Iterable[str],
+        *,
+        epochs: int = 2,
+        lr: float = 0.03,
+        weight_decay: float = 0.005,
+        holdout: Iterable[str] | None = None,
+    ) -> Dict[str, Any]:
+        """Coherence-gated specialization pass with decoupled weight decay and best-snapshot retention."""
+        if isinstance(epochs, bool) or not isinstance(epochs, int) or not 1 <= epochs <= 64:
+            raise ValueError("epochs must be an integer in [1, 64]")
+        if isinstance(lr, bool) or not isinstance(lr, (int, float)) or not math.isfinite(float(lr)) or not 0 < float(lr) <= 1.0:
+            raise ValueError("lr must be finite and in (0, 1]")
+        if isinstance(weight_decay, bool) or not isinstance(weight_decay, (int, float)) or not math.isfinite(float(weight_decay)) or not 0.0 <= float(weight_decay) <= 0.5:
+            raise ValueError("weight_decay must be finite and in [0, 0.5]")
+        corpus = [t for t in texts if isinstance(t, str) and t.strip()]
+        eval_corpus = [t for t in (holdout if holdout is not None else corpus) if isinstance(t, str) and t.strip()]
+        if not corpus or not eval_corpus:
+            return {"calibrated": 0, "reason": "empty-corpus"}
+        initial_ppl = self.perplexity(eval_corpus)
+        best_ppl = initial_ppl
+        best_snap = self.snapshot()
+        windows: List[Tuple[List[int], int]] = []
+        for raw in corpus:
+            ids = self._ids(raw)
+            if len(ids) < 2:
+                continue
+            for i in range(1, len(ids)):
+                windows.append((ids[max(0, i - self.ctx):i], ids[i]))
+        if not windows:
+            return {"calibrated": 0, "reason": "no-token-windows", "initial_ppl": initial_ppl, "final_ppl": initial_ppl}
+        total_steps = max(1, epochs * len(windows))
+        step_idx = 0
+        kept_epoch = 0
+        for ep in range(1, epochs + 1):
+            for window, target in windows:
+                eta = cosine_lr(step_idx, total_steps, base=float(lr), floor=float(lr) * 0.1)
+                if weight_decay > 0.0 and self._accel is None:
+                    self._apply_weight_decay(1.0 - eta * float(weight_decay))
+                self._sgd(window, target, eta)
+                step_idx += 1
+            self.fitted += len(corpus)
+            cand_ppl = self.perplexity(eval_corpus)
+            if math.isfinite(cand_ppl) and cand_ppl < best_ppl:
+                best_ppl = cand_ppl
+                best_snap = self.snapshot()
+                kept_epoch = ep
+        if best_ppl <= initial_ppl:
+            restored = type(self).from_snapshot(best_snap)
+            self.E, self.P, self.Wout, self.bout = restored.E, restored.P, restored.Wout, restored.bout
+            self.layers, self.n_layers = restored.layers, restored.n_layers
+            self.fitted, self.steps = restored.fitted, restored.steps
+            if self.tied:
+                self.tie()
+            if self._accel is not None:
+                self._accel.pin()
+            self._standby_snapshot = best_snap
+        return {
+            "calibrated": 1 if best_ppl < initial_ppl else 0,
+            "initial_ppl": round(initial_ppl, 6),
+            "final_ppl": round(best_ppl, 6),
+            "kept_epoch": kept_epoch,
+            "steps": step_idx,
+        }
+
+    def validate_finite_weights(self) -> Dict[str, Any]:
+        """Verify all embedding, projection, and block parameters are finite numbers."""
+        self._sync_accelerator()
+        nonfinite = 0
+        checked = 0
+        for mat in (self.E, self.P, self.Wout):
+            for row in mat:
+                for val in row:
+                    checked += 1
+                    if not math.isfinite(val):
+                        nonfinite += 1
+        for val in self.bout:
+            checked += 1
+            if not math.isfinite(val):
+                nonfinite += 1
+        for layer in self.layers:
+            for mat in (layer.Wq, layer.Wk, layer.Wv, layer.Wo, layer.W1, layer.Wu, layer.W2):
+                for row in mat:
+                    for val in row:
+                        checked += 1
+                        if not math.isfinite(val):
+                            nonfinite += 1
+            for vec in (layer.b1, layer.bu, layer.b2, layer.ln1_g, layer.ln1_b, layer.ln2_g, layer.ln2_b):
+                for val in vec:
+                    checked += 1
+                    if not math.isfinite(val):
+                        nonfinite += 1
+        return {
+            "healthy": nonfinite == 0,
+            "nonfinite_count": nonfinite,
+            "checked_parameters": checked,
+            "layers": self.n_layers,
+        }
+
+    def checkpoint_redundant_standby(self) -> Dict[str, Any]:
+        """Save a verified finite-weight hot-standby snapshot for instant self-healing."""
+        health = self.validate_finite_weights()
+        if not health["healthy"]:
+            return {"checkpointed": 0, "reason": "nonfinite-weights", "health": health}
+        snap = self.snapshot()
+        self._standby_snapshot = snap
+        return {
+            "checkpointed": 1,
+            "steps": self.steps,
+            "fitted": self.fitted,
+            "layers": self.n_layers,
+            "checked_parameters": health["checked_parameters"],
+        }
+
+    def restore_from_standby(self) -> Dict[str, Any]:
+        """Restore weights from the hot-standby checkpoint if available."""
+        snap = getattr(self, "_standby_snapshot", None)
+        if not isinstance(snap, dict):
+            return {"restored": 0, "reason": "no-standby-checkpoint"}
+        restored = type(self).from_snapshot(snap)
+        self.E, self.P, self.Wout, self.bout = restored.E, restored.P, restored.Wout, restored.bout
+        self.layers, self.n_layers = restored.layers, restored.n_layers
+        self.fitted, self.steps = restored.fitted, restored.steps
+        if self.tied:
+            self.tie()
+        if self._accel is not None:
+            try:
+                self._accel.pin()
+            except Exception:
+                self._accel = None
+                self.resident = False
+                self.device = "cpu"
+        return {
+            "restored": 1,
+            "steps": self.steps,
+            "fitted": self.fitted,
+            "layers": self.n_layers,
+        }
+
+    def heavy_task_infer(
+        self,
+        prefix: str | Sequence[str],
+        *,
+        n: int = 16,
+        seed: int = 0,
+        backup_models: Sequence["TinyTransformer"] | None = None,
+        entropy_threshold: float = 4.2,
+        chunk_tokens: int = 8,
+        temperature: float = 1.0,
+        min_p: float = 0.05,
+    ) -> Dict[str, Any]:
+        """Redundant chunked inference with health verification and backup failover for heavy tasks."""
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
+        chunk_sz = max(1, int(chunk_tokens))
+        rng = random.Random(int(seed) & 0xFFFFFFFF)
+        if isinstance(prefix, str):
+            prompt_ids = self._ids(prefix)
+        else:
+            prompt_ids = [self._id(str(t)) for t in prefix] or [self.unk]
+
+        backups = [
+            m for m in (backup_models or ())
+            if m is not None and int(getattr(m, "V", -1)) == self.V
+        ]
+        is_heavy = bool(n >= 12 or len(prompt_ids) >= self.ctx or len(backups) > 0)
+
+        health = self.validate_finite_weights()
+        primary_healthy = bool(health["healthy"])
+        failover_reason: Optional[str] = None
+        used_backup = False
+        repaired_from_standby = False
+
+        if not primary_healthy:
+            restore_res = self.restore_from_standby()
+            if restore_res.get("restored") and self.validate_finite_weights()["healthy"]:
+                primary_healthy = True
+                repaired_from_standby = True
+            else:
+                failover_reason = "primary-nonfinite-weights"
+
+        healthy_backups: List["TinyTransformer"] = []
+        for b_model in backups:
+            try:
+                if b_model.validate_finite_weights()["healthy"]:
+                    healthy_backups.append(b_model)
+            except Exception:
+                continue
+
+        active_model: "TinyTransformer" = self
+        if not primary_healthy:
+            if healthy_backups:
+                active_model = healthy_backups[0]
+                used_backup = True
+            else:
+                raise RuntimeError("primary transformer and all backup transformers are unhealthy")
+
+        out_ids = list(prompt_ids)
+        generated_ids: List[int] = []
+        entropies: List[float] = []
+        chunks_processed = 0
+        backup_consultations = 0
+        cache = KVCache(active_model.n_layers, active_model.ctx) if not active_model.use_mod else None
+
+        remaining = n
+        while remaining > 0:
+            step_budget = min(chunk_sz, remaining)
+            chunks_processed += 1
+            for _ in range(step_budget):
+                window = out_ids[-active_model.ctx:]
+                logits: Optional[List[float]] = None
+                try:
+                    logits = (
+                        active_model._logits_window(window, cache)
+                        if cache is not None
+                        else active_model._logits(window)
+                    )
+                    if not all(math.isfinite(x) for x in logits):
+                        logits = None
+                except Exception:
+                    logits = None
+
+                if logits is None:
+                    if healthy_backups:
+                        active_model = healthy_backups[0]
+                        cache = KVCache(active_model.n_layers, active_model.ctx) if not active_model.use_mod else None
+                        used_backup = True
+                        failover_reason = failover_reason or "primary-forward-exception"
+                        window = out_ids[-active_model.ctx:]
+                        logits = (
+                            active_model._logits_window(window, cache)
+                            if cache is not None
+                            else active_model._logits(window)
+                        )
+                    else:
+                        raise RuntimeError("inference failed on primary and no healthy backup available")
+
+                probs = softmax(logits)
+                entropy = -sum(p * math.log(max(p, 1e-12)) for p in probs)
+                entropies.append(entropy)
+
+                # When uncertainty spikes on a heavy task, blend with healthy backup logits.
+                if entropy > float(entropy_threshold) and healthy_backups:
+                    backup_consultations += 1
+                    used_backup = True
+                    failover_reason = failover_reason or "high-entropy-backup-blend"
+                    blended = [0.6 * p for p in probs]
+                    share = 0.4 / len(healthy_backups)
+                    for bm in healthy_backups:
+                        b_win = out_ids[-bm.ctx:]
+                        b_logits = bm._logits(b_win)
+                        if all(math.isfinite(x) for x in b_logits):
+                            b_probs = softmax(b_logits)
+                            for v_idx in range(self.V):
+                                blended[v_idx] += share * b_probs[v_idx]
+                    logits = [math.log(max(p, 1e-12)) for p in blended]
+
+                nxt = int(
+                    sample_logits(
+                        logits,
+                        rng,
+                        temperature=temperature,
+                        min_p=min_p,
+                    )
+                )
+                out_ids.append(nxt)
+                generated_ids.append(nxt)
+            remaining -= step_budget
+
+        tokens_out = tuple(
+            self.itos[i] if 0 <= i < len(self.itos) else UNK
+            for i in generated_ids
+        )
+        mean_entropy = sum(entropies) / max(1, len(entropies))
+        return {
+            "text": " ".join(tokens_out),
+            "tokens": tokens_out,
+            "token_ids": generated_ids,
+            "is_heavy_task": is_heavy,
+            "used_backup": used_backup,
+            "repaired_from_standby": repaired_from_standby,
+            "failover_reason": failover_reason,
+            "primary_healthy": primary_healthy,
+            "healthy_backup_count": len(healthy_backups),
+            "backup_consultations": backup_consultations,
+            "chunks_processed": chunks_processed,
+            "mean_entropy": round(mean_entropy, 6),
+        }
 
     def adamw_sequence(
         self,
@@ -1071,6 +1392,7 @@ class TinyTransformer:
         temperature: float = 1.0,
         top_k: int = 0,
         top_p: float = 1.0,
+        min_p: float = 0.0,
         use_cache: bool = True,
     ) -> Tuple[str, ...]:
         """Return exactly n new tokens, excluding the conditioning prefix."""
@@ -1088,11 +1410,125 @@ class TinyTransformer:
             window = out[-self.ctx:]
             logits = self._logits_window(window, cache)
             nxt = sample_logits(
-                logits, rng, temperature=temperature, top_k=top_k, top_p=top_p,
+                logits, rng, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p,
             )
             out.append(int(nxt))
             generated.append(int(nxt))
         return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in generated)
+
+    def constrained_generate(
+        self,
+        prefix: str | Sequence[str],
+        n: int = 12,
+        *,
+        seed: int = 0,
+        allowed_tokens: Optional[Sequence[str]] = None,
+        banned_tokens: Optional[Sequence[str]] = None,
+        required_tokens: Optional[Sequence[str]] = None,
+        domain_boost_tokens: Optional[Sequence[str]] = None,
+        no_repeat_ngram_size: int = 2,
+        temperature: float = 0.0,
+        min_p: float = 0.0,
+        use_cache: bool = True,
+    ) -> Dict[str, Any]:
+        """Neuro-symbolic grammar & hardware-budget constrained token generation."""
+        from skeleton.cortex.speculative import GrammarBudgetLogitProcessor
+
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
+        rng = random.Random(int(seed) & 0xFFFFFFFF)
+        if isinstance(prefix, str):
+            ids = self._ids(prefix)
+        else:
+            ids = [self._id(str(t)) for t in prefix] or [self.unk]
+        processor = GrammarBudgetLogitProcessor(
+            self.itos,
+            allowed_tokens=allowed_tokens,
+            banned_tokens=banned_tokens,
+            required_tokens=required_tokens,
+            domain_boost_tokens=domain_boost_tokens,
+            no_repeat_ngram_size=no_repeat_ngram_size,
+        )
+        out = list(ids)
+        cache = KVCache(self.n_layers, self.ctx) if use_cache else None
+        generated: List[int] = []
+        hyper_bank = getattr(self, "hyper_lora", None)
+        for step_idx in range(n):
+            window = out[-self.ctx:]
+            if cache is not None and not self.use_mod:
+                logits = list(self._logits_window(window, cache))
+            else:
+                logits = list(self._logits(window))
+            if hyper_bank is not None and "Wout" in getattr(hyper_bank, "adapters", {}):
+                hidden, _ = self._forward(window)
+                if hidden:
+                    logits = hyper_bank.adapters["Wout"].apply(logits, hidden[-1])
+            masked = processor.process(
+                logits,
+                generated,
+                steps_remaining=max(1, n - step_idx),
+            )
+            nxt = sample_logits(
+                masked,
+                rng,
+                temperature=temperature,
+                min_p=min_p,
+            )
+            out.append(int(nxt))
+            generated.append(int(nxt))
+        tokens_str = tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in generated)
+        req_set = set(required_tokens or ()) & set(self.itos)
+        satisfied = sorted(req_set & set(tokens_str))
+        return {
+            "text": " ".join(tokens_str),
+            "tokens": tokens_str,
+            "token_ids": generated,
+            "required_satisfied": satisfied,
+            "all_required_satisfied": len(satisfied) == len(req_set),
+        }
+
+    def attach_hyper_lora(self, *, ctx_dim: int = 8, rank: int = 2, alpha: float = 4.0, seed: int = 0) -> Dict[str, Any]:
+        from skeleton.cortex.lora import HyperLoRABank
+        return HyperLoRABank(ctx_dim=ctx_dim, rank=rank, alpha=alpha, seed=seed).attach(self)
+
+
+    def expand_depth(self, *, extra_layers: int = 1) -> Dict[str, Any]:
+        """Function-preserving Net2Net-style depth growth for progressive model increase.
+
+        Appends ``extra_layers`` new residual blocks initialized with zero
+        output projections (``Wo = 0``, ``W2 = 0``, ``b2 = 0``) so the residual
+        stream is initially an exact identity mapping while acquiring new
+        trainable capacity for subsequent training.
+        """
+        add_n = max(1, int(extra_layers))
+        self._sync_accelerator()
+        before = self.n_layers
+        s = 0.08
+        for idx in range(add_n):
+            rng = random.Random((1337 + 31 * (before + idx)) & 0xFFFFFFFF)
+            blk = TransformerBlock(
+                self.dim,
+                self.d_ff,
+                rng,
+                s,
+                norm=self.norm,
+                ffn_kind=self.ffn_kind,
+            )
+            blk.Wo = [[0.0] * self.dim for _ in range(self.dim)]
+            if blk.W2:
+                blk.W2 = [[0.0] * self.d_ff for _ in range(self.dim)]
+            if blk.b2:
+                blk.b2 = [0.0] * self.dim
+            self.layers.append(blk)
+        self.n_layers = len(self.layers)
+        if self._accel is not None:
+            try:
+                self._accel.pin()
+            except Exception:
+                self._accel = None
+                self.resident = False
+                self.device = "cpu"
+        return {"layers_before": before, "layers_after": self.n_layers, "added": add_n}
 
     def snapshot(self) -> Dict[str, Any]:
         self._sync_accelerator()

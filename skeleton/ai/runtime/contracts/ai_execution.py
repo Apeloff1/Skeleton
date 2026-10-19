@@ -12,7 +12,8 @@ import json
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
