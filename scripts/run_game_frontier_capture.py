@@ -36,7 +36,7 @@ def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation",choices=("ingest","verify","fork"),
+    parser.add_argument("operation",choices=("ingest","verify","fork","timeline"),
                         help="Do not combine a new capture with replay or fork")
     parser.add_argument("--signed-gdd",type=Path,required=True)
     parser.add_argument("--scene-json",type=Path,required=True)
@@ -46,6 +46,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fork-track")
     parser.add_argument("--through",type=int)
     parser.add_argument("--max-samples",type=int,default=1000000)
+    parser.add_argument("--start-frame",type=int,default=0)
+    parser.add_argument("--page-limit",type=int,default=128)
+    parser.add_argument("--actor-id")
+    parser.add_argument("--chunk-x",type=int)
+    parser.add_argument("--chunk-y",type=int)
+    parser.add_argument("--changes-only",action="store_true")
     parser.add_argument("--resume",action="store_true",
                         help="Only reuse exact already-committed capture records")
     arguments=parser.parse_args(argv)
@@ -54,6 +60,13 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.operation=="fork" and (
         arguments.fork_track is None or arguments.through is None):
         parser.error("fork requires --fork-track and --through")
+    if (arguments.chunk_x is None)!=(arguments.chunk_y is None):
+        parser.error("timeline chunk filters require both --chunk-x and --chunk-y")
+    if arguments.operation!="timeline" and (
+        arguments.start_frame!=0 or arguments.page_limit!=128 or
+        arguments.actor_id is not None or arguments.chunk_x is not None or
+        arguments.changes_only):
+        parser.error("timeline filters are only valid with timeline operation")
     if arguments.operation!="ingest" and arguments.resume:
         parser.error("--resume applies only to ingest")
     if arguments.operation!="ingest" and arguments.capture_jsonl is not None:
@@ -99,6 +112,13 @@ def main(argv: list[str] | None = None) -> int:
             elif arguments.operation=="verify":
                 report={"operation":"verify","journal":journal.stats(),
                         "replay":journal.replay(through=arguments.through)}
+            elif arguments.operation=="timeline":
+                report={"operation":"timeline","page":journal.evidence_page(
+                    start_frame=arguments.start_frame,limit=arguments.page_limit,
+                    actor_id=arguments.actor_id,
+                    chunk_xy=((arguments.chunk_x,arguments.chunk_y)
+                              if arguments.chunk_x is not None else None),
+                    changes_only=arguments.changes_only)}
             else:
                 journal.fork(arguments.fork_track,through=arguments.through)
                 report={"operation":"fork","source_track":arguments.track,
