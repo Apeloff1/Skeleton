@@ -60,6 +60,7 @@ _DOMAINS = (
     "liquid", "tides", "light", "leaf_shadow", "characters",
     "environment", "structures", "biome", "audio", "chunks",
     "balance", "elastic_skin", "instruments", "rpg_events",
+    "position_fix", "gdd_frame",
 )
 
 
@@ -339,6 +340,50 @@ def audit_scene_realism(manifest: Mapping) -> RealismAudit:
                       len(x["source_evidence"])==64
                       for x in admitted),
                   "canonical_authority_must_dispatch")
+
+    position=manifest.get("position_fix")
+    if isinstance(position,Mapping):
+        check("position_fix","precise_coordinates_redacted",
+              position.get("coordinates_redacted") is True and
+              "latitude_deg" not in position and
+              "longitude_deg" not in position and
+              "altitude_m" not in position,
+              "consent_bound_device_gnss_and_control_survey")
+        gps=position.get("live")
+        if isinstance(gps,Mapping):
+            uncertainty=measurement("position_fix","horizontal_accuracy",
+                                    gps["accuracy_m"],"m")
+            check("position_fix","location_quality_and_custody",
+                  0<uncertainty<=75 and gps.get("retains_coordinates") is False,
+                  "foreground_session_only")
+        control=position.get("surveyed")
+        if isinstance(control,Mapping):
+            survey_uncertainty=measurement(
+                "position_fix","survey_uncertainty",
+                control["horizontal_uncertainty_m"],"m")
+            check("position_fix","survey_geometry_quality",
+                  0<survey_uncertainty and control.get("retains_coordinates") is False and
+                  int(control.get("control_count",0))>=2,
+                  "independent_user_verified_wgs84_controls")
+    frame=manifest.get("frame_progress")
+    if isinstance(frame,Mapping):
+        frame_no=measurement("gdd_frame","frame_index",frame["frame_index"],"frames")
+        count=measurement("gdd_frame","chunk_count",frame["chunk_count"],"chunks")
+        checks=(frame.get("double_verified") is True and
+                frame.get("verifier_a") is True and
+                frame.get("verifier_b") is True and
+                type(frame.get("gdd_digest")) is str and
+                len(frame["gdd_digest"])==64 and
+                type(frame.get("receipt_digest")) is str and
+                len(frame["receipt_digest"])==64 and
+                frame_no>=0 and count>=1 and
+                len(frame.get("chunks",[]))==count)
+        check("gdd_frame","scene_has_double_verified_frame_receipt",
+              bool(checks),"independent_chunk_hash_and_temporal_gdd_verifiers")
+        check("gdd_frame","context_authority_remains_provisional",
+              frame.get("ai_authority")==
+              "suggested_context_only_signed_gdd_unchanged",
+              "signed_story_bible_no_ai_auto_promotion")
 
     payload = {
         "measurements": [m.__dict__ for m in readings],
