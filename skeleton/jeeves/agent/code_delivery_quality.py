@@ -45,10 +45,10 @@ _ACTION = re.compile(
 def required_delivery_kind(goal: Goal) -> str | None:
     """Classify explicitly flagged builds and clearly executable coding tasks."""
     kind = goal.metadata.get("delivery_kind")
-    if kind is not None:
-        if kind not in {"code", "game", "non_code"}:
-            raise ValueError("delivery_kind must be code, game, or non_code")
-        return None if kind == "non_code" else str(kind)
+    if kind is not None and kind not in {"code", "game", "non_code"}:
+        raise ValueError("delivery_kind must be code, game, or non_code")
+    if kind in {"code", "game"}:
+        return str(kind)
     objective = goal.objective
     if not _ACTION.search(objective):
         return None
@@ -57,6 +57,27 @@ def required_delivery_kind(goal: Goal) -> str | None:
     if _CODE_NOUNS.search(objective):
         return "code"
     return None
+
+
+@dataclass(frozen=True, slots=True)
+class QualityCheckResult:
+    """Independent host checker evidence for an exact source digest."""
+    checker_id: str
+    source_digest: str
+    passed: bool
+    evidence_ref: str
+    findings: tuple[CodeFinding, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.checker_id or not self.evidence_ref:
+            raise ValueError("checker result needs a name and evidence reference")
+        if not isinstance(self.passed, bool) or not isinstance(self.source_digest, str):
+            raise TypeError("checker result must contain typed pass flag and digest")
+        if any(not isinstance(item, CodeFinding) for item in self.findings):
+            raise ValueError("checker result contains invalid findings")
+
+
+QualityChecker = Callable[[Mapping[str, str]], QualityCheckResult]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +102,7 @@ class QualityReleaseReceipt:
     source_digest: str
     standards: tuple[str, ...]
     executed_checkers: tuple[str, ...]
+    checker_evidence: tuple[tuple[str, str], ...]
     scrutiny: ScrutinyOutcome
     status: str
     failures: tuple[str, ...]
@@ -92,6 +114,7 @@ class QualityReleaseReceipt:
             "source": self.source_digest,
             "standards": self.standards,
             "executed_checkers": self.executed_checkers,
+            "checker_evidence": self.checker_evidence,
             "scrutiny": self.scrutiny.fingerprint,
             "status": self.status,
             "failures": self.failures,
@@ -119,7 +142,7 @@ def required_checker_names(kind: str, extras: Sequence[str] = ()) -> tuple[str, 
 
 
 def _validate_obligations(
-    kind: str, checkers: Mapping[str, Checker],
+    kind: str, checkers: Mapping[str, QualityChecker],
     additional: Sequence[str],
 ) -> tuple[str, ...]:
     required = required_checker_names(kind, additional)
@@ -147,6 +170,11 @@ def verify_quality_receipt(
         raise QualityReleaseError("core or additional quality tenets were removed")
     if tuple(x for x in expected if x not in receipt.executed_checkers):
         raise QualityReleaseError("quality checker coverage missing")
+    if set(receipt.checker_evidence) != set(
+        (name, reference) for name, reference in receipt.checker_evidence
+        if name in expected and isinstance(reference, str) and reference.strip()
+    ) or {name for name, _ in receipt.checker_evidence} != set(expected):
+        raise QualityReleaseError("quality checker evidence missing or invalid")
     if receipt.source_digest != stable_fingerprint(dict(files)):
         raise QualityReleaseError("quality verification is stale for these sources")
     verify_scrutiny_receipts(receipt.scrutiny)
@@ -169,7 +197,7 @@ class CodeDeliveryQualityReviewer:
         kind: str,
         files: Mapping[str, str],
         *,
-        checkers: Mapping[str, Checker],
+        checkers: Mapping[str, QualityChecker],
         additional_requirements: Sequence[str] = (),
         discover: Discovery | None = None,
         repair: Repair | None = None,
@@ -177,21 +205,33 @@ class CodeDeliveryQualityReviewer:
     ) -> QualityReleaseReceipt:
         required = _validate_obligations(kind, checkers, additional_requirements)
         seen: set[str] = set()
+        last_proofs: dict[str, str] = {}
 
         def check_all(sources: Mapping[str, str]) -> Sequence[CodeFinding]:
+            nonlocal last_proofs
+            last_proofs = {}
             gathered: list[CodeFinding] = []
             for name in required:
                 # On each pass every domain must execute against identical source bytes.
-                outcomes = checkers[name](dict(sources))
-                if outcomes is None:
-                    raise QualityReleaseError(f"{name} checker returned no evidence")
-                findings = tuple(outcomes)
-                if any(not isinstance(item, CodeFinding) for item in findings):
-                    raise QualityReleaseError(f"{name} checker produced an invalid finding")
+                outcome = checkers[name](dict(sources))
+                if not isinstance(outcome, QualityCheckResult):
+                    raise QualityReleaseError(f"{name} checker lacks a typed result")
+                if outcome.checker_id != name or outcome.source_digest != stable_fingerprint(dict(sources)):
+                    raise QualityReleaseError(f"{name} checker proof is stale or misattributed")
+                findings = outcome.findings
+                if not outcome.passed and not findings:
+                    first_path = next(iter(sources))
+                    findings = (CodeFinding(
+                        first_path, 1, "quality", "CHECK_FAILED",
+                        f"{name} reported failure without diagnostics", name,
+                    ),)
+                if outcome.passed and findings:
+                    raise QualityReleaseError(f"{name} claimed pass with unresolved findings")
                 if any(item.path not in sources for item in findings):
                     raise QualityReleaseError(f"{name} checker reported a file outside review scope")
                 gathered.extend(findings)
                 seen.add(name)
+                last_proofs[name] = outcome.evidence_ref
             return tuple(gathered)
 
         scrutiny = CodeScrutinyLoop(ScrutinyPolicy(
@@ -213,6 +253,9 @@ class CodeDeliveryQualityReviewer:
             source_digest=stable_fingerprint(dict(scrutiny.files)),
             standards=required,
             executed_checkers=tuple(name for name in required if name in seen),
+            checker_evidence=tuple(
+                (name, last_proofs[name]) for name in required if name in last_proofs
+            ),
             scrutiny=scrutiny,
             status="verified_clean" if scrutiny.success else "blocked",
             failures=() if scrutiny.success else (
