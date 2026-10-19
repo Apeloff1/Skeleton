@@ -288,3 +288,22 @@ def test_rewrite_must_verify_originality_actual_transformation_voice_and_canon()
         )
     with pytest.raises(FinalReviewError, match="mandatory scrutiny dimensions"):
         review(rewrite=omissions)
+
+
+@pytest.mark.parametrize("path", (
+    "../other/project.py", "src\\\\scene.py", "src//scene.py",
+    "src/./scene.py", ".", "src/scene.py\\x00copied",
+))
+def test_rights_inventory_rejects_noncanonical_artifact_paths(path):
+    with pytest.raises(FinalReviewError, match="invalid provenance path"):
+        SourceProvenance(
+            path=path, content_digest="a" * 64, origin="original",
+            permitted_use=True, rights_evidence="host:provenance",
+        )
+    with pytest.raises(FinalReviewError, match="safe text sources"):
+        ComparativeObjectiveFinalReviewer().inspect(
+            "game", {path: "source"}, metrics=measurements(),
+            provenance=(), copyright_checker=check("copyright", []),
+            rewrite_checker=check("creative_rewrite", []),
+            upstream_quality_digest=UPSTREAM,
+        )
