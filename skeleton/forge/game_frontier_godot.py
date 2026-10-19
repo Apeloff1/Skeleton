@@ -45,6 +45,8 @@ var _native_move_force_n: float = 240.0
 var _native_max_horizontal_speed_mps: float = 8.0
 var _native_jump_impulse_ns: float = 120.0
 var _native_gameplay_zones: Array = []
+var _native_force_fields: Array = []
+var _native_previous_field_steps: Array = []
 var _native_previous_zone_members: Array = []
 var _native_preview_label: Label
 var _native_recent_zone_events: Array[String] = []
@@ -509,6 +511,7 @@ func _configure_native_capture(settings: Dictionary) -> void:
             return
         _native_controls_enabled = true
     _native_gameplay_zones = settings.get("gameplay_zones", [])
+    _native_force_fields = settings.get("gameplay_force_fields", [])
     if not _native_gameplay_zones.is_empty():
         _create_native_playtest_inspector()
     for zone_item in _native_gameplay_zones:
@@ -663,6 +666,10 @@ func _record_native_physics() -> void:
     }
     if _native_controls_enabled:
         row["previous_step_control"] = _native_last_action.duplicate(true)
+    if not _native_force_fields.is_empty():
+        row["native_force_field_schema"] = "skeleton.game.native_force_fields.v1"
+        row["native_force_fields"] = _native_force_fields
+        row["previous_step_field_forces"] = _native_previous_field_steps.duplicate(true)
     if not _native_gameplay_zones.is_empty():
         var occupants: Array = []
         for zone_item in _native_gameplay_zones:
@@ -722,6 +729,47 @@ func _exit_tree() -> void:
     if _native_capture_file != null:
         _native_capture_file.close()
         _native_capture_file = null
+
+func _apply_native_gameplay_fields() -> void:
+    if _native_force_fields.is_empty() or _aero_character == null:
+        return
+    if _native_capture_tick > _native_capture_max_frames:
+        return
+    var point := _aero_character.global_position
+    var game_xyz: Array = [point.x, -point.z, point.y]
+    var steps: Array = []
+    for field_item in _native_force_fields:
+        var field: Dictionary = field_item
+        var center: Array = field["center_xyz_m"]
+        var dx: float = float(game_xyz[0]) - float(center[0])
+        var dy: float = float(game_xyz[1]) - float(center[1])
+        var dz: float = float(game_xyz[2]) - float(center[2])
+        var radius: float = float(field["radius_m"])
+        var distance_squared: float = dx * dx + dy * dy + dz * dz
+        var taper: float = maxf(0.0, 1.0 - distance_squared / (radius * radius))
+        var kind: String = str(field["kind"])
+        var direction: Vector3 = Vector3.ZERO
+        if kind == "updraft":
+            direction = Vector3.UP
+        elif kind == "downdraft":
+            direction = Vector3.DOWN
+        elif kind == "eastward_current":
+            direction = Vector3.RIGHT
+        elif kind == "vortex":
+            var planar: float = sqrt(dx * dx + dy * dy)
+            if planar > 0.000000001:
+                direction = _vec([-dy / planar, dx / planar, 0.0])
+        var applied: Vector3 = direction * _aero_character.mass * (
+            float(field["acceleration_mps2"]) * taper)
+        _aero_character.apply_central_force(applied)
+        steps.append({
+            "field_id": field["id"],
+            "actor_id": field["actor_id"],
+            "command_tick": _native_capture_tick - 1,
+            "source_position_xyz_m": game_xyz,
+            "force_world_xyz_n": [applied.x, -applied.z, applied.y],
+        })
+    _native_previous_field_steps = steps
 
 func _apply_reference_controls() -> void:
     if not _native_controls_enabled or _native_capture_tick > _native_capture_max_frames:
@@ -783,6 +831,7 @@ func _physics_process(delta: float) -> void:
     var speed := relative.length()
     var drag_n := -0.5 * _aero_density * _aero_cd * _aero_area * speed * relative
     _aero_character.apply_central_force(drag_n)
+    _apply_native_gameplay_fields()
     _apply_reference_controls()
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
@@ -901,6 +950,7 @@ def emit_frontier_godot_overlay(
     native_reference_test_drive_ticks: int = 0,
     native_gameplay_zones: tuple[Mapping, ...] = (),
     native_camera_follow: bool = False,
+    native_gameplay_force_fields: tuple[Mapping, ...] = (),
 ) -> dict[str, str]:
     """Emit a Godot scene + fixed GDScript + snapshot and wind path JSON.
 
@@ -929,8 +979,11 @@ def emit_frontier_godot_overlay(
     from skeleton.jeeves.game_frontier_native_zones import (
         normalize_gameplay_zones, NativeZoneError,
     )
-    if native_gameplay_zones and not enable_native_capture:
-        raise FrontierGodotError("gameplay zones require opt-in native capture")
+    from skeleton.jeeves.game_frontier_native_fields import (
+        normalize_native_force_fields, NativeForceFieldError,
+    )
+    if (native_gameplay_zones or native_gameplay_force_fields) and not enable_native_capture:
+        raise FrontierGodotError("authored gameplay zones/force fields require native capture")
     if type(native_camera_follow) is not bool or (
         native_camera_follow and not enable_native_reference_controls):
         raise FrontierGodotError("native camera follow requires explicit reference controls")
@@ -1027,6 +1080,11 @@ def emit_frontier_godot_overlay(
                 allowed_actors={item["id"] for item in sources})
         except NativeZoneError as exc:
             raise FrontierGodotError("invalid or unauthorized authored game zones") from exc
+        try:
+            signed_gameplay_forces = normalize_native_force_fields(
+                native_gameplay_force_fields, allowed_actors={actor_id})
+        except NativeForceFieldError as exc:
+            raise FrontierGodotError("native field may only target proven rigid reference actor") from exc
         # Bind native measurements to the signed scene's original body.
         # The source is candidate-only, not authority over a finished game.
         body = advanced["body"]
@@ -1043,6 +1101,7 @@ def emit_frontier_godot_overlay(
             "enabled": True, "max_frames": native_capture_max_frames,
             "primary_source_dynamics": primary_source_dynamics,
             "gameplay_zones": signed_gameplay_zones,
+            "gameplay_force_fields": signed_gameplay_forces,
             "reference_controls": {
                 "enabled": enable_native_reference_controls,
                 "move_force_n": 240., "max_speed_mps": 8.,
@@ -1140,6 +1199,7 @@ def attach_frontier_overlay(
     native_reference_test_drive_ticks: int = 0,
     native_gameplay_zones: tuple[Mapping, ...] = (),
     native_camera_follow: bool = False,
+    native_gameplay_force_fields: tuple[Mapping, ...] = (),
 ) -> dict[str, str]:
     """Safely attach an emitted reference scene to an existing Forge Godot project.
 
@@ -1168,6 +1228,7 @@ def attach_frontier_overlay(
         native_reference_test_drive_ticks=native_reference_test_drive_ticks,
         native_gameplay_zones=native_gameplay_zones,
         native_camera_follow=native_camera_follow,
+        native_gameplay_force_fields=native_gameplay_force_fields,
     )
     conflicts = tuple(sorted(set(project_files).intersection(overlay)))
     if any(project_files[key] != overlay[key] for key in conflicts):

@@ -47,6 +47,12 @@ def build_smoke_project(out:Path, *, fps:int=60, frames:int=20) -> dict:
         enable_native_reference_controls=True,
         native_reference_test_drive_ticks=min(frames-1,12),
         native_camera_follow=True,
+        native_gameplay_force_fields=({
+            "id":"reference_thermal_updraft","actor_id":"hero",
+            "kind":"updraft",
+            "center_xyz_m":list(candidate.manifest["advanced_physics"]["body"]["position_xyz"]),
+            "radius_m":5., "acceleration_mps2":9.8,
+        },),
         native_gameplay_zones=({
             "id":"spawn_marker", "actor_id":"hero",
             "center_xyz_m":list(candidate.manifest["advanced_physics"]["body"]["position_xyz"]),

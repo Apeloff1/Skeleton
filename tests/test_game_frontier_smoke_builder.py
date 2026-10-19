@@ -132,3 +132,24 @@ if __name__=="__main__":
             self.assertEqual({page.page_id for page in authored},{
                 "observed_actor_motion","entered_game_zone","exited_game_zone"})
             self.assertTrue(all(not page.repeat for page in authored))
+
+    def test_native_gameplay_updraft_is_real_engine_applied_force(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from skeleton.jeeves.game_frontier_native_fields import normalize_native_force_fields
+        with TemporaryDirectory() as root:
+            dest=Path(root)
+            build_smoke_project(dest,frames=20)
+            source=json.loads((dest/"frontier/data/scene.json").read_text())
+            fields=source["native_capture"]["gameplay_force_fields"]
+            self.assertEqual(len(fields),1)
+            self.assertEqual(fields,normalize_native_force_fields(fields))
+            self.assertEqual(fields[0]["actor_id"],"hero")
+            self.assertEqual(fields[0]["kind"],"updraft")
+            script=(dest/"frontier/frontier_scene.gd").read_text()
+            for marker in ("_apply_native_gameplay_fields",
+                           "native_force_field_schema",
+                           "previous_step_field_forces",
+                           "_aero_character.apply_central_force(applied)"):
+                self.assertIn(marker,script)
