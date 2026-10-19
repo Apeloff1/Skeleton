@@ -81,6 +81,28 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-75 Bind continuous collision prediction and multi-body contact solver to game-authoritative engine physics and actor controllers.
 - [ ] GF-P0-76 Add real per-era physics solver adaptation and source-verified fixed-step streams with dual chunk checks under loaded scenes.
 - [ ] GF-P0-77 Benchmark field-scale weather turbulence and long-horizon physical energy/momentum against independent reference solvers.
+- [x] GF-P0-78 Add segmented limb/torso/cargo mass distribution with content-addressed centre of mass and inertia tensors.
+- [x] GF-P0-79 Implement stance support polygon, foot-load sharing, acceleration-induced balance offset and grip-force stability checks.
+- [x] GF-P0-80 Implement ElasticBodySkin3D source rig wrapper with topology-linked spring/shear nodes, pinned bone pose and movable mesh vertices.
+- [x] GF-P0-81 Make elastic 3D skin weather/wetness, air temperature, collision and impact-responsive with bounded timestep.
+- [x] GF-P0-82 Export optional native Godot SoftBody3D using indexed shared topology and original rig vertex pin constraints.
+- [x] GF-P0-83 Add simulated integrated gyroscope with angular rate, drift, bias and horizon tilt measurement.
+- [x] GF-P0-84 Add calibrated compass with explicit magnetic declination, dip and local anomaly/interference checks.
+- [x] GF-P0-85 Add line-of-sight natural-horizon sextant angles with horizon dip, index error and refraction corrections.
+- [x] GF-P0-86 Add bubble sextant independent of natural horizon, with gyro attitude/bubble tilt and acceleration error models.
+- [x] GF-P0-87 Add hypsometric barometric altimeter calibrated to pressure/temperature/sea-level reference.
+- [x] GF-P0-88 Add baseline/elevation-angle trigonometric altimeter, optional curvature/refraction and SI/imperial output.
+- [x] GF-P0-89 Add deterministic navigation instrument panel receipts and Godot inspector, clearly labeled simulated not geolocation.
+- [x] GF-P0-90 Add condition-driven RPG environmental triggers for climate, wind, tides, collisions, strain, cargo, body COM, sensors and world events.
+- [x] GF-P0-91 Add RPG event priority, edge-crossing, hysteresis, cooldown and conflict suppression without native world mutation.
+- [x] GF-P0-92 Expand existing RPG Studio authoring surface with physical editors and environmental event pages.
+- [x] GF-P0-93 Integrate optional body distribution, skin and navigation triggers into Jeeves canonical scene and Forge export.
+- [x] GF-P0-94 Add detailed source regression tests and path-scoped CI for skin, navigation, weight, RPG and scene export.
+- [x] GF-P0-95 Add bounded elastic mesh link projection to limit runaway strain while preserving pinned rig nodes.
+- [ ] GF-P0-96 Run real Godot headless import and active SoftBody3D skin pin/mass/collision/animation validation.
+- [ ] GF-P0-97 Connect character material skin and fascia to authoritative game collision, cloth, locomotion and anatomical rig layers.
+- [ ] GF-P0-98 Connect approved environmental RPG event actions with existing quest/canon and save-state authority in every relevant era engine.
+- [ ] GF-P0-99 Persist and replay instrument calibration/drift, real celestial ephemeris and derived navigation readings through game time.
 
 - [ ] GF-P0-11 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
@@ -124,6 +146,12 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-29 Dynamic rigid-body CCD/broadphase/BVH/manifold generation and reliable restitution/friction on deformable and moving terrain.
 - [ ] GF-P1-30 Couple wind, thermal plumes, dynamic foliage, fabric, debris, fluid droplets and character motion through one authoritative timestep.
 - [ ] GF-P1-31 Map weather state to collision/surface friction, surface temperature and physical damage without mutating canonical worlds out of turn.
+- [ ] GF-P1-32 Integrate accurate segmented mass, multipoint contact forces, pose-aware center-of-mass and animation retargeting with native engine physics.
+- [ ] GF-P1-33 Upgrade elastic skin beyond reference springs with actual FEM/PBD tissue/skin, volume preservation, sliding layers and physically qualified penetration resistance.
+- [ ] GF-P1-34 Validate Godot SoftBody3D indexed-mesh topology, shared skeleton anchors, pin behavior, collision layers and Jolt/Godot solver parity.
+- [ ] GF-P1-35 Source actual time/sky celestial ephemerides with rotation, astronomical sight corrections, bubble sextant bias and geographic sphere/ellipsoid.
+- [ ] GF-P1-36 Add interactive gyro/compass/sextant/bubble-sextant/barometer/survey-altimeter UI calibration and side-by-side reference instrument simulation.
+- [ ] GF-P1-37 Build visual advanced RPG trigger graph editor tied to weather, character physics, time of day, objects, instruments, quests and world axes.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -155,6 +183,11 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-26 Character cognition for drafting, updraft soaring, terminal descent, foothold search, avalanche/fall-risk avoidance and climate-responsive traversal.
 - [ ] GF-P2-27 Closed-loop learned game-agent simulation around weather, fast collision, climbing, carrying loads, stamina and terrain aging.
 - [ ] GF-P2-28 Weather realism parameter fitting across hot/cold, extreme elevation and changing land cover with held-out validation.
+- [ ] GF-P2-29 Add character biomechanics with segmented weight shifts, climbing, carrying, walking and gear impact coupled to elastic skin.
+- [ ] GF-P2-30 Add advanced RPG quest/event verification for environmental trigger chains, dynamic world conditions and narrative canon.
+- [ ] GF-P2-31 Train navigation/world cognition to use instruments without treating synthetic values as ground truth position fixes.
+- [ ] GF-P2-32 Validate actual simulated navigation with moving observer, drift, changing magnetic fields, seasons and game world rotation.
+- [ ] GF-P2-33 Add adversarial tissue/wet cloth/hair/skin simulation and multi-era animation model comparison against native rendering.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -184,6 +217,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-24 Cross-engine real-time aerodynamics, drag, wakes, winds, fast CCD, multi-contact, climbing and impact throughput under 30/50/60/120 FPS presentation modes.
 - [ ] GF-P3-25 Native physics frame-by-frame replay energy/momentum conservation, rollback and weeks-long weather-aware traversal tests.
 - [ ] GF-P3-26 Independent external physics benchmark acceptance across rigid/soft/liquid/terrain engines and hardware generations.
+- [ ] GF-P3-27 Complete per-era native SoftBody3D/character full install tests and CPU/GPU deformation/skin collision performance scorecards.
+- [ ] GF-P3-28 Validate instrument error budgets, gyro drift, celestial fixes, barometer and survey results with independent measured cases.
+- [ ] GF-P3-29 Stress 2030s RPG authoring chains, save/restore/canon continuity, event ordering and character environmental triggers for months-long projects.
+- [ ] GF-P3-30 Qualify native stability/memory, weather/elastic skin and calibration replay on historical console and modern hardware profiles.
 
 ## Source references
 
