@@ -133,3 +133,17 @@ def test_refill_is_bounded():
     )
     assert len(prepared.refill) == 128
     verify_delivery(prepared, goal(), (miss(),))
+
+def test_long_sequence_rolls_older_notes_out_of_prompt_but_keeps_receipts():
+    observations = tuple(miss(f"miss-{i}") for i in range(40))
+    prepared = WorkingContextCycle().prepare(goal(), observations)
+    active_note = prepared.prompt_note()
+    assert len(prepared.notes) == 40
+    assert len(prepared.receipts) == 42
+    assert '"older_note_count":24' in active_note
+    assert '"total_note_count":40' in active_note
+    assert "miss-0" not in active_note
+    assert "miss-39" not in active_note  # Raw IDs remain in typed retained notes.
+    assert prepared.notes[0].call_id == "miss-0"
+    assert prepared.notes[-1].call_id == "miss-39"
+    verify_delivery(prepared, goal(), observations)
