@@ -42,6 +42,11 @@ from .game_frontier_mesh_evolution import PixelAsset, create_old_new_asset_pair
 from .game_frontier_biome_motion import (
     ShrubState, SmallRockState, ContactForce, BiomeMotion, advance_biome_objects,
 )
+from .game_frontier_advanced_physics import (
+    RigidBody, AeroProfile, WakeSource, UpdraftColumn, TractionSurface,
+    Climber, CollisionContact, airflow_at, integrate_air_motion,
+    evaluate_climbing, resolve_contact, aggregate_realism,
+)
 
 FRONTIER_SCENE_SCHEMA = "skeleton.game.frontier_scene_candidate.v1"
 FRONTIER_MODEL_STATUS = "engine_candidate_only_no_proprietary_weights"
@@ -104,6 +109,15 @@ def compile_frontier_scene(
     original_pixel_asset: PixelAsset | None = None,
     shrubs: tuple[ShrubState, ...] = (),
     small_rocks: tuple[SmallRockState, ...] = (),
+    advanced_body: RigidBody | None = None,
+    advanced_aero: AeroProfile | None = None,
+    advanced_traction: TractionSurface | None = None,
+    advanced_climber: Climber | None = None,
+    advanced_wakes: tuple[WakeSource, ...] = (),
+    advanced_thermals: tuple[UpdraftColumn, ...] = (),
+    advanced_contact: CollisionContact | None = None,
+    advanced_other_body: RigidBody | None = None,
+    advanced_turbulence_amplitude: float = 0.,
 ) -> FrontierSceneCandidate:
     """Produce a content-addressed, inspectable, playable-engine-side proposal.
 
@@ -286,6 +300,110 @@ def compile_frontier_scene(
         vertices, mesh.triangles) if verify_all_era_chunks else ())
     old_new_meshes = (create_old_new_asset_pair(original_pixel_asset)
                       if original_pixel_asset is not None else ())
+    # Advanced physics runs only by explicit actor opt-in. The old
+    # CharacterStep stays authoritative to the reference and cannot be
+    # silently overwritten by a later/parallel physics candidate.
+    advanced_receipt = None
+    if advanced_body is None and any((
+        advanced_aero is not None, advanced_traction is not None,
+        advanced_climber is not None, advanced_wakes, advanced_thermals,
+        advanced_contact is not None, advanced_other_body is not None,
+        advanced_turbulence_amplitude != 0,
+    )):
+        raise ValueError("advanced physics inputs require advanced_body")
+    if advanced_body is not None:
+        if (advanced_aero is None or advanced_traction is None
+                or advanced_climber is None):
+            raise ValueError("advanced physics requires aero, traction, climber")
+        if advanced_other_body is not None and advanced_contact is None:
+            raise ValueError("second body requires an explicit contact")
+        import math
+        count = max(1, math.ceil(delta_s / .05))
+        if count > 1024:
+            raise ValueError("advanced physics requires host-subdivided time")
+        candidate_body = advanced_body
+        flow = None
+        aero_step = None
+        for tick in range(count):
+            flow = airflow_at(
+                candidate_body.position, ambient_wind=active_wind,
+                air=air_conditions, wakes=advanced_wakes,
+                thermals=advanced_thermals,
+                turbulence_seed=wind_field.seed,
+                time_s=time_s + tick * (delta_s / count),
+                turbulence_amplitude=advanced_turbulence_amplitude,
+            )
+            aero_step = integrate_air_motion(
+                candidate_body, advanced_aero, flow,
+                delta_s=delta_s / count,
+                gravity_mps2=abs(signed_gravity),
+            )
+            candidate_body = aero_step.body
+        assert flow is not None and aero_step is not None
+        grip = evaluate_climbing(
+            advanced_traction, advanced_climber,
+            wind=flow.wind,
+            motion_mps=math.hypot(candidate_body.velocity.x,
+                                  candidate_body.velocity.y),
+            gravity_mps2=abs(signed_gravity),
+        )
+        collision = (resolve_contact(candidate_body, advanced_other_body,
+                                     advanced_contact)
+                     if advanced_contact is not None else None)
+        final_body = collision.body_a if collision is not None else candidate_body
+        metrics = aggregate_realism(aero_step, flow, grip,
+                                    advanced_traction, collision)
+        advanced_receipt = {
+            "body": {
+                "id": final_body.body_id,
+                "position_xyz": [final_body.position.x,
+                                 final_body.position.y, final_body.position.z],
+                "velocity_xyz": [final_body.velocity.x,
+                                 final_body.velocity.y, final_body.velocity.z],
+                "angular_velocity_xyz": [
+                    final_body.angular_velocity.x,
+                    final_body.angular_velocity.y,
+                    final_body.angular_velocity.z],
+                "mass_kg": final_body.mass_kg,
+            },
+            "terminal_velocity_mps": metrics.terminal_speed_mps,
+            "relative_wind_mps": aero_step.relative_air_speed_mps,
+            "air_density_kg_m3": flow.air_density_kg_m3,
+            "draft_shelter_fraction": metrics.wake_shelter_fraction,
+            "updraft_mps": flow.updraft_mps,
+            "turbulence_xyz": [flow.turbulence.x,
+                               flow.turbulence.y, flow.turbulence.z],
+            "aerodynamic_drag_n_xyz": [
+                aero_step.drag_force_n.x, aero_step.drag_force_n.y,
+                aero_step.drag_force_n.z],
+            "dissipated_drag_energy_j": aero_step.drag_dissipation_j,
+            "traction": {
+                "max_slope_degrees": grip.max_slope_degrees,
+                "slope_degrees": grip.slope_degrees,
+                "required_force_n": grip.required_uphill_force_n,
+                "available_force_n": grip.available_climbing_force_n,
+                "slip_risk": grip.slip_risk,
+                "climbable": grip.climbing_possible,
+                "gait": grip.recommended_gait,
+                "speed_scale": grip.recommended_speed_scale,
+            },
+            "impact": ({
+                "impulse_ns": collision.normal_impulse_ns,
+                "friction_impulse_ns": collision.friction_impulse_ns,
+                "energy_loss_j": collision.energy_dissipated_j,
+                "damage_a": collision.damage_a,
+                "damage_b": collision.damage_b,
+                "momentum_residual_ns": collision.momentum_residual_ns,
+            } if collision else None),
+            "realism_invariants": {
+                "collision_energy_nonincreasing":
+                    metrics.collision_energy_nonincreasing,
+                "momentum_residual_ns": metrics.momentum_residual_ns,
+                "climb_safe": metrics.climbing_safe,
+                "evidence_digest": metrics.evidence_digest,
+            },
+            "authority": "candidate_only_no_native_mutation",
+        }
     prediction = None
     if speculative_input is not None:
         anticipated = anticipate_user_motion(speculative_input, horizon_ms=prediction_horizon_ms)
@@ -518,6 +636,7 @@ def compile_frontier_scene(
             "vertex_count": len(m.vertices),
             "original_source_preserved": m.source_preserved,
         } for m in old_new_meshes],
+        "advanced_physics": advanced_receipt,
         "governance": {
             "neural_model_checkpoint_loaded": False,
             "gameplay_action_executed": False,
