@@ -36,6 +36,8 @@ class NativeEngineDispatchTests(NativeQuestBatchTests):
         self.assertEqual([h["stage_id"] for h in data["expected_quest_history"]],["start","middle","ending"])
         self.assertEqual(data["expected_quest_history"][-1]["objective"],"Finish the route")
         self.assertEqual(data["expected_inventory"],{})
+        self.assertEqual(data["expected_local_health"],100)
+        self.assertEqual(data["expected_local_effect_history"],[])
         self.assertEqual(data["expected_npc_emotions"],{})
         self.assertEqual(data["expected_camera_mode"],0)
         self.assertEqual(data["expected_instrument_focus"],"none")

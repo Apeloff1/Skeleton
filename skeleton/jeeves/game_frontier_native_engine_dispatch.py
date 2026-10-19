@@ -21,6 +21,26 @@ from .game_frontier_native_session_checkpoint import advance_native_quest_window
 
 _CAMERA_MODES={"authored":0,"follow":1,"orbit":2,"overhead":3}
 _INSTRUMENT_FOCUS=frozenset(("flight","landing","camera"))
+_LOCAL_HEALTH_CAP=100
+
+
+def _health_amount(value: object) -> int:
+    if (type(value) is not str or not 1<=len(value)<=3
+        or any(ch not in "0123456789" for ch in value)
+        or (len(value)>1 and value[0]=="0")
+        or not 1<=int(value)<=_LOCAL_HEALTH_CAP):
+        raise NativeQuestSessionError("local health delta requires canonical 1..100")
+    return int(value)
+
+
+def _local_item_id(value: object) -> str:
+    if (type(value) is not str or not 1<=len(value)<=128
+        or not value[0].isascii() or not value[0].isalpha()
+        or any(not(c.isascii() and (c.isalnum() or c in "_.-")) for c in value)):
+        raise NativeQuestSessionError("invalid local inventory item identifier")
+    return value
+
+
 
 
 _ALLOWED=frozenset((
@@ -28,6 +48,7 @@ _ALLOWED=frozenset((
     "play_cutscene","play_music","spatial_audio","change_camera",
     "inspect_instrument","trigger_impact_fx","trigger_foliage_fx",
     "craft_item","set_npc_emotion",
+    "take_damage","heal_health","consume_item",
 ))
 
 
@@ -58,6 +79,8 @@ def compile_native_godot_dispatch(
     npc_moods={}
     selected_camera=0
     instrument_focus="none"
+    local_health=_LOCAL_HEALTH_CAP
+    local_effect_history=[]
     signed_actors={a["id"] for a in journal.native_sample(0)["actors"]}
     cursor=None
     for first in range(0,last+1,frames_per_window):
@@ -83,13 +106,33 @@ def compile_native_godot_dispatch(
                         if action["value"] not in _CAMERA_MODES:
                             raise NativeQuestSessionError("unauthorized Godot camera preset")
                         selected_camera=_CAMERA_MODES[action["value"]]
+                    if action["kind"] in ("take_damage","heal_health"):
+                        delta=_health_amount(action["value"])
+                        local_health=(max(0,local_health-delta)
+                            if action["kind"]=="take_damage"
+                            else min(_LOCAL_HEALTH_CAP,local_health+delta))
+                        local_effect_history.append({
+                            "frame":entry["frame"],"page_id":approved["page_id"],
+                            "kind":action["kind"],"value":action["value"],
+                            "resulting_health":local_health,
+                            "source_frame_digest":entry["source_frame_receipt_digest"],
+                        })
+                    if action["kind"]=="consume_item":
+                        item=_local_item_id(action["value"])
+                        if inventory.get(item,0)<1:
+                            raise NativeQuestSessionError("cannot consume absent approved item")
+                        inventory[item]-=1
+                        if inventory[item]==0:
+                            del inventory[item]
+                        local_effect_history.append({
+                            "frame":entry["frame"],"page_id":approved["page_id"],
+                            "kind":action["kind"],"value":item,
+                            "resulting_health":local_health,
+                            "source_frame_digest":entry["source_frame_receipt_digest"],
+                        })
                     if action["kind"]=="craft_item":
-                        item=action["value"]
-                        if (not item or len(item)>128 or
-                            not (item[0].isalpha() and
-                                 all(c.isascii() and (c.isalnum() or c in "_.-")
-                                     for c in item)) or
-                            inventory.get(item,0)>=9999 or
+                        item=_local_item_id(action["value"])
+                        if (inventory.get(item,0)>=9999 or
                             (item not in inventory and len(inventory)>=1024)):
                             raise NativeQuestSessionError("invalid local crafted item or inventory limit")
                         inventory[item]=inventory.get(item,0)+1
@@ -168,6 +211,8 @@ def compile_native_godot_dispatch(
         "initial_flags":dict(approvals["initial_flags"]),
         "expected_flags":checkpoint["flags"],
         "expected_inventory":inventory,
+        "expected_local_health":local_health,
+        "expected_local_effect_history":local_effect_history,
         "expected_camera_mode":selected_camera,
         "expected_instrument_focus":instrument_focus,
         "expected_npc_emotions":npc_moods,
