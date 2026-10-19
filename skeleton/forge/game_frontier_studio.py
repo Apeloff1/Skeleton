@@ -8,6 +8,7 @@ The runtime returns proposals for canonical Godot/engine confirmation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from hashlib import sha256
 import json
 
@@ -49,6 +50,8 @@ STUDIO_TOOLS = (
     "native_zone_event_timeline_inspector",
     "native_runtime_rpg_event_compiler", "native_physics_sensor_bindings",
     "native_3d_airflow_field_editor", "native_rigid_body_field_receipt_inspector",
+    "native_quest_graph_compiler", "native_quest_stage_branch_editor",
+    "native_approved_session_replay_inspector",
 )
 
 
@@ -195,6 +198,45 @@ class StudioForceField:
             raise StudioError("invalid Studio field type, mass force or coordinate bounds") from exc
 
 
+
+_STUDIO_QUEST_ID=re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,127}$")
+
+
+@dataclass(frozen=True)
+class StudioQuestStage:
+    stage_id: str
+    objective: str
+    next_stage_ids: tuple[str,...] = ()
+
+    def __post_init__(self):
+        if (type(self.stage_id) is not str or
+            _STUDIO_QUEST_ID.fullmatch(self.stage_id) is None or
+            type(self.objective) is not str or
+            not 1<=len(self.objective)<=512 or
+            type(self.next_stage_ids) is not tuple or
+            len(self.next_stage_ids)>32 or
+            any(type(s) is not str or _STUDIO_QUEST_ID.fullmatch(s) is None
+                for s in self.next_stage_ids)):
+            raise StudioError("bounded typed native quest stage required")
+
+
+@dataclass(frozen=True)
+class StudioQuest:
+    quest_id: str
+    title: str
+    first_stage_id: str
+    stages: tuple[StudioQuestStage,...]
+
+    def __post_init__(self):
+        if (type(self.quest_id) is not str or
+            _STUDIO_QUEST_ID.fullmatch(self.quest_id) is None or
+            type(self.first_stage_id) is not str or
+            _STUDIO_QUEST_ID.fullmatch(self.first_stage_id) is None or
+            type(self.title) is not str or not 1<=len(self.title)<=256 or
+            type(self.stages) is not tuple or not 1<=len(self.stages)<=4096 or
+            any(not isinstance(s,StudioQuestStage) for s in self.stages)):
+            raise StudioError("bounded authored quest graph required")
+
 @dataclass(frozen=True)
 class StudioProject:
     project_id: str
@@ -210,6 +252,7 @@ class StudioProject:
     virtual_game_map: GameMap | None = None
     native_trigger_volumes: tuple[StudioTriggerVolume,...] = ()
     native_gameplay_force_fields: tuple[StudioForceField,...] = ()
+    native_quests: tuple[StudioQuest,...] = ()
 
     def __post_init__(self):
         if not self.project_id or len(self.project_id)>128:
@@ -246,6 +289,17 @@ class StudioProject:
             any(not isinstance(field,StudioForceField)
                 for field in self.native_gameplay_force_fields)):
             raise StudioError("bounded typed gameplay force field catalog required")
+        if (type(self.native_quests) is not tuple or len(self.native_quests)>128 or
+            any(not isinstance(q,StudioQuest) for q in self.native_quests)):
+            raise StudioError("bounded Studio quest catalog required")
+        if self.native_quests:
+            from skeleton.jeeves.game_frontier_native_quest_session import (
+                NativeQuestSessionError, parse_native_quest_graph,
+            )
+            try:
+                parse_native_quest_graph(_studio_quest_source(self.native_quests))
+            except NativeQuestSessionError as exc:
+                raise StudioError("Studio quest branches must be complete and reachable") from exc
         field_ids=[field.field_id for field in self.native_gameplay_force_fields]
         if len(field_ids)!=len(set(field_ids)):
             raise StudioError("duplicate Studio gameplay force field")
@@ -304,6 +358,7 @@ class StudioProject:
                 "acceleration_mps2":field.acceleration_mps2,
                 "offset_xyz_m":list(field.center_offset_xyz_m),
             } for field in self.native_gameplay_force_fields],
+            "native_quests":_studio_quest_source(self.native_quests)["quests"],
             "soundtrack":self.soundtrack_ids,
             "virtual_game_map": ({
                 "world_id":self.virtual_game_map.world_id,
@@ -411,6 +466,36 @@ def compile_studio_gameplay_force_fields(project: StudioProject) -> dict:
     report["receipt_digest"]=sha256(json.dumps(
         report,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
     return report
+
+
+
+def _studio_quest_source(quests: tuple[StudioQuest,...]) -> dict:
+    return {
+        "schema":"skeleton.game.native_quest_graph.v1",
+        "quests":[{
+            "id":q.quest_id,"title":q.title,"start":q.first_stage_id,
+            "stages":[{"id":s.stage_id,"objective":s.objective,
+                       "next":list(s.next_stage_ids)} for s in q.stages],
+        } for q in quests],
+    }
+
+
+def compile_studio_native_quest_graph(project: StudioProject) -> dict:
+    """Export source-authored, multi-branch quests to native RPG session replay.
+
+    Quest catalog is bound into the Studio project's authored manifest;
+    the gameplay session needs separately reviewed local approvals before any
+    quest state advances. No scene or canonical GDD is mutated by compilation.
+    """
+    from skeleton.jeeves.game_frontier_native_quest_session import (
+        parse_native_quest_graph, NativeQuestSessionError,
+    )
+    if not isinstance(project,StudioProject):
+        raise StudioError("typed Studio quest project required")
+    try:
+        return parse_native_quest_graph(_studio_quest_source(project.native_quests))
+    except NativeQuestSessionError as exc:
+        raise StudioError("Studio quest graph failed typed source verifier") from exc
 
 
 def compile_studio_native_rpg_pages(

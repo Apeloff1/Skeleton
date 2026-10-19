@@ -26,6 +26,9 @@ from skeleton.jeeves.game_frontier_native_compare import compare_native_sessions
 from skeleton.jeeves.game_frontier_native_rpg_bridge import (
     parse_native_rpg_pages,evaluate_native_rpg_timeline,
 )
+from skeleton.jeeves.game_frontier_native_quest_session import (
+    simulate_native_quest_session,
+)
 
 
 def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
@@ -42,7 +45,7 @@ def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation",choices=("ingest","verify","fork","timeline","analyze","compare",
-                                 "evaluate-events"),
+                                 "evaluate-events","simulate-quests"),
                         help="Do not combine a new capture with replay or fork")
     parser.add_argument("--signed-gdd",type=Path,required=True)
     parser.add_argument("--scene-json",type=Path,required=True)
@@ -58,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--event-pages-json",type=Path)
     parser.add_argument("--event-flags-json",type=Path)
     parser.add_argument("--event-limit",type=int,default=256)
+    parser.add_argument("--quest-graph-json",type=Path)
+    parser.add_argument("--quest-approvals-json",type=Path)
     parser.add_argument("--audit-max-frames",type=int,default=256)
     parser.add_argument("--other-journal",type=Path)
     parser.add_argument("--other-track",default="production")
@@ -78,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("fork requires --fork-track and --through")
     if (arguments.chunk_x is None)!=(arguments.chunk_y is None):
         parser.error("timeline chunk filters require both --chunk-x and --chunk-y")
-    if arguments.operation not in ("timeline","analyze","compare","evaluate-events") and (
+    if arguments.operation not in ("timeline","analyze","compare","evaluate-events","simulate-quests") and (
         arguments.start_frame!=0 or arguments.actor_id is not None):
         parser.error("frame cursor and actor filter apply only to timeline/analyze")
     if arguments.operation!="timeline" and (
@@ -101,10 +106,19 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.operation=="evaluate-events" and (
         arguments.event_pages_json is None or arguments.actor_id is None):
         parser.error("event evaluation requires --event-pages-json and --actor-id")
-    if arguments.operation!="evaluate-events" and (
+    if arguments.operation=="simulate-quests" and (
+        arguments.event_pages_json is None or arguments.actor_id is None or
+        arguments.quest_graph_json is None or arguments.quest_approvals_json is None):
+        parser.error("quest simulation needs RPG pages, actor, graph and approvals")
+    if arguments.operation!="simulate-quests" and (
+        arguments.quest_graph_json is not None or arguments.quest_approvals_json is not None):
+        parser.error("quest graph and approval files apply only to simulate-quests")
+    if arguments.operation not in ("evaluate-events","simulate-quests") and (
         arguments.event_pages_json is not None or arguments.event_flags_json is not None
         or arguments.event_limit!=256):
         parser.error("event pages, flags and evaluation limit only apply to evaluate-events")
+    if arguments.operation=="simulate-quests" and arguments.event_flags_json is not None:
+        parser.error("game session flags must be embedded in approved manifest")
     if arguments.operation!="ingest" and arguments.resume:
         parser.error("--resume applies only to ingest")
     if arguments.operation!="ingest" and arguments.capture_jsonl is not None:
@@ -190,6 +204,31 @@ def main(argv: list[str] | None = None) -> int:
                             journal,pages,actor_id=arguments.actor_id,
                             start_frame=arguments.start_frame,
                             limit=arguments.event_limit,flags=flags)}
+            elif arguments.operation=="simulate-quests":
+                raw_pages=_operator_json(arguments.event_pages_json)
+                if ("source_actor_id" in raw_pages and
+                    raw_pages["source_actor_id"]!=arguments.actor_id):
+                    raise ValueError("quest page source actor differs from selected game actor")
+                if arguments.actor_id not in catalog:
+                    raise ValueError("session actor absent from signed Forge scene catalog")
+                initial=journal.native_sample(0)
+                if (initial is None or
+                    initial.get("scene_candidate_digest")!=settings["candidate_digest"] or
+                    initial.get("signed_gdd_digest")!=gdd.source_digest or
+                    {item["id"]:item["source_digest"]
+                     for item in initial.get("actors",[])}!=catalog):
+                    raise ValueError("session source actor catalog differs from captured Godot scene")
+                pages=parse_native_rpg_pages(raw_pages)
+                graph=_operator_json(arguments.quest_graph_json)
+                approvals=_operator_json(arguments.quest_approvals_json)
+                simulation=simulate_native_quest_session(
+                    journal,pages,graph,approvals,
+                    actor_id=arguments.actor_id,
+                    scene_candidate_digest=settings["candidate_digest"],
+                    start_frame=arguments.start_frame,
+                    through_frame=arguments.through,
+                    limit=arguments.event_limit)
+                report={"operation":"simulate-quests","gameplay_session":simulation}
             elif arguments.operation=="analyze":
                 report={"operation":"analyze","diagnostics":analyze_native_capture(
                     journal,start_frame=arguments.start_frame,
