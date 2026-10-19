@@ -38,6 +38,9 @@ from .game_frontier_photometry import (
     LeafPose, LightClimate, move_leaf, verify_leaf_shadow, illuminate_atmosphere_3d,
 )
 from .game_frontier_chunks import verify_registered_era_chunks
+from .game_frontier_chunk_evidence import (
+    build_frame_chunk_receipts, build_mesh_chunk_receipts,
+)
 from .game_frontier_mesh_evolution import PixelAsset, create_old_new_asset_pair
 from .game_frontier_biome_motion import (
     ShrubState, SmallRockState, ContactForce, BiomeMotion, advance_biome_objects,
@@ -143,6 +146,7 @@ def compile_frontier_scene(
     frame_index: int | None = None,
     frame_objects: tuple[FrameObject, ...] = (),
     previous_frame_receipt: FrameReceipt | None = None,
+    previous_frame_evidence: dict | None = None,
     between_frame_notes: tuple[GDDFrameNote, ...] = (),
     virtual_navigation: VirtualNavigationRequest | None = None,
     previous_virtual_navigation: dict | None = None,
@@ -326,6 +330,12 @@ def compile_frontier_scene(
              if audio_source_distance_m is not None else None)
     chunk_reports = (verify_registered_era_chunks(
         vertices, mesh.triangles) if verify_all_era_chunks else ())
+    # Per-era mesh evidence remains opt-in; it records source and independent
+    # topology checks, not actual console/GPU streaming acceptance.
+    mesh_evidence = [
+        build_mesh_chunk_receipts(vertices,mesh.triangles,era=report.era)
+        for report in chunk_reports
+    ]
     old_new_meshes = (create_old_new_asset_pair(original_pixel_asset)
                       if original_pixel_asset is not None else ())
     # Advanced physics runs only by explicit actor opt-in. The old
@@ -563,9 +573,11 @@ def compile_frontier_scene(
         "authority": "optional_permissioned_observation_no_persistence",
     } if (live is not None or surveyed is not None) else None)
     frame_receipt = None
+    frame_chunk_evidence = None
     if frame_gdd is None and any((
         frame_index is not None, frame_objects,
         previous_frame_receipt is not None, between_frame_notes,
+        previous_frame_evidence is not None,
     )):
         raise ValueError("per-frame build requires a signed GDD")
     if frame_gdd is not None:
@@ -575,6 +587,10 @@ def compile_frontier_scene(
             frame_index=frame_index, fps=clock.fps, gdd=frame_gdd,
             objects=frame_objects, previous=previous_frame_receipt,
             notes=between_frame_notes)
+        frame_chunk_evidence = build_frame_chunk_receipts(
+            frame_receipt,frame_gdd,
+            previous=previous_frame_receipt,
+            previous_evidence=previous_frame_evidence)
     # Real OS positioning stays isolated behind explicit consent and redacted
     # receipts. Fictional game-map GPS NEVER uses that sensor/permission path.
     if virtual_navigation is not None and (gps_fix is not None or survey_controls):
@@ -815,6 +831,7 @@ def compile_frontier_scene(
             "tide_surf_ambience": audio.tide_surf_ambience,
             "cues": list(audio.cues),
         } if audio else None),
+        "mesh_chunk_evidence": mesh_evidence,
         "chunk_verification": [{
             "era": c.era, "chunk_count": c.chunk_count,
             "sha256_valid": c.authenticated,
@@ -847,6 +864,7 @@ def compile_frontier_scene(
         } for m in old_new_meshes],
         "position_fix": position_receipt,
         "virtual_game_gps": virtual_position,
+        "frame_chunk_evidence": frame_chunk_evidence,
         "frame_progress": ({
             "frame_index": frame_receipt.frame_index,
             "timestamp_ns": frame_receipt.time_ns,
