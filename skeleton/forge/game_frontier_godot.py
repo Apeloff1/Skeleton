@@ -117,13 +117,10 @@ func _ready() -> void:
     _create_character_suite_inspector(suite)
     _create_virtual_game_gps(data.get("virtual_game_gps", {}))
     _create_virtual_route_book(data.get("virtual_game_gps", {}))
-    _create_native_flight_instruments()
-    _create_native_landing_risk_inspector()
     _create_chunk_evidence_inspector(data.get("chunk_evidence_summary", {}))
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
     _create_camera(data.get("projection", {}), data.get("world_variant", {}))
-    _create_game_cinematic_camera_control()
     _create_lighting(data.get("world_variant", {}),
                      data.get("photometric_3d", []), data.get("atmosphere", {}))
     _create_water(data.get("liquid", {}), data.get("tides", {}))
@@ -131,6 +128,9 @@ func _ready() -> void:
     _create_biome_objects(data.get("biome_motion", {}))
     _create_advanced_character(data.get("advanced_physics", {}))
     _configure_native_capture(data.get("native_capture", {}))
+    _create_native_flight_instruments()
+    _create_native_landing_risk_inspector()
+    _create_game_cinematic_camera_control()
     _load_approved_native_gameplay(data.get("native_capture", {}))
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
@@ -1052,6 +1052,16 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var cue_ticks: Array = []
     for cue_item in next_cues:
         cue_ticks.append(int(cue_item["source_frame"]))
+    var runtime_ui_modules: Array[String] = []
+    if _native_flight_instrument_label != null:
+        runtime_ui_modules.append("virtual_flight_instruments")
+    if _native_landing_risk_label != null and _native_landing_risk_meter != null:
+        runtime_ui_modules.append("native_landing_risk")
+    if _virtual_camera_mode_label != null and _native_camera != null:
+        runtime_ui_modules.append("cinematic_camera_director")
+    if runtime_ui_modules.size() != 3:
+        push_error("Required native Godot game interface is missing")
+        return
     var accepted := {
         "schema":"skeleton.game.godot_approved_dispatch_receipt.v1",
         "dispatch_file_sha256":expected_sha,
@@ -1062,6 +1072,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "source_through_frame":bundle["source_through_frame"],
         "actions_applied":actions.size(),
         "quests":next_quests,"flags":next_flags,
+        "runtime_ui_modules":runtime_ui_modules,
         "quest_progression_history":next_quest_history,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,
         "visualized_npc_ids":_approved_npc_visuals,
