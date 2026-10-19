@@ -60,6 +60,8 @@ var _approved_gameplay_quests: Dictionary = {}
 var _approved_gameplay_dispatch_digest: String = ""
 var _approved_gameplay_flags: Dictionary = {}
 var _approved_gameplay_inventory: Dictionary = {}
+var _approved_local_health: int = 100
+var _approved_local_effect_history: Array = []
 var _approved_gameplay_npc_emotions: Dictionary = {}
 var _approved_npc_visuals: Array[String] = []
 var _approved_inventory_visuals: Array[String] = []
@@ -950,6 +952,8 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var next_quest_history: Array = []
     var next_action_trace: Array = []
     var next_inventory: Dictionary = {}
+    var next_health: int = 100
+    var next_local_effect_history: Array = []
     var next_npc_emotions: Dictionary = {}
     var last_tick: int = -1
     for row_item in actions:
@@ -1003,6 +1007,39 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             if int(next_inventory[value]) > 9999 or next_inventory.size() > 1024:
                 push_error("Approved local inventory limit exceeded")
                 return
+        elif kind == "take_damage" or kind == "heal_health":
+            var accepted_number: bool = (
+                value.length() >= 1 and value.length() <= 3
+                and not (value.length() > 1 and value.begins_with("0"))
+            )
+            for character in value:
+                if not "0123456789".contains(character):
+                    accepted_number = false
+            if not accepted_number or int(value) < 1 or int(value) > 100:
+                push_error("Approved local health delta is not canonical 1..100")
+                return
+            var delta: int = int(value)
+            next_health = (
+                maxi(0,next_health - delta) if kind == "take_damage"
+                else mini(100,next_health + delta)
+            )
+            next_local_effect_history.append({
+                "frame":frame,"page_id":str(row.get("page_id","")),
+                "kind":kind,"value":value,"resulting_health":next_health,
+                "source_frame_digest":str(row.get("native_frame_receipt_digest","")),
+            })
+        elif kind == "consume_item":
+            if not next_inventory.has(value) or int(next_inventory[value]) < 1:
+                push_error("Local approved item cannot be consumed before acquisition")
+                return
+            next_inventory[value] = int(next_inventory[value]) - 1
+            if int(next_inventory[value]) == 0:
+                next_inventory.erase(value)
+            next_local_effect_history.append({
+                "frame":frame,"page_id":str(row.get("page_id","")),
+                "kind":kind,"value":value,"resulting_health":next_health,
+                "source_frame_digest":str(row.get("native_frame_receipt_digest","")),
+            })
         elif kind == "set_npc_emotion":
             var mood_parts := value.split(":")
             if mood_parts.size() != 2 or not [
@@ -1115,9 +1152,26 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             push_error("Authored quest history tick invalid")
             return
         history_item["frame"] = int(tick)
+    var expected_effect_history: Array = (
+        bundle.get("expected_local_effect_history", []).duplicate(true)
+    )
+    for effect_item in expected_effect_history:
+        if typeof(effect_item) != TYPE_DICTIONARY:
+            push_error("Expected local RPG effect receipt invalid")
+            return
+        var effect: Dictionary = effect_item
+        for numeric_key in ["frame", "resulting_health"]:
+            var numeric_value: Variant = effect.get(numeric_key, -1)
+            if (float(numeric_value) < 0.0 or
+                float(numeric_value) != floorf(float(numeric_value))):
+                push_error("Expected local health receipt nonintegral")
+                return
+            effect[numeric_key] = int(numeric_value)
     if (next_flags != bundle.get("expected_flags", {})
         or next_quests != expected_quests
         or next_inventory != expected_inventory
+        or next_health != int(bundle.get("expected_local_health", -1))
+        or next_local_effect_history != expected_effect_history
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})
         or next_action_trace != expected_trace
         or next_camera_mode != int(bundle.get("expected_camera_mode", -1))
@@ -1141,6 +1195,8 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
     _approved_gameplay_inventory = next_inventory
+    _approved_local_health = next_health
+    _approved_local_effect_history = next_local_effect_history
     _approved_inventory_visuals = _create_approved_inventory_objects(next_inventory)
     _approved_gameplay_npc_emotions = next_npc_emotions
     _approved_gameplay_cues = next_cues
@@ -1196,6 +1252,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "runtime_ui_modules":runtime_ui_modules,
         "quest_progression_history":next_quest_history,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,
+        "local_health":next_health,"local_effect_history":next_local_effect_history,
         "visualized_npc_ids":_approved_npc_visuals,
         "visualized_item_ids":_approved_inventory_visuals,
         "executed_action_trace":next_action_trace,
@@ -1208,6 +1265,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     if not _persist_verified_gameplay_receipt(accepted):
         return
     _create_approved_gameplay_inspector(accepted)
+    _create_approved_health_inspector()
     _create_approved_dialogue_view()
     _create_approved_cue_timeline()
     _create_approved_branch_preview()
@@ -1240,6 +1298,28 @@ func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
         push_error("Approved gameplay save did not survive readback")
         return false
     return true
+
+
+func _create_approved_health_inspector() -> void:
+    var overlay := CanvasLayer.new()
+    overlay.name = "SourceApprovedGameHealth"
+    var stack := VBoxContainer.new()
+    stack.name = "ApprovedHealthMeterAndHistory"
+    stack.position = Vector2(20, 35)
+    stack.custom_minimum_size = Vector2(310, 46)
+    var label := Label.new()
+    label.name = "ApprovedLocalHealthLabel"
+    label.text = ("Approved local RPG health: " +
+                  str(_approved_local_health) + " / 100")
+    stack.add_child(label)
+    var meter := ProgressBar.new()
+    meter.name = "ApprovedLocalHealthMeter"
+    meter.min_value = 0
+    meter.max_value = 100
+    meter.value = _approved_local_health
+    stack.add_child(meter)
+    overlay.add_child(stack)
+    add_child(overlay)
 
 
 func _create_approved_inventory_objects(items: Dictionary) -> Array[String]:

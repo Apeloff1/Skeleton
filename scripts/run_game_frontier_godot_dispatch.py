@@ -138,6 +138,7 @@ def _verify(args):
         "quest_progression_history","runtime_ui_modules","approved_camera_mode",
         "approved_instrument_focus",
         "presentation_cues","inventory","npc_emotions","visualized_npc_ids",
+        "local_health","local_effect_history",
         "executed_action_trace","visualized_item_ids","cue_timeline_frame_index",
         "read_only_branch_options","visualized_fx_page_ids","authority",
     }
@@ -172,6 +173,9 @@ def _verify(args):
         or receipt["read_only_branch_options"]!=bundle["available_branch_options"]
         or receipt["flags"]!=bundle["expected_flags"]
         or receipt["inventory"]!=bundle["expected_inventory"]
+        or type(receipt["local_health"]) is not int
+        or receipt["local_health"]!=bundle["expected_local_health"]
+        or receipt["local_effect_history"]!=bundle["expected_local_effect_history"]
         or receipt["npc_emotions"]!=bundle["expected_npc_emotions"]
         or receipt["visualized_npc_ids"]!=sorted(bundle["expected_npc_emotions"])
         or receipt["visualized_item_ids"]!=sorted(bundle["expected_inventory"])[:24]
@@ -190,6 +194,8 @@ def _verify(args):
         "verified_quest_history_entries":len(receipt["quest_progression_history"]),
         "verified_npc_reactions":len(receipt["visualized_npc_ids"]),
         "verified_inventory_visuals":len(receipt["visualized_item_ids"]),
+        "verified_local_health":receipt["local_health"],
+        "verified_local_effects":len(receipt["local_effect_history"]),
         "verified_cue_count":len(expected_cues),
         "verified_fx_cues":len(expected_fx),
         "verified_cue_timeline_ticks":len(receipt["cue_timeline_frame_index"]),
