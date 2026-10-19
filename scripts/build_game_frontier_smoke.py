@@ -43,7 +43,9 @@ def build_smoke_project(out:Path, *, fps:int=60, frames:int=20) -> dict:
     candidate=compile_frontier_scene(**cfg)
     overlay=emit_frontier_godot_overlay(
         candidate,cloud_path_duration_s=2,enable_native_capture=True,
-        native_capture_all_actors=True,native_capture_max_frames=frames)
+        native_capture_all_actors=True,native_capture_max_frames=frames,
+        enable_native_reference_controls=True,
+        native_reference_test_drive_ticks=min(frames-1,12))
     project_godot='''config_version=5
 
 [application]

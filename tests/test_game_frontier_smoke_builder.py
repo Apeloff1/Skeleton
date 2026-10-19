@@ -67,3 +67,37 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+    def test_native_reference_controls_from_real_exporter(self):
+        import json
+        from skeleton.jeeves.game_frontier import compile_frontier_scene
+        from skeleton.jeeves.game_frontier_frame_coherence import bind_signed_gdd, FrameObject
+        from skeleton.jeeves.game_frontier_production import Vec3
+        from skeleton.forge.game_frontier_godot import (
+            emit_frontier_godot_overlay, FrontierGodotError,
+        )
+        from tests.test_game_frontier_position_frames import gdd
+        from tests.test_game_frontier_advanced_scene import scene_params
+        params=scene_params()
+        params.update(frame_gdd=bind_signed_gdd(gdd()),frame_index=0,
+            frame_objects=(FrameObject("hero",Vec3(0,0,30),
+                                      Vec3(0,0,-20),"a"*64),))
+        candidate=compile_frontier_scene(**params)
+        with self.assertRaises(FrontierGodotError):
+            emit_frontier_godot_overlay(candidate,
+                enable_native_reference_controls=True)
+        with self.assertRaises(FrontierGodotError):
+            emit_frontier_godot_overlay(candidate,
+                native_reference_test_drive_ticks=5)
+        payload=emit_frontier_godot_overlay(
+            candidate,enable_native_capture=True,
+            enable_native_reference_controls=True,
+            native_reference_test_drive_ticks=5)
+        scene=json.loads(payload["frontier/data/scene.json"])
+        self.assertTrue(scene["native_capture"]["reference_controls"]["enabled"])
+        self.assertEqual(scene["native_capture"]["reference_controls"][
+            "headless_fixture_ticks"],5)
+        script=payload["frontier/frontier_scene.gd"]
+        self.assertIn('Input.get_vector("ui_left", "ui_right"',script)
+        self.assertIn("apply_central_impulse",script)
+        self.assertIn("bounded_reference_controller_not_NPC_AI",script)

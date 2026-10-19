@@ -38,6 +38,12 @@ var _native_actor_asset_sha: String = ""
 var _native_capture_nodes: Array[Node3D] = []
 var _native_capture_actors: Array = []
 var _native_chunk_size_m: float = 32.0
+var _native_controls_enabled: bool = false
+var _native_test_drive_ticks: int = 0
+var _native_last_action: Dictionary = {}
+var _native_move_force_n: float = 240.0
+var _native_max_horizontal_speed_mps: float = 8.0
+var _native_jump_impulse_ns: float = 120.0
 
 func _vec(data: Array) -> Vector3:
     return Vector3(float(data[0]), float(data[2]), -float(data[1]))
@@ -480,6 +486,19 @@ func _configure_native_capture(settings: Dictionary) -> void:
         return
     _aero_character.contact_monitor = true
     _aero_character.max_contacts_reported = 8
+    var control: Dictionary = settings.get("reference_controls", {})
+    if bool(control.get("enabled", false)):
+        _native_move_force_n = float(control.get("move_force_n", 240.0))
+        _native_max_horizontal_speed_mps = float(control.get("max_speed_mps", 8.0))
+        _native_jump_impulse_ns = float(control.get("jump_impulse_ns", 120.0))
+        _native_test_drive_ticks = int(control.get("headless_fixture_ticks", 0))
+        if (_native_move_force_n <= 0.0 or _native_move_force_n > 5000.0
+            or _native_max_horizontal_speed_mps < 0.1 or _native_max_horizontal_speed_mps > 50.0
+            or _native_jump_impulse_ns < 0.0 or _native_jump_impulse_ns > 2000.0
+            or _native_test_drive_ticks < 0 or _native_test_drive_ticks > 64):
+            push_error("Invalid reference controls")
+            return
+        _native_controls_enabled = true
     # Fixed user:// destination, not a user-supplied external path.
     _native_capture_file = FileAccess.open("user://frontier_native_physics.jsonl", FileAccess.WRITE)
     if _native_capture_file == null:
@@ -577,6 +596,8 @@ func _record_native_physics() -> void:
         "native_chunk_size_m": _native_chunk_size_m,
         "native_chunks": chunks,
     }
+    if _native_controls_enabled:
+        row["previous_step_control"] = _native_last_action.duplicate(true)
     _native_capture_file.store_line(JSON.stringify(row))
     _native_capture_file.flush()
     _native_capture_tick += 1
@@ -585,6 +606,38 @@ func _exit_tree() -> void:
     if _native_capture_file != null:
         _native_capture_file.close()
         _native_capture_file = null
+
+func _apply_reference_controls() -> void:
+    if not _native_controls_enabled or _native_capture_tick > _native_capture_max_frames:
+        return
+    var command_tick: int = _native_capture_tick - 1
+    var axis: Vector2 = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+    var kind: String = "human_input" if axis.length_squared() > 0.0 else "none"
+    if command_tick < _native_test_drive_ticks:
+        axis = Vector2.RIGHT
+        kind = "headless_fixture"
+    var force: Vector3 = Vector3.ZERO
+    var horizontal_speed: float = Vector2(
+        _aero_character.linear_velocity.x, _aero_character.linear_velocity.z).length()
+    if axis.length_squared() > 0.0 and horizontal_speed < _native_max_horizontal_speed_mps:
+        force = _vec([axis.x, -axis.y, 0.0]) * _native_move_force_n
+        _aero_character.apply_central_force(force)
+    var jumped: bool = false
+    if kind != "headless_fixture":
+        jumped = (Input.is_action_just_pressed("ui_accept")
+            and _aero_character.get_colliding_bodies().size() > 0)
+    if jumped:
+        _aero_character.apply_central_impulse(Vector3.UP * _native_jump_impulse_ns)
+    _native_last_action = {
+        "schema": "skeleton.game.native_reference_input.v1",
+        "actor_id": _native_actor_id,
+        "command_tick": command_tick,
+        "input_kind": kind,
+        "input_axis_xy": [axis.x, axis.y],
+        "force_world_xyz_n": [force.x, -force.z, force.y],
+        "jump_impulse_ns": _native_jump_impulse_ns if jumped else 0.0,
+        "bounded_reference_controller_not_NPC_AI": true,
+    }
 
 func _physics_process(delta: float) -> void:
     if _aero_character == null or delta < 0:
@@ -598,6 +651,7 @@ func _physics_process(delta: float) -> void:
     var speed := relative.length()
     var drag_n := -0.5 * _aero_density * _aero_cd * _aero_area * speed * relative
     _aero_character.apply_central_force(drag_n)
+    _apply_reference_controls()
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]
@@ -706,6 +760,8 @@ def emit_frontier_godot_overlay(
     enable_native_capture: bool = False,
     native_capture_max_frames: int = 6000,
     native_capture_all_actors: bool = False,
+    enable_native_reference_controls: bool = False,
+    native_reference_test_drive_ticks: int = 0,
 ) -> dict[str, str]:
     """Emit a Godot scene + fixed GDScript + snapshot and wind path JSON.
 
@@ -725,6 +781,12 @@ def emit_frontier_godot_overlay(
         type(native_capture_max_frames) is not int or
         not 1 <= native_capture_max_frames <= 1_000_000):
         raise FrontierGodotError("bounded explicit native capture opt-in required")
+    if (type(enable_native_reference_controls) is not bool or
+        type(native_reference_test_drive_ticks) is not int or
+        not 0<=native_reference_test_drive_ticks<=64 or
+        enable_native_reference_controls and not enable_native_capture or
+        native_reference_test_drive_ticks and not enable_native_reference_controls):
+        raise FrontierGodotError("bounded native reference controller opt-in required")
     manifest = candidate.manifest
     actual = sha256(json.dumps(manifest, sort_keys=True,
                                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
@@ -827,6 +889,12 @@ def emit_frontier_godot_overlay(
         native_config = {
             "enabled": True, "max_frames": native_capture_max_frames,
             "primary_source_dynamics": primary_source_dynamics,
+            "reference_controls": {
+                "enabled": enable_native_reference_controls,
+                "move_force_n": 240., "max_speed_mps": 8.,
+                "jump_impulse_ns": 120.,
+                "headless_fixture_ticks": native_reference_test_drive_ticks,
+            },
             "candidate_digest": candidate.manifest_digest,
             "gdd_digest": frame["gdd_digest"], "fps": frame["fps"],
             "actor_id": actor_id, "actor_asset_digest": mapped[0],
@@ -913,6 +981,8 @@ def attach_frontier_overlay(
     enable_native_capture: bool = False,
     native_capture_max_frames: int = 6000,
     native_capture_all_actors: bool = False,
+    enable_native_reference_controls: bool = False,
+    native_reference_test_drive_ticks: int = 0,
 ) -> dict[str, str]:
     """Safely attach an emitted reference scene to an existing Forge Godot project.
 
@@ -937,6 +1007,8 @@ def attach_frontier_overlay(
         enable_native_capture=enable_native_capture,
         native_capture_max_frames=native_capture_max_frames,
         native_capture_all_actors=native_capture_all_actors,
+        enable_native_reference_controls=enable_native_reference_controls,
+        native_reference_test_drive_ticks=native_reference_test_drive_ticks,
     )
     conflicts = tuple(sorted(set(project_files).intersection(overlay)))
     if any(project_files[key] != overlay[key] for key in conflicts):
