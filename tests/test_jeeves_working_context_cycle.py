@@ -6,6 +6,7 @@ import pytest
 
 from skeleton.jeeves.agent.types import Goal, ToolObservation
 from skeleton.jeeves.agent.working_context_cycle import (
+    CycleReceipt,
     IntegrityVerifier,
     PageClicker,
     ScopeVerifier,
@@ -147,3 +148,19 @@ def test_long_sequence_rolls_older_notes_out_of_prompt_but_keeps_receipts():
     assert prepared.notes[0].call_id == "miss-0"
     assert prepared.notes[-1].call_id == "miss-39"
     verify_delivery(prepared, goal(), observations)
+
+def test_rehashed_but_false_receipt_event_is_rejected():
+    observations = (miss(), hit())
+    original = WorkingContextCycle().prepare(goal(), observations)
+    receipts = []
+    previous = "0" * 64
+    for prior in original.receipts:
+        action = "wrong_action" if not receipts else prior.action
+        updated = CycleReceipt.issue(
+            prior.sequence, prior.serial, action, prior.subject_digest, previous
+        )
+        receipts.append(updated)
+        previous = updated.digest
+    forged = replace(original, receipts=tuple(receipts))
+    with pytest.raises(ValueError, match="bind the declared event"):
+        IntegrityVerifier.verify(forged, goal(), observations)
