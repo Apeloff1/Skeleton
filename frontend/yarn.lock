@@ -1058,10 +1058,10 @@
     "@babel/code-frame" "^7.20.0"
     json5 "^2.2.3"
 
-"@expo/json-file@^11.0.1":
-  version "11.0.1"
-  resolved "https://registry.yarnpkg.com/@expo/json-file/-/json-file-11.0.1.tgz#dab8f6e5ff78e7c33a8e49a48722ce972306036c"
-  integrity sha512-zxHWj4MKKMAL29ZQSY/Fssx4Thluk40JmuGNaeS078wy/NhlFhnVi+rHHunulE3xJAJ0CM73m8VK2+GkF9eRwQ==
+"@expo/json-file@^11.2.1":
+  version "11.2.1"
+  resolved "https://registry.yarnpkg.com/@expo/json-file/-/json-file-11.2.1.tgz#57176987ed1060b0aa504defa4cc1a5079341184"
+  integrity sha512-UPhKoFCj8BcwgLB1rKQ1CuR/REITnZLiqxHEHOeH1tPsdXcHGtUDh0P5bLbr7oU0nKVdtJ5rzyKx8jniMQdESQ==
   dependencies:
     "@babel/code-frame" "^7.20.0"
     json5 "^2.2.3"
@@ -1214,18 +1214,18 @@
     yaml "^1.10.0"
 
 "@expo/osascript@^2.3.8":
-  version "2.7.1"
-  resolved "https://registry.yarnpkg.com/@expo/osascript/-/osascript-2.7.1.tgz#1880dcbaf79cde9631e0e68f461f05c8f0542b88"
-  integrity sha512-Zn03EX6In7ts2lPUW2ESUSkEhEWQN1qqsiXjadtZMJOuZRkMiAg1ZQHuvz9DjByDWNJ2pBwAGyrts9lj9k389g==
+  version "2.8.1"
+  resolved "https://registry.yarnpkg.com/@expo/osascript/-/osascript-2.8.1.tgz#b1cec514ef77ad9c37bc4fc235e03af79d0dbc6c"
+  integrity sha512-SCi+6q6uOkGhiAn6AIP/OPFgaIq/iKD2oYpnAOg2rShHStJ8ey7wyT127RbOaZXmlcY/62rHOX1WiiMnD8u/BA==
   dependencies:
     "@expo/spawn-async" "^1.8.0"
 
 "@expo/package-manager@^1.9.11":
-  version "1.13.1"
-  resolved "https://registry.yarnpkg.com/@expo/package-manager/-/package-manager-1.13.1.tgz#a6ce56c602a70e33ed376525dd100945e19006f9"
-  integrity sha512-y/K+CaYYpZpNGZhSX4HyLT/vyIunFjNfyoxNysPBCefeLKI/VCx6f9LNPzrxayr3rCYO5bl9O8H+HRQK265Nkg==
+  version "1.14.2"
+  resolved "https://registry.yarnpkg.com/@expo/package-manager/-/package-manager-1.14.2.tgz#49ed74b75b5e2b68e67b761c20f315b11654dd8b"
+  integrity sha512-sftl0eRVVCarI6grMdjAB3jX2pX1Mt3cdSnajlXS4QyeDkaKRM/ntBy6dcagj1VL0+cEfEqctlyvinmlZdNubg==
   dependencies:
-    "@expo/json-file" "^11.0.1"
+    "@expo/json-file" "^11.2.1"
     "@expo/spawn-async" "^1.8.0"
     chalk "^4.0.0"
     npm-package-arg "^11.0.0"
@@ -1299,9 +1299,9 @@
   integrity sha512-nDRbLmSrJar7abvUjp3smDwH8HcbZcoOEa5jVPUv9/9CajgmWw20JNRwTuBRzWIWIkEJDkz20GoNA+tSwUqk0Q==
 
 "@expo/xcpretty@^4.3.0":
-  version "4.4.6"
-  resolved "https://registry.yarnpkg.com/@expo/xcpretty/-/xcpretty-4.4.6.tgz#0450c8cfce6ae952e93eebfc4c9b98c230074ecf"
-  integrity sha512-uRaZZ/IsX1WkFW69xxTZtMeRvI5ziD9yoian+FMqdhITkU6NGvIWd5uRMh2Gbo/6xstpQ4v0GtF1V5YatTwzDA==
+  version "4.4.7"
+  resolved "https://registry.yarnpkg.com/@expo/xcpretty/-/xcpretty-4.4.7.tgz#32f1f97d3546be5f294450f14898a66131d9bebb"
+  integrity sha512-EbxYllZ7/ozONVZd425cm4XnolfW+AmSFT5aP7Jdno6oc3WrYQcHz2CO20z/2rwWwYgztmV2PXvYH+BQ8YFjqg==
   dependencies:
     "@babel/code-frame" "^7.20.0"
     chalk "^4.1.0"
