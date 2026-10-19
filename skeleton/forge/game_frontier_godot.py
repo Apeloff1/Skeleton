@@ -127,10 +127,14 @@ func _create_character_suite_inspector(suite: Dictionary) -> void:
         marker.position = _vec(mass["center_of_mass_xyz"])
         add_child(marker)
     var navigation: Variant = suite.get("instruments")
-    if typeof(navigation) != TYPE_DICTIONARY:
-        return
-    var rows: Array = navigation.get("readings", [])
-    if rows.is_empty():
+    var rpg: Variant = suite.get("rpg_events")
+    var rows: Array = []
+    if typeof(navigation) == TYPE_DICTIONARY:
+        rows = navigation.get("readings", [])
+    var proposed: Array = []
+    if typeof(rpg) == TYPE_DICTIONARY:
+        proposed = rpg.get("accepted", [])
+    if rows.is_empty() and proposed.is_empty():
         return
     var panel := CanvasLayer.new()
     panel.name = "NavigationInstrumentInspector"
@@ -141,6 +145,10 @@ func _create_character_suite_inspector(suite: Dictionary) -> void:
     for record in rows:
         var fields: Dictionary = record.get("fields", {})
         label.text += str(record.get("type", "sensor")) + ": " + str(fields) + "\\n"
+    if not proposed.is_empty():
+        label.text += "RPG ENVIRONMENT PROPOSALS (NOT EXECUTED)\\n"
+        for event in proposed:
+            label.text += str(event.get("page", "event")) + ": " + str(event.get("actions", [])) + "\\n"
     panel.add_child(label)
     add_child(panel)
 
