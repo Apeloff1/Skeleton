@@ -71,6 +71,7 @@ var _approved_faction_events: Array = []
 var _approved_progression_hud: Label
 var _approved_ability_activations: int = 0
 var _approved_ability_last_tick: int = -60
+var _native_ability_fixture_mode: bool = false
 var _approved_effect_history_label: Label
 var _approved_effect_history_cursor: int = 0
 var _approved_health_effect_kinds: Array[String] = []
@@ -157,6 +158,8 @@ func _ready() -> void:
     _create_native_landing_risk_inspector()
     _create_game_cinematic_camera_control()
     _load_approved_native_gameplay(data.get("native_capture", {}))
+    # Explicit CLI test input, absent in real player sessions.
+    _native_ability_fixture_mode = OS.get_cmdline_user_args().has("--frontier-ci-wind-dash")
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
 
@@ -1602,6 +1605,8 @@ func _activate_approved_wind_dash() -> void:
             direction = Vector3(1.,0.,0.)
         else:
             direction = direction.normalized()
+    var exact_impulse: Vector3 = direction * minf(45.,_aero_character.mass*3.)
+    var prior_velocity: Vector3 = _aero_character.linear_velocity
     var receipt := {
         "schema":"skeleton.game.approved_local_wind_dash_activation.v1",
         "actor_id":_native_actor_id,
@@ -1612,6 +1617,10 @@ func _activate_approved_wind_dash() -> void:
         "current_level":_approved_local_level,
         "source_game_tick":_native_capture_tick,
         "bounded_impulse_ns":minf(45.,_aero_character.mass*3.),
+        "player_mass_kg":_aero_character.mass,
+        "impulse_world_xyz_ns":[exact_impulse.x,-exact_impulse.z,exact_impulse.y],
+        "velocity_before_world_xyz_mps":[prior_velocity.x,-prior_velocity.z,prior_velocity.y],
+        "input_mode":"explicit_native_ci" if _native_ability_fixture_mode else "human_key_G",
         "authority":"local_player_control_not_canonical_world_edit",
     }
     var path := "user://frontier_local_ability_activations.jsonl"
@@ -1625,9 +1634,7 @@ func _activate_approved_wind_dash() -> void:
     output.store_string(JSON.stringify(receipt) + "\n")
     output.flush()
     output.close()
-    _aero_character.apply_central_impulse(
-        direction * minf(45.,_aero_character.mass*3.)
-    )
+    _aero_character.apply_central_impulse(exact_impulse)
     _approved_ability_last_tick = _native_capture_tick
     _approved_ability_activations += 1
     _update_approved_progression_hud()
@@ -2518,6 +2525,8 @@ func _physics_process(delta: float) -> void:
     # Snapshot the solver output before applying forces for the next tick.
     # Physics observations are not GPU pixel observations or attestation.
     _record_native_physics()
+    if _native_ability_fixture_mode and _native_capture_tick == 2:
+        _activate_approved_wind_dash()
     # Native solver updates the body after each fixed physics tick. Apply
     # quadratic air drag using *current* relative wind, not a stale impulse.
     var relative := _aero_character.linear_velocity - _aero_wind
