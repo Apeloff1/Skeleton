@@ -167,13 +167,21 @@ def verify_quality_receipt(
     expected = required_checker_names(kind, required)
     if receipt.kind != kind or receipt.standards != expected:
         raise QualityReleaseError("core or additional quality tenets were removed")
-    if tuple(x for x in expected if x not in receipt.executed_checkers):
-        raise QualityReleaseError("quality checker coverage missing")
-    if set(receipt.checker_evidence) != set(
-        (name, reference) for name, reference in receipt.checker_evidence
-        if name in expected and isinstance(reference, str) and reference.strip()
-    ) or {name for name, _ in receipt.checker_evidence} != set(expected):
+    if (len(receipt.executed_checkers) != len(expected)
+            or set(receipt.executed_checkers) != set(expected)):
+        raise QualityReleaseError("quality checker coverage missing or duplicated")
+    evidence = receipt.checker_evidence
+    if (len(evidence) != len(expected)
+            or any(
+                not isinstance(name, str) or name not in expected
+                or not isinstance(reference, str) or not reference.strip()
+                for name, reference in evidence
+            )
+            or {name for name, _ in evidence} != set(expected)
+            or len({name for name, _ in evidence}) != len(expected)):
         raise QualityReleaseError("quality checker evidence missing or invalid")
+    if len({reference for _, reference in evidence}) != len(expected):
+        raise QualityReleaseError("independent quality checkers reused an evidence reference")
     if receipt.source_digest != stable_fingerprint(dict(files)):
         raise QualityReleaseError("quality verification is stale for these sources")
     verify_scrutiny_receipts(receipt.scrutiny)
