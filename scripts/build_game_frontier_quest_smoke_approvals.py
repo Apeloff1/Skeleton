@@ -57,7 +57,10 @@ def select_fixture_approvals(
         raise ValueError("real source-verified RPG event prefix required")
     matched={}
     for entry in timeline["entries"]:
-        if entry["source_actor_id"]!=actor_id or entry["signed_gdd_digest"]!=gdd_digest:
+        if (entry["source_actor_id"]!=actor_id or entry["signed_gdd_digest"]!=gdd_digest
+            or entry.get("receipt_digest")!=_digest({
+                k:v for k,v in entry.items() if k!="receipt_digest"
+            })):
             raise ValueError("foreign native actor/source event evidence")
         for proposal in entry["accepted_proposals"]:
             page=proposal["page_id"]

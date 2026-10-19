@@ -128,9 +128,10 @@ if __name__=="__main__":
             build_smoke_project(directory,frames=20)
             source=json.loads((directory/"native_rpg_pages.json").read_text())
             authored=parse_native_rpg_pages(source)
-            self.assertEqual(len(authored),3)
+            self.assertEqual(len(authored),5)
             self.assertEqual({page.page_id for page in authored},{
-                "observed_actor_motion","entered_game_zone","exited_game_zone"})
+                "observed_actor_motion","entered_game_zone","exited_game_zone",
+                "begin_sky_trial","complete_sky_trial"})
             self.assertTrue(all(not page.repeat for page in authored))
 
     def test_native_gameplay_updraft_is_real_engine_applied_force(self):
