@@ -310,7 +310,7 @@ def attach_frontier_overlay(
     for path, content in project_files.items():
         if (type(path) is not str or type(content) is not str
                 or not path or path.startswith("/") or
-                ".." in path.split("/") or "\\\\" in path):
+                ".." in path.split("/") or chr(92) in path):
             raise FrontierGodotError("invalid existing Godot project file")
     overlay = emit_frontier_godot_overlay(
         candidate, cloud_path_duration_s=cloud_path_duration_s,
