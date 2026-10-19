@@ -12,7 +12,7 @@ import math
 from typing import Iterable
 
 _NANO = 1_000_000_000
-FPS_MODES = frozenset((30, 50, 120))
+FPS_MODES = frozenset((30, 50, 60, 120))
 _SCHEMA = "skeleton.jeeves.frontier_world_dynamics.v1"
 
 
@@ -200,7 +200,7 @@ class PresentationClock:
 
     def __init__(self, fps: int, *, origin_ns: int = 0) -> None:
         if type(fps) is not int or fps not in FPS_MODES:
-            raise FrontierDynamicsError("supported presentation fps: 30, 50, 120")
+            raise FrontierDynamicsError("supported presentation fps: 30, 50, 60, 120")
         if type(origin_ns) is not int or origin_ns < 0:
             raise FrontierDynamicsError("origin_ns must be non-negative integer")
         self.fps, self.origin_ns, self.index = fps, origin_ns, 0
