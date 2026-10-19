@@ -39,7 +39,7 @@ def audit_native_quest_checkpoint(
         "checkpoint_digest":checkpoint["receipt_digest"],
         "native_journal_frame_digest":checkpoint["frame_receipt_digest"],
         "verified_source_prefix_frames":verified["verified_frame_count"],
-        "batch_chain_head_digest":verified["batch_chain_head_digest"],
+        "source_session_chain_head_digest":verified["head_checkpoint"]["last_session_receipt_digest"],
         "authored_pages_digest":verified["authored_pages_digest"],
         "quest_graph_digest":verified["quest_graph_digest"],
         "approved_events_verified":verified["total_approved_events"],

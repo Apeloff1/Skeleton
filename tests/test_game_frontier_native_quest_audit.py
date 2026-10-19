@@ -20,6 +20,13 @@ class NativeQuestAuditTests(NativeQuestBatchTests):
                 self.assertEqual(result["checkpoint_frame"],stop)
                 self.assertEqual(result["checkpoint_digest"],checkpoint["receipt_digest"])
                 self.assertEqual(result["verified_source_prefix_frames"],stop+1)
+                other=audit_native_quest_checkpoint(
+                    self.journal,self.pages,self.graph,self.approved,
+                    checkpoint,actor_id="hero",scene_candidate_digest="d"*64,
+                    frames_per_window=2)
+                self.assertEqual(result,other)
+                self.assertEqual(result["source_session_chain_head_digest"],
+                                 checkpoint["last_session_receipt_digest"])
                 self.assertTrue(verify_native_quest_checkpoint_audit(
                     self.journal,self.pages,self.graph,self.approved,checkpoint,result,
                     actor_id="hero",scene_candidate_digest="d"*64,
