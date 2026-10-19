@@ -84,6 +84,8 @@ var _approved_quest_history_cursor: int = 0
 var _approved_quest_history_label: Label
 var _native_flight_instrument_label: Label
 var _native_flight_instruments_visible: bool = true
+var _native_landing_risk_label: Label
+var _native_landing_risk_meter: ProgressBar
 var _game_route_waypoints: Array = []
 var _game_route_cursor: int = 0
 var _game_route_label: Label
@@ -116,6 +118,7 @@ func _ready() -> void:
     _create_virtual_game_gps(data.get("virtual_game_gps", {}))
     _create_virtual_route_book(data.get("virtual_game_gps", {}))
     _create_native_flight_instruments()
+    _create_native_landing_risk_inspector()
     _create_chunk_evidence_inspector(data.get("chunk_evidence_summary", {}))
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
@@ -242,6 +245,55 @@ func _create_chunk_evidence_inspector(proof: Dictionary) -> void:
     label.text += "Era mesh bundles: " + str(proof.get("era_mesh_receipts", 0)) + "\\n"
     ledger.add_child(label)
     add_child(ledger)
+
+func _create_native_landing_risk_inspector() -> void:
+    if _aero_character == null:
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "GameNativeLandingRiskInspector"
+    var stack := VBoxContainer.new()
+    stack.position = Vector2(20, 115)
+    stack.custom_minimum_size = Vector2(280, 70)
+    var label := Label.new()
+    label.name = "GameLandingRiskReadout"
+    label.add_theme_color_override("font_color", Color(1., .72, .32))
+    stack.add_child(label)
+    var meter := ProgressBar.new()
+    meter.name = "GameLandingRiskFraction"
+    meter.min_value = 0.0
+    meter.max_value = 100.0
+    meter.show_percentage = false
+    stack.add_child(meter)
+    overlay.add_child(stack)
+    add_child(overlay)
+    _native_landing_risk_label = label
+    _native_landing_risk_meter = meter
+    _update_native_landing_risk()
+
+
+func _update_native_landing_risk() -> void:
+    if _native_landing_risk_label == null or _aero_character == null:
+        return
+    # Physics-only risk preview: never changes actual game health/canon.
+    var fall_speed: float = maxf(0.0, -_aero_character.linear_velocity.y)
+    var mass_kg: float = maxf(.01, _aero_character.mass)
+    var local_gravity: float = float(ProjectSettings.get_setting(
+        "physics/3d/default_gravity", 9.8))
+    var terminal_speed: float = sqrt(
+        maxf(.001, 2.0 * mass_kg * local_gravity /
+            maxf(.001, _aero_density * _aero_cd * _aero_area))
+    )
+    var danger: float = clampf(
+        fall_speed / maxf(.01, terminal_speed), 0.0, 2.0
+    )
+    _native_landing_risk_meter.value = danger * 50.0
+    _native_landing_risk_label.text = (
+        "FICTIONAL GAME LANDING RISK (not health damage)\n" +
+        "Descent: " + str(snappedf(fall_speed, .01)) +
+        " m/s | modeled terminal: " +
+        str(snappedf(terminal_speed, .01)) + " m/s"
+    )
+
 
 func _create_native_flight_instruments() -> void:
     if _aero_character == null:
@@ -1817,6 +1869,7 @@ func _physics_process(delta: float) -> void:
     _apply_reference_controls()
     _inspect_approved_npc_proximity()
     _update_native_flight_instruments()
+    _update_native_landing_risk()
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]

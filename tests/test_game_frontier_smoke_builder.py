@@ -45,6 +45,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("ApprovedNPCProximityInspector",script)
             self.assertIn("_persist_verified_gameplay_receipt",script)
             self.assertIn("NativeVirtualFlightInstruments",script)
+            self.assertIn("GameNativeLandingRiskInspector",script)
+            self.assertIn("_update_native_landing_risk",script)
             self.assertIn("FictionalWorldRouteBook",script)
             self.assertIn("GameCinematicCameraDirector",script)
             self.assertIn("Overhead inspection",script)
