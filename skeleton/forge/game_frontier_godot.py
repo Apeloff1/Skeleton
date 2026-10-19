@@ -82,6 +82,8 @@ var _approved_gameplay_label: Label
 var _approved_quest_history: Array = []
 var _approved_quest_history_cursor: int = 0
 var _approved_quest_history_label: Label
+var _native_flight_instrument_label: Label
+var _native_flight_instruments_visible: bool = true
 var _approved_cue_timeline: Array = []
 var _approved_cue_cursor: int = 0
 var _approved_cue_label: Label
@@ -106,6 +108,7 @@ func _ready() -> void:
         _create_character(data["geometry"], data["colliders"])
     _create_character_suite_inspector(suite)
     _create_virtual_game_gps(data.get("virtual_game_gps", {}))
+    _create_native_flight_instruments()
     _create_chunk_evidence_inspector(data.get("chunk_evidence_summary", {}))
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
@@ -231,6 +234,46 @@ func _create_chunk_evidence_inspector(proof: Dictionary) -> void:
     label.text += "Era mesh bundles: " + str(proof.get("era_mesh_receipts", 0)) + "\\n"
     ledger.add_child(label)
     add_child(ledger)
+
+func _create_native_flight_instruments() -> void:
+    if _aero_character == null:
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "NativeVirtualFlightInstruments"
+    var gauge := Label.new()
+    gauge.name = "LiveGameAltimeterCompassVario"
+    gauge.position = Vector2(20, 235)
+    gauge.add_theme_color_override("font_color", Color(.35, .98, .93))
+    overlay.add_child(gauge)
+    add_child(overlay)
+    _native_flight_instrument_label = gauge
+    _update_native_flight_instruments()
+
+
+func _update_native_flight_instruments() -> void:
+    if _native_flight_instrument_label == null or _aero_character == null:
+        return
+    var pos: Vector3 = _aero_character.global_position
+    var velocity: Vector3 = _aero_character.linear_velocity
+    var airspeed: float = (velocity - _aero_wind).length()
+    var groundspeed: float = Vector2(velocity.x, velocity.z).length()
+    var bearing: float = fposmod(
+        rad_to_deg(atan2(velocity.x, -velocity.z)), 360.0
+    )
+    # Scene Godot basis is x/east, -z/north, y/up. Entirely fictional GPS.
+    _native_flight_instrument_label.text = (
+        "GAME VIRTUAL FLIGHT INSTRUMENTS (H toggles; no device GPS)\n" +
+        "Survey/game xyz (m): " + str(snappedf(pos.x, .01)) + " / " +
+        str(snappedf(-pos.z, .01)) + " / " +
+        str(snappedf(pos.y, .01)) + "\n" +
+        "Altimeter (m): " + str(snappedf(pos.y, .01)) +
+        " | Vario (m/s): " + str(snappedf(velocity.y, .01)) + "\n" +
+        "Air-relative speed (m/s): " + str(snappedf(airspeed, .01)) +
+        " | Ground speed (m/s): " + str(snappedf(groundspeed, .01)) + "\n" +
+        "Virtual bearing (deg): " + str(snappedf(bearing, .1)) +
+        " | Tick: " + str(_native_capture_tick)
+    )
+
 
 func _create_virtual_game_gps(nav: Dictionary) -> void:
     if nav.is_empty():
@@ -1585,6 +1628,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
     var key := event as InputEventKey
     if not key.pressed or key.echo:
         return
+    if key.physical_keycode == KEY_H and _native_flight_instrument_label != null:
+        _native_flight_instruments_visible = not _native_flight_instruments_visible
+        _native_flight_instrument_label.visible = _native_flight_instruments_visible
+        get_viewport().set_input_as_handled()
+        return
     if key.physical_keycode == KEY_J and not _approved_quest_history.is_empty():
         _next_approved_quest_history()
         get_viewport().set_input_as_handled()
@@ -1640,6 +1688,7 @@ func _physics_process(delta: float) -> void:
     _apply_native_gameplay_fields()
     _apply_reference_controls()
     _inspect_approved_npc_proximity()
+    _update_native_flight_instruments()
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]
