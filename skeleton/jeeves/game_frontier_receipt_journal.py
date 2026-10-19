@@ -454,6 +454,92 @@ class FrameReceiptJournal:
         from .game_frontier_native_dynamics import inspect_native_dynamics
         return inspect_native_dynamics(native)
 
+    def verify_native_segment(
+        self, *, start_frame: int, through: int,
+        predecessor_frame_digest: str | None = None,
+    ) -> dict:
+        """Bounded anchored re-verification for durable native game sessions.
+
+        For start=0 this checks the full available prefix. For start>0, a
+        separately trusted game-session checkpoint must supply the exact
+        predecessor frame digest; a forged digest alone is NOT authorization.
+        Every new source frame, chunk, delta, movement, GDD law, signed
+        identity and game-native attachment is independently checked.
+        """
+        head,_=self._head()
+        if (type(start_frame) is not int or type(through) is not int
+            or start_frame<0 or through<start_frame or through>head
+            or through-start_frame+1>4096
+            or (start_frame==0 and predecessor_frame_digest is not None)
+            or (start_frame>0 and (
+                type(predecessor_frame_digest) is not str or
+                len(predecessor_frame_digest)!=64))):
+            raise FrameJournalError("bounded anchored native frame verification required")
+        previous=None
+        previous_evidence=None
+        previous_native=None
+        if start_frame:
+            previous,previous_evidence=self.load(start_frame-1)
+            previous_native=self.native_sample(start_frame-1)
+            if previous.receipt_digest!=predecessor_frame_digest:
+                raise FrameJournalError("checkpoint predecessor differs from retained source")
+            if previous_native is None:
+                raise FrameJournalError("resume predecessor lacks real game-native capture")
+            self._validate_native_sample(previous,previous_native)
+        for index in range(start_frame,through+1):
+            frame,proof=self.load(index)
+            if not all(verify_frame(
+                frame,self.gdd,previous=previous,
+                chunk_size_m=self.chunk_size_m,
+                max_speed_mps=self.max_speed_mps
+            )):
+                raise FrameJournalError("native frame continuity failed within resumed segment")
+            if not all(verify_frame_chunk_receipts(
+                proof,frame,self.gdd,previous=previous,
+                previous_evidence=previous_evidence,
+                chunk_size_m=self.chunk_size_m,
+                max_speed_mps=self.max_speed_mps
+            )):
+                raise FrameJournalError("resumed native chunk evidence diverged")
+            compact=self.frame_delta(index)
+            if compact is not None and not all(verify_frame_delta(
+                compact,frame,self.gdd,previous=previous,
+                chunk_size_m=self.chunk_size_m,
+                max_speed_mps=self.max_speed_mps,
+            )):
+                raise FrameJournalError("resumed frame delta cannot be independently rebuilt")
+            native=self.native_sample(index)
+            chunks=self.native_chunk_evidence(index)
+            transitions=self.native_chunk_transitions(index)
+            if native is None or chunks is None or transitions is None:
+                raise FrameJournalError("game session requires complete native tick evidence")
+            self._validate_native_sample(frame,native)
+            expected=inspect_native_chunks(
+                native,expected_chunk_size_m=self.chunk_size_m,
+                require_native_partition="native_chunks" in native)
+            if chunks!=expected:
+                raise FrameJournalError("resumed native game physics/chunk proof corrupt")
+            expected_transitions=compare_native_chunk_transitions(
+                native,previous=previous_native,
+                expected_chunk_size_m=self.chunk_size_m,
+                max_speed_mps=self.max_speed_mps)
+            if transitions!=expected_transitions:
+                raise FrameJournalError("resumed native motion crossing has changed")
+            if previous_native is not None and (
+                native["scene_candidate_digest"]!=previous_native["scene_candidate_digest"]
+                or native["ticks_usec"]<=previous_native["ticks_usec"]
+            ):
+                raise FrameJournalError("resumed native source or engine clock discontinuity")
+            previous,previous_evidence,previous_native=frame,proof,native
+        return {
+            "track":self.track,"start_frame":start_frame,"through_frame":through,
+            "verified_frames":through-start_frame+1,
+            "predecessor_frame_digest":predecessor_frame_digest,
+            "end_frame_digest":previous.receipt_digest,
+            "signed_gdd_digest":self.gdd.source_digest,
+            "authority":"anchored_source_segment_verification_not_runtime_attestation",
+        }
+
     def replay(self, *, through: int | None = None) -> dict:
         """Replay the entire retained prefix, fail closed at first corruption."""
         head,_=self._head()
