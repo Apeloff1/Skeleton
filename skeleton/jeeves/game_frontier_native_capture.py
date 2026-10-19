@@ -17,6 +17,7 @@ from typing import Mapping, Iterable
 from .game_frontier_frame_coherence import FrameObject
 from .game_frontier_production import Vec3
 from .game_frontier_receipt_journal import FrameReceiptJournal, FrameJournalError
+from .game_frontier_native_chunks import inspect_native_chunks
 
 
 class NativeObservationError(ValueError):
@@ -63,10 +64,29 @@ class GodotPhysicsCaptureIngestor:
         self.assets=dict(allowed_assets)
         self.max_samples=max_samples
 
-    def ingest(self, native: Mapping) -> dict:
+    def ingest(self, native: Mapping, *, resume: bool = False) -> dict:
         if not isinstance(native,Mapping):
             raise NativeObservationError("typed Godot runtime sample required")
         head=self.journal.stats()["head"]
+        tick=native.get("native_tick")
+        if type(resume) is not bool:
+            raise NativeObservationError("explicit boolean resume policy required")
+        if resume and type(tick) is int and 0 <= tick <= head:
+            previous=self.journal.native_sample(tick)
+            if previous != dict(native):
+                raise NativeObservationError("resumed source frame differs from committed capture")
+            prior_frame,prior_evidence=self.journal.load(tick)
+            native_chunks=self.journal.native_chunk_evidence(tick)
+            if (prior_frame.frame_index!=tick or
+                prior_evidence.get("source_frame_digest")!=prior_frame.receipt_digest or
+                native_chunks!=inspect_native_chunks(
+                    native,expected_chunk_size_m=self.journal.chunk_size_m,
+                    require_native_partition="native_chunks" in native)):
+                raise NativeObservationError("resumed native frame has invalid evidence")
+            return {"frame":tick,"frame_digest":prior_frame.receipt_digest,
+                    "chunk_evidence_digest":prior_evidence["receipt_digest"],
+                    "native_chunk_evidence_digest":native_chunks["receipt_digest"],
+                    "reused_existing":True,"track":self.journal.track}
         if head+1>=self.max_samples:
             raise NativeObservationError("native capture ingestion budget exhausted")
         if (native.get("schema")!="skeleton.game.native_physics_observation.v1" or
@@ -109,7 +129,8 @@ class GodotPhysicsCaptureIngestor:
             raise NativeObservationError("Godot fixed-step source failed dual frame/chunk checks") from exc
 
     def ingest_jsonl(self, lines: Iterable[str], *,
-                     max_bytes_per_line: int = 128*1024) -> tuple[dict,...]:
+                     max_bytes_per_line: int = 128*1024,
+                     resume: bool = False) -> tuple[dict,...]:
         results=[]
         for line in lines:
             if (type(line) is not str or
@@ -119,13 +140,14 @@ class GodotPhysicsCaptureIngestor:
                 record=json.loads(line)
             except (TypeError,ValueError) as exc:
                 raise NativeObservationError("malformed Godot sample line") from exc
-            results.append(self.ingest(record))
+            results.append(self.ingest(record,resume=resume))
         return tuple(results)
 
-    def ingest_file(self, path: str | Path) -> tuple[dict,...]:
+    def ingest_file(self, path: str | Path, *,
+                    resume: bool = False) -> tuple[dict,...]:
         """Stream from an explicitly selected file; never invoke device GPS."""
         selected=Path(path)
         if not selected.is_file() or selected.is_symlink():
             raise NativeObservationError("regular Godot capture file required")
         with selected.open("r",encoding="utf-8") as source:
-            return self.ingest_jsonl(source)
+            return self.ingest_jsonl(source,resume=resume)
