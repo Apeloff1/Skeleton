@@ -20,7 +20,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-07 SIMA-inspired evidence-linked cinematic shots plus inspect/approach/interact proposals (never autonomous mutation).
 - [x] GF-P0-08 Muse-inspired bounded speculative user-motion prediction with no input firing.
 - [x] GF-P0-09 Candidate-only shared composition façade with content-addressed receipts.
-- [x] GF-P0-10 Add primitive and integration regression tests (execution/green CI not yet proven).
+- [x] GF-P0-10 Add primitive and integration regressions; targeted CI execution has passed.
 - [x] GF-P0-19 Add candidate-only model checkpoint, frame throughput and simulation-ready 3D evidence contracts.
 - [x] GF-P0-20 Add independent license allowlist, external receipt identity, measured-versus-requested FPS checks.
 - [x] GF-P0-21 Add opt-in 30/50/60/120 FPS bridge to canonical per-era simulation timing, with cross-mode tests.
@@ -57,7 +57,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-52 Add declarative multi-era RPG game editor backend for tile maps, prefabs, event pages, quests, cinematics, RPG systems and world/weather/physics parameters.
 - [x] GF-P0-53 Integrate reference atmosphere, tide, fluid, foliage, 3D lighting, mesh evolution and per-era chunk verification in one game scene candidate.
 - [x] GF-P0-54 Extend Godot Forge overlay with fog, scene light dampening, shadow polygons, water surface and shrub/rock geometry.
-- [x] GF-P0-55 Add cross-system code regressions and focused GitHub quality job; latest exact-head evidence still required.
+- [x] GF-P0-55 Cross-system regression verified: 74 tests passed on source commit `e5cd4fe9c4026b6e090b349ffea600bd1b560dda` (run `39188618020`).
 - [ ] GF-P0-56 Integrate double-verifier chunking in every *actual* registered native engine runtime and guarantee seamless spatial streaming.
 - [ ] GF-P0-57 Run live Godot weather/water/leaf-shadow/rock/character physics simulation with per-frame coherence and screenshot proof.
 - [ ] GF-P0-58 Surface all new RPG-style editors in Galaxy Studio/Jeeves cockpit and connect event actions through authorized game runtime.
