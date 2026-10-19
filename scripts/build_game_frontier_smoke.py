@@ -94,6 +94,8 @@ renderer/rendering_method.mobile="gl_compatibility"
                      "target":"hero","value":"sky_trial_awaken_fx"},
                     {"kind":"change_camera","channel":"cinematic",
                      "target":"hero","value":"orbit"},
+                    {"kind":"inspect_instrument","channel":"ui",
+                     "target":"hero","value":"flight"},
                 ],
                 "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
             },

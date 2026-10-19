@@ -83,6 +83,8 @@ var _approved_quest_history: Array = []
 var _approved_quest_history_cursor: int = 0
 var _approved_quest_history_label: Label
 var _native_flight_instrument_label: Label
+var _approved_instrument_focus: String = "none"
+var _approved_instrument_focus_label: Label
 var _native_flight_instruments_visible: bool = true
 var _native_landing_risk_label: Label
 var _native_landing_risk_meter: ProgressBar
@@ -292,6 +294,36 @@ func _update_native_landing_risk() -> void:
         "Descent: " + str(snappedf(fall_speed, .01)) +
         " m/s | modeled terminal: " +
         str(snappedf(terminal_speed, .01)) + " m/s"
+    )
+
+
+func _apply_approved_instrument_focus() -> void:
+    if _native_flight_instrument_label == null:
+        return
+    if _native_landing_risk_label == null or _virtual_camera_mode_label == null:
+        return
+    var widgets: Dictionary = {
+        "flight":_native_flight_instrument_label,
+        "landing":_native_landing_risk_label,
+        "camera":_virtual_camera_mode_label,
+    }
+    for instrument_id in widgets.keys():
+        var widget: Label = widgets[instrument_id]
+        widget.add_theme_font_size_override(
+            "font_size", 22 if _approved_instrument_focus == instrument_id else 14
+        )
+    if _approved_instrument_focus_label == null:
+        var hud := CanvasLayer.new()
+        hud.name = "ApprovedInstrumentFocusDirector"
+        var label := Label.new()
+        label.name = "SourceAuthorizedInstrumentFocus"
+        label.position = Vector2(20, 85)
+        label.add_theme_color_override("font_color", Color(.96,.87,.52))
+        hud.add_child(label)
+        add_child(hud)
+        _approved_instrument_focus_label = label
+    _approved_instrument_focus_label.text = (
+        "Approved instrument priority: " + _approved_instrument_focus
     )
 
 
@@ -857,6 +889,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var next_quests: Dictionary = {}
     var next_cues: Array = []
     var next_camera_mode: int = 0
+    var next_instrument_focus: String = "none"
     var next_quest_history: Array = []
     var next_action_trace: Array = []
     var next_inventory: Dictionary = {}
@@ -921,6 +954,15 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 push_error("Approved NPC emotion command invalid")
                 return
             next_npc_emotions[mood_parts[0]] = mood_parts[1]
+        elif kind == "inspect_instrument":
+            if not ["flight","landing","camera"].has(value):
+                push_error("Unapproved instrument focus rejected")
+                return
+            next_instrument_focus = value
+            next_cues.append({
+                "kind":kind,"cue":value,"source_frame":frame,
+                "page_id":str(row.get("page_id","")),
+            })
         elif kind == "change_camera":
             var camera_modes := {
                 "authored":0,"follow":1,"orbit":2,"overhead":3
@@ -940,7 +982,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 return
             next_flags[pair[0]] = pair[1] == "true"
         elif ["show_dialogue", "play_cutscene", "play_music",
-              "spatial_audio", "inspect_instrument",
+              "spatial_audio",
               "trigger_impact_fx", "trigger_foliage_fx"].has(kind):
             next_cues.append({
                 "kind":kind, "cue":value, "source_frame":frame,
@@ -1022,6 +1064,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})
         or next_action_trace != expected_trace
         or next_camera_mode != int(bundle.get("expected_camera_mode", -1))
+        or next_instrument_focus != str(bundle.get("expected_instrument_focus", ""))
         or next_quest_history != expected_history):
         push_error("Engine RPG reducer diverged from independently replayed state")
         return
@@ -1033,6 +1076,8 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             push_error("Approved quest stage has no source-authored objective")
             return
     _approved_quest_history = next_quest_history
+    _approved_instrument_focus = next_instrument_focus
+    _apply_approved_instrument_focus()
     _virtual_camera_mode = next_camera_mode
     _refresh_game_camera_mode()
     _approved_gameplay_quests = next_quests
@@ -1089,6 +1134,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "actions_applied":actions.size(),
         "quests":next_quests,"flags":next_flags,
         "approved_camera_mode":next_camera_mode,
+        "approved_instrument_focus":next_instrument_focus,
         "runtime_ui_modules":runtime_ui_modules,
         "quest_progression_history":next_quest_history,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,

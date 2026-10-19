@@ -20,6 +20,7 @@ from .game_frontier_native_session_checkpoint import advance_native_quest_window
 
 
 _CAMERA_MODES={"authored":0,"follow":1,"orbit":2,"overhead":3}
+_INSTRUMENT_FOCUS=frozenset(("flight","landing","camera"))
 
 
 _ALLOWED=frozenset((
@@ -56,6 +57,7 @@ def compile_native_godot_dispatch(
     inventory={}
     npc_moods={}
     selected_camera=0
+    instrument_focus="none"
     signed_actors={a["id"] for a in journal.native_sample(0)["actors"]}
     cursor=None
     for first in range(0,last+1,frames_per_window):
@@ -73,6 +75,10 @@ def compile_native_godot_dispatch(
                     if action["kind"] not in _ALLOWED:
                         raise NativeQuestSessionError(
                             "Godot dispatcher refuses unimplemented world mutations")
+                    if action["kind"]=="inspect_instrument":
+                        if action["value"] not in _INSTRUMENT_FOCUS:
+                            raise NativeQuestSessionError("unknown approved flight instrument")
+                        instrument_focus=action["value"]
                     if action["kind"]=="change_camera":
                         if action["value"] not in _CAMERA_MODES:
                             raise NativeQuestSessionError("unauthorized Godot camera preset")
@@ -163,6 +169,7 @@ def compile_native_godot_dispatch(
         "expected_flags":checkpoint["flags"],
         "expected_inventory":inventory,
         "expected_camera_mode":selected_camera,
+        "expected_instrument_focus":instrument_focus,
         "expected_npc_emotions":npc_moods,
         "expected_quests":checkpoint["quests"],
         "actions":commands,

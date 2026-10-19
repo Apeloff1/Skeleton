@@ -38,6 +38,7 @@ class NativeEngineDispatchTests(NativeQuestBatchTests):
         self.assertEqual(data["expected_inventory"],{})
         self.assertEqual(data["expected_npc_emotions"],{})
         self.assertEqual(data["expected_camera_mode"],0)
+        self.assertEqual(data["expected_instrument_focus"],"none")
         self.assertEqual(data["quest_titles"]["chapter_1"],"The Wind Islands")
         self.assertEqual(data["available_branch_options"]["chapter_1"],[])
         self.assertEqual(data["quest_objectives"]["chapter_1"]["ending"],"Finish the route")
