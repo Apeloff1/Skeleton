@@ -90,6 +90,8 @@ renderer/rendering_method.mobile="gl_compatibility"
                      "target":"hero","value":"The sky-island trial has begun."},
                     {"kind":"set_npc_emotion","channel":"character",
                      "target":"hero","value":"island:curious"},
+                    {"kind":"trigger_impact_fx","channel":"scene",
+                     "target":"hero","value":"sky_trial_awaken_fx"},
                 ],
                 "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
             },

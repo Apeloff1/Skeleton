@@ -71,6 +71,9 @@ var _approved_npc_proximity_label: Label
 var _approved_npc_focus: String = ""
 var _approved_inventory_focus: int = 0
 var _approved_inventory_label: Label
+var _approved_fx_nodes: Array[MeshInstance3D] = []
+var _approved_fx_page_ids: Array[String] = []
+var _approved_fx_clock: float = 0.0
 var _approved_dialogue_queue: Array[String] = []
 var _approved_dialogue_cursor: int = 0
 var _approved_dialogue_panel: PanelContainer
@@ -773,6 +776,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _approved_inventory_visuals = _create_approved_inventory_objects(next_inventory)
     _approved_gameplay_npc_emotions = next_npc_emotions
     _approved_gameplay_cues = next_cues
+    _approved_fx_page_ids = _create_approved_fx_meshes(next_cues)
     _approved_cue_timeline = next_cues.duplicate(true)
     _approved_cue_cursor = 0
     _approved_npc_visuals = _show_approved_npc_reactions(next_npc_emotions)
@@ -816,6 +820,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "presentation_cues":next_cues,
         "cue_timeline_frame_index":cue_ticks,
         "read_only_branch_options":_approved_branch_options,
+        "visualized_fx_page_ids":_approved_fx_page_ids,
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
     }
     if not _persist_verified_gameplay_receipt(accepted):
@@ -947,6 +952,49 @@ func _create_approved_gameplay_inspector(record: Dictionary) -> void:
     hud.add_child(inspector)
     add_child(hud)
     _approved_gameplay_label = inspector
+
+
+func _create_approved_fx_meshes(cues: Array) -> Array[String]:
+    # Approved cue previews are cosmetics only: no collisions or GDD mutation.
+    var result: Array[String] = []
+    if _aero_character == null:
+        return result
+    for cue_item in cues:
+        var cue: Dictionary = cue_item
+        var kind: String = str(cue.get("kind", ""))
+        if kind != "trigger_impact_fx" and kind != "trigger_foliage_fx":
+            continue
+        if result.size() >= 64:
+            push_error("Approved VFX preview exceeds mesh budget")
+            return []
+        var visual := MeshInstance3D.new()
+        visual.name = "ApprovedCueFX_" + str(result.size())
+        var sphere := SphereMesh.new()
+        sphere.radius = .45
+        sphere.height = .9
+        visual.mesh = sphere
+        visual.position = Vector3(0., .4 + float(result.size())*.08, 0.)
+        var material := StandardMaterial3D.new()
+        material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        material.albedo_color = (
+            Color(.99,.42,.18,.35) if kind == "trigger_impact_fx"
+            else Color(.25,.96,.42,.35)
+        )
+        visual.material_override = material
+        _aero_character.add_child(visual)
+        _approved_fx_nodes.append(visual)
+        result.append(str(cue.get("page_id", "")))
+    return result
+
+
+func _animate_approved_fx(delta: float) -> void:
+    if _approved_fx_nodes.is_empty():
+        return
+    _approved_fx_clock += maxf(0., delta)
+    for i in range(_approved_fx_nodes.size()):
+        var scalar := .7 + .16 * sin(_approved_fx_clock * 1.5 + float(i))
+        _approved_fx_nodes[i].scale = Vector3.ONE * scalar
 
 
 func _create_approved_inventory_inspector() -> void:
@@ -1609,6 +1657,7 @@ func _process(delta: float) -> void:
         return
     _cloud_elapsed += min(delta, 0.25)
     _update_clouds()
+    _animate_approved_fx(delta)
     if _native_follow_cam and _native_camera != null and _aero_character != null:
         var avatar: Vector3 = _aero_character.global_position
         _native_camera.global_position = _native_camera.global_position.lerp(

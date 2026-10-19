@@ -66,7 +66,8 @@ class NativeQuestSmokeFixtureTests(unittest.TestCase):
                 begin=next(p for p in pages if p.page_id=="begin_sky_trial")
                 finish=next(p for p in pages if p.page_id=="complete_sky_trial")
                 self.assertEqual({a.kind for a in begin.actions},
-                                 {"start_quest","set_flag","craft_item","show_dialogue","set_npc_emotion"})
+                                 {"start_quest","set_flag","craft_item","show_dialogue","set_npc_emotion",
+                                  "trigger_impact_fx"})
                 self.assertEqual(finish.actions[0].value,"sky_trial:finished")
                 self.assertEqual(next(a.value for a in begin.actions
                                       if a.kind=="set_npc_emotion"),"island:curious")

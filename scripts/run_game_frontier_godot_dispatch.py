@@ -137,7 +137,7 @@ def _verify(args):
         "source_through_frame","actions_applied","quests","flags",
         "presentation_cues","inventory","npc_emotions","visualized_npc_ids",
         "executed_action_trace","visualized_item_ids","cue_timeline_frame_index",
-        "read_only_branch_options","authority",
+        "read_only_branch_options","visualized_fx_page_ids","authority",
     }
     allowed_cues={"show_dialogue","play_cutscene","play_music",
                   "spatial_audio","change_camera","inspect_instrument",
@@ -146,6 +146,8 @@ def _verify(args):
         "kind":entry["kind"],"cue":entry["value"],
         "source_frame":entry["frame"],"page_id":entry["page_id"],
     } for entry in bundle["actions"] if entry["kind"] in allowed_cues]
+    expected_fx=[cue["page_id"] for cue in expected_cues
+                 if cue["kind"] in ("trigger_impact_fx","trigger_foliage_fx")]
     if (type(receipt) is not dict or set(receipt)!=expected_keys
         or receipt["schema"]!="skeleton.game.godot_approved_dispatch_receipt.v1"
         or receipt["authority"]!="approved_gameplay_runtime_local_state_not_canonical_world_promotion"
@@ -165,6 +167,7 @@ def _verify(args):
         or receipt["visualized_npc_ids"]!=sorted(bundle["expected_npc_emotions"])
         or receipt["visualized_item_ids"]!=sorted(bundle["expected_inventory"])[:24]
         or receipt["presentation_cues"]!=expected_cues
+        or receipt["visualized_fx_page_ids"]!=expected_fx
         or receipt["cue_timeline_frame_index"]!=[c["source_frame"] for c in expected_cues]
         or receipt["executed_action_trace"]!=bundle["expected_action_trace"]):
         raise GodotDispatchError("actual Godot engine gameplay state does not match source replay")
@@ -175,6 +178,7 @@ def _verify(args):
         "verified_npc_reactions":len(receipt["visualized_npc_ids"]),
         "verified_inventory_visuals":len(receipt["visualized_item_ids"]),
         "verified_cue_count":len(expected_cues),
+        "verified_fx_cues":len(expected_fx),
         "verified_cue_timeline_ticks":len(receipt["cue_timeline_frame_index"]),
         "dispatch_file_sha256":expected,
         "engine_gameplay_receipt_sha256":sha256(args.engine_receipt_json.read_bytes()).hexdigest(),
