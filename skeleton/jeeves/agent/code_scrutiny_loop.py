@@ -8,14 +8,13 @@ Each pass rechecks every in-scope file, and every correction is reverified.
 
 from __future__ import annotations
 
-import ast
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Callable, Mapping, Sequence
 
-from .types import canonical_json, stable_fingerprint
+from .types import stable_fingerprint
 
 _FIND_TERMS = re.compile(r"(?:error|failure|exception|syntax|lint|type|import|stub|traceback)", re.I)
 _FIXME = re.compile(r"^(?:raise NotImplementedError\b|TODO\s*:|FIXME\s*:)", re.I)
