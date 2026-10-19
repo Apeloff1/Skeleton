@@ -539,3 +539,83 @@ def aggregate_realism(
         collision.momentum_residual_ns if collision else 0.,
         surface.wetness, surface.ice_fraction, digest,
     )
+
+
+@dataclass(frozen=True)
+class SweptContact:
+    time_of_impact_s: float
+    contact: CollisionContact
+    source: str
+
+
+def sweep_spheres(a: RigidBody, b: RigidBody, *, delta_s: float,
+                  tolerance_m: float = 0.) -> SweptContact | None:
+    """Analytic moving-sphere CCD to avoid high-speed tunneling.
+
+    The detected contact is a candidate; host engine still owns the final
+    collision loop, broadphase and arbitrary-mesh contact manifold.
+    """
+    dt = finite(delta_s, "CCD delta", 0, 10)
+    extra = finite(tolerance_m, "CCD tolerance", 0, 1)
+    start = b.position - a.position
+    relative = b.velocity - a.velocity
+    combined = a.radius_m + b.radius_m + extra
+    c = start.dot(start) - combined * combined
+    if c <= 0:
+        t = 0.
+    else:
+        qa = relative.dot(relative)
+        qb = 2 * start.dot(relative)
+        if qa <= 1e-15 or qb >= 0:
+            return None
+        discriminant = qb * qb - 4 * qa * c
+        if discriminant < 0:
+            return None
+        t = (-qb - math.sqrt(discriminant)) / (2 * qa)
+        if not 0 <= t <= dt:
+            return None
+    displacement = start + relative.scaled(t)
+    normal = unit(displacement) if vecnorm(displacement) > 1e-8 else unit(
+        relative) if vecnorm(relative) > 1e-8 else Vec3(1, 0, 0)
+    a_center = a.position + a.velocity.scaled(t)
+    point = a_center + normal.scaled(a.radius_m)
+    penetration = max(0., combined - vecnorm(displacement))
+    return SweptContact(t, CollisionContact(point, normal, penetration,
+                                           surface_friction=math.sqrt(a.friction*b.friction),
+                                           surface_restitution=min(a.restitution,b.restitution)),
+                        "sphere_sphere_linear_ccd")
+
+
+def sweep_sphere_plane(
+    body: RigidBody, *, plane_point: Vec3, plane_outward_normal: Vec3,
+    delta_s: float, surface_friction: float = .7,
+    surface_restitution: float = .2,
+) -> SweptContact | None:
+    """Sphere versus infinite plane: normal points toward the free half-space.
+
+    Plane response needs opposite normal (A toward infinite-mass terrain B).
+    A face crossing within the full sweep is detected even at large speed.
+    """
+    dt = finite(delta_s, "CCD delta", 0, 10)
+    finite(surface_friction, "friction", 0, 3)
+    finite(surface_restitution, "restitution", 0, 1)
+    if abs(vecnorm(plane_outward_normal) - 1) > .0001:
+        raise AdvancedPhysicsError("unit outward plane normal required")
+    signed = (body.position - plane_point).dot(plane_outward_normal) - body.radius_m
+    normal_speed = body.velocity.dot(plane_outward_normal)
+    if signed <= 0:
+        t = 0.
+    elif normal_speed >= 0:
+        return None
+    else:
+        t = -signed / normal_speed
+        if t > dt:
+            return None
+    center = body.position + body.velocity.scaled(t)
+    point = center - plane_outward_normal.scaled(body.radius_m)
+    penetration = max(0., -signed) if t == 0 else 0.
+    return SweptContact(t, CollisionContact(point,
+                                           plane_outward_normal.scaled(-1),
+                                           penetration, surface_friction,
+                                           surface_restitution),
+                        "sphere_plane_linear_ccd")
