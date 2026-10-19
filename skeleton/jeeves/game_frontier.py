@@ -139,8 +139,13 @@ def compile_frontier_scene(
                       if character_step and character_step.impacts else None)
         for s in structures
     )
-    light_steps = illuminate_scene(lighting_surfaces, light_sources, light_occluders) \
-        if lighting_surfaces else ()
+    cloud_coverage = (sum(c.opacity for c in moved) / len(moved)) if moved else 0
+    world_luminance = variant_cell.luminance if variant_cell else .7
+    ambient = max(.005, .1 * (world_luminance / .7) * (1 - cloud_coverage * .45))
+    light_steps = (illuminate_scene(
+        lighting_surfaces, light_sources, light_occluders,
+        ambient_rgb=(ambient, ambient, ambient),
+    ) if lighting_surfaces else ())
     prediction = None
     if speculative_input is not None:
         anticipated = anticipate_user_motion(speculative_input, horizon_ms=prediction_horizon_ms)
