@@ -975,13 +975,24 @@ class JeevesAgentRuntime:
         self._checkpoint(state)
         return True
 
+    def _delivery_observations(self, state: _RunState) -> Sequence[ToolObservation]:
+        """Prompt view only; the authoritative observation log is unchanged."""
+        return state.observations
+
+    def _delivery_extra_sections(self, state: _RunState) -> tuple[ContextSection, ...]:
+        return ()
+
+    def _delivery_verify(self, state: _RunState, draft: FinalDraft) -> tuple[bool, str | None]:
+        """Host-controlled release gate, called before memory promotion or delivery."""
+        return True, None
+
     def _finalize(self, state: _RunState) -> AgentResult:
         draft: FinalDraft | None = None
         grounding: GroundingReport | None = None
         attempts = self.config.grounding_repairs + 1
         repair_section: ContextSection | None = None
         for attempt in range(attempts):
-            extras = (repair_section,) if repair_section is not None else ()
+            extras = ((repair_section,) if repair_section is not None else ()) + self._delivery_extra_sections(state)
             packet = self.context.compile(
                 system_instruction=self.prompts.system(mode="finalizer"),
                 task_instruction=self.prompts.finalization_task(),
@@ -990,7 +1001,7 @@ class JeevesAgentRuntime:
                 memory=self.memory,
                 evidence=state.ledger,
                 plan=state.plan,
-                observations=state.observations,
+                observations=self._delivery_observations(state),
                 scratchpad=state.scratch,
                 extra_sections=extras,
             )
@@ -1063,6 +1074,16 @@ class JeevesAgentRuntime:
                 draft.answer,
                 claims=grounding.accepted,
                 metadata={"unresolved": list(draft.unresolved)},
+            )
+
+        accepted_delivery, delivery_reason = self._delivery_verify(state, draft)
+        if not accepted_delivery:
+            return self._finish_failure(
+                state,
+                TerminationReason.VERIFICATION_FAILED,
+                "Pre-delivery context audit failed; result was not released.",
+                claims=grounding.accepted,
+                metadata={"reason": str(delivery_reason or "dual verifier rejected")[:512]},
             )
 
         if self.config.stage_memory_candidates:
