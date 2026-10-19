@@ -42,8 +42,29 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-37 Extend existing Forge Godot overlay with Y-up/Z-forward conversion, shadow-casting clouds, 60fps, variant luminance and top-down/platformer/pseudo-depth cameras.
 - [ ] GF-P0-38 Run real Godot headless parse, emitted scene import and screenshot smoke; inspect shadow caster geometry, camera and collision fidelity.
 - [x] GF-P0-39 Add conflict-safe Godot project overlay attachment preserving existing main level and imports.
-- [x] GF-P0-22 Export Godot overlay scene with posed polygons, generated bone capsules, sky islands and source-wind cloud animation paths.
-- [x] GF-P0-23 Add exporter custody/regression tests and apply 30/50/60/120 requested FPS cap to preview script.
+- [x] GF-P0-40 Export Godot overlay scene with posed polygons, generated bone capsules, sky islands and source-wind cloud animation paths.
+- [x] GF-P0-41 Add exporter custody/regression tests and apply 30/50/60/120 requested FPS cap to preview script.
+- [x] GF-P0-42 Sample altitude/heat/moist air density and visibility with ISA troposphere reference at 830 metres / 2723 feet.
+- [x] GF-P0-43 Separate physical fog extinction from air density, rain freshness proxy and optional cold-wind response.
+- [x] GF-P0-44 Add solar/lunar harmonic tide phase, height, current and rise-rate calculations.
+- [x] GF-P0-45 Add bounded conservative liquid grid flux with volume receipts and immersion/buoyancy/drag character calculations.
+- [x] GF-P0-46 Add atmosphere/rain/fog/occlusion/tide aware environmental audio delay/gain/filter/ambience candidates.
+- [x] GF-P0-47 Implement motion-coherent animated leaf geometry with independently ray-verified receiver-plane shadow area.
+- [x] GF-P0-48 Add 3D source distance inverse-square lighting with per-occluder transmittance, fog/rain/cloud optical dampening and wet-material highlight.
+- [x] GF-P0-49 Add wind- and character-impact responsive shrub/pebble reference physics integrated into same-frame 3D occlusion.
+- [x] GF-P0-50 Build real 3D indexed meshes from original 2D source sprites with old-era and modern outputs retaining the same asset digest.
+- [x] GF-P0-51 Build chunked triangle mesh partitioning and dual SHA-256 identity/topology reconstruction verification for every registered engine era.
+- [x] GF-P0-52 Add declarative multi-era RPG game editor backend for tile maps, prefabs, event pages, quests, cinematics, RPG systems and world/weather/physics parameters.
+- [x] GF-P0-53 Integrate reference atmosphere, tide, fluid, foliage, 3D lighting, mesh evolution and per-era chunk verification in one game scene candidate.
+- [x] GF-P0-54 Extend Godot Forge overlay with fog, scene light dampening, shadow polygons, water surface and shrub/rock geometry.
+- [x] GF-P0-55 Add cross-system code regressions and focused GitHub quality job; latest exact-head evidence still required.
+- [ ] GF-P0-56 Integrate double-verifier chunking in every *actual* registered native engine runtime and guarantee seamless spatial streaming.
+- [ ] GF-P0-57 Run live Godot weather/water/leaf-shadow/rock/character physics simulation with per-frame coherence and screenshot proof.
+- [ ] GF-P0-58 Surface all new RPG-style editors in Galaxy Studio/Jeeves cockpit and connect event actions through authorized game runtime.
+- [ ] GF-P0-59 Bind conservative water solver to native moving-boundary shorelines, 3D collision and persistent coastal terrain.
+- [ ] GF-P0-60 Bind atmospheric audio cues and proper audio assets to playable mixer buses, occlusion and audio engine.
+- [ ] GF-P0-61 Profile production GPU 3D ray/path lighting and physically measured leaf-shadow alignment on low/high hardware.
+
 - [ ] GF-P0-11 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
@@ -76,6 +97,11 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-19 Full world-family graph and cross-world transitions preserving identity, canon, biome climate and physical rules.
 - [ ] GF-P1-20 Parallax layer/material synthesis and camera editor controls per 2.5–2.9D projection level.
 - [ ] GF-P1-21 Native gameplay rig, clothing, impact and structure wear benchmarks per historical console era.
+- [ ] GF-P1-22 Automatic source-to-target mesh/texture/normal/upscale/retarget LOD across old console/modern engines with semantic safeguards.
+- [ ] GF-P1-23 True water surface hydrodynamics and submerged character locomotion with mass/energy budgets.
+- [ ] GF-P1-24 Motion-driven leaf shadow penumbra vs GPU ray-tracer cross-verification and temporal coherence across sunlight.
+- [ ] GF-P1-25 Implement 3D source/medium photometry (atmospheric scattering, high-order bounces, shadow transmittance) in GPU shader pipeline.
+- [ ] GF-P1-26 Build desktop/mobile interactive RPG authoring UI for events, quests, scenes, characters, chunk editors and 3D prefabs.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -99,6 +125,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-18 Construction crews, resource supply, scheduled maintenance and accelerated weather-aging simulations across years.
 - [ ] GF-P2-19 Elemental/ethereal/celestial/mythic inverse/mirror realm puzzle/physics/lighting scenario validation.
 - [ ] GF-P2-20 Full ray-traced cinematics (moving lights, dynamic geometry, shadow continuity and multi-view evidence).
+- [ ] GF-P2-21 Emergent multi-era RPG production templates with dialogue/quest continuity and playable game build export.
+- [ ] GF-P2-22 Cross-chunk foliage/river/shore physics reconciliation and dual verifier checks under dynamic world changes.
+- [ ] GF-P2-23 Calibrate barometry, aerosol visibility, thermal/cold/wet motion and seasonal astronomical physics against test measurements.
+- [ ] GF-P2-24 Build live character/foliage/rocks/liquid interactions with audio events, impact damage, shadow and weather responses.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -121,6 +151,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-17 Per-era visual QA of dynamic hair/cloth and character-aware ray tracing under mobile/PC/console performance envelopes.
 - [ ] GF-P3-18 Gameplay across all nine world families (including original) and eight projection modes; continuity/transition acceptance.
 - [ ] GF-P3-19 Frame and sensor evidence separate computed reference motion from authoritative GPU/physics outcomes.
+- [ ] GF-P3-20 Qualify 830m reference air vs sea level, polar/hot/fog/rain weather extremes, and lunar/solar tides at realistic and fictional locations.
+- [ ] GF-P3-21 Verify all-engine chunk streaming under multithreaded edits, world reloads, LOD swaps, actor movement and save/restore.
+- [ ] GF-P3-22 Full Godot export/import screenshots and real 2D-to-3D modernization project first-install acceptance.
+- [ ] GF-P3-23 Cinematic/audio/lighting/world consistency benchmarks at actual GPU-produced 30/50/60/120fps.
 
 ## Source references
 
