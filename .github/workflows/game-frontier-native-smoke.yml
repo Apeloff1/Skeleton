@@ -260,6 +260,7 @@ jobs:
               "${quest_cli_args[@]}" \
               --vault "$RUNNER_TEMP/frontier-game-endurance-$fps.sqlite" \
               --cycles 12 --retain-latest 2 --crash-interval 3 \
+              --max-cycle-ms 120000 --max-vault-bytes 33554432 \
               > "$RUNNER_TEMP/frontier-game-endurance-$fps.json"
             python - "$RUNNER_TEMP/frontier-game-endurance-$fps.json" <<'PY'
           import json,sys
@@ -270,6 +271,8 @@ jobs:
           assert report["crash_rollbacks_executed"]>=1
           assert report["cycle_evidence"][-1]["replayed_through"]==report["source_head_frame"]
           assert len(report["final_vault_receipt_digest"])==64
+          assert report["peak_cycle_elapsed_ns"]>0
+          assert report["peak_measured_vault_disk_bytes"]<=33554432
           print(json.dumps({"native_endurance_restarts":report["cycles_executed"],
                             "verified_rollbacks":report["crash_rollbacks_executed"],
                             "source_ticks":report["source_frames_cold_replayed"]}))

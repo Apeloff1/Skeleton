@@ -23,6 +23,8 @@ def exercise_native_session_endurance(
     scene_candidate_digest:str,vault_path:Path,
     cycles:int=12,window_frames:int=32,retain_latest:int=2,
     crash_interval:int=5,
+    max_cycle_ms:int | None = None,
+    max_vault_bytes:int | None = None,
 ) -> dict:
     """Close/open save vault every cycle, cold audit source and inject rollbacks.
 
@@ -34,7 +36,9 @@ def exercise_native_session_endurance(
         or type(window_frames) is not int or not 1<=window_frames<=4096
         or type(retain_latest) is not int or not 1<=retain_latest<=1024
         or type(crash_interval) is not int or not 0<=crash_interval<=1024
-        or not isinstance(vault_path,Path)):
+        or not isinstance(vault_path,Path)
+        or (max_cycle_ms is not None and (type(max_cycle_ms) is not int or not 1<=max_cycle_ms<=3_600_000))
+        or (max_vault_bytes is not None and (type(max_vault_bytes) is not int or not 1<=max_vault_bytes<=1_000_000_000_000))):
         raise NativeSessionVaultError("bounded endurance profile required")
     stats=journal.stats()
     head=stats["head"]
@@ -50,6 +54,7 @@ def exercise_native_session_endurance(
     journal_rows=[]
     session_id=approvals["session_id"]
     for cycle in range(cycles):
+        cycle_start_ns=time.monotonic_ns()
         # Interleave actual new verified game frames (where available) with
         # restart-only cycles to exercise idempotent recovery.
         target=min(head,((cycle+1)*(head+1)+cycles-1)//cycles-1)
@@ -93,8 +98,19 @@ def exercise_native_session_endurance(
             or resumed["checkpoint"]!=batch["head_checkpoint"]
             or resumed["vault_receipt_digest"]!=saved_root):
             raise NativeSessionVaultError("post-restart game save replay changed")
+        measured_cycle_ns=time.monotonic_ns()-cycle_start_ns
+        database_bytes=sum(
+            file.stat().st_size for file in (
+                vault_path,Path(str(vault_path)+"-wal"),Path(str(vault_path)+"-shm"))
+            if file.exists())
+        if (max_cycle_ms is not None and measured_cycle_ns>max_cycle_ms*1_000_000):
+            raise NativeSessionVaultError("measured game restart cycle exceeded wall clock budget")
+        if max_vault_bytes is not None and database_bytes>max_vault_bytes:
+            raise NativeSessionVaultError("measured game vault exceeded disk growth budget")
         item={
             "cycle":cycle+1,"source_head_frame":head,
+            "cycle_wall_elapsed_ns":measured_cycle_ns,
+            "cycle_vault_disk_bytes":database_bytes,
             "replayed_through":target,
             "game_checkpoint_digest":batch["head_checkpoint"]["receipt_digest"],
             "vault_receipt_digest":saved_root,
@@ -128,6 +144,10 @@ def exercise_native_session_endurance(
         "final_vault_receipt_digest":saved_root,
         "on_disk_vault_bytes":vault_path.stat().st_size,
         "measured_elapsed_ns":elapsed,
+        "peak_cycle_elapsed_ns":max(x["cycle_wall_elapsed_ns"] for x in journal_rows),
+        "peak_measured_vault_disk_bytes":max(x["cycle_vault_disk_bytes"] for x in journal_rows),
+        "max_cycle_ms":max_cycle_ms,
+        "max_vault_bytes":max_vault_bytes,
         "cycle_evidence":journal_rows,
         "authority":"measured_bounded_restart_and_replay_not_months_long_uptime_certificate",
     }

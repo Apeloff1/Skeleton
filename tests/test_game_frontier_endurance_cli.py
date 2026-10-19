@@ -23,6 +23,7 @@ class GameFrontierEnduranceCLITests(NativeQuestOperationsCLITests):
             "--actor-id","hero","--vault",str(path),
             "--cycles","12","--frames-per-window","2",
             "--retain-latest","2","--crash-interval","3",
+            "--max-cycle-ms","120000","--max-vault-bytes","33554432",
         ]
         stdout,stderr=StringIO(),StringIO()
         with redirect_stdout(stdout),redirect_stderr(stderr):
@@ -34,4 +35,6 @@ class GameFrontierEnduranceCLITests(NativeQuestOperationsCLITests):
         self.assertEqual(result["cycle_evidence"][-1]["replayed_through"],4)
         self.assertGreater(result["crash_rollbacks_executed"],0)
         self.assertEqual(len(result["receipt_digest"]),64)
+        self.assertEqual(result["max_cycle_ms"],120000)
+        self.assertGreater(result["peak_cycle_elapsed_ns"],0)
         self.assertTrue(path.is_file())

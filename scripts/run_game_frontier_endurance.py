@@ -33,6 +33,8 @@ def main(argv=None)->int:
     p.add_argument("--frames-per-window",type=int,default=4)
     p.add_argument("--retain-latest",type=int,default=2)
     p.add_argument("--crash-interval",type=int,default=4)
+    p.add_argument("--max-cycle-ms",type=int)
+    p.add_argument("--max-vault-bytes",type=int)
     args=p.parse_args(argv)
     try:
         anchor=bind_signed_gdd(_operator_json(args.signed_gdd))
@@ -66,7 +68,8 @@ def main(argv=None)->int:
                 actor_id=args.actor_id,scene_candidate_digest=settings["candidate_digest"],
                 vault_path=args.vault,cycles=args.cycles,
                 window_frames=args.frames_per_window,retain_latest=args.retain_latest,
-                crash_interval=args.crash_interval)
+                crash_interval=args.crash_interval,
+                max_cycle_ms=args.max_cycle_ms,max_vault_bytes=args.max_vault_bytes)
         print(json.dumps(report,sort_keys=True,separators=(",",":")))
         return 0
     except (ValueError,TypeError,KeyError,IndexError,OSError) as error:

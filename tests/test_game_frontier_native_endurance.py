@@ -25,6 +25,9 @@ class NativeEnduranceTests(NativeQuestBatchTests):
             self.assertGreaterEqual(report["idempotent_duplicate_saves"],1)
             self.assertEqual(report["source_frames_cold_replayed"],5)
             self.assertGreaterEqual(report["on_disk_vault_bytes"],4096)
+            self.assertGreater(report["peak_cycle_elapsed_ns"],0)
+            self.assertGreater(report["peak_measured_vault_disk_bytes"],0)
+            self.assertTrue(all(row["cycle_wall_elapsed_ns"]>0 for row in report["cycle_evidence"]))
             self.assertEqual(len(report["cycle_evidence"]),12)
             self.assertEqual(report["cycle_evidence"][-1]["replayed_through"],4)
             self.assertEqual(len(report["receipt_digest"]),64)
@@ -47,6 +50,22 @@ class NativeEnduranceTests(NativeQuestBatchTests):
                         self.journal,self.pages,self.graph,self.approved,
                         actor_id="hero",scene_candidate_digest="d"*64,
                         vault_path=Path(root)/"not-created.sqlite",**profile)
+
+    def test_small_disk_budget_fails_closed_without_corrupting_vault(self):
+        with TemporaryDirectory() as root:
+            dest=Path(root)/"disk-budget.sqlite"
+            with self.assertRaisesRegex(NativeSessionVaultError,"disk growth budget"):
+                exercise_native_session_endurance(
+                    self.journal,self.pages,self.graph,self.approved,
+                    actor_id="hero",scene_candidate_digest="d"*64,
+                    vault_path=dest,cycles=3,max_vault_bytes=1)
+            with NativeSessionVault(dest,session_id=self.approved["session_id"]) as vault:
+                # Failure is after a transaction commit: independently
+                # recovering the last save must still work.
+                restored=vault.recover(
+                    self.journal,self.pages,self.graph,self.approved,
+                    actor_id="hero",scene_candidate_digest="d"*64)
+                self.assertEqual(restored["frame"],1)
 
     def test_no_unapproved_quest_completion_during_endurance(self):
         with TemporaryDirectory() as root:
