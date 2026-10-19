@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0,str(ROOT))
 
 from skeleton.jeeves.game_frontier_native_chunks import (
-    inspect_native_chunks,compare_native_chunk_transitions,
+    inspect_native_chunks,compare_native_chunk_transitions,NativeChunkError,
 )
 from skeleton.jeeves.game_frontier_frame_coherence import digest
 
@@ -111,11 +111,14 @@ def validate_native_trace(
                 if contacts is None or type(contacts) is not int or not 0<=contacts<=64:
                     raise NativeSmokeError("native engine contact observation missing")
                 observed_contact_actors+=int(contacts>0)
-            partition=inspect_native_chunks(record,
-                expected_chunk_size_m=units,require_native_partition=True)
+            try:
+                partition=inspect_native_chunks(record,
+                    expected_chunk_size_m=units,require_native_partition=True)
+                motion=compare_native_chunk_transitions(
+                    record,previous=previous,expected_chunk_size_m=units)
+            except NativeChunkError as exc:
+                raise NativeSmokeError("native per-chunk physics evidence inconsistent") from exc
             observed_chunks.update(tuple(x["chunk_xy"]) for x in partition["chunks"])
-            motion=compare_native_chunk_transitions(
-                record,previous=previous,expected_chunk_size_m=units)
             observed_migrations+=motion["migrations"]
             coordinate=incoming[primary]["world_xyz_m"]
             if start is None:
