@@ -84,6 +84,9 @@ var _approved_quest_history_cursor: int = 0
 var _approved_quest_history_label: Label
 var _native_flight_instrument_label: Label
 var _native_flight_instruments_visible: bool = true
+var _game_route_waypoints: Array = []
+var _game_route_cursor: int = 0
+var _game_route_label: Label
 var _approved_cue_timeline: Array = []
 var _approved_cue_cursor: int = 0
 var _approved_cue_label: Label
@@ -108,6 +111,7 @@ func _ready() -> void:
         _create_character(data["geometry"], data["colliders"])
     _create_character_suite_inspector(suite)
     _create_virtual_game_gps(data.get("virtual_game_gps", {}))
+    _create_virtual_route_book(data.get("virtual_game_gps", {}))
     _create_native_flight_instruments()
     _create_chunk_evidence_inspector(data.get("chunk_evidence_summary", {}))
     _create_clouds(data["clouds"])
@@ -273,6 +277,54 @@ func _update_native_flight_instruments() -> void:
         "Virtual bearing (deg): " + str(snappedf(bearing, .1)) +
         " | Tick: " + str(_native_capture_tick)
     )
+
+
+func _create_virtual_route_book(nav: Dictionary) -> void:
+    if nav.is_empty() or bool(nav.get("device_location_used", true)):
+        return
+    if str(nav.get("authority", "")) != "virtual_game_navigation_candidate_no_world_mutation":
+        return
+    var route: Variant = nav.get("route")
+    if typeof(route) != TYPE_DICTIONARY:
+        return
+    var tiles: Array = route.get("tiles", [])
+    if tiles.is_empty() or tiles.size() > 4096:
+        return
+    _game_route_waypoints.clear()
+    for tile in tiles:
+        if typeof(tile) != TYPE_ARRAY or tile.size() != 2:
+            return
+        _game_route_waypoints.append({"tile_x":int(tile[0]),"tile_y":int(tile[1])})
+    var overlay := CanvasLayer.new()
+    overlay.name = "FictionalWorldRouteBook"
+    var label := Label.new()
+    label.name = "VirtualRouteWaypoint"
+    label.position = Vector2(20, 302)
+    label.add_theme_color_override("font_color", Color(.78, .93, 1.))
+    overlay.add_child(label)
+    add_child(overlay)
+    _game_route_cursor = 0
+    _game_route_label = label
+    _show_virtual_route_waypoint()
+
+
+func _show_virtual_route_waypoint() -> void:
+    if _game_route_label == null or _game_route_waypoints.is_empty():
+        return
+    var waypoint: Dictionary = _game_route_waypoints[_game_route_cursor]
+    _game_route_label.text = (
+        "FICTIONAL WORLD ROUTE (M cycles, no device GPS)\n" +
+        "Waypoint " + str(_game_route_cursor + 1) + "/" +
+        str(_game_route_waypoints.size()) + " | map tile " +
+        str(waypoint["tile_x"]) + "," + str(waypoint["tile_y"])
+    )
+
+
+func _cycle_virtual_route_waypoint() -> void:
+    if _game_route_waypoints.is_empty():
+        return
+    _game_route_cursor = (_game_route_cursor + 1) % _game_route_waypoints.size()
+    _show_virtual_route_waypoint()
 
 
 func _create_virtual_game_gps(nav: Dictionary) -> void:
@@ -1627,6 +1679,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     var key := event as InputEventKey
     if not key.pressed or key.echo:
+        return
+    if key.physical_keycode == KEY_M and not _game_route_waypoints.is_empty():
+        _cycle_virtual_route_waypoint()
+        get_viewport().set_input_as_handled()
         return
     if key.physical_keycode == KEY_H and _native_flight_instrument_label != null:
         _native_flight_instruments_visible = not _native_flight_instruments_visible

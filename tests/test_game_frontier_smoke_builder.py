@@ -45,6 +45,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("ApprovedNPCProximityInspector",script)
             self.assertIn("_persist_verified_gameplay_receipt",script)
             self.assertIn("NativeVirtualFlightInstruments",script)
+            self.assertIn("FictionalWorldRouteBook",script)
+            self.assertIn("_cycle_virtual_route_waypoint",script)
             self.assertIn("LiveGameAltimeterCompassVario",script)
             self.assertIn("_update_native_flight_instruments()",script)
             self.assertIn("Existing approved game save differs from replay",script)
