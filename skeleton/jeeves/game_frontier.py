@@ -865,6 +865,15 @@ def compile_frontier_scene(
         "position_fix": position_receipt,
         "virtual_game_gps": virtual_position,
         "frame_chunk_evidence": frame_chunk_evidence,
+        # Verified scene kinematics for optional native multi-actor reference
+        # probes. The signed frame/GDD and chunk source ownership are unchanged.
+        "frame_actor_sources": ([{
+            "id": actor.entity_id,
+            "source_digest": actor.source_digest,
+            "position_xyz_m": [actor.position.x,actor.position.y,actor.position.z],
+            "velocity_xyz_mps": [actor.velocity.x,actor.velocity.y,actor.velocity.z],
+        } for chunk in frame_receipt.chunks for actor in chunk.objects]
+            if frame_receipt is not None else []),
         "frame_progress": ({
             "frame_index": frame_receipt.frame_index,
             "timestamp_ns": frame_receipt.time_ns,
