@@ -1,0 +1,56 @@
+name: AI 100 Milestone Real Execution
+
+# Manual-only to avoid scheduling all 421 volume checks on every PR.
+on:
+  workflow_dispatch:
+    inputs:
+      milestone:
+        description: 'Canonical milestone MDM-001 through MDM-100'
+        required: true
+        type: string
+      execute:
+        description: 'Run actual tests rather than preview'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-ai-milestone-${{ github.ref }}-${{ inputs.milestone }}
+  cancel-in-progress: false
+
+jobs:
+  canonical-source-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.11.16'
+      - name: Install Python acceptance dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          'pytest>=8,<9' 'pydantic>=2,<3' 'fastapi==0.136.1'
+          'httpx==0.28.1' 'PyJWT>=2,<3'
+      - name: Real canonical milestone test executor
+        env:
+          REQUESTED_MILESTONE: ${{ inputs.milestone }}
+          REAL_EXECUTION: ${{ inputs.execute }}
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+          PYTHONPATH: '.'
+        run: |
+          set -euo pipefail
+          if [[ "$REAL_EXECUTION" == "true" ]]; then
+            python scripts/execute_ai_100_large_milestones.py \
+              --milestone "$REQUESTED_MILESTONE" --execute --timeout 180 \
+              --report "$RUNNER_TEMP/ai-milestone-receipts.json"
+          else
+            python scripts/execute_ai_100_large_milestones.py \
+              --milestone "$REQUESTED_MILESTONE"
+          fi

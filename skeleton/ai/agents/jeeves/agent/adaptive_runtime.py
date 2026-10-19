@@ -30,6 +30,31 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Sequence
 
 from .adversarial_verification import CouncilVerdict, VerificationCouncil, VerificationSubject
+from .cognition import ContextSection
+from .adversarial_verifier_review import AdversarialVerifierReviewer
+from .code_delivery_quality import (
+    CodeDeliveryQualityReviewer, QualityCheckResult, QualityReleaseReceipt,
+    QualityVerifierAdversary, required_delivery_kind,
+)
+from .code_scrutiny_loop import Discovery, Repair
+from .delivery_evidence_journal import (
+    ReleaseEvidenceJournal, build_release_evidence_journal,
+)
+from .delivery_assurance_milestones import (
+    ASSURANCE_MILESTONES, AssuranceMilestone, MilestoneBoard,
+)
+from .delivery_milestone_workbench import (
+    ACCEPTANCE_CRITERIA, AcceptanceCriterion, ExecutionBatch,
+    ExecutionVerdict, HostChecker, execute_milestone_batch,
+)
+from .delivery_milestone_queue import (
+    MilestoneQueue, WorkLease,
+)
+from .final_delivery_reviews import (
+    ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
+    FinalReviewAdversary, MeasuredCriterion, SourceProvenance,
+    required_final_kind, quality_source_continuity_failure,
+)
 from .context_repository import (
     ContextEntry,
     ContextKind,
@@ -51,7 +76,12 @@ from .deliberation import (
     SpecialistRole,
     proposal,
 )
-from .evidence import EvidenceLedger
+from .evidence import EvidenceArtifact, EvidenceLedger
+from .working_context_cycle import (
+    PreparedDelivery,
+    WorkingContextCycle,
+    verify_delivery,
+)
 from .frontier_adjudication import HostCandidateAdjudicator
 from .frontier_consensus import merge_search_results
 from .frontier_feedback import FrontierReasoningFeedback
@@ -85,6 +115,7 @@ from .types import (
     RiskTier,
     StepStatus,
     TerminationReason,
+    ToolObservation,
     bounded_text,
     json_safe,
     probability,
@@ -194,6 +225,30 @@ class AdaptiveRunReport:
     context_head: str | None
     experience_matches: int
     fingerprint: str
+    working_note_count: int = 0
+    working_page_count: int = 0
+    working_receipt: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _DeliveryQualityBinding:
+    kind: str
+    source_reader: Callable[[], Mapping[str, str]]
+    checkers: Mapping[str, Callable[[Mapping[str, str]], QualityCheckResult]]
+    additional_requirements: tuple[str, ...]
+    discover: Discovery | None
+    repair: Repair | None
+    authorize_repairs: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _FinalReviewBinding:
+    kind: str
+    source_reader: Callable[[str], Mapping[str, str]]
+    metric_reader: Callable[[Mapping[str, str]], Sequence[MeasuredCriterion]]
+    rights_reader: Callable[[Mapping[str, str]], Sequence[SourceProvenance]]
+    copyright_checker: ContentChecker
+    rewrite_checker: ContentChecker
 
 
 @dataclass(slots=True)
@@ -247,6 +302,22 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         ] = {}
         self._reports: dict[str, AdaptiveRunReport] = {}
         self._adaptive_lock = threading.RLock()
+        self._working_context_cycle = WorkingContextCycle()
+        self._working_deliveries: dict[str, PreparedDelivery] = {}
+        self._delivery_quality_bindings: dict[str, _DeliveryQualityBinding] = {}
+        self._delivery_quality_reports: dict[str, QualityReleaseReceipt] = {}
+        self._delivery_adversarial_receipts: dict[str, str] = {}
+        self._code_delivery_quality_reviewer = CodeDeliveryQualityReviewer()
+        self._verifier_adversary = AdversarialVerifierReviewer()
+        self._quality_verifier_adversary = QualityVerifierAdversary()
+        self._final_review_bindings: dict[str, _FinalReviewBinding] = {}
+        self._final_review_reports: dict[str, FinalReleaseReview] = {}
+        self._final_review_proofs: dict[str, str] = {}
+        self._final_reviewer = ComparativeObjectiveFinalReviewer()
+        self._final_reviewer_adversary = FinalReviewAdversary()
+        self._release_evidence_journals: dict[str, ReleaseEvidenceJournal] = {}
+        self._milestone_boards: dict[str, MilestoneBoard] = {}
+        self._milestone_queues: dict[str, MilestoneQueue] = {}
 
     def run(self, inputs: RunInputs) -> AgentResult:
         result = super().run(inputs)
@@ -1092,6 +1163,547 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
     def context_repository(self, inputs: RunInputs) -> ContextRepository:
         return self._context_repo(inputs)
 
+    def _finalize(self, state: _RunState) -> AgentResult:
+        """Compact scoped misses before the existing grounded finalization."""
+        try:
+            repo = self._context_repo(state.inputs)
+            branch = self._run_branch(state.run_id)
+            # Only previously promoted high-trust memory can refill a short
+            # delivery context. A missed search never promotes itself.
+            recalled = repo.retrieve(
+                state.inputs.goal.objective,
+                branch=branch,
+                kinds=(ContextKind.PROJECT, ContextKind.SEMANTIC,
+                       ContextKind.PROCEDURAL, ContextKind.STRATEGY, ContextKind.LESSON),
+                max_entries=4,
+                max_tokens=600,
+                minimum_trust=0.7,
+                include_unpromoted=False,
+            )
+            refill = json.dumps({
+                "original_goal": state.inputs.goal.objective[:1400],
+                "remaining_work": "Continue with the task using supported findings. "
+                                  "If more retrieval is needed, report the remaining gap; "
+                                  "never convert a scoped no-result into a universal assertion.",
+                "trusted_recall": [
+                    {"key": hit.entry.key, "excerpt": hit.entry.content[:500]}
+                    for hit in recalled
+                ],
+            }, ensure_ascii=False, sort_keys=True)
+            prepared = self._working_context_cycle.prepare(
+                state.inputs.goal, tuple(state.observations), refill_text=refill
+            )
+            first, second = verify_delivery(
+                prepared, state.inputs.goal, tuple(state.observations)
+            )
+            with self._adaptive_lock:
+                self._working_deliveries[state.run_id] = prepared
+                if len(self._working_deliveries) > self.adaptive_config.retain_adaptive_reports:
+                    oldest = next(iter(self._working_deliveries))
+                    self._working_deliveries.pop(oldest, None)
+            if prepared.notes:
+                self._persist_no_found_receipt(state, repo, branch, prepared)
+                state.trace.emit("adaptive.working_context_compacted", {
+                    "notes": len(prepared.notes),
+                    "page_counter": prepared.page_count,
+                    "saved_chars": prepared.freed_chars,
+                    "receipt": prepared.fingerprint,
+                    "verifier_integrity": first,
+                    "verifier_scope": second,
+                })
+        except Exception as exc:
+            return self._finish_failure(
+                state, TerminationReason.VERIFICATION_FAILED,
+                "Pre-delivery working-context preparation failed; no final answer released.",
+                metadata={"audit_error": type(exc).__name__, "detail": str(exc)[:384]},
+            )
+        return super()._finalize(state)
+
+    def _delivery_observations(self, state: _RunState) -> Sequence[ToolObservation]:
+        prepared = self._working_deliveries.get(state.run_id)
+        return prepared.active_observations if prepared is not None else state.observations
+
+    def _delivery_extra_sections(self, state: _RunState) -> tuple[ContextSection, ...]:
+        prepared = self._working_deliveries.get(state.run_id)
+        if prepared is None or not prepared.notes:
+            return ()
+        return (ContextSection(
+            name="scoped_no_found_working_memory",
+            content=prepared.prompt_note(),
+            priority=100,
+            required=True,
+            source_ids=tuple(note.call_id for note in prepared.notes),
+        ),)
+
+    def register_delivery_quality(
+        self, run_id: str, *, kind: str,
+        source_reader: Callable[[], Mapping[str, str]],
+        checkers: Mapping[str, Callable[[Mapping[str, str]], QualityCheckResult]],
+        additional_requirements: Sequence[str] = (),
+        discover: Discovery | None = None,
+        repair: Repair | None = None,
+        authorize_repairs: bool = False,
+    ) -> None:
+        """Host-only source and independent tools; unregistered tasks fail closed."""
+        run_key = require_id("run_id", run_id)
+        if kind not in {"code", "game"} or not callable(source_reader):
+            raise ValueError("code/game delivery requires an authoritative source reader")
+        if any(not isinstance(name, str) or not callable(checker)
+               for name, checker in checkers.items()):
+            raise ValueError("invalid host checker")
+        if repair is not None and not callable(repair):
+            raise ValueError("invalid repair callback")
+        if discover is not None and not callable(discover):
+            raise ValueError("invalid discovery callback")
+        with self._adaptive_lock:
+            self._delivery_quality_bindings[run_key] = _DeliveryQualityBinding(
+                kind=kind, source_reader=source_reader, checkers=dict(checkers),
+                additional_requirements=tuple(additional_requirements),
+                discover=discover, repair=repair, authorize_repairs=authorize_repairs,
+            )
+
+    def delivery_quality_receipt(self, run_id: str) -> QualityReleaseReceipt | None:
+        with self._adaptive_lock:
+            return self._delivery_quality_reports.get(require_id("run_id", run_id))
+
+    def register_final_review(
+        self, run_id: str, *, kind: str,
+        source_reader: Callable[[str], Mapping[str, str]],
+        metric_reader: Callable[[Mapping[str, str]], Sequence[MeasuredCriterion]],
+        rights_reader: Callable[[Mapping[str, str]], Sequence[SourceProvenance]],
+        copyright_checker: ContentChecker,
+        rewrite_checker: ContentChecker,
+    ) -> None:
+        """Bind independent comparative, rights and rewrite checkers to one run.
+
+        Source reader MUST include exact final response text as
+        delivery/jeeves_final_answer.md. Registration grants no rights itself.
+        """
+        run_key = require_id("run_id", run_id)
+        if kind not in {"code", "game", "creative"}:
+            raise ValueError("final review requires code, game or creative kind")
+        if any(not callable(callback) for callback in (
+            source_reader, metric_reader, rights_reader,
+            copyright_checker, rewrite_checker,
+        )):
+            raise ValueError("all final review adapters must be callable")
+        with self._adaptive_lock:
+            self._final_review_bindings[run_key] = _FinalReviewBinding(
+                kind, source_reader, metric_reader, rights_reader,
+                copyright_checker, rewrite_checker,
+            )
+
+    def final_review_receipt(self, run_id: str) -> FinalReleaseReview | None:
+        with self._adaptive_lock:
+            return self._final_review_reports.get(require_id("run_id", run_id))
+
+    def release_evidence_journal(self, run_id: str) -> ReleaseEvidenceJournal | None:
+        """Retrieve the verified, content-free release milestone receipt chain."""
+        with self._adaptive_lock:
+            return self._release_evidence_journals.get(require_id("run_id", run_id))
+
+    @staticmethod
+    def assurance_milestone_catalog() -> tuple[AssuranceMilestone, ...]:
+        """One hundred acceptance targets; never infer completion from plans."""
+        return ASSURANCE_MILESTONES
+
+    @staticmethod
+    def assurance_acceptance_criteria() -> tuple[AcceptanceCriterion, ...]:
+        """All 100 independently measured and objective acceptance contracts."""
+        return ACCEPTANCE_CRITERIA
+
+    def assurance_milestone_board(self, run_id: str) -> MilestoneBoard | None:
+        with self._adaptive_lock:
+            return self._milestone_boards.get(require_id("run_id", run_id))
+
+    def assurance_work_queue(self, run_id: str) -> MilestoneQueue | None:
+        with self._adaptive_lock:
+            return self._milestone_queues.get(require_id("run_id", run_id))
+
+    def begin_assurance_work_queue(
+        self, run_id: str, *, source_commit: str, artifact_digest: str,
+        max_attempts: int = 3, lease_seconds: float = 120.0,
+    ) -> MilestoneQueue:
+        """Begin a durable host-driven execution queue without fake passes."""
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            if key in self._milestone_queues:
+                raise ValueError("assurance queue already exists for this run")
+            previous = self._milestone_boards.get(key)
+            if previous is not None and previous.receipts:
+                raise ValueError("cannot replace an existing milestone board with a new queue")
+            queue = MilestoneQueue.start(
+                source_commit, artifact_digest, max_attempts=max_attempts,
+                lease_seconds=lease_seconds,
+            )
+            if previous is not None and previous.source_commit != source_commit:
+                raise ValueError("queue would change pinned source commit")
+            self._milestone_queues[key] = queue
+            self._milestone_boards[key] = queue.board
+            return queue
+
+    def claim_assurance_work(
+        self, run_id: str, *, owner: str, now: float,
+    ) -> WorkLease | None:
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            if queue is None:
+                raise ValueError("assurance work queue not registered")
+            updated, lease = queue.claim(owner, now)
+            self._milestone_queues[key] = updated
+            return lease
+
+    def settle_assurance_work(
+        self, run_id: str, *, lease: WorkLease, now: float,
+        primary: HostChecker | None, independent: HostChecker | None,
+    ) -> ExecutionVerdict:
+        """Commit a verified work lease with optimistic state consistency."""
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            if queue is None:
+                raise ValueError("assurance work queue not registered")
+        updated, verdict = queue.settle(
+            lease, now, primary, independent,
+        )
+        with self._adaptive_lock:
+            latest = self._milestone_queues.get(key)
+            if latest is None or latest.fingerprint != queue.fingerprint:
+                raise ValueError("concurrent work result: lease must be rechecked")
+            self._milestone_queues[key] = updated
+            self._milestone_boards[key] = updated.board
+            return verdict
+
+    def recover_assurance_work(
+        self, run_id: str, *, now: float,
+    ) -> MilestoneQueue:
+        """Explicitly expire abandoned leases without background execution."""
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            if queue is None:
+                raise ValueError("assurance work queue not registered")
+            recovered = queue.expire(now)
+            self._milestone_queues[key] = recovered
+            return recovered
+
+    def advance_assurance_milestones(
+        self, run_id: str, *, source_commit: str, artifact_digest: str,
+        checkers: Mapping[str, tuple[HostChecker | None, HostChecker | None]],
+        requested: Sequence[str] = (),
+    ) -> ExecutionBatch:
+        """Execute a bounded, explicitly host-authorized milestone review.
+
+        Never auto-populate evidence: absent host adapters leave the milestone
+        unverified. A new source commit requires a new run-scoped board.
+        """
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            if key in self._milestone_queues:
+                raise ValueError("cannot bypass active assurance queue and its work leases")
+            board = self._milestone_boards.get(key)
+            if board is None:
+                board = MilestoneBoard.begin(source_commit)
+            elif board.source_commit != source_commit:
+                raise ValueError("assurance board is pinned to an earlier source commit")
+        result = execute_milestone_batch(
+            board, artifact_digest, checkers, requested=requested,
+        )
+        with self._adaptive_lock:
+            current = self._milestone_boards.get(key)
+            if current is not None and current.fingerprint != board.fingerprint:
+                raise ValueError("concurrent milestone update: re-evaluate current evidence")
+            self._milestone_boards[key] = result.board
+        return result
+
+    def _verify_final_content_review(
+        self, state: _RunState, answer: str,
+        *, kind: str, quality: QualityReleaseReceipt | None,
+    ) -> tuple[bool, str | None]:
+        binding = self._final_review_bindings.get(state.run_id)
+        if binding is None:
+            return False, "mandatory comparative/objective/copyright/rewrite review missing"
+        if binding.kind != kind:
+            return False, "final content review domain mismatch"
+        reviewed = dict(binding.source_reader(answer))
+        if reviewed.get("delivery/jeeves_final_answer.md") != answer:
+            return False, "final answer text is not present in the reviewed content"
+        if quality is not None:
+            latest_quality_sources = dict(self._delivery_quality_bindings[
+                state.run_id
+            ].source_reader())
+            # A fresh source reader alone is not release evidence: both readers
+            # could observe a new version after the quality receipt was issued.
+            # The copyright/rewrite review must bind the *exact* quality-audited
+            # bytes, and the host must still serve that same version.
+            audited_sources = dict(quality.scrutiny.files)
+            if not quality.releasable:
+                return False, "final review cannot reuse a blocked quality receipt"
+            drift = quality_source_continuity_failure(
+                reviewed, latest_quality_sources, audited_sources,
+            )
+            if drift:
+                return False, drift
+        review = self._final_reviewer.inspect(
+            kind, reviewed, metrics=tuple(binding.metric_reader(dict(reviewed))),
+            provenance=tuple(binding.rights_reader(dict(reviewed))),
+            copyright_checker=binding.copyright_checker,
+            rewrite_checker=binding.rewrite_checker,
+            upstream_quality_digest=quality.digest if quality else None,
+        )
+        with self._adaptive_lock:
+            self._final_review_reports[state.run_id] = review
+        if not review.passed:
+            return False, "final copyright/creative review blocked: " + "; ".join(
+                review.findings[:8]
+            )
+        proof = self._final_reviewer_adversary.challenge(
+            review, reviewed, upstream_quality_digest=quality.digest if quality else None,
+        )
+        with self._adaptive_lock:
+            self._final_review_proofs[state.run_id] = proof
+        state.trace.emit("adaptive.final_content_review_verified", {
+            "kind": kind, "final_receipt": review.fingerprint,
+            "comparison_metrics": len(review.measurements),
+            "copyright_evidence": review.copyright.evidence_ref,
+            "creative_rewrite_evidence": review.creative_rewrite.evidence_ref,
+            "verifier_adversary": proof,
+            "page_count": len(review.receipts),
+        })
+        from .types import EvidenceKind
+        state.ledger.append(EvidenceArtifact(
+            evidence_id=stable_id("finalreviewevidence", {
+                "run": state.run_id, "review": review.fingerprint,
+            }),
+            kind=EvidenceKind.DERIVED,
+            source="jeeves-final-content-review",
+            payload={
+                "review": review.fingerprint,
+                "verifier_adversary": proof,
+                "source_digest": review.source_digest,
+                "metric_evidence": [
+                    {"axis": metric.axis, "candidate": metric.observed_evidence,
+                     "baseline": metric.baseline_evidence,
+                     "target": metric.target_evidence}
+                    for metric in review.measurements
+                ],
+                "rights_evidence": [item.rights_evidence for item in review.provenance],
+                "copyright_evidence": review.copyright.evidence_ref,
+                "rewrite_evidence": review.creative_rewrite.evidence_ref,
+                "stage_receipts": [receipt.digest for receipt in review.receipts],
+                "review_scope": [
+                    review.copyright.review_scope, review.creative_rewrite.review_scope,
+                ],
+            },
+            observed_at=self._wall_clock(),
+            confidence=1.0,
+        ))
+        return True, None
+
+    def _delivery_verify(self, state: _RunState, draft) -> tuple[bool, str | None]:
+        prepared = self._working_deliveries.get(state.run_id)
+        if prepared is None:
+            return False, "working context audit missing"
+        try:
+            first, second = verify_delivery(
+                prepared, state.inputs.goal, tuple(state.observations),
+                answer=draft.answer,
+            )
+            adversarial = self._verifier_adversary.review(
+                prepared, state.inputs.goal, tuple(state.observations),
+                answer=draft.answer,
+            )
+            with self._adaptive_lock:
+                self._delivery_adversarial_receipts[state.run_id] = adversarial.digest
+            state.trace.emit("adaptive.working_context_delivery_verified", {
+                "receipt": prepared.fingerprint,
+                "verifier_integrity": first,
+                "verifier_scope": second,
+                "verifier_of_verifiers": adversarial.digest,
+                "adversarial_attacks": len(adversarial.attacks),
+            })
+            required_kind = required_delivery_kind(state.inputs.goal)
+            binding = self._delivery_quality_bindings.get(state.run_id)
+            if required_kind is not None and binding is None:
+                return False, "mandatory code/game quality checker registration missing"
+            if binding is not None:
+                if required_kind is not None and binding.kind != required_kind:
+                    return False, "delivery kind does not match registered quality checkers"
+                metadata_requirements = state.inputs.goal.metadata.get(
+                    "additional_quality_requirements", (),
+                )
+                if not isinstance(metadata_requirements, (tuple, list)) or any(
+                    not isinstance(x, str) for x in metadata_requirements
+                ):
+                    return False, "invalid additional code-quality requirements"
+                extras = tuple(dict.fromkeys(
+                    tuple(metadata_requirements) + binding.additional_requirements
+                ))
+                sources = dict(binding.source_reader())
+                review = self._code_delivery_quality_reviewer.inspect(
+                    binding.kind, sources,
+                    checkers=binding.checkers,
+                    additional_requirements=extras,
+                    discover=binding.discover,
+                    repair=binding.repair,
+                    authorize_repairs=binding.authorize_repairs,
+                )
+                latest = dict(binding.source_reader())
+                if latest != dict(review.scrutiny.files):
+                    return False, "reviewed source was not committed to the host source"
+                with self._adaptive_lock:
+                    self._delivery_quality_reports[state.run_id] = review
+                if not review.releasable:
+                    return False, "mandatory quality gate blocked: " + "; ".join(
+                        review.failures[:8]
+                    )
+                quality_adversarial = self._quality_verifier_adversary.review(
+                    review, files=latest, kind=binding.kind, required=extras,
+                )
+                state.trace.emit("adaptive.code_quality_verified", {
+                    "kind": binding.kind,
+                    "receipt": review.digest,
+                    "adversarial": quality_adversarial,
+                    "passes": len(review.scrutiny.receipts),
+                    "repairs": review.scrutiny.corrections,
+                    "standards": list(review.standards),
+                })
+                from .types import EvidenceKind
+                state.ledger.append(EvidenceArtifact(
+                    evidence_id=stable_id("qualityevidence", {
+                        "run": state.run_id, "receipt": review.digest,
+                    }),
+                    kind=EvidenceKind.DERIVED,
+                    source="jeeves-code-delivery-quality",
+                    payload={
+                        "kind": binding.kind,
+                        "source_digest": review.source_digest,
+                        "receipt": review.digest,
+                        "reviewer_adversarial_receipt": quality_adversarial,
+                        "checker_evidence": [list(x) for x in review.checker_evidence],
+                        "passes": len(review.scrutiny.receipts),
+                        "corrections": review.scrutiny.corrections,
+                    },
+                    observed_at=self._wall_clock(),
+                    confidence=1.0,
+                ))
+            final_kind = required_final_kind(state.inputs.goal)
+            quality = self._delivery_quality_reports.get(state.run_id)
+            if final_kind is not None:
+                cleared, failure = self._verify_final_content_review(
+                    state, draft.answer, kind=final_kind, quality=quality,
+                )
+                if not cleared:
+                    return False, failure
+            final = self._final_review_reports.get(state.run_id) if final_kind else None
+            final_sources = None
+            if final_kind is not None:
+                # Re-read after external reviewer callbacks to catch changes
+                # between the reviewed snapshot and delivery handoff.
+                final_sources = dict(
+                    self._final_review_bindings[state.run_id].source_reader(draft.answer)
+                )
+            journal = build_release_evidence_journal(
+                state.run_id, state.inputs.goal, tuple(state.observations),
+                prepared, draft.answer, quality=quality, final=final,
+                final_sources=final_sources,
+            )
+            with self._adaptive_lock:
+                self._release_evidence_journals[state.run_id] = journal
+            state.trace.emit("adaptive.delivery_evidence_journal_sealed", {
+                "run_id": state.run_id,
+                "journal": journal.fingerprint,
+                "release": journal.release_digest,
+                "stage_count": journal.milestone_count,
+                "stages": list(journal.stage_names),
+                "kind": journal.kind,
+            })
+            from .types import EvidenceKind
+            state.ledger.append(EvidenceArtifact(
+                evidence_id=stable_id("deliveryjournal", {
+                    "run": state.run_id, "receipt": journal.release_digest,
+                }),
+                kind=EvidenceKind.DERIVED,
+                source="jeeves-release-evidence-journal",
+                payload={
+                    "journal": journal.fingerprint,
+                    "release": journal.release_digest,
+                    "source_digest": journal.source_digest,
+                    "answer_digest": journal.answer_digest,
+                    "stages": list(journal.stage_names),
+                    "receipts": [entry.digest for entry in journal.stages],
+                },
+                observed_at=self._wall_clock(), confidence=1.0,
+            ))
+            return True, None
+        except Exception as exc:
+            return False, f"{type(exc).__name__}: {str(exc)[:320]}"
+
+    def _persist_no_found_receipt(
+        self, state: _RunState, repo: ContextRepository,
+        branch: str, prepared: PreparedDelivery,
+    ) -> None:
+        now = self._wall_clock()
+        key = stable_id("working", {"run": state.run_id, "receipt": prepared.fingerprint})
+        entry = ContextEntry(
+            entry_id=stable_id("ctx", {"key": key}),
+            namespace=repo.namespace,
+            key=key,
+            kind=ContextKind.SCRATCH,
+            content=prepared.prompt_note(),
+            created_at=now,
+            updated_at=now,
+            confidence=1.0,
+            salience=0.7,
+            trust=0.5,
+            source="working-context-cycle",
+            tags=("working", "no-found", "run-scoped"),
+            protected=False,
+            promoted=False,
+            metadata={"run_id": state.run_id, "page_count": prepared.page_count,
+                      "receipt": prepared.fingerprint},
+        )
+        patch = ContextPatch(
+            patch_id=stable_id("ctxpatch", {"run": state.run_id, "working": prepared.fingerprint}),
+            namespace=repo.namespace,
+            items=(ContextPatchItem(
+                PatchOperation.UPSERT, key, entry=entry,
+                reason="retain scoped no-found working note without context clutter",
+            ),),
+            author="working-context-cycle",
+            created_at=now,
+            rationale="append verified temporary notes to run branch for later inquiry",
+            source_run_id=state.run_id,
+        )
+        repo.commit(branch, patch, message="working memory no-found receipt",
+                    expected_head=repo.head(branch))
+        from .types import EvidenceKind
+        state.ledger.append(EvidenceArtifact(
+            evidence_id=stable_id("workevidence", {"run": state.run_id, "receipt": prepared.fingerprint}),
+            kind=EvidenceKind.DERIVED,
+            source="working-context-cycle",
+            payload={
+                "classification": "scoped_no_found_not_global_absence",
+                "run_id": state.run_id,
+                "notes": [
+                    {"call_id": note.call_id, "source_digest": note.source_digest,
+                     "note_digest": note.fingerprint, "serial": note.serial}
+                    for note in prepared.notes
+                ],
+                "page_counter": prepared.page_count,
+                "receipts": [item.digest for item in prepared.receipts],
+                "working_note": entry.content_fingerprint,
+            },
+            observed_at=now,
+            confidence=1.0,
+        ))
+
+    def working_context_receipt(self, run_id: str) -> PreparedDelivery | None:
+        """Read the verified run-scoped note and serialized receipt trail."""
+        with self._adaptive_lock:
+            return self._working_deliveries.get(require_id("run_id", run_id))
+
     def _post_run(self, inputs: RunInputs, result: AgentResult) -> AgentResult:
         trajectory: Trajectory | None = None
         credit: CreditReport | None = None
@@ -1130,6 +1742,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             self.metrics.increment("agent.adaptive.summary_failures")
         feedback_report = self.frontier_feedback.report()
         feedback_recommendation = self.frontier_feedback.recommendation()
+        working = self.working_context_receipt(result.run_id)
         report_payload = {
             "run": result.run_id,
             "success": result.success,
@@ -1153,6 +1766,9 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             ],
             "frontier_feedback": feedback_report.fingerprint,
             "frontier_feedback_recommendation": feedback_recommendation.fingerprint,
+            "working_note_count": len(working.notes) if working else 0,
+            "working_page_count": working.page_count if working else 0,
+            "working_receipt": working.fingerprint if working else None,
         }
         report = AdaptiveRunReport(
             run_id=result.run_id,
@@ -1168,6 +1784,9 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             context_head=repo.head(adaptive.context_branch),
             experience_matches=adaptive.experience_matches,
             fingerprint=stable_fingerprint(report_payload),
+            working_note_count=len(working.notes) if working else 0,
+            working_page_count=working.page_count if working else 0,
+            working_receipt=working.fingerprint if working else None,
         )
         with self._adaptive_lock:
             self._reports[result.run_id] = report
@@ -1177,6 +1796,11 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         metadata = dict(result.metadata)
         metadata["adaptive"] = {
             "report_fingerprint": report.fingerprint,
+            "working_context": {
+                "notes": report.working_note_count,
+                "pages": report.working_page_count,
+                "receipt": report.working_receipt,
+            },
             "trajectory_id": report.trajectory_id,
             "credit_fingerprint": report.credit_fingerprint,
             "council_verdict": council.verdict.value if council else None,
