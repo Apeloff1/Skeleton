@@ -54,6 +54,9 @@ from .game_frontier_geoposition import (
     LocationConsent, DeviceGPSFix, SurveyControl, SurveySighting,
     ingest_host_gps, solve_control_survey, reconcile_live_and_survey,
 )
+from .game_frontier_virtual_navigation import (
+    VirtualNavigationRequest, compose_virtual_navigation,
+)
 from .game_frontier_frame_coherence import (
     GDDSource, FrameObject, FrameReceipt, GDDFrameNote, advance_frame,
 )
@@ -141,6 +144,7 @@ def compile_frontier_scene(
     frame_objects: tuple[FrameObject, ...] = (),
     previous_frame_receipt: FrameReceipt | None = None,
     between_frame_notes: tuple[GDDFrameNote, ...] = (),
+    virtual_navigation: VirtualNavigationRequest | None = None,
 ) -> FrontierSceneCandidate:
     """Produce a content-addressed, inspectable, playable-engine-side proposal.
 
@@ -570,6 +574,15 @@ def compile_frontier_scene(
             frame_index=frame_index, fps=clock.fps, gdd=frame_gdd,
             objects=frame_objects, previous=previous_frame_receipt,
             notes=between_frame_notes)
+    # Real OS positioning stays isolated behind explicit consent and redacted
+    # receipts. Fictional game-map GPS NEVER uses that sensor/permission path.
+    if virtual_navigation is not None and (gps_fix is not None or survey_controls):
+        raise ValueError("do not mix virtual game positioning with physical GPS/survey")
+    virtual_position = (compose_virtual_navigation(
+        virtual_navigation, frame=frame_receipt,
+        gdd=frame_gdd if frame_receipt is not None else None,
+        previous_frame=previous_frame_receipt)
+        if virtual_navigation is not None else None)
     prediction = None
     if speculative_input is not None:
         anticipated = anticipate_user_motion(speculative_input, horizon_ms=prediction_horizon_ms)
@@ -815,6 +828,7 @@ def compile_frontier_scene(
             "original_source_preserved": m.source_preserved,
         } for m in old_new_meshes],
         "position_fix": position_receipt,
+        "virtual_game_gps": virtual_position,
         "frame_progress": ({
             "frame_index": frame_receipt.frame_index,
             "timestamp_ns": frame_receipt.time_ns,
