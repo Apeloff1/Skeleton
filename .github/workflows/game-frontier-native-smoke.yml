@@ -11,6 +11,7 @@ on:
       - "scripts/build_game_frontier_smoke.py"
       - "scripts/build_game_frontier_quest_smoke_approvals.py"
       - "scripts/run_game_frontier_quest_tools.py"
+      - "scripts/run_game_frontier_godot_dispatch.py"
       - "scripts/qualify_game_frontier_godot.py"
       - "scripts/run_game_frontier_capture.py"
       - "scripts/validate_game_frontier_native_smoke.py"
@@ -251,6 +252,39 @@ jobs:
                             "window_count":batch["window_count"],
                             "source_frame_count":batch["verified_frame_count"],
                             "audit_root":evidence["receipt_digest"]}))
+          PY
+            # Install verified commands as DATA, rerun Godot and independently
+            # compare the actual engine's persisted quest/flag/dialogue receipt.
+            python scripts/run_game_frontier_godot_dispatch.py prepare \
+              "${quest_cli_args[@]}" \
+              --checkpoint-json "$full_checkpoint" \
+              --project "$project" \
+              > "$RUNNER_TEMP/frontier-game-dispatch-prepared-$fps.json"
+            dispatch_user="$RUNNER_TEMP/frontier-dispatch-runtime-$fps"
+            mkdir -p "$dispatch_user"
+            XDG_DATA_HOME="$dispatch_user" "$FRONTIER_GODOT" \
+              --headless --path "$project" --quit-after 5 \
+              > "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log" 2>&1
+            dispatch_receipt="$(find "$dispatch_user" -type f \
+              -name frontier_approved_gameplay_receipt.json -print -quit)"
+            test -n "$dispatch_receipt"
+            test -s "$dispatch_receipt"
+            python scripts/run_game_frontier_godot_dispatch.py verify \
+              "${quest_cli_args[@]}" \
+              --checkpoint-json "$full_checkpoint" \
+              --project "$project" \
+              --engine-receipt-json "$dispatch_receipt" \
+              > "$RUNNER_TEMP/frontier-game-dispatch-verified-$fps.json"
+            python - "$RUNNER_TEMP/frontier-game-dispatch-verified-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          proof=json.loads(Path(sys.argv[1]).read_text())
+          assert proof["verified_engine_actions"]==3, proof
+          assert proof["verified_quest_count"]==1, proof
+          assert proof["verified_cue_count"]==0, proof
+          print(json.dumps({"godot_engine_dispatch_verified":True,
+                            "verified_commands":proof["verified_engine_actions"],
+                            "runtime_receipt":proof["engine_gameplay_receipt_sha256"]}))
           PY
             echo "#### Real Godot $fps Hz approved CI quest simulation" >> "$GITHUB_STEP_SUMMARY"
             echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
