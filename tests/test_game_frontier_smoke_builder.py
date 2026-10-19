@@ -47,6 +47,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("ApprovedNPCProximityInspector",script)
             self.assertIn("_persist_verified_gameplay_receipt",script)
             self.assertIn("NativeVirtualFlightInstruments",script)
+            self.assertIn("frontier_virtual_instruments.jsonl",script)
+            self.assertIn("independent_native_instrument_observation_not_attested",script)
             self.assertIn("GameNativeLandingRiskInspector",script)
             self.assertIn("Required native Godot game interface is missing",script)
             self.assertIn("_update_native_landing_risk",script)

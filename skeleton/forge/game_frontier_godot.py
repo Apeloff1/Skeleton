@@ -29,6 +29,7 @@ var _aero_density: float = 1.2
 var _aero_cd: float = 1.0
 var _aero_area: float = 0.7
 var _native_capture_file: FileAccess
+var _virtual_instrument_trace_file: FileAccess
 var _native_capture_tick: int = 0
 var _native_capture_max_frames: int = 0
 var _native_candidate_sha: String = ""
@@ -902,6 +903,11 @@ func _configure_native_capture(settings: Dictionary) -> void:
     _native_capture_file = FileAccess.open("user://frontier_native_physics.jsonl", FileAccess.WRITE)
     if _native_capture_file == null:
         push_error("Native capture file could not be opened")
+        return
+    _virtual_instrument_trace_file = FileAccess.open(
+        "user://frontier_virtual_instruments.jsonl", FileAccess.WRITE)
+    if _virtual_instrument_trace_file == null:
+        push_error("Independent native instrument telemetry could not be opened")
 
 func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var dispatch_settings: Dictionary = capture.get("native_gameplay_dispatch", {})
@@ -1905,6 +1911,38 @@ func _record_native_physics() -> void:
             ]
             lines.append_array(_native_recent_zone_events)
             _native_preview_label.text = "\n".join(lines)
+    if _virtual_instrument_trace_file != null:
+        for actor_sample in recorded:
+            if str(actor_sample["id"]) != _native_actor_id:
+                continue
+            var av: Vector3 = _vec(actor_sample["velocity_xyz_mps"])
+            var player_xyz: Array = actor_sample["world_xyz_m"]
+            var player_velocity: Array = actor_sample["velocity_xyz_mps"]
+            var speed: float = Vector2(av.x,av.z).length()
+            var absolute_heading: float = (
+                fposmod(rad_to_deg(atan2(av.x,-av.z)),360.0)
+                if speed > .0000001 else 0.0
+            )
+            var instrument := {
+                "schema":"skeleton.game.godot_native_instrument_sample.v1",
+                "authority":"independent_native_instrument_observation_not_attested",
+                "scene_candidate_digest":_native_candidate_sha,
+                "signed_gdd_digest":_native_signed_gdd_sha,
+                "actor_id":_native_actor_id,
+                "native_tick":_native_capture_tick,
+                "fps":Engine.physics_ticks_per_second,
+                "world_xyz_m":player_xyz,
+                "velocity_xyz_mps":player_velocity,
+                "ground_speed_mps":speed,
+                "vertical_rate_mps":av.y,
+                "heading_deg":absolute_heading,
+                "airflow_xyz_mps":[_aero_wind.x,-_aero_wind.z,_aero_wind.y],
+                "air_relative_speed_mps":(av-_aero_wind).length(),
+                "contact_count":actor_sample["contact_count"],
+            }
+            _virtual_instrument_trace_file.store_line(JSON.stringify(instrument))
+            _virtual_instrument_trace_file.flush()
+            break
     _native_capture_file.store_line(JSON.stringify(row))
     _native_capture_file.flush()
     _native_capture_tick += 1
@@ -1913,6 +1951,9 @@ func _exit_tree() -> void:
     if _native_capture_file != null:
         _native_capture_file.close()
         _native_capture_file = null
+    if _virtual_instrument_trace_file != null:
+        _virtual_instrument_trace_file.close()
+        _virtual_instrument_trace_file = null
 
 func _apply_native_gameplay_fields() -> void:
     if _native_force_fields.is_empty() or _aero_character == null:
