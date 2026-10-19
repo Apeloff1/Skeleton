@@ -286,3 +286,37 @@ def emit_frontier_godot_overlay(
         "frontier/frontier_scene.gd": _GDSCRIPT,
         "frontier/data/scene.json": encoded + "\n",
     }
+
+
+def attach_frontier_overlay(
+    project_files: Mapping[str, str],
+    candidate: FrontierSceneCandidate,
+    *,
+    cloud_path_duration_s: int = 30,
+    cloud_step_s: int = 1,
+) -> dict[str, str]:
+    """Safely attach an emitted reference scene to an existing Forge Godot project.
+
+    Pure mapping transform: does not overwrite the existing main level,
+    authorization, save state, input, or materializer files. The caller must
+    separately run the canonical static checker and a real Godot playtest.
+    """
+    if not isinstance(project_files, Mapping):
+        raise FrontierGodotError("existing Godot project mapping required")
+    if "project.godot" not in project_files:
+        raise FrontierGodotError("cannot attach frontier scene without project.godot")
+    if len(project_files) > 100_000:
+        raise FrontierGodotError("project file budget exceeded")
+    for path, content in project_files.items():
+        if (type(path) is not str or type(content) is not str
+                or not path or path.startswith("/") or
+                ".." in path.split("/") or "\\\\" in path):
+            raise FrontierGodotError("invalid existing Godot project file")
+    overlay = emit_frontier_godot_overlay(
+        candidate, cloud_path_duration_s=cloud_path_duration_s,
+        cloud_step_s=cloud_step_s,
+    )
+    conflicts = tuple(sorted(set(project_files).intersection(overlay)))
+    if any(project_files[key] != overlay[key] for key in conflicts):
+        raise FrontierGodotError("existing frontier project overlay would be overwritten")
+    return {**project_files, **overlay}
