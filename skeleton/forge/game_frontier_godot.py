@@ -695,17 +695,29 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             # Only typed commands with an approved runtime gateway may run.
             push_error("Unsupported game world mutation rejected by dispatcher")
             return
+    # Godot JSON.parse_string decodes JSON numeric fields as float. The
+    # Python quest source defines transition ticks and inventory counts as
+    # integers; normalize only these known typed keys before strict equality.
+    var expected_quests: Dictionary = bundle.get("expected_quests", {}).duplicate(true)
+    for qid in expected_quests.keys():
+        var expected_stage: Dictionary = expected_quests[qid]
+        var raw_tick: Variant = expected_stage.get("last_transition_frame", -1)
+        if float(raw_tick) != floorf(float(raw_tick)):
+            push_error("Nonintegral signed quest source tick")
+            return
+        expected_stage["last_transition_frame"] = int(raw_tick)
+    var expected_inventory: Dictionary = bundle.get("expected_inventory", {}).duplicate(true)
+    for item_id in expected_inventory.keys():
+        var amount: Variant = expected_inventory[item_id]
+        if float(amount) != floorf(float(amount)):
+            push_error("Nonintegral signed inventory source count")
+            return
+        expected_inventory[item_id] = int(amount)
     if (next_flags != bundle.get("expected_flags", {})
-        or next_quests != bundle.get("expected_quests", {})
-        or next_inventory != bundle.get("expected_inventory", {})
+        or next_quests != expected_quests
+        or next_inventory != expected_inventory
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})):
-        push_error("Engine RPG reducer diverged from independently replayed state" +
-            " quests=" + JSON.stringify(next_quests) +
-            " expected_quests=" + JSON.stringify(bundle.get("expected_quests", {})) +
-            " flags=" + JSON.stringify(next_flags) +
-            " expected_flags=" + JSON.stringify(bundle.get("expected_flags", {})) +
-            " inventory=" + JSON.stringify(next_inventory) +
-            " expected_inventory=" + JSON.stringify(bundle.get("expected_inventory", {})))
+        push_error("Engine RPG reducer diverged from independently replayed state")
         return
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
