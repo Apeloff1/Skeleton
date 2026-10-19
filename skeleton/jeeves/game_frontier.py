@@ -145,6 +145,7 @@ def compile_frontier_scene(
     previous_frame_receipt: FrameReceipt | None = None,
     between_frame_notes: tuple[GDDFrameNote, ...] = (),
     virtual_navigation: VirtualNavigationRequest | None = None,
+    previous_virtual_navigation: dict | None = None,
 ) -> FrontierSceneCandidate:
     """Produce a content-addressed, inspectable, playable-engine-side proposal.
 
@@ -578,10 +579,13 @@ def compile_frontier_scene(
     # receipts. Fictional game-map GPS NEVER uses that sensor/permission path.
     if virtual_navigation is not None and (gps_fix is not None or survey_controls):
         raise ValueError("do not mix virtual game positioning with physical GPS/survey")
+    if previous_virtual_navigation is not None and virtual_navigation is None:
+        raise ValueError("prior virtual GPS requires current virtual map observation")
     virtual_position = (compose_virtual_navigation(
         virtual_navigation, frame=frame_receipt,
         gdd=frame_gdd if frame_receipt is not None else None,
-        previous_frame=previous_frame_receipt)
+        previous_frame=previous_frame_receipt,
+        previous_navigation=previous_virtual_navigation)
         if virtual_navigation is not None else None)
     prediction = None
     if speculative_input is not None:
