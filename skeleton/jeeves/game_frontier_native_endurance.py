@@ -34,7 +34,7 @@ def exercise_native_session_endurance(
         or type(window_frames) is not int or not 1<=window_frames<=4096
         or type(retain_latest) is not int or not 1<=retain_latest<=1024
         or type(crash_interval) is not int or not 0<=crash_interval<=1024
-        or type(vault_path) is not Path):
+        or not isinstance(vault_path,Path)):
         raise NativeSessionVaultError("bounded endurance profile required")
     stats=journal.stats()
     head=stats["head"]
