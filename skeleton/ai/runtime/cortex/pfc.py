@@ -121,3 +121,33 @@ class PrefrontalCortex:
             slot="pfc", kind="plan", text=body, confidence=conf,
             tags=tags, numbers=(float(len(self.memory)), 1.0 if veto else 0.0),
         )
+
+    def plan_game_slice(self, stimulus: str, context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """Produce a Pareto-scoped vertical-slice execution gate for game creation."""
+        ctx = dict(context or {})
+        thought = self.think(stimulus, ctx)
+        veto = bool(thought.numbers and thought.numbers[-1] >= 1.0)
+        genre = str(ctx.get("genre") or "action")
+        era = str(ctx.get("era") or "extraction_now")
+        core_verb = str(ctx.get("core_verb") or f"{genre}:act_feedback_recover")
+        return {
+            "veto": veto,
+            "era": era,
+            "genre": genre,
+            "core_verb": core_verb,
+            "authoritative_state_fields": ("health", "position", "inventory", "tick_index", "rng_seed"),
+            "canon_sheet_locked": ("skin_tone", "eye_color", "hair_color", "hair_style", "cloth_primary"),
+            "vertical_slice_gates": (
+                "single_authoritative_state_writer",
+                "fixed_tick_simulation_decoupled_from_display",
+                "readable_telegraph_before_damage",
+                "legal_retry_state_on_failure",
+                "reproducible_seed_and_input_replay",
+            ),
+            "deferred_until_slice_green": (
+                "secondary_biomes",
+                "third_boss_phase",
+                "crowd_costume_variants",
+                "decorative_camera_shake",
+            ),
+        }

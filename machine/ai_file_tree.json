@@ -6582,7 +6582,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_178_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "180_mapping_plus_178_native_owner_current_main_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7317,6 +7317,11 @@
       "path": "skeleton/realtime",
       "owner": "Existing canonical application SSE and presence transport",
       "reason": "Accepted docs/architecture/ADR-realtime-transport.md retains the shared event envelope, bounded hub, authorization/presence, SLO and secret-guard implementation here; transport adds no competing model/runtime or durable state authority."
+    },
+    {
+      "path": "skeleton/compat",
+      "owner": "Canonical Python runtime compatibility adapters",
+      "reason": "Retain feature-detected Python runtime shims outside staged AI migration; the adapters are shared across application, engine, tests and CI, and remain the canonical owner of cross-version portability contracts."
     }
   ],
   "classification_coverage": {
@@ -7550,7 +7555,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 180,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 126,
+    "retained_outside_ai_tree_count": 127,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
@@ -7563,7 +7568,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 60
+    "native_ai_owner_count": 178
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8113,6 +8118,52 @@
       "parity_mode": "compatibility_facade",
       "authority": "Existing canonical provider owner and explicit non-owning alias; no provider, service, state-store or model-policy ownership cutover. Final canonical source object refresh and exact-head validation remain required.",
       "source_pin_policy": "Both provider aliases retain the same canonical source Git object pin and must refresh together against the frozen canonical source."
+    },
+    "current_main_source_parity_2026_10_20": {
+      "base_main_sha": "291e870d6f0104d8e4336dc82ab913cfa3ceb5b7",
+      "restored_exact_source_mirrors": [
+        "skeleton/ai/runtime/contracts/ai_execution.py",
+        "skeleton/ai/runtime/persistence/execution_repository.py",
+        "skeleton/ai/agents/jeeves/matrices.py",
+        "skeleton/ai/forge/game_builder.py",
+        "skeleton/ai/forge/hardware.py",
+        "skeleton/ai/runtime/cortex/accum.py",
+        "skeleton/ai/runtime/cortex/acquire_repo.py",
+        "skeleton/ai/runtime/cortex/genos.py",
+        "skeleton/ai/runtime/cortex/gossip.py",
+        "skeleton/ai/runtime/cortex/heads.py",
+        "skeleton/ai/runtime/cortex/hemispheres.py",
+        "skeleton/ai/runtime/cortex/hive.py",
+        "skeleton/ai/runtime/cortex/improve.py",
+        "skeleton/ai/runtime/cortex/learned.py",
+        "skeleton/ai/runtime/cortex/lm.py",
+        "skeleton/ai/runtime/cortex/lora.py",
+        "skeleton/ai/runtime/cortex/midbrain.py",
+        "skeleton/ai/runtime/cortex/moe.py",
+        "skeleton/ai/runtime/cortex/neocortex.py",
+        "skeleton/ai/runtime/cortex/neural.py",
+        "skeleton/ai/runtime/cortex/own.py",
+        "skeleton/ai/runtime/cortex/pfc.py",
+        "skeleton/ai/runtime/cortex/port.py",
+        "skeleton/ai/runtime/cortex/production_profile.py",
+        "skeleton/ai/runtime/cortex/refs.py",
+        "skeleton/ai/runtime/cortex/rl.py",
+        "skeleton/ai/runtime/cortex/sleep.py",
+        "skeleton/ai/runtime/cortex/speculative.py",
+        "skeleton/ai/runtime/cortex/transformer.py",
+        "skeleton/ai/runtime/distributed/mesh/connection_pool.py",
+        "skeleton/ai/runtime/distributed/mesh/deduplicator.py",
+        "skeleton/ai/runtime/distributed/mesh/request_hedging.py",
+        "skeleton/ai/runtime/distributed/mesh/service_discovery.py",
+        "skeleton/ai/runtime/distributed/mesh/throughput_controller.py",
+        "skeleton/ai/runtime/distributed/mesh/traffic_splitter.py"
+      ],
+      "restored_mirror_count": 35,
+      "classification_added": [
+        "skeleton/compat"
+      ],
+      "native_owner_count": 178,
+      "policy": "Preserve canonical source authority and staged-mirror parity using exact pre-existing Git blobs. Do not introduce new owner, authorize cutover or change signatures. Require exact-head CI."
     }
   },
   "native_ai_owners": [

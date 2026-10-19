@@ -476,6 +476,46 @@ def _attach_qa(body: dict[str, Any], qa: QaHook | None, report: Mapping[str, Any
     return body
 
 
+def cortex_planner_hook(cortex: Any) -> PlannerHook:
+    """Return a `PlannerHook` backed by `JeevesCortex.plan_game_spec`."""
+    def _hook(spec: Mapping[str, Any]) -> Mapping[str, Any]:
+        if cortex is not None and hasattr(cortex, "plan_game_spec"):
+            return cortex.plan_game_spec(dict(spec))
+        return dict(spec)
+    return _hook
+
+
+def cortex_qa_hook(cortex: Any, *, learn: bool = True) -> QaHook:
+    """Return a `QaHook` backed by `JeevesCortex.review_game_build` and optional online learning."""
+    def _hook(build: Mapping[str, Any]) -> Mapping[str, Any]:
+        if cortex is None or not hasattr(cortex, "review_game_build"):
+            return {"passed": bool(build.get("ok")), "issues": []}
+        verdict = dict(cortex.review_game_build(dict(build)))
+        if learn and hasattr(cortex, "learn_from_game_build"):
+            verdict["learning"] = cortex.learn_from_game_build(dict(build))
+        return verdict
+    return _hook
+
+
+def finetuned_game_creation_hooks(
+    cortex: Any = None,
+    *,
+    finetune_rounds: int = 1,
+    learn_on_qa: bool = True,
+) -> tuple[PlannerHook, QaHook, Any]:
+    """Build or finetune a `JeevesCortex` and return `(planner_hook, qa_hook, cortex)`."""
+    if cortex is None:
+        from skeleton.cortex.neocortex import JeevesCortex
+        cortex = JeevesCortex()
+    if finetune_rounds > 0 and hasattr(cortex, "apply_gaming_weights"):
+        cortex.apply_gaming_weights(rounds=finetune_rounds)
+    return (
+        cortex_planner_hook(cortex),
+        cortex_qa_hook(cortex, learn=learn_on_qa),
+        cortex,
+    )
+
+
 def _optional_id(value: str | None, name: str) -> str | None:
     if value is None or value == "":
         return None

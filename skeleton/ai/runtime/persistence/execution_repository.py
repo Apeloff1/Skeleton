@@ -12,7 +12,8 @@ import json
 import sqlite3
 import threading
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
