@@ -183,5 +183,88 @@ class OperatorCLIRegressionTests(unittest.TestCase):
             self.run_command("ingest")
 
 
+    def test_operator_approved_native_quest_session_cli(self):
+        """Full operator path: native ingest -> proposals -> approval -> quest."""
+        from hashlib import sha256
+        from skeleton.jeeves.game_frontier_receipt_journal import FrameReceiptJournal
+        from skeleton.jeeves.game_frontier_native_rpg_bridge import (
+            parse_native_rpg_pages,evaluate_native_rpg_timeline,
+        )
+        from skeleton.jeeves.game_frontier_native_quest_session import (
+            authored_page_digest,parse_native_quest_graph,
+        )
+        def checksum(source):
+            return sha256(json.dumps(source,sort_keys=True,separators=(",",":"),
+                                     allow_nan=False).encode()).hexdigest()
+        self.capture.write_text("".join(json.dumps(self.sample(n))+"\\n"
+                                        for n in range(4)))
+        code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture))
+        self.assertEqual(code,0,err)
+        pages={"schema":"skeleton.game.native_rpg_pages.v1","pages":[{
+            "id":"quest_begin","priority":40,
+            "conditions":[{"signal":"native_actor_speed_mps",
+                           "comparison":"at_least","threshold":2.}],
+            "actions":[{"kind":"start_quest","channel":"quest",
+                        "target":"hero","value":"sky_route"}],
+            "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
+        }]}
+        graph={"schema":"skeleton.game.native_quest_graph.v1","quests":[{
+            "id":"sky_route","title":"Airborne route","start":"departure",
+            "stages":[
+                {"id":"departure","objective":"Board","next":["landed"]},
+                {"id":"landed","objective":"Arrive","next":[]},
+            ],
+        }]}
+        with FrameReceiptJournal(self.db,self.anchor) as journal:
+            proposal=evaluate_native_rpg_timeline(
+                journal,parse_native_rpg_pages(pages),actor_id="hero")
+        entry=proposal["entries"][0]
+        approved=entry["accepted_proposals"][0]
+        manifest={
+            "schema":"skeleton.game.native_quest_approvals.v1",
+            "session_id":"operator-confirmed-route",
+            "actor_id":"hero","track":"production",
+            "signed_gdd_digest":self.anchor.source_digest,
+            "authored_pages_digest":authored_page_digest(parse_native_rpg_pages(pages)),
+            "quest_graph_digest":parse_native_quest_graph(graph)["receipt_digest"],
+            "initial_flags":{},
+            "approvals":[{
+                "frame":0,"page_id":"quest_begin",
+                "event_evidence_digest":approved["event_evidence_digest"],
+                "frame_receipt_digest":entry["frame_receipt_digest"],
+            }],
+        }
+        manifest["receipt_digest"]=checksum(manifest)
+        files={}
+        for name,body in (("native_events",pages),("quest_graph",graph),
+                          ("approved_events",manifest)):
+            path=self.directory/(name+".json")
+            path.write_text(json.dumps(body))
+            files[name]=str(path)
+        opts=("--actor-id","hero","--event-pages-json",files["native_events"],
+              "--quest-graph-json",files["quest_graph"],
+              "--quest-approvals-json",files["approved_events"])
+        code,out,err=self.run_command("simulate-quests",*opts)
+        self.assertEqual(code,0,err)
+        report=json.loads(out)["gameplay_session"]
+        self.assertEqual(report["approved_page_count"],1)
+        self.assertEqual(report["final_quests"]["sky_route"]["stage"],"departure")
+        self.assertFalse(report["final_quests"]["sky_route"]["completed"])
+        self.assertEqual(report["source_prefix_verified_frames"],4)
+        code,out,err=self.run_command("simulate-quests",*opts,
+                                      "--start-frame","2","--through","3",
+                                      "--event-limit","2")
+        self.assertEqual(code,0,err)
+        self.assertEqual(json.loads(out)["gameplay_session"]["final_quests"],
+                         report["final_quests"])
+        manifest["approvals"][0]["event_evidence_digest"]="0"*64
+        manifest["receipt_digest"]=checksum({k:v for k,v in manifest.items()
+                                             if k!="receipt_digest"})
+        Path(files["approved_events"]).write_text(json.dumps(manifest))
+        code,out,err=self.run_command("simulate-quests",*opts)
+        self.assertEqual(code,2)
+        self.assertIn("approval references forged",err)
+
+
 if __name__=="__main__":
     unittest.main()

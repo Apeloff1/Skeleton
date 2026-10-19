@@ -122,7 +122,8 @@ class NativeQuestSessionTests(unittest.TestCase):
         approval=approval if approval is not None else self.approval(pages,quest=quest)
         return simulate_native_quest_session(
             self.journal,pages,quest,approval,actor_id="hero",
-            scene_candidate_digest="d"*64,**kwargs)
+            scene_candidate_digest=kwargs.pop("scene_candidate_digest","d"*64),
+            **kwargs)
 
     def test_full_branch_progression_flags_cues_and_evidence_chain(self):
         report=self.run_session()
