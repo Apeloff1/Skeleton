@@ -203,13 +203,32 @@ def _prior_integrity(previous_evidence: Mapping,
                 previous_evidence.get("signed_gdd_digest")==gdd.source_digest and
                 previous_evidence.get("verifier_a") is True and
                 previous_evidence.get("verifier_b") is True and
+                previous_evidence.get("frame_index")==previous.frame_index and
+                previous_evidence.get("chunk_count")==len(previous.chunks) and
+                previous_evidence.get("object_count")==sum(
+                    len(c.objects) for c in previous.chunks) and
                 isinstance(previous_evidence.get("receipts"),list) and
-                [row.get("source_chunk_digest") for row in previous_evidence["receipts"]]==
-                    [c.content_digest for c in previous.chunks] and
-                all(isinstance(row,Mapping) and
+                len(previous_evidence["receipts"])==len(previous.chunks) and
+                all(
+                    isinstance(row,Mapping) and
                     row.get("receipt_digest")==_hash({
                         k:v for k,v in row.items() if k!="receipt_digest"
-                    }) for row in previous_evidence["receipts"]))
+                    }) and
+                    row.get("source_chunk_digest")==chunk.content_digest and
+                    row.get("source_frame_digest")==previous.receipt_digest and
+                    row.get("signed_gdd_digest")==gdd.source_digest and
+                    row.get("chunk_xy")==list(chunk.chunk_key) and
+                    row.get("source_entities")==[
+                        obj.entity_id for obj in chunk.objects] and
+                    row.get("source_asset_digests")==[
+                        obj.source_digest for obj in chunk.objects] and
+                    row.get("verifier_a",{}).get("passed") is True and
+                    row.get("verifier_a",{}).get("recomputed_digest")==
+                        _hash(chunk.payload()) and
+                    row.get("verifier_b",{}).get("passed") is True
+                    for row,chunk in zip(
+                        previous_evidence["receipts"],previous.chunks)
+                ))
     except (TypeError,ValueError,KeyError,AttributeError):
         return False
 
