@@ -133,6 +133,15 @@ FOCUS: dict[str, str] = {
     "likeness": "The rule is that a performer face on the {asset} needs written consent for the {place}, and silence is not a {grant}.",
     "music_rights": "The rule is that the {note} cue separates the composition from the recorded take, and only the take named by the {grant} may ship.",
     "asset_rights": "The rule is that the {asset} enters the {place} only with a {grant} for the shipped revision, and a preview file is not that grant.",
+    "sea_map": "The rule is that the seamap of the {place} marks deep water, the shore, and the rock, and a chart with no shore is not a harbor.",
+    "mountain_map": "The rule is that the mountain map of the {place} has a peak, a valley, and a pass, and the peak is higher than the valley.",
+    "cave_map": "The rule is that the cave map of the {place} starts at one entrance and every floor step connects back to that entrance.",
+    "elevation_map": "The rule is that the elevation map of the {place} stores a height on every cell, and a walk uses that height rather than the picture.",
+    "adventure_map": "The rule is that the adventure map of the {place} links screens across seams, and a large height change is a stair rather than a silent step.",
+    "homebrew_map": "The rule is that the homebrew map of the {place} has one home cell and a maker key, and every trail connects back to that home.",
+    "tabletop_map": "The rule is that the tabletop map of the {place} uses one square scale, and cover stops a shot without blocking a step.",
+    "dungeon_map": "The rule is that the dungeon map of the {place} links original rooms by doors, and every room connects back to the entry.",
+    "jeeves_cognition": "The rule is that Jeeves keeps a claim about the {place} uncertain until the {asset} evidence is written, and a missing observation does not become a fact.",
 }
 
 
