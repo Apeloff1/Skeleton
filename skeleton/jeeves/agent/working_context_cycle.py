@@ -317,7 +317,8 @@ class ScopeVerifier:
                     )
             if not valid_negative:
                 raise ValueError("note has no independently confirmed no-found source")
-            if note.scope != _scope(obs) or "do not infer global nonexistence" not in note.text:
+            if (note.scope != _scope(obs) or note.tool_name != obs.tool_name
+                    or "do not infer global nonexistence" not in note.text):
                 raise ValueError("source scope or epistemic warning was lost")
             if not note.serial.startswith("JVS-"):
                 raise ValueError("note has no page serial")
