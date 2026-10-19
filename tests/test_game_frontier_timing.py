@@ -11,7 +11,7 @@ class FrameToEngineBridgeTests(unittest.TestCase):
     def test_mode_preserves_authoritative_era_physics(self):
         for era in (EngineEra.EARLY_3D, EngineEra.FIXED_3D, EngineEra.SHADER,
                     EngineEra.MODERN, EngineEra.NEXT):
-            for fps in (30, 50, 120):
+            for fps in (30, 50, 60, 120):
                 bridge = FrontierEraTiming(era, fps=fps)
                 self.assertEqual(bridge.simulation_hz, engine_era_profile(era).tick_hz)
                 self.assertEqual(bridge.simulation.policy.presentation_hz, fps)
