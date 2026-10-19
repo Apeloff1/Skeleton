@@ -160,6 +160,7 @@ jobs:
             skeleton/jeeves/agent/adaptive_runtime.py
           python -m pytest -q --noconftest \
             tests/test_jeeves_working_context_cycle.py \
+            tests/test_jeeves_adversarial_verifier_review.py \
             tests/test_jeeves_code_delivery_quality.py
 
       - name: Canonical local/CI quality parity gate
