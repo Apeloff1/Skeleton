@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-**Game-model 2026-10-19 P0–P3 To-Do:** [313 sequenced game frontier milestones](TODO.md) and [acceptance plan](docs/plan/GAME_FRONTIER_MODELS_P0_P3_2026_10_19.md) (feature-branch source only; not production-qualified).
+**Game-model 2026-10-19 P0–P3 To-Do:** [344 sequenced game frontier milestones](TODO.md) and [acceptance plan](docs/plan/GAME_FRONTIER_MODELS_P0_P3_2026_10_19.md) (feature-branch source only; not production-qualified).
 
 Updated 2026-09-18 (F-60..F-67 idempotency headers, bool TTL/rate, era allow-list, identity audits). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
