@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from skeleton.jeeves.agent.types import Goal, ToolObservation
+from skeleton.jeeves.agent.types import EvidenceKind, EvidenceRef, Goal, ToolObservation
 from skeleton.jeeves.agent.working_context_cycle import (
     CycleReceipt,
     IntegrityVerifier,
@@ -164,3 +164,80 @@ def test_rehashed_but_false_receipt_event_is_rejected():
     forged = replace(original, receipts=tuple(receipts))
     with pytest.raises(ValueError, match="bind the declared event"):
         IntegrityVerifier.verify(forged, goal(), observations)
+
+
+def test_retained_observation_payload_and_evidence_cannot_be_replaced_by_id():
+    source = hit()
+    scoped = (miss(), source)
+    prepared = WorkingContextCycle().prepare(goal(), scoped)
+    swapped = replace(source, payload={"status": "ok", "results": ["forged"]})
+    altered = replace(prepared, active_observations=(swapped,))
+    with pytest.raises(ValueError, match="active evidence"):
+        IntegrityVerifier.verify(altered, goal(), scoped)
+    with pytest.raises(ValueError, match="retained observation source"):
+        ScopeVerifier.verify(altered, goal(), scoped)
+
+    citation = EvidenceRef(
+        evidence_id="ev:123", kind=EvidenceKind.TOOL, source="git:commit",
+        fingerprint="a" * 64, observed_at=10.0, confidence=0.9,
+    )
+    witnessed = replace(source, evidence=(citation,))
+    evidence_scope = (miss(), witnessed)
+    checked = WorkingContextCycle().prepare(goal(), evidence_scope)
+    forged_citation = replace(citation, fingerprint="b" * 64)
+    corrupted = replace(checked, active_observations=(
+        replace(witnessed, evidence=(forged_citation,)),
+    ))
+    with pytest.raises(ValueError, match="active evidence"):
+        IntegrityVerifier.verify(corrupted, goal(), evidence_scope)
+    with pytest.raises(ValueError, match="retained observation source"):
+        ScopeVerifier.verify(corrupted, goal(), evidence_scope)
+
+
+def test_original_goal_metadata_is_authoritative_for_delivery_gates():
+    original = Goal(
+        "goal:working", "Build a game", metadata={"delivery_kind": "game"},
+    )
+    prepared = WorkingContextCycle().prepare(original, (miss(),))
+    verify_delivery(prepared, original, (miss(),))
+    lowered = replace(original, metadata={"delivery_kind": "non_code"})
+    with pytest.raises(ValueError, match="original goal"):
+        verify_delivery(prepared, lowered, (miss(),))
+
+
+@pytest.mark.parametrize("negative", (
+    {"status": "no_results", "results": [{"path": "found.py"}]},
+    {"status": "no_results", "next_cursor": "page-2", "results": []},
+    {"status": "no_matches", "has_more": True},
+    {"found": False, "complete": False},
+    {"status": "not_found", "complete": False},
+    {"status": "no_results", "items": [{"id": 1}]},
+    {"status": "no_results", "results": "invalid collection"},
+))
+def test_incomplete_or_contradictory_negative_results_cannot_be_compacted(negative):
+    observation = ToolObservation(
+        "search-partial", "search_repo", True, payload=negative,
+    )
+    assert not is_no_found(observation)
+    prepared = WorkingContextCycle().prepare(goal(), (observation,))
+    assert not prepared.notes
+    assert prepared.active_observations == (observation,)
+    verify_delivery(prepared, goal(), (observation,))
+    # A forged note for a contradictory result is rejected by the separate
+    # source-scope verifier even when the tool says 'no_results'.
+    prior = WorkingContextCycle().prepare(goal(), (miss(),))
+    forged = replace(prior, notes=(replace(prior.notes[0], call_id="search-partial"),))
+    with pytest.raises(ValueError, match="independently confirmed no-found"):
+        ScopeVerifier.verify(forged, goal(), (observation,))
+
+
+def test_compaction_savings_and_input_types_cannot_be_forged():
+    observed = (miss(), hit())
+    prepared = WorkingContextCycle().prepare(goal(), observed)
+    with pytest.raises(ValueError, match="space accounting"):
+        IntegrityVerifier.verify(
+            replace(prepared, freed_chars=prepared.freed_chars + 9999),
+            goal(), observed,
+        )
+    with pytest.raises(TypeError, match="ToolObservation"):
+        WorkingContextCycle().prepare(goal(), (object(),))
