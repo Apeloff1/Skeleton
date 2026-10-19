@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import PurePosixPath
 from typing import Callable, Mapping, Sequence
 
 from .code_scrutiny_loop import (
-    Checker, CodeFinding, CodeScrutinyLoop, Discovery, Repair, ScrutinyOutcome,
+    CodeFinding, CodeScrutinyLoop, Discovery, Repair, ScrutinyOutcome,
     ScrutinyPolicy, verify_scrutiny_receipts,
 )
 from .types import Goal, stable_fingerprint
