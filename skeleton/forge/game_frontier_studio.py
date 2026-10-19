@@ -47,6 +47,7 @@ STUDIO_TOOLS = (
     "frame_location_coherence", "gdd_navigation_context",
     "native_3d_trigger_volume_editor", "authored_quest_zone_bindings",
     "native_zone_event_timeline_inspector",
+    "native_runtime_rpg_event_compiler", "native_physics_sensor_bindings",
 )
 
 
@@ -323,6 +324,62 @@ def compile_studio_gameplay_zones(project: StudioProject) -> dict:
     }
     report["receipt_digest"]=sha256(json.dumps(
         report,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+    return report
+
+
+def compile_studio_native_rpg_pages(
+    project: StudioProject, *,
+    actor_entity_id: str,
+) -> dict:
+    """Export already-authored Studio environmental pages to real native RPG.
+
+    Only source sensors reported by the Godot gameplay journal can be
+    compiled. A weather or environmental signal not observed in the selected
+    engine run cannot silently become an invented runtime measurement.
+    """
+    from skeleton.jeeves.game_frontier_native_rpg_bridge import (
+        NATIVE_RPG_SIGNALS, parse_native_rpg_pages,
+    )
+    if not isinstance(project,StudioProject) or type(actor_entity_id) is not str:
+        raise StudioError("typed native RPG project and actor required")
+    placements={
+        p.prefab_id+":"+str(index):p.prefab_id
+        for index,p in enumerate(project.placements)}
+    prefab=placements.get(actor_entity_id)
+    if prefab is None:
+        raise StudioError("native RPG actor must be an authored placed source")
+    pages=[]
+    for page in project.environmental_pages:
+        if any(condition.signal not in NATIVE_RPG_SIGNALS
+               for condition in page.conditions):
+            raise StudioError("Studio environmental page has no observed native physics sensor")
+        if any(action.target not in (actor_entity_id,prefab)
+               for action in page.actions):
+            raise StudioError("native RPG page target is not the selected source actor")
+        pages.append({
+            "id":page.page_id,"priority":page.priority,
+            "conditions":[condition.__dict__ for condition in page.conditions],
+            "actions":[action.__dict__ for action in page.actions],
+            "required_flags":[{"name":name,"value":value}
+                              for name,value in page.required_flags],
+            "cooldown_ms":page.cooldown_ms,
+            "enabled":page.enabled,"repeat":page.repeat,
+        })
+    report={
+        "schema":"skeleton.game.native_rpg_pages.v1",
+        "pages":pages,
+        "authored_studio_digest":compile_studio_project(project)["content_sha256"],
+        "source_actor_id":actor_entity_id,
+        "authority":"Studio_native_RPG_source_proposals_not_world_mutations",
+    }
+    report["receipt_digest"]=sha256(json.dumps(
+        report,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+    try:
+        parsed=parse_native_rpg_pages(report)
+    except ValueError as exc:
+        raise StudioError("Studio native RPG pages failed common typed verifier") from exc
+    if len(parsed)!=len(project.environmental_pages):
+        raise StudioError("Studio native RPG page coverage incomplete")
     return report
 
 

@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from skeleton.forge.game_frontier_studio import (
     StudioProject,StudioPrefab,StudioEvent,StudioPlacement,StudioTriggerVolume,
+    compile_studio_native_rpg_pages,
     MapLayer,StudioError,compile_studio_gameplay_zones,compile_studio_project,STUDIO_TOOLS,
 )
 from skeleton.jeeves.game_frontier_worlds import ProjectionMode,WorldFamily
@@ -90,3 +91,59 @@ class StudioZoneAuthoringTests(unittest.TestCase):
         self.assertEqual(a["zones"],[])
         self.assertEqual(a["zone_count"],0)
         self.assertEqual(a,compile_studio_gameplay_zones(legacy))
+
+class StudioNativeRPGPageCompilationTests(unittest.TestCase):
+    def test_physics_zone_page_compiles_as_runtime_compatible_typed_source(self):
+        from skeleton.forge.game_frontier_rpg_events import (
+            EnvironmentalTrigger,RPGEventPage,RPGEventAction,
+        )
+        from skeleton.jeeves.game_frontier_native_rpg_bridge import parse_native_rpg_pages
+        page=RPGEventPage("zone_quest",70,(
+            EnvironmentalTrigger("native_gameplay_zone_entries","at_least",1.),),
+            (RPGEventAction("start_quest","quest","hero:0","chapter_1"),),
+            required_flags=(("can_start_quest",True),),
+            cooldown_ms=150,repeat=False)
+        studio=replace(authored(),environmental_pages=(page,))
+        result=compile_studio_native_rpg_pages(studio,actor_entity_id="hero:0")
+        self.assertEqual(result["source_actor_id"],"hero:0")
+        self.assertEqual(result["pages"][0]["id"],"zone_quest")
+        self.assertEqual(result["pages"][0]["required_flags"][0]["name"],"can_start_quest")
+        parsed=parse_native_rpg_pages(result)
+        self.assertEqual(parsed[0].conditions[0].signal,"native_gameplay_zone_entries")
+        self.assertEqual(parsed[0].cooldown_ms,150)
+        self.assertEqual(result,compile_studio_native_rpg_pages(
+            studio,actor_entity_id="hero:0"))
+        self.assertIn("native_runtime_rpg_event_compiler",STUDIO_TOOLS)
+
+    def test_native_event_compiler_blocks_unsupported_sensor_and_actor_targets(self):
+        from skeleton.forge.game_frontier_rpg_events import (
+            EnvironmentalTrigger,RPGEventPage,RPGEventAction,
+        )
+        for sensor,target in (
+            ("temperature_c","hero:0"),
+            ("native_actor_speed_mps","unplaced_hero"),
+        ):
+            page=RPGEventPage("observed",12,(
+                EnvironmentalTrigger(sensor,"above",.1),),
+                (RPGEventAction("show_dialogue","ui",target,"message"),))
+            studio=replace(authored(),environmental_pages=(page,))
+            with self.assertRaises(StudioError):
+                compile_studio_native_rpg_pages(studio,actor_entity_id="hero:0")
+        with self.assertRaises(StudioError):
+            compile_studio_native_rpg_pages(authored(),actor_entity_id="npc:99")
+
+    def test_native_compiled_page_tamper_breaks_receipt_before_runtime(self):
+        from skeleton.forge.game_frontier_rpg_events import (
+            EnvironmentalTrigger,RPGEventPage,RPGEventAction,
+        )
+        from skeleton.jeeves.game_frontier_native_rpg_bridge import (
+            parse_native_rpg_pages,NativeRPGBridgeError,
+        )
+        page=RPGEventPage("native_mass",10,(
+            EnvironmentalTrigger("character_mass_kg","above",20.),),
+            (RPGEventAction("show_dialogue","ui","hero","heavy"),))
+        report=compile_studio_native_rpg_pages(
+            replace(authored(),environmental_pages=(page,)),actor_entity_id="hero:0")
+        report["pages"][0]["priority"]=90
+        with self.assertRaises(NativeRPGBridgeError):
+            parse_native_rpg_pages(report)

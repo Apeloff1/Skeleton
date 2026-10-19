@@ -21,6 +21,15 @@ from .game_frontier_native_dynamics import inspect_native_dynamics
 from .game_frontier_native_zones import inspect_native_gameplay_zones
 
 
+NATIVE_RPG_SIGNALS=frozenset({
+    "altitude_m","fall_speed_mps","character_mass_kg",
+    "native_actor_speed_mps","native_vertical_speed_mps",
+    "native_contact_count","native_kinetic_energy_j",
+    "native_gameplay_zone_entries","native_gameplay_zone_exits",
+    "native_gameplay_zone_occupants",
+})
+
+
 class NativeRPGBridgeError(ValueError):
     pass
 
@@ -35,6 +44,12 @@ def parse_native_rpg_pages(payload: object) -> tuple[RPGEventPage,...]:
     if not isinstance(payload,dict) or payload.get("schema")!=(
         "skeleton.game.native_rpg_pages.v1"):
         raise NativeRPGBridgeError("source-typed game event pages JSON required")
+    if "receipt_digest" in payload:
+        stored=payload["receipt_digest"]
+        unsealed={key:value for key,value in payload.items()
+                  if key!="receipt_digest"}
+        if type(stored) is not str or stored!=_digest(unsealed):
+            raise NativeRPGBridgeError("native RPG source page receipt identity corrupt")
     specs=payload.get("pages")
     if not isinstance(specs,list) or len(specs)>4096:
         raise NativeRPGBridgeError("bounded RPG event pages list required")
