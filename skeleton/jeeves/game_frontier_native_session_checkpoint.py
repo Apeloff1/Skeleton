@@ -122,12 +122,13 @@ def advance_native_quest_window(
     actor_id: str, scene_candidate_digest: str,
     through_frame: int | None = None,
     previous_checkpoint: dict | None = None,
+    expected_checkpoint_digest: str | None = None,
     max_frames: int = 256,
 ) -> dict:
     """Consume a bounded contiguous native replay window and output next cursor.
 
     First window runs canonical full-prefix replay. A continuation verifies
-    its trusted predecessor against CAS source, then independently checks
+    its separately trusted predecessor digest against CAS source, then checks
     only the next bounded native window. Approval entries for past frames
     are append-only. Unapproved page proposals still consume cooldown/once,
     but never modify the quest state or flags.
@@ -148,6 +149,8 @@ def advance_native_quest_window(
     current_head=journal.stats()["head"]
     finish=current_head if through_frame is None else through_frame
     if previous_checkpoint is None:
+        if expected_checkpoint_digest is not None:
+            raise NativeQuestSessionError("unexpected trusted checkpoint anchor for first window")
         begin=0
         flags=dict(approval["initial_flags"])
         quests={}
@@ -159,6 +162,10 @@ def advance_native_quest_window(
         old_count=0
         old_frame_digest=None
     else:
+        if (type(expected_checkpoint_digest) is not str or
+            _HEX.fullmatch(expected_checkpoint_digest) is None or
+            previous_checkpoint.get("receipt_digest")!=expected_checkpoint_digest):
+            raise NativeQuestSessionError("independent trusted checkpoint digest required for resume")
         previous=_require_checkpoint(
             previous_checkpoint,journal=journal,source=scene_candidate_digest,
             actor=actor_id,pages_hash=pages_hash,graph=graph,approval=approval)

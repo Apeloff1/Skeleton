@@ -68,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quest-graph-json",type=Path)
     parser.add_argument("--quest-approvals-json",type=Path)
     parser.add_argument("--checkpoint-input-json",type=Path)
+    parser.add_argument("--expected-checkpoint-digest")
     parser.add_argument("--checkpoint-output-json",type=Path)
     parser.add_argument("--audit-max-frames",type=int,default=256)
     parser.add_argument("--other-journal",type=Path)
@@ -117,10 +118,12 @@ def main(argv: list[str] | None = None) -> int:
         arguments.quest_graph_json is None or arguments.quest_approvals_json is None):
         parser.error("quest replay needs RPG pages, actor, graph and approvals")
     if arguments.operation=="advance-quests" and (
-        arguments.checkpoint_output_json is None or arguments.start_frame!=0):
-        parser.error("durable quest continuation requires a new checkpoint output and no frame cursor")
+        arguments.checkpoint_output_json is None or arguments.start_frame!=0 or
+        (arguments.checkpoint_input_json is None)!=(arguments.expected_checkpoint_digest is None)):
+        parser.error("durable quest continuation requires new checkpoint output, and trusted digest for resume")
     if arguments.operation!="advance-quests" and (
-        arguments.checkpoint_input_json is not None or arguments.checkpoint_output_json is not None):
+        arguments.checkpoint_input_json is not None or arguments.checkpoint_output_json is not None
+        or arguments.expected_checkpoint_digest is not None):
         parser.error("checkpoint files only apply to advance-quests")
     if arguments.operation not in ("simulate-quests","advance-quests") and (
         arguments.quest_graph_json is not None or arguments.quest_approvals_json is not None):
@@ -253,6 +256,7 @@ def main(argv: list[str] | None = None) -> int:
                         scene_candidate_digest=settings["candidate_digest"],
                         through_frame=arguments.through,
                         previous_checkpoint=prior,
+                        expected_checkpoint_digest=arguments.expected_checkpoint_digest,
                         max_frames=arguments.event_limit)
                     # Exclusive create avoids overwriting any earlier checkpoint,
                     # restoring/rewriting a user save, or following a symlink.

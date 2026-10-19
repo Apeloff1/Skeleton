@@ -32,12 +32,15 @@ class NativeQuestCheckpointTests(unittest.TestCase):
         self.approvals=fixture.approval()
 
     def step(self, *, through, checkpoint=None, approvals=None, pages=None,
-             graph_source=None, actor="hero", source="d"*64, max_frames=256):
+             graph_source=None, actor="hero", source="d"*64, max_frames=256,
+             trusted_root=None):
         return advance_native_quest_window(
             self.journal,pages or self.pages,graph_source or self.graph,
             approvals if approvals is not None else self.approvals,
             actor_id=actor,scene_candidate_digest=source,
             through_frame=through,previous_checkpoint=checkpoint,
+            expected_checkpoint_digest=(trusted_root if trusted_root is not None
+                else checkpoint["receipt_digest"] if checkpoint is not None else None),
             max_frames=max_frames)
 
     def test_four_window_replay_matches_monolithic_quest_actions_and_recipts(self):
@@ -54,7 +57,9 @@ class NativeQuestCheckpointTests(unittest.TestCase):
             self.assertTrue(verify_native_quest_window(
                 self.journal,self.pages,self.graph,self.approvals,result,
                 actor_id="hero",scene_candidate_digest="d"*64,
-                through_frame=frame,previous_checkpoint=receipt))
+                through_frame=frame,previous_checkpoint=receipt,
+                expected_checkpoint_digest=(
+                    receipt["receipt_digest"] if receipt is not None else None)))
             receipt=result["checkpoint"]
         self.assertEqual(captured,whole["entries"])
         self.assertEqual(receipt["quests"],whole["final_quests"])
@@ -131,7 +136,8 @@ class NativeQuestCheckpointTests(unittest.TestCase):
                     k:v for k,v in fake.items() if k!="receipt_digest"})
             with self.subTest(variant=variant),self.assertRaises(
                 (NativeQuestSessionError,FrameJournalError)):
-                self.step(through=2,checkpoint=fake)
+                self.step(through=2,checkpoint=fake,
+                          trusted_root=valid["receipt_digest"])
 
     def test_tampering_with_sqlite_source_rejected_during_resume(self):
         initial=self.step(through=1)
@@ -163,12 +169,13 @@ class NativeQuestCheckpointTests(unittest.TestCase):
         start=self.step(through=0)
         result=self.step(through=2,checkpoint=start["checkpoint"])
         corrupt=deepcopy(result)
-        corrupt["checkpoint"]["quests"]["chapter_1"]["stage"]="ending"
+        corrupt["checkpoint"]["quests"]["chapter_1"]["stage"]="middle"
         with self.assertRaises(NativeQuestSessionError):
             verify_native_quest_window(
                 self.journal,self.pages,self.graph,self.approvals,corrupt,
                 actor_id="hero",scene_candidate_digest="d"*64,
-                through_frame=2,previous_checkpoint=start["checkpoint"])
+                through_frame=2,previous_checkpoint=start["checkpoint"],
+                expected_checkpoint_digest=start["checkpoint"]["receipt_digest"])
 
     def test_segment_verifier_checks_anchored_game_source(self):
         first=self.journal.verify_native_segment(start_frame=0,through=4)
