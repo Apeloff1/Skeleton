@@ -42,7 +42,12 @@ func _ready() -> void:
         push_error("Invalid frontier data")
         return
     Engine.max_fps = int(data["requested_fps"])
-    _create_character(data["geometry"], data["colliders"])
+    var suite: Dictionary = data.get("character_suite", {})
+    if typeof(suite.get("elastic_skin3d")) == TYPE_DICTIONARY:
+        _create_elastic_body_skin(suite["elastic_skin3d"], data["geometry"])
+    else:
+        _create_character(data["geometry"], data["colliders"])
+    _create_character_suite_inspector(suite)
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
     _create_camera(data.get("projection", {}), data.get("world_variant", {}))
@@ -54,6 +59,73 @@ func _ready() -> void:
     _create_advanced_character(data.get("advanced_physics", {}))
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
+
+func _create_elastic_body_skin(info: Dictionary, geometry: Dictionary) -> void:
+    # Real SoftBody3D preview path. Native solver acceptance, pin stability,
+    # and accurate skin tissue biomechanics remain separate engine checks.
+    var points: Array = info.get("positions_xyz", [])
+    var triangles: Array = geometry.get("triangles", [])
+    if points.is_empty() or triangles.is_empty():
+        push_error("ElasticBodySkin3D missing mesh topology")
+        return
+    var pins: Array = info.get("pinned_vertices", [])
+    var pinned_occurrences := PackedInt32Array()
+    var builder := SurfaceTool.new()
+    builder.begin(Mesh.PRIMITIVE_TRIANGLES)
+    var vertex_number := 0
+    for face in triangles:
+        for source_index in face:
+            var idx := int(source_index)
+            if idx < 0 or idx >= points.size():
+                push_error("ElasticBodySkin3D invalid mesh index")
+                return
+            builder.add_vertex(_vec(points[idx]))
+            if pins.has(idx):
+                pinned_occurrences.append(vertex_number)
+            vertex_number += 1
+    builder.generate_normals()
+    var native_mesh := builder.commit()
+    if native_mesh == null:
+        push_error("ElasticBodySkin3D mesh materialisation failed")
+        return
+    var soft := SoftBody3D.new()
+    soft.name = "ElasticBodySkin3D"
+    soft.mesh = native_mesh
+    soft.total_mass = max(.01, float(info.get("mass_per_vertex_kg", .04)) * float(points.size()))
+    soft.linear_stiffness = clamp(float(info.get("shear_stiffness", 8.0)) / 100.0, .01, 1.0)
+    soft.damping_coefficient = clamp(float(info.get("damping", 1.0)) / 50.0, 0.0, 1.0)
+    soft.simulation_precision = 8
+    soft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+    add_child(soft)
+    for point_index in pinned_occurrences:
+        soft.set_point_pinned(int(point_index), true)
+
+func _create_character_suite_inspector(suite: Dictionary) -> void:
+    if suite.is_empty():
+        return
+    var mass: Variant = suite.get("weight_distribution")
+    if typeof(mass) == TYPE_DICTIONARY:
+        var marker := Marker3D.new()
+        marker.name = "CenterOfMassCandidate"
+        marker.position = _vec(mass["center_of_mass_xyz"])
+        add_child(marker)
+    var navigation: Variant = suite.get("instruments")
+    if typeof(navigation) != TYPE_DICTIONARY:
+        return
+    var rows: Array = navigation.get("readings", [])
+    if rows.is_empty():
+        return
+    var panel := CanvasLayer.new()
+    panel.name = "NavigationInstrumentInspector"
+    var label := Label.new()
+    label.name = "SimulatedInstrumentReadings"
+    label.position = Vector2(16, 16)
+    label.text = "SIMULATED INSTRUMENTS (NOT GPS)\\n"
+    for record in rows:
+        var fields: Dictionary = record.get("fields", {})
+        label.text += str(record.get("type", "sensor")) + ": " + str(fields) + "\\n"
+    panel.add_child(label)
+    add_child(panel)
 
 func _create_camera(spec: Dictionary, variant: Dictionary) -> void:
     var camera := Camera3D.new()
@@ -429,6 +501,7 @@ def emit_frontier_godot_overlay(
         "biome_motion": manifest.get("biome_motion") or {},
         "advanced_physics": manifest.get("advanced_physics") or {},
         "realism_audit": manifest.get("realism_audit") or {},
+        "character_suite": manifest.get("character_suite") or {},
         "geometry": {
             "vertices": [[v.x, v.y, v.z] for v in vertices],
             "triangles": [list(face) for face in triangles],
