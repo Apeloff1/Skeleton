@@ -852,25 +852,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 "completed":quest_edges[token[0]][token[1]].is_empty(),
                 "last_transition_frame":frame,
             }
-        if kind == "start_quest" or kind == "advance_quest":
-            var chunks := value.split(":")
-            var quest_id: String = str(chunks[0])
-            var stage_id: String = (
-                str(quest_starts[quest_id]) if kind == "start_quest"
-                else str(chunks[1])
-            )
-            var objective: Dictionary = quest_objectives[quest_id]
-            if not objective.has(stage_id):
-                push_error("Quest history stage lacks authored objective")
-                return
-            next_quest_history.append({
-                "frame":frame,"page_id":str(row.get("page_id", "")),
-                "quest_id":quest_id,"title":str(quest_titles[quest_id]),
-                "stage_id":stage_id,"objective":str(objective[stage_id]),
-                "completed":quest_edges[quest_id][stage_id].is_empty(),
-                "source_frame_digest":str(row.get("native_frame_receipt_digest", "")),
-            })
-        if kind == "craft_item":
+        elif kind == "craft_item":
             if value.is_empty() or value.length() > 128:
                 push_error("Approved crafted item name invalid")
                 return
@@ -904,6 +886,24 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             # Only typed commands with an approved runtime gateway may run.
             push_error("Unsupported game world mutation rejected by dispatcher")
             return
+        if kind == "start_quest" or kind == "advance_quest":
+            var chunks := value.split(":")
+            var quest_id: String = str(chunks[0])
+            var stage_id: String = (
+                str(quest_starts[quest_id]) if kind == "start_quest"
+                else str(chunks[1])
+            )
+            var objective: Dictionary = quest_objectives[quest_id]
+            if not objective.has(stage_id):
+                push_error("Quest history stage lacks authored objective")
+                return
+            next_quest_history.append({
+                "frame":frame,"page_id":str(row.get("page_id", "")),
+                "quest_id":quest_id,"title":str(quest_titles[quest_id]),
+                "stage_id":stage_id,"objective":str(objective[stage_id]),
+                "completed":quest_edges[quest_id][stage_id].is_empty(),
+                "source_frame_digest":str(row.get("native_frame_receipt_digest", "")),
+            })
         next_action_trace.append({
             "frame":frame,"page_id":str(row.get("page_id", "")),
             "action_index":int(row.get("action_index", -1)),
