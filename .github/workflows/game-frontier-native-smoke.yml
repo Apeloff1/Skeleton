@@ -355,7 +355,11 @@ jobs:
           import json,sys
           from pathlib import Path
           proof=json.loads(Path(sys.argv[1]).read_text())
-          assert proof["verified_engine_actions"]==13, proof
+          assert proof["verified_engine_actions"]==17, proof
+          assert proof["verified_rpg_xp"]==130, proof
+          assert proof["verified_rpg_level"]==2, proof
+          assert proof["verified_unlocked_skills"]==1, proof
+          assert proof["verified_faction_standings"]==1, proof
           assert proof["verified_local_health"]==88, proof
           assert proof["verified_local_effects"]==3, proof
           assert proof["verified_health_visual_effects"]==2, proof
@@ -364,7 +368,7 @@ jobs:
           assert proof["verified_quest_count"]==1, proof
           assert proof["verified_live_interface_modules"]==3, proof
           assert proof["verified_cue_count"]==4, proof
-          assert proof["verified_action_receipts"]==13, proof
+          assert proof["verified_action_receipts"]==17, proof
           assert proof["verified_fx_cues"]==1, proof
           assert proof["verified_npc_reactions"]==1, proof
           assert proof["verified_inventory_visuals"]==1, proof

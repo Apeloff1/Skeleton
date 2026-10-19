@@ -67,11 +67,12 @@ class NativeQuestSmokeFixtureTests(unittest.TestCase):
                 finish=next(p for p in pages if p.page_id=="complete_sky_trial")
                 self.assertEqual({a.kind for a in begin.actions},
                                  {"start_quest","set_flag","craft_item","show_dialogue","set_npc_emotion",
-                                  "trigger_impact_fx","change_camera","inspect_instrument"})
+                                  "trigger_impact_fx","change_camera","inspect_instrument",
+                                  "award_xp","unlock_skill","set_faction_reputation"})
                 self.assertEqual(finish.actions[0].value,"sky_trial:finished")
                 self.assertEqual([a.kind for a in finish.actions],
-                                 ["advance_quest","take_damage","heal_health",
-                                  "consume_item"])
+                                 ["advance_quest","take_damage","award_xp",
+                                  "heal_health","consume_item"])
                 self.assertEqual(sum(a.kind=="craft_item" for a in begin.actions),2)
                 self.assertEqual(next(a.value for a in begin.actions
                                       if a.kind=="set_npc_emotion"),"island:curious")
