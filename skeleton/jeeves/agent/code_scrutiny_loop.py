@@ -64,6 +64,8 @@ class ScrutinyPolicy:
                   self.maximum_chars_per_file, self.maximum_findings)
         if any(type(n) is not int or n <= 0 for n in values):
             raise ValueError("scrutiny policy requires positive integer limits")
+        if self.stability_passes < 2:
+            raise ValueError("scrutiny requires at least two independent clean passes")
         if self.maximum_passes < self.stability_passes:
             raise ValueError("scrutiny cannot establish stability within pass budget")
 
