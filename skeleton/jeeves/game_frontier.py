@@ -50,6 +50,13 @@ from .game_frontier_advanced_physics import (
 from .game_frontier_realism import audit_scene_realism
 from .game_frontier_weather_physics import Microclimate, evolve_microclimate
 from .game_frontier_character_suite import CharacterSuiteConfig, compile_character_suite
+from .game_frontier_geoposition import (
+    LocationConsent, DeviceGPSFix, SurveyControl, SurveySighting,
+    ingest_host_gps, solve_control_survey, reconcile_live_and_survey,
+)
+from .game_frontier_frame_coherence import (
+    GDDSource, FrameObject, FrameReceipt, GDDFrameNote, advance_frame,
+)
 
 FRONTIER_SCENE_SCHEMA = "skeleton.game.frontier_scene_candidate.v1"
 FRONTIER_MODEL_STATUS = "engine_candidate_only_no_proprietary_weights"
@@ -123,6 +130,17 @@ def compile_frontier_scene(
     advanced_turbulence_amplitude: float = 0.,
     advanced_microclimate: Microclimate | None = None,
     character_suite: CharacterSuiteConfig | None = None,
+    gps_fix: DeviceGPSFix | None = None,
+    gps_consent: LocationConsent | None = None,
+    gps_now_ms: int | None = None,
+    previous_gps_fix: DeviceGPSFix | None = None,
+    survey_controls: tuple[SurveyControl, ...] = (),
+    survey_sightings: tuple[SurveySighting, ...] = (),
+    frame_gdd: GDDSource | None = None,
+    frame_index: int | None = None,
+    frame_objects: tuple[FrameObject, ...] = (),
+    previous_frame_receipt: FrameReceipt | None = None,
+    between_frame_notes: tuple[GDDFrameNote, ...] = (),
 ) -> FrontierSceneCandidate:
     """Produce a content-addressed, inspectable, playable-engine-side proposal.
 
@@ -515,6 +533,43 @@ def compile_frontier_scene(
         delta_s=delta_s, weather=physical_weather,
         derived_observations=derived_signals,
     ) if character_suite is not None else None)
+    # Host permission and freshness are mandatory. Raw live/surveyed
+    # coordinates never enter hashed, logged or exported scene manifests.
+    if gps_fix is None and any((gps_consent is not None,
+                               gps_now_ms is not None,
+                               previous_gps_fix is not None)):
+        raise ValueError("GPS authority fields require a live device fix")
+    if bool(survey_controls) != bool(survey_sightings):
+        raise ValueError("survey controls and sightings must be paired")
+    live = None
+    if gps_fix is not None:
+        if gps_consent is None or gps_now_ms is None:
+            raise ValueError("live GPS fix requires explicit host permission/time")
+        live = ingest_host_gps(gps_fix, gps_consent, now_ms=gps_now_ms,
+                               prior=previous_gps_fix)
+    surveyed = (solve_control_survey(survey_controls, survey_sightings)
+                if survey_sightings else None)
+    position_receipt = ({
+        "live": live.public_receipt() if live is not None else None,
+        "surveyed": surveyed.public_receipt() if surveyed is not None else None,
+        "coherence": (reconcile_live_and_survey(live, surveyed)
+                      if live is not None and surveyed is not None else None),
+        "coordinates_redacted": True,
+        "authority": "optional_permissioned_observation_no_persistence",
+    } if (live is not None or surveyed is not None) else None)
+    frame_receipt = None
+    if frame_gdd is None and any((
+        frame_index is not None, frame_objects,
+        previous_frame_receipt is not None, between_frame_notes,
+    )):
+        raise ValueError("per-frame build requires a signed GDD")
+    if frame_gdd is not None:
+        if frame_index is None or not frame_objects:
+            raise ValueError("per-frame build requires frame index and source objects")
+        frame_receipt = advance_frame(
+            frame_index=frame_index, fps=clock.fps, gdd=frame_gdd,
+            objects=frame_objects, previous=previous_frame_receipt,
+            notes=between_frame_notes)
     prediction = None
     if speculative_input is not None:
         anticipated = anticipate_user_motion(speculative_input, horizon_ms=prediction_horizon_ms)
@@ -747,6 +802,32 @@ def compile_frontier_scene(
             "vertex_count": len(m.vertices),
             "original_source_preserved": m.source_preserved,
         } for m in old_new_meshes],
+        "position_fix": position_receipt,
+        "frame_progress": ({
+            "frame_index": frame_receipt.frame_index,
+            "timestamp_ns": frame_receipt.time_ns,
+            "fps": frame_receipt.fps,
+            "gdd_digest": frame_receipt.gdd_digest,
+            "previous_receipt_digest": frame_receipt.previous_digest,
+            "receipt_digest": frame_receipt.receipt_digest,
+            "double_verified": frame_receipt.verified,
+            "verifier_a": frame_receipt.verifier_a_integrity,
+            "verifier_b": frame_receipt.verifier_b_coherence,
+            "chunk_count": len(frame_receipt.chunks),
+            "chunks": [{
+                "cell": list(c.chunk_key),
+                "digest": c.content_digest,
+                "object_ids": [o.entity_id for o in c.objects],
+            } for c in frame_receipt.chunks],
+            "between_frame_notes": [{
+                "gdd_world_law_index": n.world_law_index,
+                "gdd_world_law": frame_gdd.world_laws[n.world_law_index],
+                "category": n.category,
+                "content": n.text,
+                "review_status": n.author_kind,
+            } for n in frame_receipt.note_from_previous],
+            "ai_authority": "suggested_context_only_signed_gdd_unchanged",
+        } if frame_receipt is not None else None),
         "advanced_physics": advanced_receipt,
         "character_suite": character_suite_receipt,
         "governance": {
