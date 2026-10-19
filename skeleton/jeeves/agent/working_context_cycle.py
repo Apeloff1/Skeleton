@@ -249,8 +249,27 @@ class IntegrityVerifier:
         by_id = {x.call_id: x for x in original}
         if any(note.source_digest != observation_digest(by_id[note.call_id]) for note in prepared.notes):
             raise ValueError("no-found note source was modified")
+        expected_events = [
+            ("no_found_compacted", note.source_digest)
+            for note in prepared.notes
+        ]
+        if prepared.notes:
+            expected_events.extend((
+                ("refill_context", stable_fingerprint({
+                    "goal": goal.goal_id, "refill": prepared.refill,
+                    "active": [item.call_id for item in prepared.active_observations],
+                })),
+                ("delivery_audit_pending", stable_fingerprint([
+                    note.fingerprint for note in prepared.notes
+                ])),
+            ))
+        if len(expected_events) != len(prepared.receipts):
+            raise ValueError("missing or extra page receipts")
         previous = "0" * 64
         for sequence, receipt in enumerate(prepared.receipts, 1):
+            action, subject = expected_events[sequence - 1]
+            if receipt.action != action or receipt.subject_digest != subject:
+                raise ValueError("page receipt does not bind the declared event")
             expected = CycleReceipt.issue(sequence, receipt.serial,
                                           receipt.action, receipt.subject_digest, previous)
             if receipt != expected or receipt.serial != (
