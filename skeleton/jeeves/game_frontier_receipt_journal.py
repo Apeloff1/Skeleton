@@ -172,7 +172,9 @@ class FrameReceiptJournal:
             data=json.loads(row[0])
         except (ValueError,TypeError) as exc:
             raise FrameJournalError("corrupt receipt JSON") from exc
-        if digest(data)!=identity:
+        content = ({k:v for k,v in data.items() if k!="receipt_digest"}
+                   if "receipt_digest" in data else data)
+        if digest(content)!=identity:
             raise FrameJournalError("content-addressed blob failed hash authentication")
         return data
 
@@ -230,7 +232,9 @@ class FrameReceiptJournal:
                 (frame.receipt_digest,frame.payload()),
                 (expected["receipt_digest"],expected),
             ):
-                if digest(payload)!=identity:
+                bare = ({k:v for k,v in payload.items() if k!="receipt_digest"}
+                        if "receipt_digest" in payload else payload)
+                if digest(bare)!=identity:
                     raise FrameJournalError("unverified source blob")
                 self._db.execute(
                     "INSERT OR IGNORE INTO frontier_blobs(digest,content) VALUES(?,?)",
