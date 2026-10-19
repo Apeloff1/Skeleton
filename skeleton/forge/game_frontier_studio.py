@@ -13,6 +13,7 @@ import json
 
 from skeleton.jeeves.game_frontier_worlds import ProjectionMode, WorldFamily
 from skeleton.jeeves.game_frontier_production import ERA_TRIANGLE_BUDGETS
+from skeleton.forge.game_frontier_rpg_events import RPGEventPage, event_authoring_catalog
 
 
 class StudioError(ValueError):
@@ -29,6 +30,16 @@ STUDIO_TOOLS = (
     "solar_lunar_tides", "soundscape_mixer", "ray_light_editor",
     "shadow_coherence", "prefab_catalog", "procedural_chunker",
     "dual_verifier", "console_era_compiler", "live_playtest",
+    "environmental_trigger_graph", "weather_condition_event_pages",
+    "instrument_event_graph", "elastic_body_skin3d_editor",
+    "limb_weight_painter", "center_of_mass_inspector",
+    "stability_polygon_inspector", "impact_material_composer",
+    "gyro_simulator", "magnetic_compass_calibrator",
+    "sextant_navigation_table", "bubble_sextant_lab",
+    "barometric_altimeter_calibration", "trig_altimeter_survey",
+    "quest_branch_verifier", "npc_perception_map",
+    "cinematic_environment_sync", "terrain_traction_authoring",
+    "physics_receipt_viewer", "rpg_event_conflict_resolver",
 )
 
 
@@ -137,6 +148,7 @@ class StudioProject:
     placements: tuple[StudioPlacement,...] = ()
     events: tuple[StudioEvent,...] = ()
     soundtrack_ids: tuple[str,...] = ()
+    environmental_pages: tuple[RPGEventPage, ...] = ()
 
     def __post_init__(self):
         if not self.project_id or len(self.project_id)>128:
@@ -145,7 +157,7 @@ class StudioProject:
             raise StudioError("target era required")
         if not isinstance(self.projection,ProjectionMode) or not isinstance(self.world_family,WorldFamily):
             raise StudioError("valid world and projection required")
-        if not 1<=len(self.layers)<=128 or len(self.prefabs)>4096 or len(self.placements)>100000 or len(self.events)>8192:
+        if not 1<=len(self.layers)<=128 or len(self.prefabs)>4096 or len(self.placements)>100000 or len(self.events)>8192 or len(self.environmental_pages)>4096:
             raise StudioError("authoring budgets exceeded")
         ids=[l.layer_id for l in self.layers]
         if len(set(ids))!=len(ids):
@@ -158,6 +170,9 @@ class StudioProject:
         events=[x.event_id for x in self.events]
         if len(set(events))!=len(events):
             raise StudioError("duplicate event id")
+        page_ids=[page.page_id for page in self.environmental_pages]
+        if len(page_ids)!=len(set(page_ids)) or set(page_ids).intersection(events):
+            raise StudioError("duplicate or colliding environmental page id")
 
     def authored_manifest(self) -> dict:
         return {
@@ -171,6 +186,15 @@ class StudioProject:
             "prefabs":[p.__dict__ for p in self.prefabs],
             "placements":[p.__dict__ for p in self.placements],
             "events":[e.__dict__ for e in self.events],
+            "environmental_pages":[{
+                "id":page.page_id,"priority":page.priority,
+                "conditions":[condition.__dict__ for condition in page.conditions],
+                "actions":[action.__dict__ for action in page.actions],
+                "flags":page.required_flags,
+                "cooldown_ms":page.cooldown_ms,
+                "enabled":page.enabled,"repeat":page.repeat,
+            } for page in self.environmental_pages],
+            "environmental_editor_catalog":event_authoring_catalog(),
             "soundtrack":self.soundtrack_ids,
             "authority":"candidate_not_executed",
         }
