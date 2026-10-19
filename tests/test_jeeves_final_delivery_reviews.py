@@ -7,7 +7,7 @@ import pytest
 from skeleton.jeeves.agent.final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentReviewResult, FinalReviewAdversary,
     FinalReviewError, MeasuredCriterion, SourceProvenance, verify_final_release,
-    required_final_kind,
+    required_final_kind, quality_source_continuity_failure,
 )
 from skeleton.jeeves.agent.types import Goal, stable_fingerprint
 
@@ -307,3 +307,24 @@ def test_rights_inventory_rejects_noncanonical_artifact_paths(path):
             rewrite_checker=check("creative_rewrite", []),
             upstream_quality_digest=UPSTREAM,
         )
+
+
+def test_final_release_uses_original_quality_source_bytes():
+    audited = {"src/game.py": "value = 1"}
+    answer = "Verified answer"
+    final = dict(audited)
+    final["delivery/jeeves_final_answer.md"] = answer
+    assert quality_source_continuity_failure(final, audited, audited) is None
+
+    edited = {"src/game.py": "value = 2"}
+    revised = dict(edited)
+    revised["delivery/jeeves_final_answer.md"] = answer
+    assert "changed before final review" in quality_source_continuity_failure(
+        revised, edited, audited,
+    )
+    assert "omitted or changed" in quality_source_continuity_failure(
+        {"delivery/jeeves_final_answer.md": answer}, audited, audited,
+    )
+    assert "omitted or changed" in quality_source_continuity_failure(
+        revised, audited, audited,
+    )
