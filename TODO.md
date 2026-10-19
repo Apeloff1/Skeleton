@@ -6,6 +6,7 @@ Detailed acceptance map: [Game Frontier Model Milestones](docs/plan/GAME_FRONTIE
 Advanced physics assurance: [L00–L13 aerodynamics, collisions, climbing, climate and environment dossier](docs/plan/GAME_FRONTIER_ADVANCED_PHYSICS_ASSURANCE_2026_10_19.md).
 GPS/GDD assurance: [L00–L13 foreground positioning and per-frame signed-design coherence](docs/plan/GAME_FRONTIER_GPS_GDD_FRAME_ASSURANCE_2026_10_19.md).
 Chunk evidence: [Per-chunk source proofs, retirements, double verifiers and signed GDD receipts](docs/plan/GAME_FRONTIER_CHUNK_EVIDENCE_RECEIPTS_2026_10_19.md).
+Native capture, frame journal and compact source deltas: [L00–L13 runbook](docs/plan/GAME_FRONTIER_NATIVE_JOURNAL_DELTA_OPERATIONS_2026_10_19.md).
 Virtual game GPS and GDD map navigation: [fictional-only surveying, waypoints, per-frame proofs and AI context](docs/plan/GAME_FRONTIER_VIRTUAL_GPS_GDD_NAVIGATION_2026_10_19.md).
 
 **Status semantics:** `[x]` = source implementation committed to the feature branch
@@ -156,6 +157,23 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-147 Make real native era engines emit authoritative render/physics chunk evidence rather than source-only candidate estimates.
 - [ ] GF-P0-148 Persist full per-chunk receipts in existing canonical content-addressed durable checkpoint/rollback plane with pagination.
 - [ ] GF-P0-149 Add explicit chunk-level shader/light/shadow/terrain/weather and vertex-diff source reference receipts on game world edits.
+- [x] GF-P0-150 Add SQLite WAL full-fidelity frame and content-addressed chunk receipt journal with atomic single-frame commits.
+- [x] GF-P0-151 Reconstruct stored canonical typed FrameReceipt and source chunk receipts from hashed durable blobs with independently checked signed-GDD inputs.
+- [x] GF-P0-152 Reject invalid/missing frames, source-GDD changes, duplicated frame indices, altered hashes and impossible actor motion without partial journal advances.
+- [x] GF-P0-153 Reopen/replay verified source frame histories after restart and report recorded source/evidence chain heads.
+- [x] GF-P0-154 Add non-destructive rollback by forking a verified journal prefix and deduplicating common SHA source blobs.
+- [x] GF-P0-155 Add opt-in Godot 4 fixed-tick RigidBody3D observation serializer with scene/GDD/asset IDs, measured game XYZ and monotonic engine clock.
+- [x] GF-P0-156 Add strict allowlisted native-observation importer with actor/source/scene/fps/timestamp checking and bounded JSONL processing.
+- [x] GF-P0-157 Transactionally retain native Godot sample JSON alongside full independent A/B frame and chunk evidence; replay checks native candidate/timing continuity.
+- [x] GF-P0-158 Create an operator-run CLI for signed-GDD Godot JSONL ingestion, verification and journal prefix fork.
+- [x] GF-P0-159 Implement per-frame changed-actor and touched/retired-chunk delta format with GDD source and parent frame identity.
+- [x] GF-P0-160 Reconstitute deltas into full source frames and recheck exact original digest, GDD and two independent verifiers.
+- [x] GF-P0-161 Optionally persist compact source deltas alongside full frames in one WAL transaction and validate both during replay/fork.
+- [x] GF-P0-162 Add focused 30/50/60/120 FPS, 80-frame replay, native capture, script CLI, corruption, rollback and compact-delta regressions.
+- [ ] GF-P0-163 Run the generated Godot scene through a real version-pinned Godot 4 headless import with actual physics-tick capture and no GDScript parse errors.
+- [ ] GF-P0-164 Reconcile actual rendered/GPU/physics output with native capture, journal source and per-chunk evidence on target hardware.
+- [ ] GF-P0-165 Wire native recorder activation through the approved installer, user-run game creation UI, save slots and multi-entity controllers.
+- [ ] GF-P0-166 Add game authoritative telemetry source adapters for real collision normals/forces, lighting, audio and streamed mesh LOD per chunk.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
 - [ ] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups.
@@ -215,6 +233,12 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-47 Deliver streamed real engine chunk snapshots linked to render frame/LOD/collision/asset identity and dual independent verifiers.
 - [ ] GF-P1-48 Build live RPG Studio evidence timeline with per-chunk physics, position, AI intent, GDD law and migration navigation.
 - [ ] GF-P1-49 Add per-chunk delta compression, content addressing, LOD transition lineage and crash-resumable manifest batches.
+- [ ] GF-P1-50 Implement signed scene asset catalog for multiple real native Godot actors rather than the current one-RigidBody capture bridge.
+- [ ] GF-P1-51 Add true persisted delta compaction and bounded retention/rollups with verified checkpoint bases and independent reconstruction.
+- [ ] GF-P1-52 Expand opt-in native collection to contact impulses, surface pressure/traction, soft bodies and weather-material deformation with explicit source fields.
+- [ ] GF-P1-53 Instrument true renderer frames, depth/normal/shadow buffers, material IDs and per-chunk draw/visibility counters with native provenance.
+- [ ] GF-P1-54 Expose replay timeline and frame evidence diffs in Jeeves/Galaxy Studio UI with per-chunk graph, notes and native observation filtering.
+- [ ] GF-P1-55 Integrate runtime save/restore and replay journal branches with the canonical Forge production game state and GDD revision authority.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -260,6 +284,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-40 Dynamically repair path and world-portal routes after construction, floods, collapse, tides and terrain changes.
 - [ ] GF-P2-41 Teach Jeeves/Dragon to reason about verified chunk changes and signaled semantic differences without hallucinating observations.
 - [ ] GF-P2-42 Continuous per-chunk physics/lighting/foliage/weather/audio correspondence checks during multiworld building.
+- [ ] GF-P2-43 Train or adapt Jeeves/Dragon to reason on recorded actual native game-state vs frame-delta context with immutable rights and source gating.
+- [ ] GF-P2-44 Develop ensemble adversarial benchmarks for source-vs-native physics divergence, lost chunk streams and corrupted replay.
+- [ ] GF-P2-45 Add multiworld branch/realm semantic rebasing on signed GDD transitions with cross-era compatibility.
+- [ ] GF-P2-46 Analyze true gameplay camera/sound/foliage/light continuity from captured native frames without inventing missing observations.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -303,6 +331,11 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-38 Benchmark long-horizon 30/50/60/120fps chunk proof overhead, storage, replay and native renderer fidelity on all engine eras.
 - [ ] GF-P3-39 Validate cross-chunk LOD/seam, mesh edit, actor migration and signed GDD AI receipts under months-long game builds.
 - [ ] GF-P3-40 Qualify independent host-engine observability and operator-verified evidence retention, security and release signoff.
+- [ ] GF-P3-41 Qualify sustained 30/50/60/120 FPS native fixed-step receipt and GPU frame capture throughput on multiple physical target devices.
+- [ ] GF-P3-42 Test weeks/months-long atomic journal recovery, content-addressed compaction, timed backups, deletion controls and interrupted rollback.
+- [ ] GF-P3-43 Obtain independent engine binary provenance, native runtime log and gameplay screenshot acceptance for first install and console era builds.
+- [ ] GF-P3-44 Stress multi-actor, multi-GDD revision, multiplayer, portal and longform studio rollback against adverse I/O and FPS drift.
+- [ ] GF-P3-45 Benchmark model-assisted delta/canon reviews against verified game playthrough quality without promoting unreviewed AI output.
 
 ## Source references
 
