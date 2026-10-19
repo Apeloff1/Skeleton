@@ -213,8 +213,8 @@ func _create_virtual_game_gps(nav: Dictionary) -> void:
         line.name = "VirtualMinimapPath"
         line.width = 2
         line.default_color = Color(.2, .8, 1.0, 1.0)
-        var cols := max(1.0, float(nav.get("map_width_tiles", 1)))
-        var rows := max(1.0, float(nav.get("map_height_tiles", 1)))
+        var cols: float = maxf(1.0, float(nav.get("map_width_tiles", 1)))
+        var rows: float = maxf(1.0, float(nav.get("map_height_tiles", 1)))
         # Render a bounded path preview; routing remains game-map candidate.
         for index in range(min(128, tile_path.size())):
             var cell: Array = tile_path[index]
@@ -257,7 +257,7 @@ func _create_lighting(variant: Dictionary, ray_samples: Array, air: Dictionary) 
     var sunlight := DirectionalLight3D.new()
     sunlight.rotation_degrees = Vector3(-45, 30, 0)
     sunlight.shadow_enabled = true
-    var strength := max(.03, float(variant.get("luminance", .7)) * 1.4)
+    var strength: float = maxf(.03, float(variant.get("luminance", .7)) * 1.4)
     # Atmospheric transmission is already measured by the source CPU rays.
     # Don't multiply by its geometric shadows again: the Godot shadow map
     # handles 3D cast geometry separately.
@@ -269,7 +269,7 @@ func _create_lighting(variant: Dictionary, ray_samples: Array, air: Dictionary) 
     sunlight.light_energy = strength
     add_child(sunlight)
     if air.has("visibility_m"):
-        var view_distance := max(1.0, float(air["visibility_m"]))
+        var view_distance: float = maxf(1.0, float(air["visibility_m"]))
         var world_env := WorldEnvironment.new()
         world_env.environment = Environment.new()
         world_env.environment.fog_enabled = view_distance < 20000
@@ -282,7 +282,7 @@ func _create_water(liquid: Dictionary, tides: Dictionary) -> void:
     var depths: Array = liquid.get("depths_m", [])
     if depths.is_empty():
         return
-    var water_level := max(0.0, float(depths[0]) + float(tides.get("water_height_m", 0.0)))
+    var water_level: float = maxf(0.0, float(depths[0]) + float(tides.get("water_height_m", 0.0)))
     if water_level < .001:
         return
     var water := MeshInstance3D.new()
@@ -390,7 +390,7 @@ func _create_advanced_character(info: Dictionary) -> void:
     dynamic.add_child(render)
     var physical := PhysicsMaterial.new()
     var terrain_grip: Dictionary = info.get("traction", {})
-    var slip_risk := clamp(float(terrain_grip.get("slip_risk", 0.0)), 0.0, 1.0)
+    var slip_risk: float = clampf(float(terrain_grip.get("slip_risk", 0.0)), 0.0, 1.0)
     # Wet/icy terrain reduces friction; do not amplify native grip above its
     # validated material coefficient. Real grip changes with surface contact
     # must later be handled by engine-authoritative contact callbacks.
@@ -635,7 +635,7 @@ func _update_clouds() -> void:
             float(_cloud_tracks[i]["altitude_m"]) / 100.0,
             -lerp(float(first["y_m"]), float(second["y_m"]), blend) / 100.0
         )
-        var stretch := lerp(float(first["stretch"]), float(second["stretch"]), blend)
+        var stretch: float = lerpf(float(first["stretch"]), float(second["stretch"]), blend)
         cloud.scale = Vector3(max(.1, stretch), .4, max(.1, stretch) * .8)
         cloud.rotation.y = lerp_angle(float(first["orientation_rad"]),
                                       float(second["orientation_rad"]), blend)
