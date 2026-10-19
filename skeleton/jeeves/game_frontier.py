@@ -93,9 +93,13 @@ def compile_frontier_scene(
                      "biome": cell.biome, "sky_island": cell.sky_island,
                      "gust_strength": cell.gust_strength},
         },
+        "wind_configuration": {"seed": wind_field.seed,
+                               "gust_period_s": wind_field.gust_period_s},
+        "simulation_time_s": time_s + delta_s,
         "wind": [{"altitude_m": layer.altitude_m,
                   "east_mps": layer.base.east_mps, "north_mps": layer.base.north_mps,
-                  "turbulence_mps": layer.turbulence_mps}
+                  "turbulence_mps": layer.turbulence_mps,
+                  "cell_size_m": layer.cell_size_m}
                  for layer in wind_field.layers],
         "clouds": [
             {"id": c.cloud_id, "x_m": c.x_m, "y_m": c.y_m,
