@@ -776,15 +776,35 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "presentation_cues":next_cues,
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
     }
-    var result := FileAccess.open("user://frontier_approved_gameplay_receipt.json",FileAccess.WRITE)
-    if result == null:
-        push_error("Godot approved gameplay state could not be persisted")
+    if not _persist_verified_gameplay_receipt(accepted):
         return
-    result.store_string(JSON.stringify(accepted) + "\n")
-    result.flush()
-    result.close()
     _create_approved_gameplay_inspector(accepted)
     _create_approved_dialogue_view()
+
+
+func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
+    # Second process start must NOT overwrite a changed game save. The
+    # existing bytes are revalidated against the fully re-reduced, SHA-bound
+    # approved source. This is local file integrity, not server authentication.
+    var path := "user://frontier_approved_gameplay_receipt.json"
+    var canonical := JSON.stringify(state) + "\n"
+    if FileAccess.file_exists(path):
+        var previous := FileAccess.get_file_as_string(path)
+        if previous != canonical:
+            push_error("Existing approved game save differs from replay; explicit recovery required")
+            return false
+        return true
+    var output := FileAccess.open(path, FileAccess.WRITE)
+    if output == null:
+        push_error("Native approved gameplay save cannot be created")
+        return false
+    output.store_string(canonical)
+    output.flush()
+    output.close()
+    if not FileAccess.file_exists(path) or FileAccess.get_file_as_string(path) != canonical:
+        push_error("Approved gameplay save did not survive readback")
+        return false
+    return true
 
 
 func _create_approved_inventory_objects(items: Dictionary) -> Array[String]:

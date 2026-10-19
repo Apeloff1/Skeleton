@@ -293,6 +293,19 @@ jobs:
               tail -n 80 "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log"
               exit 1
             fi
+            # Relaunch Godot against the same user:// directory. It must
+            # *reuse* its exact independently verified local gameplay state.
+            # A newly written or rewritten save would fail byte identity.
+            before_restart="$(sha256sum "$dispatch_receipt" | cut -d ' ' -f 1)"
+            XDG_DATA_HOME="$dispatch_user" "$FRONTIER_GODOT" \
+              --headless --path "$project" --quit-after 5 \
+              > "$RUNNER_TEMP/frontier-game-dispatch-restart-$fps.log" 2>&1
+            after_restart="$(sha256sum "$dispatch_receipt" | cut -d ' ' -f 1)"
+            if test "$before_restart" != "$after_restart"; then
+              echo "::error::Approved game save mutated across real Godot restart"
+              exit 1
+            fi
+            echo "Verified identical approved RPG save after second Godot process ($fps Hz)"
             python scripts/run_game_frontier_godot_dispatch.py verify \
               "${quest_cli_args[@]}" \
               --checkpoint-json "$full_checkpoint" \

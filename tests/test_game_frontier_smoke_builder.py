@@ -37,6 +37,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("_advance_approved_dialogue",script)
             self.assertIn("ApprovedGameDialogueCard",script)
             self.assertIn("_create_approved_inventory_objects",script)
+            self.assertIn("_persist_verified_gameplay_receipt",script)
+            self.assertIn("Existing approved game save differs from replay",script)
             self.assertIn("ApprovedInventoryToken_",script)
             self.assertIn("ContinueApprovedDialogue",script)
             self.assertIn("NativeApprovedGameplayHUD",script)
