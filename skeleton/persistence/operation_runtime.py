@@ -137,6 +137,23 @@ class DurableOperationRuntime:
     def _now() -> datetime:
         return datetime.now(timezone.utc)
 
+    def recover_expired_operations(
+        self, *, now: datetime | None = None, limit: int = 128,
+    ) -> tuple[StoredOperation, ...]:
+        """Explicit, bounded crash/deadline reconciliation.
+
+        Recover only operations whose declared deadline has passed. This
+        never invents a successful result or re-executes reasoning; it commits
+        a canonical FAILED transition and retries its durable stream outbox.
+        Unexpired in-flight operations remain untouched for host takeover.
+        """
+        if self._closed:
+            raise OperationStoreError("cannot recover operations after close")
+        recovered = self.operations.recover_expired(now=now, limit=limit)
+        if recovered:
+            self.dispatch_outbox()
+        return recovered
+
     def dispatch_outbox(
         self,
         *,

@@ -173,7 +173,8 @@ jobs:
             tests/test_jeeves_delivery_milestone_workbench.py \
             tests/test_jeeves_delivery_milestone_queue.py \
             tests/test_ai_100_real_milestone_execution.py \
-            tests/test_jeeves_agent_mirror.py
+            tests/test_jeeves_agent_mirror.py \
+            skeleton/testing/test_operation_runtime.py
           python scripts/check_jeeves_agent_mirror.py
 
       - name: Canonical local/CI quality parity gate

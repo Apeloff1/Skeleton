@@ -477,3 +477,81 @@ def test_dispatcher_configuration_rejects_excessive_batch(tmp_path: Path, invali
         )
     operations.close()
     events.close()
+
+
+
+def test_expired_operations_are_failed_without_reexecuting_reasoning(tmp_path: Path):
+    initial = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    now = initial + timedelta(days=2)
+    reasoner = _Reasoner()
+    runtime = _runtime(tmp_path, reasoner)
+    store = runtime.operations
+    dead = []
+    for i in range(2):
+        operation_id = str(uuid4())
+        dead.append(operation_id)
+        store.create(
+            OperationEnvelope(
+                operation_id=operation_id, tenant_id="tenant-a",
+                actor_id="worker", capability="intelligence.reason",
+                created_at=initial, deadline=initial + timedelta(hours=1),
+                idempotency_key=f"expired-{i}", trace_id=f"expire-{i}",
+            ), now=initial,
+        )
+        for state in (OperationState.VALIDATED, OperationState.AUTHORIZED,
+                      OperationState.ADMITTED, OperationState.RUNNING):
+            store.transition(operation_id, state, now=initial)
+    future = str(uuid4())
+    store.create(OperationEnvelope(
+        operation_id=future, tenant_id="tenant-a", actor_id="worker",
+        capability="intelligence.reason", created_at=initial,
+        deadline=now + timedelta(hours=2),
+        idempotency_key="future-unexpired", trace_id="future-trace",
+    ), now=initial)
+
+    first = runtime.recover_expired_operations(now=now, limit=1)
+    assert len(first) == 1
+    assert first[0].envelope.state is OperationState.FAILED
+    second = runtime.recover_expired_operations(now=now, limit=1)
+    assert len(second) == 1
+    assert second[0].envelope.state is OperationState.FAILED
+    assert {first[0].envelope.operation_id, second[0].envelope.operation_id} == set(dead)
+    assert runtime.recover_expired_operations(now=now, limit=3) == ()
+    assert store.get(future).envelope.state is OperationState.CREATED
+    assert reasoner.calls == 0
+    assert store.pending_outbox() == ()
+    for operation_id in dead:
+        stream = runtime.stream.replay(ReplayCursor(operation_id))
+        assert stream[-1].type == "operation.failed"
+        assert [event.sequence for event in stream] == list(range(1, len(stream) + 1))
+    runtime.close()
+
+
+def test_expired_recovery_will_not_rewrite_terminal_operation(tmp_path: Path):
+    initial = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    runtime = _runtime(tmp_path)
+    operation_id = str(uuid4())
+    runtime.operations.create(OperationEnvelope(
+        operation_id=operation_id, tenant_id="tenant",
+        actor_id="actor", capability="intelligence.reason",
+        created_at=initial, deadline=initial + timedelta(minutes=10),
+        idempotency_key="terminal-idem", trace_id="terminal-trace",
+    ), now=initial)
+    terminal = runtime.operations.transition(
+        operation_id, OperationState.FAILED, now=initial,
+    )
+    assert runtime.recover_expired_operations(
+        now=initial + timedelta(days=1),
+    ) == ()
+    current = runtime.operations.get(operation_id)
+    assert current.version == terminal.version
+    assert current.envelope.state is OperationState.FAILED
+    runtime.close()
+
+
+@pytest.mark.parametrize("invalid", (0, -1, 4097, True, 0.5))
+def test_expired_recovery_rejects_unbounded_batches(tmp_path: Path, invalid):
+    runtime = _runtime(tmp_path)
+    with pytest.raises(ValueError, match="between 1 and 4096"):
+        runtime.recover_expired_operations(limit=invalid)
+    runtime.close()
