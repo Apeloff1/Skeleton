@@ -41,7 +41,10 @@ func _ready() -> void:
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
     _create_camera(data.get("projection", {}), data.get("world_variant", {}))
-    _create_lighting(data.get("world_variant", {}))
+    _create_lighting(data.get("world_variant", {}),
+                     data.get("photometric_3d", []), data.get("atmosphere", {}))
+    _create_water(data.get("liquid", {}), data.get("tides", {}))
+    _create_leaf_shadows(data.get("leaf_shadows", []))
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
 
@@ -75,12 +78,78 @@ func _create_camera(spec: Dictionary, variant: Dictionary) -> void:
         camera.look_at(Vector3(0, 1, 0))
     camera.current = true
 
-func _create_lighting(variant: Dictionary) -> void:
+func _create_lighting(variant: Dictionary, ray_samples: Array, air: Dictionary) -> void:
     var sunlight := DirectionalLight3D.new()
     sunlight.rotation_degrees = Vector3(-45, 30, 0)
     sunlight.shadow_enabled = true
-    sunlight.light_energy = max(.03, float(variant.get("luminance", .7)) * 1.4)
+    var strength := max(.03, float(variant.get("luminance", .7)) * 1.4)
+    # Atmospheric transmission is already measured by the source CPU rays.
+    # Don't multiply by its geometric shadows again: the Godot shadow map
+    # handles 3D cast geometry separately.
+    if not ray_samples.is_empty():
+        var sum_transmission := 0.0
+        for sample in ray_samples:
+            sum_transmission += clamp(float(sample.get("volumetric_transmission", 1)), 0, 1)
+        strength *= max(.01, sum_transmission / float(ray_samples.size()))
+    sunlight.light_energy = strength
     add_child(sunlight)
+    if air.has("visibility_m"):
+        var view_distance := max(1.0, float(air["visibility_m"]))
+        var world_env := WorldEnvironment.new()
+        world_env.environment = Environment.new()
+        world_env.environment.fog_enabled = view_distance < 20000
+        world_env.environment.fog_density = clamp(1.0 / view_distance, 0.0, .05)
+        add_child(world_env)
+
+func _create_water(liquid: Dictionary, tides: Dictionary) -> void:
+    if liquid.is_empty():
+        return
+    var depths: Array = liquid.get("depths_m", [])
+    if depths.is_empty():
+        return
+    var water_level := max(0.0, float(depths[0]) + float(tides.get("water_height_m", 0.0)))
+    if water_level < .001:
+        return
+    var water := MeshInstance3D.new()
+    water.name = "FrontierLiquidSurface"
+    var plane := PlaneMesh.new()
+    plane.size = Vector2(12, 12)
+    water.mesh = plane
+    water.position.y = water_level
+    var material := StandardMaterial3D.new()
+    material.albedo_color = Color(.08, .35, .7, .72)
+    material.metallic = .1
+    material.roughness = .16
+    material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    water.material_override = material
+    add_child(water)
+
+func _create_leaf_shadows(records: Array) -> void:
+    for record in records:
+        if not bool(record.get("double_verified", false)):
+            push_warning("Leaf shadow coherence failed; suppress shadow polygon")
+            continue
+        var vertices: Array = record.get("polygon_xyz", [])
+        if vertices.size() != 4:
+            continue
+        var builder := SurfaceTool.new()
+        builder.begin(Mesh.PRIMITIVE_TRIANGLES)
+        for index in [0, 1, 2, 0, 2, 3]:
+            var point := _vec(vertices[index])
+            point.y += .02
+            builder.add_vertex(point)
+        builder.generate_normals()
+        var leaf_shadow := MeshInstance3D.new()
+        leaf_shadow.name = "VerifiedLeafShadow"
+        leaf_shadow.mesh = builder.commit()
+        var material := StandardMaterial3D.new()
+        material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        material.albedo_color = Color(0, .02, .03, .38)
+        material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        material.cull_mode = BaseMaterial3D.CULL_DISABLED
+        leaf_shadow.material_override = material
+        leaf_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        add_child(leaf_shadow)
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]
@@ -256,6 +325,11 @@ def emit_frontier_godot_overlay(
         "projection": manifest.get("projection") or {},
         "character_physics": manifest.get("character_physics"),
         "ray_lighting": manifest.get("ray_lighting", []),
+        "photometric_3d": manifest.get("photometric_3d", []),
+        "leaf_shadows": manifest.get("leaf_shadows", []),
+        "atmosphere": manifest.get("atmosphere") or {},
+        "tides": manifest.get("tides") or {},
+        "liquid": manifest.get("liquid") or {},
         "geometry": {
             "vertices": [[v.x, v.y, v.z] for v in vertices],
             "triangles": [list(face) for face in triangles],
