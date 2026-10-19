@@ -21,6 +21,28 @@ def _now():
     return datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
 
 
+async def _user_request_refs(thread_id, message_id, *, tenant_id, owner_id):
+    """Return the bind-matching request ref for the standard test turn."""
+    return (_matching_request_ref("new question", "client-1"),)
+
+def _matching_request_ref(message: str, idempotency_key: str) -> str:
+    """Build the chat-request-sha256 ref the bind expects for these semantics."""
+    import hashlib, json
+    payload = {
+        "schema_version": "backend.ai.chat-request.v1",
+        "message": message,
+        "idempotency_key": idempotency_key,
+        "context_sha256": None,
+        "memory_policy": None,
+    }
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+    return "chat-request-sha256:" + digest
+
+
+
+
 def _thread(thread_id: str | None = None, *, version: int = 1, sequence: int = 0):
     return ConversationThread(
         thread_id=thread_id or str(uuid4()),
@@ -209,6 +231,7 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
             append_user_message=append_user_message,
             active_transcript=active_transcript,
             commit_assistant_message=commit_assistant_message,
+            user_request_refs=_user_request_refs,
         ),
     )
     monkeypatch.setattr(
@@ -450,6 +473,7 @@ def test_provider_failure_keeps_user_message_canonical_for_retry(
             append_user_message=append_user_message,
             active_transcript=active_transcript,
             commit_assistant_message=commit_assistant_message,
+            user_request_refs=_user_request_refs,
         ),
     )
     monkeypatch.setattr(
@@ -664,6 +688,7 @@ def test_chat_compiles_immutable_context_and_keeps_ephemeral_context_untrusted(
             append_user_message=append_user_message,
             active_transcript=active_transcript,
             commit_assistant_message=commit_assistant_message,
+            user_request_refs=_user_request_refs,
         ),
     )
     monkeypatch.setattr(

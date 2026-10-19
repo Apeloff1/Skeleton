@@ -2,7 +2,8 @@
 
 import json
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime, timedelta
 
 import pytest
 

@@ -8,7 +8,8 @@ import socket
 import threading
 from contextlib import asynccontextmanager
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 from uuid import NAMESPACE_URL, uuid4, uuid5

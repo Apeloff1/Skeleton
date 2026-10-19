@@ -13,7 +13,8 @@ import inspect
 import json
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime
 from enum import Enum
 from uuid import NAMESPACE_URL, uuid5
 

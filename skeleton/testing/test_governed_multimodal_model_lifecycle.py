@@ -6,7 +6,8 @@ import hashlib
 import io
 import json
 import sqlite3
-from datetime import UTC, datetime
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime
 
 import numpy as np
 import pytest

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime, timedelta
 
 from skeleton.ai.assistant.evidence import (
     ClaimEvidenceReceipt,
