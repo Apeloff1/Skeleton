@@ -41,7 +41,11 @@ from .delivery_evidence_journal import (
     ReleaseEvidenceJournal, build_release_evidence_journal,
 )
 from .delivery_assurance_milestones import (
-    ASSURANCE_MILESTONES, AssuranceMilestone,
+    ASSURANCE_MILESTONES, AssuranceMilestone, MilestoneBoard,
+)
+from .delivery_milestone_workbench import (
+    ACCEPTANCE_CRITERIA, AcceptanceCriterion, ExecutionBatch,
+    HostChecker, execute_milestone_batch,
 )
 from .final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
@@ -309,6 +313,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         self._final_reviewer = ComparativeObjectiveFinalReviewer()
         self._final_reviewer_adversary = FinalReviewAdversary()
         self._release_evidence_journals: dict[str, ReleaseEvidenceJournal] = {}
+        self._milestone_boards: dict[str, MilestoneBoard] = {}
 
     def run(self, inputs: RunInputs) -> AgentResult:
         result = super().run(inputs)
@@ -1297,6 +1302,42 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
     def assurance_milestone_catalog() -> tuple[AssuranceMilestone, ...]:
         """One hundred acceptance targets; never infer completion from plans."""
         return ASSURANCE_MILESTONES
+
+    @staticmethod
+    def assurance_acceptance_criteria() -> tuple[AcceptanceCriterion, ...]:
+        """All 100 independently measured and objective acceptance contracts."""
+        return ACCEPTANCE_CRITERIA
+
+    def assurance_milestone_board(self, run_id: str) -> MilestoneBoard | None:
+        with self._adaptive_lock:
+            return self._milestone_boards.get(require_id("run_id", run_id))
+
+    def advance_assurance_milestones(
+        self, run_id: str, *, source_commit: str, artifact_digest: str,
+        checkers: Mapping[str, tuple[HostChecker | None, HostChecker | None]],
+        requested: Sequence[str] = (),
+    ) -> ExecutionBatch:
+        """Execute a bounded, explicitly host-authorized milestone review.
+
+        Never auto-populate evidence: absent host adapters leave the milestone
+        unverified. A new source commit requires a new run-scoped board.
+        """
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            board = self._milestone_boards.get(key)
+            if board is None:
+                board = MilestoneBoard.begin(source_commit)
+            elif board.source_commit != source_commit:
+                raise ValueError("assurance board is pinned to an earlier source commit")
+        result = execute_milestone_batch(
+            board, artifact_digest, checkers, requested=requested,
+        )
+        with self._adaptive_lock:
+            current = self._milestone_boards.get(key)
+            if current is not None and current.fingerprint != board.fingerprint:
+                raise ValueError("concurrent milestone update: re-evaluate current evidence")
+            self._milestone_boards[key] = result.board
+        return result
 
     def _verify_final_content_review(
         self, state: _RunState, answer: str,

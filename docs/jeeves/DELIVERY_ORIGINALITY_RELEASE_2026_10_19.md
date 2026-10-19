@@ -139,3 +139,34 @@ journal stage receipts and milestone-board passes serve different purposes:
 the former seals an individual verified delivery; the latter tracks the
 hundred longer-horizon capability targets without pretending that an
 implemented type or a proposed integration proves E2E completion.
+
+
+## Milestone workbench: executable 100/100 acceptance contracts
+
+The milestone workbench implements exactly one hundred **distinct measured
+acceptance criteria**, ten per domain, with unique metric names, units,
+comparison direction, numeric target, minimum observed sample count and allowed
+independent-measurement disagreement. It is not a "100% completed" claim:
+the workbench starts at zero completed milestones until authorized hosts return
+real, scoped evidence from the exact source commit and artifact digest.
+
+- Two independently registered host measurement callbacks must separately
+  inspect the same metric, method, scope and source bytes. Same checker ID,
+  duplicate evidence reference, stale source hash, incompatible unit, missing
+  sample, nonfinite result or disagreement beyond policy blocks the candidate.
+- Both actual measurements must satisfy the objective threshold: neither
+  optimistic self-scores nor a single passing reviewer are release evidence.
+- The batch runner executes each domain's prerequisite chain, tracks deferred
+  candidates, prevents duplicate promotion, supports idempotent resumed runs
+  and produces a content-free hash receipt.
+- AdaptiveJeevesRuntime.assurance_acceptance_criteria() surfaces all 100
+  named acceptance rules. advance_assurance_milestones() explicitly accepts
+  bound host checkers and a pinned commit; assurance_milestone_board() exposes
+  the actual pass/blocked/unverified tally.
+- Existing Backend Quality now compiles and runs deterministic positive and
+  negative tests for every acceptance rule. Fixture-green tests demonstrate
+  the workbench contract; they do not substitute for real game playthrough,
+  compiler/toolchain, installer, hardware measurement or rights review.
+
+An absence of live adapters yields **0 verified of 100**, not an automatic
+perfect score. Production stage admission is a separate decision.
