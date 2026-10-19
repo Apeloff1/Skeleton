@@ -12,7 +12,7 @@ import sqlite3
 import unittest
 
 from skeleton.jeeves.game_frontier_native_chunks import (
-    inspect_native_chunks, NativeChunkError,
+    inspect_native_chunks, compare_native_chunk_transitions, NativeChunkError,
 )
 from skeleton.jeeves.game_frontier_native_capture import (
     GodotPhysicsCaptureIngestor, NativeObservationError,
@@ -225,6 +225,81 @@ class MultiActorNativeTests(unittest.TestCase):
         with self.assertRaises(FrontierGodotError):
             emit_frontier_godot_overlay(candidate,enable_native_capture=True,
                                         native_capture_all_actors=True)
+
+
+class NativeChunkTransitionProofTests(unittest.TestCase):
+    def setUp(self):
+        self.anchor=bind_signed_gdd(gdd())
+
+    def test_source_native_migrations_retirement_and_contact_deltas(self):
+        before=sample(0,self.anchor.source_digest)
+        after=sample(1,self.anchor.source_digest)
+        after["actors"][0]["contact_count"]=2
+        proof=compare_native_chunk_transitions(after,previous=before)
+        self.assertEqual(proof["migrations"],1)
+        self.assertEqual(proof["retired_chunk_count"],1)
+        self.assertEqual(proof["fps"],60)
+        hero=[x for x in proof["actors"] if x["actor_id"]=="hero"][0]
+        self.assertTrue(hero["migrated"])
+        self.assertEqual(hero["from_chunk"],[0,-1])
+        self.assertEqual(hero["to_chunk"],[1,-1])
+        self.assertEqual(hero["contact_count_delta"],1)
+        self.assertEqual(len(proof["receipt_digest"]),64)
+        self.assertEqual(compare_native_chunk_transitions(after,previous=before),proof)
+
+    def test_reject_actor_teleport_scene_forgery_and_nonmonotone_clock(self):
+        earlier=sample(0,self.anchor.source_digest)
+        after=sample(1,self.anchor.source_digest)
+        tamper=dict(after)
+        tamper["native_tick"]=12
+        with self.assertRaises(NativeChunkError):
+            compare_native_chunk_transitions(tamper,previous=earlier)
+        tamper=dict(after)
+        tamper["scene_candidate_digest"]="e"*64
+        with self.assertRaises(NativeChunkError):
+            compare_native_chunk_transitions(tamper,previous=earlier)
+        tamper=dict(after)
+        tamper["actors"]=[dict(x) for x in after["actors"]]
+        tamper["actors"][0]["world_xyz_m"]=[10_000,0,30]
+        tamper.pop("native_chunks")
+        tamper.pop("native_chunk_size_m")
+        with self.assertRaises(NativeChunkError):
+            compare_native_chunk_transitions(tamper,previous=earlier)
+
+    def test_journal_replays_source_transition_and_forks(self):
+        with TemporaryDirectory() as temp:
+            path=Path(temp)/"transitions.sqlite"
+            with FrameReceiptJournal(path,self.anchor) as journal:
+                importer=GodotPhysicsCaptureIngestor(
+                    journal,candidate_digest=CANDIDATE,
+                    allowed_assets={"hero":A,"npc":B,"island":C})
+                start=importer.ingest(sample(0,self.anchor.source_digest))
+                second=importer.ingest(sample(1,self.anchor.source_digest))
+                self.assertEqual(journal.replay()["verified_frames"],2)
+                expected=journal.native_chunk_transitions(1)
+                self.assertEqual(second["native_chunk_transition_digest"],
+                                 expected["receipt_digest"])
+                self.assertEqual(expected["migrations"],1)
+                journal.fork("fork0",through=0)
+            with FrameReceiptJournal(path,self.anchor,track="fork0") as recovered:
+                self.assertEqual(recovered.replay()["verified_frames"],1)
+                self.assertEqual(recovered.native_chunk_transitions(0)["migrations"],0)
+
+    def test_tampered_native_transition_replay_fails_closed(self):
+        with TemporaryDirectory() as temp:
+            path=Path(temp)/"transitions.sqlite"
+            with FrameReceiptJournal(path,self.anchor) as journal:
+                importer=GodotPhysicsCaptureIngestor(
+                    journal,candidate_digest=CANDIDATE,
+                    allowed_assets={"hero":A,"npc":B,"island":C})
+                evidence=importer.ingest(sample(0,self.anchor.source_digest))
+                identity=evidence["native_chunk_transition_digest"]
+            with sqlite3.connect(path) as db:
+                db.execute("UPDATE frontier_blobs SET content='{}' WHERE digest=?",
+                           (identity,))
+            with FrameReceiptJournal(path,self.anchor) as journal:
+                with self.assertRaises(FrameJournalError):
+                    journal.replay()
 
 
 if __name__=="__main__":
