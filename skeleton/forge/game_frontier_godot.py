@@ -45,6 +45,7 @@ func _ready() -> void:
                      data.get("photometric_3d", []), data.get("atmosphere", {}))
     _create_water(data.get("liquid", {}), data.get("tides", {}))
     _create_leaf_shadows(data.get("leaf_shadows", []))
+    _create_biome_objects(data.get("biome_motion", {}))
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
 
@@ -150,6 +151,39 @@ func _create_leaf_shadows(records: Array) -> void:
         leaf_shadow.material_override = material
         leaf_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         add_child(leaf_shadow)
+
+func _create_biome_objects(biome: Dictionary) -> void:
+    for shrub in biome.get("shrubs", []):
+        var root := _vec(shrub["root"])
+        var tip := _vec(shrub["tip"])
+        var axis := tip - root
+        if axis.length() < .01:
+            continue
+        var foliage := MeshInstance3D.new()
+        foliage.name = "MotionAwareShrub"
+        var shape := CylinderMesh.new()
+        shape.top_radius = float(shrub["radius_m"]) * .7
+        shape.bottom_radius = float(shrub["radius_m"])
+        shape.height = axis.length()
+        foliage.mesh = shape
+        foliage.position = (root + tip) * .5
+        foliage.quaternion = Quaternion(Vector3.UP, axis.normalized())
+        var material := StandardMaterial3D.new()
+        material.albedo_color = Color(.18, .5, .2)
+        foliage.material_override = material
+        foliage.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+        add_child(foliage)
+    for rock in biome.get("rocks", []):
+        var node := MeshInstance3D.new()
+        node.name = "ImpactAwareRock"
+        var mesh := SphereMesh.new()
+        mesh.radius = float(rock["radius_m"])
+        mesh.height = mesh.radius * 2
+        node.mesh = mesh
+        node.position = _vec(rock["position"])
+        node.rotation.z = float(rock["rotation_radians"])
+        node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+        add_child(node)
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]
@@ -330,6 +364,7 @@ def emit_frontier_godot_overlay(
         "atmosphere": manifest.get("atmosphere") or {},
         "tides": manifest.get("tides") or {},
         "liquid": manifest.get("liquid") or {},
+        "biome_motion": manifest.get("biome_motion") or {},
         "geometry": {
             "vertices": [[v.x, v.y, v.z] for v in vertices],
             "triangles": [list(face) for face in triangles],
