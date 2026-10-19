@@ -40,7 +40,7 @@ from .code_scrutiny_loop import Discovery, Repair
 from .final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
     FinalReviewAdversary, MeasuredCriterion, SourceProvenance,
-    required_final_kind,
+    required_final_kind, quality_source_continuity_failure,
 )
 from .context_repository import (
     ContextEntry,
@@ -1302,12 +1302,13 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             # The copyright/rewrite review must bind the *exact* quality-audited
             # bytes, and the host must still serve that same version.
             audited_sources = dict(quality.scrutiny.files)
-            if (not quality.releasable
-                    or latest_quality_sources != audited_sources):
-                return False, "quality-reviewed sources changed before final review"
-            if any(reviewed.get(path) != content
-                   for path, content in audited_sources.items()):
-                return False, "final review omitted or changed a quality-reviewed artifact"
+            if not quality.releasable:
+                return False, "final review cannot reuse a blocked quality receipt"
+            drift = quality_source_continuity_failure(
+                reviewed, latest_quality_sources, audited_sources,
+            )
+            if drift:
+                return False, drift
         review = self._final_reviewer.inspect(
             kind, reviewed, metrics=tuple(binding.metric_reader(dict(reviewed))),
             provenance=tuple(binding.rights_reader(dict(reviewed))),
