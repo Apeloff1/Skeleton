@@ -152,6 +152,59 @@ jobs:
                             "source_frames":result["source_prefix_verified_frames"],
                             "receipt_root":result["receipt_digest"]}))
           PY
+            # Resume the same CI quest from a durable source-anchored state,
+            # without resetting event cooldown, quest flags or proposal history.
+            # The prior checkpoint digest is carried separately from its file.
+            common_quest_args=(
+              --signed-gdd "$project/signed_gdd.json"
+              --scene-json "$project/frontier/data/scene.json"
+              --journal "$journal"
+              --event-pages-json "$project/native_rpg_pages.json"
+              --quest-graph-json "$project/native_quest_graph.json"
+              --quest-approvals-json "$RUNNER_TEMP/frontier-fixture-approved-$fps.json"
+              --actor-id hero
+              --event-limit 64
+            )
+            first_cp="$RUNNER_TEMP/frontier-checkpoint-$fps-a.json"
+            second_cp="$RUNNER_TEMP/frontier-checkpoint-$fps-b.json"
+            first_window="$RUNNER_TEMP/frontier-quest-window-$fps-a.json"
+            second_window="$RUNNER_TEMP/frontier-quest-window-$fps-b.json"
+            python scripts/run_game_frontier_capture.py advance-quests \
+              "${common_quest_args[@]}" --through 2 \
+              --checkpoint-output-json "$first_cp" \
+              > "$first_window"
+            trusted_root="$(python - "$first_window" <<'PY'
+          import json,sys
+          from pathlib import Path
+          print(json.loads(Path(sys.argv[1]).read_text())["gameplay_window"]["checkpoint"]["receipt_digest"])
+          PY
+            )"
+            python scripts/run_game_frontier_capture.py advance-quests \
+              "${common_quest_args[@]}" \
+              --checkpoint-input-json "$first_cp" \
+              --expected-checkpoint-digest "$trusted_root" \
+              --checkpoint-output-json "$second_cp" \
+              > "$second_window"
+            python - "$RUNNER_TEMP/frontier-quest-session-$fps.json" "$first_window" "$second_window" "$second_cp" <<'PY'
+          import json,sys
+          from pathlib import Path
+          old=json.loads(Path(sys.argv[1]).read_text())["gameplay_session"]
+          first=json.loads(Path(sys.argv[2]).read_text())["gameplay_window"]
+          second=json.loads(Path(sys.argv[3]).read_text())["gameplay_window"]
+          cursor=json.loads(Path(sys.argv[4]).read_text())
+          assert first["entries"]+second["entries"]==old["entries"]
+          assert second["previous_checkpoint_digest"]==first["checkpoint"]["receipt_digest"]
+          assert second["checkpoint"]==cursor
+          assert cursor["quests"]==old["final_quests"]
+          assert cursor["flags"]==old["final_flags"]
+          assert cursor["approved_page_count"]==old["approved_page_count"]==2
+          assert cursor["last_session_receipt_digest"]==old["last_session_receipt_digest"]
+          assert first["verified_window_frames"]==3
+          assert second["verified_window_frames"]>=1
+          print(json.dumps({"replayed_and_resumed_native_quest":True,
+                            "source_frames":old["source_prefix_verified_frames"],
+                            "checkpoint_root":cursor["receipt_digest"]}))
+          PY
             echo "#### Real Godot $fps Hz approved CI quest simulation" >> "$GITHUB_STEP_SUMMARY"
             echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
             cat "$RUNNER_TEMP/frontier-quest-fixture-$fps.json" >> "$GITHUB_STEP_SUMMARY"
