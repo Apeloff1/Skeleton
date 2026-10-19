@@ -47,6 +47,7 @@ from .game_frontier_advanced_physics import (
     Climber, CollisionContact, airflow_at, integrate_air_motion,
     evaluate_climbing, resolve_contact, aggregate_realism,
 )
+from .game_frontier_realism import audit_scene_realism
 
 FRONTIER_SCENE_SCHEMA = "skeleton.game.frontier_scene_candidate.v1"
 FRONTIER_MODEL_STATUS = "engine_candidate_only_no_proprietary_weights"
@@ -644,6 +645,9 @@ def compile_frontier_scene(
             "runtime_admitted": False,
         },
     }
+    # A separate observer recomputes cross-domain physical invariants from
+    # manifest evidence. These checks do not elevate a candidate to authority.
+    manifest["realism_audit"] = audit_scene_realism(manifest).manifest()
     digest = sha256(json.dumps(manifest, sort_keys=True,
                                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     return FrontierSceneCandidate(manifest, digest, vertices, moved,
