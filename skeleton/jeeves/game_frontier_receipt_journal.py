@@ -25,6 +25,9 @@ from .game_frontier_frame_coherence import (
 from .game_frontier_chunk_evidence import (
     ChunkEvidenceError, build_frame_chunk_receipts, verify_frame_chunk_receipts,
 )
+from .game_frontier_delta import (
+    create_frame_delta, verify_frame_delta, FrameDeltaError,
+)
 
 
 class FrameJournalError(ValueError):
@@ -113,6 +116,12 @@ class FrameReceiptJournal:
                     gdd_digest TEXT NOT NULL, chunk_size REAL NOT NULL,
                     max_speed REAL NOT NULL, fps INTEGER,
                     head INTEGER NOT NULL DEFAULT -1
+                );
+                CREATE TABLE IF NOT EXISTS frontier_deltas (
+                    track TEXT NOT NULL, frame INTEGER NOT NULL,
+                    content_digest TEXT NOT NULL,
+                    PRIMARY KEY(track,frame),
+                    FOREIGN KEY(content_digest) REFERENCES frontier_blobs(digest)
                 );
                 CREATE TABLE IF NOT EXISTS frontier_native_samples (
                     track TEXT NOT NULL, frame INTEGER NOT NULL,
@@ -248,14 +257,15 @@ class FrameReceiptJournal:
 
     def append(self, frame: FrameReceipt,
                evidence: Mapping | None = None, *,
-               native_capture: Mapping | None = None) -> dict:
+               native_capture: Mapping | None = None,
+               include_delta: bool = False) -> dict:
         """Commit only an independently verified next frame, atomically.
 
         If the same index is submitted twice, refuse; callers can load and
         compare if they need idempotent transport acknowledgement.
         """
-        if not isinstance(frame,FrameReceipt):
-            raise FrameJournalError("typed source FrameReceipt required")
+        if not isinstance(frame,FrameReceipt) or type(include_delta) is not bool:
+            raise FrameJournalError("typed source frame and delta selection required")
         self._db.execute("BEGIN IMMEDIATE")
         try:
             head,fps=self._head()
@@ -280,6 +290,17 @@ class FrameReceiptJournal:
                 chunk_size_m=self.chunk_size_m,
                 max_speed_mps=self.max_speed_mps)):
                 raise FrameJournalError("chunk evidence has not passed independent replay")
+            delta_payload=None
+            delta_hash=None
+            if include_delta:
+                delta_payload=create_frame_delta(
+                    frame,self.gdd,previous=previous,
+                    chunk_size_m=self.chunk_size_m,max_speed_mps=self.max_speed_mps)
+                if not all(verify_frame_delta(
+                    delta_payload,frame,self.gdd,previous=previous,
+                    chunk_size_m=self.chunk_size_m,max_speed_mps=self.max_speed_mps)):
+                    raise FrameJournalError("frame delta cannot reconstruct source")
+                delta_hash=delta_payload["receipt_digest"]
             native_hash=None
             if native_capture is not None:
                 self._validate_native_sample(frame,native_capture)
@@ -290,6 +311,8 @@ class FrameReceiptJournal:
             ]
             if native_hash is not None:
                 blobs.append((native_hash,dict(native_capture)))
+            if delta_hash is not None:
+                blobs.append((delta_hash,delta_payload))
             for identity,payload in blobs:
                 bare = ({k:v for k,v in payload.items() if k!="receipt_digest"}
                         if "receipt_digest" in payload else payload)
@@ -305,9 +328,13 @@ class FrameReceiptJournal:
                 "VALUES(?,?,?,?,?)",
                 (self.track,frame.frame_index,frame.receipt_digest,
                  expected["receipt_digest"],frame.previous_digest))
+            if delta_hash is not None:
+                self._db.execute(
+                    "INSERT INTO frontier_deltas(track,frame,content_digest) VALUES(?,?,?)",
+                    (self.track,frame.frame_index,delta_hash))
             if native_hash is not None:
                 self._db.execute(
-                    "INSERT INTO frontier_native_samples(track,frame,content_digest) VALUES(?,?,?)",
+                    "INSERT INTO frontier_native_samples(track,frame,content_digest) VALUES(?,?,?)"
                     (self.track,frame.frame_index,native_hash))
             changed=self._db.execute(
                 "UPDATE frontier_tracks SET head=?,fps=? WHERE name=? AND head=?",
@@ -319,6 +346,7 @@ class FrameReceiptJournal:
                     "frame_digest":frame.receipt_digest,
                     "chunk_evidence_digest":expected["receipt_digest"],
                     "native_capture_digest":native_hash,
+                    "delta_digest":delta_hash,
                     "track":self.track,
                     "authority":"journal_committed_verified_candidate_only"}
         except Exception:
@@ -327,7 +355,8 @@ class FrameReceiptJournal:
 
     def advance(self, objects: tuple[FrameObject,...], *, fps: int = 60,
                 notes: tuple[GDDFrameNote,...] = (),
-                native_capture: Mapping | None = None) -> dict:
+                native_capture: Mapping | None = None,
+                include_delta: bool = False) -> dict:
         """Produce source frame from host-observed actor samples and commit."""
         head,saved_fps=self._head()
         previous=self.load(head)[0] if head>=0 else None
@@ -340,7 +369,14 @@ class FrameReceiptJournal:
                 chunk_size_m=self.chunk_size_m,max_speed_mps=self.max_speed_mps)
         except (FrameCoherenceError, ValueError) as exc:
             raise FrameJournalError("source frame failed canonical temporal/GDD verification") from exc
-        return self.append(frame,native_capture=native_capture)
+        return self.append(
+            frame,native_capture=native_capture,include_delta=include_delta)
+
+    def frame_delta(self, frame_index: int) -> dict | None:
+        row=self._db.execute(
+            "SELECT content_digest FROM frontier_deltas WHERE track=? AND frame=?",
+            (self.track,frame_index)).fetchone()
+        return self._blob(row[0]) if row else None
 
     def native_sample(self, frame_index: int) -> dict | None:
         row=self._db.execute(
@@ -366,6 +402,11 @@ class FrameReceiptJournal:
                 previous_evidence=old_evidence,
                 chunk_size_m=self.chunk_size_m,
                 max_speed_mps=self.max_speed_mps)
+            compact=self.frame_delta(index)
+            if compact is not None and not all(verify_frame_delta(
+                compact,frame,self.gdd,previous=previous,
+                chunk_size_m=self.chunk_size_m,max_speed_mps=self.max_speed_mps)):
+                raise FrameJournalError("content-addressed frame delta replay failed")
             native=self.native_sample(index)
             if native is not None:
                 self._validate_native_sample(frame,native)
@@ -409,6 +450,11 @@ class FrameReceiptJournal:
                 "INSERT INTO frontier_commits(track,frame,frame_digest,evidence_digest,previous_frame_digest) "
                 "SELECT ?,frame,frame_digest,evidence_digest,previous_frame_digest "
                 "FROM frontier_commits WHERE track=? AND frame<=? ORDER BY frame",
+                (name,self.track,through))
+            self._db.execute(
+                "INSERT INTO frontier_deltas(track,frame,content_digest) "
+                "SELECT ?,frame,content_digest FROM frontier_deltas "
+                "WHERE track=? AND frame<=?",
                 (name,self.track,through))
             self._db.execute(
                 "INSERT INTO frontier_native_samples(track,frame,content_digest) "
