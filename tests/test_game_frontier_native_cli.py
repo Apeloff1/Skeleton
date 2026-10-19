@@ -84,7 +84,7 @@ class OperatorCLIRegressionTests(unittest.TestCase):
 
     def test_idempotent_cli_resume_and_modified_capture_rejection(self):
         records=[self.sample(i) for i in range(4)]
-        self.capture.write_text("".join(json.dumps(p)+"\\n" for p in records))
+        self.capture.write_text("".join(json.dumps(p)+"\n" for p in records))
         code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture))
         self.assertEqual(code,0,err)
         code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture),
@@ -94,7 +94,7 @@ class OperatorCLIRegressionTests(unittest.TestCase):
         self.assertEqual(json.loads(out)["samples_reused"],4)
         modified=[dict(p) for p in records]
         modified[2]=dict(modified[2],ticks_usec=4321)
-        self.capture.write_text("".join(json.dumps(p)+"\\n" for p in modified))
+        self.capture.write_text("".join(json.dumps(p)+"\n" for p in modified))
         code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture),
                                       "--resume")
         self.assertEqual(code,2)
@@ -123,7 +123,7 @@ class OperatorCLIRegressionTests(unittest.TestCase):
             {"chunk_xy":[-2,0],"actor_ids":["rock"]},
             {"chunk_xy":[0,0],"actor_ids":["hero"]},
         ]
-        self.capture.write_text(json.dumps(one)+"\\n")
+        self.capture.write_text(json.dumps(one)+"\n")
         code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture))
         self.assertEqual(code,0,err)
         self.assertEqual(json.loads(out)["samples_committed"],1)
