@@ -1,10 +1,10 @@
 # Skeleton AI Application Construction Manual
 
-Architecture tag: `arch-map/v3.6`
+Architecture tag: `arch-map/v3.7`
 
 Machine contract: `machine/ai_app_construction.json`
 
-Construction version: `3.6.0`
+Construction version: `3.7.0`
 
 Architecture contract: `machine/architecture.json`
 
@@ -24,7 +24,14 @@ Before an AI coding agent, human contributor, runtime provider adapter, automati
 2. `machine/architecture.json`
 3. `machine/ai_app_construction.json`
 4. `machine/capability_interfaces.json`
-5. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+5. `machine/state_topology.json`
+6. `machine/ai_runtime_schemas.json`
+7. `machine/ai_capabilities.json`
+8. `machine/ai_implementation_handoff.json`
+9. `machine/ai_closure_evidence.json`
+10. `machine/enterprise_ai_superiority.json`
+11. `machine/enterprise_ai_implementation_notes_index.json`
+12. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
 
 Do not infer architecture from branch names, historical files, or provider-specific conventions when these contracts answer the question. An undeclared runtime provider, runtime service, top-level runtime root, capability plane, or ownership boundary is rejected until the contracts are updated and validated.
 
@@ -66,7 +73,7 @@ The runtime service topology stays intentionally small. Complex AI behavior belo
 | Product shell | `frontend/` | Only human-interface root |
 | Application API | `backend/` | Product/business routes and control plane |
 | Engine runtime/API | `skeleton/` | AI engine, orchestration, memory, retrieval, agents |
-| Runtime model provider boundary | `backend/core/ai_provider.py` | Provider-neutral contract and concrete adapters |
+| Runtime model provider boundary | `skeleton/provider_runtime.py` | Canonical credential-bearing provider activation; `backend/core/ai_provider.py` is compatibility-only |
 | Model routing | `skeleton/frontier/model_routing.py` | Canonical capability/privacy/cost/quality routing; backend router is compatibility/composition |
 | Native acceleration | `skeleton/native/` | Optional, fallback-safe |
 | JVM acceleration | `java-accelerators/` | Optional, fallback-safe |

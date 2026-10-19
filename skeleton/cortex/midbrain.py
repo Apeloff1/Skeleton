@@ -110,3 +110,30 @@ class Midbrain:
             tags=("route", "coordinator", "medium") + (("left",) if to_left else ()) + (("right",) if to_right else ()),
             numbers=(arousal, lw, rw),
         )
+
+    def route_game_stage(self, stimulus: str, *, stage: str = "design") -> Dict[str, Any]:
+        """Arbitrate tract weights and priority for a specific game-creation pipeline stage."""
+        arousal, lw, rw = _weights(stimulus or "")
+        st = (stage or "design").lower()
+        stage_priors = {
+            "intent": (0.45, 0.55),
+            "spec": (0.60, 0.50),
+            "world": (0.40, 0.75),
+            "combat": (0.75, 0.55),
+            "content": (0.50, 0.70),
+            "prove": (0.85, 0.30),
+            "qa": (0.80, 0.45),
+            "polish": (0.65, 0.65),
+        }
+        pl, pr = stage_priors.get(st, (0.55, 0.55))
+        eff_left = round(0.5 * lw + 0.5 * pl, 4)
+        eff_right = round(0.5 * rw + 0.5 * pr, 4)
+        return {
+            "stage": st,
+            "arousal": round(arousal, 4),
+            "left_weight": eff_left,
+            "right_weight": eff_right,
+            "fire_left": eff_left >= 0.25,
+            "fire_right": eff_right >= 0.25,
+            "primary_tract": "left" if eff_left >= eff_right else "right",
+        }

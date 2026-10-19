@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from skeleton.cortex.acquire_repo import SPREE, parse_ref, reference_of
+from skeleton.cortex.acquire_repo import GAME_ADJACENT_SPREE, SPREE, parse_ref, reference_of
 from skeleton.cortex.port import Thought
 from skeleton.cortex.reference_provenance import (
     ReferenceProvenanceError,
@@ -28,8 +28,9 @@ def _norm(s: str) -> str:
     return " ".join((s or "").lower().split())
 
 
-def index() -> list[dict[str, Any]]:
-    return [reference_of(g) for g in SPREE]
+def index(*, include_adjacent: bool = True) -> list[dict[str, Any]]:
+    source = (*SPREE, *GAME_ADJACENT_SPREE) if include_adjacent else SPREE
+    return [reference_of(g) for g in source]
 
 
 def match(stimulus: str) -> list[dict[str, Any]]:

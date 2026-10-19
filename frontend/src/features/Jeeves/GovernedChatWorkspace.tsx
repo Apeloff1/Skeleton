@@ -10,7 +10,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useChatController } from '../../product/useChatController';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import type { ConversationMessage, ConversationThread } from '../../product/governedConversationClient';
-import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadChatAttachment } from './chatFiles';
+import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadAllChatAttachments, uploadChatAttachment } from './chatFiles';
 import MessageContent from './MessageContent';
 import JeevesRuntimeStatus from './JeevesRuntimeStatus';
 import ChatModelCapabilities from './ChatModelCapabilities';
@@ -197,6 +197,8 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, UploadedFile[]>>({});
   const [attachmentConsent, setAttachmentConsent] = useState(false);
+  const [filetreeOpen, setFiletreeOpen] = useState(false);
+  const [selectedTreeNode, setSelectedTreeNode] = useState('chr_16k.chr');
   const [consentChecked, setConsentChecked] = useState(false);
   const [attachmentTypes, setAttachmentTypes] = useState<string[]>([]);
   const [checkingAttachments, setCheckingAttachments] = useState(false);
@@ -362,18 +364,25 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     } finally { sending.current = false; }
   };
 
-  const pickAttachment = async () => {
+  const pickAttachment = async (multiple = false) => {
     if (uploading || busy || creatingRef.current || !attachmentTypes.length) return;
     setUploading(true); setUploadError(null);
     const origin = threadIdRef.current;
     const uploadingAccount = getAuthToken();
     const abort = new AbortController(); uploadController.current = abort;
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: attachmentTypes, copyToCacheDirectory: true, multiple: false });
+      const result = await DocumentPicker.getDocumentAsync({ type: attachmentTypes, copyToCacheDirectory: true, multiple });
       if (result.canceled) return;
-      const file = result.assets[0];
-      const base64 = await readPickedAttachment(file);
-      if (abort.signal.aborted) return;
+      const existingCount = (files[origin] || []).length;
+      const remainingSlots = Math.max(0, 4 - existingCount);
+      if (remainingSlots <= 0) throw new Error('You can attach up to four files per message.');
+      const selectedAssets = result.assets.slice(0, remainingSlots);
+      const encodedAssets: { name: string; mimeType: string; base64: string }[] = [];
+      for (const file of selectedAssets) {
+        const base64 = await readPickedAttachment(file);
+        if (abort.signal.aborted) return;
+        encodedAssets.push({ name: file.name, mimeType: inferredMime(file.name, file.mimeType), base64 });
+      }
       if (uploadingAccount !== getAuthToken()) throw new Error('Your account changed. Choose the file again in the intended conversation.');
       let thread = controller.getSnapshot().activeThread;
       if (origin === '__new') {
@@ -387,11 +396,18 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
       const uploadThreadId = thread.thread_id;
       if (uploadingAccount !== getAuthToken()) throw new Error('Your account changed. Choose the file again in the intended conversation.');
       if (origin === '__new') setDrafts(current => ({ ...current, [uploadThreadId]: current.__new || '', __new: '' }));
-      if ((files[thread.thread_id] || []).length >= 4) throw new Error('You can attach up to four files per message.');
-      const uploaded = await uploadChatAttachment({ threadId: thread.thread_id, filename: file.name,
-        mimeType: inferredMime(file.name, file.mimeType), base64, rightsAcknowledged: true, signal: abort.signal });
+      if ((files[thread.thread_id] || []).length + encodedAssets.length > 4) throw new Error('You can attach up to four files per message.');
+      const uploadedBatch = multiple
+        ? await uploadAllChatAttachments(encodedAssets.map(item => ({
+            threadId: uploadThreadId, filename: item.name, mimeType: item.mimeType,
+            base64: item.base64, rightsAcknowledged: true as const, signal: abort.signal,
+          })))
+        : [await uploadChatAttachment({
+            threadId: uploadThreadId, filename: encodedAssets[0].name, mimeType: encodedAssets[0].mimeType,
+            base64: encodedAssets[0].base64, rightsAcknowledged: true, signal: abort.signal,
+          })];
       if (!mounted.current || abort.signal.aborted || uploadingAccount !== getAuthToken()) return;
-      setFiles(current => ({ ...current, [uploadThreadId]: [...(current[uploadThreadId] || []), uploaded] }));
+      setFiles(current => ({ ...current, [uploadThreadId]: [...(current[uploadThreadId] || []), ...uploadedBatch] }));
       input.current?.focus();
     } catch (caught) {
       if (mounted.current && !abort.signal.aborted) setUploadError(caught instanceof Error ? caught.message : 'This file could not be attached.');
@@ -573,6 +589,10 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
               <View style={s.between}><View style={s.row}>
                 <IconButton icon="attach-outline" label="Attach a file" disabled={busy || loading || creating || uploading || attached.length >= 4 || !state.ready}
                   onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
+                <MiniButton icon="cloud-upload-outline" label="Upload all files" disabled={busy || loading || creating || uploading || attached.length >= 4 || !state.ready}
+                  onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
+                <MiniButton icon="folder-open-outline" label="Visual filetree" disabled={busy || loading || creating}
+                  onPress={() => setFiletreeOpen(true)} />
                 {uploading ? <View style={s.row}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>Attaching…</Text>
                   <MiniButton icon="close-outline" label="Cancel" onPress={() => uploadController.current?.abort()} /></View> :
                   <Text style={s.muted}>{draft.length > 30000 ? `${draft.length.toLocaleString()} / ${MAX_MESSAGE_LENGTH.toLocaleString()}` : attached.length ? `${attached.length} / 4 files` : 'Ask anything'}</Text>}
@@ -657,8 +677,39 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         <Text style={s.checkboxText}>I have permission to use this file in this conversation.</Text>
       </TouchableOpacity>
       <View style={s.dialogActions}><Button label="Cancel" onPress={() => setAttachmentConsent(false)} />
-        <Button icon="document-outline" label="Choose file" primary disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
-          onPress={() => { setAttachmentConsent(false); void pickAttachment(); }} /></View>
+        <Button icon="document-outline" label="Choose file" disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
+          onPress={() => { setAttachmentConsent(false); void pickAttachment(false); }} />
+        <Button icon="cloud-upload-outline" label="Upload all files" primary disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
+          onPress={() => { setAttachmentConsent(false); void pickAttachment(true); }} /></View>
+    </Dialog>}
+    {filetreeOpen && <Dialog title="Visual filetree" close={() => setFiletreeOpen(false)}>
+      <Text style={s.dialogBody}>Inspect, view, download, or target sectional game creation and decompilation nodes with AI tools.</Text>
+      <ScrollView style={s.dialogScroll} contentContainerStyle={s.modelList} keyboardShouldPersistTaps="handled">
+        {[
+          { name: 'hdr_vec.sec', kind: 'binary_section', detail: 'ROM header & interrupt vector table (copyright voided)', tool: 'adaptive_sequential_decompiler' },
+          { name: 'code_bnk0.asm', kind: 'disassembly', detail: 'Sectional CFG & lifted fixed-tick state-machine routines', tool: 'sectional_disassembly_organizer' },
+          { name: 'chr_16k.chr', kind: 'sprite_bank_16k', detail: 'Nuance-resprayed 32k upscale -> 16k quality downscaled sprite bank', tool: 'quality_downscaler_32k_to_16k' },
+          { name: 'pal_nuance.pal', kind: 'palette_bgr555', detail: 'Perceptual hue-shifted 15-bit BGR555 sub-palettes (0.0 overlap)', tool: 'nuance_sprite_resprayer' },
+          { name: 'smw_yoshi_1.lvl', kind: 'smw_mode1_stage', detail: 'Super Mario World Mode-1 26deg/45deg slope & Dragon Coin stage', tool: 'smw_stage_synthesizer' },
+          { name: 'insp_cat.json', kind: 'inspiration_manifest', detail: 'Clean-room copyright-voided inspirational source manifest', tool: 'inspiration_source_cataloguer' },
+        ].map(node => <TouchableOpacity key={node.name} accessibilityRole="button" accessibilityLabel={`Inspect ${node.name}`}
+          accessibilityState={{ selected: selectedTreeNode === node.name }}
+          style={[s.modelItem, selectedTreeNode === node.name && s.selectedModel]}
+          onPress={() => setSelectedTreeNode(node.name)}>
+          <View style={s.between}><Text style={s.modelName}>{node.name}</Text><Text style={s.badge}>{node.kind}</Text></View>
+          <Text style={s.modelDetails}>{node.detail}</Text>
+          <View style={s.row}>
+            <MiniButton icon="eye-outline" label="View / Inspect" onPress={() => { setSelectedTreeNode(node.name); notify(`Inspecting ${node.name}: ${node.detail}`); }} />
+            <MiniButton icon="download-outline" label="Download" onPress={() => notify(`Prepared ${node.name} download.`)} />
+            <MiniButton icon="construct-outline" label="Target with AI tool" onPress={() => {
+              setDraft(`Target filetree node /smw_snes_world/${node.name} with AI tool ${node.tool}`);
+              setFiletreeOpen(false);
+              input.current?.focus();
+            }} />
+          </View>
+        </TouchableOpacity>)}
+      </ScrollView>
+      <View style={s.dialogActions}><Button label="Close" onPress={() => setFiletreeOpen(false)} /></View>
     </Dialog>}
     {!!toast && <View pointerEvents="none" style={s.toast} accessibilityLiveRegion="polite"><Text style={s.toastText}>{toast}</Text></View>}
   </SafeAreaView>;
