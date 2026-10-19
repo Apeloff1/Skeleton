@@ -51,46 +51,48 @@ jobs:
           chmod 700 "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64"
           echo "FRONTIER_GODOT=$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
           echo "FRONTIER_GODOT_SHA=$(sha256sum "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" | cut -d' ' -f1)" >> "$GITHUB_ENV"
-      - name: Materialize authorized signed-GDD multi-actor Godot project
+      # One pinned binary download, four independently sandboxed native
+      # simulations and journals. This avoids a 4x runner/install/download fanout.
+      - name: Qualify 30/50/60/120 Hz native physics and frame journals
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/frontier-project" "$RUNNER_TEMP/frontier-userdata"
-          python scripts/build_game_frontier_smoke.py \
-            --output "$RUNNER_TEMP/frontier-project" --fps 60 --frames 20
-      - name: Native Godot 4 headless import and scene playback
-        shell: bash
-        env:
-          XDG_DATA_HOME: ${{ runner.temp }}/frontier-userdata
-        run: |
-          set -euo pipefail
-          python scripts/qualify_game_frontier_godot.py \
-            --godot "$FRONTIER_GODOT" --godot-sha256 "$FRONTIER_GODOT_SHA" \
-            --project "$RUNNER_TEMP/frontier-project" --frames 20
-      - name: Ingest real Godot physics observations and replay source frame/chunk proof
-        shell: bash
-        env:
-          XDG_DATA_HOME: ${{ runner.temp }}/frontier-userdata
-        run: |
-          set -euo pipefail
-          capture=$(find "$RUNNER_TEMP/frontier-userdata" -type f \
-            -name frontier_native_physics.jsonl -print -quit)
-          test -n "$capture"
-          test -s "$capture"
-          python scripts/validate_game_frontier_native_smoke.py \
-            --capture-jsonl "$capture" \
-            --scene-json "$RUNNER_TEMP/frontier-project/frontier/data/scene.json" \
-            --min-ticks 4 --max-ticks 20 --require-dynamics
-          python scripts/run_game_frontier_capture.py ingest \
-            --signed-gdd "$RUNNER_TEMP/frontier-project/signed_gdd.json" \
-            --scene-json "$RUNNER_TEMP/frontier-project/frontier/data/scene.json" \
-            --capture-jsonl "$capture" \
-            --journal "$RUNNER_TEMP/frontier-frames.sqlite"
-          python scripts/run_game_frontier_capture.py verify \
-            --signed-gdd "$RUNNER_TEMP/frontier-project/signed_gdd.json" \
-            --scene-json "$RUNNER_TEMP/frontier-project/frontier/data/scene.json" \
-            --journal "$RUNNER_TEMP/frontier-frames.sqlite"
-          python scripts/run_game_frontier_capture.py timeline \
-            --signed-gdd "$RUNNER_TEMP/frontier-project/signed_gdd.json" \
-            --scene-json "$RUNNER_TEMP/frontier-project/frontier/data/scene.json" \
-            --journal "$RUNNER_TEMP/frontier-frames.sqlite" --page-limit 20
+          for fps in 30 50 60 120; do
+            echo "::group::Game Frontier real Godot native ${fps} Hz"
+            project="$RUNNER_TEMP/frontier-project-${fps}"
+            userdir="$RUNNER_TEMP/frontier-userdata-${fps}"
+            journal="$RUNNER_TEMP/frontier-frames-${fps}.sqlite"
+            mkdir -p "$project" "$userdir"
+            python scripts/build_game_frontier_smoke.py \
+              --output "$project" --fps "$fps" --frames 20
+            XDG_DATA_HOME="$userdir" python scripts/qualify_game_frontier_godot.py \
+              --godot "$FRONTIER_GODOT" --godot-sha256 "$FRONTIER_GODOT_SHA" \
+              --project "$project" --frames 20
+            capture="$(find "$userdir" -type f -name frontier_native_physics.jsonl -print -quit)"
+            test -n "$capture"
+            test -s "$capture"
+            python scripts/validate_game_frontier_native_smoke.py \
+              --capture-jsonl "$capture" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --min-ticks 4 --max-ticks 20 --require-dynamics \
+              > "$RUNNER_TEMP/frontier-native-report-${fps}.json"
+            python scripts/run_game_frontier_capture.py ingest \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --capture-jsonl "$capture" \
+              --journal "$journal"
+            python scripts/run_game_frontier_capture.py verify \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal"
+            python scripts/run_game_frontier_capture.py timeline \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" --page-limit 20 \
+              > "$RUNNER_TEMP/frontier-native-timeline-${fps}.json"
+            echo "#### Real Godot ${fps} Hz native proof" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/frontier-native-report-${fps}.json" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+            echo "::endgroup::"
+          done
