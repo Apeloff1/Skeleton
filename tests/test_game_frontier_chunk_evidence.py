@@ -105,11 +105,11 @@ class FrameChunkEvidenceTests(unittest.TestCase):
     def test_30_50_60_120fps_migration_proofs_and_gdd_note_references(self):
         for fps in (30,50,60,120):
             previous=advance_frame(frame_index=0,fps=fps,gdd=self.gdd,
-                                   objects=entity())
+                                   objects=entity(31.99))
             prior_proof=build_frame_chunk_receipts(previous,self.gdd)
             next_frame=advance_frame(
                 frame_index=1,fps=fps,gdd=self.gdd,previous=previous,
-                objects=entity(32.05),
+                objects=entity(32.01),
                 notes=(GDDFrameNote(1,"design_context",
                                    "Keep weather-aware route continuity."),))
             proof=build_frame_chunk_receipts(
