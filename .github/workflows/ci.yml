@@ -64,7 +64,7 @@ jobs:
       - name: Repository toolchain contract
         run: python ../scripts/check_toolchain_contract.py
       - name: Backend correctness lint
-        run: uvx --from "ruff==0.9.10" ruff check . --output-format=github
+        run: uvx --from "ruff==0.17.1" ruff check . --output-format=github
       - name: Backend syntax compilation
         run: python -m compileall -q .
       - name: Process invocation safety gate

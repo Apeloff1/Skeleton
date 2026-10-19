@@ -16,8 +16,8 @@ UV_REQUIRED_VERSION = "==0.12.15"
 JAVA_BOOTSTRAP_MAJOR = 21
 GIT_BOOTSTRAP_MINIMUM = "2.40"
 BOOTSTRAP_COMMAND = "mise run bootstrap"
-RUFF_CI_VERSION = "0.9.10"
-RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
+RUFF_CI_VERSION = "0.17.1"
+RUFF_DEV_REQUIREMENT = "ruff>=0.17.1,<0.18"
 EXPO_SDK_VERSION = "~54.0.35"
 REACT_VERSION = "19.1.0"
 REACT_NATIVE_VERSION = "0.81.5"
@@ -163,6 +163,26 @@ def main() -> int:
     failures: list[str] = []
 
     root_project = tomllib.loads(read("pyproject.toml"))
+    root_dev = (
+        root_project.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+    )
+    require(
+        RUFF_DEV_REQUIREMENT in root_dev,
+        "root Python development Ruff range drifted from canonical toolchain",
+        failures,
+    )
+    require(
+        RUFF_DEV_REQUIREMENT in read("requirements-dev.txt").splitlines(),
+        "requirements-dev Ruff range drifted from canonical toolchain",
+        failures,
+    )
+    require(
+        RUFF_DEV_REQUIREMENT in {
+            line.strip() for line in read("setup.cfg").splitlines()
+        },
+        "setup.cfg dev Ruff range drifted from canonical toolchain",
+        failures,
+    )
     require(
         root_project.get("tool", {}).get("uv", {}).get("required-version")
         == UV_REQUIRED_VERSION,
