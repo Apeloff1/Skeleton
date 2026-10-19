@@ -335,7 +335,39 @@ def build_frame_chunk_receipts(
             "authority":"source_frame_chunk_candidate_not_native_renderer_proof",
         })
         receipts.append(record)
+    retired=[]
     if previous:
+        active_cells={chunk.chunk_key for chunk in frame.chunks}
+        for prior_chunk in previous.chunks:
+            if prior_chunk.chunk_key in active_cells:
+                continue
+            departures=[
+                {"entity_id":item.entity_id,
+                 "from_xy":list(prior_chunk.chunk_key),
+                 "to_xy":list(now[item.entity_id][0].chunk_key),
+                 "source_digest":item.source_digest}
+                for item in prior_chunk.objects if item.entity_id in now
+            ]
+            if (len(departures)!=len(prior_chunk.objects) or
+                any(tuple(item["to_xy"])==prior_chunk.chunk_key
+                    for item in departures) or
+                _hash(prior_chunk.payload())!=prior_chunk.content_digest):
+                raise ChunkEvidenceError("retired chunk source/migration invalid")
+            retired.append(_sealed({
+                "schema":"skeleton.game.retired_frame_chunk_receipt.v1",
+                "chunk_xy":list(prior_chunk.chunk_key),
+                "prior_source_chunk_digest":prior_chunk.content_digest,
+                "prior_source_frame_digest":previous.receipt_digest,
+                "new_source_frame_digest":frame.receipt_digest,
+                "signed_gdd_digest":gdd.source_digest,
+                "departing_entities":departures,
+                "verifier_a":{"passed":True,
+                              "recomputed_digest":_hash(prior_chunk.payload())},
+                "verifier_b":{"passed":True,
+                              "method":"retired_chunk_all_entities_migrated"},
+                "authority":"candidate_departure_evidence_not_native_chunk_unload",
+            }))
+            outgoing+=len(departures)
         earlier_keys={obj.entity_id:ch.chunk_key for ch in previous.chunks
                       for obj in ch.objects}
         expected=sum(1 for ch in frame.chunks for obj in ch.objects
@@ -351,6 +383,7 @@ def build_frame_chunk_receipts(
             previous_evidence["receipt_digest"] if previous_evidence else None),
         "signed_gdd_digest":gdd.source_digest,
         "chunk_count":len(receipts),"object_count":len(now),
+        "retired_chunk_count":len(retired),"retired_chunks":retired,
         "cross_chunk_migrations":incoming,
         "chunk_receipts":len(receipts),
         "source_note_count":len(note_links),
