@@ -426,7 +426,11 @@ class FinalReviewAdversary:
                 review.creative_rewrite, passed=False,
             )), sources),
             ("tampered_objective", replace(review, measurements=(
-                replace(review.measurements[0], observed=float("-inf")), *review.measurements[1:]
+                replace(review.measurements[0], observed=(
+                    review.measurements[0].target - 1_000_000.0
+                    if review.measurements[0].direction == "higher"
+                    else review.measurements[0].target + 1_000_000.0
+                )), *review.measurements[1:]
             )), sources),
             ("reordered_checks", replace(review, receipts=tuple(reversed(review.receipts))), sources),
             ("changed_upstream", replace(review, upstream_quality_digest="0" * 64), sources),
