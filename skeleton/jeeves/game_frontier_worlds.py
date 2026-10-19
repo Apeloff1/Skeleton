@@ -180,9 +180,12 @@ def variant_world_cell(axes: WorldAxis, variant: WorldVariant, x: int, y: int) -
         floating = True if strength >= .5 else floating
         light = _clamp(.7 + strength * .25)
         energy = _clamp(.25 + strength * .7)
+    biome = ("snow" if temp < .28 else "desert" if humidity < .28
+             else "marsh" if humidity > .72 else "mountain" if elev > .72
+             else "woodland" if humidity > .5 else "grassland")
     return VariantCell(family, sx, sy, x, y, elev, humidity, temp,
                        light, permeability, sign, energy, altitude,
-                       floating, element, base.biome, axes.seed)
+                       floating, element, biome, axes.seed)
 
 
 @dataclass(frozen=True)
