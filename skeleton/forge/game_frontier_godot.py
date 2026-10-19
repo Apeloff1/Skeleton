@@ -55,6 +55,10 @@ var _native_recent_zone_events: Array[String] = []
 var _native_follow_cam: bool = false
 var _native_camera: Camera3D
 var _native_debug_speed: float = 1.0
+var _approved_gameplay_quests: Dictionary = {}
+var _approved_gameplay_flags: Dictionary = {}
+var _approved_gameplay_cues: Array = []
+var _approved_gameplay_label: Label
 
 func _vec(data: Array) -> Vector3:
     return Vector3(float(data[0]), float(data[2]), -float(data[1]))
@@ -87,6 +91,7 @@ func _ready() -> void:
     _create_biome_objects(data.get("biome_motion", {}))
     _create_advanced_character(data.get("advanced_physics", {}))
     _configure_native_capture(data.get("native_capture", {}))
+    _load_approved_native_gameplay(data.get("native_capture", {}))
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
 
@@ -573,6 +578,159 @@ func _configure_native_capture(settings: Dictionary) -> void:
     _native_capture_file = FileAccess.open("user://frontier_native_physics.jsonl", FileAccess.WRITE)
     if _native_capture_file == null:
         push_error("Native capture file could not be opened")
+
+func _load_approved_native_gameplay(capture: Dictionary) -> void:
+    var dispatch_settings: Dictionary = capture.get("native_gameplay_dispatch", {})
+    if dispatch_settings.is_empty():
+        return
+    # Fixed res:// path; no LLM-generated executable script or user path.
+    var path := "res://frontier/data/native_gameplay_dispatch.json"
+    var expected_sha := str(dispatch_settings.get("file_sha256", ""))
+    if expected_sha.length() != 64 or not FileAccess.file_exists(path):
+        push_error("Approved game dispatcher source file/digest missing")
+        return
+    if FileAccess.get_sha256(path) != expected_sha:
+        push_error("Approved game dispatcher source SHA does not match scene")
+        return
+    var bundle: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+    if typeof(bundle) != TYPE_DICTIONARY:
+        push_error("Approved game dispatcher must be typed JSON")
+        return
+    if (str(bundle.get("schema", "")) != "skeleton.game.native_godot_dispatch.v1"
+        or str(bundle.get("authority", "")) !=
+            "local_gameplay_state_only_not_canonical_GDD_or_network_attestation"
+        or str(bundle.get("scene_candidate_digest", "")) != _native_candidate_sha
+        or str(bundle.get("signed_gdd_digest", "")) != _native_signed_gdd_sha
+        or str(bundle.get("actor_id", "")) != _native_actor_id):
+        push_error("Approved game dispatcher scene/GDD/actor mismatch")
+        return
+    var actions: Array = bundle.get("actions", [])
+    if actions.size() > 65536 or typeof(bundle.get("initial_flags")) != TYPE_DICTIONARY:
+        push_error("Approved game dispatcher action budget invalid")
+        return
+    var quest_edges: Dictionary = bundle.get("quest_edges", {})
+    var quest_starts: Dictionary = bundle.get("quest_start_stages", {})
+    var next_flags: Dictionary = bundle["initial_flags"].duplicate(true)
+    var next_quests: Dictionary = {}
+    var next_cues: Array = []
+    var last_tick: int = -1
+    for row_item in actions:
+        if typeof(row_item) != TYPE_DICTIONARY:
+            push_error("Approved game command row invalid")
+            return
+        var row: Dictionary = row_item
+        var frame: int = int(row.get("frame", -1))
+        if frame < last_tick or frame < 0 or frame > int(bundle.get("source_through_frame", 0)):
+            push_error("Approved game command time ordering invalid")
+            return
+        last_tick = frame
+        if str(row.get("target", "")) != _native_actor_id:
+            push_error("Approved game command actor is not the authorized player")
+            return
+        var kind := str(row.get("kind", ""))
+        var value := str(row.get("value", ""))
+        if kind == "start_quest":
+            if not quest_starts.has(value) or next_quests.has(value):
+                push_error("Approved game quest start missing or duplicated")
+                return
+            var initial_stage: String = str(quest_starts[value])
+            var edges: Dictionary = quest_edges[value]
+            next_quests[value] = {
+                "stage": initial_stage, "completed":edges[initial_stage].is_empty(),
+                "last_transition_frame": frame,
+            }
+        elif kind == "advance_quest":
+            var token := value.split(":")
+            if token.size() != 2 or not next_quests.has(token[0]):
+                push_error("Approved game quest branch not active")
+                return
+            var record: Dictionary = next_quests[token[0]]
+            if bool(record["completed"]):
+                push_error("Approved game quest has already completed")
+                return
+            var choices: Array = quest_edges[token[0]][record["stage"]]
+            if not choices.has(token[1]):
+                push_error("Approved game quest transition missing authored edge")
+                return
+            next_quests[token[0]] = {
+                "stage":token[1],
+                "completed":quest_edges[token[0]][token[1]].is_empty(),
+                "last_transition_frame":frame,
+            }
+        elif kind == "set_flag":
+            var pair := value.split("=")
+            if pair.size() != 2 or not ["true", "false"].has(pair[1]):
+                push_error("Approved game quest flag must be boolean")
+                return
+            next_flags[pair[0]] = pair[1] == "true"
+        elif ["show_dialogue", "play_cutscene", "play_music",
+              "spatial_audio", "change_camera", "inspect_instrument",
+              "trigger_impact_fx", "trigger_foliage_fx"].has(kind):
+            next_cues.append({
+                "kind":kind, "cue":value, "source_frame":frame,
+                "page_id":str(row.get("page_id","")),
+            })
+        else:
+            # Inventory/world/NPC changes are NEVER inferred from proposals.
+            # Only typed commands with an approved runtime gateway may run.
+            push_error("Unsupported game world mutation rejected by dispatcher")
+            return
+    if (next_flags != bundle.get("expected_flags", {})
+        or next_quests != bundle.get("expected_quests", {})):
+        push_error("Engine RPG reducer diverged from independently replayed state")
+        return
+    _approved_gameplay_quests = next_quests
+    _approved_gameplay_flags = next_flags
+    _approved_gameplay_cues = next_cues
+    # One atomic document recording the actual Godot dispatch outcome.
+    # Canonical GDD and native physics frame evidence are never rewritten.
+    var accepted := {
+        "schema":"skeleton.game.godot_approved_dispatch_receipt.v1",
+        "dispatch_file_sha256":expected_sha,
+        "dispatch_receipt_digest":bundle["receipt_digest"],
+        "signed_gdd_digest":_native_signed_gdd_sha,
+        "scene_candidate_digest":_native_candidate_sha,
+        "actor_id":_native_actor_id,
+        "source_through_frame":bundle["source_through_frame"],
+        "actions_applied":actions.size(),
+        "quests":next_quests,"flags":next_flags,
+        "presentation_cues":next_cues,
+        "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
+    }
+    var result := FileAccess.open("user://frontier_approved_gameplay_receipt.json",FileAccess.WRITE)
+    if result == null:
+        push_error("Godot approved gameplay state could not be persisted")
+        return
+    result.store_string(JSON.stringify(accepted) + "\n")
+    result.flush()
+    result.close()
+    _create_approved_gameplay_inspector(accepted)
+
+
+func _create_approved_gameplay_inspector(record: Dictionary) -> void:
+    var hud := CanvasLayer.new()
+    hud.name = "NativeApprovedGameplayHUD"
+    var inspector := Label.new()
+    inspector.name = "ApprovedQuestState"
+    inspector.position = Vector2(20, 770)
+    inspector.add_theme_color_override("font_color",Color(.95,.84,.35))
+    var content: Array[String] = [
+        "Approved Godot game session | local gameplay, not canon promotion",
+        "Frames 0 - " + str(record["source_through_frame"]) +
+            " | verified RPG actions " + str(record["actions_applied"]),
+    ]
+    for id in _approved_gameplay_quests.keys():
+        var state: Dictionary = _approved_gameplay_quests[id]
+        content.append(str(id) + " : " + str(state["stage"]) +
+            (" (completed)" if bool(state["completed"]) else " (in progress)"))
+    for cue in _approved_gameplay_cues:
+        if cue["kind"] == "show_dialogue":
+            content.append("Dialogue: " + str(cue["cue"]))
+    inspector.text = "\n".join(content)
+    hud.add_child(inspector)
+    add_child(hud)
+    _approved_gameplay_label = inspector
+
 
 func _native_chunk_less(a: Dictionary, b: Dictionary) -> bool:
     var first: Array = a["chunk_xy"]
