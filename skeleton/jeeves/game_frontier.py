@@ -48,6 +48,7 @@ from .game_frontier_advanced_physics import (
     evaluate_climbing, resolve_contact, aggregate_realism,
 )
 from .game_frontier_realism import audit_scene_realism
+from .game_frontier_weather_physics import Microclimate, evolve_microclimate
 
 FRONTIER_SCENE_SCHEMA = "skeleton.game.frontier_scene_candidate.v1"
 FRONTIER_MODEL_STATUS = "engine_candidate_only_no_proprietary_weights"
@@ -119,6 +120,7 @@ def compile_frontier_scene(
     advanced_contact: CollisionContact | None = None,
     advanced_other_body: RigidBody | None = None,
     advanced_turbulence_amplitude: float = 0.,
+    advanced_microclimate: Microclimate | None = None,
 ) -> FrontierSceneCandidate:
     """Produce a content-addressed, inspectable, playable-engine-side proposal.
 
@@ -310,6 +312,7 @@ def compile_frontier_scene(
         advanced_climber is not None, advanced_wakes, advanced_thermals,
         advanced_contact is not None, advanced_other_body is not None,
         advanced_turbulence_amplitude != 0,
+        advanced_microclimate is not None,
     )):
         raise ValueError("advanced physics inputs require advanced_body")
     if advanced_body is not None:
@@ -323,13 +326,31 @@ def compile_frontier_scene(
         if count > 1024:
             raise ValueError("advanced physics requires host-subdivided time")
         candidate_body = advanced_body
+        terrain_step = None
+        active_traction = advanced_traction
+        active_thermals = advanced_thermals
+        physical_wind = active_wind
+        if advanced_microclimate is not None:
+            # Weather and terrain grip evolve from the same source conditions,
+            # rather than adjusting character friction through a visual cue.
+            climate_weather = physical_weather or Weather(
+                active_wind, air_conditions.temperature_c,
+                precipitation_mm_h=air_conditions.rain_mm_h,
+                humidity=air_conditions.relative_humidity)
+            terrain_step = evolve_microclimate(
+                advanced_microclimate, climate_weather,
+                air_conditions, advanced_traction,
+                delta_s=delta_s, location=advanced_body.position)
+            active_traction = terrain_step.traction_surface
+            active_thermals = (*advanced_thermals, terrain_step.terrain_updraft)
+            physical_wind = active_wind + terrain_step.pressure_wind_delta
         flow = None
         aero_step = None
         for tick in range(count):
             flow = airflow_at(
-                candidate_body.position, ambient_wind=active_wind,
+                candidate_body.position, ambient_wind=physical_wind,
                 air=air_conditions, wakes=advanced_wakes,
-                thermals=advanced_thermals,
+                thermals=active_thermals,
                 turbulence_seed=wind_field.seed,
                 time_s=time_s + tick * (delta_s / count),
                 turbulence_amplitude=advanced_turbulence_amplitude,
@@ -342,7 +363,7 @@ def compile_frontier_scene(
             candidate_body = aero_step.body
         assert flow is not None and aero_step is not None
         grip = evaluate_climbing(
-            advanced_traction, advanced_climber,
+            active_traction, advanced_climber,
             wind=flow.wind,
             motion_mps=math.hypot(candidate_body.velocity.x,
                                   candidate_body.velocity.y),
@@ -353,7 +374,7 @@ def compile_frontier_scene(
                      if advanced_contact is not None else None)
         final_body = collision.body_a if collision is not None else candidate_body
         metrics = aggregate_realism(aero_step, flow, grip,
-                                    advanced_traction, collision)
+                                    active_traction, collision)
         advanced_receipt = {
             "body": {
                 "id": final_body.body_id,
@@ -398,6 +419,21 @@ def compile_frontier_scene(
                 "gait": grip.recommended_gait,
                 "speed_scale": grip.recommended_speed_scale,
             },
+            "microclimate": ({
+                "ground_temperature_c": terrain_step.state.terrain_temperature_c,
+                "soil_water_fraction": terrain_step.state.soil_water_fraction,
+                "ground_ice_fraction": terrain_step.state.ground_ice_fraction,
+                "loose_sediment_fraction": terrain_step.state.loose_sediment_fraction,
+                "pressure_wind_delta_xyz": [
+                    terrain_step.pressure_wind_delta.x,
+                    terrain_step.pressure_wind_delta.y,
+                    terrain_step.pressure_wind_delta.z],
+                "updraft_mps": terrain_step.terrain_updraft.vertical_velocity_mps,
+                "rain_absorption_m": terrain_step.rain_absorption_m,
+                "evaporation_m": terrain_step.evaporation_m,
+                "freeze_thaw_transition": terrain_step.freeze_thaw_transition,
+                "erosion_pressure": terrain_step.erosion_pressure,
+            } if terrain_step else None),
             "impact": ({
                 "impulse_ns": collision.normal_impulse_ns,
                 "friction_impulse_ns": collision.friction_impulse_ns,
