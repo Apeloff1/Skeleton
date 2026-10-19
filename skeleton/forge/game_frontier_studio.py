@@ -14,6 +14,7 @@ import json
 from skeleton.jeeves.game_frontier_worlds import ProjectionMode, WorldFamily
 from skeleton.jeeves.game_frontier_production import ERA_TRIANGLE_BUDGETS
 from skeleton.forge.game_frontier_rpg_events import RPGEventPage, event_authoring_catalog
+from skeleton.jeeves.game_frontier_virtual_navigation import GameMap, VirtualNavigationRequest, compose_virtual_navigation
 
 
 class StudioError(ValueError):
@@ -40,6 +41,10 @@ STUDIO_TOOLS = (
     "quest_branch_verifier", "npc_perception_map",
     "cinematic_environment_sync", "terrain_traction_authoring",
     "physics_receipt_viewer", "rpg_event_conflict_resolver",
+    "virtual_world_gps_map", "fictional_beacon_constellation",
+    "world_landmark_survey", "gps_resection_debugger",
+    "map_route_waypoints", "realm_coordinate_viewer",
+    "frame_location_coherence", "gdd_navigation_context",
 )
 
 
@@ -149,6 +154,7 @@ class StudioProject:
     events: tuple[StudioEvent,...] = ()
     soundtrack_ids: tuple[str,...] = ()
     environmental_pages: tuple[RPGEventPage, ...] = ()
+    virtual_game_map: GameMap | None = None
 
     def __post_init__(self):
         if not self.project_id or len(self.project_id)>128:
@@ -162,6 +168,11 @@ class StudioProject:
         ids=[l.layer_id for l in self.layers]
         if len(set(ids))!=len(ids):
             raise StudioError("duplicate map layer")
+        if self.virtual_game_map is not None and (
+            self.virtual_game_map.world_id != self.project_id or
+            self.virtual_game_map.realm_id != self.world_family.value
+        ):
+            raise StudioError("virtual map must match authored project and realm")
         pids=[p.prefab_id for p in self.prefabs]
         if len(set(pids))!=len(pids):
             raise StudioError("duplicate prefab")
@@ -196,6 +207,14 @@ class StudioProject:
             } for page in self.environmental_pages],
             "environmental_editor_catalog":event_authoring_catalog(),
             "soundtrack":self.soundtrack_ids,
+            "virtual_game_map": ({
+                "world_id":self.virtual_game_map.world_id,
+                "realm_id":self.virtual_game_map.realm_id,
+                "map_digest":self.virtual_game_map.identity(),
+                "width_tiles":self.virtual_game_map.width_tiles,
+                "height_tiles":self.virtual_game_map.height_tiles,
+                "tile_size_m":self.virtual_game_map.tile_size_m,
+            } if self.virtual_game_map is not None else None),
             "authority":"candidate_not_executed",
         }
 
@@ -233,6 +252,7 @@ def compile_studio_frame(
     entity_velocities: dict[str, tuple[float,float,float]] | None = None,
     previous_frame: object | None = None,
     context_cursor: object | None = None,
+    virtual_navigation: VirtualNavigationRequest | None = None,
 ) -> dict:
     """Build one *verified* Studio progress frame from actual placed prefabs.
 
@@ -289,6 +309,13 @@ def compile_studio_frame(
         frame_index=frame_index,fps=fps,gdd=anchor,
         objects=tuple(objects),previous=prior,notes=tuple(notes),
     )
+    if virtual_navigation is not None:
+        if (project.virtual_game_map is None or
+            project.virtual_game_map.identity() != virtual_navigation.world.identity()):
+            raise StudioError("virtual navigation must use authored RPG game map")
+    game_nav = (compose_virtual_navigation(
+        virtual_navigation,frame=frame,gdd=anchor,previous_frame=prior)
+        if virtual_navigation is not None else None)
     latest_cursor=advance_context_cursor(
         anchor,frame,previous_frame=prior,
         previous_cursor=context_cursor if use_incremental else None,
@@ -313,6 +340,7 @@ def compile_studio_frame(
         "frame_receipt_digest":frame.receipt_digest,
         "note_count":len(frame.note_from_previous),
         "gdd_ai_context":context,
+        "virtual_game_gps":game_nav,
         "record":frame,
         "context_cursor":latest_cursor,
         "authority":"studio_preview_proposed_not_engine_mutated",
