@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
+RUFF_DEV_REQUIREMENT = "ruff>=0.17.1,<0.18"
 
 # These are intentionally behavior-oriented markers rather than exact whole
 # command lines so local execution may use ``python -m`` while CI can invoke a
