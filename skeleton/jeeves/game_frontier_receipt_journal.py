@@ -266,10 +266,15 @@ class FrameReceiptJournal:
         """Produce source frame from host-observed actor samples and commit."""
         head,saved_fps=self._head()
         previous=self.load(head)[0] if head>=0 else None
-        frame=advance_frame(
-            frame_index=head+1,fps=saved_fps or fps,
-            gdd=self.gdd,objects=objects,previous=previous,notes=notes,
-            chunk_size_m=self.chunk_size_m,max_speed_mps=self.max_speed_mps)
+        if saved_fps is not None and fps != saved_fps:
+            raise FrameJournalError("journal presentation FPS cannot drift mid-track")
+        try:
+            frame=advance_frame(
+                frame_index=head+1,fps=saved_fps or fps,
+                gdd=self.gdd,objects=objects,previous=previous,notes=notes,
+                chunk_size_m=self.chunk_size_m,max_speed_mps=self.max_speed_mps)
+        except (FrameCoherenceError, ValueError) as exc:
+            raise FrameJournalError("source frame failed canonical temporal/GDD verification") from exc
         return self.append(frame)
 
     def replay(self, *, through: int | None = None) -> dict:
