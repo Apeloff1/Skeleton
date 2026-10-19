@@ -201,6 +201,9 @@ class AdaptiveRunReport:
     context_head: str | None
     experience_matches: int
     fingerprint: str
+    working_note_count: int = 0
+    working_page_count: int = 0
+    working_receipt: str | None = None
 
 
 @dataclass(slots=True)
@@ -1293,6 +1296,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             self.metrics.increment("agent.adaptive.summary_failures")
         feedback_report = self.frontier_feedback.report()
         feedback_recommendation = self.frontier_feedback.recommendation()
+        working = self.working_context_receipt(result.run_id)
         report_payload = {
             "run": result.run_id,
             "success": result.success,
@@ -1316,6 +1320,9 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             ],
             "frontier_feedback": feedback_report.fingerprint,
             "frontier_feedback_recommendation": feedback_recommendation.fingerprint,
+            "working_note_count": len(working.notes) if working else 0,
+            "working_page_count": working.page_count if working else 0,
+            "working_receipt": working.fingerprint if working else None,
         }
         report = AdaptiveRunReport(
             run_id=result.run_id,
@@ -1331,6 +1338,9 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             context_head=repo.head(adaptive.context_branch),
             experience_matches=adaptive.experience_matches,
             fingerprint=stable_fingerprint(report_payload),
+            working_note_count=len(working.notes) if working else 0,
+            working_page_count=working.page_count if working else 0,
+            working_receipt=working.fingerprint if working else None,
         )
         with self._adaptive_lock:
             self._reports[result.run_id] = report
@@ -1340,6 +1350,11 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         metadata = dict(result.metadata)
         metadata["adaptive"] = {
             "report_fingerprint": report.fingerprint,
+            "working_context": {
+                "notes": report.working_note_count,
+                "pages": report.working_page_count,
+                "receipt": report.working_receipt,
+            },
             "trajectory_id": report.trajectory_id,
             "credit_fingerprint": report.credit_fingerprint,
             "council_verdict": council.verdict.value if council else None,
