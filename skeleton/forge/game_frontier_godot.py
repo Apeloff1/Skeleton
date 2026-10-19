@@ -183,12 +183,13 @@ def emit_frontier_godot_overlay(
             raise FrontierGodotError("corrupt geometry triangle")
     layers = tuple(WindLayer(z["altitude_m"],
                              WindVector(z["east_mps"], z["north_mps"]),
-                             z["turbulence_mps"]) for z in manifest["wind"])
+                             z["turbulence_mps"], z["cell_size_m"]) for z in manifest["wind"])
     # Source seed is preserved to keep the seeded wind path repeatable.
-    wind = WindField(layers, seed=int(manifest["world"]["seed"]))
+    wind = WindField(layers, seed=int(manifest["wind_configuration"]["seed"]),
+                     gust_period_s=manifest["wind_configuration"]["gust_period_s"])
     clouds = candidate.moved_clouds
     path = [[c] for c in clouds]
-    at = float(manifest.get("time_s", 0.0))
+    at = float(manifest["simulation_time_s"])
     current = clouds
     for _ in range(cloud_path_duration_s // cloud_step_s):
         current = advect_clouds(current, wind, time_s=at,
