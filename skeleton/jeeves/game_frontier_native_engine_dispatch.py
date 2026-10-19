@@ -50,6 +50,7 @@ _ALLOWED=frozenset((
     "inspect_instrument","trigger_impact_fx","trigger_foliage_fx",
     "craft_item","set_npc_emotion",
     "take_damage","heal_health","consume_item","award_xp",
+    "unlock_skill",
 ))
 
 
@@ -83,6 +84,7 @@ def compile_native_godot_dispatch(
     local_health=_LOCAL_HEALTH_CAP
     local_xp=0
     progression_events=[]
+    unlocked_skills={}
     local_effect_history=[]
     signed_actors={a["id"] for a in journal.native_sample(0)["actors"]}
     cursor=None
@@ -109,6 +111,23 @@ def compile_native_godot_dispatch(
                         if action["value"] not in _CAMERA_MODES:
                             raise NativeQuestSessionError("unauthorized Godot camera preset")
                         selected_camera=_CAMERA_MODES[action["value"]]
+                    if action["kind"]=="unlock_skill":
+                        token=action["value"].split(":")
+                        if len(token)!=2:
+                            raise NativeQuestSessionError("skill unlock requires skill:level")
+                        name=_local_item_id(token[0])
+                        threshold=_health_amount(token[1])
+                        if (name in unlocked_skills or len(unlocked_skills)>=128
+                            or 1+local_xp//100<threshold):
+                            raise NativeQuestSessionError("skill level prerequisite or duplicate rejected")
+                        unlocked_skills[name]=threshold
+                        progression_events.append({
+                            "frame":entry["frame"],"page_id":approved["page_id"],
+                            "kind":"unlock_skill","value":action["value"],
+                            "resulting_xp":local_xp,
+                            "resulting_level":1+local_xp//100,
+                            "source_frame_digest":entry["source_frame_receipt_digest"],
+                        })
                     if action["kind"]=="award_xp":
                         amount=_health_amount(action["value"])
                         if local_xp+amount>_LOCAL_XP_CAP:
@@ -230,6 +249,7 @@ def compile_native_godot_dispatch(
         "expected_local_xp":local_xp,
         "expected_local_level":1+local_xp//100,
         "expected_progression_events":progression_events,
+        "expected_unlocked_skills":unlocked_skills,
         "expected_local_effect_history":local_effect_history,
         "expected_camera_mode":selected_camera,
         "expected_instrument_focus":instrument_focus,

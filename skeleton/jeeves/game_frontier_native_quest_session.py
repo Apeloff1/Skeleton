@@ -206,7 +206,8 @@ def _apply_page(actions: list[dict], *, actor_id: str,
                 raise NativeQuestSessionError("boolean flag action required")
             flags[name]=truth=="true"
         elif kind in ("craft_item","set_npc_emotion",
-                       "take_damage","heal_health","consume_item","award_xp"):
+                       "take_damage","heal_health","consume_item","award_xp",
+                       "unlock_skill"):
             if target!=actor_id:
                 raise NativeQuestSessionError("local game world action targets wrong actor")
             cues.append({"kind":kind,"target":target,"cue":value,

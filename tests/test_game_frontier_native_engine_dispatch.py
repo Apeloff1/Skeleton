@@ -40,6 +40,7 @@ class NativeEngineDispatchTests(NativeQuestBatchTests):
         self.assertEqual(data["expected_local_xp"],0)
         self.assertEqual(data["expected_local_level"],1)
         self.assertEqual(data["expected_progression_events"],[])
+        self.assertEqual(data["expected_unlocked_skills"],{})
         self.assertEqual(data["expected_local_effect_history"],[])
         self.assertEqual(data["expected_npc_emotions"],{})
         self.assertEqual(data["expected_camera_mode"],0)
