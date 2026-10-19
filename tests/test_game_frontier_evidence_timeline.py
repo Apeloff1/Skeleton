@@ -72,7 +72,7 @@ class TimelineTests(unittest.TestCase):
             absent=journal.evidence_page(actor_id="nobody")
             self.assertEqual(absent["entries"],[])
             movers=journal.evidence_page(changes_only=True)
-            self.assertEqual([x["frame"] for x in movers],[1])
+            self.assertEqual([x["frame"] for x in movers["entries"]],[1])
 
     def test_source_forgery_refused_in_timeline(self):
         with FrameReceiptJournal(self.path,self.anchor) as journal:
