@@ -46,9 +46,15 @@ def required_final_kind(goal: Goal) -> str | None:
         return "creative"
     if declared in {"code", "game"}:
         return str(declared)
+    existing_kind = required_delivery_kind(goal)
+    if existing_kind == "game" and re.search(
+        r"\b(?:game|engine|asset|emulator|rom|sprite|npc|world|level|quest)\b",
+        goal.objective, re.I,
+    ):
+        return "game"
     if _CREATIVE_INTENT.search(goal.objective) and _CREATIVE_OUTPUT.search(goal.objective):
         return "creative"
-    return required_delivery_kind(goal)
+    return existing_kind
 
 
 def _digest_sources(sources: Mapping[str, str]) -> str:
