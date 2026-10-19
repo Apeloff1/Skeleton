@@ -19,7 +19,7 @@ ACTION_KINDS = frozenset((
     "show_dialogue", "save_bookmark", "start_quest", "advance_quest",
     "trigger_impact_fx", "spatial_audio", "inspect_instrument",
 ))
-_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
+_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z")
 
 
 class NativeZoneError(ValueError):

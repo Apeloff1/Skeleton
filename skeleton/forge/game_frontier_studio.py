@@ -45,6 +45,8 @@ STUDIO_TOOLS = (
     "world_landmark_survey", "gps_resection_debugger",
     "map_route_waypoints", "realm_coordinate_viewer",
     "frame_location_coherence", "gdd_navigation_context",
+    "native_3d_trigger_volume_editor", "authored_quest_zone_bindings",
+    "native_zone_event_timeline_inspector",
 )
 
 
@@ -143,6 +145,30 @@ class StudioPlacement:
 
 
 @dataclass(frozen=True)
+class StudioTriggerVolume:
+    """Studio-owned 3D zone bound to a placed actor and existing RPG event."""
+    zone_id: str
+    actor_entity_id: str
+    event_page_id: str
+    radius_m: float
+    offset_xyz_m: tuple[float,float,float] = (0.,0.,0.)
+
+    def __post_init__(self):
+        import math
+        from skeleton.jeeves.game_frontier_native_zones import _ID
+        for name in (self.zone_id,self.actor_entity_id,self.event_page_id):
+            if type(name) is not str or not _ID.fullmatch(name):
+                raise StudioError("bounded studio zone/actor/event identity required")
+        if (type(self.radius_m) not in (float,int) or
+            not math.isfinite(self.radius_m) or not .1<=self.radius_m<=10000):
+            raise StudioError("authored zone radius outside native game engine bounds")
+        if (not isinstance(self.offset_xyz_m,tuple) or len(self.offset_xyz_m)!=3 or
+            any(type(v) not in (float,int) or not math.isfinite(v) or abs(v)>10000
+                for v in self.offset_xyz_m)):
+            raise StudioError("finite 3D zone-relative source offset required")
+
+
+@dataclass(frozen=True)
 class StudioProject:
     project_id: str
     target_era: str
@@ -155,6 +181,7 @@ class StudioProject:
     soundtrack_ids: tuple[str,...] = ()
     environmental_pages: tuple[RPGEventPage, ...] = ()
     virtual_game_map: GameMap | None = None
+    native_trigger_volumes: tuple[StudioTriggerVolume,...] = ()
 
     def __post_init__(self):
         if not self.project_id or len(self.project_id)>128:
@@ -181,6 +208,27 @@ class StudioProject:
         events=[x.event_id for x in self.events]
         if len(set(events))!=len(events):
             raise StudioError("duplicate event id")
+        if type(self.native_trigger_volumes) is not tuple or (
+            len(self.native_trigger_volumes)>64 or
+            any(not isinstance(zone,StudioTriggerVolume)
+                for zone in self.native_trigger_volumes)):
+            raise StudioError("at most 64 typed native game zones")
+        zones=[z.zone_id for z in self.native_trigger_volumes]
+        if len(set(zones))!=len(zones):
+            raise StudioError("duplicate authored gameplay zone")
+        actor_sources={
+            placement.prefab_id+":"+str(index):placement.prefab_id
+            for index,placement in enumerate(self.placements)}
+        authored_events={e.event_id:e for e in self.events}
+        for zone in self.native_trigger_volumes:
+            event=authored_events.get(zone.event_page_id)
+            actor_prefab=actor_sources.get(zone.actor_entity_id)
+            if actor_prefab is None or event is None or (
+                event.trigger!="enter" or
+                event.target not in (zone.actor_entity_id,actor_prefab) or
+                event.condition_flag or
+                event.action not in ("show_dialogue","start_quest","play_audio")):
+                raise StudioError("gameplay volume must bind a placed actor and executable-preview-safe event")
         page_ids=[page.page_id for page in self.environmental_pages]
         if len(page_ids)!=len(set(page_ids)) or set(page_ids).intersection(events):
             raise StudioError("duplicate or colliding environmental page id")
@@ -206,6 +254,11 @@ class StudioProject:
                 "enabled":page.enabled,"repeat":page.repeat,
             } for page in self.environmental_pages],
             "environmental_editor_catalog":event_authoring_catalog(),
+            "native_trigger_volumes":[{
+                "zone_id":zone.zone_id,"actor_entity_id":zone.actor_entity_id,
+                "event_page_id":zone.event_page_id,"radius_m":zone.radius_m,
+                "offset_xyz_m":list(zone.offset_xyz_m),
+            } for zone in self.native_trigger_volumes],
             "soundtrack":self.soundtrack_ids,
             "virtual_game_map": ({
                 "world_id":self.virtual_game_map.world_id,
@@ -225,6 +278,52 @@ def compile_studio_project(project: StudioProject) -> dict:
     canonical=json.dumps(m,sort_keys=True,separators=(",",":"),allow_nan=False)
     m["content_sha256"]=sha256(canonical.encode()).hexdigest()
     return m
+
+
+def compile_studio_gameplay_zones(project: StudioProject) -> dict:
+    """Compile real placed prefab XYZ and authored event IDs to native zones.
+
+    This tool returns exactly the `native_gameplay_zones` descriptors accepted
+    by the existing Godot exporter. Quest/dialogue/audio remain proposals,
+    not unauthorized GDD changes or arbitrary script execution.
+    """
+    from skeleton.jeeves.game_frontier_native_zones import normalize_gameplay_zones
+    if not isinstance(project,StudioProject):
+        raise StudioError("typed Studio project required for RPG volume export")
+    placements={
+        placement.prefab_id+":"+str(index):placement
+        for index,placement in enumerate(project.placements)}
+    events={event.event_id:event for event in project.events}
+    source=[]
+    for zone in project.native_trigger_volumes:
+        placement=placements[zone.actor_entity_id]
+        page=events[zone.event_page_id]
+        mapping={"show_dialogue":"show_dialogue","start_quest":"start_quest",
+                 "play_audio":"spatial_audio"}
+        source.append({
+            "id":zone.zone_id,"actor_id":zone.actor_entity_id,
+            "center_xyz_m":[a+b for a,b in zip(
+                (placement.x,placement.y,placement.z),zone.offset_xyz_m)],
+            "radius_m":zone.radius_m,"event_page_id":page.event_id,
+            "action_kind":mapping[page.action],
+        })
+    try:
+        catalog=normalize_gameplay_zones(
+            source,allowed_actors=set(placements))
+    except ValueError as exc:
+        raise StudioError("studio trigger cannot compile to native game coordinates") from exc
+    report={
+        "schema":"skeleton.forge.native_gameplay_zone_compilation.v1",
+        "project_id":project.project_id,
+        "studio_manifest_digest":compile_studio_project(project)["content_sha256"],
+        "zones":catalog,
+        "zone_count":len(catalog),
+        "available_action_preview_only":True,
+        "authority":"studio_authored_zone_candidate_no_world_mutation",
+    }
+    report["receipt_digest"]=sha256(json.dumps(
+        report,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+    return report
 
 
 def propose_event_actions(project: StudioProject, *, trigger: str,
