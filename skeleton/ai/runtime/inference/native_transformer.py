@@ -20,16 +20,26 @@ from .local import (
 class NativeTransformerModel:
     """Expose NativeLLMRuntime through the canonical LocalModelBackend contract."""
 
-    def __init__(self, runtime: NativeLLMRuntime, *, model_id: str = "skeleton-native-transformer") -> None:
+    def __init__(
+        self,
+        runtime: NativeLLMRuntime,
+        *,
+        model_id: str = "skeleton-native-transformer",
+        backup_runtime: NativeLLMRuntime | None = None,
+    ) -> None:
         if not isinstance(runtime, NativeLLMRuntime):
             raise TypeError("runtime must be NativeLLMRuntime")
+        if backup_runtime is not None and not isinstance(backup_runtime, NativeLLMRuntime):
+            raise TypeError("backup_runtime must be NativeLLMRuntime or None")
         if not isinstance(model_id, str) or not model_id.strip():
             raise ValueError("model_id must be non-empty")
         self.runtime = runtime
+        self.backup_runtime = backup_runtime
         self.model_id = model_id.strip()
         self._model_digest = runtime.model_digest
         self._tokenizer_digest = runtime.tokenizer.digest
         self._runtime_digest = self._compute_runtime_digest()
+        self._backup_failover_count = 0
 
     @property
     def model_digest(self) -> str:
@@ -38,6 +48,10 @@ class NativeTransformerModel:
     @property
     def runtime_digest(self) -> str:
         return self._runtime_digest
+
+    @property
+    def backup_failover_count(self) -> int:
+        return self._backup_failover_count
 
     def _compute_runtime_digest(self) -> str:
         payload = {
@@ -81,26 +95,69 @@ class NativeTransformerModel:
         if cancel.is_set():
             raise LocalInferenceCancelled("local generation cancelled")
 
-        self._assert_identity()
-        prompt = request.rendered_input
-        prompt_sequence = self.runtime.encode(prompt)
         started = time.perf_counter()
-        stream = self.runtime.stream(
-            prompt,
+        default_policy = (
+            request.temperature == 1.0
+            and request.top_k == 0
+            and request.top_p == 1.0
+            and request.min_p == 0.0
+            and request.repetition_penalty == 1.0
+        )
+        config = (
             GenerationConfig(
                 max_new_tokens=request.max_output_tokens,
                 seed=request.seed,
                 temperature=0.0,
                 use_cache=True,
-            ),
+            )
+            if default_policy
+            else GenerationConfig(
+                max_new_tokens=request.max_output_tokens,
+                seed=request.seed,
+                temperature=request.temperature,
+                top_k=request.top_k,
+                top_p=request.top_p,
+                min_p=request.min_p,
+                repetition_penalty=request.repetition_penalty,
+                use_cache=True,
+            )
         )
-        for _event in stream:
-            if cancel.is_set():
-                raise LocalInferenceCancelled("local generation cancelled")
-        result = stream.result
-        if result is None:
-            raise RuntimeError("native transformer completed without a terminal result")
-        self._assert_identity()
+        prompt = request.rendered_input
+        prompt_sequence: tuple[int, ...] = ()
+        stream = None
+        result = None
+        active_runtime = self.runtime
+        try:
+            self._assert_identity()
+            prompt_sequence = self.runtime.encode(prompt)
+            stream = self.runtime.stream(
+                prompt,
+                config,
+            )
+            for _event in stream:
+                if cancel.is_set():
+                    raise LocalInferenceCancelled("local generation cancelled")
+            result = stream.result
+            if result is None:
+                raise RuntimeError("native transformer completed without a terminal result")
+            self._assert_identity()
+        except LocalInferenceCancelled:
+            raise
+        except Exception:
+            if self.backup_runtime is None:
+                raise
+            self.backup_runtime.tokenizer.assert_unchanged()
+            self.backup_runtime.assert_model_unchanged()
+            active_runtime = self.backup_runtime
+            prompt_sequence = self.backup_runtime.encode(prompt)
+            b_stream = self.backup_runtime.stream(prompt, config)
+            for _event in b_stream:
+                if cancel.is_set():
+                    raise LocalInferenceCancelled("local generation cancelled")
+            result = b_stream.result
+            if result is None:
+                raise RuntimeError("backup native transformer completed without a terminal result")
+            self._backup_failover_count += 1
 
         text = result.text
         output_tokens = len(result.generated_ids)
@@ -115,7 +172,7 @@ class NativeTransformerModel:
             # String stops are a compatibility surface above token generation.
             # Re-tokenize the published prefix so usage and response identity
             # describe exactly the content returned to the caller.
-            output_tokens = 0 if not text else len(self.runtime.tokenizer.encode_ids(text))
+            output_tokens = 0 if not text else len(active_runtime.tokenizer.encode_ids(text))
             finish_reason = "completed"
 
         published_digest = hashlib.sha256(
@@ -156,9 +213,10 @@ def build_native_transformer_adapter(
     model_id: str = "skeleton-native-transformer",
     cache_size: int = 128,
     default_seed: int = 0,
+    backup_runtime: NativeLLMRuntime | None = None,
 ) -> LocalModelAdapter:
     """Build the canonical provider-neutral adapter for the owned transformer."""
-    backend = NativeTransformerModel(runtime, model_id=model_id)
+    backend = NativeTransformerModel(runtime, model_id=model_id, backup_runtime=backup_runtime)
     engine = LocalInferenceEngine(backend, cache_size=cache_size)
     return LocalModelAdapter(
         engine,
@@ -170,6 +228,7 @@ def build_native_transformer_adapter(
             "tokenizer_digest": runtime.tokenizer.digest,
             "architecture_digest": runtime.architecture.digest,
             "device": runtime.device.to_dict(),
+            "has_backup_runtime": backup_runtime is not None,
         },
     )
 
