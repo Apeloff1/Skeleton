@@ -137,9 +137,17 @@ def test_tampering_hash_linked_receipt_is_rejected(field, value):
 
 def test_forced_mutation_of_frozen_evidence_cannot_bypass_validation():
     board = MilestoneBoard.begin(COMMIT).register(evidence("M001"))
-    forged = replace(board.receipts[0], attestation=replace(
-        board.receipts[0].attestation, primary_checker="  ",
-    ))
+    # Ordinary dataclass replacement must reject malformed evidence at creation.
+    with pytest.raises(MilestoneEvidenceError, match="checker identity"):
+        replace(board.receipts[0].attestation, primary_checker="  ")
+
+    # Even forced mutation that bypasses frozen-dataclass construction must
+    # be caught by the independent receipt-validation boundary.
+    forged = replace(
+        board.receipts[0],
+        attestation=replace(board.receipts[0].attestation),
+    )
+    object.__setattr__(forged.attestation, "primary_checker", "  ")
     with pytest.raises(MilestoneEvidenceError):
         restore_milestone_board(COMMIT, (forged,))
 
