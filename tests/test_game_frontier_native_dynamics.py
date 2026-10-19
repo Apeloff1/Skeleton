@@ -133,3 +133,52 @@ class DynamicsValidationTests(unittest.TestCase):
             compare_native_dynamics(observation(1), previous=older)
         with self.assertRaises(NativeDynamicsError):
             compare_native_dynamics(older, previous=first)
+
+class DynamicsJournalTests(unittest.TestCase):
+    def test_signed_journal_physics_replay_fork_and_timeline(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from skeleton.jeeves.game_frontier_frame_coherence import bind_signed_gdd
+        from skeleton.jeeves.game_frontier_native_capture import GodotPhysicsCaptureIngestor
+        from skeleton.jeeves.game_frontier_receipt_journal import FrameReceiptJournal
+        from tests.test_game_frontier_native_chunks import sample
+        from tests.test_game_frontier_position_frames import gdd
+
+        anchor=bind_signed_gdd(gdd())
+        with TemporaryDirectory() as folder:
+            path=Path(folder)/"native-dynamics.sqlite"
+            with FrameReceiptJournal(path,anchor) as journal:
+                ingestor=GodotPhysicsCaptureIngestor(
+                    journal,candidate_digest="d"*64,
+                    allowed_assets={"hero":"a"*64,"npc":"b"*64,"island":"c"*64})
+                for tick in range(3):
+                    record=sample(tick,anchor.source_digest)
+                    record["native_dynamics_schema"]="skeleton.game.native_actor_dynamics.v1"
+                    for actor in record["actors"]:
+                        hero=actor["id"]=="hero"
+                        actor["physics_body"]={
+                            "mode":"rigid" if hero else "static",
+                            "mass_kg":50. if hero else 0.,
+                            "friction":.4 if hero else 1.,
+                            "restitution":.2 if hero else 0.,
+                            "kinetic_energy_j":10900. if hero else 0.,
+                            "contact_actor_ids":[],
+                            "external_contact_count":actor["contact_count"],
+                        }
+                    ingestor.ingest(record)
+                proof=journal.native_dynamics_evidence(1)
+                self.assertEqual(proof["actor_count"],3)
+                self.assertEqual(proof["total_kinetic_energy_j"],10900.)
+                page=journal.evidence_page(actor_id="hero",limit=3)
+                self.assertEqual(len(page["entries"]),3)
+                self.assertEqual(page["entries"][1]["native_dynamics_digest"],
+                                 proof["receipt_digest"])
+                self.assertEqual(page["entries"][1]["native_reported_kinetic_energy_j"],
+                                 10900.)
+                self.assertEqual(page["entries"][1]["native_external_contact_count"],1)
+                self.assertEqual(journal.replay()["verified_frames"],3)
+                journal.fork("recovery",through=1)
+            with FrameReceiptJournal(path,anchor,track="recovery") as fork:
+                self.assertEqual(fork.replay()["verified_frames"],2)
+                self.assertEqual(fork.native_dynamics_evidence(1)[
+                    "total_kinetic_energy_j"],10900.)

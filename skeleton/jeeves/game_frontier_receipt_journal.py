@@ -433,6 +433,27 @@ class FrameReceiptJournal:
             (self.track,frame_index)).fetchone()
         return self._blob(row[0]) if row else None
 
+    def native_dynamics_evidence(self, frame_index: int) -> dict | None:
+        """Independently replay body/contact data from a signed journal frame.
+
+        Client-reported Godot observations are never hardware attestation.
+        Legacy captures return None rather than claiming validated dynamics.
+        """
+        if type(frame_index) is not int or frame_index < 0:
+            raise FrameJournalError("nonnegative dynamics frame required")
+        native=self.native_sample(frame_index)
+        if native is None:
+            return None
+        frame,_=self.load(frame_index)
+        self._validate_native_sample(frame,native)
+        proof=self.native_chunk_evidence(frame_index)
+        if proof is None or proof != inspect_native_chunks(
+            native,expected_chunk_size_m=self.chunk_size_m,
+            require_native_partition="native_chunks" in native):
+            raise FrameJournalError("native dynamics source evidence mismatch")
+        from .game_frontier_native_dynamics import inspect_native_dynamics
+        return inspect_native_dynamics(native)
+
     def replay(self, *, through: int | None = None) -> dict:
         """Replay the entire retained prefix, fail closed at first corruption."""
         head,_=self._head()
@@ -621,6 +642,11 @@ class FrameReceiptJournal:
                     max_speed_mps=self.max_speed_mps)
                 if expected_transition!=native_transition:
                     raise FrameJournalError("native timeline transition source forged")
+            dynamics=self.native_dynamics_evidence(index) if native else None
+            dynamics_actors=(
+                [row for row in dynamics["actors"]
+                 if actor_id is None or row["id"]==actor_id]
+                if dynamics else [])
             delta=self.frame_delta(index)
             result={
                 "frame":index,"fps":frame.fps,
@@ -636,6 +662,17 @@ class FrameReceiptJournal:
                     native_proof["receipt_digest"] if native_proof else None),
                 "native_transition_digest":(
                     native_transition["receipt_digest"] if native_transition else None),
+                "native_dynamics_digest":(
+                    dynamics["receipt_digest"] if dynamics else None),
+                "native_reported_kinetic_energy_j":(
+                    sum(row["kinetic_energy_j"] for row in dynamics_actors)
+                    if dynamics else None),
+                "native_resolved_actor_contact_count":(
+                    sum(len(row["contact_actor_ids"]) for row in dynamics_actors)
+                    if dynamics else None),
+                "native_external_contact_count":(
+                    sum(row["external_contact_count"] for row in dynamics_actors)
+                    if dynamics else None),
                 "native_contact_observation_count":(
                     sum(1 for actor in native_transition["actors"]
                         if type(actor["contact_count_after"]) is int and
