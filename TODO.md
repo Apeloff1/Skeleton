@@ -5,6 +5,7 @@ Tracking branch: `feature/game-frontier-p0-p3-20261019`.
 Detailed acceptance map: [Game Frontier Model Milestones](docs/plan/GAME_FRONTIER_MODELS_P0_P3_2026_10_19.md).
 Advanced physics assurance: [L00–L13 aerodynamics, collisions, climbing, climate and environment dossier](docs/plan/GAME_FRONTIER_ADVANCED_PHYSICS_ASSURANCE_2026_10_19.md).
 GPS/GDD assurance: [L00–L13 foreground positioning and per-frame signed-design coherence](docs/plan/GAME_FRONTIER_GPS_GDD_FRAME_ASSURANCE_2026_10_19.md).
+Chunk evidence: [Per-chunk source proofs, retirements, double verifiers and signed GDD receipts](docs/plan/GAME_FRONTIER_CHUNK_EVIDENCE_RECEIPTS_2026_10_19.md).
 Virtual game GPS and GDD map navigation: [fictional-only surveying, waypoints, per-frame proofs and AI context](docs/plan/GAME_FRONTIER_VIRTUAL_GPS_GDD_NAVIGATION_2026_10_19.md).
 
 **Status semantics:** `[x]` = source implementation committed to the feature branch
@@ -140,6 +141,21 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes.
 
 - [ ] GF-P0-134 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
+- [x] GF-P0-135 Implement source-hashed evidence records for every registered-era mesh chunk with 3D bounds, triangle IDs, vertex IDs and deterministic ordering.
+- [x] GF-P0-136 Record per-chunk independent mesh verifier A content authenticity and verifier B source topology/centroid reconstruction.
+- [x] GF-P0-137 Implement exact-once original face coverage receipts and independently re-verified whole-mesh evidence roots.
+- [x] GF-P0-138 Add signed-GDD frame-per-chunk evidence with immutable actor IDs, source asset digests, source frame hash and note/law anchors.
+- [x] GF-P0-139 Add per-chunk unchanged/moved/arrived/departed actor receipts and source-backed cross-chunk migration conservation.
+- [x] GF-P0-140 Preserve tombstone/retirement receipts for chunks whose last object leaves during frame updates.
+- [x] GF-P0-141 Add optional chained previous-chunk evidence root and reject forged predecessor actor/asset identities even with recomputed receipt hashes.
+- [x] GF-P0-142 Export complete frame/mesh chunk evidence receipts through canonical Jeeves scenes and RPG Studio frame progress.
+- [x] GF-P0-143 Root AI between-frame context in exact chunk evidence digest and signed GDD without automatic canon promotion.
+- [x] GF-P0-144 Extend independent scene auditor to recheck mesh/frame evidence hashes, migration accounting, source links and A/B flags.
+- [x] GF-P0-145 Add Godot chunk receipt inspector with source-only proof root, chunk counts, migration and signed GDD note counts.
+- [x] GF-P0-146 Add adversarial and 30/50/60/120 FPS receipt tests including mesh corruption, retired cells and chained 40-frame review.
+- [ ] GF-P0-147 Make real native era engines emit authoritative render/physics chunk evidence rather than source-only candidate estimates.
+- [ ] GF-P0-148 Persist full per-chunk receipts in existing canonical content-addressed durable checkpoint/rollback plane with pagination.
+- [ ] GF-P0-149 Add explicit chunk-level shader/light/shadow/terrain/weather and vertex-diff source reference receipts on game world edits.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
 - [ ] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups.
@@ -196,6 +212,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-44 Build independently verified AI between-frame movement plans, nav context and dynamic-GDD designer note critiques.
 - [ ] GF-P1-45 Support full multimodal traversal route synthesis between islands, caves, inverse/ethereal worlds, 2D and 3D maps.
 - [ ] GF-P1-46 Calibrate fictional GPS signal occlusion, multi-resolution terrain and dynamic game beacon movement with uncertainty envelopes.
+- [ ] GF-P1-47 Deliver streamed real engine chunk snapshots linked to render frame/LOD/collision/asset identity and dual independent verifiers.
+- [ ] GF-P1-48 Build live RPG Studio evidence timeline with per-chunk physics, position, AI intent, GDD law and migration navigation.
+- [ ] GF-P1-49 Add per-chunk delta compression, content addressing, LOD transition lineage and crash-resumable manifest batches.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -239,6 +258,8 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-38 Cross-world 3D in-game GPS survey networks for generated worlds, sky islands, caves and moving structures.
 - [ ] GF-P2-39 Couple between-frame AI navigation and building decisions to signed GDD and double-verified actor/chunk continuity.
 - [ ] GF-P2-40 Dynamically repair path and world-portal routes after construction, floods, collapse, tides and terrain changes.
+- [ ] GF-P2-41 Teach Jeeves/Dragon to reason about verified chunk changes and signaled semantic differences without hallucinating observations.
+- [ ] GF-P2-42 Continuous per-chunk physics/lighting/foliage/weather/audio correspondence checks during multiworld building.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -279,6 +300,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-35 Validate active game-map GPS on Android/iOS/Windows/console builds without real-world location permissions.
 - [ ] GF-P3-36 Stress test 30/50/60/120Hz virtual fix movement, per-frame GDD context and chunks during month-long projects.
 - [ ] GF-P3-37 Native spatial chunk/portal map coherence, rollback, replay, multiplayer and save/restore acceptance.
+- [ ] GF-P3-38 Benchmark long-horizon 30/50/60/120fps chunk proof overhead, storage, replay and native renderer fidelity on all engine eras.
+- [ ] GF-P3-39 Validate cross-chunk LOD/seam, mesh edit, actor migration and signed GDD AI receipts under months-long game builds.
+- [ ] GF-P3-40 Qualify independent host-engine observability and operator-verified evidence retention, security and release signoff.
 
 ## Source references
 
