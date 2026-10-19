@@ -69,7 +69,7 @@ class ZoneRuntimeTests(unittest.TestCase):
     def test_tampered_position_catalog_event_or_membership_rejected(self):
         prior=frame(0,0.)
         for bad in (
-            lambda x:x["actors"][0].update(world_xyz_m=[0.,0.,100.]),
+            lambda x:x["actors"][0].update(world_xyz_m=[0.,0.,30.]),
             lambda x:x["native_zone_occupancy"].append({"zone_id":"forged","actor_id":"hero"}),
             lambda x:x["native_zone_events"].clear(),
             lambda x:x["native_zone_events"][0].update(action_kind="world_portal"),
