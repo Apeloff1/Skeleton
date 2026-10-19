@@ -170,13 +170,13 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-160 Reconstitute deltas into full source frames and recheck exact original digest, GDD and two independent verifiers.
 - [x] GF-P0-161 Optionally persist compact source deltas alongside full frames in one WAL transaction and validate both during replay/fork.
 - [x] GF-P0-162 Add focused 30/50/60/120 FPS, 80-frame replay, native capture, script CLI, corruption, rollback and compact-delta regressions.
-- [ ] GF-P0-163 Run the generated Godot scene through a real version-pinned Godot 4 headless import with actual physics-tick capture and no GDScript parse errors.
+- [x] GF-P0-163 Run the generated Godot scene through a real version-pinned Godot 4 headless import with actual physics-tick capture and no GDScript parse errors. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
 - [ ] GF-P0-164 Reconcile actual rendered/GPU/physics output with native capture, journal source and per-chunk evidence on target hardware.
 - [ ] GF-P0-165 Wire native recorder activation through the approved installer, user-run game creation UI, save slots and multi-entity controllers.
 - [ ] GF-P0-166 Add game authoritative telemetry source adapters for real collision normals/forces, lighting, audio and streamed mesh LOD per chunk.
 - [x] GF-P0-167 Provide a version-hash-pinned local Godot 4 headless import/play driver with bounded frame/time budgets, source asset validation and hashed subprocess logs.
 - [x] GF-P0-168 Validate the native Godot operator harness against missing assets, corrupt scene schema, changed executable, process failures and reported parser errors.
-- [ ] GF-P0-169 Execute Godot 4 import/play with a real trusted binary, capture live RigidBody3D ticks and inspect actual emitted game-frame evidence for signoff.
+- [x] GF-P0-169 Execute Godot 4 import/play with a real trusted binary, capture live RigidBody3D ticks and inspect actual emitted game-frame evidence for signoff. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
 - [x] GF-P0-170 Export all actors from a signed double-verified source game frame, preserving source asset identity and explicit reference-proxy classifications.
 - [x] GF-P0-171 Implement opt-in multi-actor Godot 4 physics body generation and capture of position, velocity and bounded contact counts.
 - [x] GF-P0-172 Add frame-local native chunk memberships from game coordinates, including negative cell boundaries and exactly-once actor source coverage.
@@ -190,7 +190,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-180 Create deterministic safe two-actor signed-GDD native Godot project fixture generator and executable smoke build driver.
 - [x] GF-P0-181 Add specialized real-Godot-4.7.2 native headless import/capture/ingest/replay workflow with official SHA-256 pinned release archive.
 - [x] GF-P0-182 Add source regression tests for 3-actor 4-rate chunk capture, native contact bounds, hostile partitions, virtual navigation and interrupted replay.
-- [ ] GF-P0-183 Run specialized Godot workflow successfully with true headless generated scene parsing, runtime observed native physics and import receipts.
+- [x] GF-P0-183 Run specialized Godot workflow successfully with true headless generated scene parsing, runtime observed native physics and import receipts. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
 - [ ] GF-P0-184 Complete multi-actor native semantic physics using real game NPC/controller instead of bounded reference proxies.
 - [ ] GF-P0-185 Feed qualified native physics/event evidence to authorized playable game scenes with real Godot rendered-world QA.
 - [x] GF-P0-186 Add native physics actor motion/contact-count and chunk-enter/exit/retirement receipts computed independently from reported observations.
