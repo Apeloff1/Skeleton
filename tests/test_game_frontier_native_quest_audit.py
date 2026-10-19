@@ -52,7 +52,8 @@ class NativeQuestAuditTests(NativeQuestBatchTests):
             with self.subTest(kwargs=kwargs),self.assertRaises((NativeQuestSessionError,ValueError)):
                 audit_native_quest_checkpoint(
                     self.journal,self.pages,self.graph,self.approved,
-                    checkpoint,actor_id="hero",scene_candidate_digest="d"*64,**kwargs)
+                    checkpoint,actor_id=kwargs.get("actor_id","hero"),
+                    scene_candidate_digest=kwargs.get("scene_candidate_digest","d"*64))
 
     def test_recomputed_evidence_rejects_altered_results(self):
         checkpoint=self.replay()["head_checkpoint"]
