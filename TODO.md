@@ -35,7 +35,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-30 Liquid-aware hair, clothing, boots; protection/thermal and slip-risk character cognition.
 - [x] GF-P0-31 CPU shadow ray intersections for character and environment occluders plus area-light, wet-surface specular.
 - [x] GF-P0-32 Scene-candidate composition exports projection, variants, impacts, wear, awareness and ray-lighting evidence.
-- [x] GF-P0-33 Focused regression source plus opt-in path-scoped frontier GitHub workflow (actual green run pending).
+- [x] GF-P0-33 Path-scoped frontier CI verified: 57 tests passed on source commit `586028081cd740fb153378422eb04f78c944cbf8` (GitHub Actions run `39186433511`).
 - [ ] GF-P0-34 Wire reference soft-body, weather, lifecycle and character collision outputs into authoritative Godot/era runtime.
 - [ ] GF-P0-35 Convert projected polygons and character-aware ray shadows into visible graphics with native renderer reference screenshots.
 - [ ] GF-P0-36 Persist world variants, structures, weather fields and motion state with history/canon/backups.
