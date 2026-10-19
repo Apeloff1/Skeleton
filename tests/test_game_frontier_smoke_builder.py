@@ -39,6 +39,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("ApprovedCinematicCuePanel",script)
             self.assertIn("_next_approved_cue",script)
             self.assertIn("_create_approved_inventory_objects",script)
+            self.assertIn("ApprovedInventoryBrowser",script)
+            self.assertIn("_cycle_approved_inventory",script)
             self.assertIn("_inspect_approved_npc_proximity",script)
             self.assertIn("ApprovedNPCProximityInspector",script)
             self.assertIn("_persist_verified_gameplay_receipt",script)

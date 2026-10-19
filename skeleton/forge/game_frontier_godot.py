@@ -69,6 +69,8 @@ var _approved_branch_label: Label
 var _approved_branch_cursor: int = 0
 var _approved_npc_proximity_label: Label
 var _approved_npc_focus: String = ""
+var _approved_inventory_focus: int = 0
+var _approved_inventory_label: Label
 var _approved_dialogue_queue: Array[String] = []
 var _approved_dialogue_cursor: int = 0
 var _approved_dialogue_panel: PanelContainer
@@ -823,6 +825,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _create_approved_cue_timeline()
     _create_approved_branch_preview()
     _create_approved_npc_proximity_inspector()
+    _create_approved_inventory_inspector()
 
 
 func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
@@ -944,6 +947,48 @@ func _create_approved_gameplay_inspector(record: Dictionary) -> void:
     hud.add_child(inspector)
     add_child(hud)
     _approved_gameplay_label = inspector
+
+
+func _create_approved_inventory_inspector() -> void:
+    if _approved_gameplay_inventory.is_empty():
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedInventoryBrowser"
+    var label := Label.new()
+    label.name = "ApprovedInventorySelectedItem"
+    label.position = Vector2(20, 440)
+    label.add_theme_color_override("font_color", Color(.8, .99, .5))
+    overlay.add_child(label)
+    add_child(overlay)
+    _approved_inventory_label = label
+    _approved_inventory_focus = 0
+    _show_approved_inventory()
+
+
+func _show_approved_inventory() -> void:
+    if _approved_inventory_label == null:
+        return
+    var available: Array = _approved_gameplay_inventory.keys()
+    available.sort()
+    if available.is_empty():
+        _approved_inventory_label.text = "Inventory: no approved items"
+        return
+    var chosen: String = str(available[_approved_inventory_focus % available.size()])
+    _approved_inventory_label.text = (
+        "Game inventory " + str(_approved_inventory_focus + 1) +
+        "/" + str(available.size()) + " (I to inspect)\n" +
+        chosen + " x" + str(_approved_gameplay_inventory[chosen]) +
+        " | inspect only, no unapproved consumption"
+    )
+
+
+func _cycle_approved_inventory() -> void:
+    if _approved_gameplay_inventory.is_empty():
+        return
+    _approved_inventory_focus = (
+        _approved_inventory_focus + 1
+    ) % _approved_gameplay_inventory.size()
+    _show_approved_inventory()
 
 
 func _create_approved_npc_proximity_inspector() -> void:
@@ -1415,6 +1460,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     var key := event as InputEventKey
     if not key.pressed or key.echo:
+        return
+    if key.physical_keycode == KEY_I and not _approved_gameplay_inventory.is_empty():
+        _cycle_approved_inventory()
+        get_viewport().set_input_as_handled()
         return
     if key.physical_keycode == KEY_N and not _approved_npc_focus.is_empty():
         _inspect_approved_npc_focus()
