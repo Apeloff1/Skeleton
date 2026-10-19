@@ -67,6 +67,8 @@ var _approved_quest_titles: Dictionary = {}
 var _approved_branch_options: Dictionary = {}
 var _approved_branch_label: Label
 var _approved_branch_cursor: int = 0
+var _approved_npc_proximity_label: Label
+var _approved_npc_focus: String = ""
 var _approved_dialogue_queue: Array[String] = []
 var _approved_dialogue_cursor: int = 0
 var _approved_dialogue_panel: PanelContainer
@@ -817,6 +819,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _create_approved_dialogue_view()
     _create_approved_cue_timeline()
     _create_approved_branch_preview()
+    _create_approved_npc_proximity_inspector()
 
 
 func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
@@ -938,6 +941,60 @@ func _create_approved_gameplay_inspector(record: Dictionary) -> void:
     hud.add_child(inspector)
     add_child(hud)
     _approved_gameplay_label = inspector
+
+
+func _create_approved_npc_proximity_inspector() -> void:
+    if _approved_gameplay_npc_emotions.is_empty():
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedNPCProximityInspector"
+    var label := Label.new()
+    label.name = "ApprovedNearbyNPC"
+    label.position = Vector2(20, 495)
+    label.add_theme_color_override("font_color", Color(.95, .85, .5))
+    overlay.add_child(label)
+    add_child(overlay)
+    _approved_npc_proximity_label = label
+    _inspect_approved_npc_proximity()
+
+
+func _inspect_approved_npc_proximity() -> void:
+    if _approved_npc_proximity_label == null or _aero_character == null:
+        return
+    var best_distance := INF
+    var best_id := ""
+    for i in range(_native_capture_actors.size()):
+        var spec: Dictionary = _native_capture_actors[i]
+        var npc_id := str(spec.get("id", ""))
+        if not _approved_gameplay_npc_emotions.has(npc_id):
+            continue
+        var actor_node: Node3D = _native_capture_nodes[i]
+        if actor_node == null:
+            continue
+        var distance := _aero_character.global_position.distance_to(actor_node.global_position)
+        if distance < best_distance:
+            best_distance = distance
+            best_id = npc_id
+    _approved_npc_focus = best_id if best_distance <= 6.0 else ""
+    if _approved_npc_focus.is_empty():
+        _approved_npc_proximity_label.text = "NPC interaction: none within 6 game metres"
+    else:
+        _approved_npc_proximity_label.text = (
+            "Nearby NPC " + _approved_npc_focus + " | " +
+            str(_approved_gameplay_npc_emotions[_approved_npc_focus]) +
+            " | " + str(snappedf(best_distance, .01)) + " game metres" +
+            " (N to inspect)"
+        )
+
+
+func _inspect_approved_npc_focus() -> void:
+    if _approved_npc_proximity_label == null or _approved_npc_focus.is_empty():
+        return
+    _approved_npc_proximity_label.text = (
+        "Source NPC " + _approved_npc_focus + " / " +
+        str(_approved_gameplay_npc_emotions[_approved_npc_focus]) +
+        "\nObserved proximity only: no unsanctioned NPC actions."
+    )
 
 
 func _create_approved_branch_preview() -> void:
@@ -1356,6 +1413,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
     var key := event as InputEventKey
     if not key.pressed or key.echo:
         return
+    if key.physical_keycode == KEY_N and not _approved_npc_focus.is_empty():
+        _inspect_approved_npc_focus()
+        get_viewport().set_input_as_handled()
+        return
     if key.physical_keycode == KEY_B and _approved_branch_label != null:
         _cycle_approved_branch()
         get_viewport().set_input_as_handled()
@@ -1398,6 +1459,7 @@ func _physics_process(delta: float) -> void:
     _aero_character.apply_central_force(drag_n)
     _apply_native_gameplay_fields()
     _apply_reference_controls()
+    _inspect_approved_npc_proximity()
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]
