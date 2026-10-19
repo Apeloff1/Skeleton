@@ -182,18 +182,20 @@ def test_final_pass_never_publishes_unreviewed_repairs():
     patches = []
     def repair(files, findings, index):
         patches.append(index)
-        return {"app.py": "def valid():\n    pass\n" if index == 1
+        return {"app.py": "def still_invalid(:\n    pass" if index == 1
                 else "def never_reviewed():\n    pass\n"}
 
-    # With only one review pass, even an authorized repair cannot get an
-    # unchecked final source into the delivery outcome.
+    # The last pass must audit the previous repair, not run another unchecked
+    # repair after the available verification budget has been exhausted.
     outcome = CodeScrutinyLoop(ScrutinyPolicy(
-        maximum_passes=1, stability_passes=1,
+        maximum_passes=2, stability_passes=2,
     )).run({"app.py": "def f(:\n  pass"}, repair=repair, authorized=True)
     assert outcome.status == "budget_exhausted"
-    assert outcome.files == {"app.py": "def f(:\n  pass"}
-    assert not patches
+    assert outcome.files == {"app.py": "def still_invalid(:\n    pass"}
+    assert patches == [1]
     verify_scrutiny_receipts(outcome)
+    with pytest.raises(ValueError, match="two independent clean passes"):
+        ScrutinyPolicy(stability_passes=1)
 
 
 def test_quality_release_rejects_shared_or_duplicate_checker_evidence():
