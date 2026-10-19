@@ -71,9 +71,9 @@ def qualify_project(*, binary: Path, expected_sha256: str,
         if (project/src).stat().st_size>5*1024*1024:
             raise GodotQualificationError("excessive generated Godot script/scene size")
     stages=(
-        ("import",("--headless","--path",str(project),"--editor","--quit")),
+        ("import",("--headless","--path",str(project),"--import")),
         ("play",("--headless","--path",str(project),"--quit-after",
-                 str(frames),"res://frontier/frontier_scene.tscn")),
+                 str(frames),"--scene","res://frontier/frontier_scene.tscn")),
     )
     receipts=[]
     for stage,args in stages:
