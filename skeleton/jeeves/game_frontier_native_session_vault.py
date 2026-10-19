@@ -295,6 +295,54 @@ class NativeSessionVault:
         return report
 
 
+    def export_recovery_manifest(
+        self,journal,pages,quest_graph,approvals, *,
+        actor_id: str,scene_candidate_digest: str,
+    ) -> dict:
+        """Externally reviewable, data-only save receipt with no game writes.
+
+        No secret/private key is in scope: SHA binds the manifest bytes, not
+        operator identity. Verify independently against journal and vault.
+        """
+        source=self.recover(
+            journal,pages,quest_graph,approvals,actor_id=actor_id,
+            scene_candidate_digest=scene_candidate_digest)
+        audit=self.audit_retained_history(
+            journal,pages,quest_graph,approvals,actor_id=actor_id,
+            scene_candidate_digest=scene_candidate_digest)
+        storage=self.inspect_storage_integrity()
+        manifest={
+            "schema":"skeleton.game.native_vault_external_recovery.v1",
+            "session_id":self.session_id,"actor_id":actor_id,
+            "track":journal.track,"signed_gdd_digest":journal.gdd.source_digest,
+            "scene_candidate_digest":scene_candidate_digest,
+            "latest_verified_frame":source["frame"],
+            "checkpoint_digest":source["checkpoint"]["receipt_digest"],
+            "vault_head_receipt_digest":source["vault_receipt_digest"],
+            "source_history_audit_digest":audit["receipt_digest"],
+            "source_cold_audit_digest":source["independent_cold_audit_digest"],
+            "retained_receipts":audit["ancestry_receipts_verified"],
+            "retained_snapshots_replayed":audit["retained_snapshots_cold_replayed"],
+            "compacted_payloads_not_replayable":audit["compacted_payloads_not_replayable"],
+            "sqlite_health":storage,
+            "authority":"externally_replayable_local_game_save_proof_not_user_authentication",
+        }
+        manifest["receipt_digest"]=_sha(manifest)
+        return manifest
+
+    def verify_external_recovery_manifest(
+        self,journal,pages,quest_graph,approvals,recorded: object, *,
+        actor_id: str,scene_candidate_digest: str,
+    ) -> bool:
+        """Require exact independently reconstructed save proof."""
+        expected=self.export_recovery_manifest(
+            journal,pages,quest_graph,approvals,actor_id=actor_id,
+            scene_candidate_digest=scene_candidate_digest)
+        if type(recorded) is not dict or recorded!=expected:
+            raise NativeSessionVaultError("external recovery proof diverges from actual game journal")
+        return True
+
+
     def rotate(self,*,keep_latest: int = 2) -> dict:
         """Prune *payloads only*: all immutable ancestry receipts are retained."""
         if type(keep_latest) is not int or not 1<=keep_latest<=1024:

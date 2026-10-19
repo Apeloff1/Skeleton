@@ -94,6 +94,28 @@ class NativeSessionVaultTests(NativeQuestBatchTests):
                 vault._db.execute("PRAGMA synchronous=FULL")
                 self.assertEqual(vault.inspect_storage_integrity()["sqlite_check"],"ok")
 
+    def test_exported_external_recovery_manifest_checks_all_save_sources(self):
+        with TemporaryDirectory() as folder:
+            path=Path(folder)/"external.sqlite"
+            cp=self.replay(through_frame=4)["head_checkpoint"]
+            with self.make(path) as vault:
+                vault.append(cp,self.journal,self.pages,self.graph,self.approved,
+                    actor_id="hero",scene_candidate_digest="d"*64)
+                data=vault.export_recovery_manifest(
+                    self.journal,self.pages,self.graph,self.approved,
+                    actor_id="hero",scene_candidate_digest="d"*64)
+                self.assertEqual(data["latest_verified_frame"],4)
+                self.assertEqual(data["retained_receipts"],1)
+                self.assertEqual(data["sqlite_health"]["sqlite_check"],"ok")
+                self.assertTrue(vault.verify_external_recovery_manifest(
+                    self.journal,self.pages,self.graph,self.approved,data,
+                    actor_id="hero",scene_candidate_digest="d"*64))
+                forged=dict(data,retained_receipts=999)
+                with self.assertRaises(NativeSessionVaultError):
+                    vault.verify_external_recovery_manifest(
+                        self.journal,self.pages,self.graph,self.approved,forged,
+                        actor_id="hero",scene_candidate_digest="d"*64)
+
     def test_crash_before_commit_does_not_leave_partial_save(self):
         with TemporaryDirectory() as folder:
             path=Path(folder)/"vault.sqlite"

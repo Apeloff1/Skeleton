@@ -261,11 +261,16 @@ jobs:
               --vault "$RUNNER_TEMP/frontier-game-endurance-$fps.sqlite" \
               --cycles 12 --retain-latest 2 --crash-interval 3 \
               --max-cycle-ms 120000 --max-vault-bytes 33554432 \
+              --recovery-report-json "$RUNNER_TEMP/frontier-game-recovery-$fps.json" \
               > "$RUNNER_TEMP/frontier-game-endurance-$fps.json"
-            python - "$RUNNER_TEMP/frontier-game-endurance-$fps.json" <<'PY'
+            python - "$RUNNER_TEMP/frontier-game-endurance-$fps.json" "$RUNNER_TEMP/frontier-game-recovery-$fps.json" <<'PY'
           import json,sys
           from pathlib import Path
           report=json.loads(Path(sys.argv[1]).read_text())
+          recovery=json.loads(Path(sys.argv[2]).read_text())
+          assert recovery["receipt_digest"]==report["external_recovery_report_digest"]
+          assert recovery["vault_head_receipt_digest"]==report["final_vault_receipt_digest"]
+          assert recovery["sqlite_health"]["sqlite_check"]=="ok"
           assert report["cycles_executed"]==12
           assert report["source_frames_cold_replayed"]>=4
           assert report["crash_rollbacks_executed"]>=1

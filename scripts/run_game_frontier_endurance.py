@@ -7,6 +7,7 @@ does not certify months-long OS uptime or simulate model GPU workloads.
 """
 from __future__ import annotations
 import argparse
+import os
 import json
 from pathlib import Path
 import sys
@@ -33,6 +34,7 @@ def main(argv=None)->int:
     p.add_argument("--frames-per-window",type=int,default=4)
     p.add_argument("--retain-latest",type=int,default=2)
     p.add_argument("--crash-interval",type=int,default=4)
+    p.add_argument("--recovery-report-json",type=Path)
     p.add_argument("--max-cycle-ms",type=int)
     p.add_argument("--max-vault-bytes",type=int)
     args=p.parse_args(argv)
@@ -70,6 +72,30 @@ def main(argv=None)->int:
                 window_frames=args.frames_per_window,retain_latest=args.retain_latest,
                 crash_interval=args.crash_interval,
                 max_cycle_ms=args.max_cycle_ms,max_vault_bytes=args.max_vault_bytes)
+        if args.recovery_report_json is not None:
+            dest=args.recovery_report_json
+            if (not dest.parent.is_dir() or dest.parent.is_symlink()
+                or dest.exists() or dest.is_symlink()
+                or dest.resolve()==args.vault.resolve()):
+                raise ValueError("external recovery report requires new safe destination")
+            from skeleton.jeeves.game_frontier_native_session_vault import NativeSessionVault
+            with FrameReceiptJournal(args.journal,anchor,track=args.track) as journal:
+                with NativeSessionVault(args.vault,session_id=approvals["session_id"]) as vault:
+                    manifest=vault.export_recovery_manifest(
+                        journal,pages,quest_graph,approvals,
+                        actor_id=args.actor_id,
+                        scene_candidate_digest=settings["candidate_digest"])
+                    vault.verify_external_recovery_manifest(
+                        journal,pages,quest_graph,approvals,manifest,
+                        actor_id=args.actor_id,
+                        scene_candidate_digest=settings["candidate_digest"])
+            fd=os.open(dest,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+            with os.fdopen(fd,"w",encoding="utf-8") as output:
+                json.dump(manifest,output,sort_keys=True,separators=(",",":"))
+                output.write("\n")
+                output.flush()
+                os.fsync(output.fileno())
+            report["external_recovery_report_digest"]=manifest["receipt_digest"]
         print(json.dumps(report,sort_keys=True,separators=(",",":")))
         return 0
     except (ValueError,TypeError,KeyError,IndexError,OSError) as error:
