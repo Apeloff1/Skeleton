@@ -231,6 +231,8 @@ def compile_studio_frame(
     preceding_frames: tuple = (),
     notes: tuple = (),
     entity_velocities: dict[str, tuple[float,float,float]] | None = None,
+    previous_frame: object | None = None,
+    context_cursor: object | None = None,
 ) -> dict:
     """Build one *verified* Studio progress frame from actual placed prefabs.
 
@@ -242,6 +244,8 @@ def compile_studio_frame(
     from skeleton.jeeves.game_frontier_frame_coherence import (
         GDDFrameNote, FrameObject, bind_signed_gdd, advance_frame,
         ai_design_context, verify_frame, FrameCoherenceError,
+        FrameReceipt, FrameContextCursor, advance_context_cursor,
+        cursor_ai_context,
     )
     from skeleton.jeeves.game_frontier_production import Vec3
     if not isinstance(project, StudioProject):
@@ -251,6 +255,12 @@ def compile_studio_frame(
         raise StudioError("signed GDD is for a different project")
     if type(preceding_frames) is not tuple or len(preceding_frames)>10000:
         raise StudioError("bounded prior verified frames required")
+    use_incremental = context_cursor is not None or previous_frame is not None
+    if use_incremental and (
+        preceding_frames or not isinstance(previous_frame,FrameReceipt)
+        or not isinstance(context_cursor,FrameContextCursor)
+    ):
+        raise StudioError("efficient frame cursor requires paired prior state")
     if any(not isinstance(n,GDDFrameNote) for n in notes):
         raise StudioError("notes must reference signed GDD world laws")
     by_id={p.prefab_id:p for p in project.prefabs}
@@ -270,14 +280,21 @@ def compile_studio_frame(
         ))
     if not objects:
         raise StudioError("per-frame coherence requires placed source prefabs")
-    prior=preceding_frames[-1] if preceding_frames else None
-    if frame_index != len(preceding_frames):
-        raise StudioError("missing/hole in full prior frame sequence")
+    prior=(previous_frame if use_incremental else
+           preceding_frames[-1] if preceding_frames else None)
+    if (frame_index != (previous_frame.frame_index+1 if use_incremental
+                        else len(preceding_frames))):
+        raise StudioError("missing/hole in frame sequence")
     frame=advance_frame(
         frame_index=frame_index,fps=fps,gdd=anchor,
         objects=tuple(objects),previous=prior,notes=tuple(notes),
     )
-    context=ai_design_context(anchor,(*preceding_frames,frame))
+    latest_cursor=advance_context_cursor(
+        anchor,frame,previous_frame=prior,
+        previous_cursor=context_cursor if use_incremental else None,
+    ) if use_incremental or prior is None else None
+    context=(cursor_ai_context(latest_cursor,anchor) if latest_cursor
+             else ai_design_context(anchor,(*preceding_frames,frame)))
     base=compile_studio_project(project)
     return {
         "schema":"skeleton.forge.studio_frame_candidate.v1",
@@ -297,5 +314,6 @@ def compile_studio_frame(
         "note_count":len(frame.note_from_previous),
         "gdd_ai_context":context,
         "record":frame,
+        "context_cursor":latest_cursor,
         "authority":"studio_preview_proposed_not_engine_mutated",
     }
