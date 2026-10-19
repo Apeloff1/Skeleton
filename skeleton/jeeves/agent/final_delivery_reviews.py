@@ -14,7 +14,8 @@ import re
 from dataclasses import dataclass, replace
 from typing import Callable, Mapping, Sequence
 
-from .types import stable_fingerprint
+from .code_delivery_quality import required_delivery_kind
+from .types import Goal, stable_fingerprint
 
 _CORE_AXES = (
     "modularity", "efficiency", "performance", "cleanliness",
@@ -26,6 +27,28 @@ _SHA_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 class FinalReviewError(ValueError):
     """The submitted artifact does not satisfy its release requirements."""
+
+
+_CREATIVE_INTENT = re.compile(
+    r"\b(?:write|draft|create|generate|compose|develop|rewrite|revise|"
+    r"produce|design)\b", re.I,
+)
+_CREATIVE_OUTPUT = re.compile(
+    r"\b(?:story|screenplay|novel|poem|poetry|lyrics|song|dialogue|"
+    r"narrative|short fiction|film script|stage play|character arc)\b", re.I,
+)
+
+
+def required_final_kind(goal: Goal) -> str | None:
+    """Classify authored creative work without weakening the code/game gate."""
+    declared = goal.metadata.get("delivery_kind")
+    if declared == "creative":
+        return "creative"
+    if declared in {"code", "game"}:
+        return str(declared)
+    if _CREATIVE_INTENT.search(goal.objective) and _CREATIVE_OUTPUT.search(goal.objective):
+        return "creative"
+    return required_delivery_kind(goal)
 
 
 def _digest_sources(sources: Mapping[str, str]) -> str:
@@ -267,6 +290,8 @@ def _review_findings(
     if any(item.content_digest != stable_fingerprint(sources[item.path]) for item in rights):
         raise FinalReviewError("copyright inventory contains stale source")
     source_digest = _digest_sources(sources)
+    if copyright.checker == rewrite.checker or copyright.evidence_ref == rewrite.evidence_ref:
+        raise FinalReviewError("copyright and creative rewrite require independent evidence and reviewers")
     for name, report in (("copyright", copyright), ("creative_rewrite", rewrite)):
         if report.stage != name or report.source_digest != source_digest:
             raise FinalReviewError(f"{name} checker is stale or misidentified")
@@ -351,6 +376,8 @@ class ComparativeObjectiveFinalReviewer:
         inventory = tuple(provenance)
         if not callable(copyright_checker) or not callable(rewrite_checker):
             raise FinalReviewError("both final rights/originality verifiers are required")
+        if copyright_checker is rewrite_checker:
+            raise FinalReviewError("final verifiers must be separate host callbacks")
         # Perform deterministically checkable preliminary assessments *before*
         # calling the final two external analyzers.
         if not measured or len({m.axis for m in measured}) != len(measured):
