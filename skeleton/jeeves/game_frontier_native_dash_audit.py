@@ -65,7 +65,7 @@ def _read_actor_rows(lines,*,actor,scene,gdd,fps):
 
 def verify_native_wind_dash_playthrough(
     control: list, activated: list, activation: object, dispatch: object,
-    *, fps: int,
+    *, fps: int, expected_frames: int | None = None,
 ) -> dict:
     if (type(dispatch) is not dict
         or dispatch.get("schema")!="skeleton.game.native_godot_dispatch.v1"
@@ -90,6 +90,16 @@ def verify_native_wind_dash_playthrough(
     after=_read_actor_rows(activated,actor=actor,scene=scene,gdd=gdd,fps=fps)
     if len(before)!=len(after):
         raise NativeQuestSessionError("control and wind-dash runs have different frame coverage")
+    if expected_frames is not None and (
+        type(expected_frames) is not int or not 4<=expected_frames<=128
+        or len(before)!=expected_frames):
+        raise NativeQuestSessionError("Godot skill playthrough did not meet exact source frame budget")
+    initial_mass=before[0]["physics_body"]["mass_kg"]
+    for i in range(len(before)):
+        if not isclose(before[i]["physics_body"]["mass_kg"],initial_mass,abs_tol=1e-7):
+            raise NativeQuestSessionError("controlled physics mass changed during baseline")
+        if not isclose(after[i]["physics_body"]["mass_kg"],initial_mass,abs_tol=1e-7):
+            raise NativeQuestSessionError("controlled physics mass changed between playthroughs")
     keys={
         "schema","actor_id","scene_candidate_digest","signed_gdd_digest",
         "approved_dispatch_digest","skill","skill_required_level",

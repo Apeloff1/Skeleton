@@ -57,6 +57,23 @@ class NativeWindDashAuditTests(unittest.TestCase):
         self.assertEqual(len(result["receipt_digest"]),64)
         self.assertEqual(result,verify_native_wind_dash_playthrough(c,d,a,b,fps=60))
 
+    def test_explicit_playthrough_budget_is_checked(self):
+        c,d,a,b=fixture()
+        self.assertEqual(verify_native_wind_dash_playthrough(
+            c,d,a,b,fps=60,expected_frames=5)["frame_count"],5)
+        for bad in (4,6,129,True):
+            with self.subTest(expected=bad),self.assertRaises(NativeQuestSessionError):
+                verify_native_wind_dash_playthrough(
+                    c,d,a,b,fps=60,expected_frames=bad)
+
+    def test_physics_mass_cannot_mutate_during_comparison(self):
+        for side in ("control","dash"):
+            c,d,a,b=fixture()
+            target=c if side=="control" else d
+            target[3]["actors"][0]["physics_body"]["mass_kg"]=2.5
+            with self.subTest(side=side),self.assertRaises(NativeQuestSessionError):
+                verify_native_wind_dash_playthrough(c,d,a,b,fps=60)
+
     def test_no_visible_physics_change_rejected(self):
         c,d,a,b=fixture()
         with self.assertRaisesRegex(NativeQuestSessionError,"did not measurably change"):

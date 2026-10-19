@@ -33,6 +33,7 @@ def main(argv=None):
     args.add_argument("--ability-jsonl",required=True,type=Path)
     args.add_argument("--dispatch-json",required=True,type=Path)
     args.add_argument("--fps",required=True,type=int)
+    args.add_argument("--expected-frames",type=int)
     args.add_argument("--max-bytes",default=1048576,type=int)
     opts=args.parse_args(argv)
     try:
@@ -48,7 +49,8 @@ def main(argv=None):
         if len(actions)!=1:
             raise NativeQuestSessionError("exactly one unlocked dash activation required")
         report=verify_native_wind_dash_playthrough(
-            controls,activated,actions[0],dispatch,fps=opts.fps)
+            controls,activated,actions[0],dispatch,
+            fps=opts.fps,expected_frames=opts.expected_frames)
         print(json.dumps(report,sort_keys=True,separators=(",",":"),allow_nan=False))
         return 0
     except (NativeQuestSessionError,ValueError,TypeError,KeyError,OSError,

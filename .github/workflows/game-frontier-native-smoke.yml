@@ -369,7 +369,7 @@ jobs:
               --activated-jsonl "$dash_physics" \
               --ability-jsonl "$dash_activations" \
               --dispatch-json "$project/frontier/data/native_gameplay_dispatch.json" \
-              --fps "$fps" \
+              --fps "$fps" --expected-frames 20 \
               > "$RUNNER_TEMP/frontier-dash-differential-$fps.json"
             python - "$RUNNER_TEMP/frontier-dash-differential-$fps.json" <<'PY'
           import json,sys
