@@ -716,6 +716,7 @@ func _record_native_physics() -> void:
                     str(Engine.physics_ticks_per_second) + " Hz fixed solver",
                 "Zones " + str(_native_gameplay_zones.size()) +
                     " | occupants " + str(occupants.size()) +
+                    " | field forces " + str(_native_force_fields.size()) +
                     " | preview speed x" + str(_native_debug_speed),
                 "P pause/resume | - slower | = faster",
             ]

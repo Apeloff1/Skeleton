@@ -38,6 +38,8 @@ RPG_ENVIRONMENT_SIGNALS = frozenset((
     "native_contact_count", "native_kinetic_energy_j",
     "native_gameplay_zone_entries", "native_gameplay_zone_exits",
     "native_gameplay_zone_occupants",
+    "native_gameplay_field_force_n",
+    "native_gameplay_updraft_force_n",
 ))
 
 ACTIONS = frozenset((

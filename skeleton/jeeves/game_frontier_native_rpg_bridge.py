@@ -27,6 +27,7 @@ NATIVE_RPG_SIGNALS=frozenset({
     "native_contact_count","native_kinetic_energy_j",
     "native_gameplay_zone_entries","native_gameplay_zone_exits",
     "native_gameplay_zone_occupants",
+    "native_gameplay_field_force_n", "native_gameplay_updraft_force_n",
 })
 
 
@@ -115,6 +116,17 @@ def native_rpg_observations(sample: Mapping, *, actor_id: str) -> dict[str,float
             raise NativeRPGBridgeError("missing native physics body source")
         observations["character_mass_kg"]=mass["mass_kg"]
         observations["native_kinetic_energy_j"]=mass["kinetic_energy_j"]
+    from .game_frontier_native_fields import inspect_native_force_fields
+    field_proof=inspect_native_force_fields(sample)
+    if field_proof is not None:
+        native_forces=[
+            row["force_world_xyz_n"]
+            for row in sample["previous_step_field_forces"]
+            if row["actor_id"]==actor_id]
+        observations["native_gameplay_field_force_n"]=sum(
+            math.dist([0.,0.,0.],force) for force in native_forces)
+        observations["native_gameplay_updraft_force_n"]=sum(
+            max(0.,force[2]) for force in native_forces)
     zone=inspect_native_gameplay_zones(sample)
     if zone is not None:
         events=[e for e in sample["native_zone_events"] if e["actor_id"]==actor_id]

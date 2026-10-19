@@ -125,3 +125,30 @@ class NativeRPGRuntimeTests(unittest.TestCase):
                 with self.assertRaises((NativeRPGBridgeError,ValueError)):
                     evaluate_native_rpg_timeline(journal,pages(),**{
                         "actor_id":"hero",**opts})
+
+    def test_physics_driven_updraft_force_sensor_never_guesses_the_aerodynamics(self):
+        from skeleton.jeeves.game_frontier_native_fields import (
+            normalize_native_force_fields,calculated_native_field_force,
+        )
+        old=sample(0,self.gdd.source_digest)
+        new=sample(1,self.gdd.source_digest)
+        src=normalize_native_force_fields(({
+            "id":"thermal","actor_id":"hero","kind":"updraft",
+            "center_xyz_m":[31.99,-1.,30.],"radius_m":5.,
+            "acceleration_mps2":8.,
+        },))
+        for frame in (old,new):
+            frame["native_force_field_schema"]="skeleton.game.native_force_fields.v1"
+            frame["native_force_fields"]=src
+            frame["previous_step_field_forces"]=[]
+        applied=calculated_native_field_force(
+            src[0],old["actors"][0]["world_xyz_m"],80.)
+        new["previous_step_field_forces"]=[{
+            "field_id":"thermal","actor_id":"hero","command_tick":0,
+            "source_position_xyz_m":old["actors"][0]["world_xyz_m"],
+            "force_world_xyz_n":list(applied),
+        }]
+        records=native_rpg_observations(new,actor_id="hero")
+        self.assertAlmostEqual(records["native_gameplay_updraft_force_n"],640.)
+        self.assertAlmostEqual(records["native_gameplay_field_force_n"],640.)
+        self.assertNotIn("weather_turbulence_mps2",records)
