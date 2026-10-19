@@ -28,6 +28,13 @@ var _aero_wind: Vector3 = Vector3.ZERO
 var _aero_density: float = 1.2
 var _aero_cd: float = 1.0
 var _aero_area: float = 0.7
+var _native_capture_file: FileAccess
+var _native_capture_tick: int = 0
+var _native_capture_max_frames: int = 0
+var _native_candidate_sha: String = ""
+var _native_signed_gdd_sha: String = ""
+var _native_actor_id: String = ""
+var _native_actor_asset_sha: String = ""
 
 func _vec(data: Array) -> Vector3:
     return Vector3(float(data[0]), float(data[2]), -float(data[1]))
@@ -59,6 +66,7 @@ func _ready() -> void:
     _create_leaf_shadows(data.get("leaf_shadows", []))
     _create_biome_objects(data.get("biome_motion", {}))
     _create_advanced_character(data.get("advanced_physics", {}))
+    _configure_native_capture(data.get("native_capture", {}))
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
 
@@ -394,9 +402,72 @@ func _create_advanced_character(info: Dictionary) -> void:
     _aero_cd = clamp(float(aero.get("drag_coefficient", 1.0)), .001, 5.0)
     _aero_area = clamp(float(aero.get("projected_area_m2", .7)), .001, 10000.0)
 
+func _configure_native_capture(settings: Dictionary) -> void:
+    if not bool(settings.get("enabled", false)):
+        return
+    if _aero_character == null:
+        push_error("Native physics capture requires an actual RigidBody3D")
+        return
+    _native_capture_max_frames = int(settings.get("max_frames", 0))
+    if _native_capture_max_frames < 1 or _native_capture_max_frames > 1000000:
+        push_error("Invalid native capture frame budget")
+        return
+    _native_candidate_sha = str(settings.get("candidate_digest", ""))
+    _native_signed_gdd_sha = str(settings.get("gdd_digest", ""))
+    _native_actor_id = str(settings.get("actor_id", ""))
+    _native_actor_asset_sha = str(settings.get("actor_asset_digest", ""))
+    if _native_candidate_sha.length() != 64 or _native_signed_gdd_sha.length() != 64 or _native_actor_asset_sha.length() != 64:
+        push_error("Native capture provenance digests required")
+        return
+    if _native_actor_id.is_empty():
+        push_error("Native capture actor ID required")
+        return
+    Engine.physics_ticks_per_second = int(settings.get("fps", 60))
+    # Fixed user:// destination, not a user-supplied external path.
+    _native_capture_file = FileAccess.open("user://frontier_native_physics.jsonl", FileAccess.WRITE)
+    if _native_capture_file == null:
+        push_error("Native capture file could not be opened")
+
+func _record_native_physics() -> void:
+    if _native_capture_file == null:
+        return
+    if _native_capture_tick >= _native_capture_max_frames:
+        _native_capture_file.close()
+        _native_capture_file = null
+        return
+    var pos := _aero_character.global_position
+    var vel := _aero_character.linear_velocity
+    var row := {
+        "schema": "skeleton.game.native_physics_observation.v1",
+        "native_engine": "godot4_physics",
+        "authority": "untrusted_native_candidate_observation_not_attested",
+        "scene_candidate_digest": _native_candidate_sha,
+        "signed_gdd_digest": _native_signed_gdd_sha,
+        "native_tick": _native_capture_tick,
+        "ticks_usec": Time.get_ticks_usec(),
+        "fps": Engine.physics_ticks_per_second,
+        "actors": [{
+            "id": _native_actor_id,
+            "source_digest": _native_actor_asset_sha,
+            "world_xyz_m": [pos.x, -pos.z, pos.y],
+            "velocity_xyz_mps": [vel.x, -vel.z, vel.y],
+        }],
+    }
+    _native_capture_file.store_line(JSON.stringify(row))
+    _native_capture_file.flush()
+    _native_capture_tick += 1
+
+func _exit_tree() -> void:
+    if _native_capture_file != null:
+        _native_capture_file.close()
+        _native_capture_file = null
+
 func _physics_process(delta: float) -> void:
     if _aero_character == null or delta < 0:
         return
+    # Snapshot the solver output before applying forces for the next tick.
+    # Physics observations are not GPU pixel observations or attestation.
+    _record_native_physics()
     # Native solver updates the body after each fixed physics tick. Apply
     # quadratic air drag using *current* relative wind, not a stale impulse.
     var relative := _aero_character.linear_velocity - _aero_wind
@@ -508,6 +579,8 @@ def emit_frontier_godot_overlay(
     *,
     cloud_path_duration_s: int = 30,
     cloud_step_s: int = 1,
+    enable_native_capture: bool = False,
+    native_capture_max_frames: int = 6000,
 ) -> dict[str, str]:
     """Emit a Godot scene + fixed GDScript + snapshot and wind path JSON.
 
@@ -523,6 +596,10 @@ def emit_frontier_godot_overlay(
     from skeleton.jeeves.game_frontier_dynamics import (
         WindField, WindLayer, WindVector, advect_clouds,
     )
+    if type(enable_native_capture) is not bool or (
+        type(native_capture_max_frames) is not int or
+        not 1 <= native_capture_max_frames <= 1_000_000):
+        raise FrontierGodotError("bounded explicit native capture opt-in required")
     manifest = candidate.manifest
     actual = sha256(json.dumps(manifest, sort_keys=True,
                                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
@@ -568,9 +645,29 @@ def emit_frontier_godot_overlay(
         for key in ("temperature", "humidity", "sky_island", "elevation"):
             if key in variant:
                 world[key] = variant[key]
+    native_config = {"enabled": False}
+    if enable_native_capture:
+        advanced = manifest.get("advanced_physics")
+        frame = manifest.get("frame_progress")
+        proof = manifest.get("frame_chunk_evidence")
+        if not isinstance(advanced, Mapping) or not isinstance(frame, Mapping) or not isinstance(proof, Mapping):
+            raise FrontierGodotError("real native capture requires an advanced rigid body, signed GDD frame and verified chunk evidence")
+        actor_id = advanced["body"]["id"]
+        mapped = [source for row in proof["receipts"]
+                  for entity,source in zip(row["source_entities"],row["source_asset_digests"])
+                  if entity == actor_id]
+        if len(mapped) != 1 or proof.get("verifier_a") is not True or proof.get("verifier_b") is not True:
+            raise FrontierGodotError("native body ID must match exactly one double verified source actor")
+        native_config = {
+            "enabled": True, "max_frames": native_capture_max_frames,
+            "candidate_digest": candidate.manifest_digest,
+            "gdd_digest": frame["gdd_digest"], "fps": frame["fps"],
+            "actor_id": actor_id, "actor_asset_digest": mapped[0],
+        }
     payload = {
         "schema": "skeleton.game.frontier_godot_overlay.v1",
         "origin_candidate_digest": actual,
+        "native_capture": native_config,
         "game_era": manifest["render"]["era"],
         "requested_fps": manifest["render"]["fps"],
         "world": world,
@@ -645,6 +742,8 @@ def attach_frontier_overlay(
     *,
     cloud_path_duration_s: int = 30,
     cloud_step_s: int = 1,
+    enable_native_capture: bool = False,
+    native_capture_max_frames: int = 6000,
 ) -> dict[str, str]:
     """Safely attach an emitted reference scene to an existing Forge Godot project.
 
@@ -666,6 +765,8 @@ def attach_frontier_overlay(
     overlay = emit_frontier_godot_overlay(
         candidate, cloud_path_duration_s=cloud_path_duration_s,
         cloud_step_s=cloud_step_s,
+        enable_native_capture=enable_native_capture,
+        native_capture_max_frames=native_capture_max_frames,
     )
     conflicts = tuple(sorted(set(project_files).intersection(overlay)))
     if any(project_files[key] != overlay[key] for key in conflicts):
