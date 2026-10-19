@@ -160,13 +160,13 @@ def test_checker_failure_with_no_detail_is_still_blocking():
 
 
 def test_final_scrutiny_receipt_binds_source_findings_and_stability():
-    files = {"app.py": "def main():\\n    return 1\\n"}
+    files = {"app.py": "def main():\n    return 1\n"}
     clean = CodeScrutinyLoop().run(files, lint=lambda _: ())
     assert clean.success
     verify_scrutiny_receipts(clean)
     with pytest.raises(ValueError, match="source not reviewed"):
         verify_scrutiny_receipts(replace(
-            clean, files={"app.py": "def main():\\n    return 2\\n"},
+            clean, files={"app.py": "def main():\n    return 2\n"},
         ))
     with pytest.raises(ValueError, match="findings differ"):
         verify_scrutiny_receipts(replace(clean, findings=(
@@ -182,22 +182,22 @@ def test_final_pass_never_publishes_unreviewed_repairs():
     patches = []
     def repair(files, findings, index):
         patches.append(index)
-        return {"app.py": "def valid():\\n    pass\\n" if index == 1
-                else "def never_reviewed():\\n    pass\\n"}
+        return {"app.py": "def valid():\n    pass\n" if index == 1
+                else "def never_reviewed():\n    pass\n"}
 
     # With only one review pass, even an authorized repair cannot get an
     # unchecked final source into the delivery outcome.
     outcome = CodeScrutinyLoop(ScrutinyPolicy(
         maximum_passes=1, stability_passes=1,
-    )).run({"app.py": "def f(:\\n  pass"}, repair=repair, authorized=True)
+    )).run({"app.py": "def f(:\n  pass"}, repair=repair, authorized=True)
     assert outcome.status == "budget_exhausted"
-    assert outcome.files == {"app.py": "def f(:\\n  pass"}
+    assert outcome.files == {"app.py": "def f(:\n  pass"}
     assert not patches
     verify_scrutiny_receipts(outcome)
 
 
 def test_quality_release_rejects_shared_or_duplicate_checker_evidence():
-    files = {"app.py": "pass\\n"}
+    files = {"app.py": "pass\n"}
     valid = CodeDeliveryQualityReviewer().inspect("code", files, checkers=certified())
     assert valid.releasable
     proofs = list(valid.checker_evidence)
