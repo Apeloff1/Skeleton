@@ -23,6 +23,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-10 Add primitive and integration regression tests (execution/green CI not yet proven).
 - [x] GF-P0-19 Add candidate-only model checkpoint, frame throughput and simulation-ready 3D evidence contracts.
 - [x] GF-P0-20 Add independent license allowlist, external receipt identity, measured-versus-requested FPS checks.
+- [x] GF-P0-21 Add opt-in 30/50/120 FPS bridge to canonical per-era simulation timing, with cross-mode tests.
 - [ ] GF-P0-11 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
