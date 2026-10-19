@@ -40,7 +40,7 @@ from .game_frontier_photometry import (
 from .game_frontier_chunks import verify_registered_era_chunks
 from .game_frontier_mesh_evolution import PixelAsset, create_old_new_asset_pair
 from .game_frontier_biome_motion import (
-    ShrubState, SmallRockState, ContactForce, advance_biome_objects,
+    ShrubState, SmallRockState, ContactForce, BiomeMotion, advance_biome_objects,
 )
 
 FRONTIER_SCENE_SCHEMA = "skeleton.game.frontier_scene_candidate.v1"
@@ -236,9 +236,24 @@ def compile_frontier_scene(
                      character_step.state.radius_m)
         for impact in (character_step.impacts if character_step else ())
     )
-    biome_motion = advance_biome_objects(
-        shrubs, small_rocks, wind=active_wind,
-        dt_s=delta_s, contacts=object_contacts)
+    if shrubs or small_rocks:
+        # Integrate in physical substeps; ordinary long-duration scenes
+        # without biome objects must remain backwards-compatible.
+        import math
+        steps = max(1, math.ceil(delta_s / .1))
+        if steps > 1024:
+            raise ValueError("biome solver requires bounded host time chunks")
+        shrub_state, rock_state, contact_count = shrubs, small_rocks, 0
+        for step in range(steps):
+            updated = advance_biome_objects(
+                shrub_state, rock_state, wind=active_wind,
+                dt_s=delta_s / steps,
+                contacts=object_contacts if step == 0 else ())
+            shrub_state, rock_state = updated.shrubs, updated.rocks
+            contact_count += updated.impact_count
+        biome_motion = BiomeMotion(shrub_state, rock_state, contact_count)
+    else:
+        biome_motion = BiomeMotion((), (), 0)
     # Current moving geometry participates in *the same frame's* rays.
     extra_occluders = tuple(
         RayOccluder("shrub:"+obj.shrub_id,"foliage",obj.tip,
