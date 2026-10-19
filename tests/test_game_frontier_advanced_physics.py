@@ -58,10 +58,12 @@ class TerminalVelocityTests(unittest.TestCase):
         high=airflow_at(Vec3(4,0,220),**params)
         self.assertEqual(high.updraft_mps,0)
         body=RigidBody("drift",Vec3(4,0,20),Vec3(0,0,-30),75,.4)
-        still=airflow_at(body.position, ambient_wind=ZERO,
-                          air=AirConditions(altitude_m=830))
+        # Isolate thermal lift at fixed wake/draft exposure. A sheltering
+        # wake *reduces* aerodynamic drag, potentially speeding a fall, so
+        # comparing it to still air would conflate opposing physical effects.
+        no_thermal=airflow_at(body.position,**{**params, "thermals": ()})
         up=integrate_air_motion(body,AeroProfile(1.,1.0),lee,delta_s=.05)
-        no=integrate_air_motion(body,AeroProfile(1.,1.0),still,delta_s=.05)
+        no=integrate_air_motion(body,AeroProfile(1.,1.0),no_thermal,delta_s=.05)
         self.assertGreater(up.body.velocity.z,no.body.velocity.z)
 
     def test_rejects_nan_and_bad_kinematics(self):
