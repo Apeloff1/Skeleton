@@ -11,6 +11,7 @@ on:
       - "scripts/build_game_frontier_smoke.py"
       - "scripts/qualify_game_frontier_godot.py"
       - "scripts/run_game_frontier_capture.py"
+      - "scripts/validate_game_frontier_native_smoke.py"
       - "skeleton/forge/game_frontier_godot.py"
       - "skeleton/jeeves/game_frontier*.py"
       - ".github/workflows/game-frontier-native-smoke.yml"
@@ -76,6 +77,10 @@ jobs:
             -name frontier_native_physics.jsonl -print -quit)
           test -n "$capture"
           test -s "$capture"
+          python scripts/validate_game_frontier_native_smoke.py \
+            --capture-jsonl "$capture" \
+            --scene-json "$RUNNER_TEMP/frontier-project/frontier/data/scene.json" \
+            --min-ticks 4 --max-ticks 20
           python scripts/run_game_frontier_capture.py ingest \
             --signed-gdd "$RUNNER_TEMP/frontier-project/signed_gdd.json" \
             --scene-json "$RUNNER_TEMP/frontier-project/frontier/data/scene.json" \
