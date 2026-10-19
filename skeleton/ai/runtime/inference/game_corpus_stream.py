@@ -124,6 +124,40 @@ TRACKS: dict[str, tuple[str, ...]] = {
         "subtitles",
         "photo_mode",
     ),
+    "rights": (
+        "copyright",
+        "license",
+        "trademark",
+        "attribution",
+        "age_rating",
+        "likeness",
+        "music_rights",
+        "asset_rights",
+    ),
+    "sound": ("audio", "music", "haptics"),
+    "stage": ("animation", "camera", "lighting", "vfx", "particles", "color_script", "weather"),
+    "craft": ("materials", "shader", "rigging", "props", "crowd", "trailer"),
+    "play": (
+        "accessibility",
+        "behavior",
+        "interface",
+        "inventory",
+        "level_design",
+        "localization",
+        "netcode",
+        "performance",
+    ),
+    "maps": (
+        "sea_map",
+        "mountain_map",
+        "cave_map",
+        "elevation_map",
+        "adventure_map",
+        "homebrew_map",
+        "tabletop_map",
+        "dungeon_map",
+    ),
+    "cognition": ("jeeves_cognition",),
 }
 
 TEMPLATES: dict[str, tuple[str, ...]] = {
@@ -399,6 +433,74 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
         "Pass {n}. Photo mode at the {place} may move the camera. It does not advance the tick or change {field}. The {role} checks the exit state.",
         "Pass {n}. A photo hides interface chrome and keeps the character sheet: eyes {eye}, hair {hair}. It is not a new canon portrait. Pass {n}.",
     ),
+    "copyright": (
+        "Pass {n}. The {role} records who owns the expression in the {asset} and the year it was made. A filename is not ownership, and the shipping build keeps the notice with the file.",
+        "Pass {n}. A new cut of the {asset} for the {place} stays inside the granted scope. The {role} stores the source beside the notice.",
+    ),
+    "license": (
+        "Pass {n}. The {grant} for the {asset} names what the {role} may ship, change, and pass on. An extra use that the grant does not name stays out of the build.",
+        "Pass {n}. The {place} scene may show the {item} only while its {grant} is in force. When that grant ends, the file leaves the build.",
+    ),
+    "trademark": (
+        "Pass {n}. The {role} checks the game title and the {item} name against the mark list before the {place} build. A plain descriptive word is not assumed to be a mark.",
+        "Pass {n}. Writing in the {place} does not paint a third-party mark onto the {asset}. The {role} substitutes an original name and records the swap.",
+    ),
+    "attribution": (
+        "Pass {n}. Credits for the {asset} name the {role} and the {grant}. Shipping the file without that credit line breaks the record.",
+        "Pass {n}. The {place} trailer names the composer and the author of the {asset}. A shorter cut keeps those names in the ledger.",
+    ),
+    "age_rating": (
+        "Pass {n}. The {role} writes an age note for the {verb} scene at the {place}. The note describes that authored {failure} and does not paste an outside form.",
+        "Pass {n}. Intensity for the {verb} at the {place} is a content flag on the scene. The store page reads the flag and does not invent a rating badge.",
+    ),
+    "likeness": (
+        "Pass {n}. A performer's face on the {asset} needs written consent that names the {place} scene. The {role} stores that consent beside the take.",
+        "Pass {n}. The {item} likeness at the {place} is allowed only when the consent names that use. Silence from the subject is not a grant.",
+    ),
+    "music_rights": (
+        "Pass {n}. The {note} cue separates the composition from the recorded take. The {role} ships only the take named by the {grant}.",
+        "Pass {n}. A {place} scene that plays {note} keeps the music grant with the cue id. A new mix does not replace that grant.",
+    ),
+    "asset_rights": (
+        "Pass {n}. The {asset} enters the {place} build only with a {grant} that covers the shipped revision. A preview file is not that grant.",
+        "Pass {n}. The {role} traces the {item_color} {item} back to its author and its {grant}. A recolor does not create a new owner.",
+    ),
+    "sea_map": (
+        "Pass {n}. The seamap for the {place} marks deep water, the shore, and the {item} rock. A chart that never meets the shore is not a harbor.",
+        "Pass {n}. The {role} stores the seamap variant beside the {place} chart. A coast change rewrites the seam and the elevation together.",
+    ),
+    "mountain_map": (
+        "Pass {n}. The mountain map for the {place} has a peak, a valley, and a pass. The peak stays higher than the valley on every variant.",
+        "Pass {n}. The {role} marks the cliff at the {place} and the stair that crosses it. A picture of the ridge does not replace that height.",
+    ),
+    "cave_map": (
+        "Pass {n}. The cave map for the {place} starts at one entrance. Every floor cell connects back to that entrance, and a wall is not a step.",
+        "Pass {n}. Depth in the {place} cave is the step count from the mouth. A pool is one step deeper than the floor beside it.",
+    ),
+    "elevation_map": (
+        "Pass {n}. The elevation map for the {place} stores a height on every cell. A walk reads that height, and the drawing does not invent a second one.",
+        "Pass {n}. A ramp, a hill, a valley, a plateau, and a terrace are variants of the same {place} grid. Each cell still has one height.",
+    ),
+    "adventure_map": (
+        "Pass {n}. The adventure map for the {place} links original screens across seams. A height change above one step is a stair, and the return uses the opposite seam.",
+        "Pass {n}. The {role} names each screen on the {place} overworld. A coast, a ridge, and a cave mouth can share the map without copying another game.",
+    ),
+    "homebrew_map": (
+        "Pass {n}. The homebrew map for the {place} has one home cell and one maker key. Every trail connects back to that home, and the {role} writes the key.",
+        "Pass {n}. A route, a camp, a ruin, and a ford are variants of the same {place} homebrew map. The home cell stays singular.",
+    ),
+    "tabletop_map": (
+        "Pass {n}. The tabletop map for the {place} uses one square as five feet. Cover stops a shot and does not stop a step.",
+        "Pass {n}. The {role} marks difficult ground and blocking ground on the {place} table. A drawing without that scale is not the map.",
+    ),
+    "dungeon_map": (
+        "Pass {n}. The dungeon map for the {place} links original rooms by doors. Every room connects to the entry, and a door returns the same way.",
+        "Pass {n}. The {role} keys the {place} rooms without copying a commercial bestiary. A door that does not return is not a finished link.",
+    ),
+    "jeeves_cognition": (
+        "Pass {n}. Jeeves keeps a claim about the {place} uncertain until the {asset} evidence is written down. A missing observation does not become a fact.",
+        "Pass {n}. The {role} asks Jeeves for the next {verb}. The plan reads the written rule first, and a tool result stays an observation rather than a new goal.",
+    ),
 }
 
 
@@ -407,16 +509,17 @@ def domains() -> tuple[str, ...]:
 
 
 def legal_source_groups() -> dict[str, tuple[str, ...]]:
-    """Every original domain, once. Track groups plus the domains that sit outside them.
+    """Every original domain, once, grouped by the track that measures it.
 
-    These are the lessons the fine-tune may read. Holdout lines are not a source.
+    A domain that is not on a track is reported under ``adjacent``. An empty
+    adjacent set is valid: the tracks then cover the corpus. Holdout lines
+    are not a source.
     """
     tracked = {name for names in TRACKS.values() for name in names}
     groups = {track: tuple(names) for track, names in TRACKS.items()}
     adjacent = tuple(name for name in TEMPLATES if name not in tracked)
-    if not adjacent:
-        raise RuntimeError("adjacent legal sources are missing")
-    groups["adjacent"] = adjacent
+    if adjacent:
+        groups["adjacent"] = adjacent
     covered = [name for names in groups.values() for name in names]
     if sorted(covered) != sorted(TEMPLATES) or len(covered) != len(set(covered)):
         raise RuntimeError("legal sources do not match the corpus domains")
@@ -426,7 +529,7 @@ def legal_source_groups() -> dict[str, tuple[str, ...]]:
 def focus_weights() -> dict[str, float]:
     """Legal, coding, and the review domains are sampled ahead of the rest."""
     weights = {domain: 1.0 for domain in TEMPLATES}
-    for name in ("legal", "coding"):
+    for name in ("legal", "coding", *TRACKS["rights"]):
         weights[name] = 3.0
     for name in TRACKS["review"]:
         weights[name] = 2.5
@@ -450,6 +553,14 @@ def validate_templates() -> dict[str, int]:
     required = {
         "legal",
         "coding",
+        "copyright",
+        "license",
+        "trademark",
+        "attribution",
+        "age_rating",
+        "likeness",
+        "music_rights",
+        "asset_rights",
         "proofreading",
         "syntax",
         "errors",
