@@ -29,6 +29,10 @@ class NativeEnduranceTests(NativeQuestBatchTests):
             self.assertGreater(report["peak_measured_vault_disk_bytes"],0)
             self.assertTrue(all(row["cycle_wall_elapsed_ns"]>0 for row in report["cycle_evidence"]))
             self.assertEqual(len(report["cycle_evidence"]),12)
+            self.assertEqual(len(report["final_retained_history_audit_digest"]),64)
+            self.assertTrue(all(
+                item["retained_history_verified_frames"]==item["replayed_through"]
+                for item in report["cycle_evidence"]))
             self.assertEqual(report["cycle_evidence"][-1]["replayed_through"],4)
             self.assertEqual(len(report["receipt_digest"]),64)
             with NativeSessionVault(dest,session_id=self.approved["session_id"]) as reopened:

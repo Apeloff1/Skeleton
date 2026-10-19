@@ -93,10 +93,16 @@ def exercise_native_session_endurance(
             resumed=reader.recover(
                 journal,pages,quest_graph,approvals,actor_id=actor_id,
                 scene_candidate_digest=scene_candidate_digest)
+            history_proof=reader.audit_retained_history(
+                journal,pages,quest_graph,approvals,actor_id=actor_id,
+                scene_candidate_digest=scene_candidate_digest)
         successful_restarts+=1
         if (resumed["frame"]!=target
             or resumed["checkpoint"]!=batch["head_checkpoint"]
-            or resumed["vault_receipt_digest"]!=saved_root):
+            or resumed["vault_receipt_digest"]!=saved_root
+            or history_proof["head_receipt_digest"]!=saved_root
+            or history_proof["ancestry_receipts_verified"]!=rotate["archived_receipts"]
+            or history_proof["retained_snapshots_cold_replayed"]!=rotate["retained_snapshots"]):
             raise NativeSessionVaultError("post-restart game save replay changed")
         measured_cycle_ns=time.monotonic_ns()-cycle_start_ns
         database_bytes=sum(
@@ -121,6 +127,8 @@ def exercise_native_session_endurance(
             "vault_retained_snapshots":rotate["retained_snapshots"],
             "vault_ancestry_receipts":rotate["archived_receipts"],
             "cold_recovery_audit_digest":resumed["independent_cold_audit_digest"],
+            "retained_history_audit_digest":history_proof["receipt_digest"],
+            "retained_history_verified_frames":history_proof["last_cold_replayed_frame"],
         }
         item["receipt_digest"]=_sha(item)
         journal_rows.append(item)
@@ -142,6 +150,7 @@ def exercise_native_session_endurance(
         "source_head_frame":head,
         "final_quest_checkpoint_digest":checkpoint["game_checkpoint_digest"],
         "final_vault_receipt_digest":saved_root,
+        "final_retained_history_audit_digest":checkpoint["retained_history_audit_digest"],
         "on_disk_vault_bytes":vault_path.stat().st_size,
         "measured_elapsed_ns":elapsed,
         "peak_cycle_elapsed_ns":max(x["cycle_wall_elapsed_ns"] for x in journal_rows),

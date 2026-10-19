@@ -271,6 +271,9 @@ jobs:
           assert report["crash_rollbacks_executed"]>=1
           assert report["cycle_evidence"][-1]["replayed_through"]==report["source_head_frame"]
           assert len(report["final_vault_receipt_digest"])==64
+          assert len(report["final_retained_history_audit_digest"])==64
+          assert all(e["retained_history_verified_frames"]==e["replayed_through"]
+                     for e in report["cycle_evidence"])
           assert report["peak_cycle_elapsed_ns"]>0
           assert report["peak_measured_vault_disk_bytes"]<=33554432
           print(json.dumps({"native_endurance_restarts":report["cycles_executed"],
