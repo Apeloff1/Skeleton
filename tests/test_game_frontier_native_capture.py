@@ -86,7 +86,7 @@ class NativeCaptureTests(unittest.TestCase):
                         'FileAccess.open("user://frontier_native_physics.jsonl"',
                         "Time.get_ticks_usec()",
                         "Engine.physics_ticks_per_second",
-                        '"world_xyz_m": [pos.x, -pos.z, pos.y]',
+                        '"world_xyz_m": xyz',
                         "untrusted_native_candidate_observation_not_attested"):
             self.assertIn(snippet,code)
         with self.assertRaises(FrontierGodotError):
