@@ -25,7 +25,7 @@ var _cloud_step_s: float = 1.0
 var _cloud_duration_s: float = 1.0
 
 func _vec(data: Array) -> Vector3:
-    return Vector3(float(data[0]), float(data[1]), float(data[2]))
+    return Vector3(float(data[0]), float(data[2]), -float(data[1]))
 
 func _ready() -> void:
     var path := "res://frontier/data/scene.json"
@@ -40,16 +40,47 @@ func _ready() -> void:
     _create_character(data["geometry"], data["colliders"])
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
-    var camera := Camera3D.new()
-    camera.position = Vector3(0, 5, 12)
-    add_child(camera)
-    camera.look_at(Vector3(0, 1, 0))
-    camera.current = true
-    var sunlight := DirectionalLight3D.new()
-    sunlight.rotation_degrees = Vector3(-45, 30, 0)
-    add_child(sunlight)
+    _create_camera(data.get("projection", {}), data.get("world_variant", {}))
+    _create_lighting(data.get("world_variant", {}))
     _cloud_step_s = float(data["cloud_step_s"])
     _cloud_duration_s = float(data["cloud_duration_s"])
+
+func _create_camera(spec: Dictionary, variant: Dictionary) -> void:
+    var camera := Camera3D.new()
+    camera.name = "FrontierCamera"
+    var mode: String = str(spec.get("mode", "3d"))
+    if mode == "top_down":
+        camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+        camera.size = 16.0
+        camera.position = Vector3(0, 18, .01)
+        add_child(camera)
+        camera.look_at(Vector3(0, 0, 0), Vector3(0, 0, -1))
+    elif mode == "platformer":
+        camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+        camera.size = 12.0
+        camera.position = Vector3(0, 2.5, 16)
+        add_child(camera)
+        camera.look_at(Vector3(0, 2, 0))
+    else:
+        camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+        camera.position = Vector3(9, 6, 16)
+        if mode.begins_with("2."):
+            var depth_weight := float(mode.replace("2.", "").replace("d", "")) / 10.0
+            camera.fov = lerp(43.0, 72.0, depth_weight)
+            camera.position.z = lerp(20.0, 12.0, depth_weight)
+        if str(variant.get("family", "")) == "lensed":
+            camera.fov = clamp(camera.fov + 12.0 * float(variant.get("intensity", 0.0)),
+                               20.0, 100.0)
+        add_child(camera)
+        camera.look_at(Vector3(0, 1, 0))
+    camera.current = true
+
+func _create_lighting(variant: Dictionary) -> void:
+    var sunlight := DirectionalLight3D.new()
+    sunlight.rotation_degrees = Vector3(-45, 30, 0)
+    sunlight.shadow_enabled = true
+    sunlight.light_energy = max(.03, float(variant.get("luminance", .7)) * 1.4)
+    add_child(sunlight)
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]
@@ -94,9 +125,9 @@ func _create_clouds(tracks: Array) -> void:
         var material := StandardMaterial3D.new()
         material.albedo_color = Color(0.89, 0.93, 1.0, float(track["opacity"]))
         material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-        material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
         instance.material_override = material
-        instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
         add_child(instance)
         _cloud_visuals.append(instance)
     _update_clouds()
@@ -115,7 +146,7 @@ func _update_clouds() -> void:
         cloud.position = Vector3(
             lerp(float(first["x_m"]), float(second["x_m"]), blend) / 100.0,
             float(_cloud_tracks[i]["altitude_m"]) / 100.0,
-            lerp(float(first["y_m"]), float(second["y_m"]), blend) / 100.0
+            -lerp(float(first["y_m"]), float(second["y_m"]), blend) / 100.0
         )
         var stretch := lerp(float(first["stretch"]), float(second["stretch"]), blend)
         cloud.scale = Vector3(max(.1, stretch), .4, max(.1, stretch) * .8)
@@ -209,12 +240,22 @@ def emit_frontier_godot_overlay(
         }
         for original, samples in zip(clouds, path)
     ]
+    world = dict(manifest["world"]["cell"])
+    variant = manifest.get("world_variant")
+    if isinstance(variant, Mapping):
+        for key in ("temperature", "humidity", "sky_island", "elevation"):
+            if key in variant:
+                world[key] = variant[key]
     payload = {
         "schema": "skeleton.game.frontier_godot_overlay.v1",
         "origin_candidate_digest": actual,
         "game_era": manifest["render"]["era"],
         "requested_fps": manifest["render"]["fps"],
-        "world": manifest["world"]["cell"],
+        "world": world,
+        "world_variant": variant if isinstance(variant, Mapping) else {},
+        "projection": manifest.get("projection") or {},
+        "character_physics": manifest.get("character_physics"),
+        "ray_lighting": manifest.get("ray_lighting", []),
         "geometry": {
             "vertices": [[v.x, v.y, v.z] for v in vertices],
             "triangles": [list(face) for face in triangles],
