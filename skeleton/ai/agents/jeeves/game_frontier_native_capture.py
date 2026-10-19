@@ -1,0 +1,211 @@
+"""Ingest *observed* Godot physics samples into GDD verified frame journal.
+
+The Godot 4 exporter writes opt-in fixed-tick JSONL samples after the native
+rigid-body solver advances. This importer verifies schema, source scene,
+actor/asset allow-list, monotonic capture clocks and physically plausible
+motion, then delegates to the canonical FrameReceiptJournal for atomic
+frame/evidence/native-source commit. A file is evidence of reported runtime
+observations, NOT remote hardware attestation or a rendered-pixel proof.
+"""
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+from typing import Mapping, Iterable
+
+from .game_frontier_frame_coherence import FrameObject
+from .game_frontier_production import Vec3
+from .game_frontier_receipt_journal import FrameReceiptJournal, FrameJournalError
+from .game_frontier_native_chunks import inspect_native_chunks
+from .game_frontier_native_control import verify_native_reference_input
+from .game_frontier_native_zones import (
+    normalize_gameplay_zones, inspect_native_gameplay_zones, NativeZoneError,
+)
+from .game_frontier_native_fields import (
+    normalize_native_force_fields,inspect_native_force_fields,NativeForceFieldError,
+)
+
+
+class NativeObservationError(ValueError):
+    pass
+
+
+def _triplet(data: object, name: str) -> Vec3:
+    if (not isinstance(data,list) or len(data)!=3 or
+        any(type(v) not in (int,float) or not math.isfinite(v)
+            or abs(v)>1e8 for v in data)):
+        raise NativeObservationError(f"{name}: finite native XYZ required")
+    return Vec3(*[float(v) for v in data])
+
+
+class GodotPhysicsCaptureIngestor:
+    """Validated sample bridge to durable engine-neutral chunk receipts.
+
+    Allowed asset IDs come from the authorized GDD/scene owner, never from
+    the untrusted observation file.
+    """
+
+    def __init__(
+        self, journal: FrameReceiptJournal, *,
+        candidate_digest: str,
+        allowed_assets: Mapping[str,str],
+        max_samples: int = 1_000_000,
+        expected_reference_controls: Mapping | None = None,
+        controlled_actor_id: str | None = None,
+        expected_gameplay_zones: object = (),
+        expected_gameplay_force_fields: object = (),
+    ) -> None:
+        if not isinstance(journal,FrameReceiptJournal):
+            raise NativeObservationError("durable canonical frame journal required")
+        if (type(candidate_digest) is not str or len(candidate_digest)!=64 or
+            any(c not in "0123456789abcdef" for c in candidate_digest)):
+            raise NativeObservationError("qualified scene candidate digest required")
+        if (not isinstance(allowed_assets,Mapping) or
+            not 1<=len(allowed_assets)<=256 or
+            any(type(k) is not str or not k or len(k)>128 or
+                type(v) is not str or len(v)!=64 or
+                any(c not in "0123456789abcdef" for c in v)
+                for k,v in allowed_assets.items())):
+            raise NativeObservationError("signed source actor asset digest catalog required")
+        if type(max_samples) is not int or not 1<=max_samples<=10_000_000:
+            raise NativeObservationError("bounded native ingestion budget required")
+        self.journal=journal
+        self.candidate_digest=candidate_digest
+        self.assets=dict(allowed_assets)
+        self.max_samples=max_samples
+        if expected_reference_controls is not None and (
+            not isinstance(expected_reference_controls,Mapping) or
+            controlled_actor_id not in self.assets):
+            raise NativeObservationError("authorized source controller catalog required")
+        self.expected_reference_controls=(
+            dict(expected_reference_controls) if expected_reference_controls is not None
+            else None)
+        self.controlled_actor_id=controlled_actor_id
+        try:
+            self.expected_gameplay_force_fields=normalize_native_force_fields(
+                expected_gameplay_force_fields,allowed_actors=set(self.assets))
+        except NativeForceFieldError as exc:
+            raise NativeObservationError("unauthorized native physics field catalog") from exc
+        try:
+            self.expected_gameplay_zones=normalize_gameplay_zones(
+                expected_gameplay_zones,allowed_actors=set(self.assets))
+        except NativeZoneError as exc:
+            raise NativeObservationError("unauthorized game zone source catalog") from exc
+
+    def ingest(self, native: Mapping, *, resume: bool = False) -> dict:
+        if not isinstance(native,Mapping):
+            raise NativeObservationError("typed Godot runtime sample required")
+        head=self.journal.stats()["head"]
+        tick=native.get("native_tick")
+        if self.expected_gameplay_zones:
+            try:
+                prior_tick=tick-1 if type(tick) is int and tick>0 else -1
+                prior_native=(self.journal.native_sample(prior_tick)
+                              if prior_tick>=0 else None)
+                inspect_native_gameplay_zones(
+                    native,expected_catalog=self.expected_gameplay_zones,
+                    previous=prior_native)
+            except NativeZoneError as exc:
+                raise NativeObservationError("native gameplay zone source or transition forged") from exc
+        elif "native_zone_schema" in native:
+            raise NativeObservationError("unauthorized native gameplay zone telemetry")
+        if self.expected_gameplay_force_fields:
+            try:
+                previous=self.journal.native_sample(tick-1) if type(tick) is int and tick>0 else None
+                inspect_native_force_fields(
+                    native,previous=previous,
+                    expected_catalog=self.expected_gameplay_force_fields)
+            except NativeForceFieldError as exc:
+                raise NativeObservationError("native gameplay physics field receipt forged") from exc
+        elif "native_force_field_schema" in native:
+            raise NativeObservationError("unauthorized native physics force field telemetry")
+        if self.expected_reference_controls is not None:
+            try:
+                verify_native_reference_input(
+                    native,self.expected_reference_controls,
+                    actor_id=self.controlled_actor_id)
+            except ValueError as exc:
+                raise NativeObservationError("source-bound controller report invalid") from exc
+        if type(resume) is not bool:
+            raise NativeObservationError("explicit boolean resume policy required")
+        if resume and type(tick) is int and 0 <= tick <= head:
+            previous=self.journal.native_sample(tick)
+            if previous != dict(native):
+                raise NativeObservationError("resumed source frame differs from committed capture")
+            prior_frame,prior_evidence=self.journal.load(tick)
+            native_chunks=self.journal.native_chunk_evidence(tick)
+            if (prior_frame.frame_index!=tick or
+                prior_evidence.get("source_frame_digest")!=prior_frame.receipt_digest or
+                native_chunks!=inspect_native_chunks(
+                    native,expected_chunk_size_m=self.journal.chunk_size_m,
+                    require_native_partition="native_chunks" in native)):
+                raise NativeObservationError("resumed native frame has invalid evidence")
+            return {"frame":tick,"frame_digest":prior_frame.receipt_digest,
+                    "chunk_evidence_digest":prior_evidence["receipt_digest"],
+                    "native_chunk_evidence_digest":native_chunks["receipt_digest"],
+                    "reused_existing":True,"track":self.journal.track}
+        if head+1>=self.max_samples:
+            raise NativeObservationError("native capture ingestion budget exhausted")
+        if (native.get("schema")!="skeleton.game.native_physics_observation.v1" or
+            native.get("native_engine")!="godot4_physics" or
+            native.get("authority")!="untrusted_native_candidate_observation_not_attested" or
+            native.get("scene_candidate_digest")!=self.candidate_digest or
+            native.get("signed_gdd_digest")!=self.journal.gdd.source_digest or
+            type(native.get("native_tick")) is not int or
+            native["native_tick"]!=head+1 or
+            type(native.get("ticks_usec")) is not int or
+            native["ticks_usec"]<0 or
+            native.get("fps") not in (30,50,60,120)):
+            raise NativeObservationError("native source/schema/FPS/tick does not match journal")
+        prior=self.journal.native_sample(head) if head>=0 else None
+        if prior is not None:
+            if (native["ticks_usec"]<=prior["ticks_usec"] or
+                native["scene_candidate_digest"]!=prior["scene_candidate_digest"]):
+                raise NativeObservationError("native fixed-tick clock or scene regressed")
+        submitted=native.get("actors")
+        if not isinstance(submitted,list) or len(submitted)!=len(self.assets):
+            raise NativeObservationError("all authorized source actors must be observed")
+        actual={}
+        for item in submitted:
+            if not isinstance(item,Mapping):
+                raise NativeObservationError("native actor object required")
+            key=item.get("id")
+            if key not in self.assets or key in actual or (
+                item.get("source_digest")!=self.assets[key]):
+                raise NativeObservationError("unknown, duplicate, or remapped native actor")
+            xyz=_triplet(item.get("world_xyz_m"),"native world position")
+            velocity=_triplet(item.get("velocity_xyz_mps"),"native velocity")
+            actual[key]=FrameObject(key,xyz,velocity,self.assets[key])
+        if len(actual)!=len(self.assets):
+            raise NativeObservationError("native capture actor set incomplete")
+        try:
+            return self.journal.advance(
+                tuple(actual[k] for k in sorted(actual)),
+                fps=native["fps"],native_capture=dict(native))
+        except (FrameJournalError,ValueError) as exc:
+            raise NativeObservationError("Godot fixed-step source failed dual frame/chunk checks") from exc
+
+    def ingest_jsonl(self, lines: Iterable[str], *,
+                     max_bytes_per_line: int = 128*1024,
+                     resume: bool = False) -> tuple[dict,...]:
+        results=[]
+        for line in lines:
+            if (type(line) is not str or
+                len(line.encode("utf-8"))>max_bytes_per_line):
+                raise NativeObservationError("bounded UTF-8 native JSONL required")
+            try:
+                record=json.loads(line)
+            except (TypeError,ValueError) as exc:
+                raise NativeObservationError("malformed Godot sample line") from exc
+            results.append(self.ingest(record,resume=resume))
+        return tuple(results)
+
+    def ingest_file(self, path: str | Path, *,
+                    resume: bool = False) -> tuple[dict,...]:
+        """Stream from an explicitly selected file; never invoke device GPS."""
+        selected=Path(path)
+        if not selected.is_file() or selected.is_symlink():
+            raise NativeObservationError("regular Godot capture file required")
+        with selected.open("r",encoding="utf-8") as source:
+            return self.ingest_jsonl(source,resume=resume)
