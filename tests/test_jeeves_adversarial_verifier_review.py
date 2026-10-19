@@ -37,6 +37,9 @@ def test_adversarial_review_attacks_both_real_verifiers(with_miss):
     assert report.integrity_attacks >= 3
     assert report.scope_attacks >= 2
     assert all(x.rejected for x in report.attacks)
+    attacks = {item.name for item in report.attacks}
+    assert {"goal_policy_downgrade", "fabricated_compaction_savings",
+            "reused_id_modified_result"}.issubset(attacks)
     assert len(report.digest) == 64
 
 
