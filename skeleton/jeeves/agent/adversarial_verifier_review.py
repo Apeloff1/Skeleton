@@ -136,6 +136,20 @@ class AdversarialVerifierReviewer:
         attack_integrity("page_counter_forgery", replace(
             prepared, page_count=prepared.page_count + 1
         ))
+        attack_integrity("goal_policy_downgrade", prepared, changed_goal=replace(
+            goal, metadata={**goal.metadata, "delivery_kind": "non_code"}
+        ))
+        attack_integrity("fabricated_compaction_savings", replace(
+            prepared, freed_chars=prepared.freed_chars + 1
+        ))
+        if prepared.active_observations:
+            active = prepared.active_observations[0]
+            corrupted_active = replace(prepared, active_observations=(
+                replace(active, payload={"forged": True}),
+                *prepared.active_observations[1:],
+            ))
+            attack_integrity("reused_id_modified_result", corrupted_active)
+            attack_scope("reused_id_modified_result", corrupted_active)
         if originals:
             attack_integrity("lost_live_observation", replace(
                 prepared, active_observations=()
