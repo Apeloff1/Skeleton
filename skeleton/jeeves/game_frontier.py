@@ -626,6 +626,18 @@ def compile_frontier_scene(
             "action_reasons": list(next_action.rationale),
             "action_evidence": list(next_action.evidence_digests),
             "authority": "suggestions_only",
+            "signed_gdd_digest": (frame_receipt.gdd_digest
+                                  if frame_receipt is not None else None),
+            "verified_frame_digest": (frame_receipt.receipt_digest
+                                       if frame_receipt is not None else None),
+            "frame_context_notes": [{
+                "source_law_index": n.world_law_index,
+                "source_law_text": frame_gdd.world_laws[n.world_law_index],
+                "design_context": n.text,
+                "review_status": n.author_kind,
+            } for n in frame_receipt.note_from_previous]
+            if frame_receipt is not None else [],
+            "gdd_context_authority": "AI_proposal_no_auto_canon_promotion",
         },
         "preemptive_input": prediction,
         "world_variant": ({
