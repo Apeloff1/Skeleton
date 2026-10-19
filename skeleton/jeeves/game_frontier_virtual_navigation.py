@@ -12,7 +12,7 @@ from hashlib import sha256
 import heapq
 import json
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping
 
 from .game_frontier_production import Vec3
 
@@ -426,6 +426,7 @@ def compose_virtual_navigation(
     frame: "FrameReceipt | None" = None,
     gdd: "GDDSource | None" = None,
     previous_frame: "FrameReceipt | None" = None,
+    previous_navigation: Mapping | None = None,
 ) -> dict:
     """In-world GPS plus independent survey and checked frame/GDD attachment.
 
@@ -445,6 +446,25 @@ def compose_virtual_navigation(
                   if o.entity_id == request.actor_id]
         if len(actors) != 1 or _norm(actors[0].position-request.actor_truth) > 1e-6:
             raise VirtualPositionError("virtual GPS actor diverged from verified frame")
+    if previous_navigation is not None:
+        if frame is None or previous_frame is None or gdd is None:
+            raise VirtualPositionError("prior virtual GPS requires exact paired GDD frames")
+        prior = previous_navigation
+        if not isinstance(prior, Mapping):
+            raise VirtualPositionError("prior GPS receipt must be a mapping")
+        expected = _digest({k:v for k,v in prior.items() if k!="receipt_digest"})
+        if (prior.get("receipt_digest") != expected or
+            prior.get("source") != "fictional_simulated_beacons_no_device_gps" or
+            prior.get("device_location_used") is not False or
+            prior.get("double_verified") is not True or
+            prior.get("frame_receipt_digest") != previous_frame.receipt_digest or
+            prior.get("frame_index") != previous_frame.frame_index or
+            prior.get("gdd_digest") != gdd.source_digest or
+            prior.get("world_id") != request.world.world_id or
+            prior.get("realm_id") != request.world.realm_id or
+            prior.get("world_map_digest") != request.world.identity() or
+            prior.get("actor_id") != request.actor_id):
+            raise VirtualPositionError("virtual navigation frame/map/source chain broken")
     ranges = simulated_ranges(request.actor_truth,request.beacons,
                               noise_seed=request.noise_seed,
                               blocked_ids=request.blocked_beacons)
@@ -471,6 +491,23 @@ def compose_virtual_navigation(
     route = (map_route(request.world,truth_cell,request.destination_tile)
              if request.destination_tile is not None else None)
     lat,lon = request.world.fictional_coordinates(fix.position)
+    if previous_navigation is not None:
+        prior_xyz = previous_navigation.get("world_xyz_m")
+        if (not isinstance(prior_xyz,(list,tuple)) or len(prior_xyz)!=3):
+            raise VirtualPositionError("prior navigation position missing")
+        previous_xyz = Vec3(*(_number(v,"prior virtual coordinate") for v in prior_xyz))
+        previous_actor = [o for c in previous_frame.chunks for o in c.objects
+                          if o.entity_id == request.actor_id]
+        if len(previous_actor)!=1:
+            raise VirtualPositionError("prior frame actor identity missing")
+        true_distance = _norm(request.actor_truth-previous_actor[0].position)
+        reported_distance = _norm(fix.position-previous_xyz)
+        allowed = true_distance + 3*(
+            fix.horizontal_uncertainty_m +
+            _number(previous_navigation.get("horizontal_uncertainty_m"),
+                    "prior virtual fix uncertainty",.0000001,100000))
+        if reported_distance > allowed + .001:
+            raise VirtualPositionError("virtual GPS discontinuity exceeds frame motion")
     evidence = {
         "schema":"skeleton.game.virtual_map_gps.v1",
         "world_id":request.world.world_id,"realm_id":request.world.realm_id,
@@ -505,7 +542,10 @@ def compose_virtual_navigation(
             "visited_nodes":route.visited_nodes,
         } if route else None),
         "frame_receipt_digest":frame.receipt_digest if frame else None,
+        "frame_index":frame.frame_index if frame else None,
         "gdd_digest":gdd.source_digest if gdd else None,
+        "previous_navigation_receipt_digest": (
+            previous_navigation.get("receipt_digest") if previous_navigation else None),
         "double_verified":bool(frame is None or
             (frame.verifier_a_integrity and frame.verifier_b_coherence)),
         "device_location_used":False,
