@@ -503,6 +503,105 @@ class FrameReceiptJournal:
             self._db.execute("ROLLBACK")
             raise
 
+    def evidence_page(
+        self, *, start_frame: int = 0, limit: int = 128,
+        actor_id: str | None = None,
+        chunk_xy: tuple[int,int] | None = None,
+        changes_only: bool = False,
+    ) -> dict:
+        """Browse bounded verified chunk/native evidence without raw frame dumps.
+
+        Each listed frame is checked against its predecessor source; source
+        hashes and GDD links are included for UI timeline navigation.
+        Pagination uses a monotone source frame cursor, not query offsets.
+        """
+        if (type(start_frame) is not int or start_frame<0 or
+            type(limit) is not int or not 1<=limit<=512 or
+            type(changes_only) is not bool or
+            actor_id is not None and (type(actor_id) is not str or
+                not 1<=len(actor_id)<=128) or
+            chunk_xy is not None and (
+                not isinstance(chunk_xy,tuple) or len(chunk_xy)!=2 or
+                any(type(x) is not int for x in chunk_xy))):
+            raise FrameJournalError("bounded typed evidence query required")
+        head,_=self._head()
+        if start_frame>head+1:
+            raise FrameJournalError("timeline cursor beyond current history")
+        results=[]
+        end=min(head+1,start_frame+limit)
+        for index in range(start_frame,end):
+            frame,proof=self.load(index)
+            prior,prior_proof=(self.load(index-1) if index else (None,None))
+            from .game_frontier_chunk_evidence import verify_frame_chunk_receipts
+            if not all(verify_frame_chunk_receipts(
+                proof,frame,self.gdd,previous=prior,
+                previous_evidence=prior_proof,
+                chunk_size_m=self.chunk_size_m,
+                max_speed_mps=self.max_speed_mps)):
+                raise FrameJournalError("timeline chunk source verification failed")
+            referenced=[]
+            movements=set()
+            for chunk in proof["receipts"]:
+                members=chunk["source_entities"]
+                touched=(
+                    chunk["arriving_entities"]+
+                    chunk["departing_entities"]+
+                    chunk["moved_within_chunk"])
+                movements.update(touched)
+                if ((actor_id is None or actor_id in members or
+                     actor_id in touched) and
+                    (chunk_xy is None or tuple(chunk["chunk_xy"])==chunk_xy)):
+                    referenced.append(chunk["receipt_digest"])
+            for retired in proof.get("retired_chunks",[]):
+                names=[a["entity_id"] for a in retired["departing_entities"]]
+                movements.update(names)
+                if ((actor_id is None or actor_id in names) and
+                    (chunk_xy is None or tuple(retired["chunk_xy"])==chunk_xy)):
+                    referenced.append(retired["receipt_digest"])
+            if not referenced or changes_only and not movements:
+                continue
+            native=self.native_sample(index)
+            native_proof=self.native_chunk_evidence(index)
+            if (native is None)!=(native_proof is None):
+                raise FrameJournalError("native timeline evidence incomplete")
+            if native is not None:
+                self._validate_native_sample(frame,native)
+                if native_proof!=inspect_native_chunks(
+                    native,expected_chunk_size_m=self.chunk_size_m,
+                    require_native_partition="native_chunks" in native):
+                    raise FrameJournalError("native timeline chunk source forged")
+            delta=self.frame_delta(index)
+            result={
+                "frame":index,"fps":frame.fps,
+                "frame_digest":frame.receipt_digest,
+                "signed_gdd_digest":self.gdd.source_digest,
+                "chunk_receipts":referenced,
+                "moved_actor_ids":sorted(movements),
+                "migration_count":proof["cross_chunk_migrations"],
+                "retired_chunk_count":proof.get("retired_chunk_count",0),
+                "gdd_note_count":proof["source_note_count"],
+                "chunk_evidence_digest":proof["receipt_digest"],
+                "native_evidence_digest":(
+                    native_proof["receipt_digest"] if native_proof else None),
+                "delta_digest":delta["receipt_digest"] if delta else None,
+                "authority":"verified_source_evidence_cursor_not_native_gpu_proof",
+            }
+            results.append(result)
+        output={
+            "schema":"skeleton.game.chunk_evidence_timeline_page.v1",
+            "track":self.track,
+            "start_frame":start_frame,
+            "through_frame":end-1,
+            "next_frame":end if end<=head else None,
+            "entries":results,
+            "source_gdd_digest":self.gdd.source_digest,
+            "filters":{"actor_id":actor_id,
+                       "chunk_xy":list(chunk_xy) if chunk_xy else None,
+                       "changes_only":changes_only},
+        }
+        output["receipt_digest"]=digest(output)
+        return output
+
     def stats(self) -> dict:
         head,fps=self._head()
         blobs=self._db.execute("SELECT COUNT(*),SUM(LENGTH(content)) FROM frontier_blobs").fetchone()
