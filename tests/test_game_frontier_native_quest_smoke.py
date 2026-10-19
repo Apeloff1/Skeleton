@@ -66,7 +66,7 @@ class NativeQuestSmokeFixtureTests(unittest.TestCase):
                 begin=next(p for p in pages if p.page_id=="begin_sky_trial")
                 finish=next(p for p in pages if p.page_id=="complete_sky_trial")
                 self.assertEqual({a.kind for a in begin.actions},
-                                 {"start_quest","set_flag","craft_item"})
+                                 {"start_quest","set_flag","craft_item","show_dialogue"})
                 self.assertEqual(finish.actions[0].value,"sky_trial:finished")
                 self.assertEqual(finish.required_flags,(("quest_active",True),))
                 self.assertEqual(len(authored_page_digest(pages)),64)

@@ -303,9 +303,10 @@ jobs:
           import json,sys
           from pathlib import Path
           proof=json.loads(Path(sys.argv[1]).read_text())
-          assert proof["verified_engine_actions"]==4, proof
+          assert proof["verified_engine_actions"]==5, proof
           assert proof["verified_quest_count"]==1, proof
-          assert proof["verified_cue_count"]==0, proof
+          assert proof["verified_cue_count"]==1, proof
+          assert proof["verified_action_receipts"]==5, proof
           print(json.dumps({"godot_engine_dispatch_verified":True,
                             "verified_commands":proof["verified_engine_actions"],
                             "runtime_receipt":proof["engine_gameplay_receipt_sha256"]}))

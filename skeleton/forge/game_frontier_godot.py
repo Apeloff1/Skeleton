@@ -62,6 +62,10 @@ var _approved_gameplay_npc_emotions: Dictionary = {}
 var _approved_gameplay_cues: Array = []
 var _approved_quest_objectives: Dictionary = {}
 var _approved_quest_titles: Dictionary = {}
+var _approved_dialogue_queue: Array[String] = []
+var _approved_dialogue_cursor: int = 0
+var _approved_dialogue_panel: PanelContainer
+var _approved_dialogue_label: Label
 var _approved_gameplay_label: Label
 
 func _vec(data: Array) -> Vector3:
@@ -771,6 +775,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     result.flush()
     result.close()
     _create_approved_gameplay_inspector(accepted)
+    _create_approved_dialogue_view()
 
 
 func _create_approved_gameplay_inspector(record: Dictionary) -> void:
@@ -802,6 +807,64 @@ func _create_approved_gameplay_inspector(record: Dictionary) -> void:
     hud.add_child(inspector)
     add_child(hud)
     _approved_gameplay_label = inspector
+
+
+func _create_approved_dialogue_view() -> void:
+    _approved_dialogue_queue.clear()
+    _approved_dialogue_cursor = 0
+    for cue_item in _approved_gameplay_cues:
+        var cue: Dictionary = cue_item
+        if cue.get("kind", "") == "show_dialogue":
+            _approved_dialogue_queue.append(str(cue.get("cue", "")).substr(0, 1024))
+    if _approved_dialogue_queue.is_empty():
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedGameDialogueOverlay"
+    var panel := PanelContainer.new()
+    panel.name = "ApprovedGameDialogueCard"
+    panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+    panel.offset_left = 20
+    panel.offset_right = -20
+    panel.offset_top = -180
+    panel.offset_bottom = -20
+    var stack := VBoxContainer.new()
+    var line := Label.new()
+    line.name = "ApprovedDialogueText"
+    line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    line.custom_minimum_size = Vector2(320, 68)
+    line.add_theme_font_size_override("font_size", 20)
+    stack.add_child(line)
+    var advance_button := Button.new()
+    advance_button.name = "ContinueApprovedDialogue"
+    advance_button.text = "Continue (Enter / Space)"
+    advance_button.pressed.connect(_advance_approved_dialogue)
+    stack.add_child(advance_button)
+    panel.add_child(stack)
+    overlay.add_child(panel)
+    add_child(overlay)
+    _approved_dialogue_panel = panel
+    _approved_dialogue_label = line
+    _show_approved_dialogue()
+
+
+func _show_approved_dialogue() -> void:
+    if _approved_dialogue_label == null:
+        return
+    if _approved_dialogue_cursor >= _approved_dialogue_queue.size():
+        _approved_dialogue_panel.hide()
+        return
+    _approved_dialogue_label.text = (
+        "Verified dialogue " + str(_approved_dialogue_cursor + 1) + " / " +
+        str(_approved_dialogue_queue.size()) + "\n" +
+        _approved_dialogue_queue[_approved_dialogue_cursor]
+    )
+
+
+func _advance_approved_dialogue() -> void:
+    if _approved_dialogue_cursor >= _approved_dialogue_queue.size():
+        return
+    _approved_dialogue_cursor += 1
+    _show_approved_dialogue()
 
 
 func _native_chunk_less(a: Dictionary, b: Dictionary) -> bool:
@@ -1063,10 +1126,16 @@ func _apply_reference_controls() -> void:
     }
 
 func _unhandled_key_input(event: InputEvent) -> void:
-    if not _native_controls_enabled or not (event is InputEventKey):
+    if not (event is InputEventKey):
         return
     var key := event as InputEventKey
     if not key.pressed or key.echo:
+        return
+    if key.physical_keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE] and _approved_dialogue_panel != null and _approved_dialogue_panel.visible:
+        _advance_approved_dialogue()
+        get_viewport().set_input_as_handled()
+        return
+    if not _native_controls_enabled:
         return
     if key.physical_keycode == KEY_F:
         _native_field_preview_visible = not _native_field_preview_visible
