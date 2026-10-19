@@ -4,7 +4,7 @@ import json
 import unittest
 
 from skeleton.forge.game_frontier_godot import (
-    FrontierGodotError, emit_frontier_godot_overlay,
+    FrontierGodotError, emit_frontier_godot_overlay, attach_frontier_overlay,
 )
 from skeleton.jeeves.game_frontier import compile_frontier_scene
 from skeleton.jeeves.game_frontier_dynamics import (
@@ -92,6 +92,24 @@ class ForgeFrontierExportTests(unittest.TestCase):
         self.assertIn("camera.projection = Camera3D.PROJECTION_ORTHOGONAL", script)
         self.assertIn("return Vector3(float(data[0]), float(data[2]), -float(data[1]))", script)
         self.assertIn("data.get(\"projection\", {})", script)
+
+    def test_conflict_safe_attachment_preserves_project(self):
+        base = {
+            "project.godot": "[application]\\nconfig/name=\\\"Existing Game\\\"\\n",
+            "scenes/main.tscn": "existing canonical game scene",
+        }
+        candidate = source_scene(fps=60)
+        attached = attach_frontier_overlay(
+            base, candidate, cloud_path_duration_s=6)
+        self.assertEqual(attached["project.godot"], base["project.godot"])
+        self.assertEqual(attached["scenes/main.tscn"], base["scenes/main.tscn"])
+        self.assertEqual(len(attached), len(base) + 3)
+        self.assertEqual(attach_frontier_overlay(attached, candidate,
+                         cloud_path_duration_s=6), attached)
+        with self.assertRaises(FrontierGodotError):
+            attach_frontier_overlay({"project.godot": "",
+                                     "frontier/frontier_scene.tscn": "different"},
+                                    candidate)
 
     def test_exact_custody_rejects_tampered_manifest(self):
         with self.assertRaises(FrontierGodotError):
