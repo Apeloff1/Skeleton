@@ -10,6 +10,7 @@ on:
     paths:
       - "scripts/build_game_frontier_smoke.py"
       - "scripts/build_game_frontier_quest_smoke_approvals.py"
+      - "scripts/run_game_frontier_quest_tools.py"
       - "scripts/qualify_game_frontier_godot.py"
       - "scripts/run_game_frontier_capture.py"
       - "scripts/validate_game_frontier_native_smoke.py"
@@ -204,6 +205,52 @@ jobs:
           print(json.dumps({"replayed_and_resumed_native_quest":True,
                             "source_frames":old["source_prefix_verified_frames"],
                             "checkpoint_root":cursor["receipt_digest"]}))
+          PY
+            # The operator CLI's cold replay must reproduce the Godot quest.
+            quest_cli_args=(
+              --signed-gdd "$project/signed_gdd.json"
+              --scene-json "$project/frontier/data/scene.json"
+              --journal "$journal"
+              --event-pages-json "$project/native_rpg_pages.json"
+              --quest-graph-json "$project/native_quest_graph.json"
+              --quest-approvals-json "$RUNNER_TEMP/frontier-fixture-approved-$fps.json"
+              --actor-id hero
+              --frames-per-window 4
+            )
+            full_checkpoint="$RUNNER_TEMP/frontier-quest-inspect-$fps.json"
+            python scripts/run_game_frontier_quest_tools.py batch \
+              "${quest_cli_args[@]}" \
+              --checkpoint-output-json "$full_checkpoint" \
+              > "$RUNNER_TEMP/frontier-fullbatch-$fps.json"
+            python scripts/run_game_frontier_quest_tools.py audit \
+              "${quest_cli_args[@]}" --checkpoint-input-json "$full_checkpoint" \
+              > "$RUNNER_TEMP/frontier-questaudit-$fps.json"
+            python scripts/run_game_frontier_quest_tools.py inspect \
+              "${quest_cli_args[@]}" --checkpoint-input-json "$full_checkpoint" \
+              > "$RUNNER_TEMP/frontier-questview-$fps.json"
+            python - "$RUNNER_TEMP/frontier-fullbatch-$fps.json" "$RUNNER_TEMP/frontier-questaudit-$fps.json" "$RUNNER_TEMP/frontier-questview-$fps.json" "$RUNNER_TEMP/frontier-quest-session-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          bat,audit,view,mono=[json.loads(Path(p).read_text()) for p in sys.argv[1:]]
+          batch=bat["gameplay"]
+          evidence=audit["checkpoint_audit"]
+          objective=view["quest_journal"]
+          reference=mono["gameplay_session"]
+          assert batch["verified_frame_count"]==reference["source_prefix_verified_frames"]
+          assert batch["total_approved_events"]==reference["approved_page_count"]==2
+          assert batch["head_checkpoint"]["last_session_receipt_digest"]==reference["last_session_receipt_digest"]
+          assert batch["head_checkpoint"]["quests"]==reference["final_quests"]
+          assert batch["head_checkpoint"]["flags"]==reference["final_flags"]
+          assert evidence["source_replay_consistent"] is True
+          assert evidence["checkpoint_digest"]==batch["head_checkpoint"]["receipt_digest"]
+          assert objective["quests_completed"]==1
+          assert objective["quest_entries"][0]["stage_id"]=="finished"
+          assert objective["quest_entries"][0]["next_options"]==[]
+          assert objective["game_only_virtual_position_xyz_m"]
+          print(json.dumps({"godot_verified_objective_journal":True,
+                            "window_count":batch["window_count"],
+                            "source_frame_count":batch["verified_frame_count"],
+                            "audit_root":evidence["receipt_digest"]}))
           PY
             echo "#### Real Godot $fps Hz approved CI quest simulation" >> "$GITHUB_STEP_SUMMARY"
             echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
