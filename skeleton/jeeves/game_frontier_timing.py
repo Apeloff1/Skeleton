@@ -1,4 +1,4 @@
-"""Opt-in 30/50/120 presentation-rate bridge for existing Jeeves era engines.
+"""Opt-in 30/50/60/120 presentation-rate bridge for existing Jeeves era engines.
 
 Uses canonical DeterministicGameClock physics authority without replacing
 EngineEraProfile.tick_hz. Call advance_one_frame once per presentation interval.
@@ -27,7 +27,7 @@ class FrontierEraTiming:
 
     def __init__(self, era: str, *, fps: int):
         if type(fps) is not int or fps not in FPS_MODES:
-            raise FrontierDynamicsError("presentation mode must be 30, 50 or 120")
+            raise FrontierDynamicsError("presentation mode must be 30, 50, 60 or 120")
         self.presentation = PresentationClock(fps)
         self.simulation = DeterministicGameClock(era)
         policy = self.simulation.policy
