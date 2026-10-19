@@ -13,6 +13,7 @@ on:
       - "scripts/run_game_frontier_quest_tools.py"
       - "scripts/run_game_frontier_godot_dispatch.py"
       - "scripts/run_game_frontier_endurance.py"
+      - "scripts/verify_game_frontier_instruments.py"
       - "scripts/qualify_game_frontier_godot.py"
       - "scripts/run_game_frontier_capture.py"
       - "scripts/validate_game_frontier_native_smoke.py"
@@ -85,6 +86,33 @@ jobs:
               --scene-json "$project/frontier/data/scene.json" \
               --capture-jsonl "$capture" \
               --journal "$journal"
+            # Independently verify a second real Godot instrument stream
+            # against *each exact original physics tick* in the signed journal.
+            # This is not a screen/UI mock or actual device GPS data.
+            instrument_stream="$(find "$userdir" -type f \
+              -name frontier_virtual_instruments.jsonl -print -quit)"
+            test -n "$instrument_stream"
+            test -s "$instrument_stream"
+            python scripts/verify_game_frontier_instruments.py \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" \
+              --telemetry-jsonl "$instrument_stream" \
+              --actor-id hero --max-frames 20 \
+              > "$RUNNER_TEMP/frontier-game-instruments-$fps.json"
+            python - "$RUNNER_TEMP/frontier-game-instruments-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          proof=json.loads(Path(sys.argv[1]).read_text())
+          assert proof["verified_physics_frames"]>=4, proof
+          assert proof["expected_fps"] in (30,50,60,120)
+          assert len(proof["instrument_chain_head"])==64
+          assert len(proof["receipt_digest"])==64
+          print(json.dumps({"verified_native_instrument_frames":
+                                proof["verified_physics_frames"],
+                            "source_fps":proof["expected_fps"],
+                            "instrument_proof":proof["receipt_digest"]}))
+          PY
             python scripts/run_game_frontier_capture.py verify \
               --signed-gdd "$project/signed_gdd.json" \
               --scene-json "$project/frontier/data/scene.json" \
