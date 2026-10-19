@@ -29,6 +29,16 @@ from .game_frontier_motion import (
 from .game_frontier_lighting import (
     SurfaceSample, LightSource, RayOccluder, illuminate_scene,
 )
+from .game_frontier_ecosystem import (
+    AirConditions, CelestialCycle, LiquidGrid, AudioEnvironment,
+    sample_atmosphere, sample_tides, advance_liquid,
+    interact_with_water, mix_environment_audio,
+)
+from .game_frontier_photometry import (
+    LeafPose, LightClimate, move_leaf, verify_leaf_shadow, illuminate_atmosphere_3d,
+)
+from .game_frontier_chunks import verify_registered_era_chunks
+from .game_frontier_mesh_evolution import PixelAsset, create_old_new_asset_pair
 
 FRONTIER_SCENE_SCHEMA = "skeleton.game.frontier_scene_candidate.v1"
 FRONTIER_MODEL_STATUS = "engine_candidate_only_no_proprietary_weights"
@@ -80,6 +90,15 @@ def compile_frontier_scene(
     lighting_surfaces: tuple[SurfaceSample, ...] = (),
     light_sources: tuple[LightSource, ...] = (),
     light_occluders: tuple[RayOccluder, ...] = (),
+    air_conditions: AirConditions | None = None,
+    celestial_cycle: CelestialCycle | None = None,
+    liquid_grid: LiquidGrid | None = None,
+    leaf_poses: tuple[LeafPose, ...] = (),
+    solar_direction: Vec3 = Vec3(0, 0, 1),
+    trace_3d_lighting: bool = False,
+    audio_source_distance_m: float | None = None,
+    verify_all_era_chunks: bool = False,
+    original_pixel_asset: PixelAsset | None = None,
 ) -> FrontierSceneCandidate:
     """Produce a content-addressed, inspectable, playable-engine-side proposal.
 
@@ -159,6 +178,68 @@ def compile_frontier_scene(
         lighting_surfaces, light_sources, light_occluders,
         ambient_rgb=(ambient, ambient, ambient),
     ) if lighting_surfaces else ())
+    # New environmental measurements remain explicit and reproducible; no
+    # invented live meteorological observations or gameplay mutations.
+    if air_conditions is None:
+        if physical_weather is not None:
+            air_conditions = AirConditions(
+                altitude_m=830, temperature_c=physical_weather.temperature_c,
+                relative_humidity=physical_weather.humidity,
+                rain_mm_h=physical_weather.precipitation_mm_h)
+        else:
+            air_conditions = AirConditions()
+    atmosphere = sample_atmosphere(air_conditions)
+    tide = sample_tides(celestial_cycle) if celestial_cycle is not None else None
+    liquid_step = (advance_liquid(
+        liquid_grid, delta_s=delta_s,
+        rain_mm_h=air_conditions.rain_mm_h)
+                   if liquid_grid is not None else None)
+    water_response = None
+    if character_step is not None and liquid_step is not None:
+        # Reference water interaction uses a nominated cell, not an
+        # unsupported claim that this grid is a 3D fluid solver.
+        surface_z = (liquid_step.grid.bed_elevation_m[0] +
+                     liquid_step.grid.water_depth_m[0] +
+                     (tide.water_height_m if tide else 0))
+        water_response = interact_with_water(
+            water_surface_z_m=surface_z,
+            character_foot_z_m=character_step.state.position.z -
+                               character_step.state.radius_m,
+            character_height_m=character_step.state.radius_m * 3.4,
+            character_volume_m3=character_step.state.mass_kg / 985,
+            velocity=character_step.state.velocity)
+    if len(leaf_poses) > 1024:
+        raise ValueError("leaf budget exceeded")
+    active_wind = (physical_weather.wind if physical_weather else
+                   Vec3(wind_field.sample(cell_x, cell_y, 0, time_s).east_mps,
+                        wind_field.sample(cell_x, cell_y, 0, time_s).north_mps, 0))
+    moved_leaves = []
+    for leaf in leaf_poses:
+        contact_force = Vec3(0, 0, 0)
+        if character_step and character_step.impacts and (
+                (character_step.state.position - leaf.center).dot(
+                    character_step.state.position - leaf.center) < 4):
+            impact = character_step.impacts[0]
+            contact_force = impact.normal.scaled(min(3., impact.impulse_ns / 100))
+        moved_leaves.append(move_leaf(leaf, wind_mps=active_wind,
+                                     dt_s=delta_s, impact_impulse_ns=contact_force))
+    audit_leaves = tuple(verify_leaf_shadow(leaf, sun_toward=solar_direction)
+                         for leaf in moved_leaves) if leaf_poses else ()
+    climate = LightClimate(
+        atmosphere, rain_mm_h=air_conditions.rain_mm_h,
+        cloud_opacity=cloud_coverage)
+    traced = (tuple(illuminate_atmosphere_3d(
+        surface, light_sources, light_occluders, tuple(moved_leaves), climate)
+                    for surface in lighting_surfaces)
+              if trace_3d_lighting and lighting_surfaces else ())
+    audio = (mix_environment_audio(AudioEnvironment(
+        audio_source_distance_m, 1., atmosphere,
+        air_conditions.rain_mm_h, bool(light_occluders), tide))
+             if audio_source_distance_m is not None else None)
+    chunk_reports = (verify_registered_era_chunks(
+        vertices, mesh.triangles) if verify_all_era_chunks else ())
+    old_new_meshes = (create_old_new_asset_pair(original_pixel_asset)
+                      if original_pixel_asset is not None else ())
     prediction = None
     if speculative_input is not None:
         anticipated = anticipate_user_motion(speculative_input, horizon_ms=prediction_horizon_ms)
@@ -303,6 +384,78 @@ def compile_frontier_scene(
             "environment_occluders": list(l.source_occluders),
             "wet_specular": l.wet_specular,
         } for l in light_steps],
+        "atmosphere": {
+            "altitude_m": atmosphere.altitude_m,
+            "altitude_ft": atmosphere.altitude_ft,
+            "density_kg_m3": atmosphere.density_kg_m3,
+            "pressure_pa": atmosphere.pressure_pa,
+            "visibility_m": atmosphere.meteorological_visibility_m,
+            "freshness": atmosphere.rain_washed_freshness,
+            "wind_damping_game_factor": atmosphere.effective_wind_factor,
+            "sound_speed_m_s": atmosphere.sound_speed_m_s,
+        },
+        "tides": ({
+            "water_height_m": tide.water_height_m,
+            "rise_rate_m_s": tide.rise_rate_m_s,
+            "solar_altitude_proxy": tide.sun_altitude_proxy,
+            "phase": tide.moon_phase,
+            "alignment": tide.tidal_alignment,
+        } if tide else None),
+        "liquid": ({
+            "volume_before_m3": liquid_step.initial_volume_m3,
+            "volume_after_m3": liquid_step.final_volume_m3,
+            "rain_added_m3": liquid_step.rain_added_m3,
+            "mass_residual_m3": liquid_step.mass_residual_m3,
+            "depths_m": list(liquid_step.grid.water_depth_m),
+        } if liquid_step else None),
+        "character_water": ({
+            "immersion_fraction": water_response.immersion_fraction,
+            "buoyancy_n": water_response.buoyant_force_n,
+            "drag_xyz": [water_response.drag_force.x,
+                         water_response.drag_force.y,
+                         water_response.drag_force.z],
+            "gait": water_response.suggested_gait,
+            "splash": water_response.footstep_splash,
+        } if water_response else None),
+        "leaf_shadows": [{
+            "id": a.leaf_id, "area_m2": a.geometric_area_m2,
+            "predicted_area_m2": a.predicted_area_m2,
+            "coherence_error_m2": a.area_error_m2,
+            "ray_fraction": a.ray_shadow_coverage,
+            "double_verified": a.verified,
+            "polygon_xyz": [[v.x,v.y,v.z] for v in a.polygon],
+        } for a in audit_leaves],
+        "photometric_3d": [{
+            "id": v.surface_id,
+            "rgb": list(v.radiance_rgb),
+            "source_unblocked": v.unoccluded_direct,
+            "source_delivered": v.delivered_direct,
+            "volumetric_transmission": v.volumetric_transmission,
+            "shadow_fraction": v.geometric_shadow_fraction,
+            "leaf_shadow_fraction": v.leaf_shadow_fraction,
+            "source_occluders": list(v.occluder_ids),
+        } for v in traced],
+        "environment_audio": ({
+            "delay_s": audio.delay_s, "gain": audio.gain,
+            "low_pass_hz": audio.low_pass_hz,
+            "rain_ambience": audio.rain_ambience,
+            "tide_surf_ambience": audio.tide_surf_ambience,
+            "cues": list(audio.cues),
+        } if audio else None),
+        "chunk_verification": [{
+            "era": c.era, "chunk_count": c.chunk_count,
+            "sha256_valid": c.authenticated,
+            "topology_valid": c.topology_reconstructed,
+            "coverage_valid": c.full_coverage,
+            "spatial_bounds_valid": c.bounds_valid,
+            "passed_both": c.approved_by_both,
+        } for c in chunk_reports],
+        "old_new_assets": [{
+            "era": m.era, "source_digest": m.source_digest,
+            "triangles": m.triangle_count,
+            "vertex_count": len(m.vertices),
+            "original_source_preserved": m.source_preserved,
+        } for m in old_new_meshes],
         "governance": {
             "neural_model_checkpoint_loaded": False,
             "gameplay_action_executed": False,
