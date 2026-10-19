@@ -82,6 +82,54 @@ class OperatorCLIRegressionTests(unittest.TestCase):
         self.assertEqual(code,0,err)
         self.assertEqual(json.loads(out)["replay"]["verified_frames"],3)
 
+    def test_idempotent_cli_resume_and_modified_capture_rejection(self):
+        records=[self.sample(i) for i in range(4)]
+        self.capture.write_text("".join(json.dumps(p)+"\\n" for p in records))
+        code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture))
+        self.assertEqual(code,0,err)
+        code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture),
+                                      "--resume")
+        self.assertEqual(code,0,err)
+        self.assertEqual(json.loads(out)["samples_committed"],0)
+        self.assertEqual(json.loads(out)["samples_reused"],4)
+        modified=[dict(p) for p in records]
+        modified[2]=dict(modified[2],ticks_usec=4321)
+        self.capture.write_text("".join(json.dumps(p)+"\\n" for p in modified))
+        code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture),
+                                      "--resume")
+        self.assertEqual(code,2)
+        self.assertIn("differs",err)
+        code,out,err=self.run_command("verify")
+        self.assertEqual(code,0,err)
+        self.assertEqual(json.loads(out)["replay"]["verified_frames"],4)
+
+    def test_cli_uses_signed_native_multi_actor_catalog(self):
+        second="b"*64
+        extended=dict(self.overlay)
+        settings=dict(self.overlay["native_capture"])
+        settings["actors"]=[
+            {"id":"hero","source_digest":self.asset},
+            {"id":"rock","source_digest":second},
+        ]
+        extended["native_capture"]=settings
+        self.scene.write_text(json.dumps(extended))
+        one=self.sample(0)
+        one["actors"].append({
+            "id":"rock","source_digest":second,
+            "world_xyz_m":[-33,0,0],
+            "velocity_xyz_mps":[0,0,0]})
+        one["native_chunk_size_m"]=32.
+        one["native_chunks"]=[
+            {"chunk_xy":[-2,0],"actor_ids":["rock"]},
+            {"chunk_xy":[0,0],"actor_ids":["hero"]},
+        ]
+        self.capture.write_text(json.dumps(one)+"\\n")
+        code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture))
+        self.assertEqual(code,0,err)
+        self.assertEqual(json.loads(out)["samples_committed"],1)
+        code,out,err=self.run_command("verify")
+        self.assertEqual(code,0,err)
+
     def test_unsigned_or_mismatched_gdd_cannot_ingest(self):
         self.capture.write_text(json.dumps(self.sample(0))+"\n")
         source=dict(self.overlay)
