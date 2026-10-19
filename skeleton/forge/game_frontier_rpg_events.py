@@ -50,7 +50,7 @@ ACTIONS = frozenset((
     "set_faction_reputation", "deform_terrain", "trigger_impact_fx",
     "trigger_foliage_fx", "apply_gameplay_effect", "craft_item",
     "open_shop", "unlock_skill", "start_combat", "save_bookmark",
-    "take_damage", "heal_health", "consume_item",
+    "take_damage", "heal_health", "consume_item", "award_xp",
     "inspect_instrument", "set_world_axis",
 ))
 

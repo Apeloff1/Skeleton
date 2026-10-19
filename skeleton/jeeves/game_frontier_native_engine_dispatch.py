@@ -22,6 +22,7 @@ from .game_frontier_native_session_checkpoint import advance_native_quest_window
 _CAMERA_MODES={"authored":0,"follow":1,"orbit":2,"overhead":3}
 _INSTRUMENT_FOCUS=frozenset(("flight","landing","camera"))
 _LOCAL_HEALTH_CAP=100
+_LOCAL_XP_CAP=9900
 
 
 def _health_amount(value: object) -> int:
@@ -48,7 +49,7 @@ _ALLOWED=frozenset((
     "play_cutscene","play_music","spatial_audio","change_camera",
     "inspect_instrument","trigger_impact_fx","trigger_foliage_fx",
     "craft_item","set_npc_emotion",
-    "take_damage","heal_health","consume_item",
+    "take_damage","heal_health","consume_item","award_xp",
 ))
 
 
@@ -80,6 +81,8 @@ def compile_native_godot_dispatch(
     selected_camera=0
     instrument_focus="none"
     local_health=_LOCAL_HEALTH_CAP
+    local_xp=0
+    progression_events=[]
     local_effect_history=[]
     signed_actors={a["id"] for a in journal.native_sample(0)["actors"]}
     cursor=None
@@ -106,6 +109,18 @@ def compile_native_godot_dispatch(
                         if action["value"] not in _CAMERA_MODES:
                             raise NativeQuestSessionError("unauthorized Godot camera preset")
                         selected_camera=_CAMERA_MODES[action["value"]]
+                    if action["kind"]=="award_xp":
+                        amount=_health_amount(action["value"])
+                        if local_xp+amount>_LOCAL_XP_CAP:
+                            raise NativeQuestSessionError("experience level cap exceeded")
+                        local_xp+=amount
+                        progression_events.append({
+                            "frame":entry["frame"],"page_id":approved["page_id"],
+                            "kind":"award_xp","value":action["value"],
+                            "resulting_xp":local_xp,
+                            "resulting_level":1+local_xp//100,
+                            "source_frame_digest":entry["source_frame_receipt_digest"],
+                        })
                     if action["kind"] in ("take_damage","heal_health"):
                         delta=_health_amount(action["value"])
                         local_health=(max(0,local_health-delta)
@@ -212,6 +227,9 @@ def compile_native_godot_dispatch(
         "expected_flags":checkpoint["flags"],
         "expected_inventory":inventory,
         "expected_local_health":local_health,
+        "expected_local_xp":local_xp,
+        "expected_local_level":1+local_xp//100,
+        "expected_progression_events":progression_events,
         "expected_local_effect_history":local_effect_history,
         "expected_camera_mode":selected_camera,
         "expected_instrument_focus":instrument_focus,
