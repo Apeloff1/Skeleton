@@ -117,3 +117,18 @@ if __name__=="__main__":
                              "KEY_MINUS", "KEY_EQUAL", "Engine.time_scale",
                              "_native_camera.global_position.lerp"):
                 self.assertIn(expected,source)
+
+    def test_native_fixture_authors_three_real_runtime_rpg_pages(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from skeleton.jeeves.game_frontier_native_rpg_bridge import parse_native_rpg_pages
+        with TemporaryDirectory() as root:
+            directory=Path(root)
+            build_smoke_project(directory,frames=20)
+            source=json.loads((directory/"native_rpg_pages.json").read_text())
+            authored=parse_native_rpg_pages(source)
+            self.assertEqual(len(authored),3)
+            self.assertEqual({page.page_id for page in authored},{
+                "observed_actor_motion","entered_game_zone","exited_game_zone"})
+            self.assertTrue(all(not page.repeat for page in authored))

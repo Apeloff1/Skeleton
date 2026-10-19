@@ -64,8 +64,40 @@ run/main_scene="res://frontier/frontier_scene.tscn"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 '''
+    # The native fixture must exercise actual observed physics -> RPG event
+    # proposals, not only source Python synthetic event tests.
+    pages={
+        "schema":"skeleton.game.native_rpg_pages.v1",
+        "pages":[
+            {
+                "id":"observed_actor_motion","priority":40,
+                "conditions":[{"signal":"native_actor_speed_mps",
+                               "comparison":"at_least","threshold":.2}],
+                "actions":[{"kind":"show_dialogue","channel":"ui",
+                            "target":"hero","value":"native motion confirmed"}],
+                "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
+            },
+            {
+                "id":"entered_game_zone","priority":30,
+                "conditions":[{"signal":"native_gameplay_zone_entries",
+                               "comparison":"at_least","threshold":1.}],
+                "actions":[{"kind":"save_bookmark","channel":"navigation",
+                            "target":"hero","value":"zone_entered"}],
+                "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
+            },
+            {
+                "id":"exited_game_zone","priority":30,
+                "conditions":[{"signal":"native_gameplay_zone_exits",
+                               "comparison":"at_least","threshold":1.}],
+                "actions":[{"kind":"show_dialogue","channel":"ui",
+                            "target":"hero","value":"zone exited"}],
+                "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
+            },
+        ],
+    }
     overlay={"project.godot":project_godot,**overlay,
-             "signed_gdd.json":json.dumps(bible,sort_keys=True)+"\n"}
+             "signed_gdd.json":json.dumps(bible,sort_keys=True)+"\n",
+             "native_rpg_pages.json":json.dumps(pages,sort_keys=True)+"\n"}
     for filename,content in overlay.items():
         destination=out/filename
         if (not destination.resolve().is_relative_to(out.resolve())

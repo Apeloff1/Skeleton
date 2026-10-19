@@ -90,6 +90,35 @@ jobs:
               --scene-json "$project/frontier/data/scene.json" \
               --journal "$journal" --page-limit 20 \
               > "$RUNNER_TEMP/frontier-native-timeline-${fps}.json"
+            # The exact observed engine samples must also drive actual RPG
+            # comparator/priority/event receipts with the signed GDD journal.
+            python scripts/run_game_frontier_capture.py evaluate-events \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" \
+              --event-pages-json "$project/native_rpg_pages.json" \
+              --actor-id hero \
+              > "$RUNNER_TEMP/frontier-rpg-events-${fps}.json"
+            python - "$RUNNER_TEMP/frontier-rpg-events-${fps}.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          obj=json.loads(Path(sys.argv[1]).read_text())["evaluation"]
+          ids={p["page_id"] for entry in obj["entries"]
+               for p in entry["accepted_proposals"]}
+          assert {"observed_actor_motion","entered_game_zone",
+                  "exited_game_zone"} <= ids, ids
+          assert obj["source_prefix_verified_frames"]>=4
+          assert all(e["requires_runtime_approval"] for e in obj["entries"])
+          assert obj["authority"]=="source_replayed_RPG_proposals_not_approved_world_actions"
+          print(json.dumps({"verified_rpg_event_pages":sorted(ids),
+                            "source_prefix":obj["source_prefix_verified_frames"],
+                            "candidate_fire_count":obj["candidate_fire_count"]}))
+          PY
+            echo "#### Real Godot ${fps} Hz RPG proposals" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/frontier-rpg-events-${fps}.json" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~' >> "$GITHUB_STEP_SUMMARY"
             echo "#### Real Godot ${fps} Hz native proof" >> "$GITHUB_STEP_SUMMARY"
             echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
             cat "$RUNNER_TEMP/frontier-native-report-${fps}.json" >> "$GITHUB_STEP_SUMMARY"
