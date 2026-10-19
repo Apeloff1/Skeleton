@@ -68,6 +68,9 @@ var _approved_unlocked_skills: Dictionary = {}
 var _approved_faction_reputation: Dictionary = {}
 var _approved_progression_events: Array = []
 var _approved_faction_events: Array = []
+var _approved_progression_hud: Label
+var _approved_ability_activations: int = 0
+var _approved_ability_last_tick: int = -60
 var _approved_effect_history_label: Label
 var _approved_effect_history_cursor: int = 0
 var _approved_health_effect_kinds: Array[String] = []
@@ -1426,6 +1429,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         return
     _create_approved_gameplay_inspector(accepted)
     _create_approved_health_inspector()
+    _create_approved_progression_hud()
     _create_approved_local_effect_history()
     _create_approved_dialogue_view()
     _create_approved_cue_timeline()
@@ -1542,6 +1546,91 @@ func _cycle_approved_local_effect_history() -> void:
         _approved_effect_history_cursor+1
     ) % _approved_local_effect_history.size()
     _show_approved_local_effect_history()
+
+
+func _create_approved_progression_hud() -> void:
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedRPGProgressionAndFaction"
+    var label := Label.new()
+    label.name = "VerifiedXPLevelSkillsFaction"
+    label.position = Vector2(20, 780)
+    label.add_theme_color_override("font_color",Color(.50,.98,.72))
+    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    overlay.add_child(label)
+    add_child(overlay)
+    _approved_progression_hud = label
+    _update_approved_progression_hud()
+
+
+func _update_approved_progression_hud() -> void:
+    if _approved_progression_hud == null:
+        return
+    var items: Array[String] = []
+    var ordered_skills: Array = _approved_unlocked_skills.keys()
+    ordered_skills.sort()
+    for skill in ordered_skills:
+        items.append(str(skill) + " (level " + str(_approved_unlocked_skills[skill]) + ")")
+    var factions: Array[String] = []
+    var ordered_factions: Array = _approved_faction_reputation.keys()
+    ordered_factions.sort()
+    for faction in ordered_factions:
+        factions.append(str(faction) + ": " + str(_approved_faction_reputation[faction]))
+    _approved_progression_hud.text = (
+        "SOURCE-VERIFIED RPG LEVEL: " + str(_approved_local_level) +
+        " | XP " + str(_approved_local_xp) + " / 9900\n" +
+        "Skills: " + (", ".join(items) if items.size()>0 else "none") + "\n" +
+        "Faction standing: " + (", ".join(factions) if factions.size()>0 else "none") + "\n" +
+        "G: use approved wind dash (" +
+        str(_approved_ability_activations) + " local activations)"
+    )
+
+
+func _activate_approved_wind_dash() -> void:
+    # Player input acts on a real Godot RigidBody3D, never the signed canon.
+    # The operator must have explicitly approved the skill prerequisite.
+    if (_aero_character == null or not _native_controls_enabled
+        or not _approved_unlocked_skills.has("wind_dash")
+        or int(_approved_unlocked_skills["wind_dash"]) > _approved_local_level
+        or _approved_ability_activations >= 1024
+        or _native_capture_tick - _approved_ability_last_tick < 60):
+        return
+    var direction: Vector3 = Vector3(1.,0.,0.)
+    if _native_camera != null:
+        direction = -_native_camera.global_transform.basis.z
+        direction.y = 0.0
+        if direction.length_squared() < .000001:
+            direction = Vector3(1.,0.,0.)
+        else:
+            direction = direction.normalized()
+    var receipt := {
+        "schema":"skeleton.game.approved_local_wind_dash_activation.v1",
+        "actor_id":_native_actor_id,
+        "scene_candidate_digest":_native_candidate_sha,
+        "signed_gdd_digest":_native_signed_gdd_sha,
+        "approved_dispatch_digest":_approved_gameplay_dispatch_digest,
+        "skill":"wind_dash","skill_required_level":int(_approved_unlocked_skills["wind_dash"]),
+        "current_level":_approved_local_level,
+        "source_game_tick":_native_capture_tick,
+        "bounded_impulse_ns":minf(45.,_aero_character.mass*3.),
+        "authority":"local_player_control_not_canonical_world_edit",
+    }
+    var path := "user://frontier_local_ability_activations.jsonl"
+    var output := FileAccess.open(path,FileAccess.READ_WRITE)
+    if output == null and not FileAccess.file_exists(path):
+        output = FileAccess.open(path,FileAccess.WRITE_READ)
+    if output == null:
+        push_error("Approved wind dash cannot journal activation")
+        return
+    output.seek_end()
+    output.store_string(JSON.stringify(receipt) + "\n")
+    output.flush()
+    output.close()
+    _aero_character.apply_central_impulse(
+        direction * minf(45.,_aero_character.mass*3.)
+    )
+    _approved_ability_last_tick = _native_capture_tick
+    _approved_ability_activations += 1
+    _update_approved_progression_hud()
 
 
 func _create_approved_health_inspector() -> void:
@@ -2373,6 +2462,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     if key.physical_keycode == KEY_J and not _approved_quest_history.is_empty():
         _next_approved_quest_history()
+        get_viewport().set_input_as_handled()
+        return
+    if key.physical_keycode == KEY_G and _approved_unlocked_skills.has("wind_dash"):
+        _activate_approved_wind_dash()
         get_viewport().set_input_as_handled()
         return
     if key.physical_keycode == KEY_K and not _approved_local_effect_history.is_empty():
