@@ -7,8 +7,9 @@ import pytest
 from skeleton.jeeves.agent.final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentReviewResult, FinalReviewAdversary,
     FinalReviewError, MeasuredCriterion, SourceProvenance, verify_final_release,
+    required_final_kind,
 )
-from skeleton.jeeves.agent.types import stable_fingerprint
+from skeleton.jeeves.agent.types import Goal, stable_fingerprint
 
 
 SOURCES = {
@@ -230,3 +231,28 @@ def test_creative_noncode_outputs_require_originality_and_coherence():
     )
     assert result.passed and result.upstream_quality_digest is None
     assert log == ["copyright", "creative_rewrite"]
+
+
+def test_creative_delivery_detection_and_noncreative_question():
+    assert required_final_kind(Goal("g1", "Write a short story about an inventor")) == "creative"
+    assert required_final_kind(Goal("g2", "Compose a song with original lyrics")) == "creative"
+    assert required_final_kind(Goal("g3", "Create code in Python")) == "code"
+    assert required_final_kind(Goal("g4", "Implement a game engine")) == "game"
+    assert required_final_kind(Goal("g5", "Explain the history of poetry")) is None
+
+
+def test_separate_rights_and_rewrite_verifiers_cannot_share_evidence():
+    events = []
+    same = check("copyright", events)
+    with pytest.raises(FinalReviewError, match="separate host callbacks"):
+        review(copyright=same, rewrite=same)
+    def identical_evidence(sources, rights):
+        return ContentReviewResult(
+            stage="creative_rewrite", source_digest=stable_fingerprint(dict(sources)),
+            checker="host:creative_rewrite",
+            evidence_ref="host:evidence:copyright",
+            review_scope="authorial continuity and narrative canon",
+            covered_paths=tuple(sources), passed=True,
+        )
+    with pytest.raises(FinalReviewError, match="independent"):
+        review(rewrite=identical_evidence)
