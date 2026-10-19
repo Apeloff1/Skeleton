@@ -65,8 +65,11 @@ def normalize_gameplay_zones(zones: object,
         result.append({
             "id":zone["id"],
             "actor_id":zone["actor_id"],
-            "center_xyz_m":[_number(c,-1e6,1e6) for c in center],
-            "radius_m":_number(zone["radius_m"],.1,10000.),
+            # Author once to millimetres: Godot's JSON reserialization and
+            # Vector3 float32 use slightly different binary precision.
+            # Quantized source identity remains fail-closed at 0.001 m.
+            "center_xyz_m":[round(_number(c,-1e6,1e6),3) for c in center],
+            "radius_m":round(_number(zone["radius_m"],.1,10000.),3),
             "event_page_id":zone["event_page_id"],
             "action_kind":zone["action_kind"],
         })

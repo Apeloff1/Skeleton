@@ -159,7 +159,9 @@ class NativeZoneJournalTests(unittest.TestCase):
                                     for x in page["entries"]))
                 journal.fork("rollback_zone",through=0)
                 corrupt=native(2)
-                corrupt["native_zone_events"]=[]
+                corrupt["native_zone_occupancy"]=[{
+                    "zone_id":"cross32","actor_id":"hero",
+                }]
                 with self.assertRaises(NativeObservationError):
                     ingest.ingest(corrupt)
                 self.assertEqual(journal.stats()["head"],1)
