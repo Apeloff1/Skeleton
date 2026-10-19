@@ -9,7 +9,9 @@ from skeleton.jeeves.agent.code_delivery_quality import (
     QualityCheckResult, QualityReleaseError, QualityVerifierAdversary,
     required_checker_names, required_delivery_kind, verify_quality_receipt,
 )
-from skeleton.jeeves.agent.code_scrutiny_loop import CodeFinding, verify_scrutiny_receipts
+from skeleton.jeeves.agent.code_scrutiny_loop import (
+    CodeFinding, CodeScrutinyLoop, ScrutinyPolicy, verify_scrutiny_receipts,
+)
 from skeleton.jeeves.agent.types import Goal, stable_fingerprint
 
 
@@ -155,3 +157,56 @@ def test_checker_failure_with_no_detail_is_still_blocking():
     outcome = CodeDeliveryQualityReviewer().inspect("code", files, checkers=checks)
     assert not outcome.releasable
     assert any(f.code == "CHECK_FAILED" for f in outcome.scrutiny.findings)
+
+
+def test_final_scrutiny_receipt_binds_source_findings_and_stability():
+    files = {"app.py": "def main():\\n    return 1\\n"}
+    clean = CodeScrutinyLoop().run(files, lint=lambda _: ())
+    assert clean.success
+    verify_scrutiny_receipts(clean)
+    with pytest.raises(ValueError, match="source not reviewed"):
+        verify_scrutiny_receipts(replace(
+            clean, files={"app.py": "def main():\\n    return 2\\n"},
+        ))
+    with pytest.raises(ValueError, match="findings differ"):
+        verify_scrutiny_receipts(replace(clean, findings=(
+            CodeFinding("app.py", 1, "syntax", "FAKE", "unseen error", "host"),
+        )))
+    with pytest.raises(ValueError, match="clean-pass count"):
+        verify_scrutiny_receipts(replace(clean, stable_passes=99))
+    with pytest.raises(ValueError, match="correction count"):
+        verify_scrutiny_receipts(replace(clean, corrections=5))
+
+
+def test_final_pass_never_publishes_unreviewed_repairs():
+    patches = []
+    def repair(files, findings, index):
+        patches.append(index)
+        return {"app.py": "def valid():\\n    pass\\n" if index == 1
+                else "def never_reviewed():\\n    pass\\n"}
+
+    # With only one review pass, even an authorized repair cannot get an
+    # unchecked final source into the delivery outcome.
+    outcome = CodeScrutinyLoop(ScrutinyPolicy(
+        maximum_passes=1, stability_passes=1,
+    )).run({"app.py": "def f(:\\n  pass"}, repair=repair, authorized=True)
+    assert outcome.status == "budget_exhausted"
+    assert outcome.files == {"app.py": "def f(:\\n  pass"}
+    assert not patches
+    verify_scrutiny_receipts(outcome)
+
+
+def test_quality_release_rejects_shared_or_duplicate_checker_evidence():
+    files = {"app.py": "pass\\n"}
+    valid = CodeDeliveryQualityReviewer().inspect("code", files, checkers=certified())
+    assert valid.releasable
+    proofs = list(valid.checker_evidence)
+    proofs[1] = (proofs[1][0], proofs[0][1])
+    with pytest.raises(QualityReleaseError, match="reused an evidence"):
+        verify_quality_receipt(replace(
+            valid, checker_evidence=tuple(proofs),
+        ), files=files, kind="code", required=())
+    with pytest.raises(QualityReleaseError, match="duplicated"):
+        verify_quality_receipt(replace(
+            valid, executed_checkers=valid.executed_checkers + (valid.executed_checkers[0],),
+        ), files=files, kind="code", required=())
