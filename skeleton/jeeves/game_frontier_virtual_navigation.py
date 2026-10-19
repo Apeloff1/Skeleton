@@ -236,8 +236,8 @@ def solve_virtual_gps(beacons: tuple[VirtualBeacon, ...],
               if not r.blocked and catalog[r.beacon_id].enabled]
     if len(active) < 4:
         raise VirtualPositionError("3D fictional GPS needs four visible beacons")
-    anchor, origin = active[0]
-    p0, r0 = origin.position, anchor.measured_range_m
+    first_beacon, first_reading = active[0]
+    p0, r0 = first_beacon.position, first_reading.measured_range_m
     matrix = [[0.] * 3 for _ in range(3)]
     vector = [0.] * 3
     for beacon, signal in active[1:]:
@@ -245,7 +245,7 @@ def solve_virtual_gps(beacons: tuple[VirtualBeacon, ...],
         co = [2 * delta.x, 2 * delta.y, 2 * delta.z]
         target = (delta.dot(delta) - signal.measured_range_m**2
                   + r0**2)
-        weight = 1 / max(.001, signal.uncertainty_m**2 + anchor.uncertainty_m**2)
+        weight = 1 / max(.001, signal.uncertainty_m**2 + first_reading.uncertainty_m**2)
         for i in range(3):
             vector[i] += weight * co[i] * target
             for j in range(3):
