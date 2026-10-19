@@ -152,6 +152,32 @@ class OperatorCLIRegressionTests(unittest.TestCase):
         code,out,err=self.run_command("verify")
         self.assertEqual(code,2)
 
+    def test_cli_timeline_query_returns_hash_bound_chunk_frames(self):
+        self.capture.write_text("".join(
+            json.dumps(self.sample(n))+"\\n" for n in range(8)))
+        code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture))
+        self.assertEqual(code,0,err)
+        code,out,err=self.run_command("timeline","--start-frame","2",
+                                      "--page-limit","3","--actor-id","hero")
+        self.assertEqual(code,0,err)
+        result=json.loads(out)
+        self.assertEqual(result["page"]["start_frame"],2)
+        self.assertEqual([x["frame"] for x in result["page"]["entries"]],[2,3,4])
+        self.assertEqual(result["page"]["next_frame"],5)
+        self.assertEqual(len(result["page"]["receipt_digest"]),64)
+        self.assertTrue(all(x["native_evidence_digest"] for x in
+                            result["page"]["entries"]))
+        code,out,err=self.run_command("timeline","--actor-id","missing")
+        self.assertEqual(code,0,err)
+        self.assertEqual(json.loads(out)["page"]["entries"],[])
+
+    def test_timeline_requires_coherent_spatial_filter_and_page_limits(self):
+        with self.assertRaises(SystemExit):
+            self.run_command("timeline","--chunk-x","2")
+        code,out,err=self.run_command("timeline","--page-limit","100000")
+        self.assertEqual(code,2)
+        self.assertIn("bounded",err)
+
     def test_missing_capture_argument_does_not_fake_evidence(self):
         with self.assertRaises(SystemExit):
             self.run_command("ingest")
