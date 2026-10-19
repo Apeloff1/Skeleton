@@ -64,6 +64,8 @@ var _approved_local_health: int = 100
 var _approved_local_effect_history: Array = []
 var _approved_effect_history_label: Label
 var _approved_effect_history_cursor: int = 0
+var _approved_health_effect_kinds: Array[String] = []
+var _approved_health_effect_meshes: Array[MeshInstance3D] = []
 var _approved_gameplay_npc_emotions: Dictionary = {}
 var _approved_npc_visuals: Array[String] = []
 var _approved_inventory_visuals: Array[String] = []
@@ -1199,6 +1201,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _approved_gameplay_inventory = next_inventory
     _approved_local_health = next_health
     _approved_local_effect_history = next_local_effect_history
+    _approved_health_effect_kinds = _create_approved_health_visuals()
     _approved_inventory_visuals = _create_approved_inventory_objects(next_inventory)
     _approved_gameplay_npc_emotions = next_npc_emotions
     _approved_gameplay_cues = next_cues
@@ -1255,6 +1258,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "quest_progression_history":next_quest_history,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,
         "local_health":next_health,"local_effect_history":next_local_effect_history,
+        "visualized_health_effect_kinds":_approved_health_effect_kinds,
         "visualized_npc_ids":_approved_npc_visuals,
         "visualized_item_ids":_approved_inventory_visuals,
         "executed_action_trace":next_action_trace,
@@ -1301,6 +1305,49 @@ func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
         push_error("Approved gameplay save did not survive readback")
         return false
     return true
+
+
+func _create_approved_health_visuals() -> Array[String]:
+    var output: Array[String] = []
+    if _aero_character == null:
+        return output
+    for event in _approved_local_effect_history:
+        var kind: String = str(event.get("kind", ""))
+        if kind != "take_damage" and kind != "heal_health":
+            continue
+        if output.size() >= 32:
+            break
+        var light := MeshInstance3D.new()
+        light.name = "SourceApprovedHealthEffect_" + str(output.size())
+        var sphere := SphereMesh.new()
+        sphere.radius = .52 + .06 * float(output.size())
+        sphere.height = sphere.radius * 2.0
+        light.mesh = sphere
+        var tint := StandardMaterial3D.new()
+        tint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        tint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        tint.albedo_color = (
+            Color(1., .13, .16, .22) if kind == "take_damage"
+            else Color(.20, 1., .35, .22)
+        )
+        light.material_override = tint
+        light.position = Vector3(0., .25, 0.)
+        _aero_character.add_child(light)
+        _approved_health_effect_meshes.append(light)
+        output.append(kind)
+    return output
+
+
+func _animate_approved_health_effects(delta: float) -> void:
+    if _approved_health_effect_meshes.is_empty():
+        return
+    # Purely cosmetic and bounded: no physics forces or unapproved harm.
+    var tick: float = float(Time.get_ticks_msec()) * .001
+    for i in range(_approved_health_effect_meshes.size()):
+        var node: MeshInstance3D = _approved_health_effect_meshes[i]
+        node.scale = Vector3.ONE * (
+            .94 + .11 * sin(tick * 2.0 + float(i) * .7)
+        )
 
 
 func _create_approved_local_effect_history() -> void:
@@ -2334,6 +2381,7 @@ func _process(delta: float) -> void:
     _cloud_elapsed += min(delta, 0.25)
     _update_clouds()
     _animate_approved_fx(delta)
+    _animate_approved_health_effects(delta)
     _update_game_cinematic_camera(delta)
 '''
 

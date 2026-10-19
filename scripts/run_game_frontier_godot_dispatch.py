@@ -138,7 +138,7 @@ def _verify(args):
         "quest_progression_history","runtime_ui_modules","approved_camera_mode",
         "approved_instrument_focus",
         "presentation_cues","inventory","npc_emotions","visualized_npc_ids",
-        "local_health","local_effect_history",
+        "local_health","local_effect_history","visualized_health_effect_kinds",
         "executed_action_trace","visualized_item_ids","cue_timeline_frame_index",
         "read_only_branch_options","visualized_fx_page_ids","authority",
     }
@@ -149,6 +149,8 @@ def _verify(args):
         "kind":entry["kind"],"cue":entry["value"],
         "source_frame":entry["frame"],"page_id":entry["page_id"],
     } for entry in bundle["actions"] if entry["kind"] in allowed_cues]
+    expected_health_visuals=[e["kind"] for e in bundle["expected_local_effect_history"]
+                             if e["kind"] in ("take_damage","heal_health")][:32]
     expected_fx=[cue["page_id"] for cue in expected_cues
                  if cue["kind"] in ("trigger_impact_fx","trigger_foliage_fx")]
     if (type(receipt) is not dict or set(receipt)!=expected_keys
@@ -176,6 +178,7 @@ def _verify(args):
         or type(receipt["local_health"]) is not int
         or receipt["local_health"]!=bundle["expected_local_health"]
         or receipt["local_effect_history"]!=bundle["expected_local_effect_history"]
+        or receipt["visualized_health_effect_kinds"]!=expected_health_visuals
         or receipt["npc_emotions"]!=bundle["expected_npc_emotions"]
         or receipt["visualized_npc_ids"]!=sorted(bundle["expected_npc_emotions"])
         or receipt["visualized_item_ids"]!=sorted(bundle["expected_inventory"])[:24]
@@ -196,6 +199,7 @@ def _verify(args):
         "verified_inventory_visuals":len(receipt["visualized_item_ids"]),
         "verified_local_health":receipt["local_health"],
         "verified_local_effects":len(receipt["local_effect_history"]),
+        "verified_health_visual_effects":len(receipt["visualized_health_effect_kinds"]),
         "verified_cue_count":len(expected_cues),
         "verified_fx_cues":len(expected_fx),
         "verified_cue_timeline_ticks":len(receipt["cue_timeline_frame_index"]),
