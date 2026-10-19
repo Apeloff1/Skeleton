@@ -35,9 +35,9 @@ from skeleton.ai.runtime.inference.game_corpus_stream import (
 
 
 def half_weights() -> dict[str, float]:
-    """Sample every measured track often enough to move it. Legal and coding stay first."""
+    """Sample every measured track often enough to move it. Legal, coding, and rights stay first."""
     weights = focus_weights()
-    for track in ("visual", "narrative", "systems", "practice"):
+    for track in ("visual", "narrative", "systems", "practice", "sound", "stage", "craft", "play", "maps", "cognition"):
         for name in TRACKS[track]:
             weights[name] = max(weights[name], 2.0)
     return weights

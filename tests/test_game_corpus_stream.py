@@ -96,11 +96,31 @@ def test_track_holdouts_are_outside_the_training_serials():
     assert len(held) == len(set(held))
     tracks = track_holdouts()
     assert set(tracks) == set(TRACKS)
-    assert {"visual", "narrative", "systems", "review", "practice", "rights"} <= set(tracks)
+    assert {
+        "visual",
+        "narrative",
+        "systems",
+        "review",
+        "practice",
+        "rights",
+        "sound",
+        "stage",
+        "craft",
+        "play",
+        "maps",
+        "cognition",
+    } <= set(tracks)
+    assert "sea_map" in TRACKS["maps"]
+    assert "adventure_map" in TRACKS["maps"]
+    assert "homebrew_map" in TRACKS["maps"]
+    assert "dungeon_map" in TRACKS["maps"]
+    assert TRACKS["cognition"] == ("jeeves_cognition",)
     assert "copyright" in TRACKS["rights"]
     assert "legal" in TRACKS["systems"]
     assert "assets" in TRACKS["visual"]
     assert "world" in TRACKS["systems"]
+    assert "music" in TRACKS["sound"]
+    assert "audio" in TRACKS["sound"]
     flat = [text for rows in tracks.values() for text in rows]
     assert set(flat) <= set(held)
     assert len(flat) == len(set(flat))
@@ -137,9 +157,15 @@ def test_half_weights_keep_legal_and_coding_first():
     weights = half_weights()
     assert weights["legal"] == 3.0
     assert weights["coding"] == 3.0
+    assert weights["copyright"] == 3.0
+    assert weights["music_rights"] == 3.0
     assert weights["legal"] > weights["sprites"]
     assert weights["sprites"] >= 2.0
     assert weights["story"] >= 2.0
+    assert weights["music"] >= 2.0
+    assert weights["audio"] >= 2.0
+    assert weights["world"] >= 2.0
+    assert weights["assets"] >= 2.0
     assert weights["proofreading"] == 2.5
 
 
@@ -244,11 +270,12 @@ def test_legal_sources_cover_every_domain_once():
     covered = [name for names in groups.values() for name in names]
     assert sorted(covered) == sorted(TEMPLATES)
     assert len(covered) == len(set(covered))
-    assert set(groups) == set(TRACKS) | {"adjacent"}
+    assert set(groups) == set(TRACKS)
+    assert "adjacent" not in groups
     assert "copyright" in groups["rights"]
     assert "legal" in groups["systems"]
-    assert "audio" in groups["adjacent"]
-    assert "music" in groups["adjacent"]
+    assert "audio" in groups["sound"]
+    assert "music" in groups["sound"]
     assert "world" in groups["systems"]
     assert "assets" in groups["visual"]
 
