@@ -4,7 +4,7 @@
 # ============================================================================
 
 # --- Web framework ---
-fastapi==0.143.0
+fastapi==0.143.2
 uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 # Keep the backend websocket runtime on the maintained 16.x line.
@@ -16,12 +16,12 @@ requests==2.34.2
 
 # --- Database ---
 motor==3.7.1
-pymongo==4.18.3
+pymongo==4.19.0
 aiosqlite==0.22.1
 
 # --- Validation / config ---
-pydantic==2.14.0
-pydantic-settings==2.15.0
+pydantic==2.14.1
+pydantic-settings==2.16.0
 email-validator==2.3.0
 python-dotenv==1.2.4
 
@@ -40,7 +40,7 @@ cryptography==50.0.2
 # openai 3.13.0 currently makes the pinned backend graph unresolvable in CI;
 # keep the compatible 2.x line until the provider stack is migrated together.
 openai==2.54.0
-litellm==1.104.2
+litellm==1.105.1
 # google-genai was removed after the #116 runtime audit found no active Python
 # model-execution call sites. Direct Google provider imports are CI-gated until
 # a canonical ProviderAdapter and shared contract tests are added deliberately.
@@ -61,9 +61,9 @@ stripe==15.6.1
 # --- Documents / media ---
 # Studio video and LAFS probability paths import these lazily; install them
 # explicitly so a healthy boot does not hide missing production capabilities.
-imageio==2.37.2
+imageio==2.38.1
 imageio-ffmpeg==0.6.0
-scipy==1.16.3
+scipy==1.17.1
 reportlab==5.0.1
 pillow==12.3.0
 numpy==2.4.6
