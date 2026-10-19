@@ -110,7 +110,9 @@ def main(argv: list[str] | None = None) -> int:
             if arguments.operation=="ingest":
                 worker=GodotPhysicsCaptureIngestor(
                     journal,candidate_digest=settings["candidate_digest"],
-                    allowed_assets=catalog,max_samples=arguments.max_samples)
+                    allowed_assets=catalog,max_samples=arguments.max_samples,
+                    expected_reference_controls=settings.get("reference_controls"),
+                    controlled_actor_id=settings["actor_id"])
                 result=worker.ingest_file(arguments.capture_jsonl,
                                           resume=arguments.resume)
                 report={"operation":"ingest",

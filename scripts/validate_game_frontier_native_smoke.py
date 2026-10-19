@@ -24,6 +24,9 @@ from skeleton.jeeves.game_frontier_native_chunks import (
     inspect_native_chunks,compare_native_chunk_transitions,NativeChunkError,
 )
 from skeleton.jeeves.game_frontier_frame_coherence import digest
+from skeleton.jeeves.game_frontier_native_control import (
+    verify_native_reference_input,NativeControlError,
+)
 
 
 class NativeSmokeError(ValueError):
@@ -122,6 +125,11 @@ def validate_native_trace(
                 for name,source_digest in catalog.items()
             ):
                 raise NativeSmokeError("native actor/source identity mismatch")
+            if control_enabled:
+                try:
+                    verify_native_reference_input(record,controls,actor_id=primary)
+                except NativeControlError as exc:
+                    raise NativeSmokeError("source reference controller record invalid") from exc
             if prescribed is not None:
                 reported=incoming[primary].get("physics_body")
                 if (not isinstance(reported,dict) or
@@ -182,6 +190,9 @@ def validate_native_trace(
         "peak_reported_kinetic_energy_j":max_kinetic_energy_j,
         "source_primary_dynamics_verified":(
             bool(prescribed is not None and verified_dynamics_ticks==count)),
+        "reference_controls_verified":control_enabled,
+        "reference_control_steps_verified":max(0,count-1) if control_enabled else 0,
+        "fixture_drive_steps_requested":fixture_ticks,
         "source_capture_sha256":trace_root.hexdigest(),
         "signed_gdd_digest":settings["gdd_digest"],
         "candidate_digest":settings["candidate_digest"],

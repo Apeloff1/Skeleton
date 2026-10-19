@@ -18,6 +18,7 @@ from .game_frontier_frame_coherence import FrameObject
 from .game_frontier_production import Vec3
 from .game_frontier_receipt_journal import FrameReceiptJournal, FrameJournalError
 from .game_frontier_native_chunks import inspect_native_chunks
+from .game_frontier_native_control import verify_native_reference_input
 
 
 class NativeObservationError(ValueError):
@@ -44,6 +45,8 @@ class GodotPhysicsCaptureIngestor:
         candidate_digest: str,
         allowed_assets: Mapping[str,str],
         max_samples: int = 1_000_000,
+        expected_reference_controls: Mapping | None = None,
+        controlled_actor_id: str | None = None,
     ) -> None:
         if not isinstance(journal,FrameReceiptJournal):
             raise NativeObservationError("durable canonical frame journal required")
@@ -63,12 +66,27 @@ class GodotPhysicsCaptureIngestor:
         self.candidate_digest=candidate_digest
         self.assets=dict(allowed_assets)
         self.max_samples=max_samples
+        if expected_reference_controls is not None and (
+            not isinstance(expected_reference_controls,Mapping) or
+            controlled_actor_id not in self.assets):
+            raise NativeObservationError("authorized source controller catalog required")
+        self.expected_reference_controls=(
+            dict(expected_reference_controls) if expected_reference_controls is not None
+            else None)
+        self.controlled_actor_id=controlled_actor_id
 
     def ingest(self, native: Mapping, *, resume: bool = False) -> dict:
         if not isinstance(native,Mapping):
             raise NativeObservationError("typed Godot runtime sample required")
         head=self.journal.stats()["head"]
         tick=native.get("native_tick")
+        if self.expected_reference_controls is not None:
+            try:
+                verify_native_reference_input(
+                    native,self.expected_reference_controls,
+                    actor_id=self.controlled_actor_id)
+            except ValueError as exc:
+                raise NativeObservationError("source-bound controller report invalid") from exc
         if type(resume) is not bool:
             raise NativeObservationError("explicit boolean resume policy required")
         if resume and type(tick) is int and 0 <= tick <= head:
