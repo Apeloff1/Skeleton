@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Callable, Mapping, Sequence
 
 from .delivery_assurance_milestones import (
     ASSURANCE_MILESTONES, MilestoneAttestation, MilestoneBoard,
-    MilestoneEvidenceError, MILESTONE_INDEX, verify_milestone_board,
+    MILESTONE_INDEX, verify_milestone_board,
 )
 from .types import stable_fingerprint
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Sequence
 
 from .types import stable_fingerprint
 

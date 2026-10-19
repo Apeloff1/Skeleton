@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, replace
-from typing import Mapping, Sequence
+from typing import Mapping
 
 from .delivery_assurance_milestones import (
     ASSURANCE_MILESTONES, MILESTONE_INDEX, MilestoneBoard,
