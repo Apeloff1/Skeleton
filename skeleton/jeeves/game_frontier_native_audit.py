@@ -81,6 +81,15 @@ def analyze_native_capture(
                          dynamics["receipt_digest"] if dynamics else None))
         energy={row["id"]:row["kinetic_energy_j"]
                 for row in dynamics["actors"]} if dynamics else {}
+        from .game_frontier_native_fields import inspect_native_force_fields
+        field_proof=inspect_native_force_fields(
+            native,previous=journal.native_sample(index-1) if index else None)
+        game_field_forces={}
+        if field_proof is not None:
+            for item in native["previous_step_field_forces"]:
+                magnitude=math.dist([0.,0.,0.],item["force_world_xyz_n"])
+                key=item["actor_id"]
+                game_field_forces[key]=game_field_forces.get(key,0.)+magnitude
         for actor in native["actors"]:
             name=actor["id"]
             if actor_id is not None and name!=actor_id:
@@ -99,6 +108,8 @@ def analyze_native_capture(
                 "peak_reported_kinetic_energy_j":None,
                 "positive_contact_ticks":0,"contact_change_events":0,
                 "chunk_migrations":0,"event_count":0,
+                "positive_gameplay_field_force_ticks":0,
+                "peak_reported_gameplay_force_n":0.,
             })
             old=positions.get(name)
             if state["source_digest"] != actor["source_digest"]:
@@ -128,6 +139,10 @@ def analyze_native_capture(
             state["min_height_m"]=min(state["min_height_m"],position[2])
             state["net_displacement_m"]=math.dist(origin,position)
             state["positive_contact_ticks"]+=int(count is not None and count>0)
+            game_force=game_field_forces.get(name,0.)
+            state["positive_gameplay_field_force_ticks"]+=int(game_force>1e-6)
+            state["peak_reported_gameplay_force_n"]=max(
+                state["peak_reported_gameplay_force_n"],game_force)
             if name in energy:
                 prior=state["peak_reported_kinetic_energy_j"]
                 state["peak_reported_kinetic_energy_j"]=max(

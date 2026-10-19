@@ -105,3 +105,80 @@ class AuthoredNativeForceTests(unittest.TestCase):
             normalize_native_force_fields((FIELDS[0],FIELDS[0]))
         with self.assertRaises(NativeForceFieldError):
             normalize_native_force_fields(FIELDS*33)
+
+class RealNativeJournalFieldTests(unittest.TestCase):
+    def test_signed_source_fields_ingest_replay_fork_and_tamper_rejection(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from skeleton.jeeves.game_frontier_frame_coherence import bind_signed_gdd
+        from skeleton.jeeves.game_frontier_receipt_journal import FrameReceiptJournal
+        from skeleton.jeeves.game_frontier_native_capture import (
+            GodotPhysicsCaptureIngestor, NativeObservationError,
+        )
+        from tests.test_game_frontier_native_chunks import sample
+        from tests.test_game_frontier_position_frames import gdd
+        anchor=bind_signed_gdd(gdd())
+        catalog=normalize_native_force_fields(({
+            "id":"force_a","actor_id":"hero","kind":"updraft",
+            "center_xyz_m":[31.99,-1.,30.],"radius_m":5.,
+            "acceleration_mps2":6.,
+        },))
+        previous=None
+        def record(index):
+            row=sample(index,anchor.source_digest)
+            row["native_dynamics_schema"]="skeleton.game.native_actor_dynamics.v1"
+            for actor in row["actors"]:
+                rigid=actor["id"]=="hero"
+                actor["physics_body"]={
+                    "mode":"rigid" if rigid else "static",
+                    "mass_kg":80. if rigid else 0.,
+                    "friction":.6 if rigid else 1.,
+                    "restitution":.1 if rigid else 0.,
+                    "kinetic_energy_j":17440. if rigid else 0.,
+                    "contact_actor_ids":[],
+                    "external_contact_count":actor["contact_count"],
+                }
+            row["native_force_field_schema"]=SCHEMA
+            row["native_force_fields"]=catalog
+            row["previous_step_field_forces"]=[]
+            if index:
+                old=previous["actors"][0]
+                applied=calculated_native_field_force(
+                    catalog[0],old["world_xyz_m"],old["physics_body"]["mass_kg"])
+                row["previous_step_field_forces"]=[{
+                    "field_id":"force_a","actor_id":"hero",
+                    "command_tick":index-1,
+                    "source_position_xyz_m":old["world_xyz_m"],
+                    "force_world_xyz_n":list(applied),
+                }]
+            return row
+        with TemporaryDirectory() as temp:
+            path=Path(temp)/"field-replay.sqlite"
+            with FrameReceiptJournal(path,anchor) as journal:
+                ingestor=GodotPhysicsCaptureIngestor(
+                    journal,candidate_digest="d"*64,
+                    allowed_assets={"hero":"a"*64,"npc":"b"*64,"island":"c"*64},
+                    expected_gameplay_force_fields=catalog)
+                for index in range(3):
+                    row=record(index)
+                    ingestor.ingest(row)
+                    previous=row
+                result=journal.evidence_page(actor_id="hero",limit=3)
+                self.assertEqual(len(result["entries"]),3)
+                self.assertEqual(len(result["entries"][1][
+                    "native_field_step_forces"]),1)
+                self.assertEqual(result["entries"][0]["native_field_step_forces"],[])
+                self.assertTrue(all(entry["native_field_evidence_digest"]
+                                    for entry in result["entries"]))
+                self.assertEqual(journal.replay()["verified_frames"],3)
+                journal.fork("saved",through=1)
+                tampered=record(3)
+                tampered["previous_step_field_forces"][0][
+                    "force_world_xyz_n"][2]+=100
+                with self.assertRaises(NativeObservationError):
+                    ingestor.ingest(tampered)
+                self.assertEqual(journal.stats()["head"],2)
+            with FrameReceiptJournal(path,anchor,track="saved") as restored:
+                self.assertEqual(restored.replay()["verified_frames"],2)
+                self.assertTrue(restored.evidence_page(actor_id="hero")[
+                    "entries"][1]["native_field_evidence_digest"])
