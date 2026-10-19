@@ -193,6 +193,17 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-183 Run specialized Godot workflow successfully with true headless generated scene parsing, runtime observed native physics and import receipts.
 - [ ] GF-P0-184 Complete multi-actor native semantic physics using real game NPC/controller instead of bounded reference proxies.
 - [ ] GF-P0-185 Feed qualified native physics/event evidence to authorized playable game scenes with real Godot rendered-world QA.
+- [x] GF-P0-186 Add native physics actor motion/contact-count and chunk-enter/exit/retirement receipts computed independently from reported observations.
+- [x] GF-P0-187 Persist native chunk-transition receipts atomically beside Godot actor observations and double-verified signed-GDD frame records.
+- [x] GF-P0-188 Reconstruct native frame transitions and reject forged motion/chunk ledger data during source replay.
+- [x] GF-P0-189 Carry native transition evidence across verified rollback forks and expose its source SHA and observed contacts to timeline clients.
+- [x] GF-P0-190 Record native physics contact counts and game-chunk reports for multiple explicit authored frame actors.
+- [x] GF-P0-191 Resume interrupted native multi-actor JSONL capture only if every earlier observation and chunk proof matches persisted records.
+- [x] GF-P0-192 Add actual Godot trace acceptance requiring native fixed ticks, monotone clock, controlled body movement, contacts and correct spatial partitions.
+- [x] GF-P0-193 Connect native trace acceptance as mandatory pre-ingest step in specialized pinned Godot smoke workflow.
+- [x] GF-P0-194 Add adversarial native-frame source, chunk migration, timing, contact, corruption and 30/50/60/120 fps regressions.
+- [ ] GF-P0-195 Confirm real pinned-Godot smoke and exact-head focused tests pass; fix any GDScript compile or native-motion issues before native acceptance.
+- [ ] GF-P0-196 Extend reference physics proxies to actual NPC/gear/interaction controllers with signed event authority.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
 - [ ] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups.
@@ -264,6 +275,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-59 Couple real Godot scene camera, renderer shadow, GPU buffer, collision and animation cues into chunk sensory receipts.
 - [ ] GF-P1-60 Build real-time clickable Studio UI for native evidence pages, chunk migration and RPG/GDD review.
 - [ ] GF-P1-61 Integrate GPS/survey/map route into real game character controllers and NPC navigation while avoiding device geolocation.
+- [ ] GF-P1-62 Capture per-contact normal/impulse and physics material IDs from actual native physics contact reporter with physical energy budget checks.
+- [ ] GF-P1-63 Integrate actor spawn, despawn and world-portal migration with signed GDD runtime/event authority and native chunk evidence.
+- [ ] GF-P1-64 Add chunk-specific foliage/weather/material/ray-shadow source observations and verify against actual rendered-frame references.
+- [ ] GF-P1-65 Expose GDD-reviewed collision/contact evidence and migration graph in Galaxy Studio/Jeeves cockpit UI.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -317,6 +332,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-48 Train/cross-verify AI world reasoning on hold-out native collision/game-map/weather evidence with no unreviewed canon promotion.
 - [ ] GF-P2-49 Support actual generated multi-era 2D/2.5D/3D game scene runtime adapters and per-frame native evidence.
 - [ ] GF-P2-50 Link Dragon and Jeeves multimodal training to observational native world deltas and source-verified virtual GPS fix errors.
+- [ ] GF-P2-51 Train and verify world/cinematic/navigation cognition against actual native chunk transitions and physically observed sensor context.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -370,6 +386,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-48 Native engine 30/50/60/120 sustained FPS and GPU/CPU capture evidence benchmarks with measured render and frame latency.
 - [ ] GF-P3-49 Independently certify multi-actor native physics and virtual position/survey uncertainty through all game world-axis transitions.
 - [ ] GF-P3-50 Longform project recovery and canon/AI context/signoff evidence after merges and journal forks.
+- [ ] GF-P3-51 Benchmark high-density native actor transitions/contact evidence at 30/50/60/120Hz across weeks of replay and persistent GDD context.
 
 ## Source references
 
