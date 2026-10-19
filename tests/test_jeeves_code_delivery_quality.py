@@ -83,7 +83,9 @@ def test_extra_requested_requirements_add_but_never_remove_core():
     extra = ("console_compatibility", "save_resume")
     files = {"game.py": "print('ok')"}
     with pytest.raises(QualityReleaseError, match="console_compatibility"):
-        CodeDeliveryQualityReviewer().inspect("code", files, checkers=certified())
+        CodeDeliveryQualityReviewer().inspect(
+            "code", files, checkers=certified(), additional_requirements=extra
+        )
     with pytest.raises(QualityReleaseError, match="save_resume"):
         CodeDeliveryQualityReviewer().inspect(
             "code", files,
