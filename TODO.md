@@ -22,7 +22,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-07 SIMA-inspired evidence-linked cinematic shots plus inspect/approach/interact proposals (never autonomous mutation).
 - [x] GF-P0-08 Muse-inspired bounded speculative user-motion prediction with no input firing.
 - [x] GF-P0-09 Candidate-only shared composition façade with content-addressed receipts.
-- [x] GF-P0-10 Add primitive and integration regressions; targeted CI execution has passed.
+- [x] GF-P0-133 Add primitive and integration regressions; targeted CI execution has passed.
 - [x] GF-P0-19 Add candidate-only model checkpoint, frame throughput and simulation-ready 3D evidence contracts.
 - [x] GF-P0-20 Add independent license allowlist, external receipt identity, measured-versus-requested FPS checks.
 - [x] GF-P0-21 Add opt-in 30/50/60/120 FPS bridge to canonical per-era simulation timing, with cross-mode tests.
@@ -123,8 +123,22 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-116 Wire frame chunk A/B verifiers and temporal context to actual *rendered* frames in all historical and modern native engine runtimes.
 - [ ] GF-P0-117 Integrate frame history and bounded AI-context cursor with canonical durable operation/checkpoint/save/restore authority and conflict-free replay.
 - [ ] GF-P0-118 Expose surveyed-control editing and operator approval for sighting inputs and baseline metadata in live Galaxy Studio/Jeeves cockpit.
+- [x] GF-P0-119 Create game-only fictional map XYZ, metric tiles, rotation, realm coordinates and explicitly non-Earth latitude/longitude-style display.
+- [x] GF-P0-120 Simulate deterministic range measurements from four-plus authored virtual 3D beacons without device GPS.
+- [x] GF-P0-121 Resolve game avatar 3D position by uncertainty-aware beacon multilateration and independent residual/geometry checks.
+- [x] GF-P0-122 Compute independent virtual survey fixes from GDD-approved landmarks, sightings and optional vertical angles.
+- [x] GF-P0-123 Reject contradictory fictional survey/GPS fixes using independent uncertainties and block incoherent map tiles.
+- [x] GF-P0-124 Implement deterministic obstacle-aware virtual game-map waypoint routing and realm-specific map identity.
+- [x] GF-P0-125 Bind game GPS to actual double-verified frame actor positions and signed GDD source, blocking fake frame/entity positions.
+- [x] GF-P0-126 Integrate virtual map authoring, same-frame navigation receipts and provisional AI GDD design context into RPG Studio.
+- [x] GF-P0-127 Export visible Godot virtual GPS coordinate and bounded route HUD explicitly without OS sensor access.
+- [x] GF-P0-128 Independently audit fictional source identity, SHA-256 receipts, bounded accuracy, survey, map and frame/GDD provenance.
+- [x] GF-P0-129 Add virtual GPS, surveying, route, corruption and 30/50/60/120 FPS per-frame regression source.
+- [ ] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era.
+- [ ] GF-P0-131 Interactive minimap zoom, world-portal and underground/sky-island multilevel navigation controls.
+- [ ] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes.
 
-- [ ] GF-P0-11 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
+- [ ] GF-P0-134 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
 - [ ] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups.
@@ -177,6 +191,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-40 Add dynamic verified frame snapshots for camera, mesh, shader, shadows, atmospheric physics, GPS/survey, audio, animations and AI inputs together.
 - [ ] GF-P1-41 Integrate chunk provenance and GDD notes through the existing canonical game design editor and procedural worlds with stable cross-chunk identities.
 - [ ] GF-P1-42 Introduce conflict and drift detection across simultaneous AI authoring passes using existing canon/construction authority, with human-review promotion.
+- [ ] GF-P1-43 Bind fictional beacon positioning/landmark observation to all authoritative native world simulation frames and physics loops.
+- [ ] GF-P1-44 Build independently verified AI between-frame movement plans, nav context and dynamic-GDD designer note critiques.
+- [ ] GF-P1-45 Support full multimodal traversal route synthesis between islands, caves, inverse/ethereal worlds, 2D and 3D maps.
+- [ ] GF-P1-46 Calibrate fictional GPS signal occlusion, multi-resolution terrain and dynamic game beacon movement with uncertainty envelopes.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -217,6 +235,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-35 Autonomous design critique uses only verified between-frame observations and signed GDD with abstention and adversarial challenge.
 - [ ] GF-P2-36 Simulate month-long multiworld frame histories, rollback/branch/merge and canonical GDD version evolution while keeping continuity.
 - [ ] GF-P2-37 Develop continuous landmark acquisition/resection/calibration and sensor-fusion training without fabricated survey authority.
+- [ ] GF-P2-38 Cross-world 3D in-game GPS survey networks for generated worlds, sky islands, caves and moving structures.
+- [ ] GF-P2-39 Couple between-frame AI navigation and building decisions to signed GDD and double-verified actor/chunk continuity.
+- [ ] GF-P2-40 Dynamically repair path and world-portal routes after construction, floods, collapse, tides and terrain changes.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -254,6 +275,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-32 Independent professional-grade survey reference measurements, GNSS multipath/spoofing checks and documented uncertainty against surveyed fixtures.
 - [ ] GF-P3-33 Frame-by-frame native 30/50/60/120 FPS coherence benchmark across all engines including geometry, shadow/weather physics, streaming and GDD logic.
 - [ ] GF-P3-34 Long production-cycle frame receipt retention, privacy deletion, provenance restore, human GDD signoff and reproducible release acceptance.
+- [ ] GF-P3-35 Validate active game-map GPS on Android/iOS/Windows/console builds without real-world location permissions.
+- [ ] GF-P3-36 Stress test 30/50/60/120Hz virtual fix movement, per-frame GDD context and chunks during month-long projects.
+- [ ] GF-P3-37 Native spatial chunk/portal map coherence, rollback, replay, multiplayer and save/restore acceptance.
 
 ## Source references
 
