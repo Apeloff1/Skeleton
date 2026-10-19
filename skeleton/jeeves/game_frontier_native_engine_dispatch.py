@@ -114,6 +114,14 @@ def compile_native_godot_dispatch(
         "verified_checkpoint_digest":checkpoint["receipt_digest"],
         "independent_cold_audit_digest":proof["receipt_digest"],
         "source_through_frame":last,
+        "available_branch_options":{q["id"]:[
+            {"stage_id":next_id,
+             "objective":next(stage["objective"] for stage in q["stages"]
+                              if stage["id"]==next_id)}
+            for stage in q["stages"] if stage["id"]==
+                checkpoint["quests"].get(q["id"],{}).get("stage")
+            for next_id in stage["next"]]
+            for q in catalog["quests"] if q["id"] in checkpoint["quests"]},
         "quest_objectives":{item["id"]:{
             stage["id"]:stage["objective"] for stage in item["stages"]}
             for item in catalog["quests"]},

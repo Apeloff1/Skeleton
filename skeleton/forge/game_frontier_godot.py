@@ -64,6 +64,9 @@ var _approved_inventory_visuals: Array[String] = []
 var _approved_gameplay_cues: Array = []
 var _approved_quest_objectives: Dictionary = {}
 var _approved_quest_titles: Dictionary = {}
+var _approved_branch_options: Dictionary = {}
+var _approved_branch_label: Label
+var _approved_branch_cursor: int = 0
 var _approved_dialogue_queue: Array[String] = []
 var _approved_dialogue_cursor: int = 0
 var _approved_dialogue_panel: PanelContainer
@@ -774,6 +777,19 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         return
     _approved_quest_objectives = quest_objectives
     _approved_quest_titles = quest_titles
+    var next_branch_options: Dictionary = {}
+    for quest_id in next_quests.keys():
+        var current_stage: String = str(next_quests[quest_id]["stage"])
+        var possibilities: Array = quest_edges[quest_id][current_stage]
+        var candidates: Array = []
+        for stage_id in possibilities:
+            candidates.append({"stage_id":stage_id,
+                               "objective":quest_objectives[quest_id][stage_id]})
+        next_branch_options[quest_id] = candidates
+    if next_branch_options != bundle.get("available_branch_options", {}):
+        push_error("Authored branching preview mismatches replayed graph")
+        return
+    _approved_branch_options = next_branch_options
     # One atomic document recording the actual Godot dispatch outcome.
     # Canonical GDD and native physics frame evidence are never rewritten.
     var accepted := {
@@ -792,6 +808,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "executed_action_trace":next_action_trace,
         "presentation_cues":next_cues,
         "cue_timeline_frame_index":[int(cue["source_frame"]) for cue in next_cues],
+        "read_only_branch_options":_approved_branch_options,
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
     }
     if not _persist_verified_gameplay_receipt(accepted):
@@ -799,6 +816,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _create_approved_gameplay_inspector(accepted)
     _create_approved_dialogue_view()
     _create_approved_cue_timeline()
+    _create_approved_branch_preview()
 
 
 func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
@@ -920,6 +938,55 @@ func _create_approved_gameplay_inspector(record: Dictionary) -> void:
     hud.add_child(inspector)
     add_child(hud)
     _approved_gameplay_label = inspector
+
+
+func _create_approved_branch_preview() -> void:
+    var choices: Array[String] = []
+    for quest_id in _approved_branch_options.keys():
+        var next_stages: Array = _approved_branch_options[quest_id]
+        for stage in next_stages:
+            choices.append(
+                str(_approved_quest_titles[quest_id]) +
+                " -> " + str(stage["stage_id"]) + ": " +
+                str(stage["objective"])
+            )
+    if choices.is_empty():
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedQuestBranchPreview"
+    var title := Label.new()
+    title.name = "ReadOnlyApprovedQuestOptions"
+    title.position = Vector2(20, 550)
+    title.add_theme_color_override("font_color",Color(.35,.8,.98))
+    overlay.add_child(title)
+    add_child(overlay)
+    _approved_branch_label = title
+    _approved_branch_cursor = 0
+    _show_approved_branch(choices)
+
+
+func _show_approved_branch(choices: Array[String]) -> void:
+    if _approved_branch_label == null or choices.is_empty():
+        return
+    _approved_branch_label.text = (
+        "Authored future branch (preview only, B cycles):\n" +
+        choices[_approved_branch_cursor % choices.size()]
+    )
+
+
+func _cycle_approved_branch() -> void:
+    var choices: Array[String] = []
+    for quest_id in _approved_branch_options.keys():
+        for stage in _approved_branch_options[quest_id]:
+            choices.append(
+                str(_approved_quest_titles[quest_id]) +
+                " -> " + str(stage["stage_id"]) + ": " +
+                str(stage["objective"])
+            )
+    if choices.is_empty():
+        return
+    _approved_branch_cursor = (_approved_branch_cursor + 1) % choices.size()
+    _show_approved_branch(choices)
 
 
 func _create_approved_cue_timeline() -> void:
@@ -1288,6 +1355,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     var key := event as InputEventKey
     if not key.pressed or key.echo:
+        return
+    if key.physical_keycode == KEY_B and _approved_branch_label != null:
+        _cycle_approved_branch()
+        get_viewport().set_input_as_handled()
         return
     if key.physical_keycode == KEY_T and not _approved_cue_timeline.is_empty():
         _next_approved_cue()
