@@ -40,6 +40,7 @@ from .code_scrutiny_loop import Discovery, Repair
 from .final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
     FinalReviewAdversary, MeasuredCriterion, SourceProvenance,
+    required_final_kind,
 )
 from .context_repository import (
     ContextEntry,
@@ -1442,10 +1443,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                     observed_at=self._wall_clock(),
                     confidence=1.0,
                 ))
-            final_kind = (
-                "creative" if state.inputs.goal.metadata.get("delivery_kind") == "creative"
-                else required_kind
-            )
+            final_kind = required_final_kind(state.inputs.goal)
             if final_kind is not None:
                 return self._verify_final_content_review(
                     state, draft.answer, kind=final_kind,
