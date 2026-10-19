@@ -238,8 +238,11 @@ def illuminate_atmosphere_3d(
             value = base*solid_transmission*foliage_transmission*optical
             transmitted += value
             volume_factor_sum += optical
+            # Wet surfaces generate stronger (bounded) direct highlights.
+            # This view-independent approximation is a candidate BRDF cue.
+            glint = value*surface.wetness*(1.-surface.roughness)*.5
             for channel in range(3):
-                result[channel] += value*source.color[channel]*surface.albedo[channel]
+                result[channel] += source.color[channel]*(value*surface.albedo[channel]+glint)
             rays += 1
     return PhotometricSurface(surface.object_id, tuple(result), unblocked,
                               transmitted,
