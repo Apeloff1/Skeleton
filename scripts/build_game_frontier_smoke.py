@@ -76,6 +76,27 @@ renderer/rendering_method.mobile="gl_compatibility"
         "schema":"skeleton.game.native_rpg_pages.v1",
         "pages":[
             {
+                "id":"begin_sky_trial","priority":75,
+                "conditions":[{"signal":"native_actor_speed_mps",
+                               "comparison":"at_least","threshold":.2}],
+                "actions":[
+                    {"kind":"start_quest","channel":"quest",
+                     "target":"hero","value":"sky_trial"},
+                    {"kind":"set_flag","channel":"world",
+                     "target":"hero","value":"quest_active=true"},
+                ],
+                "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
+            },
+            {
+                "id":"complete_sky_trial","priority":70,
+                "conditions":[{"signal":"native_gameplay_zone_exits",
+                               "comparison":"at_least","threshold":1.}],
+                "actions":[{"kind":"advance_quest","channel":"quest",
+                            "target":"hero","value":"sky_trial:finished"}],
+                "required_flags":[{"name":"quest_active","value":True}],
+                "cooldown_ms":0,"repeat":False,"enabled":True,
+            },
+            {
                 "id":"observed_actor_motion","priority":40,
                 "conditions":[{"signal":"native_actor_speed_mps",
                                "comparison":"at_least","threshold":.2}],
@@ -101,7 +122,26 @@ renderer/rendering_method.mobile="gl_compatibility"
             },
         ],
     }
+    # CI-only authoring fixture: actual native Godot contact/zone data must
+    # choose which observed event receipts are explicitly approved later.
+    # This is not a production authority or automated canon/world mutation.
+    quest_graph={
+        "schema":"skeleton.game.native_quest_graph.v1",
+        "quests":[{
+            "id":"sky_trial","title":"Reference Sky Island Trial",
+            "start":"departed",
+            "stages":[
+                {"id":"departed","objective":"Cross the sky-island zone",
+                 "next":["finished"]},
+                {"id":"finished","objective":"Exit the sky-island zone",
+                 "next":[]},
+            ],
+        }],
+    }
+    from skeleton.jeeves.game_frontier_native_quest_session import parse_native_quest_graph
+    quest_graph=parse_native_quest_graph(quest_graph)
     overlay={"project.godot":project_godot,**overlay,
+             "native_quest_graph.json":json.dumps(quest_graph,sort_keys=True)+"\\n",
              "signed_gdd.json":json.dumps(bible,sort_keys=True)+"\n",
              "native_rpg_pages.json":json.dumps(pages,sort_keys=True)+"\n"}
     for filename,content in overlay.items():
