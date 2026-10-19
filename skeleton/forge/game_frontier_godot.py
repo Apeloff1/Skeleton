@@ -35,6 +35,9 @@ var _native_candidate_sha: String = ""
 var _native_signed_gdd_sha: String = ""
 var _native_actor_id: String = ""
 var _native_actor_asset_sha: String = ""
+var _native_capture_nodes: Array[Node3D] = []
+var _native_capture_actors: Array = []
+var _native_chunk_size_m: float = 32.0
 
 func _vec(data: Array) -> Vector3:
     return Vector3(float(data[0]), float(data[2]), -float(data[1]))
@@ -423,10 +426,71 @@ func _configure_native_capture(settings: Dictionary) -> void:
         push_error("Native capture actor ID required")
         return
     Engine.physics_ticks_per_second = int(settings.get("fps", 60))
+    _native_chunk_size_m = float(settings.get("chunk_size_m", 32.0))
+    var sources: Array = settings.get("actors", [])
+    if sources.is_empty():
+        sources = [{
+            "id": _native_actor_id, "source_digest": _native_actor_asset_sha,
+            "source_kind": "native_rigid_reference",
+        }]
+    if sources.size() > 64 or _native_chunk_size_m < .1:
+        push_error("Native actors or chunk size exceed capture budget")
+        return
+    # The first controlled body belongs to the existing scene. Additional
+    # probes use actual native Godot physics bodies, but are explicitly
+    # identified as generated reference proxies rather than full NPCs.
+    _native_capture_nodes.clear()
+    _native_capture_actors.clear()
+    var found_primary := false
+    for index in range(sources.size()):
+        var spec: Dictionary = sources[index]
+        var id := str(spec.get("id", ""))
+        var actor_node: Node3D
+        if id == _native_actor_id:
+            if found_primary:
+                push_error("Native source contains duplicate primary actor")
+                return
+            found_primary = true
+            actor_node = _aero_character
+        else:
+            var source_velocity: Vector3 = _vec(spec.get("velocity_xyz_mps", [0, 0, 0]))
+            if source_velocity.length() > 0.0001:
+                var body := RigidBody3D.new()
+                body.name = "NativePhysicsSourceProxy" + str(index)
+                body.gravity_scale = 0.0
+                body.linear_velocity = source_velocity
+                body.contact_monitor = true
+                body.max_contacts_reported = 8
+                actor_node = body
+            else:
+                var body := StaticBody3D.new()
+                body.name = "NativeStaticSourceProxy" + str(index)
+                actor_node = body
+            actor_node.position = _vec(spec.get("position_xyz_m", [0, 0, 0]))
+            var collider := CollisionShape3D.new()
+            var shape := SphereShape3D.new()
+            shape.radius = 0.2
+            collider.shape = shape
+            actor_node.add_child(collider)
+            add_child(actor_node)
+        _native_capture_nodes.append(actor_node)
+        _native_capture_actors.append(spec)
+    if not found_primary:
+        push_error("Native actor sources omit the scene's actual physics body")
+        return
+    _aero_character.contact_monitor = true
+    _aero_character.max_contacts_reported = 8
     # Fixed user:// destination, not a user-supplied external path.
     _native_capture_file = FileAccess.open("user://frontier_native_physics.jsonl", FileAccess.WRITE)
     if _native_capture_file == null:
         push_error("Native capture file could not be opened")
+
+func _native_chunk_less(a: Dictionary, b: Dictionary) -> bool:
+    var first: Array = a["chunk_xy"]
+    var second: Array = b["chunk_xy"]
+    if int(first[0]) != int(second[0]):
+        return int(first[0]) < int(second[0])
+    return int(first[1]) < int(second[1])
 
 func _record_native_physics() -> void:
     if _native_capture_file == null:
@@ -435,8 +499,41 @@ func _record_native_physics() -> void:
         _native_capture_file.close()
         _native_capture_file = null
         return
-    var pos := _aero_character.global_position
-    var vel := _aero_character.linear_velocity
+    var recorded: Array = []
+    var cells: Dictionary = {}
+    for index in range(_native_capture_nodes.size()):
+        var actor: Node3D = _native_capture_nodes[index]
+        var src: Dictionary = _native_capture_actors[index]
+        var p: Vector3 = actor.global_position
+        var v := Vector3.ZERO
+        var contacts := 0
+        if actor is RigidBody3D:
+            var rigid := actor as RigidBody3D
+            v = rigid.linear_velocity
+            contacts = rigid.get_colliding_bodies().size()
+        var xyz: Array = [p.x, -p.z, p.y]
+        var cell: Array = [
+            int(floor(float(xyz[0]) / _native_chunk_size_m)),
+            int(floor(float(xyz[1]) / _native_chunk_size_m))
+        ]
+        recorded.append({
+            "id": str(src["id"]),
+            "source_digest": str(src["source_digest"]),
+            "source_kind": str(src.get("source_kind", "generated_source_proxy")),
+            "contact_count": contacts,
+            "world_xyz_m": xyz,
+            "velocity_xyz_mps": [v.x, -v.z, v.y],
+        })
+        var cell_id := str(cell[0]) + ":" + str(cell[1])
+        if not cells.has(cell_id):
+            cells[cell_id] = {"chunk_xy": cell, "actor_ids": []}
+        cells[cell_id]["actor_ids"].append(str(src["id"]))
+    var chunks: Array = []
+    for key in cells:
+        var entry: Dictionary = cells[key]
+        entry["actor_ids"].sort()
+        chunks.append(entry)
+    chunks.sort_custom(_native_chunk_less)
     var row := {
         "schema": "skeleton.game.native_physics_observation.v1",
         "native_engine": "godot4_physics",
@@ -446,12 +543,9 @@ func _record_native_physics() -> void:
         "native_tick": _native_capture_tick,
         "ticks_usec": Time.get_ticks_usec(),
         "fps": Engine.physics_ticks_per_second,
-        "actors": [{
-            "id": _native_actor_id,
-            "source_digest": _native_actor_asset_sha,
-            "world_xyz_m": [pos.x, -pos.z, pos.y],
-            "velocity_xyz_mps": [vel.x, -vel.z, vel.y],
-        }],
+        "actors": recorded,
+        "native_chunk_size_m": _native_chunk_size_m,
+        "native_chunks": chunks,
     }
     _native_capture_file.store_line(JSON.stringify(row))
     _native_capture_file.flush()
@@ -581,6 +675,7 @@ def emit_frontier_godot_overlay(
     cloud_step_s: int = 1,
     enable_native_capture: bool = False,
     native_capture_max_frames: int = 6000,
+    native_capture_all_actors: bool = False,
 ) -> dict[str, str]:
     """Emit a Godot scene + fixed GDScript + snapshot and wind path JSON.
 
@@ -596,7 +691,7 @@ def emit_frontier_godot_overlay(
     from skeleton.jeeves.game_frontier_dynamics import (
         WindField, WindLayer, WindVector, advect_clouds,
     )
-    if type(enable_native_capture) is not bool or (
+    if type(enable_native_capture) is not bool or type(native_capture_all_actors) is not bool or (
         type(native_capture_max_frames) is not int or
         not 1 <= native_capture_max_frames <= 1_000_000):
         raise FrontierGodotError("bounded explicit native capture opt-in required")
@@ -658,11 +753,41 @@ def emit_frontier_godot_overlay(
                   if entity == actor_id]
         if len(mapped) != 1 or proof.get("verifier_a") is not True or proof.get("verifier_b") is not True:
             raise FrontierGodotError("native body ID must match exactly one double verified source actor")
+        sources = [{
+            "id": actor_id, "source_digest": mapped[0],
+            "source_kind": "native_rigid_reference",
+        }]
+        if native_capture_all_actors:
+            frame_sources = manifest.get("frame_actor_sources", [])
+            observed = {row["id"]: row for row in frame_sources}
+            authenticated = {
+                entity: source
+                for chunk in proof["receipts"]
+                for entity, source in zip(
+                    chunk["source_entities"], chunk["source_asset_digests"])
+            }
+            if (not isinstance(frame_sources, list) or
+                len(frame_sources) < 1 or len(frame_sources) > 64 or
+                len(observed) != len(frame_sources) or
+                set(observed) != set(authenticated) or
+                any(row["source_digest"] != authenticated[row["id"]]
+                    for row in frame_sources)):
+                raise FrontierGodotError("multi-actor capture requires exact proven frame entities")
+            if actor_id not in observed:
+                raise FrontierGodotError("source frame does not contain physics reference")
+            sources = []
+            for row in sorted(frame_sources, key=lambda item: item["id"]):
+                x = dict(row)
+                x["source_kind"] = (
+                    "native_rigid_reference" if row["id"] == actor_id
+                    else "generated_source_proxy")
+                sources.append(x)
         native_config = {
             "enabled": True, "max_frames": native_capture_max_frames,
             "candidate_digest": candidate.manifest_digest,
             "gdd_digest": frame["gdd_digest"], "fps": frame["fps"],
             "actor_id": actor_id, "actor_asset_digest": mapped[0],
+            "chunk_size_m": 32., "actors": sources,
         }
     payload = {
         "schema": "skeleton.game.frontier_godot_overlay.v1",
@@ -744,6 +869,7 @@ def attach_frontier_overlay(
     cloud_step_s: int = 1,
     enable_native_capture: bool = False,
     native_capture_max_frames: int = 6000,
+    native_capture_all_actors: bool = False,
 ) -> dict[str, str]:
     """Safely attach an emitted reference scene to an existing Forge Godot project.
 
@@ -767,6 +893,7 @@ def attach_frontier_overlay(
         cloud_step_s=cloud_step_s,
         enable_native_capture=enable_native_capture,
         native_capture_max_frames=native_capture_max_frames,
+        native_capture_all_actors=native_capture_all_actors,
     )
     conflicts = tuple(sorted(set(project_files).intersection(overlay)))
     if any(project_files[key] != overlay[key] for key in conflicts):
