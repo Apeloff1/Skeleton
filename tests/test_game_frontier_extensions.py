@@ -211,5 +211,70 @@ class StudioTests(unittest.TestCase):
         with self.assertRaises(StudioError):
             paint_tile(original,x=3,y=0,tile_index=1)
 
+
+class FullFrontierCandidateTests(unittest.TestCase):
+    def test_combined_sun_tide_liquid_fog_leaf_chunk_and_mesh_export(self):
+        from skeleton.jeeves.game_frontier import compile_frontier_scene
+        from skeleton.jeeves.game_frontier_dynamics import (
+            WorldAxis, WindField, WindLayer, WindVector, Cloud,
+        )
+        from skeleton.jeeves.game_frontier_production import (
+            Bone, BonePose, CharacterSkeleton, AnimationClip, AnimationKeyframe, Percept,
+        )
+        from skeleton.jeeves.game_frontier_motion import CharacterState, Weather
+        from skeleton.forge.game_frontier_godot import emit_frontier_godot_overlay
+        from skeleton.jeeves.game_frontier_worlds import (
+            WorldVariant, WorldFamily, CameraSpec, ProjectionMode,
+        )
+        zero=BonePose(Vec3(0,0,0))
+        scene=compile_frontier_scene(
+            world_axes=WorldAxis(11,.4,.6,.7,.8,.9,.2),cell_x=0,cell_y=0,
+            wind_field=WindField((WindLayer(0,WindVector(0,0)),)),
+            clouds=(Cloud("stratus",3,4,100,.5),),time_s=10,delta_s=.05,
+            skeleton=CharacterSkeleton((Bone("root",-1,Vec3(0,0,0),Vec3(0,0,1),.2),)),
+            animation=AnimationClip("idle",(AnimationKeyframe(0,(zero,)),
+                                           AnimationKeyframe(1000,(zero,)))),
+            animation_time_ms=200,era="fixed_3d",fps=60,
+            evidence=(Percept("hero","character",True,1,.9,"f"*64),),
+            world_goal_kind="character",available_actions=("inspect","interact"),
+            world_variant=WorldVariant(WorldFamily.MYTHIC),
+            camera=CameraSpec(ProjectionMode.DEPTH_27),
+            weather=Weather(Vec3(0,0,0),13,precipitation_mm_h=60),
+            character_state=CharacterState(Vec3(0,0,.5),Vec3(0,0,0),.5,80),
+            desired_character_velocity=Vec3(0,0,0),
+            air_conditions=AirConditions(altitude_m=830,temperature_c=13,
+                                         fog_liquid_g_m3=.01,rain_mm_h=60),
+            celestial_cycle=CelestialCycle(time_hours=3,moon_phase_cycles=.25),
+            liquid_grid=LiquidGrid(2,1,1,(0.,0.),(2.,0.)),
+            leaf_poses=(LeafPose("leaf",Vec3(0,0,2),Vec3(0,0,2),
+                                 Vec3(0,0,0),Vec3(0,0,1),.4,.6),),
+            trace_3d_lighting=True,
+            lighting_surfaces=(SurfaceSample("ground",Vec3(0,0,0),Vec3(0,0,1)),),
+            light_sources=(LightSource("sun",Vec3(0,0,10),800),),
+            audio_source_distance_m=10,verify_all_era_chunks=True,
+            original_pixel_asset=PixelAsset("grass",(".#","##")),
+        )
+        m=scene.manifest
+        self.assertEqual(m["atmosphere"]["altitude_m"],830)
+        self.assertIsNotNone(m["tides"])
+        self.assertIsNotNone(m["character_water"])
+        self.assertTrue(m["leaf_shadows"][0]["double_verified"])
+        self.assertLess(m["photometric_3d"][0]["source_delivered"],
+                        m["photometric_3d"][0]["source_unblocked"])
+        self.assertEqual(len(m["chunk_verification"]),len(tuple(EngineEra)))
+        self.assertTrue(all(x["passed_both"] for x in m["chunk_verification"]))
+        self.assertEqual(len(m["old_new_assets"]),2)
+        self.assertFalse(scene.approved_for_runtime)
+        from json import loads
+        files=emit_frontier_godot_overlay(scene,cloud_path_duration_s=2)
+        data=loads(files["frontier/data/scene.json"])
+        self.assertEqual(data["atmosphere"]["altitude_m"],830)
+        self.assertEqual(len(data["leaf_shadows"]),1)
+        gd=files["frontier/frontier_scene.gd"]
+        self.assertIn("FrontierLiquidSurface",gd)
+        self.assertIn("VerifiedLeafShadow",gd)
+        self.assertIn("volumetric_transmission",gd)
+
+
 if __name__=="__main__":
     unittest.main()
