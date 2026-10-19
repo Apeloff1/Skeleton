@@ -558,7 +558,11 @@ class FrameReceiptJournal:
                 if ((actor_id is None or actor_id in names) and
                     (chunk_xy is None or tuple(retired["chunk_xy"])==chunk_xy)):
                     referenced.append(retired["receipt_digest"])
-            if not referenced or changes_only and not movements:
+            # Frame zero establishes source identity; it is not a movement
+            # transition even though every actor is listed as an arrival.
+            if index == 0:
+                movements.clear()
+            if not referenced or (changes_only and not movements):
                 continue
             native=self.native_sample(index)
             native_proof=self.native_chunk_evidence(index)
