@@ -5,6 +5,7 @@ Tracking branch: `feature/game-frontier-p0-p3-20261019`.
 Detailed acceptance map: [Game Frontier Model Milestones](docs/plan/GAME_FRONTIER_MODELS_P0_P3_2026_10_19.md).
 Advanced physics assurance: [L00–L13 aerodynamics, collisions, climbing, climate and environment dossier](docs/plan/GAME_FRONTIER_ADVANCED_PHYSICS_ASSURANCE_2026_10_19.md).
 GPS/GDD assurance: [L00–L13 foreground positioning and per-frame signed-design coherence](docs/plan/GAME_FRONTIER_GPS_GDD_FRAME_ASSURANCE_2026_10_19.md).
+Virtual game GPS and GDD map navigation: [fictional-only surveying, waypoints, per-frame proofs and AI context](docs/plan/GAME_FRONTIER_VIRTUAL_GPS_GDD_NAVIGATION_2026_10_19.md).
 
 **Status semantics:** `[x]` = source implementation committed to the feature branch
 (not merged or necessarily verified); `[ ]` = open. Source implementation
