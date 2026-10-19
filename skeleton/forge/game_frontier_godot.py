@@ -62,6 +62,8 @@ var _approved_gameplay_flags: Dictionary = {}
 var _approved_gameplay_inventory: Dictionary = {}
 var _approved_local_health: int = 100
 var _approved_local_effect_history: Array = []
+var _approved_effect_history_label: Label
+var _approved_effect_history_cursor: int = 0
 var _approved_gameplay_npc_emotions: Dictionary = {}
 var _approved_npc_visuals: Array[String] = []
 var _approved_inventory_visuals: Array[String] = []
@@ -1266,6 +1268,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         return
     _create_approved_gameplay_inspector(accepted)
     _create_approved_health_inspector()
+    _create_approved_local_effect_history()
     _create_approved_dialogue_view()
     _create_approved_cue_timeline()
     _create_approved_branch_preview()
@@ -1298,6 +1301,46 @@ func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
         push_error("Approved gameplay save did not survive readback")
         return false
     return true
+
+
+func _create_approved_local_effect_history() -> void:
+    if _approved_local_effect_history.is_empty():
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedRPGBattleAndCraftHistory"
+    var label := Label.new()
+    label.name = "SourceBoundLocalEffectPage"
+    label.position = Vector2(20, 745)
+    label.add_theme_color_override("font_color",Color(1.,.82,.44))
+    overlay.add_child(label)
+    add_child(overlay)
+    _approved_effect_history_label = label
+    _approved_effect_history_cursor = 0
+    _show_approved_local_effect_history()
+
+
+func _show_approved_local_effect_history() -> void:
+    if _approved_effect_history_label == null:
+        return
+    var receipt: Dictionary = _approved_local_effect_history[_approved_effect_history_cursor]
+    _approved_effect_history_label.text = (
+        "SOURCE-APPROVED COMBAT / ITEM LOG (K to cycle)\n" +
+        str(_approved_effect_history_cursor+1) + "/" +
+        str(_approved_local_effect_history.size()) +
+        " | frame " + str(receipt["frame"]) +
+        " | " + str(receipt["kind"]) + " " + str(receipt["value"]) +
+        " | remaining health " + str(receipt["resulting_health"]) +
+        "\nSource: " + str(receipt["source_frame_digest"]).substr(0,16)
+    )
+
+
+func _cycle_approved_local_effect_history() -> void:
+    if _approved_local_effect_history.is_empty():
+        return
+    _approved_effect_history_cursor = (
+        _approved_effect_history_cursor+1
+    ) % _approved_local_effect_history.size()
+    _show_approved_local_effect_history()
 
 
 func _create_approved_health_inspector() -> void:
@@ -2129,6 +2172,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     if key.physical_keycode == KEY_J and not _approved_quest_history.is_empty():
         _next_approved_quest_history()
+        get_viewport().set_input_as_handled()
+        return
+    if key.physical_keycode == KEY_K and not _approved_local_effect_history.is_empty():
+        _cycle_approved_local_effect_history()
         get_viewport().set_input_as_handled()
         return
     if key.physical_keycode == KEY_I and not _approved_gameplay_inventory.is_empty():
