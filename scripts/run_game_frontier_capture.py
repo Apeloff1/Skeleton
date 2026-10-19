@@ -23,6 +23,9 @@ from skeleton.jeeves.game_frontier_native_capture import GodotPhysicsCaptureInge
 from skeleton.jeeves.game_frontier_receipt_journal import FrameReceiptJournal
 from skeleton.jeeves.game_frontier_native_audit import analyze_native_capture
 from skeleton.jeeves.game_frontier_native_compare import compare_native_sessions
+from skeleton.jeeves.game_frontier_native_rpg_bridge import (
+    parse_native_rpg_pages,evaluate_native_rpg_timeline,
+)
 
 
 def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
@@ -38,7 +41,8 @@ def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation",choices=("ingest","verify","fork","timeline","analyze","compare"),
+    parser.add_argument("operation",choices=("ingest","verify","fork","timeline","analyze","compare",
+                                 "evaluate-events"),
                         help="Do not combine a new capture with replay or fork")
     parser.add_argument("--signed-gdd",type=Path,required=True)
     parser.add_argument("--scene-json",type=Path,required=True)
@@ -51,6 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-frame",type=int,default=0)
     parser.add_argument("--page-limit",type=int,default=128)
     parser.add_argument("--actor-id")
+    parser.add_argument("--event-pages-json",type=Path)
+    parser.add_argument("--event-flags-json",type=Path)
+    parser.add_argument("--event-limit",type=int,default=256)
     parser.add_argument("--audit-max-frames",type=int,default=256)
     parser.add_argument("--other-journal",type=Path)
     parser.add_argument("--other-track",default="production")
@@ -71,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("fork requires --fork-track and --through")
     if (arguments.chunk_x is None)!=(arguments.chunk_y is None):
         parser.error("timeline chunk filters require both --chunk-x and --chunk-y")
-    if arguments.operation not in ("timeline","analyze","compare") and (
+    if arguments.operation not in ("timeline","analyze","compare","evaluate-events") and (
         arguments.start_frame!=0 or arguments.actor_id is not None):
         parser.error("frame cursor and actor filter apply only to timeline/analyze")
     if arguments.operation!="timeline" and (
@@ -91,6 +98,13 @@ def main(argv: list[str] | None = None) -> int:
         arguments.comparison_max_frames!=1024 or
         arguments.comparison_tolerance_m!=.5):
         parser.error("comparison options apply only to compare operation")
+    if arguments.operation=="evaluate-events" and (
+        arguments.event_pages_json is None or arguments.actor_id is None):
+        parser.error("event evaluation requires --event-pages-json and --actor-id")
+    if arguments.operation!="evaluate-events" and (
+        arguments.event_pages_json is not None or arguments.event_flags_json is not None
+        or arguments.event_limit!=256):
+        parser.error("event pages, flags and evaluation limit only apply to evaluate-events")
     if arguments.operation!="ingest" and arguments.resume:
         parser.error("--resume applies only to ingest")
     if arguments.operation!="ingest" and arguments.capture_jsonl is not None:
@@ -146,6 +160,22 @@ def main(argv: list[str] | None = None) -> int:
                         journal,other,actor_id=arguments.actor_id,
                         max_aligned_frames=arguments.comparison_max_frames,
                         tolerance_m=arguments.comparison_tolerance_m)}
+            elif arguments.operation=="evaluate-events":
+                pages=parse_native_rpg_pages(_operator_json(arguments.event_pages_json))
+                flags={}
+                if arguments.event_flags_json is not None:
+                    raw_flags=_operator_json(arguments.event_flags_json)
+                    if (raw_flags.get("schema")!="skeleton.game.native_rpg_flags.v1"
+                        or not isinstance(raw_flags.get("flags"),dict)
+                        or any(type(v) is not bool
+                               for v in raw_flags["flags"].values())):
+                        raise ValueError("source-typed boolean RPG event flags required")
+                    flags=raw_flags["flags"]
+                report={"operation":"evaluate-events",
+                        "evaluation":evaluate_native_rpg_timeline(
+                            journal,pages,actor_id=arguments.actor_id,
+                            start_frame=arguments.start_frame,
+                            limit=arguments.event_limit,flags=flags)}
             elif arguments.operation=="analyze":
                 report={"operation":"analyze","diagnostics":analyze_native_capture(
                     journal,start_frame=arguments.start_frame,
