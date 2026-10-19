@@ -1,0 +1,526 @@
+name: Game Frontier Native Godot Smoke
+
+# Specialized native engine acceptance: actual Godot 4 binary, not a mock.
+# Keep resource cost scoped; cancel superseded PR commits.
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/build_game_frontier_smoke.py"
+      - "scripts/build_game_frontier_quest_smoke_approvals.py"
+      - "scripts/run_game_frontier_quest_tools.py"
+      - "scripts/run_game_frontier_godot_dispatch.py"
+      - "scripts/run_game_frontier_endurance.py"
+      - "scripts/verify_game_frontier_instruments.py"
+      - "scripts/verify_game_frontier_dash.py"
+      - "scripts/qualify_game_frontier_godot.py"
+      - "scripts/run_game_frontier_capture.py"
+      - "scripts/validate_game_frontier_native_smoke.py"
+      - "skeleton/forge/game_frontier_godot.py"
+      - "skeleton/jeeves/game_frontier*.py"
+      - ".github/workflows/game-frontier-native-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontier-native-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  godot4-native-smoke:
+    name: Pinned Godot 4.7.2 headless physics/frame evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11.16"
+      - name: Install production source and minimal smoke dependencies
+        run: python -m pip install --disable-pip-version-check -e .
+      - name: Fetch official pinned Godot 4.7.2 standard Linux archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot-bin"
+          curl --fail --location --show-error --retry 2 \
+            --output "$RUNNER_TEMP/godot-bin/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  $RUNNER_TEMP/godot-bin/godot.zip" | sha256sum --check
+          unzip -qq "$RUNNER_TEMP/godot-bin/godot.zip" -d "$RUNNER_TEMP/godot-bin"
+          test -f "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64"
+          chmod 700 "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64"
+          echo "FRONTIER_GODOT=$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+          echo "FRONTIER_GODOT_SHA=$(sha256sum "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      # One pinned binary download, four independently sandboxed native
+      # simulations and journals. This avoids a 4x runner/install/download fanout.
+      - name: Qualify 30/50/60/120 Hz native physics and frame journals
+        shell: bash
+        run: |
+          set -euo pipefail
+          for fps in 30 50 60 120; do
+            echo "::group::Game Frontier real Godot native ${fps} Hz"
+            project="$RUNNER_TEMP/frontier-project-${fps}"
+            userdir="$RUNNER_TEMP/frontier-userdata-${fps}"
+            journal="$RUNNER_TEMP/frontier-frames-${fps}.sqlite"
+            mkdir -p "$project" "$userdir"
+            python scripts/build_game_frontier_smoke.py \
+              --output "$project" --fps "$fps" --frames 20
+            XDG_DATA_HOME="$userdir" python scripts/qualify_game_frontier_godot.py \
+              --godot "$FRONTIER_GODOT" --godot-sha256 "$FRONTIER_GODOT_SHA" \
+              --project "$project" --frames 20
+            capture="$(find "$userdir" -type f -name frontier_native_physics.jsonl -print -quit)"
+            test -n "$capture"
+            test -s "$capture"
+            python scripts/validate_game_frontier_native_smoke.py \
+              --capture-jsonl "$capture" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --min-ticks 4 --max-ticks 20 --require-dynamics --require-zones --require-fields \
+              > "$RUNNER_TEMP/frontier-native-report-${fps}.json"
+            python scripts/run_game_frontier_capture.py ingest \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --capture-jsonl "$capture" \
+              --journal "$journal"
+            # Independently verify a second real Godot instrument stream
+            # against *each exact original physics tick* in the signed journal.
+            # This is not a screen/UI mock or actual device GPS data.
+            instrument_stream="$(find "$userdir" -type f \
+              -name frontier_virtual_instruments.jsonl -print -quit)"
+            test -n "$instrument_stream"
+            test -s "$instrument_stream"
+            python scripts/verify_game_frontier_instruments.py \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" \
+              --telemetry-jsonl "$instrument_stream" \
+              --actor-id hero --max-frames 20 \
+              > "$RUNNER_TEMP/frontier-game-instruments-$fps.json"
+            python - "$RUNNER_TEMP/frontier-game-instruments-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          proof=json.loads(Path(sys.argv[1]).read_text())
+          assert proof["verified_physics_frames"]>=4, proof
+          assert proof["expected_fps"] in (30,50,60,120)
+          assert len(proof["instrument_chain_head"])==64
+          assert len(proof["receipt_digest"])==64
+          print(json.dumps({"verified_native_instrument_frames":
+                                proof["verified_physics_frames"],
+                            "source_fps":proof["expected_fps"],
+                            "instrument_proof":proof["receipt_digest"]}))
+          PY
+            python scripts/run_game_frontier_capture.py verify \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal"
+            python scripts/run_game_frontier_capture.py timeline \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" --page-limit 20 \
+              > "$RUNNER_TEMP/frontier-native-timeline-${fps}.json"
+            # The exact observed engine samples must also drive actual RPG
+            # comparator/priority/event receipts with the signed GDD journal.
+            python scripts/run_game_frontier_capture.py evaluate-events \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" \
+              --event-pages-json "$project/native_rpg_pages.json" \
+              --actor-id hero \
+              > "$RUNNER_TEMP/frontier-rpg-events-${fps}.json"
+            python - "$RUNNER_TEMP/frontier-rpg-events-${fps}.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          obj=json.loads(Path(sys.argv[1]).read_text())["evaluation"]
+          ids={p["page_id"] for entry in obj["entries"]
+               for p in entry["accepted_proposals"]}
+          assert {"observed_actor_motion","entered_game_zone",
+                  "exited_game_zone"} <= ids, ids
+          assert obj["source_prefix_verified_frames"]>=4
+          assert all(e["requires_runtime_approval"] for e in obj["entries"])
+          assert obj["authority"]=="source_replayed_RPG_proposals_not_approved_world_actions"
+          print(json.dumps({"verified_rpg_event_pages":sorted(ids),
+                            "source_prefix":obj["source_prefix_verified_frames"],
+                            "candidate_fire_count":obj["candidate_fire_count"]}))
+          PY
+            # CI ONLY: select known test quest events from genuine signed
+            # Godot frame receipts, then run the operator CLI simulation.
+            # No production approval identity is asserted by this fixture.
+            python scripts/build_game_frontier_quest_smoke_approvals.py \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" \
+              --event-pages-json "$project/native_rpg_pages.json" \
+              --quest-graph-json "$project/native_quest_graph.json" \
+              --output "$RUNNER_TEMP/frontier-fixture-approved-$fps.json" \
+              > "$RUNNER_TEMP/frontier-quest-fixture-$fps.json"
+            python scripts/run_game_frontier_capture.py simulate-quests \
+              --signed-gdd "$project/signed_gdd.json" \
+              --scene-json "$project/frontier/data/scene.json" \
+              --journal "$journal" \
+              --event-pages-json "$project/native_rpg_pages.json" \
+              --quest-graph-json "$project/native_quest_graph.json" \
+              --quest-approvals-json "$RUNNER_TEMP/frontier-fixture-approved-$fps.json" \
+              --actor-id hero \
+              > "$RUNNER_TEMP/frontier-quest-session-$fps.json"
+            python - "$RUNNER_TEMP/frontier-quest-session-$fps.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          result=json.loads(Path(sys.argv[1]).read_text())["gameplay_session"]
+          trial=result["final_quests"].get("sky_trial")
+          assert trial is not None and trial["stage"]=="finished", trial
+          assert trial["completed"] is True
+          assert result["final_flags"]["quest_active"] is True
+          assert result["approved_page_count"]==2
+          assert result["authority"]=="operator_selected_local_gameplay_simulation_not_engine_world_save"
+          assert all(len(e["receipt_digest"])==64 for e in result["entries"])
+          print(json.dumps({"native_quest_completed":True,
+                            "source_frames":result["source_prefix_verified_frames"],
+                            "receipt_root":result["receipt_digest"]}))
+          PY
+            # Resume the same CI quest from a durable source-anchored state,
+            # without resetting event cooldown, quest flags or proposal history.
+            # The prior checkpoint digest is carried separately from its file.
+            common_quest_args=(
+              --signed-gdd "$project/signed_gdd.json"
+              --scene-json "$project/frontier/data/scene.json"
+              --journal "$journal"
+              --event-pages-json "$project/native_rpg_pages.json"
+              --quest-graph-json "$project/native_quest_graph.json"
+              --quest-approvals-json "$RUNNER_TEMP/frontier-fixture-approved-$fps.json"
+              --actor-id hero
+              --event-limit 64
+            )
+            first_cp="$RUNNER_TEMP/frontier-checkpoint-$fps-a.json"
+            second_cp="$RUNNER_TEMP/frontier-checkpoint-$fps-b.json"
+            first_window="$RUNNER_TEMP/frontier-quest-window-$fps-a.json"
+            second_window="$RUNNER_TEMP/frontier-quest-window-$fps-b.json"
+            python scripts/run_game_frontier_capture.py advance-quests \
+              "${common_quest_args[@]}" --through 2 \
+              --checkpoint-output-json "$first_cp" \
+              > "$first_window"
+            trusted_root="$(python - "$first_window" <<'PY'
+          import json,sys
+          from pathlib import Path
+          print(json.loads(Path(sys.argv[1]).read_text())["gameplay_window"]["checkpoint"]["receipt_digest"])
+          PY
+            )"
+            python scripts/run_game_frontier_capture.py advance-quests \
+              "${common_quest_args[@]}" \
+              --checkpoint-input-json "$first_cp" \
+              --expected-checkpoint-digest "$trusted_root" \
+              --checkpoint-output-json "$second_cp" \
+              > "$second_window"
+            python - "$RUNNER_TEMP/frontier-quest-session-$fps.json" "$first_window" "$second_window" "$second_cp" <<'PY'
+          import json,sys
+          from pathlib import Path
+          old=json.loads(Path(sys.argv[1]).read_text())["gameplay_session"]
+          first=json.loads(Path(sys.argv[2]).read_text())["gameplay_window"]
+          second=json.loads(Path(sys.argv[3]).read_text())["gameplay_window"]
+          cursor=json.loads(Path(sys.argv[4]).read_text())
+          assert first["entries"]+second["entries"]==old["entries"]
+          assert second["previous_checkpoint_digest"]==first["checkpoint"]["receipt_digest"]
+          assert second["checkpoint"]==cursor
+          assert cursor["quests"]==old["final_quests"]
+          assert cursor["flags"]==old["final_flags"]
+          assert cursor["approved_page_count"]==old["approved_page_count"]==2
+          assert cursor["last_session_receipt_digest"]==old["last_session_receipt_digest"]
+          assert first["verified_window_frames"]==3
+          assert second["verified_window_frames"]>=1
+          print(json.dumps({"replayed_and_resumed_native_quest":True,
+                            "source_frames":old["source_prefix_verified_frames"],
+                            "checkpoint_root":cursor["receipt_digest"]}))
+          PY
+            # The operator CLI's cold replay must reproduce the Godot quest.
+            quest_cli_args=(
+              --signed-gdd "$project/signed_gdd.json"
+              --scene-json "$project/frontier/data/scene.json"
+              --journal "$journal"
+              --event-pages-json "$project/native_rpg_pages.json"
+              --quest-graph-json "$project/native_quest_graph.json"
+              --quest-approvals-json "$RUNNER_TEMP/frontier-fixture-approved-$fps.json"
+              --actor-id hero
+              --frames-per-window 4
+            )
+            full_checkpoint="$RUNNER_TEMP/frontier-quest-inspect-$fps.json"
+            python scripts/run_game_frontier_quest_tools.py batch \
+              "${quest_cli_args[@]}" \
+              --checkpoint-output-json "$full_checkpoint" \
+              > "$RUNNER_TEMP/frontier-fullbatch-$fps.json"
+            python scripts/run_game_frontier_quest_tools.py audit \
+              "${quest_cli_args[@]}" --checkpoint-input-json "$full_checkpoint" \
+              > "$RUNNER_TEMP/frontier-questaudit-$fps.json"
+            python scripts/run_game_frontier_quest_tools.py inspect \
+              "${quest_cli_args[@]}" --checkpoint-input-json "$full_checkpoint" \
+              > "$RUNNER_TEMP/frontier-questview-$fps.json"
+            python - "$RUNNER_TEMP/frontier-fullbatch-$fps.json" "$RUNNER_TEMP/frontier-questaudit-$fps.json" "$RUNNER_TEMP/frontier-questview-$fps.json" "$RUNNER_TEMP/frontier-quest-session-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          bat,audit,view,mono=[json.loads(Path(p).read_text()) for p in sys.argv[1:]]
+          batch=bat["gameplay"]
+          evidence=audit["checkpoint_audit"]
+          objective=view["quest_journal"]
+          reference=mono["gameplay_session"]
+          assert batch["verified_frame_count"]==reference["source_prefix_verified_frames"]
+          assert batch["total_approved_events"]==reference["approved_page_count"]==2
+          assert batch["head_checkpoint"]["last_session_receipt_digest"]==reference["last_session_receipt_digest"]
+          assert batch["head_checkpoint"]["quests"]==reference["final_quests"]
+          assert batch["head_checkpoint"]["flags"]==reference["final_flags"]
+          assert evidence["source_replay_consistent"] is True
+          assert evidence["checkpoint_digest"]==batch["head_checkpoint"]["receipt_digest"]
+          assert objective["quests_completed"]==1
+          assert objective["quest_entries"][0]["stage_id"]=="finished"
+          assert objective["quest_entries"][0]["next_options"]==[]
+          assert objective["game_only_virtual_position_xyz_m"]
+          print(json.dumps({"godot_verified_objective_journal":True,
+                            "window_count":batch["window_count"],
+                            "source_frame_count":batch["verified_frame_count"],
+                            "audit_root":evidence["receipt_digest"]}))
+          PY
+            # Finite crash/restart test against actual Godot native observations.
+            # Covers WAL rollback, receipt-preserving rotation and cold replay.
+            python scripts/run_game_frontier_endurance.py \
+              "${quest_cli_args[@]}" \
+              --vault "$RUNNER_TEMP/frontier-game-endurance-$fps.sqlite" \
+              --cycles 12 --retain-latest 2 --crash-interval 3 \
+              --max-cycle-ms 120000 --max-vault-bytes 33554432 \
+              --recovery-report-json "$RUNNER_TEMP/frontier-game-recovery-$fps.json" \
+              > "$RUNNER_TEMP/frontier-game-endurance-$fps.json"
+            python - "$RUNNER_TEMP/frontier-game-endurance-$fps.json" "$RUNNER_TEMP/frontier-game-recovery-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          report=json.loads(Path(sys.argv[1]).read_text())
+          recovery=json.loads(Path(sys.argv[2]).read_text())
+          assert recovery["receipt_digest"]==report["external_recovery_report_digest"]
+          assert recovery["vault_head_receipt_digest"]==report["final_vault_receipt_digest"]
+          assert recovery["sqlite_health"]["sqlite_check"]=="ok"
+          assert report["cycles_executed"]==12
+          assert report["source_frames_cold_replayed"]>=4
+          assert report["crash_rollbacks_executed"]>=1
+          assert report["cycle_evidence"][-1]["replayed_through"]==report["source_head_frame"]
+          assert len(report["final_vault_receipt_digest"])==64
+          assert len(report["final_retained_history_audit_digest"])==64
+          assert all(e["retained_history_verified_frames"]==e["replayed_through"]
+                     for e in report["cycle_evidence"])
+          assert report["peak_cycle_elapsed_ns"]>0
+          assert report["peak_measured_vault_disk_bytes"]<=33554432
+          print(json.dumps({"native_endurance_restarts":report["cycles_executed"],
+                            "verified_rollbacks":report["crash_rollbacks_executed"],
+                            "source_ticks":report["source_frames_cold_replayed"]}))
+          PY
+            # Install verified commands as DATA, rerun Godot and independently
+            # compare the actual engine's persisted quest/flag/dialogue receipt.
+            python scripts/run_game_frontier_godot_dispatch.py prepare \
+              "${quest_cli_args[@]}" \
+              --checkpoint-json "$full_checkpoint" \
+              --project "$project" \
+              > "$RUNNER_TEMP/frontier-game-dispatch-prepared-$fps.json"
+            dispatch_user="$RUNNER_TEMP/frontier-dispatch-runtime-$fps"
+            mkdir -p "$dispatch_user"
+            XDG_DATA_HOME="$dispatch_user" "$FRONTIER_GODOT" \
+              --headless --path "$project" --quit-after 32 \
+              > "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log" 2>&1
+            dispatch_receipt="$(find "$dispatch_user" -type f \
+              -name frontier_approved_gameplay_receipt.json -print -quit)"
+            if test -z "$dispatch_receipt" || ! test -s "$dispatch_receipt"; then
+              echo "::error::Missing Godot dispatch receipt; checking engine diagnostics"
+              tail -n 80 "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log"
+              exit 1
+            fi
+            # Milestones 1-5: actual physics difference after a level-2 skill.
+            # Baseline has no command-line dash. The alternate Godot process
+            # uses the same approved GDD, script and inputs plus one explicit
+            # CI-only player-key equivalent at native physics frame 2.
+            control_physics="$(find "$dispatch_user" -type f \
+              -name frontier_native_physics.jsonl -print -quit)"
+            test -n "$control_physics"
+            test -s "$control_physics"
+            test "$(wc -l < "$control_physics")" -eq 20
+            cp "$control_physics" "$RUNNER_TEMP/frontier-dash-control-$fps.jsonl"
+            dash_user="$RUNNER_TEMP/frontier-dash-active-$fps"
+            mkdir -p "$dash_user"
+            XDG_DATA_HOME="$dash_user" "$FRONTIER_GODOT" \
+              --headless --path "$project" --quit-after 32 \
+              -- --frontier-ci-wind-dash \
+              > "$RUNNER_TEMP/frontier-dash-active-$fps.log" 2>&1
+            dash_physics="$(find "$dash_user" -type f \
+              -name frontier_native_physics.jsonl -print -quit)"
+            dash_activations="$(find "$dash_user" -type f \
+              -name frontier_local_ability_activations.jsonl -print -quit)"
+            dash_save="$(find "$dash_user" -type f \
+              -name frontier_approved_gameplay_receipt.json -print -quit)"
+            if test -z "$dash_physics" || test -z "$dash_activations" || test -z "$dash_save"; then
+              echo "::error::Expected true source-unlocked Godot wind dash was not executed"
+              tail -n 80 "$RUNNER_TEMP/frontier-dash-active-$fps.log"
+              exit 1
+            fi
+            test -s "$dash_physics"
+            test "$(wc -l < "$dash_physics")" -eq 20
+            test -s "$dash_activations"
+            cmp "$dash_save" "$dispatch_receipt"
+            python scripts/verify_game_frontier_dash.py \
+              --control-jsonl "$RUNNER_TEMP/frontier-dash-control-$fps.jsonl" \
+              --activated-jsonl "$dash_physics" \
+              --ability-jsonl "$dash_activations" \
+              --dispatch-json "$project/frontier/data/native_gameplay_dispatch.json" \
+              --fps "$fps" --expected-frames 20 \
+              > "$RUNNER_TEMP/frontier-dash-differential-$fps.json"
+            python - "$RUNNER_TEMP/frontier-dash-differential-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          proof=json.loads(Path(sys.argv[1]).read_text())
+          assert proof["frame_count"]>=4, proof
+          assert proof["approved_skill_level"]==2, proof
+          assert proof["activation_tick"]==2, proof
+          assert proof["peak_added_velocity_along_impulse_mps"]>.12, proof
+          assert len(proof["receipt_digest"])==64
+          print(json.dumps({"godot_wind_dash_physics_verified":True,
+                            "fps":proof["fps"],
+                            "added_speed_mps":proof["peak_added_velocity_along_impulse_mps"],
+                            "dual_run_evidence":proof["receipt_digest"]}))
+          PY
+            # A new engine process lacking the opt-in command is forbidden
+            # to re-execute or append an already approved local player action.
+            pre_restart_ability="$(sha256sum "$dash_activations" | cut -d ' ' -f 1)"
+            XDG_DATA_HOME="$dash_user" "$FRONTIER_GODOT" \
+              --headless --path "$project" --quit-after 5 \
+              > "$RUNNER_TEMP/frontier-dash-restart-$fps.log" 2>&1
+            post_restart_ability="$(sha256sum "$dash_activations" | cut -d ' ' -f 1)"
+            if test "$pre_restart_ability" != "$post_restart_ability"; then
+              echo "::error::Wind dash spuriously replayed across process restart"
+              exit 1
+            fi
+            cmp "$dash_save" "$dispatch_receipt"
+            # Relaunch Godot against the same user:// directory. It must
+            # *reuse* its exact independently verified local gameplay state.
+            # A newly written or rewritten save would fail byte identity.
+            before_restart="$(sha256sum "$dispatch_receipt" | cut -d ' ' -f 1)"
+            XDG_DATA_HOME="$dispatch_user" "$FRONTIER_GODOT" \
+              --headless --path "$project" --quit-after 5 \
+              > "$RUNNER_TEMP/frontier-game-dispatch-restart-$fps.log" 2>&1
+            after_restart="$(sha256sum "$dispatch_receipt" | cut -d ' ' -f 1)"
+            if test "$before_restart" != "$after_restart"; then
+              echo "::error::Approved game save mutated across real Godot restart"
+              exit 1
+            fi
+            echo "Verified identical approved RPG save after second Godot process ($fps Hz)"
+            python scripts/run_game_frontier_godot_dispatch.py verify \
+              "${quest_cli_args[@]}" \
+              --checkpoint-json "$full_checkpoint" \
+              --project "$project" \
+              --engine-receipt-json "$dispatch_receipt" \
+              > "$RUNNER_TEMP/frontier-game-dispatch-verified-$fps.json"
+            python - "$RUNNER_TEMP/frontier-game-dispatch-verified-$fps.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          proof=json.loads(Path(sys.argv[1]).read_text())
+          assert proof["verified_engine_actions"]==17, proof
+          assert proof["verified_rpg_xp"]==130, proof
+          assert proof["verified_rpg_level"]==2, proof
+          assert proof["verified_unlocked_skills"]==1, proof
+          assert proof["verified_faction_standings"]==1, proof
+          assert len(proof["independent_progression_receipt"])==64, proof
+          assert len(proof["independent_local_effect_receipt"])==64, proof
+          assert proof["verified_local_health"]==88, proof
+          assert proof["verified_local_effects"]==3, proof
+          assert proof["verified_health_visual_effects"]==2, proof
+          assert proof["verified_instrument_focus"]=="flight", proof
+          assert proof["approved_native_camera_mode"]==2, proof
+          assert proof["verified_quest_count"]==1, proof
+          assert proof["verified_live_interface_modules"]==3, proof
+          assert proof["verified_cue_count"]==4, proof
+          assert proof["verified_action_receipts"]==17, proof
+          assert proof["verified_fx_cues"]==1, proof
+          assert proof["verified_npc_reactions"]==1, proof
+          assert proof["verified_inventory_visuals"]==1, proof
+          print(json.dumps({"godot_engine_dispatch_verified":True,
+                            "verified_commands":proof["verified_engine_actions"],
+                            "runtime_receipt":proof["engine_gameplay_receipt_sha256"]}))
+          PY
+            echo "#### Real Godot $fps Hz approved CI quest simulation" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/frontier-quest-fixture-$fps.json" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+            echo "#### Real Godot ${fps} Hz RPG proposals" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/frontier-rpg-events-${fps}.json" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+            echo "#### Real Godot ${fps} Hz native proof" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/frontier-native-report-${fps}.json" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+            echo "::endgroup::"
+          done
+      - name: Negative real-Godot locked-skill approval checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/frontier-project-60"
+          approval_file="$project/frontier/data/native_gameplay_dispatch.json"
+          original="$RUNNER_TEMP/frontier-approved-dispatch-negative-control.json"
+          test -s "$approval_file"
+          cp "$approval_file" "$original"
+          original_digest="$(sha256sum "$original" | cut -d ' ' -f 1)"
+          # First attempt: source absent. Godot must refuse the ability,
+          # create no approved game save and produce no dash activation.
+          rm "$approval_file"
+          absent_user="$RUNNER_TEMP/frontier-wind-dash-no-authority"
+          mkdir -p "$absent_user"
+          XDG_DATA_HOME="$absent_user" "$FRONTIER_GODOT" \
+            --headless --path "$project" --quit-after 32 \
+            -- --frontier-ci-wind-dash \
+            > "$RUNNER_TEMP/frontier-dash-no-authority.log" 2>&1
+          grep -q 'Approved game dispatcher source file/digest missing' \
+            "$RUNNER_TEMP/frontier-dash-no-authority.log"
+          if find "$absent_user" -type f \( \
+                -name frontier_local_ability_activations.jsonl -o \
+                -name frontier_approved_gameplay_receipt.json \
+              \) | grep -q .; then
+            echo "::error::Godot allowed wind dash without approved source"
+            exit 1
+          fi
+          # Second attempt: bundle exists but source digest is tampered.
+          cp "$original" "$approval_file"
+          printf ' \n' >> "$approval_file"
+          tampered_user="$RUNNER_TEMP/frontier-wind-dash-tampered-authority"
+          mkdir -p "$tampered_user"
+          XDG_DATA_HOME="$tampered_user" "$FRONTIER_GODOT" \
+            --headless --path "$project" --quit-after 32 \
+            -- --frontier-ci-wind-dash \
+            > "$RUNNER_TEMP/frontier-dash-tampered-authority.log" 2>&1
+          grep -q 'Approved game dispatcher source SHA does not match scene' \
+            "$RUNNER_TEMP/frontier-dash-tampered-authority.log"
+          if find "$tampered_user" -type f \( \
+                -name frontier_local_ability_activations.jsonl -o \
+                -name frontier_approved_gameplay_receipt.json \
+              \) | grep -q .; then
+            echo "::error::Godot accepted a modified gameplay-approval bundle"
+            exit 1
+          fi
+          cp "$original" "$approval_file"
+          test "$(sha256sum "$approval_file" | cut -d ' ' -f 1)" = "$original_digest"
+          echo "Real Godot rejected both missing and tampered skill approval sources"
+      - name: Differential native 30/50/60/120 Hz source-replayed comparisons
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in "30 60" "50 60" "60 120"; do
+            read -r left right <<< "$pair"
+            python scripts/run_game_frontier_capture.py compare \
+              --signed-gdd "$RUNNER_TEMP/frontier-project-${left}/signed_gdd.json" \
+              --scene-json "$RUNNER_TEMP/frontier-project-${left}/frontier/data/scene.json" \
+              --journal "$RUNNER_TEMP/frontier-frames-${left}.sqlite" \
+              --other-journal "$RUNNER_TEMP/frontier-frames-${right}.sqlite" \
+              --comparison-max-frames 128 --comparison-tolerance-m 0.5 \
+              > "$RUNNER_TEMP/frontier-comparison-${left}-${right}.json"
+            echo "#### Native physics ${left} vs ${right} Hz (exact rational ticks)" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/frontier-comparison-${left}-${right}.json" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+          done

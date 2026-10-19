@@ -25,7 +25,8 @@ import time
 from collections import Counter, OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime
 from typing import Any, Protocol
 
 from skeleton.provider_runtime import (

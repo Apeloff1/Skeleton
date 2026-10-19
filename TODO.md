@@ -1,0 +1,398 @@
+# To-Do — Game Frontier Models P0–P3
+
+Updated: 2026-10-19. Owner: existing Skeleton Jeeves/game, game-builder, forge and AI training planes.
+Tracking branch: `feature/game-frontier-p0-p3-20261019`.
+Detailed acceptance map: [Game Frontier Model Milestones](docs/plan/GAME_FRONTIER_MODELS_P0_P3_2026_10_19.md).
+Advanced physics assurance: [L00–L13 aerodynamics, collisions, climbing, climate and environment dossier](docs/plan/GAME_FRONTIER_ADVANCED_PHYSICS_ASSURANCE_2026_10_19.md).
+GPS/GDD assurance: [L00–L13 foreground positioning and per-frame signed-design coherence](docs/plan/GAME_FRONTIER_GPS_GDD_FRAME_ASSURANCE_2026_10_19.md).
+Chunk evidence: [Per-chunk source proofs, retirements, double verifiers and signed GDD receipts](docs/plan/GAME_FRONTIER_CHUNK_EVIDENCE_RECEIPTS_2026_10_19.md).
+Native capture, frame journal and compact source deltas: [L00–L13 runbook](docs/plan/GAME_FRONTIER_NATIVE_JOURNAL_DELTA_OPERATIONS_2026_10_19.md).
+Virtual game GPS and GDD map navigation: [fictional-only surveying, waypoints, per-frame proofs and AI context](docs/plan/GAME_FRONTIER_VIRTUAL_GPS_GDD_NAVIGATION_2026_10_19.md).
+
+**Status semantics:** `[x]` = source implementation committed to the feature branch
+(not merged or necessarily verified); `[ ]` = open. Source implementation
+is not permission to claim model parity, neural weights, benchmark proof, or
+runtime release readiness. All inference/training keeps existing authority.
+
+## P0 — Durable engine foundation / correctness first
+
+- [x] GF-P0-01 Genie-inspired deterministic wind-field primitives with altitude interpolation, turbulence, temporal/spatial coherence.
+- [x] GF-P0-02 Adaptive clouds with midpoint wind advection, shear-based stretch, per-cloud orientation, optional world wrapping.
+- [x] GF-P0-03 LingBot-inspired exact presentation clocks at **30, 50, 60, 120 FPS** with bounded catchup and physics-clock isolation.
+- [x] GF-P0-04 World-axis generation for terrain, temperature, humidity, verticality, sky islands, volatility, biomes.
+- [x] GF-P0-05 HY-World-inspired skeletal-bone-to-polygon meshes; reduce polygon counts by engine era and available triangle budget.
+- [x] GF-P0-06 TRELLIS-inspired simulation-ready mesh data with bone influences, collision capsules, animation sample transforms.
+- [x] GF-P0-07 SIMA-inspired evidence-linked cinematic shots plus inspect/approach/interact proposals (never autonomous mutation).
+- [x] GF-P0-08 Muse-inspired bounded speculative user-motion prediction with no input firing.
+- [x] GF-P0-09 Candidate-only shared composition façade with content-addressed receipts.
+- [x] GF-P0-133 Add primitive and integration regressions; targeted CI execution has passed.
+- [x] GF-P0-19 Add candidate-only model checkpoint, frame throughput and simulation-ready 3D evidence contracts.
+- [x] GF-P0-20 Add independent license allowlist, external receipt identity, measured-versus-requested FPS checks.
+- [x] GF-P0-21 Add opt-in 30/50/60/120 FPS bridge to canonical per-era simulation timing, with cross-mode tests.
+- [x] GF-P0-22 Add **60 FPS**, preserving 30/50/60/120 and canonical physics tick rates.
+- [x] GF-P0-23 Eight distinct world-variant generation transforms: inverse, mirror, elemental, ethereal, mythic, lensed, shadow, celestial.
+- [x] GF-P0-24 Top-down, platformer, full 3D and depth-weighted 2.5D/2.6D/2.7D/2.8D/2.9D projection candidates.
+- [x] GF-P0-25 Skin elasticity, cloth and hair soft-node spring motion; wetness/mass/wind damping and anchor displacement reference solver.
+- [x] GF-P0-26 Weather-aware player motion, traction, wind load, body temperature, rain and snow interaction.
+- [x] GF-P0-27 Adaptive character-plane collision, material restitution, recorded impact impulse and damage candidates.
+- [x] GF-P0-28 Environment soil saturation/erosion/foliage/snow/debris adaptation with simulated impacts.
+- [x] GF-P0-29 Construction progress, house integrity, long-term climate damage, natural growth and explicit maintenance.
+- [x] GF-P0-30 Liquid-aware hair, clothing, boots; protection/thermal and slip-risk character cognition.
+- [x] GF-P0-31 CPU shadow ray intersections for character and environment occluders plus area-light, wet-surface specular.
+- [x] GF-P0-32 Scene-candidate composition exports projection, variants, impacts, wear, awareness and ray-lighting evidence.
+- [x] GF-P0-33 Path-scoped frontier CI verified: 57 tests passed on source commit `586028081cd740fb153378422eb04f78c944cbf8` (GitHub Actions run `39186433511`).
+- [ ] GF-P0-34 Wire reference soft-body, weather, lifecycle and character collision outputs into authoritative Godot/era runtime.
+- [ ] GF-P0-35 Convert projected polygons and character-aware ray shadows into visible graphics with native renderer reference screenshots.
+- [ ] GF-P0-36 Persist world variants, structures, weather fields and motion state with history/canon/backups.
+- [x] GF-P0-37 Extend existing Forge Godot overlay with Y-up/Z-forward conversion, shadow-casting clouds, 60fps, variant luminance and top-down/platformer/pseudo-depth cameras.
+- [ ] GF-P0-38 Run real Godot headless parse, emitted scene import and screenshot smoke; inspect shadow caster geometry, camera and collision fidelity.
+- [x] GF-P0-39 Add conflict-safe Godot project overlay attachment preserving existing main level and imports.
+- [x] GF-P0-40 Export Godot overlay scene with posed polygons, generated bone capsules, sky islands and source-wind cloud animation paths.
+- [x] GF-P0-41 Add exporter custody/regression tests and apply 30/50/60/120 requested FPS cap to preview script.
+- [x] GF-P0-42 Sample altitude/heat/moist air density and visibility with ISA troposphere reference at 830 metres / 2723 feet.
+- [x] GF-P0-43 Separate physical fog extinction from air density, rain freshness proxy and optional cold-wind response.
+- [x] GF-P0-44 Add solar/lunar harmonic tide phase, height, current and rise-rate calculations.
+- [x] GF-P0-45 Add bounded conservative liquid grid flux with volume receipts and immersion/buoyancy/drag character calculations.
+- [x] GF-P0-46 Add atmosphere/rain/fog/occlusion/tide aware environmental audio delay/gain/filter/ambience candidates.
+- [x] GF-P0-47 Implement motion-coherent animated leaf geometry with independently ray-verified receiver-plane shadow area.
+- [x] GF-P0-48 Add 3D source distance inverse-square lighting with per-occluder transmittance, fog/rain/cloud optical dampening and wet-material highlight.
+- [x] GF-P0-49 Add wind- and character-impact responsive shrub/pebble reference physics integrated into same-frame 3D occlusion.
+- [x] GF-P0-50 Build real 3D indexed meshes from original 2D source sprites with old-era and modern outputs retaining the same asset digest.
+- [x] GF-P0-51 Build chunked triangle mesh partitioning and dual SHA-256 identity/topology reconstruction verification for every registered engine era.
+- [x] GF-P0-52 Add declarative multi-era RPG game editor backend for tile maps, prefabs, event pages, quests, cinematics, RPG systems and world/weather/physics parameters.
+- [x] GF-P0-53 Integrate reference atmosphere, tide, fluid, foliage, 3D lighting, mesh evolution and per-era chunk verification in one game scene candidate.
+- [x] GF-P0-54 Extend Godot Forge overlay with fog, scene light dampening, shadow polygons, water surface and shrub/rock geometry.
+- [x] GF-P0-55 Cross-system regression verified: 74 tests passed on source commit `e5cd4fe9c4026b6e090b349ffea600bd1b560dda` (run `39188618020`).
+- [ ] GF-P0-56 Integrate double-verifier chunking in every *actual* registered native engine runtime and guarantee seamless spatial streaming.
+- [ ] GF-P0-57 Run live Godot weather/water/leaf-shadow/rock/character physics simulation with per-frame coherence and screenshot proof.
+- [ ] GF-P0-58 Surface all new RPG-style editors in Galaxy Studio/Jeeves cockpit and connect event actions through authorized game runtime.
+- [ ] GF-P0-59 Bind conservative water solver to native moving-boundary shorelines, 3D collision and persistent coastal terrain.
+- [ ] GF-P0-60 Bind atmospheric audio cues and proper audio assets to playable mixer buses, occlusion and audio engine.
+- [ ] GF-P0-61 Profile production GPU 3D ray/path lighting and physically measured leaf-shadow alignment on low/high hardware.
+- [x] GF-P0-62 Implement SI-unit reference terminal velocity using atmosphere density, gravity, body mass, area and drag coefficient.
+- [x] GF-P0-63 Add 3D lee-side aerodynamic drafting with downwind wake distance, width and shielding factors.
+- [x] GF-P0-64 Add hot thermals, sinking air, vertical wind and turbulence with deterministic time/seed/position coherence.
+- [x] GF-P0-65 Add bounded substep aerodynamic integration with gravity, lift, drag, mechanical energy and drag dissipation.
+- [x] GF-P0-66 Implement wet/icy/loose gravel traction, weighted cargo, slope force balance, climbing skill and foothold/rope checks.
+- [x] GF-P0-67 Add mass/inertia-aware rigid-body impulse resolution with tangential Coulomb friction, angular motion, material restitution and energy/momentum receipts.
+- [x] GF-P0-68 Add continuous collision detection for high-speed sphere–sphere and sphere–terrain/plane sweeps.
+- [x] GF-P0-69 Evolve microclimate rain, freeze/thaw, solar drying, erosion, sediment, pressure shear and convective uplift into actual climbing surface/airflow inputs.
+- [x] GF-P0-70 Add 14-domain realism/coherence auditor with measurable invariants and content-addressed evidence; never award self-certified physics quality scores.
+- [x] GF-P0-71 Wire opt-in advanced aerodynamic, traction, impact and weather candidates into the existing source-hashed Jeeves scene.
+- [x] GF-P0-72 Export Godot native RigidBody3D candidate with mass/collider/restitution, live per-fixed-tick wind-relative drag and wet/ice-adjusted contact material.
+- [x] GF-P0-73 Add focused regression source and CI tests for terminal speed, lee-wake, thermals, climbing, collision momentum/energy, CCD, air/terrain integration and scene compatibility.
+- [ ] GF-P0-74 Verify native Godot RigidBody3D/headless import, GPU/physics timestep equivalence and actual slope/impact behavior.
+- [ ] GF-P0-75 Bind continuous collision prediction and multi-body contact solver to game-authoritative engine physics and actor controllers.
+- [ ] GF-P0-76 Add real per-era physics solver adaptation and source-verified fixed-step streams with dual chunk checks under loaded scenes.
+- [ ] GF-P0-77 Benchmark field-scale weather turbulence and long-horizon physical energy/momentum against independent reference solvers.
+- [x] GF-P0-78 Add segmented limb/torso/cargo mass distribution with content-addressed centre of mass and inertia tensors.
+- [x] GF-P0-79 Implement stance support polygon, foot-load sharing, acceleration-induced balance offset and grip-force stability checks.
+- [x] GF-P0-80 Implement ElasticBodySkin3D source rig wrapper with topology-linked spring/shear nodes, pinned bone pose and movable mesh vertices.
+- [x] GF-P0-81 Make elastic 3D skin weather/wetness, air temperature, collision and impact-responsive with bounded timestep.
+- [x] GF-P0-82 Export optional native Godot SoftBody3D using indexed shared topology and original rig vertex pin constraints.
+- [x] GF-P0-83 Add simulated integrated gyroscope with angular rate, drift, bias and horizon tilt measurement.
+- [x] GF-P0-84 Add calibrated compass with explicit magnetic declination, dip and local anomaly/interference checks.
+- [x] GF-P0-85 Add line-of-sight natural-horizon sextant angles with horizon dip, index error and refraction corrections.
+- [x] GF-P0-86 Add bubble sextant independent of natural horizon, with gyro attitude/bubble tilt and acceleration error models.
+- [x] GF-P0-87 Add hypsometric barometric altimeter calibrated to pressure/temperature/sea-level reference.
+- [x] GF-P0-88 Add baseline/elevation-angle trigonometric altimeter, optional curvature/refraction and SI/imperial output.
+- [x] GF-P0-89 Add deterministic navigation instrument panel receipts and Godot inspector, clearly labeled simulated not geolocation.
+- [x] GF-P0-90 Add condition-driven RPG environmental triggers for climate, wind, tides, collisions, strain, cargo, body COM, sensors and world events.
+- [x] GF-P0-91 Add RPG event priority, edge-crossing, hysteresis, cooldown and conflict suppression without native world mutation.
+- [x] GF-P0-92 Expand existing RPG Studio authoring surface with physical editors and environmental event pages.
+- [x] GF-P0-93 Integrate optional body distribution, skin and navigation triggers into Jeeves canonical scene and Forge export.
+- [x] GF-P0-94 Add detailed source regression tests and path-scoped CI for skin, navigation, weight, RPG and scene export.
+- [x] GF-P0-95 Add bounded elastic mesh link projection to limit runaway strain while preserving pinned rig nodes.
+- [ ] GF-P0-96 Run real Godot headless import and active SoftBody3D skin pin/mass/collision/animation validation.
+- [ ] GF-P0-97 Connect character material skin and fascia to authoritative game collision, cloth, locomotion and anatomical rig layers.
+- [ ] GF-P0-98 Connect approved environmental RPG event actions with existing quest/canon and save-state authority in every relevant era engine.
+- [ ] GF-P0-99 Persist and replay instrument calibration/drift, real celestial ephemeris and derived navigation readings through game time.
+- [x] GF-P0-100 Implement consent-bound foreground GPS fix ingestion with typed WGS84 position, accuracy, provider and monotone timestamp contracts.
+- [x] GF-P0-101 Add browser real device GPS watcher and foreground Start/Stop/Clear user interface without automatic collection, logs or network uploads.
+- [x] GF-P0-102 Reject absent/expired GPS permission, stale/future/low-accuracy/replayed or physically implausible fixes.
+- [x] GF-P0-103 Implement WGS84 surveyed position from user-verified fixed control stations and bearing line intersection with geometry/residual checks.
+- [x] GF-P0-104 Cross-check independent surveyed and live GPS position differences within declared combined uncertainty; do not silently blend mismatched fixes.
+- [x] GF-P0-105 Publish redacted scene/analytics receipts only, never raw GPS/survey coordinates in hashed GDD, model prompts, game manifests or logs.
+- [x] GF-P0-106 Integrate with existing signed story-bible/GDD source validator and immutable world-law digest rather than creating another canon authority.
+- [x] GF-P0-107 Partition each build frame into spatial actor/prefab chunks with deterministic moving-entity membership at 30/50/60/120 FPS.
+- [x] GF-P0-108 Independent frame verifier A authenticates SHA-256 chunk payload, source object identity and frame receipt linkage.
+- [x] GF-P0-109 Independent frame verifier B checks temporal continuity, chunk membership, signed-GDD law linkage, object conservation and movement envelopes.
+- [x] GF-P0-110 Add strictly bounded between-frame AI/human/engine notes that cite signed GDD world-law indices and never auto-promote generated canon.
+- [x] GF-P0-111 Expose verified frame design context for Jeeves provider callers without invoking LLMs or fabricating model weights.
+- [x] GF-P0-112 Implement bounded constant-memory GDD context cursor with hash-chain lineage to support months-long frame histories.
+- [x] GF-P0-113 Extend the existing RPG Studio to produce double-verified build-progress receipts from true placed prefab assets and stable IDs.
+- [x] GF-P0-114 Focused regressions passed for 141 tests including surveyed fixes, privacy, GPS spoof/replay rejection and 80 continuous GDD-linked frames.
+- [ ] GF-P0-115 Install compatible Expo SDK 54 native foreground location provider with permission config and actually verify Android/iOS device acquisition and revocation.
+- [ ] GF-P0-116 Wire frame chunk A/B verifiers and temporal context to actual *rendered* frames in all historical and modern native engine runtimes.
+- [ ] GF-P0-117 Integrate frame history and bounded AI-context cursor with canonical durable operation/checkpoint/save/restore authority and conflict-free replay.
+- [ ] GF-P0-118 Expose surveyed-control editing and operator approval for sighting inputs and baseline metadata in live Galaxy Studio/Jeeves cockpit.
+- [x] GF-P0-119 Create game-only fictional map XYZ, metric tiles, rotation, realm coordinates and explicitly non-Earth latitude/longitude-style display.
+- [x] GF-P0-120 Simulate deterministic range measurements from four-plus authored virtual 3D beacons without device GPS.
+- [x] GF-P0-121 Resolve game avatar 3D position by uncertainty-aware beacon multilateration and independent residual/geometry checks.
+- [x] GF-P0-122 Compute independent virtual survey fixes from GDD-approved landmarks, sightings and optional vertical angles.
+- [x] GF-P0-123 Reject contradictory fictional survey/GPS fixes using independent uncertainties and block incoherent map tiles.
+- [x] GF-P0-124 Implement deterministic obstacle-aware virtual game-map waypoint routing and realm-specific map identity.
+- [x] GF-P0-125 Bind game GPS to actual double-verified frame actor positions and signed GDD source, blocking fake frame/entity positions.
+- [x] GF-P0-126 Integrate virtual map authoring, same-frame navigation receipts and provisional AI GDD design context into RPG Studio.
+- [x] GF-P0-127 Export visible Godot virtual GPS coordinate and bounded route HUD explicitly without OS sensor access.
+- [x] GF-P0-128 Independently audit fictional source identity, SHA-256 receipts, bounded accuracy, survey, map and frame/GDD provenance.
+- [x] GF-P0-129 Add virtual GPS, surveying, route, corruption and 30/50/60/120 FPS per-frame regression source.
+- [ ] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era.
+- [ ] GF-P0-131 Interactive minimap zoom, world-portal and underground/sky-island multilevel navigation controls.
+- [ ] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes.
+
+- [ ] GF-P0-134 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
+- [x] GF-P0-135 Implement source-hashed evidence records for every registered-era mesh chunk with 3D bounds, triangle IDs, vertex IDs and deterministic ordering.
+- [x] GF-P0-136 Record per-chunk independent mesh verifier A content authenticity and verifier B source topology/centroid reconstruction.
+- [x] GF-P0-137 Implement exact-once original face coverage receipts and independently re-verified whole-mesh evidence roots.
+- [x] GF-P0-138 Add signed-GDD frame-per-chunk evidence with immutable actor IDs, source asset digests, source frame hash and note/law anchors.
+- [x] GF-P0-139 Add per-chunk unchanged/moved/arrived/departed actor receipts and source-backed cross-chunk migration conservation.
+- [x] GF-P0-140 Preserve tombstone/retirement receipts for chunks whose last object leaves during frame updates.
+- [x] GF-P0-141 Add optional chained previous-chunk evidence root and reject forged predecessor actor/asset identities even with recomputed receipt hashes.
+- [x] GF-P0-142 Export complete frame/mesh chunk evidence receipts through canonical Jeeves scenes and RPG Studio frame progress.
+- [x] GF-P0-143 Root AI between-frame context in exact chunk evidence digest and signed GDD without automatic canon promotion.
+- [x] GF-P0-144 Extend independent scene auditor to recheck mesh/frame evidence hashes, migration accounting, source links and A/B flags.
+- [x] GF-P0-145 Add Godot chunk receipt inspector with source-only proof root, chunk counts, migration and signed GDD note counts.
+- [x] GF-P0-146 Add adversarial and 30/50/60/120 FPS receipt tests including mesh corruption, retired cells and chained 40-frame review.
+- [ ] GF-P0-147 Make real native era engines emit authoritative render/physics chunk evidence rather than source-only candidate estimates.
+- [ ] GF-P0-148 Persist full per-chunk receipts in existing canonical content-addressed durable checkpoint/rollback plane with pagination.
+- [ ] GF-P0-149 Add explicit chunk-level shader/light/shadow/terrain/weather and vertex-diff source reference receipts on game world edits.
+- [x] GF-P0-150 Add SQLite WAL full-fidelity frame and content-addressed chunk receipt journal with atomic single-frame commits.
+- [x] GF-P0-151 Reconstruct stored canonical typed FrameReceipt and source chunk receipts from hashed durable blobs with independently checked signed-GDD inputs.
+- [x] GF-P0-152 Reject invalid/missing frames, source-GDD changes, duplicated frame indices, altered hashes and impossible actor motion without partial journal advances.
+- [x] GF-P0-153 Reopen/replay verified source frame histories after restart and report recorded source/evidence chain heads.
+- [x] GF-P0-154 Add non-destructive rollback by forking a verified journal prefix and deduplicating common SHA source blobs.
+- [x] GF-P0-155 Add opt-in Godot 4 fixed-tick RigidBody3D observation serializer with scene/GDD/asset IDs, measured game XYZ and monotonic engine clock.
+- [x] GF-P0-156 Add strict allowlisted native-observation importer with actor/source/scene/fps/timestamp checking and bounded JSONL processing.
+- [x] GF-P0-157 Transactionally retain native Godot sample JSON alongside full independent A/B frame and chunk evidence; replay checks native candidate/timing continuity.
+- [x] GF-P0-158 Create an operator-run CLI for signed-GDD Godot JSONL ingestion, verification and journal prefix fork.
+- [x] GF-P0-159 Implement per-frame changed-actor and touched/retired-chunk delta format with GDD source and parent frame identity.
+- [x] GF-P0-160 Reconstitute deltas into full source frames and recheck exact original digest, GDD and two independent verifiers.
+- [x] GF-P0-161 Optionally persist compact source deltas alongside full frames in one WAL transaction and validate both during replay/fork.
+- [x] GF-P0-162 Add focused 30/50/60/120 FPS, 80-frame replay, native capture, script CLI, corruption, rollback and compact-delta regressions.
+- [x] GF-P0-163 Run the generated Godot scene through a real version-pinned Godot 4 headless import with actual physics-tick capture and no GDScript parse errors. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
+- [ ] GF-P0-164 Reconcile actual rendered/GPU/physics output with native capture, journal source and per-chunk evidence on target hardware.
+- [ ] GF-P0-165 Wire native recorder activation through the approved installer, user-run game creation UI, save slots and multi-entity controllers.
+- [ ] GF-P0-166 Add game authoritative telemetry source adapters for real collision normals/forces, lighting, audio and streamed mesh LOD per chunk.
+- [x] GF-P0-167 Provide a version-hash-pinned local Godot 4 headless import/play driver with bounded frame/time budgets, source asset validation and hashed subprocess logs.
+- [x] GF-P0-168 Validate the native Godot operator harness against missing assets, corrupt scene schema, changed executable, process failures and reported parser errors.
+- [x] GF-P0-169 Execute Godot 4 import/play with a real trusted binary, capture live RigidBody3D ticks and inspect actual emitted game-frame evidence for signoff. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
+- [x] GF-P0-170 Export all actors from a signed double-verified source game frame, preserving source asset identity and explicit reference-proxy classifications.
+- [x] GF-P0-171 Implement opt-in multi-actor Godot 4 physics body generation and capture of position, velocity and bounded contact counts.
+- [x] GF-P0-172 Add frame-local native chunk memberships from game coordinates, including negative cell boundaries and exactly-once actor source coverage.
+- [x] GF-P0-173 Independently reconstruct and verify reported native chunk membership, actor source identity, bounded physics values and candidate-only evidence SHA.
+- [x] GF-P0-174 Commit source native-physics chunk receipts alongside frame, GDD, game source and native observations atomically in the durable journal.
+- [x] GF-P0-175 Recheck native chunk source reports during full replay and fork/restore; reject even hash-matched but source-inconsistent reports.
+- [x] GF-P0-176 Add resumed multi-actor JSONL import that reuses only exactly matching committed frames and rejects altered history.
+- [x] GF-P0-177 Build bounded frame/chunk/native/notes evidence page iterator for GDD-aware game studio inspection, temporal filters and source digests.
+- [x] GF-P0-178 Expose paginated game chunk evidence timeline, actor and chunk filters, replay and resumable capture in the operator CLI.
+- [x] GF-P0-179 Bind verified imported native actor frames into fictional world-map GPS and surveyed navigation with GDD and chunk native evidence links.
+- [x] GF-P0-180 Create deterministic safe two-actor signed-GDD native Godot project fixture generator and executable smoke build driver.
+- [x] GF-P0-181 Add specialized real-Godot-4.7.2 native headless import/capture/ingest/replay workflow with official SHA-256 pinned release archive.
+- [x] GF-P0-182 Add source regression tests for 3-actor 4-rate chunk capture, native contact bounds, hostile partitions, virtual navigation and interrupted replay.
+- [x] GF-P0-183 Run specialized Godot workflow successfully with true headless generated scene parsing, runtime observed native physics and import receipts. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
+- [ ] GF-P0-184 Complete multi-actor native semantic physics using real game NPC/controller instead of bounded reference proxies.
+- [ ] GF-P0-185 Feed qualified native physics/event evidence to authorized playable game scenes with real Godot rendered-world QA.
+- [x] GF-P0-186 Add native physics actor motion/contact-count and chunk-enter/exit/retirement receipts computed independently from reported observations.
+- [x] GF-P0-187 Persist native chunk-transition receipts atomically beside Godot actor observations and double-verified signed-GDD frame records.
+- [x] GF-P0-188 Reconstruct native frame transitions and reject forged motion/chunk ledger data during source replay.
+- [x] GF-P0-189 Carry native transition evidence across verified rollback forks and expose its source SHA and observed contacts to timeline clients.
+- [x] GF-P0-190 Record native physics contact counts and game-chunk reports for multiple explicit authored frame actors.
+- [x] GF-P0-191 Resume interrupted native multi-actor JSONL capture only if every earlier observation and chunk proof matches persisted records.
+- [x] GF-P0-192 Add actual Godot trace acceptance requiring native fixed ticks, monotone clock, controlled body movement, contacts and correct spatial partitions.
+- [x] GF-P0-193 Connect native trace acceptance as mandatory pre-ingest step in specialized pinned Godot smoke workflow.
+- [x] GF-P0-194 Add adversarial native-frame source, chunk migration, timing, contact, corruption and 30/50/60/120 fps regressions.
+- [ ] GF-P0-195 Confirm real pinned-Godot smoke and exact-head focused tests pass; fix any GDScript compile or native-motion issues before native acceptance.
+- [ ] GF-P0-196 Extend reference physics proxies to actual NPC/gear/interaction controllers with signed event authority.
+- [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
+- [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
+- [ ] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups.
+- [ ] GF-P0-15 Add model-weight readiness/rights/VRAM capability discovery to existing model registry and provider runtime.
+- [ ] GF-P0-16 Add exact game environment adapters, deterministic replay and holdout dataset isolation.
+- [ ] GF-P0-17 Confirm correct per-era bone-weighted mesh imports with actual Godot/headless output.
+- [ ] GF-P0-18 Establish sustainable deadlines and resource envelopes rather than unbounded per-invocation memory use.
+
+## P1 — Real neural generation and perception
+
+- [ ] GF-P1-01 Implement provider-neutral action-conditioned frame/world generator adapter with negotiated input/output types.
+- [ ] GF-P1-02 Deploy authorized real visual world-model checkpoint; record architecture and support matrix.
+- [ ] GF-P1-03 Build continuous observation+action+camera history and compact, durable temporal latent/world memory.
+- [ ] GF-P1-04 Add visual continuity, occlusion, viewpoint revisit and long-horizon drift evaluation.
+- [ ] GF-P1-05 Implement variable-latency neural sampling with 30/50/60/120 FPS fallback, frame interpolation/drop policy and metrics.
+- [ ] GF-P1-06 Add GPU/CPU fallback scheduling with adaptive graphics quality, render resolution, latency and power governors.
+- [ ] GF-P1-07 Import HY-World-like licensed mesh/3DGS/depth/normal/camera outputs; validate source license and coordinates.
+- [ ] GF-P1-08 Build skeleton-guided remeshing, bone correspondence, LODs, skin-weight transfer and seam-preservation metrics.
+- [ ] GF-P1-09 Create TRELLIS-compatible legal image-to-3D ingestion and generate UV/PBR material maps and rig proposals.
+- [ ] GF-P1-10 Verify animation-ready meshes with actual collision, walking, IK, root motion and sim tick playback.
+- [ ] GF-P1-11 Give Dragon video/optical understanding via an approved checkpoint; ground semantic observations in frame evidence.
+- [ ] GF-P1-12 Connect SIMA-like language goals, game controls, visual context and reasoned plan proposals.
+- [ ] GF-P1-13 Add world-axis auto-generation request schema and adaptive weather/terrain/cloud visual constraints.
+- [ ] GF-P1-14 Integrate grounded music, VFX, cinematic camera motion and synchronized event staging.
+- [ ] GF-P1-15 Add visual 3D asset quality and IP similarity adjudication before promotion.
+- [ ] GF-P1-16 Rigged skin deformation with vertex weights, collision-aware cloth self-contact and root-motion coupling to production physics.
+- [ ] GF-P1-17 Calibrated rain/snow/fluid solver for cloth/hair/boots and continuous environmental heat transfer.
+- [ ] GF-P1-18 GPU renderer integration of character/environment occlusion, BVH spatial acceleration, traced reflections and soft shadows.
+- [ ] GF-P1-19 Full world-family graph and cross-world transitions preserving identity, canon, biome climate and physical rules.
+- [ ] GF-P1-20 Parallax layer/material synthesis and camera editor controls per 2.5–2.9D projection level.
+- [ ] GF-P1-21 Native gameplay rig, clothing, impact and structure wear benchmarks per historical console era.
+- [ ] GF-P1-22 Automatic source-to-target mesh/texture/normal/upscale/retarget LOD across old console/modern engines with semantic safeguards.
+- [ ] GF-P1-23 True water surface hydrodynamics and submerged character locomotion with mass/energy budgets.
+- [ ] GF-P1-24 Motion-driven leaf shadow penumbra vs GPU ray-tracer cross-verification and temporal coherence across sunlight.
+- [ ] GF-P1-25 Implement 3D source/medium photometry (atmospheric scattering, high-order bounces, shadow transmittance) in GPU shader pipeline.
+- [ ] GF-P1-26 Build desktop/mobile interactive RPG authoring UI for events, quests, scenes, characters, chunk editors and 3D prefabs.
+- [ ] GF-P1-27 Implement atmospheric boundary-layer turbulence, wind shear, terrain-induced drafting and vortex shedding calibrated against physical reference cases.
+- [ ] GF-P1-28 Integrate GPU/native climbing IK, limb contact, grip mechanics, ropes, sliding and rockfall support across 2D–3D engines.
+- [ ] GF-P1-29 Dynamic rigid-body CCD/broadphase/BVH/manifold generation and reliable restitution/friction on deformable and moving terrain.
+- [ ] GF-P1-30 Couple wind, thermal plumes, dynamic foliage, fabric, debris, fluid droplets and character motion through one authoritative timestep.
+- [ ] GF-P1-31 Map weather state to collision/surface friction, surface temperature and physical damage without mutating canonical worlds out of turn.
+- [ ] GF-P1-32 Integrate accurate segmented mass, multipoint contact forces, pose-aware center-of-mass and animation retargeting with native engine physics.
+- [ ] GF-P1-33 Upgrade elastic skin beyond reference springs with actual FEM/PBD tissue/skin, volume preservation, sliding layers and physically qualified penetration resistance.
+- [ ] GF-P1-34 Validate Godot SoftBody3D indexed-mesh topology, shared skeleton anchors, pin behavior, collision layers and Jolt/Godot solver parity.
+- [ ] GF-P1-35 Source actual time/sky celestial ephemerides with rotation, astronomical sight corrections, bubble sextant bias and geographic sphere/ellipsoid.
+- [ ] GF-P1-36 Add interactive gyro/compass/sextant/bubble-sextant/barometer/survey-altimeter UI calibration and side-by-side reference instrument simulation.
+- [ ] GF-P1-37 Build visual advanced RPG trigger graph editor tied to weather, character physics, time of day, objects, instruments, quests and world axes.
+- [ ] GF-P1-38 Add native mobile GNSS bridge using approved Expo SDK-compatible foreground-only GPS subscription with hardware accuracies and permission lifecycle.
+- [ ] GF-P1-39 Add ECEF/ENU long-baseline precise surveying, vertical-angle leveling, datum transformations and documented geodetic/geoid height residuals.
+- [ ] GF-P1-40 Add dynamic verified frame snapshots for camera, mesh, shader, shadows, atmospheric physics, GPS/survey, audio, animations and AI inputs together.
+- [ ] GF-P1-41 Integrate chunk provenance and GDD notes through the existing canonical game design editor and procedural worlds with stable cross-chunk identities.
+- [ ] GF-P1-42 Introduce conflict and drift detection across simultaneous AI authoring passes using existing canon/construction authority, with human-review promotion.
+- [ ] GF-P1-43 Bind fictional beacon positioning/landmark observation to all authoritative native world simulation frames and physics loops.
+- [ ] GF-P1-44 Build independently verified AI between-frame movement plans, nav context and dynamic-GDD designer note critiques.
+- [ ] GF-P1-45 Support full multimodal traversal route synthesis between islands, caves, inverse/ethereal worlds, 2D and 3D maps.
+- [ ] GF-P1-46 Calibrate fictional GPS signal occlusion, multi-resolution terrain and dynamic game beacon movement with uncertainty envelopes.
+- [ ] GF-P1-47 Deliver streamed real engine chunk snapshots linked to render frame/LOD/collision/asset identity and dual independent verifiers.
+- [ ] GF-P1-48 Build live RPG Studio evidence timeline with per-chunk physics, position, AI intent, GDD law and migration navigation.
+- [ ] GF-P1-49 Add per-chunk delta compression, content addressing, LOD transition lineage and crash-resumable manifest batches.
+- [ ] GF-P1-50 Implement signed scene asset catalog for multiple real native Godot actors rather than the current one-RigidBody capture bridge.
+- [ ] GF-P1-51 Add true persisted delta compaction and bounded retention/rollups with verified checkpoint bases and independent reconstruction.
+- [ ] GF-P1-52 Expand opt-in native collection to contact impulses, surface pressure/traction, soft bodies and weather-material deformation with explicit source fields.
+- [ ] GF-P1-53 Instrument true renderer frames, depth/normal/shadow buffers, material IDs and per-chunk draw/visibility counters with native provenance.
+- [ ] GF-P1-54 Expose replay timeline and frame evidence diffs in Jeeves/Galaxy Studio UI with per-chunk graph, notes and native observation filtering.
+- [ ] GF-P1-55 Integrate runtime save/restore and replay journal branches with the canonical Forge production game state and GDD revision authority.
+- [ ] GF-P1-56 Add native scene-authorized moving/static actor builder per RPG entity/asset graph, not only proxy spheres.
+- [ ] GF-P1-57 Stream individual native chunk LOD/composition/physics/mesh/source deltas to durable GDD ledger and UI panels.
+- [ ] GF-P1-58 Implement crash-resumable batch compacted source ingestion, checkpoint snapshots, event replay and deep native chunk validation.
+- [ ] GF-P1-59 Couple real Godot scene camera, renderer shadow, GPU buffer, collision and animation cues into chunk sensory receipts.
+- [ ] GF-P1-60 Build real-time clickable Studio UI for native evidence pages, chunk migration and RPG/GDD review.
+- [ ] GF-P1-61 Integrate GPS/survey/map route into real game character controllers and NPC navigation while avoiding device geolocation.
+- [ ] GF-P1-62 Capture per-contact normal/impulse and physics material IDs from actual native physics contact reporter with physical energy budget checks.
+- [ ] GF-P1-63 Integrate actor spawn, despawn and world-portal migration with signed GDD runtime/event authority and native chunk evidence.
+- [ ] GF-P1-64 Add chunk-specific foliage/weather/material/ray-shadow source observations and verify against actual rendered-frame references.
+- [ ] GF-P1-65 Expose GDD-reviewed collision/contact evidence and migration graph in Galaxy Studio/Jeeves cockpit UI.
+
+## P2 — Autonomous play, training, cinematics and scaled content
+
+- [ ] GF-P2-01 Build an autonomous emulator closed-loop observe→reason→act→verify controller with authoritative state checks.
+- [ ] GF-P2-02 Add SIMA-style world cognition: object permanence, physics consequences, affordance discovery and goal hierarchy.
+- [ ] GF-P2-03 Add cinematographic reasoning: framing, camera movement, blocking, continuity, timing and subject tracking.
+- [ ] GF-P2-04 Fuse camera, audio, HUD and controller input into grounded event timelines without confusing measurements/interpretation.
+- [ ] GF-P2-05 Train prediction/calibration models for WHAM-style preemptive lookahead against recorded user action histories.
+- [ ] GF-P2-06 Define prediction latency/confidence thresholds, cancellation and rollback to avoid speculative game actions.
+- [ ] GF-P2-07 Add adversarial pilot-versus-director cooperation with reproducible game environment evidence.
+- [ ] GF-P2-08 Scale world-axis combinations across biome, geography, ecology, gravity, weather, lore and transit topology.
+- [ ] GF-P2-09 Add longform canonical world and NPC state retention; ensure non-contradictory changes in scene, quest, dialogue.
+- [ ] GF-P2-10 Add multi-camera replay and generative reconstruction benchmarking for complex regions and sky-island levels.
+- [ ] GF-P2-11 Use authorized game data and synthetic originals for training; run contamination, dedup and rights gates.
+- [ ] GF-P2-12 Train local game-related checkpoints or approved adapters; preserve optimizer state, seed, dataset and model hashes.
+- [ ] GF-P2-13 Compare neural and deterministic physics over long horizons, including weather, wind, collisions and destruction.
+- [ ] GF-P2-14 Create Dragon/Jeeves/adversary learning triangle with independently measured, not self-graded improvements.
+- [ ] GF-P2-15 Verify end-to-end playable game generation, objective completion, win/loss detection and failure recovery.
+- [ ] GF-P2-16 Cognitive character planning for heat/cold, storms, shelter, liquid interactions, slippery surfaces and impact responses.
+- [ ] GF-P2-17 Multi-character skin/hair/garment interaction and wet/dry season, wind/water, high-speed simulation sweeps.
+- [ ] GF-P2-18 Construction crews, resource supply, scheduled maintenance and accelerated weather-aging simulations across years.
+- [ ] GF-P2-19 Elemental/ethereal/celestial/mythic inverse/mirror realm puzzle/physics/lighting scenario validation.
+- [ ] GF-P2-20 Full ray-traced cinematics (moving lights, dynamic geometry, shadow continuity and multi-view evidence).
+- [ ] GF-P2-21 Emergent multi-era RPG production templates with dialogue/quest continuity and playable game build export.
+- [ ] GF-P2-22 Cross-chunk foliage/river/shore physics reconciliation and dual verifier checks under dynamic world changes.
+- [ ] GF-P2-23 Calibrate barometry, aerosol visibility, thermal/cold/wet motion and seasonal astronomical physics against test measurements.
+- [ ] GF-P2-24 Build live character/foliage/rocks/liquid interactions with audio events, impact damage, shadow and weather responses.
+- [ ] GF-P2-25 Add mass-energy calibration and conservation or loss receipts for character, projectile, vehicle, building and mixed-material contacts.
+- [ ] GF-P2-26 Character cognition for drafting, updraft soaring, terminal descent, foothold search, avalanche/fall-risk avoidance and climate-responsive traversal.
+- [ ] GF-P2-27 Closed-loop learned game-agent simulation around weather, fast collision, climbing, carrying loads, stamina and terrain aging.
+- [ ] GF-P2-28 Weather realism parameter fitting across hot/cold, extreme elevation and changing land cover with held-out validation.
+- [ ] GF-P2-29 Add character biomechanics with segmented weight shifts, climbing, carrying, walking and gear impact coupled to elastic skin.
+- [ ] GF-P2-30 Add advanced RPG quest/event verification for environmental trigger chains, dynamic world conditions and narrative canon.
+- [ ] GF-P2-31 Train navigation/world cognition to use instruments without treating synthetic values as ground truth position fixes.
+- [ ] GF-P2-32 Validate actual simulated navigation with moving observer, drift, changing magnetic fields, seasons and game world rotation.
+- [ ] GF-P2-33 Add adversarial tissue/wet cloth/hair/skin simulation and multi-era animation model comparison against native rendering.
+- [ ] GF-P2-34 Integrate location-aware game interactions and privacy ceilings without disclosing raw GPS to unauthorized AI or multiplayer/telemetry.
+- [ ] GF-P2-35 Autonomous design critique uses only verified between-frame observations and signed GDD with abstention and adversarial challenge.
+- [ ] GF-P2-36 Simulate month-long multiworld frame histories, rollback/branch/merge and canonical GDD version evolution while keeping continuity.
+- [ ] GF-P2-37 Develop continuous landmark acquisition/resection/calibration and sensor-fusion training without fabricated survey authority.
+- [ ] GF-P2-38 Cross-world 3D in-game GPS survey networks for generated worlds, sky islands, caves and moving structures.
+- [ ] GF-P2-39 Couple between-frame AI navigation and building decisions to signed GDD and double-verified actor/chunk continuity.
+- [ ] GF-P2-40 Dynamically repair path and world-portal routes after construction, floods, collapse, tides and terrain changes.
+- [ ] GF-P2-41 Teach Jeeves/Dragon to reason about verified chunk changes and signaled semantic differences without hallucinating observations.
+- [ ] GF-P2-42 Continuous per-chunk physics/lighting/foliage/weather/audio correspondence checks during multiworld building.
+- [ ] GF-P2-43 Train or adapt Jeeves/Dragon to reason on recorded actual native game-state vs frame-delta context with immutable rights and source gating.
+- [ ] GF-P2-44 Develop ensemble adversarial benchmarks for source-vs-native physics divergence, lost chunk streams and corrupted replay.
+- [ ] GF-P2-45 Add multiworld branch/realm semantic rebasing on signed GDD transitions with cross-era compatibility.
+- [ ] GF-P2-46 Analyze true gameplay camera/sound/foliage/light continuity from captured native frames without inventing missing observations.
+- [ ] GF-P2-47 Learn authored game-navigation affordances from verified native movement/chunk data and GDD world-law notes.
+- [ ] GF-P2-48 Train/cross-verify AI world reasoning on hold-out native collision/game-map/weather evidence with no unreviewed canon promotion.
+- [ ] GF-P2-49 Support actual generated multi-era 2D/2.5D/3D game scene runtime adapters and per-frame native evidence.
+- [ ] GF-P2-50 Link Dragon and Jeeves multimodal training to observational native world deltas and source-verified virtual GPS fix errors.
+- [ ] GF-P2-51 Train and verify world/cinematic/navigation cognition against actual native chunk transitions and physically observed sensor context.
+
+## P3 — Production qualification and large-scale world operation
+
+- [ ] GF-P3-01 Run real GPU serving load tests per 30/50/60/120 mode, with measured generated versus displayed frame rates.
+- [ ] GF-P3-02 Qualify 3D level scalability, chunk streaming, weather and cloud LOD under low/high device profiles.
+- [ ] GF-P3-03 Add spatial/neural memory compaction and world-state restore beyond hour/day/week production runs.
+- [ ] GF-P3-04 Profile persistent project runs lasting weeks/months, crash resume, backups, lease recovery and budget limits.
+- [ ] GF-P3-05 Build source/mesh/skeleton/material/animation export paths per licensed console and engine target.
+- [ ] GF-P3-06 Compare transfer performance over held-out games/eras and record independent benchmark receipts.
+- [ ] GF-P3-07 Add neural/visual/style quality acceptance with provenance, similarity screening, regression and human inspection.
+- [ ] GF-P3-08 Implement governable shadow→candidate→canary→production model promotion with rapid rollback.
+- [ ] GF-P3-09 Release cinematic and preemptive suggestion controls in Jeeves cockpit / Galaxy Studio.
+- [ ] GF-P3-10 Add artifact/documentation UI: live frames, weather windmaps, LoD budget, skeleton rig preview, evidence and model status.
+- [ ] GF-P3-11 Full first-install qualification, native emulator ROM validation, Godot export and cross-device recovery.
+- [ ] GF-P3-12 Finish VOL L00–L13 research/implementation/assurance dossiers and exact-head enterprise benchmarking.
+- [ ] GF-P3-13 Verify production feature parity claims strictly from executed inference and generated/exported scenes.
+- [ ] GF-P3-14 Merge only after review and acceptable CI; reconcile conflicts, retain rights and safety gates.
+- [ ] GF-P3-15 GPU/CPU parity and frame-time telemetry for 30/50/60/120 FPS including pseudo-depth view modes.
+- [ ] GF-P3-16 Multi-year world and building restoration, freeze-thaw/flood/fire long-tail damage and maintenance economic qualification.
+- [ ] GF-P3-17 Per-era visual QA of dynamic hair/cloth and character-aware ray tracing under mobile/PC/console performance envelopes.
+- [ ] GF-P3-18 Gameplay across all nine world families (including original) and eight projection modes; continuity/transition acceptance.
+- [ ] GF-P3-19 Frame and sensor evidence separate computed reference motion from authoritative GPU/physics outcomes.
+- [ ] GF-P3-20 Qualify 830m reference air vs sea level, polar/hot/fog/rain weather extremes, and lunar/solar tides at realistic and fictional locations.
+- [ ] GF-P3-21 Verify all-engine chunk streaming under multithreaded edits, world reloads, LOD swaps, actor movement and save/restore.
+- [ ] GF-P3-22 Full Godot export/import screenshots and real 2D-to-3D modernization project first-install acceptance.
+- [ ] GF-P3-23 Cinematic/audio/lighting/world consistency benchmarks at actual GPU-produced 30/50/60/120fps.
+- [ ] GF-P3-24 Cross-engine real-time aerodynamics, drag, wakes, winds, fast CCD, multi-contact, climbing and impact throughput under 30/50/60/120 FPS presentation modes.
+- [ ] GF-P3-25 Native physics frame-by-frame replay energy/momentum conservation, rollback and weeks-long weather-aware traversal tests.
+- [ ] GF-P3-26 Independent external physics benchmark acceptance across rigid/soft/liquid/terrain engines and hardware generations.
+- [ ] GF-P3-27 Complete per-era native SoftBody3D/character full install tests and CPU/GPU deformation/skin collision performance scorecards.
+- [ ] GF-P3-28 Validate instrument error budgets, gyro drift, celestial fixes, barometer and survey results with independent measured cases.
+- [ ] GF-P3-29 Stress 2030s RPG authoring chains, save/restore/canon continuity, event ordering and character environmental triggers for months-long projects.
+- [ ] GF-P3-30 Qualify native stability/memory, weather/elastic skin and calibration replay on historical console and modern hardware profiles.
+- [ ] GF-P3-31 Test live Android/iOS GPS permission grant, decline, temporary access, OS backgrounding, precision downgrade and session revocation.
+- [ ] GF-P3-32 Independent professional-grade survey reference measurements, GNSS multipath/spoofing checks and documented uncertainty against surveyed fixtures.
+- [ ] GF-P3-33 Frame-by-frame native 30/50/60/120 FPS coherence benchmark across all engines including geometry, shadow/weather physics, streaming and GDD logic.
+- [ ] GF-P3-34 Long production-cycle frame receipt retention, privacy deletion, provenance restore, human GDD signoff and reproducible release acceptance.
+- [ ] GF-P3-35 Validate active game-map GPS on Android/iOS/Windows/console builds without real-world location permissions.
+- [ ] GF-P3-36 Stress test 30/50/60/120Hz virtual fix movement, per-frame GDD context and chunks during month-long projects.
+- [ ] GF-P3-37 Native spatial chunk/portal map coherence, rollback, replay, multiplayer and save/restore acceptance.
+- [ ] GF-P3-38 Benchmark long-horizon 30/50/60/120fps chunk proof overhead, storage, replay and native renderer fidelity on all engine eras.
+- [ ] GF-P3-39 Validate cross-chunk LOD/seam, mesh edit, actor migration and signed GDD AI receipts under months-long game builds.
+- [ ] GF-P3-40 Qualify independent host-engine observability and operator-verified evidence retention, security and release signoff.
+- [ ] GF-P3-41 Qualify sustained 30/50/60/120 FPS native fixed-step receipt and GPU frame capture throughput on multiple physical target devices.
+- [ ] GF-P3-42 Test weeks/months-long atomic journal recovery, content-addressed compaction, timed backups, deletion controls and interrupted rollback.
+- [ ] GF-P3-43 Obtain independent engine binary provenance, native runtime log and gameplay screenshot acceptance for first install and console era builds.
+- [ ] GF-P3-44 Stress multi-actor, multi-GDD revision, multiplayer, portal and longform studio rollback against adverse I/O and FPS drift.
+- [ ] GF-P3-45 Benchmark model-assisted delta/canon reviews against verified game playthrough quality without promoting unreviewed AI output.
+- [ ] GF-P3-46 Qualify original game first-install native input, renderer and physics behavior across multiple windows, platforms and graphics backends.
+- [ ] GF-P3-47 Validate hour/day/week physics capture workloads with resumable ingestion, retention, backpressure and source checkpoint scrubbing.
+- [ ] GF-P3-48 Native engine 30/50/60/120 sustained FPS and GPU/CPU capture evidence benchmarks with measured render and frame latency.
+- [ ] GF-P3-49 Independently certify multi-actor native physics and virtual position/survey uncertainty through all game world-axis transitions.
+- [ ] GF-P3-50 Longform project recovery and canon/AI context/signoff evidence after merges and journal forks.
+- [ ] GF-P3-51 Benchmark high-density native actor transitions/contact evidence at 30/50/60/120Hz across weeks of replay and persistent GDD context.
+
+## Source references
+
+- [Genie 3](https://deepmind.google/blog/genie-3-a-new-frontier-for-world-models/)
+- [HY-World 2.0](https://github.com/Tencent-Hunyuan/HY-World-2.0)
+- [SIMA 2](https://deepmind.google/blog/sima-2-an-agent-that-plays-reasons-and-learns-with-you-in-virtual-3d-worlds/)
+- [Microsoft WHAM](https://www.microsoft.com/en-us/research/project/wham/)
+- [TRELLIS.2](https://github.com/microsoft/TRELLIS.2)
+- [NVIDIA Cosmos](https://developer.nvidia.com/cosmos)
