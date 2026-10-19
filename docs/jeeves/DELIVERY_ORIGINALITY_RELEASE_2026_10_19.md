@@ -199,3 +199,29 @@ their real host services; the queue does not claim those exist.
 The hundred objectives must be supported by independently captured
 measurements before the board can mark them passed. Running fixture tests,
 creating a milestone definition or queuing work is not certification.
+
+
+## Original major-milestone execution: MDM-001 through MDM-100
+
+The original masterplan has 100 milestones covering 421 canonical volumes.
+These differ from the M001-M100 assurance-rule IDs.
+
+scripts/execute_ai_100_large_milestones.py resolves real acceptance tests
+from the original source-pinned roadmap, checks their paths, hashes exact test
+source bytes and executes the approved Python tests using bounded subprocesses.
+Every result is a hash-linked test receipt, preserving failure diagnostics as
+a status and output fingerprint without leaking raw logs in the summary.
+
+Use these commands from a clean checkout:
+
+    python scripts/execute_ai_100_large_milestones.py --milestone MDM-001
+    python scripts/execute_ai_100_large_milestones.py --milestone MDM-001 --execute --report milestone-001.json
+    python scripts/execute_ai_100_large_milestones.py --all
+
+The manual-only GitHub workflow AI 100 Milestone Real Execution can invoke
+one milestone without adding mandatory CI fanout. Preview is the default;
+actual execution requires the explicit execute flag.
+
+A successful run proves only the selected tests on the pinned commit.
+It does not implement missing features, grant signoff, or clear the mandatory
+independent review, security, rollback and exact-head requirements.

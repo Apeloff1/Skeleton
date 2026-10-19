@@ -171,7 +171,8 @@ jobs:
             tests/test_jeeves_delivery_evidence_journal.py \
             tests/test_jeeves_delivery_assurance_milestones.py \
             tests/test_jeeves_delivery_milestone_workbench.py \
-            tests/test_jeeves_delivery_milestone_queue.py
+            tests/test_jeeves_delivery_milestone_queue.py \
+            tests/test_ai_100_real_milestone_execution.py
 
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
