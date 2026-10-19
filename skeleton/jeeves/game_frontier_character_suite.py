@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from typing import Mapping
 
 from .game_frontier_production import Vec3, CharacterSkeleton, SkinnedMesh, AnimationClip
 from .game_frontier_motion import Weather
@@ -67,6 +68,7 @@ def compile_character_suite(
     *, skeleton: CharacterSkeleton, mesh: SkinnedMesh,
     animation: AnimationClip, animation_time_ms: int,
     delta_s: float, weather: Weather | None = None,
+    derived_observations: Mapping[str,float] | None = None,
 ) -> dict:
     """Produce a portable, deterministic set of inspector receipts."""
     if not isinstance(config, CharacterSuiteConfig):
@@ -133,6 +135,12 @@ def compile_character_suite(
                 gyro_roll_deg=gyro.roll_deg if gyro else 0))
     instruments = instrument_manifest(tuple(readings)) if readings else None
     current = _validated_pairs(config.trigger_observations,"environment")
+    for name,value in (derived_observations or {}).items():
+        if type(value) not in (int,float) or not math.isfinite(value):
+            raise CharacterSuiteError("nonfinite environmental trigger observation")
+        if name in current and not math.isclose(current[name],value,rel_tol=1e-9,abs_tol=1e-9):
+            raise CharacterSuiteError("conflicting source-reported environmental signal: "+name)
+        current[name]=value
     if weather is not None:
         current.setdefault("temperature_c",weather.temperature_c)
         current.setdefault("rain_mm_h",weather.precipitation_mm_h)
