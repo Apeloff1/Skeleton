@@ -318,3 +318,88 @@ def ai_design_context(gdd: GDDSource, frames: Sequence[FrameReceipt], *,
         "requires_human_canon_approval":True,
         "authority":"proposed_ai_context_not_signed_gdd",
     }
+
+
+@dataclass(frozen=True)
+class FrameContextCursor:
+    """Compact, content-addressed AI context carried between verified frames.
+
+    Stores at most 64 notes instead of rescanning a full day/month of frames.
+    Native durable owner must persist and revalidate the cursor, never treat
+    it as a second authoritative GDD or frame state.
+    """
+    gdd_digest: str
+    last_frame_index: int
+    last_receipt_digest: str
+    recent_notes: tuple[dict, ...]
+    total_note_count: int
+    cursor_digest: str
+
+    def payload(self) -> dict:
+        return {
+            "gdd":self.gdd_digest,"frame":self.last_frame_index,
+            "head":self.last_receipt_digest,"notes":list(self.recent_notes),
+            "total_notes":self.total_note_count,
+        }
+
+
+def advance_context_cursor(
+    gdd: GDDSource,
+    frame: FrameReceipt, *,
+    previous_frame: FrameReceipt | None = None,
+    previous_cursor: FrameContextCursor | None = None,
+    max_notes: int = 32,
+) -> FrameContextCursor:
+    """Incremental O(frame notes) context with independently checked lineage."""
+    if type(max_notes) is not int or not 1<=max_notes<=64:
+        raise FrameCoherenceError("bounded context budget required")
+    if (previous_frame is None) != (previous_cursor is None):
+        raise FrameCoherenceError("cursor and previous frame must be paired")
+    if previous_cursor:
+        if (previous_cursor.gdd_digest!=gdd.source_digest or
+            previous_cursor.last_receipt_digest!=previous_frame.receipt_digest or
+            previous_cursor.last_frame_index!=previous_frame.frame_index or
+            digest(previous_cursor.payload())!=previous_cursor.cursor_digest):
+            raise FrameCoherenceError("provenance or checkpoint cursor drift")
+        if (digest(previous_frame.payload())!=previous_frame.receipt_digest or
+            not previous_frame.verified):
+            raise FrameCoherenceError("prior receipt integrity missing")
+    a,b=verify_frame(frame,gdd,previous=previous_frame)
+    if not a or not b:
+        raise FrameCoherenceError("AI cursor may advance only after double verification")
+    notes=list(previous_cursor.recent_notes) if previous_cursor else []
+    for note in frame.note_from_previous:
+        notes.append({
+            "frame":frame.frame_index,
+            "source_world_law_index":note.world_law_index,
+            "source_world_law":gdd.world_laws[note.world_law_index],
+            "category":note.category,
+            "note":note.text,
+            "review_status":note.author_kind,
+            "frame_receipt_digest":frame.receipt_digest,
+        })
+    total=(previous_cursor.total_note_count if previous_cursor else 0) + len(
+        frame.note_from_previous)
+    cursor=FrameContextCursor(gdd.source_digest,frame.frame_index,
+                               frame.receipt_digest,tuple(notes[-max_notes:]),total,"")
+    return FrameContextCursor(
+        cursor.gdd_digest,cursor.last_frame_index,cursor.last_receipt_digest,
+        cursor.recent_notes,cursor.total_note_count,digest(cursor.payload()))
+
+
+def cursor_ai_context(cursor: FrameContextCursor,gdd: GDDSource) -> dict:
+    if (cursor.gdd_digest!=gdd.source_digest or
+        digest(cursor.payload())!=cursor.cursor_digest):
+        raise FrameCoherenceError("invalid cached signed-GDD context")
+    return {
+        "schema":"skeleton.jeeves.frame_gdd_context.v1",
+        "project":gdd.project_id,"gdd_digest":gdd.source_digest,
+        "final_verified_frame":cursor.last_frame_index,
+        "final_frame_digest":cursor.last_receipt_digest,
+        "notes":list(cursor.recent_notes),
+        "truncated":cursor.total_note_count>len(cursor.recent_notes),
+        "total_notes":cursor.total_note_count,
+        "context_cursor_digest":cursor.cursor_digest,
+        "requires_human_canon_approval":True,
+        "authority":"proposed_ai_context_not_signed_gdd",
+    }
