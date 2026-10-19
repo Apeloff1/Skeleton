@@ -40,6 +40,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("_next_approved_cue",script)
             self.assertIn("_create_approved_inventory_objects",script)
             self.assertIn("SourceApprovedGameHealth",script)
+            self.assertIn("expected_progression_events",script)
+            self.assertIn("expected_faction_events",script)
             self.assertIn("ApprovedRPGBattleAndCraftHistory",script)
             self.assertIn("SourceApprovedHealthEffect_",script)
             self.assertIn("_animate_approved_health_effects",script)

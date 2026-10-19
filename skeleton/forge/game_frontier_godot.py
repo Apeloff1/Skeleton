@@ -62,6 +62,12 @@ var _approved_gameplay_flags: Dictionary = {}
 var _approved_gameplay_inventory: Dictionary = {}
 var _approved_local_health: int = 100
 var _approved_local_effect_history: Array = []
+var _approved_local_xp: int = 0
+var _approved_local_level: int = 1
+var _approved_unlocked_skills: Dictionary = {}
+var _approved_faction_reputation: Dictionary = {}
+var _approved_progression_events: Array = []
+var _approved_faction_events: Array = []
 var _approved_effect_history_label: Label
 var _approved_effect_history_cursor: int = 0
 var _approved_health_effect_kinds: Array[String] = []
@@ -915,6 +921,30 @@ func _configure_native_capture(settings: Dictionary) -> void:
     if _virtual_instrument_trace_file == null:
         push_error("Independent native instrument telemetry could not be opened")
 
+func _is_local_rpg_id(value: String) -> bool:
+    if value.length() < 1 or value.length() > 128:
+        return false
+    var letters := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    var allowed := letters + "0123456789_.-"
+    if not letters.contains(value.substr(0,1)):
+        return false
+    for c in value:
+        if not allowed.contains(c):
+            return false
+    return true
+
+
+func _is_canonical_rpg_amount(value: String) -> bool:
+    if value.length() < 1 or value.length() > 3:
+        return false
+    if value.length() > 1 and value.begins_with("0"):
+        return false
+    for c in value:
+        if not "0123456789".contains(c):
+            return false
+    return int(value) >= 1 and int(value) <= 100
+
+
 func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var dispatch_settings: Dictionary = capture.get("native_gameplay_dispatch", {})
     if dispatch_settings.is_empty():
@@ -957,6 +987,11 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var next_action_trace: Array = []
     var next_inventory: Dictionary = {}
     var next_health: int = 100
+    var next_xp: int = 0
+    var next_skills: Dictionary = {}
+    var next_factions: Dictionary = {}
+    var next_progression_events: Array = []
+    var next_faction_events: Array = []
     var next_local_effect_history: Array = []
     var next_npc_emotions: Dictionary = {}
     var last_tick: int = -1
@@ -1003,8 +1038,64 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 "completed":quest_edges[token[0]][token[1]].is_empty(),
                 "last_transition_frame":frame,
             }
+        elif kind == "award_xp":
+            if not _is_canonical_rpg_amount(value) or next_xp + int(value) > 9900:
+                push_error("Approved experience grant invalid or past level cap")
+                return
+            next_xp += int(value)
+            next_progression_events.append({
+                "frame":frame,"page_id":str(row.get("page_id","")),
+                "kind":kind,"value":value,"resulting_xp":next_xp,
+                "resulting_level":1 + next_xp / 100,
+                "source_frame_digest":str(row.get("native_frame_receipt_digest","")),
+            })
+        elif kind == "unlock_skill":
+            var skill_token := value.split(":")
+            if (skill_token.size() != 2 or
+                not _is_local_rpg_id(skill_token[0]) or
+                not _is_canonical_rpg_amount(skill_token[1])):
+                push_error("Approved skill ID/level invalid")
+                return
+            var requirement: int = int(skill_token[1])
+            if (next_skills.has(skill_token[0]) or next_skills.size() >= 128
+                or 1 + next_xp / 100 < requirement):
+                push_error("Skill unlock lacks level or exceeds cap")
+                return
+            next_skills[skill_token[0]] = requirement
+            next_progression_events.append({
+                "frame":frame,"page_id":str(row.get("page_id","")),
+                "kind":kind,"value":value,"resulting_xp":next_xp,
+                "resulting_level":1 + next_xp / 100,
+                "source_frame_digest":str(row.get("native_frame_receipt_digest","")),
+            })
+        elif kind == "set_faction_reputation":
+            var faction_token := value.split(":")
+            if faction_token.size() != 2 or not _is_local_rpg_id(faction_token[0]):
+                push_error("Unapproved faction identifier")
+                return
+            var signed: String = str(faction_token[1])
+            if (signed.length() < 2 or
+                not ["+", "-"].has(signed.substr(0,1)) or
+                not _is_canonical_rpg_amount(signed.substr(1))):
+                push_error("Noncanonical faction standing adjustment")
+                return
+            if not next_factions.has(faction_token[0]) and next_factions.size() >= 128:
+                push_error("Too many local game factions")
+                return
+            var amount: int = int(signed.substr(1))
+            if signed.begins_with("-"):
+                amount = -amount
+            next_factions[faction_token[0]] = clampi(
+                int(next_factions.get(faction_token[0],0)) + amount, -100, 100
+            )
+            next_faction_events.append({
+                "frame":frame,"page_id":str(row.get("page_id","")),
+                "faction":str(faction_token[0]),"value":value,
+                "resulting_reputation":int(next_factions[faction_token[0]]),
+                "source_frame_digest":str(row.get("native_frame_receipt_digest","")),
+            })
         elif kind == "craft_item":
-            if value.is_empty() or value.length() > 128:
+            if not _is_local_rpg_id(value):
                 push_error("Approved crafted item name invalid")
                 return
             next_inventory[value] = int(next_inventory.get(value, 0)) + 1
@@ -1171,10 +1262,63 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 push_error("Expected local health receipt nonintegral")
                 return
             effect[numeric_key] = int(numeric_value)
+    var expected_progression: Array = (
+        bundle.get("expected_progression_events", []).duplicate(true)
+    )
+    for event in expected_progression:
+        if typeof(event) != TYPE_DICTIONARY:
+            push_error("Authored progression receipt not a dictionary")
+            return
+        for key in ["frame","resulting_xp","resulting_level"]:
+            var number: Variant = event.get(key,-1)
+            if not is_finite(float(number)) or float(number) < 0.0 or (
+                float(number) != floorf(float(number))
+            ):
+                push_error("Authored progression receipt contains invalid numeric value")
+                return
+            event[key] = int(number)
+    var expected_skill_map: Dictionary = (
+        bundle.get("expected_unlocked_skills", {}).duplicate(true)
+    )
+    for skill in expected_skill_map.keys():
+        var requirement: Variant = expected_skill_map[skill]
+        if (not is_finite(float(requirement)) or
+            float(requirement) != floorf(float(requirement))):
+            push_error("Authored skill level nonintegral")
+            return
+        expected_skill_map[skill] = int(requirement)
+    var expected_faction_map: Dictionary = (
+        bundle.get("expected_faction_reputation", {}).duplicate(true)
+    )
+    for faction in expected_faction_map.keys():
+        var score: Variant = expected_faction_map[faction]
+        if not is_finite(float(score)) or float(score) != floorf(float(score)):
+            push_error("Authored faction score nonintegral")
+            return
+        expected_faction_map[faction] = int(score)
+    var expected_faction_history: Array = (
+        bundle.get("expected_faction_events", []).duplicate(true)
+    )
+    for event in expected_faction_history:
+        if typeof(event) != TYPE_DICTIONARY:
+            push_error("Faction standing history invalid")
+            return
+        for key in ["frame","resulting_reputation"]:
+            var number: Variant = event.get(key,-1000)
+            if not is_finite(float(number)) or float(number) != floorf(float(number)):
+                push_error("Faction standing history nonintegral")
+                return
+            event[key] = int(number)
     if (next_flags != bundle.get("expected_flags", {})
         or next_quests != expected_quests
         or next_inventory != expected_inventory
         or next_health != int(bundle.get("expected_local_health", -1))
+        or next_xp != int(bundle.get("expected_local_xp", -1))
+        or 1 + next_xp / 100 != int(bundle.get("expected_local_level", -1))
+        or next_skills != expected_skill_map
+        or next_factions != expected_faction_map
+        or next_progression_events != expected_progression
+        or next_faction_events != expected_faction_history
         or next_local_effect_history != expected_effect_history
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})
         or next_action_trace != expected_trace
@@ -1200,6 +1344,12 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _approved_gameplay_flags = next_flags
     _approved_gameplay_inventory = next_inventory
     _approved_local_health = next_health
+    _approved_local_xp = next_xp
+    _approved_local_level = 1 + next_xp / 100
+    _approved_unlocked_skills = next_skills
+    _approved_faction_reputation = next_factions
+    _approved_progression_events = next_progression_events
+    _approved_faction_events = next_faction_events
     _approved_local_effect_history = next_local_effect_history
     _approved_health_effect_kinds = _create_approved_health_visuals()
     _approved_inventory_visuals = _create_approved_inventory_objects(next_inventory)
@@ -1258,6 +1408,10 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "quest_progression_history":next_quest_history,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,
         "local_health":next_health,"local_effect_history":next_local_effect_history,
+        "local_xp":next_xp,"local_level":1 + next_xp / 100,
+        "unlocked_skills":next_skills,"faction_reputation":next_factions,
+        "progression_events":next_progression_events,
+        "faction_events":next_faction_events,
         "visualized_health_effect_kinds":_approved_health_effect_kinds,
         "visualized_npc_ids":_approved_npc_visuals,
         "visualized_item_ids":_approved_inventory_visuals,

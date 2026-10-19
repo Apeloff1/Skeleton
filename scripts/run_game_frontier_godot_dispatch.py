@@ -142,6 +142,8 @@ def _verify(args):
         "approved_instrument_focus",
         "presentation_cues","inventory","npc_emotions","visualized_npc_ids",
         "local_health","local_effect_history","visualized_health_effect_kinds",
+        "local_xp","local_level","unlocked_skills","faction_reputation",
+        "progression_events","faction_events",
         "executed_action_trace","visualized_item_ids","cue_timeline_frame_index",
         "read_only_branch_options","visualized_fx_page_ids","authority",
     }
@@ -180,6 +182,14 @@ def _verify(args):
         or receipt["inventory"]!=bundle["expected_inventory"]
         or type(receipt["local_health"]) is not int
         or receipt["local_health"]!=bundle["expected_local_health"]
+        or type(receipt["local_xp"]) is not int
+        or receipt["local_xp"]!=bundle["expected_local_xp"]
+        or type(receipt["local_level"]) is not int
+        or receipt["local_level"]!=bundle["expected_local_level"]
+        or receipt["unlocked_skills"]!=bundle["expected_unlocked_skills"]
+        or receipt["faction_reputation"]!=bundle["expected_faction_reputation"]
+        or receipt["progression_events"]!=bundle["expected_progression_events"]
+        or receipt["faction_events"]!=bundle["expected_faction_events"]
         or receipt["local_effect_history"]!=bundle["expected_local_effect_history"]
         or receipt["visualized_health_effect_kinds"]!=expected_health_visuals
         or receipt["npc_emotions"]!=bundle["expected_npc_emotions"]
@@ -201,6 +211,10 @@ def _verify(args):
         "verified_npc_reactions":len(receipt["visualized_npc_ids"]),
         "verified_inventory_visuals":len(receipt["visualized_item_ids"]),
         "verified_local_health":receipt["local_health"],
+        "verified_rpg_level":receipt["local_level"],
+        "verified_rpg_xp":receipt["local_xp"],
+        "verified_unlocked_skills":len(receipt["unlocked_skills"]),
+        "verified_faction_standings":len(receipt["faction_reputation"]),
         "verified_local_effects":len(receipt["local_effect_history"]),
         "independent_local_effect_receipt":independent_effect_receipt["receipt_digest"],
         "verified_health_visual_effects":len(receipt["visualized_health_effect_kinds"]),
