@@ -64,6 +64,18 @@ def validate_native_trace(
     if len(catalog)!=len(actors) or not 1<=len(catalog)<=64:
         raise NativeSmokeError("duplicate or excessive actor catalog")
     primary=settings["actor_id"]
+    prescribed=settings.get("primary_source_dynamics")
+    if prescribed is None:
+        if require_dynamics:
+            raise NativeSmokeError("source mass/material binding required")
+    elif (not isinstance(prescribed,dict) or
+          set(prescribed)!={"mass_kg","friction","restitution"} or
+          any(type(v) not in (float,int) or not math.isfinite(v)
+              for v in prescribed.values()) or
+          not 0<prescribed["mass_kg"]<=1e6 or
+          not 0<=prescribed["friction"]<=1 or
+          not 0<=prescribed["restitution"]<=1):
+        raise NativeSmokeError("invalid source body calibration")
     if catalog.get(primary)!=settings["actor_asset_digest"]:
         raise NativeSmokeError("missing authoritative simulated game actor")
     units=float(settings.get("chunk_size_m",32.))
@@ -110,6 +122,17 @@ def validate_native_trace(
                 for name,source_digest in catalog.items()
             ):
                 raise NativeSmokeError("native actor/source identity mismatch")
+            if prescribed is not None:
+                reported=incoming[primary].get("physics_body")
+                if (not isinstance(reported,dict) or
+                    reported.get("mode")!="rigid" or
+                    any(type(reported.get(k)) not in (float,int) or
+                        not math.isfinite(reported[k]) or
+                        not math.isclose(float(reported[k]),float(prescribed[k]),
+                                         rel_tol=1e-5,abs_tol=1e-6)
+                        for k in ("mass_kg","friction","restitution"))):
+                    raise NativeSmokeError(
+                        "native primary rigid body differs from source calibration")
             for row in incoming.values():
                 contacts=row.get("contact_count")
                 if contacts is None or type(contacts) is not int or not 0<=contacts<=64:
@@ -157,6 +180,8 @@ def validate_native_trace(
         "positive_contact_count_observations":observed_contact_actors,
         "native_dynamics_ticks_verified":verified_dynamics_ticks,
         "peak_reported_kinetic_energy_j":max_kinetic_energy_j,
+        "source_primary_dynamics_verified":(
+            bool(prescribed is not None and verified_dynamics_ticks==count)),
         "source_capture_sha256":trace_root.hexdigest(),
         "signed_gdd_digest":settings["gdd_digest"],
         "candidate_digest":settings["candidate_digest"],

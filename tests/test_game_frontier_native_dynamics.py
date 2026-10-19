@@ -182,3 +182,79 @@ class DynamicsJournalTests(unittest.TestCase):
                 self.assertEqual(fork.replay()["verified_frames"],2)
                 self.assertEqual(fork.native_dynamics_evidence(1)[
                     "total_kinetic_energy_j"],10900.)
+
+class SourceCalibratedDynamicsTests(unittest.TestCase):
+    def test_exporter_emits_scene_primary_dynamics(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from scripts.build_game_frontier_smoke import build_smoke_project
+        with TemporaryDirectory() as root:
+            folder=Path(root)
+            build_smoke_project(folder,fps=60,frames=20)
+            scene=json.loads((folder/"frontier/data/scene.json").read_text())
+            prescribed=scene["native_capture"]["primary_source_dynamics"]
+            body=scene["advanced_physics"]["body"]
+            self.assertAlmostEqual(prescribed["mass_kg"],body["mass_kg"])
+            self.assertTrue(0<=prescribed["friction"]<=1)
+            self.assertTrue(0<=prescribed["restitution"]<=1)
+
+    def test_native_smoke_source_binding_must_match_actual_observation(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        import json
+        from scripts.validate_game_frontier_native_smoke import (
+            validate_native_trace,NativeSmokeError,
+        )
+        from skeleton.jeeves.game_frontier_frame_coherence import bind_signed_gdd
+        from tests.test_game_frontier_native_chunks import sample
+        from tests.test_game_frontier_position_frames import gdd
+        anchor=bind_signed_gdd(gdd())
+        with TemporaryDirectory() as name:
+            folder=Path(name)
+            capture=folder/"trace.jsonl"
+            scene=folder/"scene.json"
+            calibration={"mass_kg":50.,"friction":.4,"restitution":.2}
+            project={"schema":"skeleton.game.frontier_godot_overlay.v1",
+                     "origin_candidate_digest":"d"*64,
+                     "native_capture":{
+                         "enabled":True,"fps":60,"candidate_digest":"d"*64,
+                         "gdd_digest":anchor.source_digest,
+                         "actor_id":"hero","actor_asset_digest":"a"*64,
+                         "chunk_size_m":32.,
+                         "primary_source_dynamics":calibration,
+                         "actors":[{"id":"hero","source_digest":"a"*64},
+                                   {"id":"npc","source_digest":"b"*64},
+                                   {"id":"island","source_digest":"c"*64}]}}
+            scene.write_text(json.dumps(project))
+            samples=[]
+            for tick in range(6):
+                record=sample(tick,anchor.source_digest)
+                record["native_dynamics_schema"]="skeleton.game.native_actor_dynamics.v1"
+                for actor in record["actors"]:
+                    hero=actor["id"]=="hero"
+                    actor["physics_body"]={
+                        "mode":"rigid" if hero else "static",
+                        "mass_kg":50. if hero else 0.,
+                        "friction":.4 if hero else 1.,
+                        "restitution":.2 if hero else 0.,
+                        "kinetic_energy_j":10900. if hero else 0.,
+                        "contact_actor_ids":[],
+                        "external_contact_count":actor["contact_count"],
+                    }
+                samples.append(record)
+            def save():
+                capture.write_text("".join(json.dumps(x)+"\\n" for x in samples))
+            save()
+            self.assertTrue(validate_native_trace(
+                capture,scene,require_dynamics=True)["source_primary_dynamics_verified"])
+            samples[2]["actors"][0]["physics_body"]["friction"]=.5
+            save()
+            with self.assertRaises(NativeSmokeError):
+                validate_native_trace(capture,scene,require_dynamics=True)
+            samples[2]["actors"][0]["physics_body"]["friction"]=.4
+            project["native_capture"]["primary_source_dynamics"]["mass_kg"]=60.
+            scene.write_text(json.dumps(project))
+            save()
+            with self.assertRaises(NativeSmokeError):
+                validate_native_trace(capture,scene,require_dynamics=True)

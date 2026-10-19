@@ -812,8 +812,21 @@ def emit_frontier_godot_overlay(
                     "native_rigid_reference" if row["id"] == actor_id
                     else "generated_source_proxy")
                 sources.append(x)
+        # Bind native measurements to the signed scene's original body.
+        # The source is candidate-only, not authority over a finished game.
+        body = advanced["body"]
+        traction = advanced.get("traction") or {}
+        slip = min(1., max(0., float(traction.get("slip_risk", 0.))))
+        primary_source_dynamics = {
+            "mass_kg": float(body["mass_kg"]),
+            "friction": min(1., max(0.,
+                float(body.get("friction", .6)) * (1. - slip * .8))),
+            "restitution": min(1., max(0.,
+                float(body.get("restitution", .1)))),
+        }
         native_config = {
             "enabled": True, "max_frames": native_capture_max_frames,
+            "primary_source_dynamics": primary_source_dynamics,
             "candidate_digest": candidate.manifest_digest,
             "gdd_digest": frame["gdd_digest"], "fps": frame["fps"],
             "actor_id": actor_id, "actor_asset_digest": mapped[0],
