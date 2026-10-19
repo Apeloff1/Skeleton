@@ -221,7 +221,13 @@ func _create_advanced_character(info: Dictionary) -> void:
     render.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
     dynamic.add_child(render)
     var physical := PhysicsMaterial.new()
-    physical.friction = clamp(float(body_data.get("friction", .6)), 0.0, 1.0)
+    var terrain_grip: Dictionary = info.get("traction", {})
+    var slip_risk := clamp(float(terrain_grip.get("slip_risk", 0.0)), 0.0, 1.0)
+    # Wet/icy terrain reduces friction; do not amplify native grip above its
+    # validated material coefficient. Real grip changes with surface contact
+    # must later be handled by engine-authoritative contact callbacks.
+    physical.friction = clamp(
+        float(body_data.get("friction", .6)) * (1.0 - slip_risk * .8), 0.0, 1.0)
     physical.bounce = clamp(float(body_data.get("restitution", .1)), 0.0, 1.0)
     dynamic.physics_material_override = physical
     add_child(dynamic)
