@@ -41,6 +41,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-36 Persist world variants, structures, weather fields and motion state with history/canon/backups.
 - [x] GF-P0-37 Extend existing Forge Godot overlay with Y-up/Z-forward conversion, shadow-casting clouds, 60fps, variant luminance and top-down/platformer/pseudo-depth cameras.
 - [ ] GF-P0-38 Run real Godot headless parse, emitted scene import and screenshot smoke; inspect shadow caster geometry, camera and collision fidelity.
+- [x] GF-P0-39 Add conflict-safe Godot project overlay attachment preserving existing main level and imports.
 - [x] GF-P0-22 Export Godot overlay scene with posed polygons, generated bone capsules, sky islands and source-wind cloud animation paths.
 - [x] GF-P0-23 Add exporter custody/regression tests and apply 30/50/60/120 requested FPS cap to preview script.
 - [ ] GF-P0-11 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
