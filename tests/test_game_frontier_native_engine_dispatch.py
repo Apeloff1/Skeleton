@@ -27,6 +27,8 @@ class NativeEngineDispatchTests(NativeQuestBatchTests):
                           "set_flag","advance_quest","show_dialogue"])
         self.assertEqual(data["expected_quests"]["chapter_1"]["stage"],"ending")
         self.assertEqual(data["expected_flags"]["door_open"],True)
+        self.assertEqual(data["expected_inventory"],{})
+        self.assertEqual(data["expected_npc_emotions"],{})
         self.assertEqual(data["quest_edges"]["chapter_1"]["start"],
                          ["middle","alternate"])
         self.assertEqual(len(dispatch_file_sha256(data)),64)

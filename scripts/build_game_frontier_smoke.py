@@ -84,6 +84,8 @@ renderer/rendering_method.mobile="gl_compatibility"
                      "target":"hero","value":"sky_trial"},
                     {"kind":"set_flag","channel":"world",
                      "target":"hero","value":"quest_active=true"},
+                    {"kind":"craft_item","channel":"character",
+                     "target":"hero","value":"sky_trial_token"},
                 ],
                 "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
             },

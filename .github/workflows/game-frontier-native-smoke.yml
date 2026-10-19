@@ -282,7 +282,7 @@ jobs:
           import json,sys
           from pathlib import Path
           proof=json.loads(Path(sys.argv[1]).read_text())
-          assert proof["verified_engine_actions"]==3, proof
+          assert proof["verified_engine_actions"]==4, proof
           assert proof["verified_quest_count"]==1, proof
           assert proof["verified_cue_count"]==0, proof
           print(json.dumps({"godot_engine_dispatch_verified":True,

@@ -23,6 +23,7 @@ _ALLOWED=frozenset((
     "start_quest","advance_quest","set_flag","show_dialogue",
     "play_cutscene","play_music","spatial_audio","change_camera",
     "inspect_instrument","trigger_impact_fx","trigger_foliage_fx",
+    "craft_item","set_npc_emotion",
 ))
 
 
@@ -49,6 +50,9 @@ def compile_native_godot_dispatch(
             "interactive dispatch snapshot exceeds explicit frame limit")
     catalog=parse_native_quest_graph(quest_graph)
     commands=[]
+    inventory={}
+    npc_moods={}
+    signed_actors={a["id"] for a in journal.native_sample(0)["actors"]}
     cursor=None
     for first in range(0,last+1,frames_per_window):
         stop=min(last,first+frames_per_window-1)
@@ -65,6 +69,23 @@ def compile_native_godot_dispatch(
                     if action["kind"] not in _ALLOWED:
                         raise NativeQuestSessionError(
                             "Godot dispatcher refuses unimplemented world mutations")
+                    if action["kind"]=="craft_item":
+                        item=action["value"]
+                        if (not item or len(item)>128 or
+                            not (item[0].isalpha() and
+                                 all(c.isascii() and (c.isalnum() or c in "_.-")
+                                     for c in item)) or
+                            inventory.get(item,0)>=9999 or
+                            (item not in inventory and len(inventory)>=1024)):
+                            raise NativeQuestSessionError("invalid local crafted item or inventory limit")
+                        inventory[item]=inventory.get(item,0)+1
+                    if action["kind"]=="set_npc_emotion":
+                        parts=action["value"].split(":")
+                        if (len(parts)!=2 or parts[0] not in signed_actors or
+                            parts[0]==actor_id or parts[1] not in
+                            ("calm","alert","friendly","afraid","hostile","curious")):
+                            raise NativeQuestSessionError("NPC emotion must target signed game actor")
+                        npc_moods[parts[0]]=parts[1]
                     commands.append({
                         "frame":entry["frame"],
                         "page_id":approved["page_id"],
@@ -100,6 +121,8 @@ def compile_native_godot_dispatch(
             for item in catalog["quests"]},
         "initial_flags":dict(approvals["initial_flags"]),
         "expected_flags":checkpoint["flags"],
+        "expected_inventory":inventory,
+        "expected_npc_emotions":npc_moods,
         "expected_quests":checkpoint["quests"],
         "actions":commands,
     }

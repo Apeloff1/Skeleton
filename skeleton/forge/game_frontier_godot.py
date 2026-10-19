@@ -57,6 +57,8 @@ var _native_camera: Camera3D
 var _native_debug_speed: float = 1.0
 var _approved_gameplay_quests: Dictionary = {}
 var _approved_gameplay_flags: Dictionary = {}
+var _approved_gameplay_inventory: Dictionary = {}
+var _approved_gameplay_npc_emotions: Dictionary = {}
 var _approved_gameplay_cues: Array = []
 var _approved_gameplay_label: Label
 
@@ -613,6 +615,8 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var next_flags: Dictionary = bundle["initial_flags"].duplicate(true)
     var next_quests: Dictionary = {}
     var next_cues: Array = []
+    var next_inventory: Dictionary = {}
+    var next_npc_emotions: Dictionary = {}
     var last_tick: int = -1
     for row_item in actions:
         if typeof(row_item) != TYPE_DICTIONARY:
@@ -657,6 +661,22 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 "completed":quest_edges[token[0]][token[1]].is_empty(),
                 "last_transition_frame":frame,
             }
+        elif kind == "craft_item":
+            if value.is_empty() or value.length() > 128:
+                push_error("Approved crafted item name invalid")
+                return
+            next_inventory[value] = int(next_inventory.get(value, 0)) + 1
+            if int(next_inventory[value]) > 9999 or next_inventory.size() > 1024:
+                push_error("Approved local inventory limit exceeded")
+                return
+        elif kind == "set_npc_emotion":
+            var mood_parts := value.split(":")
+            if mood_parts.size() != 2 or not [
+                "calm", "alert", "friendly", "afraid", "hostile", "curious"
+            ].has(mood_parts[1]):
+                push_error("Approved NPC emotion command invalid")
+                return
+            next_npc_emotions[mood_parts[0]] = mood_parts[1]
         elif kind == "set_flag":
             var pair := value.split("=")
             if pair.size() != 2 or not ["true", "false"].has(pair[1]):
@@ -676,11 +696,15 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             push_error("Unsupported game world mutation rejected by dispatcher")
             return
     if (next_flags != bundle.get("expected_flags", {})
-        or next_quests != bundle.get("expected_quests", {})):
+        or next_quests != bundle.get("expected_quests", {})
+        or next_inventory != bundle.get("expected_inventory", {})
+        or next_npc_emotions != bundle.get("expected_npc_emotions", {})):
         push_error("Engine RPG reducer diverged from independently replayed state")
         return
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
+    _approved_gameplay_inventory = next_inventory
+    _approved_gameplay_npc_emotions = next_npc_emotions
     _approved_gameplay_cues = next_cues
     # One atomic document recording the actual Godot dispatch outcome.
     # Canonical GDD and native physics frame evidence are never rewritten.
@@ -694,6 +718,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "source_through_frame":bundle["source_through_frame"],
         "actions_applied":actions.size(),
         "quests":next_quests,"flags":next_flags,
+        "inventory":next_inventory,"npc_emotions":next_npc_emotions,
         "presentation_cues":next_cues,
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
     }
@@ -723,6 +748,10 @@ func _create_approved_gameplay_inspector(record: Dictionary) -> void:
         var state: Dictionary = _approved_gameplay_quests[id]
         content.append(str(id) + " : " + str(state["stage"]) +
             (" (completed)" if bool(state["completed"]) else " (in progress)"))
+    for item in _approved_gameplay_inventory.keys():
+        content.append("Inventory: " + str(item) + " x" + str(_approved_gameplay_inventory[item]))
+    for actor in _approved_gameplay_npc_emotions.keys():
+        content.append("NPC reaction: " + str(actor) + " / " + str(_approved_gameplay_npc_emotions[actor]))
     for cue in _approved_gameplay_cues:
         if cue["kind"] == "show_dialogue":
             content.append("Dialogue: " + str(cue["cue"]))
