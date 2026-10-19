@@ -30,6 +30,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Sequence
 
 from .adversarial_verification import CouncilVerdict, VerificationCouncil, VerificationSubject
+from .cognition import ContextSection
 from .context_repository import (
     ContextEntry,
     ContextKind,
