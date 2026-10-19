@@ -163,20 +163,23 @@ def main() -> int:
     failures: list[str] = []
 
     root_project = tomllib.loads(read("pyproject.toml"))
-    root_dev = root_project.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+    root_dev = (
+        root_project.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+    )
     require(
         RUFF_DEV_REQUIREMENT in root_dev,
         "root Python development Ruff range drifted from canonical toolchain",
         failures,
     )
     require(
-        re.search(r"(?m)^ruff[^\\n]*$", read("requirements-dev.txt")) is not None
-        and RUFF_DEV_REQUIREMENT in read("requirements-dev.txt").splitlines(),
+        RUFF_DEV_REQUIREMENT in read("requirements-dev.txt").splitlines(),
         "requirements-dev Ruff range drifted from canonical toolchain",
         failures,
     )
     require(
-        re.search(r"(?m)^\\s*" + re.escape(RUFF_DEV_REQUIREMENT) + r"\\s*$", read("setup.cfg")) is not None,
+        RUFF_DEV_REQUIREMENT in {
+            line.strip() for line in read("setup.cfg").splitlines()
+        },
         "setup.cfg dev Ruff range drifted from canonical toolchain",
         failures,
     )
