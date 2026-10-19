@@ -21,6 +21,8 @@ class NativeEnduranceTests(NativeQuestBatchTests):
                 vault_path=dest,cycles=12,window_frames=2,
                 retain_latest=2,crash_interval=2)
             self.assertEqual(report["cycles_executed"],12)
+            self.assertEqual(report["sqlite_health_check_runs"],12)
+            self.assertTrue(all(row["sqlite_health"]["sqlite_check"]=="ok" for row in report["cycle_evidence"]))
             self.assertGreaterEqual(report["crash_rollbacks_executed"],1)
             self.assertGreaterEqual(report["idempotent_duplicate_saves"],1)
             self.assertEqual(report["source_frames_cold_replayed"],5)

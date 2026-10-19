@@ -167,9 +167,37 @@ class NativeSessionVault:
             self._db.execute("ROLLBACK")
             raise
 
+    def inspect_storage_integrity(self) -> dict:
+        """Run SQLite's real page/link integrity check, beyond SHA row ancestry.
+
+        A valid SQLite file does NOT imply trusted RPG actions: callers must
+        also cold-replay source receipts. Refuse non-WAL or weakened sync.
+        """
+        check=self._db.execute("PRAGMA quick_check").fetchall()
+        if check!=[("ok",)]:
+            raise NativeSessionVaultError("SQLite native game save integrity check failed")
+        mode=self._db.execute("PRAGMA journal_mode").fetchone()[0]
+        sync=self._db.execute("PRAGMA synchronous").fetchone()[0]
+        if mode.lower()!="wal" or sync!=2:
+            raise NativeSessionVaultError("durable game vault requires SQLite WAL and FULL sync")
+        page_count=self._db.execute("PRAGMA page_count").fetchone()[0]
+        free_pages=self._db.execute("PRAGMA freelist_count").fetchone()[0]
+        if not 0<=free_pages<=page_count:
+            raise NativeSessionVaultError("SQLite page accounting is invalid")
+        return {
+            "schema":"skeleton.game.native_vault_sqlite_health.v1",
+            "session_id":self.session_id,
+            "sqlite_check":"ok","journal_mode":"wal",
+            "synchronous":"full",
+            "page_count":page_count,
+            "free_page_count":free_pages,
+            "authority":"sqlite_page_integrity_not_authenticated_gameplay",
+        }
+
     def recover(self,journal,pages,quest_graph,approvals, *,
                 actor_id: str,scene_candidate_digest: str) -> dict:
         """Verify receipt ancestry and replay latest retained save from frame 0."""
+        self.inspect_storage_integrity()
         rows=self._rows()
         if not rows or rows[-1]["snapshot_json"] is None:
             raise NativeSessionVaultError("no recoverable game state retained")
@@ -215,6 +243,7 @@ class NativeSessionVault:
         payloads are reported explicitly, never treated as replayed evidence.
         This is costly by design and runs at recovery/qualification boundaries.
         """
+        self.inspect_storage_integrity()
         rows=self._rows()
         if not rows or rows[-1]["snapshot_json"] is None:
             raise NativeSessionVaultError("auditable game head checkpoint required")

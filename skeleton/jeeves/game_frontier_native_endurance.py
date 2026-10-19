@@ -93,6 +93,7 @@ def exercise_native_session_endurance(
             resumed=reader.recover(
                 journal,pages,quest_graph,approvals,actor_id=actor_id,
                 scene_candidate_digest=scene_candidate_digest)
+            storage=reader.inspect_storage_integrity()
             history_proof=reader.audit_retained_history(
                 journal,pages,quest_graph,approvals,actor_id=actor_id,
                 scene_candidate_digest=scene_candidate_digest)
@@ -127,6 +128,7 @@ def exercise_native_session_endurance(
             "vault_retained_snapshots":rotate["retained_snapshots"],
             "vault_ancestry_receipts":rotate["archived_receipts"],
             "cold_recovery_audit_digest":resumed["independent_cold_audit_digest"],
+            "sqlite_health":storage,
             "retained_history_audit_digest":history_proof["receipt_digest"],
             "retained_history_verified_frames":history_proof["last_cold_replayed_frame"],
         }
@@ -151,6 +153,7 @@ def exercise_native_session_endurance(
         "final_quest_checkpoint_digest":checkpoint["game_checkpoint_digest"],
         "final_vault_receipt_digest":saved_root,
         "final_retained_history_audit_digest":checkpoint["retained_history_audit_digest"],
+        "sqlite_health_check_runs":successful_restarts,
         "on_disk_vault_bytes":vault_path.stat().st_size,
         "measured_elapsed_ns":elapsed,
         "peak_cycle_elapsed_ns":max(x["cycle_wall_elapsed_ns"] for x in journal_rows),

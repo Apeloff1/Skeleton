@@ -79,6 +79,21 @@ class NativeSessionVaultTests(NativeQuestBatchTests):
                         self.journal,self.pages,self.graph,self.approved,
                         actor_id="hero",scene_candidate_digest="d"*64)
 
+    def test_sqlite_storage_health_separate_from_game_canon_proof(self):
+        with TemporaryDirectory() as folder:
+            path=Path(folder)/"health.sqlite"
+            with self.make(path) as vault:
+                health=vault.inspect_storage_integrity()
+                self.assertEqual(health["sqlite_check"],"ok")
+                self.assertEqual(health["journal_mode"],"wal")
+                self.assertEqual(health["synchronous"],"full")
+                self.assertGreaterEqual(health["page_count"],1)
+                vault._db.execute("PRAGMA synchronous=NORMAL")
+                with self.assertRaisesRegex(NativeSessionVaultError,"WAL and FULL sync"):
+                    vault.inspect_storage_integrity()
+                vault._db.execute("PRAGMA synchronous=FULL")
+                self.assertEqual(vault.inspect_storage_integrity()["sqlite_check"],"ok")
+
     def test_crash_before_commit_does_not_leave_partial_save(self):
         with TemporaryDirectory() as folder:
             path=Path(folder)/"vault.sqlite"
