@@ -51,7 +51,12 @@ from .deliberation import (
     SpecialistRole,
     proposal,
 )
-from .evidence import EvidenceLedger
+from .evidence import EvidenceArtifact, EvidenceLedger
+from .working_context_cycle import (
+    PreparedDelivery,
+    WorkingContextCycle,
+    verify_delivery,
+)
 from .frontier_adjudication import HostCandidateAdjudicator
 from .frontier_consensus import merge_search_results
 from .frontier_feedback import FrontierReasoningFeedback
@@ -85,6 +90,7 @@ from .types import (
     RiskTier,
     StepStatus,
     TerminationReason,
+    ToolObservation,
     bounded_text,
     json_safe,
     probability,
@@ -247,6 +253,8 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         ] = {}
         self._reports: dict[str, AdaptiveRunReport] = {}
         self._adaptive_lock = threading.RLock()
+        self._working_context_cycle = WorkingContextCycle()
+        self._working_deliveries: dict[str, PreparedDelivery] = {}
 
     def run(self, inputs: RunInputs) -> AgentResult:
         result = super().run(inputs)
@@ -1091,6 +1099,160 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
 
     def context_repository(self, inputs: RunInputs) -> ContextRepository:
         return self._context_repo(inputs)
+
+    def _finalize(self, state: _RunState) -> AgentResult:
+        """Compact scoped misses before the existing grounded finalization."""
+        try:
+            repo = self._context_repo(state.inputs)
+            branch = self._run_branch(state.run_id)
+            # Only previously promoted high-trust memory can refill a short
+            # delivery context. A missed search never promotes itself.
+            recalled = repo.retrieve(
+                state.inputs.goal.objective,
+                branch=branch,
+                kinds=(ContextKind.PROJECT, ContextKind.SEMANTIC,
+                       ContextKind.PROCEDURAL, ContextKind.STRATEGY, ContextKind.LESSON),
+                max_entries=4,
+                max_tokens=600,
+                minimum_trust=0.7,
+                include_unpromoted=False,
+            )
+            refill = json.dumps({
+                "original_goal": state.inputs.goal.objective[:1400],
+                "remaining_work": "Continue with the task using supported findings. "
+                                  "If more retrieval is needed, report the remaining gap; "
+                                  "never convert a scoped no-result into a universal assertion.",
+                "trusted_recall": [
+                    {"key": hit.entry.key, "excerpt": hit.entry.content[:500]}
+                    for hit in recalled
+                ],
+            }, ensure_ascii=False, sort_keys=True)
+            prepared = self._working_context_cycle.prepare(
+                state.inputs.goal, tuple(state.observations), refill_text=refill
+            )
+            first, second = verify_delivery(
+                prepared, state.inputs.goal, tuple(state.observations)
+            )
+            with self._adaptive_lock:
+                self._working_deliveries[state.run_id] = prepared
+                if len(self._working_deliveries) > self.adaptive_config.retain_adaptive_reports:
+                    oldest = next(iter(self._working_deliveries))
+                    self._working_deliveries.pop(oldest, None)
+            if prepared.notes:
+                self._persist_no_found_receipt(state, repo, branch, prepared)
+                state.trace.emit("adaptive.working_context_compacted", {
+                    "notes": len(prepared.notes),
+                    "page_counter": prepared.page_count,
+                    "saved_chars": prepared.freed_chars,
+                    "receipt": prepared.fingerprint,
+                    "verifier_integrity": first,
+                    "verifier_scope": second,
+                })
+        except Exception as exc:
+            return self._finish_failure(
+                state, TerminationReason.VERIFICATION_FAILED,
+                "Pre-delivery working-context preparation failed; no final answer released.",
+                metadata={"audit_error": type(exc).__name__, "detail": str(exc)[:384]},
+            )
+        return super()._finalize(state)
+
+    def _delivery_observations(self, state: _RunState) -> Sequence[ToolObservation]:
+        prepared = self._working_deliveries.get(state.run_id)
+        return prepared.active_observations if prepared is not None else state.observations
+
+    def _delivery_extra_sections(self, state: _RunState) -> tuple[ContextSection, ...]:
+        prepared = self._working_deliveries.get(state.run_id)
+        if prepared is None or not prepared.notes:
+            return ()
+        return (ContextSection(
+            name="scoped_no_found_working_memory",
+            content=prepared.prompt_note(),
+            priority=100,
+            required=True,
+            source_ids=tuple(note.call_id for note in prepared.notes),
+        ),)
+
+    def _delivery_verify(self, state: _RunState, draft) -> tuple[bool, str | None]:
+        prepared = self._working_deliveries.get(state.run_id)
+        if prepared is None:
+            return False, "working context audit missing"
+        try:
+            first, second = verify_delivery(
+                prepared, state.inputs.goal, tuple(state.observations),
+                answer=draft.answer,
+            )
+            state.trace.emit("adaptive.working_context_delivery_verified", {
+                "receipt": prepared.fingerprint,
+                "verifier_integrity": first,
+                "verifier_scope": second,
+            })
+            return True, None
+        except Exception as exc:
+            return False, f"{type(exc).__name__}: {str(exc)[:320]}"
+
+    def _persist_no_found_receipt(
+        self, state: _RunState, repo: ContextRepository,
+        branch: str, prepared: PreparedDelivery,
+    ) -> None:
+        now = self._wall_clock()
+        key = stable_id("working", {"run": state.run_id, "receipt": prepared.fingerprint})
+        entry = ContextEntry(
+            entry_id=stable_id("ctx", {"key": key}),
+            namespace=repo.namespace,
+            key=key,
+            kind=ContextKind.SCRATCH,
+            content=prepared.prompt_note(),
+            created_at=now,
+            updated_at=now,
+            confidence=1.0,
+            salience=0.7,
+            trust=0.5,
+            source="working-context-cycle",
+            tags=("working", "no-found", "run-scoped"),
+            protected=False,
+            promoted=False,
+            metadata={"run_id": state.run_id, "page_count": prepared.page_count,
+                      "receipt": prepared.fingerprint},
+        )
+        patch = ContextPatch(
+            patch_id=stable_id("ctxpatch", {"run": state.run_id, "working": prepared.fingerprint}),
+            namespace=repo.namespace,
+            items=(ContextPatchItem(
+                PatchOperation.UPSERT, key, entry=entry,
+                reason="retain scoped no-found working note without context clutter",
+            ),),
+            author="working-context-cycle",
+            created_at=now,
+            rationale="append verified temporary notes to run branch for later inquiry",
+            source_run_id=state.run_id,
+        )
+        repo.commit(branch, patch, message="working memory no-found receipt",
+                    expected_head=repo.head(branch))
+        from .types import EvidenceKind
+        state.ledger.append(EvidenceArtifact(
+            evidence_id=stable_id("workevidence", {"run": state.run_id, "receipt": prepared.fingerprint}),
+            kind=EvidenceKind.DERIVED,
+            source="working-context-cycle",
+            payload={
+                "classification": "scoped_no_found_not_global_absence",
+                "run_id": state.run_id,
+                "notes": [
+                    {"call_id": note.call_id, "source_digest": note.source_digest,
+                     "note_digest": note.fingerprint, "serial": note.serial}
+                    for note in prepared.notes
+                ],
+                "page_counter": prepared.page_count,
+                "receipts": [item.digest for item in prepared.receipts],
+                "working_note": entry.content_fingerprint,
+            },
+            observed_at=now,
+            confidence=1.0,
+        ))
+
+    def working_context_receipt(self, run_id: str) -> PreparedDelivery | None:
+        """Read the verified run-scoped note and serialized receipt trail."""
+        with self._adaptive_lock:
+            return self._working_deliveries.get(require_id("run_id", run_id))
 
     def _post_run(self, inputs: RunInputs, result: AgentResult) -> AgentResult:
         trajectory: Trajectory | None = None
