@@ -267,8 +267,11 @@ jobs:
               > "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log" 2>&1
             dispatch_receipt="$(find "$dispatch_user" -type f \
               -name frontier_approved_gameplay_receipt.json -print -quit)"
-            test -n "$dispatch_receipt"
-            test -s "$dispatch_receipt"
+            if test -z "$dispatch_receipt" || ! test -s "$dispatch_receipt"; then
+              echo "::error::Missing Godot dispatch receipt; checking engine diagnostics"
+              tail -n 80 "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log"
+              exit 1
+            fi
             python scripts/run_game_frontier_godot_dispatch.py verify \
               "${quest_cli_args[@]}" \
               --checkpoint-json "$full_checkpoint" \
