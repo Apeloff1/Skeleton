@@ -96,3 +96,21 @@ jobs:
             echo '~~~' >> "$GITHUB_STEP_SUMMARY"
             echo "::endgroup::"
           done
+      - name: Differential native 30/50/60/120 Hz source-replayed comparisons
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in "30 60" "50 60" "60 120"; do
+            read -r left right <<< "$pair"
+            python scripts/run_game_frontier_capture.py compare \
+              --signed-gdd "$RUNNER_TEMP/frontier-project-${left}/signed_gdd.json" \
+              --scene-json "$RUNNER_TEMP/frontier-project-${left}/frontier/data/scene.json" \
+              --journal "$RUNNER_TEMP/frontier-frames-${left}.sqlite" \
+              --other-journal "$RUNNER_TEMP/frontier-frames-${right}.sqlite" \
+              --comparison-max-frames 128 --comparison-tolerance-m 0.5 \
+              > "$RUNNER_TEMP/frontier-comparison-${left}-${right}.json"
+            echo "#### Native physics ${left} vs ${right} Hz (exact rational ticks)" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/frontier-comparison-${left}-${right}.json" >> "$GITHUB_STEP_SUMMARY"
+            echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+          done
