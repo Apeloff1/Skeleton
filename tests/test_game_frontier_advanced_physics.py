@@ -47,7 +47,7 @@ class TerminalVelocityTests(unittest.TestCase):
         ambient=Vec3(12,0,0)
         params=dict(ambient_wind=ambient, air=AirConditions(
             altitude_m=830,temperature_c=20),
-            wakes=(WakeSource("tower",ZERO,4,.75,25),),
+            wakes=(WakeSource("tower",Vec3(0,0,20),4,.75,25),),
             thermals=(UpdraftColumn(Vec3(0,0,0),8,6,200),),
             turbulence_seed=777,turbulence_amplitude=1,time_s=2)
         lee=airflow_at(Vec3(4,0,20),**params)
