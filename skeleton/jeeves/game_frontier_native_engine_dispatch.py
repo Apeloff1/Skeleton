@@ -50,7 +50,7 @@ _ALLOWED=frozenset((
     "inspect_instrument","trigger_impact_fx","trigger_foliage_fx",
     "craft_item","set_npc_emotion",
     "take_damage","heal_health","consume_item","award_xp",
-    "unlock_skill",
+    "unlock_skill","set_faction_reputation",
 ))
 
 
@@ -85,6 +85,8 @@ def compile_native_godot_dispatch(
     local_xp=0
     progression_events=[]
     unlocked_skills={}
+    factions={}
+    faction_events=[]
     local_effect_history=[]
     signed_actors={a["id"] for a in journal.native_sample(0)["actors"]}
     cursor=None
@@ -111,6 +113,22 @@ def compile_native_godot_dispatch(
                         if action["value"] not in _CAMERA_MODES:
                             raise NativeQuestSessionError("unauthorized Godot camera preset")
                         selected_camera=_CAMERA_MODES[action["value"]]
+                    if action["kind"]=="set_faction_reputation":
+                        parts=action["value"].split(":")
+                        if len(parts)!=2 or len(parts[1])<2 or parts[1][0] not in "+-":
+                            raise NativeQuestSessionError("faction adjustment requires id:+N or id:-N")
+                        faction=_local_item_id(parts[0])
+                        amount=_health_amount(parts[1][1:])
+                        if faction not in factions and len(factions)>=128:
+                            raise NativeQuestSessionError("faction standing budget exceeded")
+                        delta=amount if parts[1][0]=="+" else -amount
+                        factions[faction]=max(-100,min(100,factions.get(faction,0)+delta))
+                        faction_events.append({
+                            "frame":entry["frame"],"page_id":approved["page_id"],
+                            "faction":faction,"value":action["value"],
+                            "resulting_reputation":factions[faction],
+                            "source_frame_digest":entry["source_frame_receipt_digest"],
+                        })
                     if action["kind"]=="unlock_skill":
                         token=action["value"].split(":")
                         if len(token)!=2:
@@ -250,6 +268,8 @@ def compile_native_godot_dispatch(
         "expected_local_level":1+local_xp//100,
         "expected_progression_events":progression_events,
         "expected_unlocked_skills":unlocked_skills,
+        "expected_faction_reputation":factions,
+        "expected_faction_events":faction_events,
         "expected_local_effect_history":local_effect_history,
         "expected_camera_mode":selected_camera,
         "expected_instrument_focus":instrument_focus,
