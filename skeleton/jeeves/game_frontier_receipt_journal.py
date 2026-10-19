@@ -28,7 +28,7 @@ from .game_frontier_chunk_evidence import (
 from .game_frontier_delta import (
     create_frame_delta, verify_frame_delta, FrameDeltaError,
 )
-from .game_frontier_native_chunks import inspect_native_chunks, NativeChunkError
+from .game_frontier_native_chunks import inspect_native_chunks, compare_native_chunk_transitions, NativeChunkError
 
 
 class FrameJournalError(ValueError):
@@ -119,6 +119,12 @@ class FrameReceiptJournal:
                     head INTEGER NOT NULL DEFAULT -1
                 );
                 CREATE TABLE IF NOT EXISTS frontier_deltas (
+                    track TEXT NOT NULL, frame INTEGER NOT NULL,
+                    content_digest TEXT NOT NULL,
+                    PRIMARY KEY(track,frame),
+                    FOREIGN KEY(content_digest) REFERENCES frontier_blobs(digest)
+                );
+                CREATE TABLE IF NOT EXISTS frontier_native_chunk_transitions (
                     track TEXT NOT NULL, frame INTEGER NOT NULL,
                     content_digest TEXT NOT NULL,
                     PRIMARY KEY(track,frame),
@@ -311,12 +317,20 @@ class FrameReceiptJournal:
             native_hash=None
             native_chunk_proof=None
             native_chunk_hash=None
+            native_transition_proof=None
+            native_transition_hash=None
             if native_capture is not None:
                 self._validate_native_sample(frame,native_capture)
                 native_chunk_proof=inspect_native_chunks(
                     native_capture,expected_chunk_size_m=self.chunk_size_m,
                     require_native_partition="native_chunks" in native_capture)
                 native_chunk_hash=native_chunk_proof["receipt_digest"]
+                prior_native=self.native_sample(head) if head>=0 else None
+                native_transition_proof=compare_native_chunk_transitions(
+                    native_capture,previous=prior_native,
+                    expected_chunk_size_m=self.chunk_size_m,
+                    max_speed_mps=self.max_speed_mps)
+                native_transition_hash=native_transition_proof["receipt_digest"]
                 native_hash=digest(native_capture)
             blobs=[
                 (frame.receipt_digest,frame.payload()),
@@ -325,6 +339,7 @@ class FrameReceiptJournal:
             if native_hash is not None:
                 blobs.append((native_hash,dict(native_capture)))
                 blobs.append((native_chunk_hash,native_chunk_proof))
+                blobs.append((native_transition_hash,native_transition_proof))
             if delta_hash is not None:
                 blobs.append((delta_hash,delta_payload))
             for identity,payload in blobs:
@@ -353,6 +368,9 @@ class FrameReceiptJournal:
                 self._db.execute(
                     "INSERT INTO frontier_native_chunk_evidence(track,frame,content_digest) VALUES(?,?,?)",
                     (self.track,frame.frame_index,native_chunk_hash))
+                self._db.execute(
+                    "INSERT INTO frontier_native_chunk_transitions(track,frame,content_digest) VALUES(?,?,?)",
+                    (self.track,frame.frame_index,native_transition_hash))
             changed=self._db.execute(
                 "UPDATE frontier_tracks SET head=?,fps=? WHERE name=? AND head=?",
                 (frame.frame_index,frame.fps,self.track,head)).rowcount
@@ -364,6 +382,7 @@ class FrameReceiptJournal:
                     "chunk_evidence_digest":expected["receipt_digest"],
                     "native_capture_digest":native_hash,
                     "native_chunk_evidence_digest":native_chunk_hash,
+                    "native_chunk_transition_digest":native_transition_hash,
                     "delta_digest":delta_hash,
                     "track":self.track,
                     "authority":"journal_committed_verified_candidate_only"}
@@ -389,6 +408,12 @@ class FrameReceiptJournal:
             raise FrameJournalError("source frame failed canonical temporal/GDD verification") from exc
         return self.append(
             frame,native_capture=native_capture,include_delta=include_delta)
+
+    def native_chunk_transitions(self, frame_index: int) -> dict | None:
+        row=self._db.execute(
+            "SELECT content_digest FROM frontier_native_chunk_transitions WHERE track=? AND frame=?",
+            (self.track,frame_index)).fetchone()
+        return self._blob(row[0]) if row else None
 
     def native_chunk_evidence(self, frame_index: int) -> dict | None:
         row=self._db.execute(
@@ -433,8 +458,10 @@ class FrameReceiptJournal:
                 raise FrameJournalError("content-addressed frame delta replay failed")
             native=self.native_sample(index)
             stored_native_chunks=self.native_chunk_evidence(index)
-            if (native is None)!=(stored_native_chunks is None):
-                raise FrameJournalError("native chunk/source attachment incomplete")
+            stored_native_transition=self.native_chunk_transitions(index)
+            if (native is None)!=(stored_native_chunks is None) or (
+                native is None)!=(stored_native_transition is None):
+                raise FrameJournalError("native chunk/source/transition attachment incomplete")
             if native is not None:
                 self._validate_native_sample(frame,native)
                 expected_native_chunks=inspect_native_chunks(
@@ -442,6 +469,13 @@ class FrameReceiptJournal:
                     require_native_partition="native_chunks" in native)
                 if stored_native_chunks!=expected_native_chunks:
                     raise FrameJournalError("native chunk evidence diverged from runtime source")
+                previous_native=self.native_sample(index-1) if index else None
+                expected_transition=compare_native_chunk_transitions(
+                    native,previous=previous_native,
+                    expected_chunk_size_m=self.chunk_size_m,
+                    max_speed_mps=self.max_speed_mps)
+                if stored_native_transition!=expected_transition:
+                    raise FrameJournalError("native motion/chunk transition evidence altered")
                 if index and self.native_sample(index-1) is not None and (
                     native["scene_candidate_digest"]!=
                     self.native_sample(index-1)["scene_candidate_digest"] or
@@ -486,6 +520,11 @@ class FrameReceiptJournal:
             self._db.execute(
                 "INSERT INTO frontier_deltas(track,frame,content_digest) "
                 "SELECT ?,frame,content_digest FROM frontier_deltas "
+                "WHERE track=? AND frame<=?",
+                (name,self.track,through))
+            self._db.execute(
+                "INSERT INTO frontier_native_chunk_transitions(track,frame,content_digest) "
+                "SELECT ?,frame,content_digest FROM frontier_native_chunk_transitions "
                 "WHERE track=? AND frame<=?",
                 (name,self.track,through))
             self._db.execute(
