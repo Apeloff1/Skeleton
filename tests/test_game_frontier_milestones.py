@@ -77,7 +77,7 @@ class FramerateTests(unittest.TestCase):
         self.assertEqual(clock.due(1_000_000_000), ())
 
     def test_invalid_modes_rejected(self):
-        for fps in (24, 60, 119, True):
+        for fps in (24, 59, 119, True):
             with self.assertRaises(FrontierDynamicsError):
                 PresentationClock(fps)
 
