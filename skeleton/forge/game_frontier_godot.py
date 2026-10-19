@@ -59,6 +59,7 @@ var _approved_gameplay_quests: Dictionary = {}
 var _approved_gameplay_flags: Dictionary = {}
 var _approved_gameplay_inventory: Dictionary = {}
 var _approved_gameplay_npc_emotions: Dictionary = {}
+var _approved_npc_visuals: Array[String] = []
 var _approved_gameplay_cues: Array = []
 var _approved_quest_objectives: Dictionary = {}
 var _approved_quest_titles: Dictionary = {}
@@ -748,6 +749,10 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _approved_gameplay_inventory = next_inventory
     _approved_gameplay_npc_emotions = next_npc_emotions
     _approved_gameplay_cues = next_cues
+    _approved_npc_visuals = _show_approved_npc_reactions(next_npc_emotions)
+    if _approved_npc_visuals.size() != next_npc_emotions.size():
+        push_error("Approved NPC reactions did not resolve to native source actors")
+        return
     _approved_quest_objectives = quest_objectives
     _approved_quest_titles = quest_titles
     # One atomic document recording the actual Godot dispatch outcome.
@@ -763,6 +768,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "actions_applied":actions.size(),
         "quests":next_quests,"flags":next_flags,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,
+        "visualized_npc_ids":_approved_npc_visuals,
         "executed_action_trace":next_action_trace,
         "presentation_cues":next_cues,
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
@@ -776,6 +782,45 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     result.close()
     _create_approved_gameplay_inspector(accepted)
     _create_approved_dialogue_view()
+
+
+func _show_approved_npc_reactions(moods: Dictionary) -> Array[String]:
+    # Render an actual mood beacon on the native scene node. A signed
+    # captured source ID, not a free-form label, decides the target.
+    var affected: Array[String] = []
+    var palette := {
+        "calm":Color(.35,.65,.95),
+        "alert":Color(1.,.65,.10),
+        "friendly":Color(.18,.95,.42),
+        "afraid":Color(.86,.65,1.),
+        "hostile":Color(1.,.12,.12),
+        "curious":Color(.92,.82,.24),
+    }
+    for npc_id in moods.keys():
+        var selected: Node3D
+        for source_index in range(_native_capture_actors.size()):
+            var spec: Dictionary = _native_capture_actors[source_index]
+            if str(spec.get("id", "")) == str(npc_id) and str(npc_id) != _native_actor_id:
+                selected = _native_capture_nodes[source_index]
+                break
+        if selected == null or not palette.has(str(moods[npc_id])):
+            push_error("Source NPC reaction lacks target or mood")
+            return []
+        var marker := MeshInstance3D.new()
+        marker.name = "ApprovedNPCMood_" + str(npc_id)
+        marker.position = Vector3(0., .8, 0.)
+        var sphere := SphereMesh.new()
+        sphere.radius = .27
+        sphere.height = .54
+        marker.mesh = sphere
+        var material := StandardMaterial3D.new()
+        material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        material.albedo_color = palette[str(moods[npc_id])]
+        marker.material_override = material
+        selected.add_child(marker)
+        affected.append(str(npc_id))
+    affected.sort()
+    return affected
 
 
 func _create_approved_gameplay_inspector(record: Dictionary) -> void:

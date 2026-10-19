@@ -88,6 +88,8 @@ renderer/rendering_method.mobile="gl_compatibility"
                      "target":"hero","value":"sky_trial_token"},
                     {"kind":"show_dialogue","channel":"ui",
                      "target":"hero","value":"The sky-island trial has begun."},
+                    {"kind":"set_npc_emotion","channel":"character",
+                     "target":"hero","value":"island:curious"},
                 ],
                 "required_flags":[],"cooldown_ms":0,"repeat":False,"enabled":True,
             },
