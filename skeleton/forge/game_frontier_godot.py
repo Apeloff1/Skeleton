@@ -56,6 +56,7 @@ var _native_follow_cam: bool = false
 var _native_camera: Camera3D
 var _native_debug_speed: float = 1.0
 var _approved_gameplay_quests: Dictionary = {}
+var _approved_gameplay_dispatch_digest: String = ""
 var _approved_gameplay_flags: Dictionary = {}
 var _approved_gameplay_inventory: Dictionary = {}
 var _approved_gameplay_npc_emotions: Dictionary = {}
@@ -69,6 +70,8 @@ var _approved_branch_label: Label
 var _approved_branch_cursor: int = 0
 var _approved_npc_proximity_label: Label
 var _approved_npc_focus: String = ""
+var _approved_npc_interaction_count: int = 0
+var _approved_npc_interaction_status: Label
 var _approved_inventory_focus: int = 0
 var _approved_inventory_label: Label
 var _approved_fx_nodes: Array[MeshInstance3D] = []
@@ -1080,6 +1083,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _apply_approved_instrument_focus()
     _virtual_camera_mode = next_camera_mode
     _refresh_game_camera_mode()
+    _approved_gameplay_dispatch_digest = str(bundle.get("receipt_digest", ""))
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
     _approved_gameplay_inventory = next_inventory
@@ -1154,6 +1158,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _create_approved_cue_timeline()
     _create_approved_branch_preview()
     _create_approved_npc_proximity_inspector()
+    _create_approved_npc_interaction_status()
     _create_approved_inventory_inspector()
     _create_approved_quest_history_view()
 
@@ -1445,6 +1450,72 @@ func _inspect_approved_npc_proximity() -> void:
             str(_approved_gameplay_npc_emotions[_approved_npc_focus]) +
             " | " + str(snappedf(best_distance, .01)) + " game metres" +
             " (N to inspect)"
+        )
+
+
+func _create_approved_npc_interaction_status() -> void:
+    if _approved_gameplay_npc_emotions.is_empty():
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedNPCInteractionFeedback"
+    var label := Label.new()
+    label.name = "ApprovedNPCInteractionStatus"
+    label.position = Vector2(20, 525)
+    label.add_theme_color_override("font_color", Color(.9,.94,.55))
+    label.text = "E: interact with source-verified NPC within 6 game metres"
+    overlay.add_child(label)
+    add_child(overlay)
+    _approved_npc_interaction_status = label
+
+
+func _interact_approved_npc() -> void:
+    # An operator/player presses E in actual Godot. This is a *local*
+    # interaction receipt, not a proposal to change AI-driven NPC canon.
+    if (_approved_npc_focus.is_empty() or _aero_character == null
+        or not _approved_gameplay_npc_emotions.has(_approved_npc_focus)):
+        return
+    var near: Node3D
+    for i in range(_native_capture_actors.size()):
+        if str(_native_capture_actors[i].get("id", "")) == _approved_npc_focus:
+            near = _native_capture_nodes[i]
+            break
+    if near == null:
+        return
+    var distance: float = _aero_character.global_position.distance_to(near.global_position)
+    if distance > 6.0:
+        return
+    var receipt := {
+        "schema":"skeleton.game.native_npc_player_interaction.v1",
+        "authority":"local_user_interaction_not_canonical_NPC_world_action",
+        "scene_candidate_digest":_native_candidate_sha,
+        "signed_gdd_digest":_native_signed_gdd_sha,
+        "actor_id":_native_actor_id,
+        "npc_source_id":_approved_npc_focus,
+        "approved_npc_mood":_approved_gameplay_npc_emotions[_approved_npc_focus],
+        "game_frame":_native_capture_tick,
+        "game_distance_m":snappedf(distance,.001),
+        "dispatch_receipt_digest":_approved_gameplay_dispatch_digest,
+    }
+    if _approved_npc_interaction_count >= 4096:
+        push_error("Bounded local NPC interaction log exhausted")
+        return
+    var path := "user://frontier_local_npc_interactions.jsonl"
+    var output := FileAccess.open(path, FileAccess.READ_WRITE)
+    if output == null and not FileAccess.file_exists(path):
+        output = FileAccess.open(path, FileAccess.WRITE_READ)
+    if output == null:
+        push_error("NPC interaction receipt could not be opened")
+        return
+    output.seek_end()
+    output.store_string(JSON.stringify(receipt) + "\n")
+    output.flush()
+    output.close()
+    _approved_npc_interaction_count += 1
+    if _approved_npc_interaction_status != null:
+        _approved_npc_interaction_status.text = (
+            "Interacted with " + _approved_npc_focus + " [" +
+            str(_approved_gameplay_npc_emotions[_approved_npc_focus]) +
+            "] | " + str(_approved_npc_interaction_count) + " local receipts"
         )
 
 
@@ -1893,6 +1964,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     if key.physical_keycode == KEY_I and not _approved_gameplay_inventory.is_empty():
         _cycle_approved_inventory()
+        get_viewport().set_input_as_handled()
+        return
+    if key.physical_keycode == KEY_E and not _approved_npc_focus.is_empty():
+        _interact_approved_npc()
         get_viewport().set_input_as_handled()
         return
     if key.physical_keycode == KEY_N and not _approved_npc_focus.is_empty():

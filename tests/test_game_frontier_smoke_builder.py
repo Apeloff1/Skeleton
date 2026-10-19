@@ -42,6 +42,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("ApprovedInventoryBrowser",script)
             self.assertIn("_cycle_approved_inventory",script)
             self.assertIn("_inspect_approved_npc_proximity",script)
+            self.assertIn("_interact_approved_npc",script)
+            self.assertIn("frontier_local_npc_interactions.jsonl",script)
             self.assertIn("ApprovedNPCProximityInspector",script)
             self.assertIn("_persist_verified_gameplay_receipt",script)
             self.assertIn("NativeVirtualFlightInstruments",script)
