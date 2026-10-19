@@ -196,6 +196,31 @@ def simulate_elastic_skin(
                 v = velocities[i]
                 velocities[i] = Vec3(v.x*.8,v.y*.8,max(0,-v.z*.08))
                 collisions += 1
+        # Constraint projection on current topology limits runaway skin
+        # stretching, without moving pinned rig vertices. Two passes
+        # provide a stable local envelope without an external FEM solver.
+        for _projection_pass in range(2):
+            for (a,b),rest in zip(links,rest_lengths):
+                if rest <= 1e-9:
+                    continue
+                delta = positions[b]-positions[a]
+                span = length(delta)
+                if span <= 1e-9:
+                    continue
+                target = max(rest*(1-wrapper.maximum_strain),
+                             min(rest*(1+wrapper.maximum_strain),span))
+                correction = delta.scaled((span-target)/span)
+                if a in pins and b in pins:
+                    continue
+                if a in pins:
+                    positions[b] = positions[b]-correction
+                elif b in pins:
+                    positions[a] = positions[a]+correction
+                else:
+                    positions[a] = positions[a]+correction.scaled(.5)
+                    positions[b] = positions[b]-correction.scaled(.5)
+            for i in pins:
+                positions[i] = anchors[i]
     strain = 0.
     for (a,b),rest in zip(links,rest_lengths):
         if rest > 1e-9:
