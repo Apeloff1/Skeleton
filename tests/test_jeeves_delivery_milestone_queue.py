@@ -8,7 +8,6 @@ from skeleton.jeeves.agent.delivery_milestone_queue import (
     MilestoneQueue, QueueContractError, restore_queue, verify_queue,
 )
 from skeleton.jeeves.agent.delivery_milestone_workbench import HostMeasurement
-from skeleton.jeeves.agent.delivery_milestone_workbench import CRITERION_BY_ID
 
 
 COMMIT = "a" * 40
