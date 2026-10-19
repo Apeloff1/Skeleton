@@ -1,4 +1,4 @@
-"""Original sea, mountain, cave, elevation, and linked-screen adventure maps.
+"""Original sea, mountain, cave, elevation, adventure, homebrew, tabletop, and dungeon maps.
 
 Each map is a deterministic variant. Sea charts separate deep water from the
 shore. Mountain maps keep a peak above a valley. Cave floors connect to one
@@ -60,14 +60,26 @@ FAMILIES: tuple[str, ...] = (
     "cave_map",
     "elevation_map",
     "adventure_map",
+    "homebrew_map",
+    "tabletop_map",
+    "dungeon_map",
 )
+FOLLOWUP_FAMILIES: tuple[str, ...] = ("homebrew_map", "tabletop_map", "dungeon_map")
 VARIANTS: dict[str, tuple[str, ...]] = {
     "sea_map": ("bay", "atoll", "channel", "archipelago", "harbor"),
     "mountain_map": ("ridge", "pass", "peak", "saddle", "cliff"),
     "cave_map": ("tunnel", "chamber", "shaft", "fork", "shore"),
     "elevation_map": ("ramp", "hill", "valley", "plateau", "terrace"),
     "adventure_map": ("coast-link", "ridge-link", "cave-link", "island-link", "pass-link"),
+    "homebrew_map": ("region", "route", "camp", "ruin", "ford"),
+    "tabletop_map": ("skirmish", "ambush", "bridge", "courtyard", "shore"),
+    "dungeon_map": ("corridor", "vault", "loop", "branch", "cellar"),
 }
+TABLETOP_TILES = {".", "#", "c", "d"}
+HOMEBREW_TILES = {"#", ".", "~", "H", "K"}
+WALK_HOME = {".", "~", "H", "K"}
+WALK_TABLE = {".", "c", "d"}
+ROOM_NAMES = ("entry", "hall", "cache", "stair", "well", "loft")
 SIZES: tuple[tuple[int, int], ...] = ((8, 8), (12, 8), (8, 12), (16, 8))
 SEA_ELEV = {"~": 0, "-": 1, "#": 2, "^": 3}
 MOUNTAIN_ELEV = {"v": 0, ".": 1, "/": 2, "^": 3}
@@ -92,6 +104,28 @@ RESERVED_NAMES = (
     "ocarina",
     "majora",
     "calamity",
+    "dungeons and dragons",
+    "dungeons & dragons",
+    "forgotten realms",
+    "faerun",
+    "waterdeep",
+    "baldur",
+    "underdark",
+    "beholder",
+    "mind flayer",
+    "illithid",
+    "tarrasque",
+    "strahd",
+    "ravenloft",
+    "eberron",
+    "dragonlance",
+    "greyhawk",
+    "mordenkainen",
+    "vecna",
+    "lolth",
+    "neverwinter",
+    "phandelver",
+    "barovia",
 )
 
 
@@ -309,6 +343,135 @@ def _adventure(serial: int, variant: str) -> str:
     )
 
 
+def _stamp(grid: list[list[str]], x: int, y: int, tile: str) -> None:
+    grid[y][x] = tile
+
+
+def _homebrew_grid(width: int, height: int, variant: str) -> list[list[str]]:
+    grid = _blank(width, height, "#")
+    mid_y = height // 2
+    mid_x = width // 2
+    if variant == "route":
+        for x in range(width):
+            grid[mid_y][x] = "."
+        _stamp(grid, 0, mid_y, "H")
+        _stamp(grid, width - 1, mid_y, "K")
+    elif variant == "camp":
+        _stamp(grid, mid_x, mid_y, "H")
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1)):
+            x, y = mid_x + dx, mid_y + dy
+            if 0 <= x < width and 0 <= y < height and grid[y][x] == "#":
+                grid[y][x] = "."
+        _stamp(grid, min(width - 1, mid_x + 1), min(height - 1, mid_y + 1), "K")
+    elif variant == "ruin":
+        for y in range(1, max(2, height - 1)):
+            for x in range(1, max(2, width - 1)):
+                grid[y][x] = "."
+        _stamp(grid, 0, mid_y, "H")
+        if width > 1:
+            grid[mid_y][1] = "."
+        _stamp(grid, mid_x, mid_y, "K")
+    elif variant == "ford":
+        for x in range(width):
+            grid[mid_y][x] = "~"
+        _stamp(grid, 0, mid_y, "H")
+        _stamp(grid, width - 1, mid_y, "K")
+        grid[mid_y][mid_x] = "."
+    else:
+        for x in range(width):
+            grid[mid_y][x] = "."
+        _stamp(grid, 0, mid_y, "H")
+        _stamp(grid, mid_x, mid_y, "K")
+        if mid_y > 0:
+            grid[mid_y - 1][mid_x] = "."
+    return grid
+
+
+def _tabletop_grid(width: int, height: int, variant: str) -> list[list[str]]:
+    grid = _blank(width, height, ".")
+    mid_y = height // 2
+    mid_x = width // 2
+    if variant == "ambush":
+        for x in range(width):
+            grid[0][x] = "#"
+        grid[min(height - 1, 1)][mid_x] = "c"
+        grid[mid_y][mid_x] = "d"
+    elif variant == "bridge":
+        for y in range(height):
+            for x in range(width):
+                grid[y][x] = "#"
+        for x in range(width):
+            grid[mid_y][x] = "."
+        grid[mid_y][mid_x] = "c"
+        if width > 3:
+            grid[mid_y][1] = "d"
+    elif variant == "courtyard":
+        for y in range(height):
+            grid[y][0] = "#"
+            grid[y][width - 1] = "#"
+        for x in range(width):
+            grid[0][x] = "#"
+            grid[height - 1][x] = "#"
+        grid[mid_y][mid_x] = "c"
+        if mid_x > 1:
+            grid[mid_y][mid_x - 1] = "d"
+        if height > 2:
+            grid[mid_y][0] = "."
+    elif variant == "shore":
+        for y in range(mid_y):
+            for x in range(width):
+                grid[y][x] = "d"
+        grid[0][0] = "#"
+        grid[mid_y][mid_x] = "c"
+    else:
+        grid[0][0] = "#"
+        grid[mid_y][mid_x] = "c"
+        if width > 2:
+            grid[mid_y][1] = "d"
+    return grid
+
+
+def _dungeon_edges(count: int, variant: str) -> list[tuple[int, int]]:
+    if variant == "vault":
+        edges = [(1, room) for room in range(2, count + 1)]
+    elif variant == "branch":
+        edges = [(1, room) for room in range(2, count + 1)]
+        if count >= 3:
+            edges.append((2, 3))
+    elif variant == "loop":
+        edges = [(room, room + 1) for room in range(1, count)]
+        if count > 2:
+            edges.append((count, 1))
+    elif variant == "cellar":
+        edges = [(room, room + 1) for room in range(1, count)]
+        if count >= 4:
+            edges.append((2, count))
+    else:
+        edges = [(room, room + 1) for room in range(1, count)]
+    return edges
+
+
+def _dungeon(serial: int, variant: str) -> str:
+    count = 3 + (serial % 4)
+    place = SLOTS["place"][serial % len(SLOTS["place"])]
+    edges = _dungeon_edges(count, variant)
+    rooms = [
+        f"Room {index} is the {ROOM_NAMES[index - 1]} at the {place}."
+        if index == 1
+        else f"Room {index} is the {ROOM_NAMES[index - 1]}."
+        for index in range(1, count + 1)
+    ]
+    doors = [f"{left} to {right}" for left, right in edges] + [f"{right} to {left}" for left, right in edges]
+    return "\n".join(
+        (
+            f"Dungeon map variant {variant} rooms {count} pass {serial}.",
+            *rooms,
+            "Doors " + ", ".join(doors) + ".",
+            "Every room connects to the entry. A door returns the same way it was crossed.",
+        )
+    )
+
+
 def render_map(family: str, serial: int) -> str:
     """One original map. The same serial always rebuilds the same variant."""
     if family not in FAMILIES:
@@ -337,11 +500,23 @@ def render_map(family: str, serial: int) -> str:
             "Every floor and pool connects to the entrance. Walls are not walked."
         )
         title = f"Cave map variant {variant} grid {width}x{height} pass {serial}."
-    else:
+    elif family == "elevation_map":
         grid = _elevation_grid(width, height, variant)
         body = _digits(grid)
         legend = "Every cell is a height from 0 to 9. A walk reads the height and does not invent a second one."
         title = f"Elevation map variant {variant} grid {width}x{height} pass {serial}."
+    elif family == "homebrew_map":
+        grid = _homebrew_grid(width, height, variant)
+        body = _paint(grid)
+        legend = "Home is one cell. Every trail connects to home. The maker wrote the key, and a second key is not invented."
+        title = f"Homebrew map variant {variant} grid {width}x{height} pass {serial}."
+    elif family == "tabletop_map":
+        grid = _tabletop_grid(width, height, variant)
+        body = _paint(grid)
+        legend = "Scale one square is five feet. Cover stops a shot and not a step. Difficult ground costs two. Blocking ground is not entered."
+        title = f"Tabletop map variant {variant} grid {width}x{height} pass {serial}."
+    else:
+        return _dungeon(serial, variant)
     return "\n".join((title, body, legend))
 
 
@@ -356,6 +531,35 @@ def _bfs_floor(grid: list[list[str]], start: tuple[int, int]) -> dict[tuple[int,
             if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in seen and grid[ny][nx] in {".", "~"}:
                 seen[(nx, ny)] = seen[(x, y)] + 1
                 queue.append((nx, ny))
+    return seen
+
+
+def _reach(grid: list[list[str]], start: tuple[int, int], walkable: set[str]) -> set[tuple[int, int]]:
+    height, width = len(grid), len(grid[0])
+    seen = {start}
+    queue: deque[tuple[int, int]] = deque([start])
+    while queue:
+        x, y = queue.popleft()
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in seen and grid[ny][nx] in walkable:
+                seen.add((nx, ny))
+                queue.append((nx, ny))
+    return seen
+
+
+def _room_reach(doors: list[tuple[int, int]], start: int = 1) -> set[int]:
+    adjacent: dict[int, set[int]] = {}
+    for left, right in doors:
+        adjacent.setdefault(left, set()).add(right)
+    seen = {start}
+    queue: deque[int] = deque([start])
+    while queue:
+        room = queue.popleft()
+        for nxt in adjacent.get(room, ()):
+            if nxt not in seen:
+                seen.add(nxt)
+                queue.append(nxt)
     return seen
 
 
@@ -374,6 +578,12 @@ def assess_map(text: str) -> dict[str, Any]:
         family = "elevation_map"
     elif title.startswith("Adventure map "):
         family = "adventure_map"
+    elif title.startswith("Homebrew map "):
+        family = "homebrew_map"
+    elif title.startswith("Tabletop map "):
+        family = "tabletop_map"
+    elif title.startswith("Dungeon map "):
+        family = "dungeon_map"
     lowered = text.lower()
     reserved = any(name in lowered for name in RESERVED_NAMES)
     valid = False
@@ -458,6 +668,73 @@ def assess_map(text: str) -> dict[str, Any]:
             and stairs == gaps
             and "return" in lines[6]
         )
+    elif family == "homebrew_map" and not reserved:
+        variant = title.split(" variant ")[1].split(" grid ")[0]
+        size = title.split(" grid ")[1].split(" pass ")[0]
+        width, height = (int(part) for part in size.split("x"))
+        rows = lines[1 : 1 + height]
+        grid = [list(row) for row in rows]
+        homes = [(x, y) for y, cells in enumerate(grid) for x, cell in enumerate(cells) if cell == "H"]
+        keys = [(x, y) for y, cells in enumerate(grid) for x, cell in enumerate(cells) if cell == "K"]
+        legend = lines[1 + height] if len(lines) > 1 + height else ""
+        reached = _reach(grid, homes[0], WALK_HOME) if homes else set()
+        trails = [(x, y) for y, cells in enumerate(grid) for x, cell in enumerate(cells) if cell in WALK_HOME]
+        valid = (
+            variant in VARIANTS[family]
+            and len(grid) == height
+            and all(len(cells) == width for cells in grid)
+            and {cell for cells in grid for cell in cells} <= HOMEBREW_TILES
+            and len(homes) == 1
+            and len(keys) == 1
+            and set(trails) <= reached
+            and "Home is one cell" in legend
+            and "second key is not invented" in legend
+        )
+    elif family == "tabletop_map" and not reserved:
+        variant = title.split(" variant ")[1].split(" grid ")[0]
+        size = title.split(" grid ")[1].split(" pass ")[0]
+        width, height = (int(part) for part in size.split("x"))
+        rows = lines[1 : 1 + height]
+        grid = [list(row) for row in rows]
+        legend = lines[1 + height] if len(lines) > 1 + height else ""
+        walkable = [(x, y) for y, cells in enumerate(grid) for x, cell in enumerate(cells) if cell in WALK_TABLE]
+        cover = any(cell == "c" for cells in grid for cell in cells)
+        reached = _reach(grid, walkable[0], WALK_TABLE) if walkable else set()
+        valid = (
+            variant in VARIANTS[family]
+            and len(grid) == height
+            and all(len(cells) == width for cells in grid)
+            and {cell for cells in grid for cell in cells} <= TABLETOP_TILES
+            and cover
+            and walkable
+            and set(walkable) <= reached
+            and "Scale one square is five feet." in legend
+            and "Cover stops a shot and not a step." in legend
+        )
+    elif family == "dungeon_map" and not reserved:
+        variant = title.split(" variant ")[1].split(" rooms ")[0]
+        count = int(title.split(" rooms ")[1].split(" pass ")[0])
+        rooms = lines[1 : 1 + count]
+        door_line = lines[1 + count] if len(lines) > 1 + count else ""
+        legend = lines[2 + count] if len(lines) > 2 + count else ""
+        raw = door_line.removeprefix("Doors ").removesuffix(".")
+        doors = []
+        if raw:
+            for part in raw.split(", "):
+                left, arrow, right = part.split(" ")
+                if arrow == "to":
+                    doors.append((int(left), int(right)))
+        paired = {(right, left) for left, right in doors}
+        valid = (
+            variant in VARIANTS[family]
+            and len(rooms) == count
+            and rooms[0].startswith("Room 1 is the entry")
+            and all(rooms[index - 1].startswith(f"Room {index} is the {ROOM_NAMES[index - 1]}") for index in range(1, count + 1))
+            and set(doors) == paired
+            and _room_reach(doors) == set(range(1, count + 1))
+            and "Every room connects to the entry." in legend
+            and "same way" in legend
+        )
     return {"valid": bool(valid), "family": family, "variant": variant, "reserved_name": reserved}
 
 
@@ -481,20 +758,37 @@ def validate_maps() -> dict[str, int]:
     return {"families": len(FAMILIES), "checked": checked}
 
 
-def iter_training_maps(map_budget: int, *, start: int = 0) -> Iterator[tuple[str, str]]:
+def iter_training_maps(
+    map_budget: int,
+    *,
+    start: int = 0,
+    families: tuple[str, ...] | None = None,
+    family_budget: int | None = None,
+) -> Iterator[tuple[str, str]]:
     """Yield original maps until the map budget is met. Holdout serials never appear."""
     if isinstance(map_budget, bool) or not isinstance(map_budget, int) or map_budget < 1:
         raise ValueError("map_budget must be a positive int")
     if isinstance(start, bool) or not isinstance(start, int) or start < 0:
         raise ValueError("start must be a non-negative int")
+    chosen = FAMILIES if families is None else tuple(families)
+    if not chosen or any(name not in FAMILIES for name in chosen):
+        raise ValueError("families must be known map families")
+    if family_budget is not None and (isinstance(family_budget, bool) or not isinstance(family_budget, int) or family_budget < 1):
+        raise ValueError("family_budget must be a positive int")
     validate_maps()
     banned = banned_windows(DENYLIST)
     reserved = set(map_holdouts())
     produced = 0
     counter = 0
     skips = 0
+    counts = {name: 0 for name in chosen}
     while produced < map_budget:
-        family = FAMILIES[counter % len(FAMILIES)]
+        family = chosen[counter % len(chosen)]
+        if family_budget is not None and counts[family] >= family_budget:
+            if all(counts[name] >= family_budget for name in chosen):
+                break
+            counter += 1
+            continue
         serial = training_serial(counter)
         counter += 1
         text = render_map(family, serial)
@@ -505,6 +799,7 @@ def iter_training_maps(map_budget: int, *, start: int = 0) -> Iterator[tuple[str
             continue
         skips = 0
         produced += 1
+        counts[family] += 1
         if produced <= start:
             continue
         yield family, text
@@ -523,6 +818,9 @@ def train_map_budget(
     plateau_rejects: int | None = None,
     max_seconds: float | None = None,
     persist_every: int = 2048,
+    families: tuple[str, ...] | None = None,
+    family_budget: int | None = None,
+    selection: str = "map-billion",
     ledger_path: Path | str | None = None,
     log: Any = None,
 ) -> dict[str, Any]:
@@ -544,6 +842,13 @@ def train_map_budget(
         raise ValueError("max_seconds must be positive")
     if isinstance(persist_every, bool) or not isinstance(persist_every, int) or persist_every < 1:
         raise ValueError("persist_every must be a positive int")
+    chosen = FAMILIES if families is None else tuple(families)
+    if not chosen or any(name not in FAMILIES for name in chosen):
+        raise ValueError("families must be known map families")
+    if family_budget is not None and (isinstance(family_budget, bool) or not isinstance(family_budget, int) or family_budget < 1):
+        raise ValueError("family_budget must be a positive int")
+    if not isinstance(selection, str) or not selection:
+        raise ValueError("selection must be a non-empty string")
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     ckpt_path = root / "checkpoint.pt"
@@ -554,6 +859,8 @@ def train_map_budget(
     maps = 0
     maps_kept = 0
     byte_count = 0
+    family_counts: dict[str, int] = {}
+    family_kept: dict[str, int] = {}
     elapsed_before = 0.0
     seen: set[str] = set()
     resumed = False
@@ -569,6 +876,8 @@ def train_map_budget(
         elapsed_before = float(loaded.get("elapsed", 0.0))
         source_digest = loaded.get("source_digest")
         seen = set(loaded.get("families") or [])
+        family_counts = {str(key): int(value) for key, value in (loaded.get("family_counts") or {}).items()}
+        family_kept = {str(key): int(value) for key, value in (loaded.get("family_kept") or {}).items()}
         resumed = True
     elif source is not None:
         loaded = torch.load(source, map_location="cpu", weights_only=False)
@@ -594,7 +903,7 @@ def train_map_budget(
         ratchet.stall = int(loaded.get("stall", 0))
     opt = _fresh_optimizer(parameters, float(peak_lr))
     started = time.perf_counter()
-    batch: list[str] = []
+    batch: list[tuple[str, str]] = []
     reason: str | None = None
     model.train()
 
@@ -602,9 +911,10 @@ def train_map_budget(
         nonlocal maps, maps_kept, byte_count, best_state, best_scores, opt
         if not batch:
             return
+        texts = [item[1] for item in batch]
         origin = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
         opt.param_groups[0]["lr"] = float(peak_lr) * ratchet.scale
-        loss = _batch_loss(model, list(batch))
+        loss = _batch_loss(model, texts)
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(parameters, GRAD_CLIP)
@@ -624,12 +934,16 @@ def train_map_budget(
                 best_scores = after
                 best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
                 maps_kept += count
+                for family, _text in batch:
+                    family_kept[family] = family_kept.get(family, 0) + 1
             else:
                 model.load_state_dict(origin)
                 _pin(model)
                 opt = _fresh_optimizer(parameters, float(peak_lr))
         maps += count
-        byte_count += sum(len(text.encode("utf-8")) for text in batch)
+        for family, text in batch:
+            family_counts[family] = family_counts.get(family, 0) + 1
+            byte_count += len(text.encode("utf-8"))
         batch.clear()
 
     def _elapsed() -> float:
@@ -656,15 +970,22 @@ def train_map_budget(
             "ratchet": ratchet.snapshot(),
             "stall": ratchet.stall,
             "families": sorted(seen),
+            "family_counts": family_counts,
+            "family_kept": family_kept,
         }
         tmp = ckpt_path.with_suffix(".tmp")
         torch.save(payload, tmp)
         os.replace(tmp, ckpt_path)
 
     if maps < map_budget:
-        for family, text in iter_training_maps(map_budget, start=maps):
+        for family, text in iter_training_maps(
+            map_budget,
+            start=maps,
+            families=chosen,
+            family_budget=family_budget,
+        ):
             seen.add(family)
-            batch.append(text)
+            batch.append((family, text))
             if len(batch) >= chunk_maps:
                 _flush()
                 reason = _stop()
@@ -702,6 +1023,9 @@ def train_map_budget(
         "maps_trained": maps,
         "maps_kept": maps_kept,
         "families": sorted(seen),
+        "family_counts": family_counts,
+        "family_kept": family_kept,
+        "per_family_budget": None if family_budget is None else int(family_budget),
         "stop_reason": reason,
         "budget_met": bool(forecast["budget_met"]),
         "maps_per_second": forecast["words_per_second"],
@@ -731,7 +1055,7 @@ def train_map_budget(
         "promotion": False,
         "service_checkpoint_touched": False,
         "byte_loss_is_gameplay_quality": False,
-        "selection": "map-billion",
+        "selection": selection,
         "loss_focus": None,
     }
     (root / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")

@@ -147,7 +147,17 @@ TRACKS: dict[str, tuple[str, ...]] = {
         "netcode",
         "performance",
     ),
-    "maps": ("sea_map", "mountain_map", "cave_map", "elevation_map", "adventure_map"),
+    "maps": (
+        "sea_map",
+        "mountain_map",
+        "cave_map",
+        "elevation_map",
+        "adventure_map",
+        "homebrew_map",
+        "tabletop_map",
+        "dungeon_map",
+    ),
+    "cognition": ("jeeves_cognition",),
 }
 
 TEMPLATES: dict[str, tuple[str, ...]] = {
@@ -474,6 +484,22 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
     "adventure_map": (
         "Pass {n}. The adventure map for the {place} links original screens across seams. A height change above one step is a stair, and the return uses the opposite seam.",
         "Pass {n}. The {role} names each screen on the {place} overworld. A coast, a ridge, and a cave mouth can share the map without copying another game.",
+    ),
+    "homebrew_map": (
+        "Pass {n}. The homebrew map for the {place} has one home cell and one maker key. Every trail connects back to that home, and the {role} writes the key.",
+        "Pass {n}. A route, a camp, a ruin, and a ford are variants of the same {place} homebrew map. The home cell stays singular.",
+    ),
+    "tabletop_map": (
+        "Pass {n}. The tabletop map for the {place} uses one square as five feet. Cover stops a shot and does not stop a step.",
+        "Pass {n}. The {role} marks difficult ground and blocking ground on the {place} table. A drawing without that scale is not the map.",
+    ),
+    "dungeon_map": (
+        "Pass {n}. The dungeon map for the {place} links original rooms by doors. Every room connects to the entry, and a door returns the same way.",
+        "Pass {n}. The {role} keys the {place} rooms without copying a commercial bestiary. A door that does not return is not a finished link.",
+    ),
+    "jeeves_cognition": (
+        "Pass {n}. Jeeves keeps a claim about the {place} uncertain until the {asset} evidence is written down. A missing observation does not become a fact.",
+        "Pass {n}. The {role} asks Jeeves for the next {verb}. The plan reads the written rule first, and a tool result stays an observation rather than a new goal.",
     ),
 }
 
