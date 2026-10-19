@@ -216,6 +216,40 @@ class RayTraceTests(unittest.TestCase):
 
 
 class WholeSceneTests(unittest.TestCase):
+    def test_inverse_gravity_and_ethereal_contact_affect_character_dynamics(self):
+        skeleton = CharacterSkeleton((
+            Bone("root", -1, Vec3(0, 0, 0), Vec3(0, 0, 1), .2),
+        ))
+        zero = BonePose(Vec3(0, 0, 0))
+        clip = AnimationClip("idle", (
+            AnimationKeyframe(0, (zero,)),
+            AnimationKeyframe(1000, (zero,)),
+        ))
+        params = dict(
+            world_axes=AXIS, cell_x=0, cell_y=1,
+            wind_field=WindField((WindLayer(0, WindVector(0, 0)),)),
+            clouds=(), time_s=0, delta_s=.05,
+            skeleton=skeleton, animation=clip, animation_time_ms=200,
+            era="early_3d", fps=60,
+            evidence=(Percept("npc", "character", True, 1, .9, HASH),),
+            world_goal_kind="character", available_actions=("inspect", "interact"),
+            weather=Weather(Vec3(0, 0, 0), 20),
+            character_state=CharacterState(Vec3(0, 0, .5),
+                                           Vec3(0, 0, 0), .5, 70),
+            collision_surfaces=(CollisionPlane(
+                "ceiling", Vec3(0, 0, .75), Vec3(0, 0, -1)),),
+            desired_character_velocity=Vec3(0, 0, 0),
+        )
+        original = compile_frontier_scene(**params)
+        inverted = compile_frontier_scene(
+            **params, world_variant=WorldVariant(WorldFamily.INVERSE, intensity=1))
+        self.assertGreater(inverted.manifest["character_physics"]["velocity"][2],
+                           original.manifest["character_physics"]["velocity"][2])
+        ethereal = compile_frontier_scene(
+            **params, world_variant=WorldVariant(WorldFamily.ETHEREAL, intensity=1))
+        self.assertTrue(ethereal.manifest["world_variant"]["character_collision_ethereal_pass_through"])
+        self.assertFalse(ethereal.manifest["character_physics"]["impacts"])
+
     def test_60fps_world_motion_lighting_candidate(self):
         skeleton = CharacterSkeleton((
             Bone("root", -1, Vec3(0, 0, 0), Vec3(0, 0, 1.2), .25),
