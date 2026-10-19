@@ -205,6 +205,67 @@ class NativeSessionVault:
             "authority":"verified_local_game_save_recovery_not_canonical_GDD_writer",
         }
 
+    def audit_retained_history(
+        self,journal,pages,quest_graph,approvals, *,
+        actor_id: str,scene_candidate_digest: str,
+    ) -> dict:
+        """Independently cold-replay ALL retained game snapshots.
+
+        Receipt ancestry remains verifiable after rotation. Missing compacted
+        payloads are reported explicitly, never treated as replayed evidence.
+        This is costly by design and runs at recovery/qualification boundaries.
+        """
+        rows=self._rows()
+        if not rows or rows[-1]["snapshot_json"] is None:
+            raise NativeSessionVaultError("auditable game head checkpoint required")
+        counts=0
+        last=-1
+        verified=[]
+        for row in rows:
+            if (row["signed_gdd_digest"]!=journal.gdd.source_digest or
+                row["scene_candidate_digest"]!=scene_candidate_digest or
+                row["actor_id"]!=actor_id or row["track"]!=journal.track or
+                row["approved_manifest_digest"]!=approvals["receipt_digest"]):
+                raise NativeSessionVaultError("historical receipt bound to different game source")
+            if row["snapshot_json"] is None:
+                counts+=1
+                continue
+            try:
+                saved=json.loads(row["snapshot_json"])
+            except (TypeError,ValueError) as exc:
+                raise NativeSessionVaultError("retained game snapshot is invalid JSON") from exc
+            if (saved.get("receipt_digest")!=row["checkpoint_digest"] or
+                saved.get("frame")!=row["frame"] or
+                saved.get("authored_pages_digest")!=row["authored_pages_digest"] or
+                saved.get("quest_graph_digest")!=row["quest_graph_digest"]):
+                raise NativeSessionVaultError("retained snapshot contradicts its archived receipt")
+            proven=audit_native_quest_checkpoint(
+                journal,pages,quest_graph,approvals,saved,
+                actor_id=actor_id,scene_candidate_digest=scene_candidate_digest)
+            if proven["receipt_digest"]!=row["cold_audit_digest"]:
+                raise NativeSessionVaultError("retained snapshot differs from original frame history")
+            verified.append({
+                "frame":row["frame"],"serial":row["serial"],
+                "checkpoint_digest":saved["receipt_digest"],
+                "vault_receipt_digest":row["receipt_digest"],
+            })
+            last=row["frame"]
+        report={
+            "schema":"skeleton.game.native_vault_history_audit.v1",
+            "session_id":self.session_id,"source_gdd_digest":journal.gdd.source_digest,
+            "scene_candidate_digest":scene_candidate_digest,
+            "ancestry_receipts_verified":len(rows),
+            "retained_snapshots_cold_replayed":len(verified),
+            "compacted_payloads_not_replayable":counts,
+            "last_cold_replayed_frame":last,
+            "head_receipt_digest":rows[-1]["receipt_digest"],
+            "retained_snapshots":verified,
+            "authority":"archived_receipt_ancestry_and_retained_cold_replay_not_long_term_attestation",
+        }
+        report["receipt_digest"]=_sha(report)
+        return report
+
+
     def rotate(self,*,keep_latest: int = 2) -> dict:
         """Prune *payloads only*: all immutable ancestry receipts are retained."""
         if type(keep_latest) is not int or not 1<=keep_latest<=1024:

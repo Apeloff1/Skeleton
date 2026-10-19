@@ -47,6 +47,38 @@ class NativeSessionVaultTests(NativeQuestBatchTests):
                     actor_id="hero",scene_candidate_digest="d"*64)
                 self.assertTrue(repeated["reused_existing"])
 
+    def test_full_retained_history_audit_after_compaction(self):
+        with TemporaryDirectory() as folder:
+            path=Path(folder)/"history.sqlite"
+            checkpoints=[self.replay(through_frame=i)["head_checkpoint"] for i in (0,1,2,4)]
+            with self.make(path) as vault:
+                for cp in checkpoints:
+                    vault.append(cp,self.journal,self.pages,self.graph,self.approved,
+                        actor_id="hero",scene_candidate_digest="d"*64)
+                audit=vault.audit_retained_history(
+                    self.journal,self.pages,self.graph,self.approved,
+                    actor_id="hero",scene_candidate_digest="d"*64)
+                self.assertEqual(audit["retained_snapshots_cold_replayed"],4)
+                self.assertEqual(audit["ancestry_receipts_verified"],4)
+                self.assertEqual(audit["compacted_payloads_not_replayable"],0)
+                vault.rotate(keep_latest=2)
+            with self.make(path) as vault:
+                proof=vault.audit_retained_history(
+                    self.journal,self.pages,self.graph,self.approved,
+                    actor_id="hero",scene_candidate_digest="d"*64)
+                self.assertEqual(proof["ancestry_receipts_verified"],4)
+                self.assertEqual(proof["retained_snapshots_cold_replayed"],2)
+                self.assertEqual(proof["compacted_payloads_not_replayable"],2)
+                self.assertEqual(proof["last_cold_replayed_frame"],4)
+            with sqlite3.connect(path) as db:
+                db.execute("UPDATE game_native_quest_vault SET snapshot_json='{}' "
+                           "WHERE serial=2")
+            with self.make(path) as vault:
+                with self.assertRaises(NativeSessionVaultError):
+                    vault.audit_retained_history(
+                        self.journal,self.pages,self.graph,self.approved,
+                        actor_id="hero",scene_candidate_digest="d"*64)
+
     def test_crash_before_commit_does_not_leave_partial_save(self):
         with TemporaryDirectory() as folder:
             path=Path(folder)/"vault.sqlite"
