@@ -135,6 +135,7 @@ def _verify(args):
         "schema","dispatch_file_sha256","dispatch_receipt_digest",
         "signed_gdd_digest","scene_candidate_digest","actor_id",
         "source_through_frame","actions_applied","quests","flags",
+        "quest_progression_history",
         "presentation_cues","inventory","npc_emotions","visualized_npc_ids",
         "executed_action_trace","visualized_item_ids","cue_timeline_frame_index",
         "read_only_branch_options","visualized_fx_page_ids","authority",
@@ -160,6 +161,7 @@ def _verify(args):
         or type(receipt["actions_applied"]) is not int
         or receipt["actions_applied"]!=len(bundle["actions"])
         or receipt["quests"]!=bundle["expected_quests"]
+        or receipt["quest_progression_history"]!=bundle["expected_quest_history"]
         or receipt["read_only_branch_options"]!=bundle["available_branch_options"]
         or receipt["flags"]!=bundle["expected_flags"]
         or receipt["inventory"]!=bundle["expected_inventory"]
@@ -175,6 +177,7 @@ def _verify(args):
         "operation":"verify","verified_engine_actions":len(bundle["actions"]),
         "verified_action_receipts":len(receipt["executed_action_trace"]),
         "verified_quest_count":len(receipt["quests"]),
+        "verified_quest_history_entries":len(receipt["quest_progression_history"]),
         "verified_npc_reactions":len(receipt["visualized_npc_ids"]),
         "verified_inventory_visuals":len(receipt["visualized_item_ids"]),
         "verified_cue_count":len(expected_cues),

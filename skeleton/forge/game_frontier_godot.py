@@ -79,6 +79,9 @@ var _approved_dialogue_cursor: int = 0
 var _approved_dialogue_panel: PanelContainer
 var _approved_dialogue_label: Label
 var _approved_gameplay_label: Label
+var _approved_quest_history: Array = []
+var _approved_quest_history_cursor: int = 0
+var _approved_quest_history_label: Label
 var _approved_cue_timeline: Array = []
 var _approved_cue_cursor: int = 0
 var _approved_cue_label: Label
@@ -638,6 +641,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     var next_flags: Dictionary = bundle["initial_flags"].duplicate(true)
     var next_quests: Dictionary = {}
     var next_cues: Array = []
+    var next_quest_history: Array = []
     var next_action_trace: Array = []
     var next_inventory: Dictionary = {}
     var next_npc_emotions: Dictionary = {}
@@ -685,7 +689,25 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 "completed":quest_edges[token[0]][token[1]].is_empty(),
                 "last_transition_frame":frame,
             }
-        elif kind == "craft_item":
+        if kind == "start_quest" or kind == "advance_quest":
+            var chunks := value.split(":")
+            var quest_id: String = str(chunks[0])
+            var stage_id: String = (
+                str(quest_starts[quest_id]) if kind == "start_quest"
+                else str(chunks[1])
+            )
+            var objective: Dictionary = quest_objectives[quest_id]
+            if not objective.has(stage_id):
+                push_error("Quest history stage lacks authored objective")
+                return
+            next_quest_history.append({
+                "frame":frame,"page_id":str(row.get("page_id", "")),
+                "quest_id":quest_id,"title":str(quest_titles[quest_id]),
+                "stage_id":stage_id,"objective":str(objective[stage_id]),
+                "completed":quest_edges[quest_id][stage_id].is_empty(),
+                "source_frame_digest":str(row.get("native_frame_receipt_digest", "")),
+            })
+        if kind == "craft_item":
             if value.is_empty() or value.length() > 128:
                 push_error("Approved crafted item name invalid")
                 return
@@ -756,11 +778,22 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
                 push_error("Approved source action trace index is not integral")
                 return
             trace_row[numeric_key] = int(source_number)
+    var expected_history: Array = bundle.get("expected_quest_history", []).duplicate(true)
+    for history_item in expected_history:
+        if typeof(history_item) != TYPE_DICTIONARY:
+            push_error("Authored quest history row invalid")
+            return
+        var tick: Variant = history_item.get("frame", -1)
+        if float(tick) < 0.0 or float(tick) != floorf(float(tick)):
+            push_error("Authored quest history tick invalid")
+            return
+        history_item["frame"] = int(tick)
     if (next_flags != bundle.get("expected_flags", {})
         or next_quests != expected_quests
         or next_inventory != expected_inventory
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})
-        or next_action_trace != expected_trace):
+        or next_action_trace != expected_trace
+        or next_quest_history != expected_history):
         push_error("Engine RPG reducer diverged from independently replayed state")
         return
     for quest_id in next_quests.keys():
@@ -770,6 +803,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
             or not quest_objectives[quest_id].has(progress["stage"])):
             push_error("Approved quest stage has no source-authored objective")
             return
+    _approved_quest_history = next_quest_history
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
     _approved_gameplay_inventory = next_inventory
@@ -813,6 +847,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "source_through_frame":bundle["source_through_frame"],
         "actions_applied":actions.size(),
         "quests":next_quests,"flags":next_flags,
+        "quest_progression_history":next_quest_history,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,
         "visualized_npc_ids":_approved_npc_visuals,
         "visualized_item_ids":_approved_inventory_visuals,
@@ -831,6 +866,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _create_approved_branch_preview()
     _create_approved_npc_proximity_inspector()
     _create_approved_inventory_inspector()
+    _create_approved_quest_history_view()
 
 
 func _persist_verified_gameplay_receipt(state: Dictionary) -> bool:
@@ -995,6 +1031,46 @@ func _animate_approved_fx(delta: float) -> void:
     for i in range(_approved_fx_nodes.size()):
         var scalar := .7 + .16 * sin(_approved_fx_clock * 1.5 + float(i))
         _approved_fx_nodes[i].scale = Vector3.ONE * scalar
+
+
+func _create_approved_quest_history_view() -> void:
+    if _approved_quest_history.is_empty():
+        return
+    var overlay := CanvasLayer.new()
+    overlay.name = "ApprovedQuestHistoryViewer"
+    var label := Label.new()
+    label.name = "VerifiedQuestHistory"
+    label.position = Vector2(20, 365)
+    label.add_theme_color_override("font_color", Color(.85, .82, .98))
+    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    overlay.add_child(label)
+    add_child(overlay)
+    _approved_quest_history_label = label
+    _approved_quest_history_cursor = 0
+    _show_approved_quest_history()
+
+
+func _show_approved_quest_history() -> void:
+    if _approved_quest_history_label == null or _approved_quest_history.is_empty():
+        return
+    var row: Dictionary = _approved_quest_history[_approved_quest_history_cursor]
+    _approved_quest_history_label.text = (
+        "Verified quest history (J): " + str(_approved_quest_history_cursor + 1) +
+        "/" + str(_approved_quest_history.size()) +
+        " | frame " + str(row["frame"]) +
+        "\n" + str(row["title"]) + " / " + str(row["stage_id"]) +
+        ": " + str(row["objective"]) +
+        (" [completed]" if bool(row["completed"]) else "")
+    )
+
+
+func _next_approved_quest_history() -> void:
+    if _approved_quest_history.is_empty():
+        return
+    _approved_quest_history_cursor = (
+        _approved_quest_history_cursor + 1
+    ) % _approved_quest_history.size()
+    _show_approved_quest_history()
 
 
 func _create_approved_inventory_inspector() -> void:
@@ -1508,6 +1584,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
         return
     var key := event as InputEventKey
     if not key.pressed or key.echo:
+        return
+    if key.physical_keycode == KEY_J and not _approved_quest_history.is_empty():
+        _next_approved_quest_history()
+        get_viewport().set_input_as_handled()
         return
     if key.physical_keycode == KEY_I and not _approved_gameplay_inventory.is_empty():
         _cycle_approved_inventory()

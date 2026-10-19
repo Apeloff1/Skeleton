@@ -27,6 +27,8 @@ class NativeEngineDispatchTests(NativeQuestBatchTests):
                           "set_flag","advance_quest","show_dialogue"])
         self.assertEqual(data["expected_quests"]["chapter_1"]["stage"],"ending")
         self.assertEqual(data["expected_flags"]["door_open"],True)
+        self.assertEqual([h["stage_id"] for h in data["expected_quest_history"]],["start","middle","ending"])
+        self.assertEqual(data["expected_quest_history"][-1]["objective"],"Finish the route")
         self.assertEqual(data["expected_inventory"],{})
         self.assertEqual(data["expected_npc_emotions"],{})
         self.assertEqual(data["quest_titles"]["chapter_1"],"The Wind Islands")

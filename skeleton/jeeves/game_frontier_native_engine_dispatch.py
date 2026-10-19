@@ -100,6 +100,26 @@ def compile_native_godot_dispatch(
         cursor=response["checkpoint"]
     if cursor!=checkpoint or len(commands)>65536:
         raise NativeQuestSessionError("dispatch actions differ from audited source prefix")
+    quest_history=[]
+    for command in commands:
+        if command["kind"] not in ("start_quest","advance_quest"):
+            continue
+        token=command["value"].split(":")
+        quest_id=token[0]
+        authored=next((q for q in catalog["quests"] if q["id"]==quest_id),None)
+        if authored is None:
+            raise NativeQuestSessionError("quest history refers to unknown author")
+        stage_id=authored["start"] if command["kind"]=="start_quest" else token[1]
+        stage=next((s for s in authored["stages"] if s["id"]==stage_id),None)
+        if stage is None:
+            raise NativeQuestSessionError("history points at unapproved quest objective")
+        quest_history.append({
+            "frame":command["frame"],"page_id":command["page_id"],
+            "quest_id":quest_id,"title":authored["title"],
+            "stage_id":stage_id,"objective":stage["objective"],
+            "completed":len(stage["next"])==0,
+            "source_frame_digest":command["native_frame_receipt_digest"],
+        })
     result={
         "schema":"skeleton.game.native_godot_dispatch.v1",
         "source":"operator_approved_native_quest_source_replay",
@@ -137,6 +157,7 @@ def compile_native_godot_dispatch(
         "expected_npc_emotions":npc_moods,
         "expected_quests":checkpoint["quests"],
         "actions":commands,
+        "expected_quest_history":quest_history,
         "expected_action_trace":[{
             "frame":c["frame"],"page_id":c["page_id"],
             "action_index":c["action_index"],"kind":c["kind"],
