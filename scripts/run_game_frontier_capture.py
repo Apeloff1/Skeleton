@@ -46,12 +46,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fork-track")
     parser.add_argument("--through",type=int)
     parser.add_argument("--max-samples",type=int,default=1000000)
+    parser.add_argument("--resume",action="store_true",
+                        help="Only reuse exact already-committed capture records")
     arguments=parser.parse_args(argv)
     if arguments.operation=="ingest" and arguments.capture_jsonl is None:
         parser.error("ingest requires --capture-jsonl")
     if arguments.operation=="fork" and (
         arguments.fork_track is None or arguments.through is None):
         parser.error("fork requires --fork-track and --through")
+    if arguments.operation!="ingest" and arguments.resume:
+        parser.error("--resume applies only to ingest")
     if arguments.operation!="ingest" and arguments.capture_jsonl is not None:
         parser.error("capture input is only valid for ingest")
     try:
@@ -65,14 +69,32 @@ def main(argv: list[str] | None = None) -> int:
             settings.get("candidate_digest")!=source.get("origin_candidate_digest") or
             settings.get("fps") not in (30,50,60,120)):
             raise ValueError("not a signed-GDD-linked opt-in Godot source overlay")
-        catalog={settings["actor_id"]:settings["actor_asset_digest"]}
+        specified=settings.get("actors")
+        if specified is None:
+            catalog={settings["actor_id"]:settings["actor_asset_digest"]}
+        else:
+            if (not isinstance(specified,list) or not 1<=len(specified)<=64 or
+                not all(isinstance(item,dict) and
+                        type(item.get("id")) is str and
+                        type(item.get("source_digest")) is str
+                        for item in specified)):
+                raise ValueError("invalid signed multi-actor catalog")
+            catalog={item["id"]:item["source_digest"] for item in specified}
+            if (len(catalog)!=len(specified) or
+                catalog.get(settings["actor_id"])!=settings["actor_asset_digest"]):
+                raise ValueError("duplicate, missing, or forged primary actor catalog")
         with FrameReceiptJournal(arguments.journal,gdd,track=arguments.track) as journal:
             if arguments.operation=="ingest":
                 worker=GodotPhysicsCaptureIngestor(
                     journal,candidate_digest=settings["candidate_digest"],
                     allowed_assets=catalog,max_samples=arguments.max_samples)
-                result=worker.ingest_file(arguments.capture_jsonl)
-                report={"operation":"ingest","samples_committed":len(result),
+                result=worker.ingest_file(arguments.capture_jsonl,
+                                          resume=arguments.resume)
+                report={"operation":"ingest",
+                        "samples_committed":sum(not x.get("reused_existing",False)
+                                                for x in result),
+                        "samples_reused":sum(bool(x.get("reused_existing",False))
+                                              for x in result),
                         "journal":journal.stats(),"replay":journal.replay()}
             elif arguments.operation=="verify":
                 report={"operation":"verify","journal":journal.stats(),
