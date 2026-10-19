@@ -113,6 +113,20 @@ def audit_scene_realism(manifest: Mapping) -> RealismAudit:
                         traction["available_force_n"], "N")
             measurement("climbing", "required_force",
                         traction["required_force_n"], "N")
+        micro = adv.get("microclimate")
+        if isinstance(micro, Mapping):
+            wet_soil = measurement("environment", "micro_soil_water",
+                                   micro["soil_water_fraction"])
+            ground_ice = measurement("environment", "micro_ground_ice",
+                                    micro["ground_ice_fraction"])
+            heat_flux = measurement("environment", "micro_updraft",
+                                    micro["updraft_mps"], "m/s")
+            erosion = measurement("environment", "micro_erosion",
+                                  micro["erosion_pressure"])
+            check("environment", "microclimate_bounded",
+                  0 <= wet_soil <= 1 and 0 <= ground_ice <= 1
+                  and 0 <= erosion <= 1 and abs(heat_flux) <= 100,
+                  "freeze_thaw_rain_heat_reference")
         impact = adv.get("impact")
         if isinstance(impact, Mapping):
             residual = measurement("collision", "momentum_residual",
