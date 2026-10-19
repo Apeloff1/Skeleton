@@ -104,17 +104,30 @@ def compile_frontier_scene(
     if physical_weather is None and any((character_state is not None, soft_nodes,
                                          environment_state is not None, structures)):
         wind = wind_field.sample(cell_x, cell_y, 0, time_s)
+        # World variant affects derived weather and liquid exposure, not just
+        # display metadata. An explicit Weather supplied by the host wins.
+        local_temp = variant_cell.temperature if variant_cell else cell.temperature
+        local_humidity = variant_cell.humidity if variant_cell else cell.humidity
+        elemental_water_depth = (max(0, local_humidity - cell.humidity) * 2
+                                 if world_variant is not None
+                                 and world_variant.family.value == "elemental"
+                                 and world_variant.element == "water" else 0)
         physical_weather = Weather(Vec3(wind.east_mps, wind.north_mps, 0),
-                                   (cell.temperature - .5) * 60,
-                                   humidity=cell.humidity)
+                                   (local_temp - .5) * 60,
+                                   humidity=local_humidity,
+                                   water_depth_m=elemental_water_depth)
     # Do not infer authority, run prediction model or mutate host-scene objects.
     if (character_state is not None and desired_character_velocity is None):
         raise ValueError("character simulation requires explicit desired velocity")
     if (soft_nodes or soft_anchors) and physical_weather is None:
         raise ValueError("soft material simulation requires weather")
+    ethereal_collision_disabled = bool(variant_cell and variant_cell.permeability >= .8)
+    collision_candidates = () if ethereal_collision_disabled else collision_surfaces
+    signed_gravity = 9.81 * (variant_cell.gravity_sign if variant_cell else 1)
     character_step = (simulate_character(character_state, physical_weather,
-                                         collision_surfaces,
+                                         collision_candidates,
                                          desired_velocity=desired_character_velocity,
+                                         gravity_mps2=signed_gravity,
                                          delta_s=delta_s)
                       if character_state is not None else None)
     simulated_soft = (simulate_soft_nodes(soft_nodes, physical_weather,
@@ -209,6 +222,7 @@ def compile_frontier_scene(
             "element": world_variant.element, "intensity": world_variant.intensity,
             "source_coordinates": [variant_cell.source_x, variant_cell.source_y],
             "gravity_sign": variant_cell.gravity_sign,
+            "character_collision_ethereal_pass_through": ethereal_collision_disabled,
             "energy": variant_cell.world_energy,
             "permeability": variant_cell.permeability,
             "luminance": variant_cell.luminance,
