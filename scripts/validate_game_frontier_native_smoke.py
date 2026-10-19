@@ -67,6 +67,19 @@ def validate_native_trace(
     if len(catalog)!=len(actors) or not 1<=len(catalog)<=64:
         raise NativeSmokeError("duplicate or excessive actor catalog")
     primary=settings["actor_id"]
+    controls=settings.get("reference_controls")
+    if controls is None:
+        control_enabled=False
+        fixture_ticks=0
+    else:
+        if not isinstance(controls,dict) or type(controls.get("enabled")) is not bool:
+            raise NativeSmokeError("invalid native reference controller settings")
+        control_enabled=controls["enabled"]
+        fixture_ticks=controls.get("headless_fixture_ticks",0)
+        if type(fixture_ticks) is not int or not 0<=fixture_ticks<=64:
+            raise NativeSmokeError("native fixture tick count outside source bounds")
+        if not control_enabled and fixture_ticks:
+            raise NativeSmokeError("disabled controller cannot author fixture actions")
     prescribed=settings.get("primary_source_dynamics")
     if prescribed is None:
         if require_dynamics:
