@@ -71,8 +71,8 @@ class DurableOperationRuntime:
             raise TypeError("orchestrator must expose reason()")
         if isinstance(outbox_batch_size, bool) or not isinstance(outbox_batch_size, int):
             raise TypeError("outbox_batch_size must be an integer")
-        if outbox_batch_size < 1:
-            raise ValueError("outbox_batch_size must be positive")
+        if not 1 <= outbox_batch_size <= 4096:
+            raise ValueError("outbox_batch_size must be between 1 and 4096")
         if (
             not isinstance(outbox_dispatch_interval_s, (int, float))
             or isinstance(outbox_dispatch_interval_s, bool)
@@ -104,6 +104,10 @@ class DurableOperationRuntime:
         self._dispatcher_stop = Event()
         self._dispatcher_thread: Thread | None = None
         self._dispatcher_lock = RLock()
+        # Foreground commits and the background dispatcher can drain the same
+        # pending outbox. Serialize the entire read -> stream -> ack window,
+        # not merely worker start/stop, to preserve exactly-once append intent.
+        self._outbox_drain_lock = RLock()
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.orchestrator, name)
@@ -141,40 +145,45 @@ class DurableOperationRuntime:
     ) -> OutboxDispatchReport:
         """Publish pending outbox rows to the canonical durable stream."""
         batch = self.outbox_batch_size if limit is None else limit
-        pending = self.operations.pending_outbox(
-            operation_id=operation_id,
-            limit=batch,
-        )
-        published = 0
-        error_type: str | None = None
+        if type(batch) is not int or not 1 <= batch <= 4096:
+            raise ValueError("outbox drain limit must be between 1 and 4096")
+        # Draining must be a single critical section even when callers use
+        # separate foreground threads and the optional background dispatcher.
+        with self._outbox_drain_lock:
+            pending = self.operations.pending_outbox(
+                operation_id=operation_id,
+                limit=batch,
+            )
+            published = 0
+            error_type: str | None = None
 
-        for item in pending:
-            try:
-                self.stream.append(
-                    item.operation_id,
-                    item.event_type,
-                    dict(item.payload),
-                    event_id=item.outbox_id,
-                    timestamp=item.created_at,
-                )
-                self.operations.acknowledge_outbox(item.outbox_id)
-                published += 1
-            except Exception as exc:
-                self._dispatch_failures += 1
-                error_type = type(exc).__name__
-                break
+            for item in pending:
+                try:
+                    self.stream.append(
+                        item.operation_id,
+                        item.event_type,
+                        dict(item.payload),
+                        event_id=item.outbox_id,
+                        timestamp=item.created_at,
+                    )
+                    self.operations.acknowledge_outbox(item.outbox_id)
+                    published += 1
+                except Exception as exc:
+                    self._dispatch_failures += 1
+                    error_type = type(exc).__name__
+                    break
 
-        remaining = self.operations.pending_outbox_count(
-            operation_id=operation_id,
-        )
-        report = OutboxDispatchReport(
-            attempted=len(pending),
-            published=published,
-            remaining=remaining,
-            error_type=error_type,
-        )
-        self._last_dispatch = report
-        return report
+            remaining = self.operations.pending_outbox_count(
+                operation_id=operation_id,
+            )
+            report = OutboxDispatchReport(
+                attempted=len(pending),
+                published=published,
+                remaining=remaining,
+                error_type=error_type,
+            )
+            self._last_dispatch = report
+            return report
 
     def _dispatch_after_commit(self, operation_id: str) -> None:
         self.dispatch_outbox(operation_id=operation_id)

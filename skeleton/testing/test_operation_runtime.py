@@ -396,3 +396,84 @@ def test_stop_dispatcher_is_idempotent_and_flushes_pending_rows(
     assert again is not None
     assert again.remaining == 0
     runtime.close()
+
+
+
+def test_outbox_drain_serializes_background_and_foreground_publication(tmp_path: Path):
+    """Two simultaneous drains may not both append one pending event."""
+    from threading import Event, Thread
+
+    class PausingStream:
+        def __init__(self, inner):
+            self.inner = inner
+            self.entered = Event()
+            self.release = Event()
+            self.append_calls = 0
+
+        def append(self, *args, **kwargs):
+            self.append_calls += 1
+            self.entered.set()
+            assert self.release.wait(3), "test stream held beyond deadline"
+            return self.inner.append(*args, **kwargs)
+
+    store = SQLiteOperationStore(tmp_path / "operations.sqlite")
+    inner = SQLiteOperationEventStore(tmp_path / "events.sqlite")
+    pausing = PausingStream(inner)
+    runtime = DurableOperationRuntime(_Reasoner(), store, pausing)
+    now = datetime.now(timezone.utc)
+    operation_id = str(uuid4())
+    store.create(OperationEnvelope(
+        operation_id=operation_id, tenant_id="tenant-a", actor_id="actor-a",
+        capability="intelligence.reason",
+        created_at=now, deadline=now + timedelta(minutes=1),
+        idempotency_key="one-dispatch-only", trace_id="trace-drain-race",
+    ), now=now)
+
+    reports = []
+    errors = []
+
+    def drain():
+        try:
+            reports.append(runtime.dispatch_outbox(operation_id=operation_id))
+        except Exception as exc:
+            errors.append(exc)
+
+    first = Thread(target=drain)
+    second = Thread(target=drain)
+    first.start()
+    try:
+        assert pausing.entered.wait(2), "foreground dispatcher did not begin"
+        second.start()
+    finally:
+        pausing.release.set()
+        first.join(timeout=4)
+        if second.ident is not None:
+            second.join(timeout=4)
+    assert not first.is_alive() and not second.is_alive()
+    assert not errors
+    assert pausing.append_calls == 1
+    assert sum(row.published for row in reports) == 1
+    assert store.pending_outbox() == ()
+    assert len(inner.replay(ReplayCursor(operation_id))) == 1
+    store.close()
+    inner.close()
+
+
+@pytest.mark.parametrize("invalid", (True, -1, 0, 4097, 1.2, "100"))
+def test_drain_limit_refuses_unsafe_or_unbounded_values(tmp_path: Path, invalid):
+    runtime = _runtime(tmp_path)
+    with pytest.raises(ValueError, match="between 1 and 4096"):
+        runtime.dispatch_outbox(limit=invalid)
+    runtime.close()
+
+
+@pytest.mark.parametrize("invalid", (0, -1, 4097))
+def test_dispatcher_configuration_rejects_excessive_batch(tmp_path: Path, invalid):
+    operations = SQLiteOperationStore(tmp_path / "operations.sqlite")
+    events = SQLiteOperationEventStore(tmp_path / "events.sqlite")
+    with pytest.raises(ValueError, match="between 1 and 4096"):
+        DurableOperationRuntime(
+            _Reasoner(), operations, events, outbox_batch_size=invalid,
+        )
+    operations.close()
+    events.close()
