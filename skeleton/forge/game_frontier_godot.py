@@ -60,6 +60,8 @@ var _approved_gameplay_flags: Dictionary = {}
 var _approved_gameplay_inventory: Dictionary = {}
 var _approved_gameplay_npc_emotions: Dictionary = {}
 var _approved_gameplay_cues: Array = []
+var _approved_quest_objectives: Dictionary = {}
+var _approved_quest_titles: Dictionary = {}
 var _approved_gameplay_label: Label
 
 func _vec(data: Array) -> Vector3:
@@ -612,6 +614,8 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         return
     var quest_edges: Dictionary = bundle.get("quest_edges", {})
     var quest_starts: Dictionary = bundle.get("quest_start_stages", {})
+    var quest_objectives: Dictionary = bundle.get("quest_objectives", {})
+    var quest_titles: Dictionary = bundle.get("quest_titles", {})
     var next_flags: Dictionary = bundle["initial_flags"].duplicate(true)
     var next_quests: Dictionary = {}
     var next_cues: Array = []
@@ -719,11 +723,20 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})):
         push_error("Engine RPG reducer diverged from independently replayed state")
         return
+    for quest_id in next_quests.keys():
+        var progress: Dictionary = next_quests[quest_id]
+        if (not quest_objectives.has(quest_id)
+            or not quest_titles.has(quest_id)
+            or not quest_objectives[quest_id].has(progress["stage"])):
+            push_error("Approved quest stage has no source-authored objective")
+            return
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
     _approved_gameplay_inventory = next_inventory
     _approved_gameplay_npc_emotions = next_npc_emotions
     _approved_gameplay_cues = next_cues
+    _approved_quest_objectives = quest_objectives
+    _approved_quest_titles = quest_titles
     # One atomic document recording the actual Godot dispatch outcome.
     # Canonical GDD and native physics frame evidence are never rewritten.
     var accepted := {
@@ -764,8 +777,10 @@ func _create_approved_gameplay_inspector(record: Dictionary) -> void:
     ]
     for id in _approved_gameplay_quests.keys():
         var state: Dictionary = _approved_gameplay_quests[id]
-        content.append(str(id) + " : " + str(state["stage"]) +
+        content.append(str(_approved_quest_titles[id]) + " : " + str(state["stage"]) +
             (" (completed)" if bool(state["completed"]) else " (in progress)"))
+        content.append("Objective: " +
+            str(_approved_quest_objectives[id][state["stage"]]))
     for item in _approved_gameplay_inventory.keys():
         content.append("Inventory: " + str(item) + " x" + str(_approved_gameplay_inventory[item]))
     for actor in _approved_gameplay_npc_emotions.keys():

@@ -29,6 +29,9 @@ class NativeEngineDispatchTests(NativeQuestBatchTests):
         self.assertEqual(data["expected_flags"]["door_open"],True)
         self.assertEqual(data["expected_inventory"],{})
         self.assertEqual(data["expected_npc_emotions"],{})
+        self.assertEqual(data["quest_titles"]["chapter_1"],"The Wind Islands")
+        self.assertEqual(data["quest_objectives"]["chapter_1"]["ending"],"Finish the route")
+        self.assertEqual(data["quest_objectives"]["chapter_1"]["start"],"Watch the fall")
         self.assertEqual(data["quest_edges"]["chapter_1"]["start"],
                          ["middle","alternate"])
         self.assertEqual(len(dispatch_file_sha256(data)),64)
