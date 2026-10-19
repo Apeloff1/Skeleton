@@ -148,11 +148,13 @@ def _builtin_checks(files: Mapping[str, str], *, external_checker: bool) -> tupl
         extension = PurePosixPath(path).suffix.lower()
         if extension in _PYTHON:
             try:
-                ast.parse(source, filename=path)
-            except SyntaxError as exc:
+                # Compiling without executing also rejects top-level return,
+                # nonlocal misuse and other errors AST parsing can admit.
+                compile(source, path, "exec", dont_inherit=True)
+            except (SyntaxError, ValueError) as exc:
                 findings.append(CodeFinding(
-                    path, max(1, exc.lineno or 1), "syntax", "PY_SYNTAX",
-                    str(exc.msg)[:256], "python-ast",
+                    path, max(1, getattr(exc, "lineno", None) or 1), "syntax", "PY_SYNTAX",
+                    str(getattr(exc, "msg", str(exc)))[:256], "python-compiler",
                 ))
         elif extension in _JSON:
             try:
