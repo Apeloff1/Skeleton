@@ -149,6 +149,24 @@ class FrameChunkEvidenceTests(unittest.TestCase):
             build_frame_chunk_receipts(newer,self.gdd,previous=old,
                                        previous_evidence=forged_row)
 
+    def test_reshashed_prior_evidence_with_wrong_source_ids_is_rejected(self):
+        from skeleton.jeeves.game_frontier_chunk_evidence import _hash
+        old=advance_frame(frame_index=0,fps=60,gdd=self.gdd,objects=entity())
+        previous_proof=build_frame_chunk_receipts(old,self.gdd)
+        later=advance_frame(frame_index=1,fps=60,gdd=self.gdd,
+                            previous=old,objects=entity(32.05))
+        replaced=dict(previous_proof)
+        rows=[dict(x) for x in previous_proof["receipts"]]
+        rows[0]["source_entities"]=["forged-hero"]
+        rows[0]["receipt_digest"]=_hash({
+            k:v for k,v in rows[0].items() if k!="receipt_digest"})
+        replaced["receipts"]=rows
+        replaced["receipt_digest"]=_hash({
+            k:v for k,v in replaced.items() if k!="receipt_digest"})
+        with self.assertRaises(ChunkEvidenceError):
+            build_frame_chunk_receipts(later,self.gdd,previous=old,
+                                       previous_evidence=replaced)
+
     def test_tampering_pseudoproof_boolean_hash_or_gdd_detected(self):
         old=advance_frame(frame_index=0,fps=60,gdd=self.gdd,objects=entity())
         proof=build_frame_chunk_receipts(old,self.gdd)
