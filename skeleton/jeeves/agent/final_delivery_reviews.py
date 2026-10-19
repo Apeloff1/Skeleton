@@ -32,6 +32,23 @@ class FinalReviewError(ValueError):
     """The submitted artifact does not satisfy its release requirements."""
 
 
+def quality_source_continuity_failure(
+    reviewed: Mapping[str, str],
+    current: Mapping[str, str],
+    audited: Mapping[str, str],
+) -> str | None:
+    """Prevent source-reader TOCTOU from laundering an old quality receipt.
+
+    Final originality review may include new delivery artifacts, but every
+    quality-reviewed artifact must still have its audited source bytes.
+    """
+    if dict(current) != dict(audited):
+        return "quality-reviewed sources changed before final review"
+    if any(reviewed.get(path) != content for path, content in audited.items()):
+        return "final review omitted or changed a quality-reviewed artifact"
+    return None
+
+
 _CREATIVE_INTENT = re.compile(
     r"\b(?:write|draft|create|generate|compose|develop|rewrite|revise|"
     r"produce|design)\b", re.I,
