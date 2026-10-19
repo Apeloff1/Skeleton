@@ -49,6 +49,7 @@ func _ready() -> void:
         _create_character(data["geometry"], data["colliders"])
     _create_character_suite_inspector(suite)
     _create_virtual_game_gps(data.get("virtual_game_gps", {}))
+    _create_chunk_evidence_inspector(data.get("chunk_evidence_summary", {}))
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
     _create_camera(data.get("projection", {}), data.get("world_variant", {}))
@@ -152,6 +153,25 @@ func _create_character_suite_inspector(suite: Dictionary) -> void:
             label.text += str(event.get("page", "event")) + ": " + str(event.get("actions", [])) + "\\n"
     panel.add_child(label)
     add_child(panel)
+
+func _create_chunk_evidence_inspector(proof: Dictionary) -> void:
+    if proof.is_empty():
+        return
+    var ledger := CanvasLayer.new()
+    ledger.name = "VerifiedChunkEvidenceInspector"
+    var label := Label.new()
+    label.name = "ChunkEvidenceReadout"
+    label.position = Vector2(20, 420)
+    label.text = "CHUNK EVIDENCE (SOURCE ONLY; NOT GPU PROOF)\\n"
+    label.text += "Frame receipts: " + str(proof.get("frame_chunk_count", 0)) + "\\n"
+    label.text += "Retired chunks: " + str(proof.get("retired_chunk_count", 0)) + "\\n"
+    label.text += "Actor migrations: " + str(proof.get("cross_chunk_migrations", 0)) + "\\n"
+    label.text += "GDD note receipts: " + str(proof.get("gdd_note_count", 0)) + "\\n"
+    label.text += "A/B verified: " + str(proof.get("verifier_a", false)) + " / " + str(proof.get("verifier_b", false)) + "\\n"
+    label.text += "Proof root: " + str(proof.get("receipt_digest", "")).substr(0, 24) + "…\\n"
+    label.text += "Era mesh bundles: " + str(proof.get("era_mesh_receipts", 0)) + "\\n"
+    ledger.add_child(label)
+    add_child(ledger)
 
 func _create_virtual_game_gps(nav: Dictionary) -> void:
     if nav.is_empty():
@@ -568,6 +588,25 @@ def emit_frontier_godot_overlay(
         "realism_audit": manifest.get("realism_audit") or {},
         "character_suite": manifest.get("character_suite") or {},
         "virtual_game_gps": manifest.get("virtual_game_gps") or {},
+        "chunk_evidence_summary": ({
+            "frame_chunk_count": (manifest["frame_chunk_evidence"]["chunk_count"]
+                if manifest.get("frame_chunk_evidence") else 0),
+            "retired_chunk_count": (manifest["frame_chunk_evidence"]["retired_chunk_count"]
+                if manifest.get("frame_chunk_evidence") else 0),
+            "cross_chunk_migrations": (manifest["frame_chunk_evidence"]["cross_chunk_migrations"]
+                if manifest.get("frame_chunk_evidence") else 0),
+            "gdd_note_count": (manifest["frame_chunk_evidence"]["source_note_count"]
+                if manifest.get("frame_chunk_evidence") else 0),
+            "receipt_digest": (manifest["frame_chunk_evidence"]["receipt_digest"]
+                if manifest.get("frame_chunk_evidence") else ""),
+            "verifier_a": (manifest["frame_chunk_evidence"]["verifier_a"]
+                if manifest.get("frame_chunk_evidence") else False),
+            "verifier_b": (manifest["frame_chunk_evidence"]["verifier_b"]
+                if manifest.get("frame_chunk_evidence") else False),
+            "era_mesh_receipts": len(manifest.get("mesh_chunk_evidence") or []),
+        } if manifest.get("frame_chunk_evidence") or manifest.get("mesh_chunk_evidence")
+          else {}),
+
         "geometry": {
             "vertices": [[v.x, v.y, v.z] for v in vertices],
             "triangles": [list(face) for face in triangles],
