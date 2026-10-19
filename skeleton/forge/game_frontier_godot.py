@@ -69,25 +69,42 @@ func _create_elastic_body_skin(info: Dictionary, geometry: Dictionary) -> void:
         push_error("ElasticBodySkin3D missing mesh topology")
         return
     var pins: Array = info.get("pinned_vertices", [])
-    var pinned_occurrences := PackedInt32Array()
-    var builder := SurfaceTool.new()
-    builder.begin(Mesh.PRIMITIVE_TRIANGLES)
-    var vertex_number := 0
+    # Preserve indexed adjacency in ArrayMesh. A non-indexed SurfaceTool
+    # triangle soup breaks shared soft-body edges and produces disconnected
+    # pieces under native simulation.
+    var vertices := PackedVector3Array()
+    for point in points:
+        vertices.append(_vec(point))
+    var normal_accum: Array[Vector3] = []
+    normal_accum.resize(vertices.size())
+    normal_accum.fill(Vector3.ZERO)
+    var indices := PackedInt32Array()
     for face in triangles:
-        for source_index in face:
-            var idx := int(source_index)
-            if idx < 0 or idx >= points.size():
-                push_error("ElasticBodySkin3D invalid mesh index")
-                return
-            builder.add_vertex(_vec(points[idx]))
-            if pins.has(idx):
-                pinned_occurrences.append(vertex_number)
-            vertex_number += 1
-    builder.generate_normals()
-    var native_mesh := builder.commit()
-    if native_mesh == null:
-        push_error("ElasticBodySkin3D mesh materialisation failed")
-        return
+        if face.size() != 3:
+            push_error("ElasticBodySkin3D non-triangle face")
+            return
+        var ia := int(face[0])
+        var ib := int(face[1])
+        var ic := int(face[2])
+        if min(ia, min(ib, ic)) < 0 or max(ia, max(ib, ic)) >= points.size():
+            push_error("ElasticBodySkin3D invalid mesh index")
+            return
+        indices.append_array(PackedInt32Array([ia, ib, ic]))
+        var face_normal := (vertices[ib] - vertices[ia]).cross(
+            vertices[ic] - vertices[ia])
+        normal_accum[ia] += face_normal
+        normal_accum[ib] += face_normal
+        normal_accum[ic] += face_normal
+    var normals := PackedVector3Array()
+    for normal in normal_accum:
+        normals.append(normal.normalized() if normal.length() > .00001 else Vector3.UP)
+    var arrays: Array = []
+    arrays.resize(Mesh.ARRAY_MAX)
+    arrays[Mesh.ARRAY_VERTEX] = vertices
+    arrays[Mesh.ARRAY_NORMAL] = normals
+    arrays[Mesh.ARRAY_INDEX] = indices
+    var native_mesh := ArrayMesh.new()
+    native_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
     var soft := SoftBody3D.new()
     soft.name = "ElasticBodySkin3D"
     soft.mesh = native_mesh
@@ -97,7 +114,7 @@ func _create_elastic_body_skin(info: Dictionary, geometry: Dictionary) -> void:
     soft.simulation_precision = 8
     soft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
     add_child(soft)
-    for point_index in pinned_occurrences:
+    for point_index in pins:
         soft.set_point_pinned(int(point_index), true)
 
 func _create_character_suite_inspector(suite: Dictionary) -> void:
