@@ -200,5 +200,81 @@ class FrameVerificationTests(unittest.TestCase):
             ai_design_context(anchor,(zero,replace(one,previous_digest="0"*64)))
 
 
+
+class SceneAndStudioIntegrationTests(unittest.TestCase):
+    def test_permissioned_live_survey_and_gdd_frames_enter_scene_redacted(self):
+        from tests.test_game_frontier_advanced_scene import scene_params
+        from skeleton.jeeves.game_frontier import compile_frontier_scene
+        import json
+        source=bind_signed_gdd(gdd())
+        result=compile_frontier_scene(**scene_params(),
+            gps_fix=fix(),gps_consent=grant(),gps_now_ms=5000,
+            survey_controls=SurveyTests().stations()[0],
+            survey_sightings=SurveyTests().stations()[1],
+            frame_gdd=source,frame_index=0,frame_objects=objects(),
+        )
+        scene=result.manifest
+        self.assertTrue(scene["position_fix"]["coordinates_redacted"])
+        self.assertTrue(scene["position_fix"]["coherence"]["consistent"])
+        self.assertTrue(scene["frame_progress"]["double_verified"])
+        self.assertEqual(scene["frame_progress"]["chunk_count"],2)
+        self.assertFalse(result.approved_for_runtime)
+        json_location=json.dumps(scene["position_fix"])
+        self.assertNotIn("latitude_deg",json_location)
+        self.assertNotIn("longitude_deg",json_location)
+        self.assertNotIn('"altitude_m"',json_location)
+
+    def test_scene_rejects_unsigned_gdd_and_missing_location_permission(self):
+        from tests.test_game_frontier_advanced_scene import scene_params
+        from skeleton.jeeves.game_frontier import compile_frontier_scene
+        with self.assertRaises(ValueError):
+            compile_frontier_scene(**scene_params(),gps_fix=fix())
+        with self.assertRaises(ValueError):
+            compile_frontier_scene(**scene_params(),frame_index=0,
+                                   frame_objects=objects())
+
+    def test_studio_progress_uses_actual_prefabs_and_signed_gdd_ai_notes(self):
+        from skeleton.forge.game_frontier_studio import (
+            StudioProject,StudioPrefab,StudioPlacement,MapLayer,
+            compile_studio_frame,
+        )
+        from skeleton.jeeves.game_frontier_worlds import ProjectionMode,WorldFamily
+        project=StudioProject("frontier","modern",
+            ProjectionMode.DEPTH_29,WorldFamily.CELESTIAL,
+            (MapLayer("floor",1,1,("grass",),(0,)),),
+            prefabs=(StudioPrefab("hero","character","modern","a"*64),),
+            placements=(StudioPlacement("hero",0,0,1),))
+        zero=compile_studio_frame(project,gdd(),frame_index=0,fps=60,
+            entity_velocities={"hero:0":(6.,0.,0.)})
+        next_project=replace(project,placements=(StudioPlacement("hero",.1,0,1),))
+        one=compile_studio_frame(
+            next_project,gdd(),frame_index=1,fps=60,
+            preceding_frames=(zero["record"],),
+            entity_velocities={"hero:0":(6.,0.,0.)},
+            notes=(GDDFrameNote(1,"design_context",
+               "Climbing through the gust requires slower motion."),))
+        self.assertTrue(one["verified_a"] and one["verified_b"])
+        self.assertEqual(one["note_count"],1)
+        self.assertEqual(one["gdd_ai_context"]["notes"][0]["source_world_law_index"],1)
+        self.assertEqual(one["gdd_ai_context"]["authority"],
+                         "proposed_ai_context_not_signed_gdd")
+        self.assertEqual(one["authority"],"studio_preview_proposed_not_engine_mutated")
+
+    def test_studio_refuses_cross_project_gdd(self):
+        from skeleton.forge.game_frontier_studio import (
+            StudioProject,StudioPrefab,StudioPlacement,MapLayer,
+            compile_studio_frame,StudioError,
+        )
+        from skeleton.jeeves.game_frontier_worlds import ProjectionMode,WorldFamily
+        project=StudioProject("other","modern",
+            ProjectionMode.DEPTH_29,WorldFamily.CELESTIAL,
+            (MapLayer("floor",1,1,("grass",),(0,)),),
+            prefabs=(StudioPrefab("hero","character","modern","a"*64),),
+            placements=(StudioPlacement("hero",0,0,1),))
+        with self.assertRaises(StudioError):
+            compile_studio_frame(project,gdd(),frame_index=0,fps=60)
+
+
+
 if __name__=="__main__":
     unittest.main()
