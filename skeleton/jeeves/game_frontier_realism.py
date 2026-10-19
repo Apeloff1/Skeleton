@@ -61,6 +61,7 @@ _DOMAINS = (
     "environment", "structures", "biome", "audio", "chunks",
     "balance", "elastic_skin", "instruments", "rpg_events",
     "position_fix", "gdd_frame", "virtual_game_gps",
+    "frame_chunk_evidence", "mesh_chunk_evidence",
 )
 
 
@@ -429,6 +430,70 @@ def audit_scene_realism(manifest: Mapping) -> RealismAudit:
               "suggested_context_only_signed_gdd_unchanged",
               "signed_story_bible_no_ai_auto_promotion")
 
+    # The source chunk builders already check A/B against the source mesh/
+    # FrameReceipt. This observer checks exported receipts and links, but
+    # does not pretend manifest-only hashes prove native geometry rendering.
+    from .game_frontier_chunk_evidence import _hash as chunk_hash
+    def sealed_chunk_record(item: object) -> bool:
+        return (isinstance(item,Mapping) and
+                type(item.get("receipt_digest")) is str and
+                item.get("receipt_digest")==chunk_hash(
+                    {k:v for k,v in item.items() if k!="receipt_digest"}))
+    frame_proof=manifest.get("frame_chunk_evidence")
+    if isinstance(frame_proof,Mapping):
+        count=measurement("frame_chunk_evidence","receipt_count",
+                          frame_proof["chunk_count"],"chunks")
+        receipts=frame_proof.get("receipts",[])
+        source=manifest.get("frame_progress")
+        valid_source=(isinstance(source,Mapping) and
+            frame_proof.get("source_frame_digest")==source.get("receipt_digest") and
+            frame_proof.get("signed_gdd_digest")==source.get("gdd_digest") and
+            frame_proof.get("frame_index")==source.get("frame_index") and
+            frame_proof.get("previous_frame_digest")==source.get("previous_receipt_digest"))
+        check("frame_chunk_evidence","source_and_GDD_link",
+              valid_source,"canonical_frame_receipt_signed_GDD")
+        check("frame_chunk_evidence","evidence_hash_chain",
+              sealed_chunk_record(frame_proof) and
+              len(receipts)==count and
+              frame_proof.get("verifier_a") is True and
+              frame_proof.get("verifier_b") is True and
+              all(sealed_chunk_record(r) and
+                  r.get("verifier_a",{}).get("passed") is True and
+                  r.get("verifier_b",{}).get("passed") is True and
+                  r.get("signed_gdd_digest")==frame_proof.get("signed_gdd_digest")
+                  for r in receipts),
+              "recomputed_per_chunk_receipt_hashes")
+        measurement("frame_chunk_evidence","migrations",
+                    frame_proof.get("cross_chunk_migrations",0),"actors")
+        check("frame_chunk_evidence","complete_entity_coverage",
+              sum(r.get("object_count",0) for r in receipts)==
+                  frame_proof.get("object_count") and
+              len({entity for r in receipts
+                   for entity in r.get("source_entities",[])})==
+                  frame_proof.get("object_count"),
+              "exactly_once_frame_entity_partition")
+    mesh_proofs=manifest.get("mesh_chunk_evidence")
+    if isinstance(mesh_proofs,list) and mesh_proofs:
+        for i,bundle in enumerate(mesh_proofs):
+            count=measurement("mesh_chunk_evidence",f"mesh_chunk_count_{i}",
+                              bundle["chunk_count"],"chunks")
+            receipts=bundle.get("receipts",[])
+            check("mesh_chunk_evidence",f"mesh_bundle_{i}_receipts",
+                  sealed_chunk_record(bundle) and
+                  len(receipts)==count and
+                  bundle.get("coverage_exactly_once") is True and
+                  bundle.get("verifier_a") is True and
+                  bundle.get("verifier_b") is True and
+                  sum(r.get("face_count",0) for r in receipts)==
+                     bundle.get("source_triangle_count") and
+                  len({face for r in receipts
+                       for face in r.get("source_face_ids",[])})==
+                     bundle.get("source_triangle_count") and
+                  all(sealed_chunk_record(r) and
+                      r.get("verifier_a",{}).get("passed") is True and
+                      r.get("verifier_b",{}).get("passed") is True
+                      for r in receipts),
+                  "source_mesh_exact_face_coverage")
     payload = {
         "measurements": [m.__dict__ for m in readings],
         "invariants": [i.__dict__ for i in checks],
