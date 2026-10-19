@@ -46,6 +46,7 @@ def build_smoke_project(out:Path, *, fps:int=60, frames:int=20) -> dict:
         native_capture_all_actors=True,native_capture_max_frames=frames,
         enable_native_reference_controls=True,
         native_reference_test_drive_ticks=min(frames-1,12),
+        native_camera_follow=True,
         native_gameplay_zones=({
             "id":"spawn_marker", "actor_id":"hero",
             "center_xyz_m":list(candidate.manifest["advanced_physics"]["body"]["position_xyz"]),

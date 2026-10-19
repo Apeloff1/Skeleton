@@ -46,6 +46,11 @@ var _native_max_horizontal_speed_mps: float = 8.0
 var _native_jump_impulse_ns: float = 120.0
 var _native_gameplay_zones: Array = []
 var _native_previous_zone_members: Array = []
+var _native_preview_label: Label
+var _native_recent_zone_events: Array[String] = []
+var _native_follow_cam: bool = false
+var _native_camera: Camera3D
+var _native_debug_speed: float = 1.0
 
 func _vec(data: Array) -> Vector3:
     return Vector3(float(data[0]), float(data[2]), -float(data[1]))
@@ -260,6 +265,7 @@ func _create_camera(spec: Dictionary, variant: Dictionary) -> void:
         add_child(camera)
         camera.look_at(Vector3(0, 1, 0))
     camera.current = true
+    _native_camera = camera
 
 func _create_lighting(variant: Dictionary, ray_samples: Array, air: Dictionary) -> void:
     var sunlight := DirectionalLight3D.new()
@@ -490,6 +496,7 @@ func _configure_native_capture(settings: Dictionary) -> void:
     _aero_character.max_contacts_reported = 8
     var control: Dictionary = settings.get("reference_controls", {})
     if bool(control.get("enabled", false)):
+        _native_follow_cam = bool(control.get("camera_follow", false))
         _native_move_force_n = float(control.get("move_force_n", 240.0))
         _native_max_horizontal_speed_mps = float(control.get("max_speed_mps", 8.0))
         _native_jump_impulse_ns = float(control.get("jump_impulse_ns", 120.0))
@@ -502,6 +509,8 @@ func _configure_native_capture(settings: Dictionary) -> void:
             return
         _native_controls_enabled = true
     _native_gameplay_zones = settings.get("gameplay_zones", [])
+    if not _native_gameplay_zones.is_empty():
+        _create_native_playtest_inspector()
     for zone_item in _native_gameplay_zones:
         var zone: Dictionary = zone_item
         # Real Godot Area3D preview and collision volume. Gameplay receipts
@@ -540,6 +549,18 @@ func _native_chunk_less(a: Dictionary, b: Dictionary) -> bool:
     if int(first[0]) != int(second[0]):
         return int(first[0]) < int(second[0])
     return int(first[1]) < int(second[1])
+
+func _create_native_playtest_inspector() -> void:
+    var overlay := CanvasLayer.new()
+    overlay.name = "NativeGameplayEventInspector"
+    var text_label := Label.new()
+    text_label.name = "LiveGameplayProposals"
+    text_label.position = Vector2(20, 530)
+    text_label.add_theme_color_override("font_color", Color(0.74, 0.98, 0.84))
+    text_label.text = "Godot gameplay preview | pending physics capture"
+    overlay.add_child(text_label)
+    add_child(overlay)
+    _native_preview_label = text_label
 
 func _native_zone_event(member: Dictionary, transition: String) -> Dictionary:
     for zone_item in _native_gameplay_zones:
@@ -675,6 +696,24 @@ func _record_native_physics() -> void:
         row["native_zone_occupancy"] = occupants
         row["native_zone_events"] = changes
         _native_previous_zone_members = occupants.duplicate(true)
+        for event_item in changes:
+            var ev: Dictionary = event_item
+            _native_recent_zone_events.append(str(ev["transition"]) +
+                " / " + str(ev["event_page_id"]) + " / " + str(ev["action_kind"]))
+        while _native_recent_zone_events.size() > 5:
+            _native_recent_zone_events.pop_front()
+        if _native_preview_label != null:
+            var lines: Array[String] = [
+                "Godot RPG game zones | candidate actions, not canon",
+                "Tick " + str(_native_capture_tick) + "  |  " +
+                    str(Engine.physics_ticks_per_second) + " Hz fixed solver",
+                "Zones " + str(_native_gameplay_zones.size()) +
+                    " | occupants " + str(occupants.size()) +
+                    " | preview speed x" + str(_native_debug_speed),
+                "P pause/resume | - slower | = faster",
+            ]
+            lines.append_array(_native_recent_zone_events)
+            _native_preview_label.text = "\n".join(lines)
     _native_capture_file.store_line(JSON.stringify(row))
     _native_capture_file.flush()
     _native_capture_tick += 1
@@ -715,6 +754,22 @@ func _apply_reference_controls() -> void:
         "jump_impulse_ns": _native_jump_impulse_ns if jumped else 0.0,
         "bounded_reference_controller_not_NPC_AI": true,
     }
+
+func _unhandled_key_input(event: InputEvent) -> void:
+    if not _native_controls_enabled or not (event is InputEventKey):
+        return
+    var key := event as InputEventKey
+    if not key.pressed or key.echo:
+        return
+    if key.physical_keycode == KEY_P:
+        _native_debug_speed = 1.0 if _native_debug_speed == 0.0 else 0.0
+        Engine.time_scale = _native_debug_speed
+    elif key.physical_keycode == KEY_MINUS:
+        _native_debug_speed = maxf(.25, _native_debug_speed * .5)
+        Engine.time_scale = _native_debug_speed
+    elif key.physical_keycode == KEY_EQUAL:
+        _native_debug_speed = minf(4.,maxf(.25,_native_debug_speed) * 2.)
+        Engine.time_scale = _native_debug_speed
 
 func _physics_process(delta: float) -> void:
     if _aero_character == null or delta < 0:
@@ -826,6 +881,11 @@ func _process(delta: float) -> void:
         return
     _cloud_elapsed += min(delta, 0.25)
     _update_clouds()
+    if _native_follow_cam and _native_camera != null and _aero_character != null:
+        var avatar: Vector3 = _aero_character.global_position
+        _native_camera.global_position = _native_camera.global_position.lerp(
+            avatar + Vector3(9, 6, 16),minf(1.0,delta * 3.5))
+        _native_camera.look_at(avatar + Vector3(0, 1, 0))
 '''
 
 
@@ -840,6 +900,7 @@ def emit_frontier_godot_overlay(
     enable_native_reference_controls: bool = False,
     native_reference_test_drive_ticks: int = 0,
     native_gameplay_zones: tuple[Mapping, ...] = (),
+    native_camera_follow: bool = False,
 ) -> dict[str, str]:
     """Emit a Godot scene + fixed GDScript + snapshot and wind path JSON.
 
@@ -870,6 +931,9 @@ def emit_frontier_godot_overlay(
     )
     if native_gameplay_zones and not enable_native_capture:
         raise FrontierGodotError("gameplay zones require opt-in native capture")
+    if type(native_camera_follow) is not bool or (
+        native_camera_follow and not enable_native_reference_controls):
+        raise FrontierGodotError("native camera follow requires explicit reference controls")
     manifest = candidate.manifest
     actual = sha256(json.dumps(manifest, sort_keys=True,
                                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
@@ -984,6 +1048,7 @@ def emit_frontier_godot_overlay(
                 "move_force_n": 240., "max_speed_mps": 8.,
                 "jump_impulse_ns": 120.,
                 "headless_fixture_ticks": native_reference_test_drive_ticks,
+                "camera_follow": native_camera_follow,
             },
             "candidate_digest": candidate.manifest_digest,
             "gdd_digest": frame["gdd_digest"], "fps": frame["fps"],
@@ -1074,6 +1139,7 @@ def attach_frontier_overlay(
     enable_native_reference_controls: bool = False,
     native_reference_test_drive_ticks: int = 0,
     native_gameplay_zones: tuple[Mapping, ...] = (),
+    native_camera_follow: bool = False,
 ) -> dict[str, str]:
     """Safely attach an emitted reference scene to an existing Forge Godot project.
 
@@ -1101,6 +1167,7 @@ def attach_frontier_overlay(
         enable_native_reference_controls=enable_native_reference_controls,
         native_reference_test_drive_ticks=native_reference_test_drive_ticks,
         native_gameplay_zones=native_gameplay_zones,
+        native_camera_follow=native_camera_follow,
     )
     conflicts = tuple(sorted(set(project_files).intersection(overlay)))
     if any(project_files[key] != overlay[key] for key in conflicts):

@@ -101,3 +101,19 @@ if __name__=="__main__":
         self.assertIn('Input.get_vector("ui_left", "ui_right"',script)
         self.assertIn("apply_central_impulse",script)
         self.assertIn("bounded_reference_controller_not_NPC_AI",script)
+
+    def test_native_overlay_live_event_inspector_camera_and_speed_controls(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as root:
+            folder=Path(root)
+            build_smoke_project(folder,fps=60,frames=20)
+            scene=json.loads((folder/"frontier/data/scene.json").read_text())
+            self.assertTrue(scene["native_capture"]["reference_controls"]["camera_follow"])
+            source=(folder/"frontier/frontier_scene.gd").read_text()
+            for expected in ("NativeGameplayEventInspector",
+                             "_native_recent_zone_events", "KEY_P",
+                             "KEY_MINUS", "KEY_EQUAL", "Engine.time_scale",
+                             "_native_camera.global_position.lerp"):
+                self.assertIn(expected,source)
